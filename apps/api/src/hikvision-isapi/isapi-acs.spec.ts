@@ -10,10 +10,24 @@ import type { HikvisionIsapiClient } from './isapi.client';
 import type { XmlValue } from './xml';
 
 describe('isapi-acs helpers', () => {
-  it('describeAcsEvent labels common major/minor', () => {
-    expect(describeAcsEvent({ major: 5, minor: 75 })).toBe('Acceso concedido');
-    expect(describeAcsEvent({ major: 5, minor: 38 })).toBe('Acceso denegado');
-    expect(describeAcsEvent({ major: 1, minor: 3 } as IsapiAcsEvent)).toMatch(/Alarma/);
+  it('describeAcsEvent etiqueta desde el catálogo, no desde una tabla propia', () => {
+    // Esta función tenía su propia tabla — la quinta copia del mismo mapa, con
+    // los mismos dos errores: el 21 como «Acceso denegado» cuando es la puerta
+    // abriéndose, y el 22 como «Puerta abierta por botón» cuando es la puerta
+    // cerrándose (el botón es el 23).
+    expect(describeAcsEvent({ major: 5, minor: 75 })).toBe('Acceso concedido · rostro');
+    expect(describeAcsEvent({ major: 5, minor: 1 })).toBe('Acceso concedido · tarjeta');
+    expect(describeAcsEvent({ major: 5, minor: 21 })).toBe('Puerta desbloqueada');
+    expect(describeAcsEvent({ major: 5, minor: 23 })).toBe('Botón de salida pulsado');
+    expect(describeAcsEvent({ major: 1, minor: 3 } as IsapiAcsEvent)).toMatch(/Evento|Alarma/);
+  });
+
+  it('un minor que no está en el Apéndice C no se etiqueta a ojo', () => {
+    // El 38 lo daba por «Acceso denegado» la tabla vieja. No aparece en la
+    // tabla oficial del fabricante ni en los 47.343 eventos de Oficinas, así
+    // que afirmarlo era inventarlo. Se admite como desconocido, con su número
+    // a la vista para poder buscarlo si algún día aparece.
+    expect(describeAcsEvent({ major: 5, minor: 38 })).toContain('38');
   });
 });
 
