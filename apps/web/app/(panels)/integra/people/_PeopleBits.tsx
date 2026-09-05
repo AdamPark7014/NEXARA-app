@@ -10,11 +10,16 @@ import FingerprintRounded from "@mui/icons-material/FingerprintRounded";
 import GridViewRounded from "@mui/icons-material/GridViewRounded";
 import SwapVertRounded from "@mui/icons-material/SwapVertRounded";
 import TableRowsRounded from "@mui/icons-material/TableRowsRounded";
+import { IgBadge } from "../_Console";
+import { PersonFaceThumb } from "../_PersonFace";
 import styles from "./_people.module.css";
 import {
   SORT_OPTIONS,
   describeCredentials,
+  describeValidity,
   flattenDetail,
+  genderLabel,
+  userTypeLabel,
   type CredentialKind,
   type Person,
   type SortKey,
@@ -44,6 +49,56 @@ export function SuspendedFlag() {
       <BlockRounded aria-hidden />
       Suspendida
     </span>
+  );
+}
+
+/* ── Cabecera de la ficha ─────────────────────────────────────────────── */
+
+/**
+ * Foto grande, identidad y estado de un vistazo.
+ *
+ * La cabecera vieja pintaba la vigencia como una etiqueta suelta («Vencida») y
+ * enseñaba el `userType` crudo del terminal (`normal`, `blackList`). Aquí la
+ * vigencia lleva su color y, debajo, **qué implica**: no es lo mismo «caducó
+ * hace tres días» que «está suspendida a mano», y hasta ahora las dos se leían
+ * igual de rojo sin decir cuál era.
+ */
+export function PersonHero({
+  person,
+  bust,
+  children,
+}: {
+  person: Person;
+  /** Cambia tras subir foto para forzar el re-fetch del rostro. */
+  bust?: number;
+  /** Fila extra bajo el estado (identidad ERP, etc.). */
+  children?: ReactNode;
+}) {
+  const v = describeValidity(person);
+  const genero = genderLabel(person.gender);
+  return (
+    <div className={styles.hero}>
+      <PersonFaceThumb
+        className={styles.heroPhoto}
+        size="xl"
+        personId={person.id}
+        personName={person.name}
+        bust={bust}
+      />
+      <div className={styles.heroMain}>
+        <h3 className={styles.heroName}>{person.name}</h3>
+        <p className={styles.heroCode}>{person.code || person.id}</p>
+        <div className={styles.heroBadges}>
+          <ValidityPill info={v} />
+          {person.validEnable === false && <SuspendedFlag />}
+          <IgBadge>{userTypeLabel(person.userType)}</IgBadge>
+          {person.orgName && <IgBadge>{person.orgName}</IgBadge>}
+          {genero && <IgBadge>{genero}</IgBadge>}
+        </div>
+        <p className={styles.heroMeaning}>{v.meaning}</p>
+        {children}
+      </div>
+    </div>
   );
 }
 

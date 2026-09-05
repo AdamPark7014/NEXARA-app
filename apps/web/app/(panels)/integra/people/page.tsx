@@ -1,15 +1,17 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ArrowBackRounded from "@mui/icons-material/ArrowBackRounded";
 import ArrowForwardRounded from "@mui/icons-material/ArrowForwardRounded";
 import BadgeRounded from "@mui/icons-material/BadgeRounded";
 import DeleteForeverRounded from "@mui/icons-material/DeleteForeverRounded";
 import EventBusyRounded from "@mui/icons-material/EventBusyRounded";
+import FilterAltOffRounded from "@mui/icons-material/FilterAltOffRounded";
 import FingerprintRounded from "@mui/icons-material/FingerprintRounded";
 import LinkOffRounded from "@mui/icons-material/LinkOffRounded";
 import LinkRounded from "@mui/icons-material/LinkRounded";
+import NoPhotographyRounded from "@mui/icons-material/NoPhotographyRounded";
 import OpenInNewRounded from "@mui/icons-material/OpenInNewRounded";
 import PersonAddAlt1Rounded from "@mui/icons-material/PersonAddAlt1Rounded";
 import PhotoCameraRounded from "@mui/icons-material/PhotoCameraRounded";
@@ -17,7 +19,6 @@ import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import ScheduleRounded from "@mui/icons-material/ScheduleRounded";
 import SyncRounded from "@mui/icons-material/SyncRounded";
 import {
-  IgBadge,
   IgBtn,
   IgError,
   IgField,
@@ -28,7 +29,8 @@ import {
   IgToolbar,
 } from "../_Console";
 import { getCachedProvider, subscribeProvider } from "../_caps";
-import { PersonFaceThumb, invalidatePersonFaceCache, prefetchPersonFace } from "../_PersonFace";
+import { diagnosticar, pedirIntegra } from "../_fallosApi";
+import { invalidatePersonFaceCache, prefetchPersonFace } from "../_PersonFace";
 import { inputStyle, integraApi, selectStyle } from "../_lib";
 import { toast } from "@/components/Toast";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
@@ -45,39 +47,58 @@ import {
   generateTempPassword,
   type AltaMode,
 } from "../_personIdentity";
-import people$ from "./_people.module.css";
 import {
   ActionGroup,
   CredentialList,
   DetailFacts,
   DetailSkeleton,
   DirectorySkeleton,
-  SuspendedFlag,
-  ValidityPill,
+  PersonHero,
   ViewBar,
 } from "./_PeopleBits";
+import people$ from "./_people.module.css";
 import { PeopleDirectory } from "./_PeopleDirectory";
 import { PersonAccessPanel } from "./_PersonAccessPanel";
 import {
   VALIDITY_FILTER_OPTIONS,
-  credentialScore,
   describeError,
-  describeValidity,
+  doorOptions,
   faceOn,
+  filterPeople,
   formatWhen,
-  genderLabel,
   sortPeople,
-  userTypeLabel,
+  userTypeOptions,
   type Person,
-  type SortKey,
+  type ValidityKey,
 } from "./_peopleView";
-import { usePeopleQuery, type ViewMode } from "./_usePeopleQuery";
+import { usePeopleQuery, type TriFilter } from "./_usePeopleQuery";
 
 type Org = { id: string; name: string; parentId?: string };
 type AcsDev = { id: string; name: string; kind: string; ip?: string | null; deviceType?: string | null };
 type OpResult = { deviceIp: string; ok: boolean; error?: string; attempts?: number };
-type ValidityFilter = "" | "ok" | "warn" | "expired" | "off" | "face" | "noface" | "erp" | "noerp";
 type MutKind = "save" | "photo" | "faceDel" | "delete" | "create" | "fp" | null;
+
+/**
+ * Lo que la pantalla necesita para dar un aviso útil, venga el diagnóstico del
+ * código HTTP (`_fallosApi`) o del texto del mensaje (`_peopleView`).
+ */
+type Aviso = {
+  title: string;
+  hint: string;
+  tone: "warn" | "danger";
+  /** Si reintentar tiene alguna posibilidad; si no, el botón sobra. */
+  retriable: boolean;
+};
+
+/** Las tres formas de dar de alta. Fuera del render para no recrear el array. */
+const ALTA_TABS = [
+  ["unified", "Unificada"],
+  ["link", "Vincular ERP"],
+  ["acs", "Solo ACS"],
+] as const satisfies ReadonlyArray<readonly [AltaMode, string]>;
+
+/** Id del panel que gobiernan las pestañas del alta (`aria-controls`). */
+const ALTA_PANEL_ID = "alta-panel";
 type AltaStep = 1 | 2 | 3 | 4;
 type ErpRole = { id: number; nombre: string };
 type ErpDept = { id: number; nombre: string };
@@ -97,21 +118,6 @@ async function erpApiFetch<T>(path: string, token: string, init?: RequestInit): 
   }
   const text = await res.text();
   return (text ? JSON.parse(text) : null) as T;
-}
-
-function validityOf(p: Person): {
-  key: "ok" | "warn" | "expired" | "off" | "unknown";
-  label: string;
-  tone: "ok" | "warn" | "danger" | "neutral";
-} {
-  if (p.validEnable === false) return { key: "off", label: "Deshabilitada", tone: "danger" };
-  if (!p.validTo) return { key: "unknown", label: "Sin vigencia", tone: "neutral" };
-  const end = Date.parse(p.validTo);
-  if (!Number.isFinite(end)) return { key: "unknown", label: p.validTo, tone: "neutral" };
-  const days = (end - Date.now()) / 86_400_000;
-  if (days < 0) return { key: "expired", label: "Vencida", tone: "danger" };
-  if (days < 30) return { key: "warn", label: "Por vencer", tone: "warn" };
-  return { key: "ok", label: "Vigente", tone: "ok" };
 }
 
 function fileToJpegBase64(file: File): Promise<string> {
@@ -136,24 +142,11 @@ function fileToJpegBase64(file: File): Promise<string> {
   });
 }
 
-function CredChips({ person }: { person: Person }) {
-  const faceOn = (person.numOfFace ?? 0) > 0 || person.hasFace || person.hasLocalFace;
-  return (
-    <div className={styles.personChips}>
-      <span className={styles.personChip} data-on={faceOn ? "1" : undefined}>
-        Face {person.hasLocalFace ? "NEXARA" : person.numOfFace ?? (faceOn ? "·" : "0")}
-      </span>
-      <span className={styles.personChip} data-on={(person.numOfFP ?? 0) > 0 ? "1" : undefined}>
-        Huella {person.numOfFP ?? 0}
-        {person.localFpIds?.length ? ` · ${person.localFpIds.length} dig.` : ""}
-      </span>
-      <span className={styles.personChip} data-on={(person.numOfCard ?? 0) > 0 ? "1" : undefined}>
-        Tarjeta {person.numOfCard ?? 0}
-      </span>
-    </div>
-  );
-}
-
+/**
+ * Estado del enlace ERP ↔ terminales. `faceOn` sale de `_peopleView` para que
+ * el listado, la tabla y la ficha respondan lo mismo a «¿tiene rostro?»: aquí
+ * había una tercera copia del criterio.
+ */
 function IdentityStatusBadges({
   person,
   erp,
@@ -161,7 +154,7 @@ function IdentityStatusBadges({
   person: Person;
   erp: ApiUserRow | null;
 }) {
-  const faceOn = (person.numOfFace ?? 0) > 0 || person.hasFace || person.hasLocalFace;
+  const conRostro = faceOn(person);
   const roleLabel = erp?.role?.nombre || null;
   return (
     <div className={styles.personStatusRow}>
@@ -171,8 +164,8 @@ function IdentityStatusBadges({
       <span className={styles.personStatusChip} data-on="1" data-tone="ok">
         En terminales
       </span>
-      <span className={styles.personStatusChip} data-on={faceOn ? "1" : undefined} data-tone={faceOn ? "ok" : "off"}>
-        {faceOn ? "Foto" : "Sin foto"}
+      <span className={styles.personStatusChip} data-on={conRostro ? "1" : undefined} data-tone={conRostro ? "ok" : "off"}>
+        {conRostro ? "Foto" : "Sin foto"}
       </span>
       <span className={styles.personStatusChip} data-on={roleLabel ? "1" : undefined} data-tone={roleLabel ? "ok" : "off"}>
         {roleLabel ? `Rol · ${roleLabel}` : "Sin rol"}
@@ -229,10 +222,32 @@ function WizardSteps({ step, mode }: { step: AltaStep; mode: AltaMode }) {
   );
 }
 
+/**
+ * `usePeopleQuery` lee `useSearchParams`, y en el App Router eso obliga a una
+ * frontera de Suspense: sin ella el build de producción falla al prerenderizar.
+ */
 export default function IntegraPeoplePage() {
+  return (
+    <Suspense
+      fallback={
+        <IgPage>
+          <IgToolbar title="Personas" meta="Cargando…" />
+          <DirectorySkeleton view="tarjetas" />
+        </IgPage>
+      }
+    >
+      <IntegraPeopleConsole />
+    </Suspense>
+  );
+}
+
+function IntegraPeopleConsole() {
   const router = useRouter();
   const { user: currentUser } = useUser();
   const token = currentUser?.token ?? "";
+  /** Filtros, orden y forma de ver: viven en la URL para poder compartirlos. */
+  const { query, setQuery, resetFilters, activeFilterCount } = usePeopleQuery();
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [erpUsers, setErpUsers] = useState<ApiUserRow[]>([]);
   const [erpRoles, setErpRoles] = useState<ErpRole[]>([]);
@@ -266,10 +281,13 @@ export default function IntegraPeoplePage() {
   const [opOk, setOpOk] = useState<boolean | null>(null);
   const [opResults, setOpResults] = useState<OpResult[] | null>(null);
   const [mutKind, setMutKind] = useState<MutKind>(null);
-  const [orgFilter, setOrgFilter] = useState("");
-  const [validityFilter, setValidityFilter] = useState<ValidityFilter>("");
   const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState("");
+  /**
+   * El fallo de carga tal cual, no su texto. Solo esta ruta pasa por
+   * `pedirIntegra`, que conserva el código HTTP; el resto de operaciones del
+   * módulo guardan la cadena en `error` y se clasifican al pintar.
+   */
+  const [loadFallo, setLoadFallo] = useState<unknown>(null);
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadingPeople, setLoadingPeople] = useState(true);
@@ -281,6 +299,29 @@ export default function IntegraPeoplePage() {
   const mutating = mutKind != null;
 
   useEffect(() => subscribeProvider(setProvider), []);
+
+  /*
+   * El cuadro de búsqueda escribe en la URL, y escribir en la URL vuelve a
+   * renderizar la ruta entera. Sin este retardo cada tecla dispara un
+   * `router.replace` sobre una lista que puede tener cientos de fichas. El ref
+   * guarda el último valor ya sincronizado para distinguir «lo cambió el
+   * usuario aquí» de «llegó por el enlace o por Atrás».
+   */
+  const [qDraft, setQDraft] = useState(query.q);
+  const qSincronizada = useRef(query.q);
+  useEffect(() => {
+    if (query.q === qSincronizada.current) return;
+    qSincronizada.current = query.q;
+    setQDraft(query.q);
+  }, [query.q]);
+  useEffect(() => {
+    if (qDraft === qSincronizada.current) return;
+    const t = setTimeout(() => {
+      qSincronizada.current = qDraft;
+      setQuery({ q: qDraft });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [qDraft, setQuery]);
 
   useEffect(() => {
     if (!selected) return;
@@ -327,13 +368,18 @@ export default function IntegraPeoplePage() {
 
   const load = useCallback(async () => {
     setError(null);
+    setLoadFallo(null);
     setLoadingPeople(true);
     try {
+      // `pedirIntegra` es `integraApi` conservando el `res.status`. En la carga
+      // del directorio es donde más importa: sin el código, «tu rol no llega»
+      // (403) y «el backend está caído» (502) llegan a pantalla como la misma
+      // cadena gris y el operador no sabe a quién llamar.
       const [p, o, d] = await Promise.all([
-        integraApi<{ items: Person[] }>(live ? "integra/people?live=1" : "integra/people"),
-        integraApi<{ items: Org[] }>("integra/orgs").catch(() => ({ items: [] })),
+        pedirIntegra<{ items: Person[] }>(live ? "integra/people?live=1" : "integra/people"),
+        pedirIntegra<{ items: Org[] }>("integra/orgs").catch(() => ({ items: [] })),
         isIsapi
-          ? integraApi<{ items: AcsDev[] }>("integra/devices").catch(() => ({ items: [] }))
+          ? pedirIntegra<{ items: AcsDev[] }>("integra/devices").catch(() => ({ items: [] }))
           : Promise.resolve({ items: [] as AcsDev[] }),
       ]);
       setPeople(p.items);
@@ -356,6 +402,9 @@ export default function IntegraPeoplePage() {
       });
       void Promise.all(workers);
     } catch (e) {
+      // El objeto se guarda entero: lleva el `status` que necesita el
+      // diagnóstico. El texto plano queda para el detalle de depuración.
+      setLoadFallo(e);
       setError(formatApiError(e, "No se pudo cargar Personas"));
     } finally {
       setLoadingPeople(false);
@@ -393,35 +442,42 @@ export default function IntegraPeoplePage() {
     [erpUsers, acsKeySet],
   );
 
-  const filtered = useMemo(
-    () =>
-      people.filter((p) => {
-        if (orgFilter && p.orgId !== orgFilter) return false;
-        const erp = findErpForPerson(p, erpByKey);
-        if (validityFilter === "face") {
-          if (!p.hasFace && !p.hasLocalFace && !(p.numOfFace && p.numOfFace > 0)) return false;
-        } else if (validityFilter === "noface") {
-          if (p.hasFace || p.hasLocalFace || (p.numOfFace && p.numOfFace > 0)) return false;
-        } else if (validityFilter === "erp") {
-          if (!erp) return false;
-        } else if (validityFilter === "noerp") {
-          if (erp) return false;
-        } else if (validityFilter) {
-          if (validityOf(p).key !== validityFilter) return false;
-        }
-        if (!q) return true;
-        const qq = q.toLowerCase();
-        return (
-          p.name.toLowerCase().includes(qq) ||
-          (p.code || "").toLowerCase().includes(qq) ||
-          p.id.toLowerCase().includes(qq) ||
-          (erp?.nombre || "").toLowerCase().includes(qq) ||
-          (erp?.email || "").toLowerCase().includes(qq) ||
-          (erp?.role?.nombre || "").toLowerCase().includes(qq)
-        );
-      }),
-    [people, q, orgFilter, validityFilter, erpByKey],
+  const erpOf = useCallback(
+    (p: Person): ApiUserRow | null => findErpForPerson(p, erpByKey),
+    [erpByKey],
   );
+
+  /**
+   * Filtrar y ordenar son funciones puras de `_peopleView`: la página solo les
+   * pasa lo que dice la URL. Antes el criterio vivía aquí dentro, mezclando en
+   * un mismo desplegable «vigencia» con «tiene rostro» y «está en ERP», que son
+   * tres preguntas distintas y no se podían combinar.
+   */
+  const filtered = useMemo(
+    () => sortPeople(filterPeople(people, query, erpOf), query.orden),
+    [people, query, erpOf],
+  );
+
+  const tiposPresentes = useMemo(() => userTypeOptions(people), [people]);
+  const puertasPresentes = useMemo(() => doorOptions(people), [people]);
+
+  /**
+   * Diagnóstico del último fallo: titular, qué hacer y si reintentar sirve.
+   *
+   * Si el fallo viene de la carga del directorio se diagnostica por código HTTP
+   * (`_fallosApi`), que es exacto. Para el resto —donde el estado ya se perdió
+   * al convertir a texto— se clasifica por el mensaje, que es aproximado pero
+   * mucho mejor que escupir el crudo del servidor.
+   */
+  const errorInfo = useMemo<Aviso | null>(() => {
+    if (loadFallo != null) {
+      const d = diagnosticar(loadFallo, "cargar el directorio de personas");
+      return { title: d.titulo, hint: d.cuerpo, tone: d.tono, retriable: d.reintentable };
+    }
+    if (!error) return null;
+    const d = describeError(error);
+    return { title: d.title, hint: d.hint, tone: d.tone, retriable: d.retriable };
+  }, [loadFallo, error]);
 
   const openDetail = async (p: Person) => {
     setSelected(p);
@@ -704,24 +760,25 @@ export default function IntegraPeoplePage() {
           <>
             {(isIsapi || isArtemis) && (
               <IgBtn variant="primary" onClick={() => startAlta("unified")}>
-                + Alta unificada
+                <PersonAddAlt1Rounded aria-hidden /> Alta unificada
               </IgBtn>
             )}
             <IgBtn onClick={() => router.push("/erp/users")} title="Directorio IAM ERP">
-              Usuarios ERP
+              <BadgeRounded aria-hidden /> Usuarios ERP
             </IgBtn>
             <IgBtn onClick={() => router.push("/integra/events")} title="Timeline ACS con foto">
-              Eventos Face
+              <OpenInNewRounded aria-hidden /> Eventos Face
             </IgBtn>
             <IgBtn
               onClick={() => setLive((v) => !v)}
+              aria-pressed={live}
               title={
                 live
                   ? "Consultando terminales en vivo (más lento)"
                   : "Listado del espejo sincronizado"
               }
             >
-              {live ? "Live ACS ON" : "Espejo"}
+              <SyncRounded aria-hidden /> {live ? "Live ACS ON" : "Espejo"}
             </IgBtn>
             {isIsapi && (
               <IgBtn
@@ -729,6 +786,7 @@ export default function IntegraPeoplePage() {
                 onClick={() => void syncNow()}
                 title="Solo si el espejo se desfasó — los cambios ya van en vivo a los terminales"
               >
+                <EventBusyRounded aria-hidden />{" "}
                 {syncing ? "Reconciliando…" : "Reconciliar"}
               </IgBtn>
             )}
@@ -737,13 +795,39 @@ export default function IntegraPeoplePage() {
                 void load();
                 void loadErpDirectory();
               }}
+              disabled={loadingPeople}
             >
-              Actualizar
+              <RefreshRounded aria-hidden /> {loadingPeople ? "Actualizando…" : "Actualizar"}
             </IgBtn>
           </>
         }
       />
-      <IgError>{error}</IgError>
+      {/*
+        Los ~30 `setError` del módulo siguen guardando el texto del servidor —
+        para depurar hace falta— pero la pantalla ya no lo escupe tal cual.
+        `describeError` distingue «no tienes permiso» (tu rol no llega, y
+        reintentar no arregla nada) de «el servidor no responde» (reintentar es
+        exactamente lo que hay que hacer), que antes se leían igual de grises.
+      */}
+      {errorInfo && (
+        <IgError
+          title={errorInfo.title}
+          tone={errorInfo.tone}
+          onRetry={
+            errorInfo.retriable
+              ? () => {
+                  setError(null);
+                  void load();
+                }
+              : undefined
+          }
+          retryLabel="Volver a cargar"
+          retrying={loadingPeople}
+        >
+          {errorInfo.hint}{" "}
+          <span className={styles.personFactSub}>{error}</span>
+        </IgError>
+      )}
       <p className={styles.personLead}>
         <strong>Cambios en vivo a terminales.</strong> Alta, edición, Face ID y baja se empujan
         al instante a todos los ACS; «Reconciliar» solo si el espejo se desfasó. Una persona ={" "}
@@ -753,9 +837,92 @@ export default function IntegraPeoplePage() {
       </p>
 
       <IgFilters>
-        {isArtemis && (
+        <IgField label="Buscar">
+          <input
+            value={qDraft}
+            onChange={(e) => setQDraft(e.target.value)}
+            style={inputStyle}
+            placeholder="nombre / código / rol / correo"
+            aria-label="Buscar por nombre, código, rol o correo"
+          />
+        </IgField>
+        <IgField label="Vigencia">
+          <select
+            value={query.estado}
+            onChange={(e) => setQuery({ estado: e.target.value as ValidityKey | "" })}
+            style={selectStyle}
+          >
+            <option value="">Cualquier estado</option>
+            {VALIDITY_FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </IgField>
+        {isIsapi && (
+          <IgField label="Rostro">
+            <select
+              value={query.rostro}
+              onChange={(e) => setQuery({ rostro: e.target.value as TriFilter })}
+              style={selectStyle}
+            >
+              <option value="">Con y sin rostro</option>
+              <option value="si">Solo con rostro enrolado</option>
+              <option value="no">Solo sin rostro</option>
+            </select>
+          </IgField>
+        )}
+        {tiposPresentes.length > 1 && (
+          <IgField label="Tipo">
+            <select
+              value={query.tipo}
+              onChange={(e) => setQuery({ tipo: e.target.value })}
+              style={selectStyle}
+            >
+              <option value="">Todos los tipos</option>
+              {tiposPresentes.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </IgField>
+        )}
+        {puertasPresentes.length > 0 && (
+          <IgField label="Puede abrir">
+            <select
+              value={query.puerta}
+              onChange={(e) => setQuery({ puerta: e.target.value })}
+              style={selectStyle}
+            >
+              <option value="">Cualquier puerta</option>
+              {puertasPresentes.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </IgField>
+        )}
+        <IgField label="ERP">
+          <select
+            value={query.erp}
+            onChange={(e) => setQuery({ erp: e.target.value as TriFilter })}
+            style={selectStyle}
+          >
+            <option value="">Con y sin usuario ERP</option>
+            <option value="si">Solo vinculadas al ERP</option>
+            <option value="no">Solo sin usuario ERP</option>
+          </select>
+        </IgField>
+        {isArtemis && orgs.length > 0 && (
           <IgField label="Org">
-            <select value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)} style={selectStyle}>
+            <select
+              value={query.org}
+              onChange={(e) => setQuery({ org: e.target.value })}
+              style={selectStyle}
+            >
               <option value="">Todas</option>
               {orgs.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -765,86 +932,40 @@ export default function IntegraPeoplePage() {
             </select>
           </IgField>
         )}
-        {isIsapi && (
-          <IgField label="Filtro">
-            <select
-              value={validityFilter}
-              onChange={(e) => setValidityFilter(e.target.value as ValidityFilter)}
-              style={selectStyle}
-            >
-              <option value="">Todas</option>
-              <option value="erp">En ERP</option>
-              <option value="noerp">Sin ERP</option>
-              <option value="ok">Vigentes</option>
-              <option value="warn">Por vencer</option>
-              <option value="expired">Vencidas</option>
-              <option value="off">Deshabilitadas</option>
-              <option value="face">Con Face ID</option>
-              <option value="noface">Sin Face ID</option>
-            </select>
-          </IgField>
-        )}
-        <IgField label="Buscar">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            style={inputStyle}
-            placeholder="nombre / código / rol / correo"
-          />
-        </IgField>
       </IgFilters>
 
       <IgSplit
         leftWidth="52%"
         left={
           <IgPanel title="Directorio" count={filtered.length} flush>
-            <div className={styles.personDirectory}>
-              {loadingPeople && filtered.length === 0 && (
-                <div className={styles.personEmptyBox}>
-                  <strong>Cargando personas…</strong>
-                  <p>Espejo ACS y enlace ERP.</p>
-                </div>
+            <div className={people$.directory}>
+              <ViewBar
+                view={query.vista}
+                onView={(v) => setQuery({ vista: v })}
+                sort={query.orden}
+                onSort={(s) => setQuery({ orden: s })}
+                shown={filtered.length}
+                total={people.length}
+                activeFilterCount={activeFilterCount}
+                onResetFilters={resetFilters}
+              />
+              {/*
+                Esqueleto con la geometría de lo que va a aparecer: el listado
+                saltaba de vacío a lleno y parecía que no se había pedido nada.
+              */}
+              {loadingPeople && people.length === 0 ? (
+                <DirectorySkeleton view={query.vista} />
+              ) : (
+                <PeopleDirectory
+                  people={filtered}
+                  view={query.vista}
+                  selectedId={mode === "ficha" ? selected?.id ?? null : null}
+                  onOpen={(p) => void openDetail(p)}
+                  faceBust={faceBust}
+                  erpFor={erpOf}
+                  showCredentials={isIsapi}
+                />
               )}
-              {filtered.map((p) => {
-                const v = validityOf(p);
-                const erp = findErpForPerson(p, erpByKey);
-                const sel = selected?.id === p.id && mode === "ficha";
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={styles.personRow}
-                    data-selected={sel ? "1" : undefined}
-                    onClick={() => void openDetail(p)}
-                  >
-                    <PersonFaceThumb
-                      className={styles.personAvatar}
-                      size="md"
-                      personId={
-                        p.hasFace || p.hasLocalFace || (p.numOfFace ?? 0) > 0 || p.faceUrl
-                          ? p.id
-                          : null
-                      }
-                      personName={p.name}
-                      bust={faceBust}
-                    />
-                    <div className={styles.personRowMain}>
-                      <div className={styles.personRowTop}>
-                        <strong>{p.name}</strong>
-                        <IgBadge tone={v.tone}>{v.label}</IgBadge>
-                      </div>
-                      <div className={styles.personRowMeta}>
-                        <span className={styles.personMono}>{p.code || p.id}</span>
-                        {erp?.email && <span>{erp.email}</span>}
-                        {!erp && (p.userType || p.orgName) && <span>{p.userType || p.orgName}</span>}
-                        {genderLabel(p.gender) && <span>{genderLabel(p.gender)}</span>}
-                      </div>
-                      <IdentityStatusBadges person={p} erp={erp} />
-                      {isIsapi && <CredChips person={p} />}
-                    </div>
-                  </button>
-                );
-              })}
               {erpOnlyUsers.length > 0 && isIsapi && (
                 <div className={styles.personErpOnly}>
                   <header>
@@ -859,22 +980,45 @@ export default function IntegraPeoplePage() {
                           {u.employeeNumber || "sin nº"} · {u.role?.nombre || "sin rol"}
                         </span>
                       </div>
-                      <IgBtn onClick={() => startLinkFromErp(u)}>Enrolar ACS</IgBtn>
+                      <IgBtn
+                        onClick={() => startLinkFromErp(u)}
+                        aria-label={`Enrolar a ${u.nombre} en los terminales`}
+                      >
+                        <PersonAddAlt1Rounded aria-hidden /> Enrolar ACS
+                      </IgBtn>
                     </div>
                   ))}
                 </div>
               )}
-              {!loadingPeople && filtered.length === 0 && (
+              {/*
+                Vacío por filtro y vacío de verdad no son lo mismo: en el primer
+                caso lo que hace falta es quitar el filtro, no dar de alta a
+                nadie. Antes los dos decían «Sin personas».
+              */}
+              {!loadingPeople && filtered.length === 0 && people.length > 0 && (
+                <div className={styles.personEmptyBox}>
+                  <strong>Ninguna persona encaja con el filtro</strong>
+                  <p>
+                    Hay {people.length} en el directorio, pero{" "}
+                    {activeFilterCount === 1 ? "el filtro activo" : "los filtros activos"} no
+                    dejan pasar ninguna.
+                  </p>
+                  <IgBtn onClick={resetFilters}>
+                    <FilterAltOffRounded aria-hidden /> Quitar los filtros
+                  </IgBtn>
+                </div>
+              )}
+              {!loadingPeople && people.length === 0 && (
                 <div className={styles.personEmptyBox}>
                   <strong>Sin personas</strong>
                   <p>
                     {isArtemis
-                      ? "No hay coincidencias en el directorio."
-                      : "El espejo está vacío o el filtro no deja nada. Da de alta unificada o reconciliá."}
+                      ? "El directorio no devolvió a nadie."
+                      : "El espejo está vacío. Da de alta unificada o reconcilia contra los terminales."}
                   </p>
                   {(isIsapi || isArtemis) && (
                     <IgBtn variant="primary" onClick={() => startAlta("unified")}>
-                      + Alta unificada
+                      <PersonAddAlt1Rounded aria-hidden /> Alta unificada
                     </IgBtn>
                   )}
                 </div>
@@ -907,30 +1051,44 @@ export default function IntegraPeoplePage() {
           >
             {mode === "alta" && isIsapi && (
               <div className={styles.personCrud}>
-                <div className={styles.personModeTabs} role="tablist">
-                  {(
-                    [
-                      ["unified", "Unificada"],
-                      ["link", "Vincular ERP"],
-                      ["acs", "Solo ACS"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      role="tab"
-                      className={styles.personModeTab}
-                      data-on={altaMode === key ? "1" : undefined}
-                      onClick={() => {
-                        setAltaMode(key);
-                        setAltaStep(1);
-                        setError(null);
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                {/*
+                  Pestañas de verdad: `role="tab"` sin `aria-selected` ni
+                  `aria-controls` le decía al lector de pantalla que había tres
+                  pestañas y ninguna elegida, y el panel de abajo no estaba
+                  asociado a ninguna. Solo se pinta la activa, así que la que
+                  manda `aria-controls` es siempre la seleccionada.
+                */}
+                <div className={styles.personModeTabs} role="tablist" aria-label="Forma de dar de alta">
+                  {ALTA_TABS.map(([key, label]) => {
+                    const on = altaMode === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        id={`alta-tab-${key}`}
+                        aria-selected={on}
+                        aria-controls={ALTA_PANEL_ID}
+                        tabIndex={on ? 0 : -1}
+                        className={styles.personModeTab}
+                        data-on={on ? "1" : undefined}
+                        onClick={() => {
+                          setAltaMode(key);
+                          setAltaStep(1);
+                          setError(null);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
+                <div
+                  id={ALTA_PANEL_ID}
+                  role="tabpanel"
+                  aria-labelledby={`alta-tab-${altaMode}`}
+                  className={styles.personCrud}
+                >
                 <WizardSteps step={altaStep} mode={altaMode} />
 
                 {altaStep === 1 && altaMode === "unified" && (
@@ -996,7 +1154,7 @@ export default function IntegraPeoplePage() {
                       disabled={!name.trim() || !email.trim() || !roleId || !departmentId}
                       onClick={() => setAltaStep(2)}
                     >
-                      Continuar →
+                      Continuar <ArrowForwardRounded aria-hidden />
                     </IgBtn>
                   </section>
                 )}
@@ -1046,7 +1204,7 @@ export default function IntegraPeoplePage() {
                       disabled={!linkUserId}
                       onClick={() => setAltaStep(2)}
                     >
-                      Continuar →
+                      Continuar <ArrowForwardRounded aria-hidden />
                     </IgBtn>
                   </section>
                 )}
@@ -1071,7 +1229,7 @@ export default function IntegraPeoplePage() {
                       disabled={!name.trim()}
                       onClick={() => setAltaStep(2)}
                     >
-                      Continuar →
+                      Continuar <ArrowForwardRounded aria-hidden />
                     </IgBtn>
                   </section>
                 )}
@@ -1113,13 +1271,15 @@ export default function IntegraPeoplePage() {
                       </p>
                     )}
                     <div className={styles.personBtnRow}>
-                      <IgBtn onClick={() => setAltaStep(1)}>← Atrás</IgBtn>
+                      <IgBtn onClick={() => setAltaStep(1)}>
+                        <ArrowBackRounded aria-hidden /> Atrás
+                      </IgBtn>
                       <IgBtn
                         variant="primary"
                         disabled={!autoCode && !code.trim()}
                         onClick={() => setAltaStep(3)}
                       >
-                        Continuar →
+                        Continuar <ArrowForwardRounded aria-hidden />
                       </IgBtn>
                     </div>
                   </section>
@@ -1165,13 +1325,15 @@ export default function IntegraPeoplePage() {
                       />
                     </label>
                     <div className={styles.personBtnRow}>
-                      <IgBtn onClick={() => setAltaStep(2)}>← Atrás</IgBtn>
+                      <IgBtn onClick={() => setAltaStep(2)}>
+                        <ArrowBackRounded aria-hidden /> Atrás
+                      </IgBtn>
                       <IgBtn
                         variant="primary"
                         disabled={!altaJpegB64}
                         onClick={() => setAltaStep(4)}
                       >
-                        Continuar →
+                        Continuar <ArrowForwardRounded aria-hidden />
                       </IgBtn>
                     </div>
                   </section>
@@ -1222,7 +1384,7 @@ export default function IntegraPeoplePage() {
                     )}
                     <div className={styles.personBtnRow}>
                       <IgBtn onClick={() => setAltaStep(3)} disabled={mutating}>
-                        ← Atrás
+                        <ArrowBackRounded aria-hidden /> Atrás
                       </IgBtn>
                       <IgBtn variant="primary" disabled={mutating} onClick={() => void runAlta()}>
                         {mutKind === "create"
@@ -1240,6 +1402,7 @@ export default function IntegraPeoplePage() {
                     <OpFanout results={opResults} />
                   </section>
                 )}
+                </div>
               </div>
             )}
 
@@ -1283,7 +1446,7 @@ export default function IntegraPeoplePage() {
                       }
                     }}
                   >
-                    Alta persona
+                    <PersonAddAlt1Rounded aria-hidden /> Alta persona
                   </IgBtn>
                 </section>
               </div>
@@ -1291,30 +1454,17 @@ export default function IntegraPeoplePage() {
 
             {mode === "ficha" && detailPerson && selected ? (
               <div className={styles.personCrud}>
-                <div className={styles.personCardHead}>
-                  <PersonFaceThumb
-                    className={styles.personAvatarLg}
-                    size="xl"
-                    personId={detailPerson.id}
-                    personName={detailPerson.name}
-                    bust={faceBust}
-                  />
-                  <div>
-                    <h3 className={styles.personCardName}>{detailPerson.name}</h3>
-                    <p className={styles.personCardCode}>{detailPerson.code || detailPerson.id}</p>
-                    <div className={styles.personChips}>
-                      <IgBadge tone={validityOf(detailPerson).tone}>
-                        {validityOf(detailPerson).label}
-                      </IgBadge>
-                      {(detailPerson.userType || detailPerson.orgName) && (
-                        <IgBadge>{detailPerson.userType || detailPerson.orgName}</IgBadge>
-                      )}
-                    </div>
-                    <IdentityStatusBadges person={detailPerson} erp={selectedErp} />
-                  </div>
-                </div>
+                {/*
+                  Cabecera de la ficha. La vigencia ya no es una etiqueta suelta:
+                  lleva su estado con color y, debajo, lo que significa para el
+                  portador. Y `validEnable=false` —que estaba escondido dentro
+                  del cálculo— sale como marca propia: una persona suspendida no
+                  abre ninguna puerta por muchas credenciales que tenga.
+                */}
+                <PersonHero person={detailPerson} bust={faceBust}>
+                  <IdentityStatusBadges person={detailPerson} erp={selectedErp} />
+                </PersonHero>
 
-                {busy && <IgBadge>Cargando detalle…</IgBadge>}
 
                 <section className={styles.personSection} data-tone="accent">
                   <header className={styles.personSectionHead}>
@@ -1344,37 +1494,40 @@ export default function IntegraPeoplePage() {
                       </dl>
                       <div className={styles.personBtnRow}>
                         <IgBtn onClick={() => router.push(`/erp/users?highlight=${selectedErp.id}`)}>
-                          Abrir en ERP
+                          <OpenInNewRounded aria-hidden /> Abrir en ERP
                         </IgBtn>
                         <IgBtn
                           disabled={mutating}
-                          onClick={async () => {
-                            if (
-                              !confirm(
-                                `¿Desvincular ${detailPerson.name} del usuario ERP? El terminal no se modifica.`,
-                              )
-                            ) {
-                              return;
-                            }
-                            setMutKind("save");
-                            try {
-                              const r = await integraApi<{ note?: string }>(
-                                `integra/people/${encodeURIComponent(selected.id)}/link`,
-                                { method: "DELETE" },
-                              );
-                              setOpNote(r.note || "Desvinculado del ERP.");
-                              setOpOk(true);
-                              await loadErpDirectory();
-                              await load();
-                            } catch (e) {
-                              setError(e instanceof Error ? e.message : "No se pudo desvincular");
-                              setOpOk(false);
-                            } finally {
-                              setMutKind(null);
-                            }
-                          }}
+                          onClick={() =>
+                            setConfirmState({
+                              title: "Desvincular del ERP",
+                              message: `${detailPerson.name} dejará de estar asociada a su usuario de NEXARA. El terminal no se modifica: sigue abriendo igual, pero sus eventos ya no resolverán a esa persona en asistencia ni en actividades.`,
+                              confirmLabel: "Desvincular",
+                              danger: false,
+                              fn: async () => {
+                                setMutKind("save");
+                                try {
+                                  const r = await integraApi<{ note?: string }>(
+                                    `integra/people/${encodeURIComponent(selected.id)}/link`,
+                                    { method: "DELETE" },
+                                  );
+                                  setOpNote(r.note || "Desvinculado del ERP.");
+                                  setOpOk(true);
+                                  await loadErpDirectory();
+                                  await load();
+                                } catch (e) {
+                                  setError(
+                                    e instanceof Error ? e.message : "No se pudo desvincular",
+                                  );
+                                  setOpOk(false);
+                                } finally {
+                                  setMutKind(null);
+                                }
+                              },
+                            })
+                          }
                         >
-                          Desvincular
+                          <LinkOffRounded aria-hidden /> Desvincular
                         </IgBtn>
                       </div>
                     </>
@@ -1426,9 +1579,11 @@ export default function IntegraPeoplePage() {
                             }
                           }}
                         >
-                          Vincular a ERP
+                          <LinkRounded aria-hidden /> Vincular a ERP
                         </IgBtn>
-                        <IgBtn onClick={() => startAlta("link")}>Alta / vínculo guiado</IgBtn>
+                        <IgBtn onClick={() => startAlta("link")}>
+                          <PersonAddAlt1Rounded aria-hidden /> Alta / vínculo guiado
+                        </IgBtn>
                       </div>
                     </>
                   )}
@@ -1463,7 +1618,14 @@ export default function IntegraPeoplePage() {
                         </div>
                       )}
                     </dl>
-                    <CredChips person={detailPerson} />
+                    {/*
+                      Credenciales con lo que cada una significa. Los tres
+                      contadores (`numOfFace`, `numOfFP`, `numOfCard`) llegaban
+                      del terminal y se pintaban como «Face 1 · Huella 0 ·
+                      Tarjeta 2», que no le dice a nadie qué puede hacer esa
+                      persona ni dónde vive el dato.
+                    */}
+                    <CredentialList person={detailPerson} />
 
                     {!detailPerson.hasLocalFace &&
                       ((detailPerson.numOfFace ?? 0) > 0 || detailPerson.hasFace) && (
@@ -1553,10 +1715,14 @@ export default function IntegraPeoplePage() {
                         <strong>Horarios y puertas</strong>
                         <span>Valid · RightPlan</span>
                       </header>
-                      <p className={styles.personNote}>
-                        Define vigencia (incl. indefinido), presets (24/7, oficina, visita…)
-                        y qué plantilla aplica en cada puerta del sitio.
-                      </p>
+                      {/*
+                        `GET people/:id/access` ya resolvía `templateName` —el
+                        nombre real del plan horario que aplica en cada puerta,
+                        leído de `UserRightPlanTemplate`— y la ficha lo tiraba.
+                        Se veía «Puerta principal» sin decir si esa persona la
+                        abre a cualquier hora o solo de nueve a seis.
+                      */}
+                      <PersonAccessPanel personId={selected.id} />
                       <IgBtn
                         variant="primary"
                         onClick={() =>
@@ -1565,7 +1731,7 @@ export default function IntegraPeoplePage() {
                           )
                         }
                       >
-                        Abrir editor de horarios
+                        <ScheduleRounded aria-hidden /> Abrir editor de horarios
                       </IgBtn>
                     </section>
 
@@ -1579,11 +1745,20 @@ export default function IntegraPeoplePage() {
                         verificación FDSearch). Ideal: frontal 50–400 KB. El terminal puede
                         no re-entregar la imagen (solo modelo).
                       </p>
-                      <div className={styles.personBtnRow}>
+                      <p className={styles.personNote} data-tone="warn">
+                        El rostro es <strong>dato personal sensible</strong> (LFPDPPP): solo se
+                        captura con consentimiento expreso y no sale de NEXARA ni de los
+                        terminales del sitio.
+                      </p>
+                      <ActionGroup
+                        title="Enrolar o reemplazar"
+                        hint="reversible — se puede repetir"
+                      >
                         <label
                           className={styles.personFileBtn}
                           data-busy={mutKind === "photo" ? "1" : undefined}
                         >
+                          <PhotoCameraRounded aria-hidden />{" "}
                           {mutKind === "photo" ? "Subiendo…" : "Subir / actualizar JPEG"}
                           <input
                             type="file"
@@ -1613,43 +1788,52 @@ export default function IntegraPeoplePage() {
                             }}
                           />
                         </label>
+                      </ActionGroup>
+                      <ActionGroup
+                        title="Quitar el rostro"
+                        hint="destructiva — hay que volver a capturarlo"
+                      >
                         <IgBtn
+                          variant="danger"
                           disabled={mutating}
-                          onClick={async () => {
-                            if (
-                              !confirm(
-                                `¿Quitar Face ID de ${selected.name} en todos los terminales y la copia NEXARA?`,
-                              )
-                            ) {
-                              return;
-                            }
-                            setMutKind("faceDel");
-                            try {
-                              const r = await integraApi<{
-                                success?: boolean;
-                                note?: string;
-                                results?: OpResult[];
-                              }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
-                                method: "DELETE",
-                              });
-                              invalidatePersonFaceCache(selected.id);
-                              setFaceBust((n) => n + 1);
-                              applyOp({
-                                ...r,
-                                note: r.success ? "Face ID quitado." : r.note || "No se quitó del todo.",
-                              });
-                              await load();
-                            } catch (err) {
-                              setError(err instanceof Error ? err.message : "Error");
-                              setOpOk(false);
-                            } finally {
-                              setMutKind(null);
-                            }
-                          }}
+                          onClick={() =>
+                            setConfirmState({
+                              title: "Quitar el rostro",
+                              message: `Se borra el modelo facial de ${selected.name} en todos los terminales y también el JPEG guardado en NEXARA. Dejará de poder abrir mirando al lector y sus eventos saldrán sin foto. Para recuperarlo hay que volver a capturarla.`,
+                              confirmLabel: "Quitar rostro",
+                              fn: async () => {
+                                setMutKind("faceDel");
+                                try {
+                                  const r = await integraApi<{
+                                    success?: boolean;
+                                    note?: string;
+                                    results?: OpResult[];
+                                  }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
+                                    method: "DELETE",
+                                  });
+                                  invalidatePersonFaceCache(selected.id);
+                                  setFaceBust((n) => n + 1);
+                                  applyOp({
+                                    ...r,
+                                    note: r.success
+                                      ? "Face ID quitado."
+                                      : r.note || "No se quitó del todo.",
+                                  });
+                                  await load();
+                                } catch (err) {
+                                  setError(err instanceof Error ? err.message : "Error");
+                                  setOpOk(false);
+                                } finally {
+                                  setMutKind(null);
+                                }
+                              },
+                            })
+                          }
                         >
-                          {mutKind === "faceDel" ? "Quitando…" : "Quitar Face ID"}
+                          <NoPhotographyRounded aria-hidden />{" "}
+                          {mutKind === "faceDel" ? "Quitando…" : "Quitar rostro"}
                         </IgBtn>
-                      </div>
+                      </ActionGroup>
                     </section>
 
                     <section className={styles.personSection}>
@@ -1661,6 +1845,10 @@ export default function IntegraPeoplePage() {
                         Pon el dedo en el terminal con sensor (p. ej. .162 / .163). Se captura,
                         se guarda plantilla en NEXARA si el ACS la entrega, y se aplica a todos
                         los ACS. Terminales solo-rostro pueden rechazarla.
+                      </p>
+                      <p className={styles.personNote} data-tone="warn">
+                        La huella también es <strong>dato personal sensible</strong> (LFPDPPP).
+                        Captúrala solo con consentimiento expreso de la persona.
                       </p>
                       <IgField label="Terminal de captura">
                         <select
@@ -1675,7 +1863,7 @@ export default function IntegraPeoplePage() {
                           ))}
                         </select>
                       </IgField>
-                      <div className={styles.personBtnRow}>
+                      <ActionGroup title="Capturar" hint="reversible — sustituye la anterior">
                         <IgBtn
                           variant="primary"
                           disabled={mutating || !fpDeviceIp}
@@ -1709,9 +1897,10 @@ export default function IntegraPeoplePage() {
                             }
                           }}
                         >
+                          <FingerprintRounded aria-hidden />{" "}
                           {mutKind === "fp" ? "Esperando dedo…" : "Capturar y enrolar huella"}
                         </IgBtn>
-                      </div>
+                      </ActionGroup>
                     </section>
 
                     <section className={styles.personDangerZone} id="person-danger-zone">
@@ -1744,84 +1933,85 @@ export default function IntegraPeoplePage() {
                       <IgBtn
                         variant="danger"
                         disabled={mutating}
-                        onClick={async () => {
-                          if (
-                            !confirm(
-                              forceDelete
-                                ? `¿ELIMINAR a ${selected.name} (${selected.code || selected.id})?\n\nFORCE: sale del espejo aunque algún ACS falle. Se reintentará el Delete en IPs caídas.`
-                                : `¿ELIMINAR a ${selected.name} (${selected.code || selected.id}) de TODOS los terminales?\n\nSi uno falla, se conserva en NEXARA (marca «Forzar baja» para insistir).`,
-                            )
-                          ) {
-                            return;
-                          }
-                          setMutKind("delete");
-                          setError(null);
-                          try {
-                            const qs = forceDelete ? "?force=1" : "";
-                            const r = await integraApi<{
-                              success?: boolean;
-                              partial?: boolean;
-                              forced?: boolean;
-                              note?: string;
-                              results?: OpResult[];
-                              pendingIps?: string[];
-                            }>(`integra/people/${encodeURIComponent(selected.id)}${qs}`, {
-                              method: "DELETE",
-                            });
-                            applyOp(r);
-                            if (r.success || r.forced) {
-                              const gone = selected.id;
-                              invalidatePersonFaceCache(gone);
-                              setPeople((prev) => prev.filter((p) => p.id !== gone));
-                              setSelected(null);
-                              setDetail(null);
-                              setMode("alta");
-                              setForceDelete(false);
-                              setOpNote(r.note || "Eliminado.");
-                              setOpOk(true);
+                        onClick={() =>
+                          setConfirmState({
+                            title: `Eliminar a ${selected.name}`,
+                            message: forceDelete
+                              ? `Se borran rostro, huella y ficha de ${selected.name} (${selected.code || selected.id}) en todos los terminales. FORZADO: sale del espejo de NEXARA aunque algún ACS no conteste, y el borrado se reintenta después en las IPs caídas. No se puede deshacer.`
+                              : `Se borran rostro, huella y ficha de ${selected.name} (${selected.code || selected.id}) en todos los terminales. Si alguno falla, la persona se conserva en NEXARA para que no quede a medias — marca «Forzar baja» e insiste. No se puede deshacer.`,
+                            confirmLabel: forceDelete ? "Eliminar (forzado)" : "Eliminar",
+                            fn: async () => {
+                              setMutKind("delete");
                               setError(null);
-                              toast.success(
-                                r.forced
-                                  ? "Baja forzada en NEXARA. Reintento ACS en cola."
-                                  : "Eliminado en terminales y NEXARA.",
-                              );
-                            } else {
-                              const fails = (r.results || [])
-                                .filter((x) => !x.ok)
-                                .map((x) => `${x.deviceIp}: ${x.error || "falló"}`)
-                                .join("\n");
-                              const msg = fails
-                                ? `${r.note || "Borrado incompleto"}\n${fails}\n\nMarca «Forzar baja en NEXARA» e inténtalo de nuevo.`
-                                : r.note || "Borrado incompleto — revisa por IP abajo.";
-                              setError(msg);
-                              setForceDelete(true);
-                              toast.error(
-                                fails
-                                  ? `Borrado incompleto. Fallos:\n${fails}`
-                                  : msg,
-                              );
-                              requestAnimationFrame(() => {
-                                document
-                                  .getElementById("person-danger-zone")
-                                  ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                              });
-                            }
-                          } catch (err) {
-                            const msg =
-                              err instanceof Error ? err.message : "Error al eliminar";
-                            setError(msg);
-                            setOpOk(false);
-                            setForceDelete(true);
-                            toast.error(msg);
-                          } finally {
-                            setMutKind(null);
-                          }
-                        }}
+                              try {
+                                const qs = forceDelete ? "?force=1" : "";
+                                const r = await integraApi<{
+                                  success?: boolean;
+                                  partial?: boolean;
+                                  forced?: boolean;
+                                  note?: string;
+                                  results?: OpResult[];
+                                  pendingIps?: string[];
+                                }>(`integra/people/${encodeURIComponent(selected.id)}${qs}`, {
+                                  method: "DELETE",
+                                });
+                                applyOp(r);
+                                if (r.success || r.forced) {
+                                  const gone = selected.id;
+                                  invalidatePersonFaceCache(gone);
+                                  setPeople((prev) => prev.filter((p) => p.id !== gone));
+                                  setSelected(null);
+                                  setDetail(null);
+                                  setMode("alta");
+                                  setForceDelete(false);
+                                  setOpNote(r.note || "Eliminado.");
+                                  setOpOk(true);
+                                  setError(null);
+                                  toast.success(
+                                    r.forced
+                                      ? "Baja forzada en NEXARA. Reintento ACS en cola."
+                                      : "Eliminado en terminales y NEXARA.",
+                                  );
+                                } else {
+                                  const fails = (r.results || [])
+                                    .filter((x) => !x.ok)
+                                    .map((x) => `${x.deviceIp}: ${x.error || "falló"}`)
+                                    .join("\n");
+                                  const msg = fails
+                                    ? `${r.note || "Borrado incompleto"}\n${fails}\n\nMarca «Forzar baja en NEXARA» e inténtalo de nuevo.`
+                                    : r.note || "Borrado incompleto — revisa por IP abajo.";
+                                  setError(msg);
+                                  setForceDelete(true);
+                                  toast.error(
+                                    fails
+                                      ? `Borrado incompleto. Fallos:\n${fails}`
+                                      : msg,
+                                  );
+                                  requestAnimationFrame(() => {
+                                    document
+                                      .getElementById("person-danger-zone")
+                                      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                                  });
+                                }
+                              } catch (err) {
+                                const msg =
+                                  err instanceof Error ? err.message : "Error al eliminar";
+                                setError(msg);
+                                setOpOk(false);
+                                setForceDelete(true);
+                                toast.error(msg);
+                              } finally {
+                                setMutKind(null);
+                              }
+                            },
+                          })
+                        }
                       >
+                        <DeleteForeverRounded aria-hidden />{" "}
                         {mutKind === "delete"
                           ? "Eliminando (esperando terminales)…"
                           : forceDelete
-                            ? "Eliminar (force) de NEXARA + ACS"
+                            ? "Eliminar (forzado) de NEXARA + ACS"
                             : "Eliminar de todos los terminales"}
                       </IgBtn>
                       {error && mode === "ficha" && (
@@ -1839,24 +2029,68 @@ export default function IntegraPeoplePage() {
                   </>
                 )}
 
-                {isArtemis && detail != null && (
-                  <pre className={styles.personRawPre}>{JSON.stringify(detail, null, 2)}</pre>
+                {/*
+                  Antes esto era `<pre>{JSON.stringify(detail)}</pre>` y era el
+                  contenido principal de la ficha en Artemis: el operador leía
+                  `"validEnable": false` entre llaves y comas. Ahora son pares
+                  clave-valor en español, y el crudo sigue estando —plegado—
+                  porque para depurar un terminal hace falta verlo tal cual.
+                */}
+                {(busy || detail != null) && (
+                  <section className={styles.personSection}>
+                    <header className={styles.personSectionHead}>
+                      <strong>Detalle del terminal</strong>
+                      <span>tal y como lo devolvió el ACS</span>
+                    </header>
+                    {busy ? (
+                      <DetailSkeleton label="Consultando la ficha en el terminal…" />
+                    ) : (
+                      <DetailFacts detail={detail} />
+                    )}
+                  </section>
                 )}
                 {isArtemis && (
-                  <IgBtn
-                    variant="danger"
-                    onClick={async () => {
-                      if (!confirm("¿Eliminar esta persona del directorio?")) return;
-                      await integraApi(`integra/people/${encodeURIComponent(selected.id)}`, {
-                        method: "DELETE",
-                      });
-                      setSelected(null);
-                      setDetail(null);
-                      await load();
-                    }}
+                  <ActionGroup
+                    title="Zona de peligro"
+                    hint="no se puede deshacer"
                   >
-                    Eliminar
-                  </IgBtn>
+                    <IgBtn
+                      variant="danger"
+                      disabled={mutating}
+                      onClick={() =>
+                        setConfirmState({
+                          title: `Eliminar a ${detailPerson.name}`,
+                          message: `Se borra a ${detailPerson.name} (${detailPerson.code || detailPerson.id}) del directorio de control de acceso. Dejará de abrir cualquier puerta. No se puede deshacer.`,
+                          confirmLabel: "Eliminar",
+                          fn: async () => {
+                            setMutKind("delete");
+                            setError(null);
+                            try {
+                              await integraApi(
+                                `integra/people/${encodeURIComponent(selected.id)}`,
+                                { method: "DELETE" },
+                              );
+                              setSelected(null);
+                              setDetail(null);
+                              await load();
+                              toast.success("Persona eliminada del directorio.");
+                            } catch (e) {
+                              // Antes esto no se capturaba: si el borrado fallaba,
+                              // la promesa se rechazaba en silencio y la pantalla
+                              // se quedaba igual, como si no hubieras pulsado.
+                              const msg = formatApiError(e, "No se pudo eliminar");
+                              setError(msg);
+                              toast.error(msg);
+                            } finally {
+                              setMutKind(null);
+                            }
+                          },
+                        })
+                      }
+                    >
+                      <DeleteForeverRounded aria-hidden /> Eliminar del directorio
+                    </IgBtn>
+                  </ActionGroup>
                 )}
               </div>
             ) : null}
@@ -1866,13 +2100,21 @@ export default function IntegraPeoplePage() {
                 <strong>Ninguna ficha abierta</strong>
                 <p>Elige a alguien del directorio o da de alta a una persona nueva.</p>
                 <IgBtn variant="primary" onClick={() => startAlta("unified")}>
-                  + Nueva persona
+                  <PersonAddAlt1Rounded aria-hidden /> Nueva persona
                 </IgBtn>
               </div>
             )}
           </IgPanel>
         }
       />
+
+      {/*
+        Los cuatro `window.confirm` de esta pantalla eran un cuadro gris del
+        navegador con el nombre del dominio y sin decir qué se pierde. Este
+        bloquea el botón mientras la operación está en vuelo, cierra con Esc y
+        devuelve el foco a donde estaba.
+      */}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </IgPage>
   );
 }

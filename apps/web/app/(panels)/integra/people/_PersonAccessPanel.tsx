@@ -4,10 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import ScheduleRounded from "@mui/icons-material/ScheduleRounded";
 import SensorDoorRounded from "@mui/icons-material/SensorDoorRounded";
 import { IgError } from "../_Console";
-import { integraApi } from "../_lib";
-import { formatApiError } from "@/lib/erp-api";
+import { diagnosticar, pedirIntegra, type Diagnostico } from "../_fallosApi";
 import styles from "./_people.module.css";
-import { describeError, formatWhen } from "./_peopleView";
+import { formatWhen } from "./_peopleView";
 
 /**
  * Puertas de una persona con su plan horario.
@@ -62,19 +61,29 @@ const VALID_MODE_LABEL: Record<string, string> = {
 export function PersonAccessPanel({ personId }: { personId: string }) {
   const [data, setData] = useState<PersonAccess | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * Se guarda el diagnóstico, no el texto: `pedirIntegra` conserva el código
+   * HTTP y aquí eso decide qué se le dice al operador. Consultar puertas es de
+   * las cosas que un rol de solo lectura sí puede tener vetadas, y un 403 no se
+   * arregla reintentando.
+   */
+  const [fallo, setFallo] = useState<Diagnostico | null>(null);
+  /** El crudo del servidor, para el detalle de depuración. */
+  const [detalle, setDetalle] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setFallo(null);
+    setDetalle(null);
     try {
       setData(
-        await integraApi<PersonAccess>(
+        await pedirIntegra<PersonAccess>(
           `integra/people/${encodeURIComponent(personId)}/access`,
         ),
       );
     } catch (e) {
-      setError(formatApiError(e, "No se pudo leer el acceso de esta persona"));
+      setFallo(diagnosticar(e, "consultar las puertas de esta persona"));
+      setDetalle(e instanceof Error ? e.message : String(e));
       setData(null);
     } finally {
       setLoading(false);
@@ -96,15 +105,16 @@ export function PersonAccessPanel({ personId }: { personId: string }) {
     );
   }
 
-  if (error) {
-    const info = describeError(error);
+  if (fallo) {
     return (
       <IgError
-        title={info.title}
-        tone={info.tone}
-        onRetry={info.retriable ? () => void load() : undefined}
+        title={fallo.titulo}
+        tone={fallo.tono}
+        onRetry={fallo.reintentable ? () => void load() : undefined}
+        retryLabel="Volver a consultar"
       >
-        {info.hint} <span className={styles.credDetail}>{error}</span>
+        {fallo.cuerpo}
+        {detalle && <span className={styles.credDetail}>{detalle}</span>}
       </IgError>
     );
   }
