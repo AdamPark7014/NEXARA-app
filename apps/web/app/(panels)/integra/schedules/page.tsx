@@ -915,7 +915,7 @@ function SchedulesConsole() {
           </IgFilters>
 
           <IgPanel title="Quién × cuándo" count={selectedDoor?.name}>
-            {!matrix?.people.length && !busy ? (
+            {!matrixRows.length && !busy ? (
               <div className={styles.igEmpty}>
                 <strong className={styles.igEmptyTitle}>Vacío</strong>
                 <span className={styles.igEmptyHint}>
@@ -935,16 +935,18 @@ function SchedulesConsole() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(matrix?.people || []).map((p) => (
-                      <tr key={p.personId}>
+                    {matrixRows.map(({ row: p, planName, noAccess }) => (
+                      <tr key={p.personId} data-no-access={noAccess ? "1" : undefined}>
                         <td>
                           <strong>{p.name}</strong>
                           <div className={styles.schedMeta}>{p.code || p.personId}</div>
                         </td>
                         <td>{formatValidityLabel(p)}</td>
                         <td>
-                          {p.planName ||
-                            templateLabel(catalog.templates, p.planTemplateNo)}
+                          {/* Plantilla «0» no es un horario vacío: es que esta
+                              persona no puede abrir esta puerta. Decirlo evita
+                              leer un hueco como un fallo de carga. */}
+                          {noAccess ? <em>Sin acceso a esta puerta</em> : planName}
                         </td>
                         <td>
                           <WeekStrip summary={p.weekSummary} />
@@ -989,6 +991,7 @@ function SchedulesConsole() {
           </IgPanel>
         </>
       )}
+      </TabPanel>
     </IgPage>
   );
 }
