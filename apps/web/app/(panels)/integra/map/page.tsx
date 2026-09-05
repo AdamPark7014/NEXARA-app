@@ -40,6 +40,19 @@ export default function IntegraMapPage() {
   const [entityId, setEntityId] = useState("");
   const [doors, setDoors] = useState<EntityOpt[]>([]);
   const [cams, setCams] = useState<EntityOpt[]>([]);
+  /**
+   * Pin seleccionado. Antes NO existía: hacer clic en un pin lo borraba en el
+   * acto, sin preguntar, y el texto de ayuda hasta lo anunciaba. Un pin es una
+   * cámara o una puerta situada en el plano — perderlo de un clic accidental es
+   * perder trabajo de configuración que nadie sabe rehacer.
+   */
+  const [selectedPin, setSelectedPin] = useState<Pin | null>(null);
+  /**
+   * Consultar y editar son cosas distintas. Fuera del modo edición el plano se
+   * mira: ni se colocan pines ni se borran.
+   */
+  const [editMode, setEditMode] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Pin | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -187,8 +200,13 @@ export default function IntegraMapPage() {
         )}
         {active && (
           <div
-            style={{ position: "relative", maxWidth: 900, cursor: entityId ? "crosshair" : "default" }}
+            style={{
+              position: "relative",
+              maxWidth: 900,
+              cursor: editMode && entityId ? "crosshair" : "default",
+            }}
             onClick={(e) => {
+              if (!editMode) return;
               const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
               const xPct = ((e.clientX - rect.left) / rect.width) * 100;
               const yPct = ((e.clientY - rect.top) / rect.height) * 100;
@@ -216,21 +234,102 @@ export default function IntegraMapPage() {
                   borderRadius: "50%",
                   border: "2px solid #fff",
                   background: p.entityType === "CAMERA" ? "#0e7490" : "#b45309",
+                  outline: selectedPin?.id === p.id ? "3px solid #22d3ee" : "none",
+                  outlineOffset: 2,
                   cursor: "pointer",
                   padding: 0,
                 }}
+                aria-label={`${p.entityType === "CAMERA" ? "Cámara" : "Puerta"}: ${p.label || p.entityId}`}
+                aria-pressed={selectedPin?.id === p.id}
                 onClick={(ev) => {
                   ev.stopPropagation();
-                  void integraApi(`integra/map-pins/${p.id}`, { method: "DELETE" }).then(load);
+                  setSelectedPin((prev) => (prev?.id === p.id ? null : p));
                 }}
               />
             ))}
           </div>
         )}
         <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 8 }}>
-          Clic en el plano coloca el pin seleccionado. Clic en un pin lo elimina.
+          {editMode
+            ? entityId
+              ? "Modo edición: clic en el plano coloca el pin de la entidad elegida."
+              : "Modo edición: elige una entidad arriba para poder colocarla."
+            : "Clic en un pin para ver qué es. Para colocar o quitar, entra en modo edición."}
         </p>
-        <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
+
+        {selectedPin && (
+          <div
+            style={{
+              marginTop: 8,
+              padding: "8px 12px",
+              border: "1px solid var(--nx-panel-hairline, #d8dfe8)",
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: 13 }}>
+              <strong>{selectedPin.label || selectedPin.entityId}</strong>{" "}
+              <span style={{ color: "var(--text-secondary)" }}>
+                · {selectedPin.entityType === "CAMERA" ? "Cámara" : "Puerta"}
+              </span>
+            </span>
+            {editMode && (
+              <IgBtn onClick={() => setPendingDelete(selectedPin)}>Quitar del plano</IgBtn>
+            )}
+            <IgBtn onClick={() => setSelectedPin(null)}>Cerrar</IgBtn>
+          </div>
+        )}
+
+        {pendingDelete && (
+          <div
+            role="alertdialog"
+            aria-label="Confirmar quitar pin"
+            style={{
+              marginTop: 8,
+              padding: "10px 12px",
+              border: "1px solid #b45309",
+              borderRadius: 8,
+              fontSize: 13,
+            }}
+          >
+            <p style={{ margin: "0 0 8px" }}>
+              ¿Quitar <strong>{pendingDelete.label || pendingDelete.entityId}</strong> del plano?
+              El equipo no se borra: solo deja de estar situado aquí.
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <IgBtn
+                onClick={() => {
+                  const id = pendingDelete.id;
+                  setPendingDelete(null);
+                  setSelectedPin(null);
+                  void integraApi(`integra/map-pins/${id}`, { method: "DELETE" })
+                    .then(load)
+                    .catch((e) =>
+                      setError(e instanceof Error ? e.message : "No se pudo quitar el pin"),
+                    );
+                }}
+              >
+                Sí, quitar
+              </IgBtn>
+              <IgBtn onClick={() => setPendingDelete(null)}>Cancelar</IgBtn>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <IgBtn
+            onClick={() => {
+              setEditMode((v) => !v);
+              setPendingDelete(null);
+            }}
+          >
+            {editMode ? "Salir de edición" : "Editar plano"}
+          </IgBtn>
+          <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
+        </div>
       </IgPanel>
     </IgPage>
   );
