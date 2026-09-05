@@ -73,31 +73,6 @@ import {
 } from "./_peopleView";
 import { usePeopleQuery, type ViewMode } from "./_usePeopleQuery";
 
-type Person = {
-  id: string;
-  name: string;
-  code?: string;
-  orgId?: string;
-  orgName?: string;
-  userType?: string;
-  gender?: string;
-  validEnable?: boolean;
-  validFrom?: string;
-  validTo?: string;
-  doorRight?: string;
-  rightPlan?: unknown;
-  numOfFace?: number;
-  numOfFP?: number;
-  numOfCard?: number;
-  faceUrl?: string | null;
-  hasFace?: boolean;
-  hasLocalFace?: boolean;
-  localFpIds?: number[];
-  sourceIp?: string;
-  sourceName?: string;
-  doorNames?: string[];
-};
-
 type Org = { id: string; name: string; parentId?: string };
 type AcsDev = { id: string; name: string; kind: string; ip?: string | null; deviceType?: string | null };
 type OpResult = { deviceIp: string; ok: boolean; error?: string; attempts?: number };
@@ -124,14 +99,6 @@ async function erpApiFetch<T>(path: string, token: string, init?: RequestInit): 
   return (text ? JSON.parse(text) : null) as T;
 }
 
-function genderLabel(g?: string) {
-  const v = String(g || "").toLowerCase();
-  if (v === "male" || v === "1" || v === "m") return "Hombre";
-  if (v === "female" || v === "2" || v === "f") return "Mujer";
-  if (!g) return null;
-  return String(g);
-}
-
 function validityOf(p: Person): {
   key: "ok" | "warn" | "expired" | "off" | "unknown";
   label: string;
@@ -145,17 +112,6 @@ function validityOf(p: Person): {
   if (days < 0) return { key: "expired", label: "Vencida", tone: "danger" };
   if (days < 30) return { key: "warn", label: "Por vencer", tone: "warn" };
   return { key: "ok", label: "Vigente", tone: "ok" };
-}
-
-function formatWhen(iso?: string) {
-  if (!iso) return "—";
-  const d = Date.parse(iso);
-  if (!Number.isFinite(d)) return iso;
-  return new Date(d).toLocaleDateString("es-MX", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 function fileToJpegBase64(file: File): Promise<string> {

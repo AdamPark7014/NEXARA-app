@@ -19,7 +19,7 @@ import {
 import { RetryNotice, RowsSkeleton } from "../_AccessUi";
 import { ModuleSwitch } from "../_ModuleSwitch";
 import { getActiveCompanyId } from "@/lib/tenant";
-import { integraApi } from "../_lib";
+import { inputStyle, integraApi, selectStyle } from "../_lib";
 import styles from "../integra.module.css";
 import a from "../_access.module.css";
 
