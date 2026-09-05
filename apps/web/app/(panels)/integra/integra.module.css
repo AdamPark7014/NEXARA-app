@@ -749,8 +749,7 @@
 
 /*
  * Altavoz sobre el video. Arranca en 🔇 siempre: el navegador solo deja sonar
- * un video tras un gesto del usuario,
-así que el gesto es este botón.
+ * un video tras un gesto del usuario, así que el gesto es este botón.
  */
 .playerSound {
   position: absolute;
@@ -978,11 +977,9 @@ así que el gesto es este botón.
 
 /*
  * El muro y el foco viven montados a la vez y se alternan con `hidden`. Un
- * `display` de clase le gana al `hidden` del navegador,
-así que sin esto el
+ * `display` de clase le gana al `hidden` del navegador, así que sin esto el
  * muro seguía a la vista en modo Foco: se veían los mosaicos «En cola» —
- * porque en Foco el muro deja de tener cupo— y el foco quedaba debajo,
-oculto.
+ * porque en Foco el muro deja de tener cupo— y el foco quedaba debajo, oculto.
  */
 .wallWorkbench[hidden] {
   display: none;
@@ -1335,10 +1332,8 @@ oculto.
 
 /*
  * El título de página era 0.95rem (≈15px): apenas dos píxeles por encima del
- * cuerpo de la consola,
-así que la barra superior no leía como cabecera de
- * nada. Al paso más alto de la escala y con peso,
-ya manda sobre el resto.
+ * cuerpo de la consola, así que la barra superior no leía como cabecera de
+ * nada. Al paso más alto de la escala y con peso, ya manda sobre el resto.
  */
 .igToolbarTitle {
   margin: 0;
@@ -1441,11 +1436,9 @@ ya manda sobre el resto.
 /*
  * Antes: `max-height: calc(100dvh - 168px)`. Ese 168 era la altura supuesta del
  * chrome (barra global + toolbar + filtros): en cuanto una página añadía o
- * quitaba una fila de filtros el número dejaba de cuadrar,
-y dentro de IgSplit
+ * quitaba una fila de filtros el número dejaba de cuadrar, y dentro de IgSplit
  * abría un segundo scroll dentro del scroll del panel.
- * Ahora el tope lo pone la cadena flex (.igPanel flex:1 + min-height:0),
-que ya
+ * Ahora el tope lo pone la cadena flex (.igPanel flex:1 + min-height:0), que ya
  * sabe la altura real; el max-height solo queda como respaldo para cuando la
  * tabla cuelga de un bloque de altura automática.
  */
@@ -1471,12 +1464,9 @@ que ya
 }
 
 /*
- * La cabecera iba a 10px,
-en versalitas y con el gris de texto secundario: el
- * peor caso posible de legibilidad,
-y encima es lo que dice qué se está
- * mirando. Sube al siguiente paso (11px),
-gana peso y pasa a la tinta media,
+ * La cabecera iba a 10px, en versalitas y con el gris de texto secundario: el
+ * peor caso posible de legibilidad, y encima es lo que dice qué se está
+ * mirando. Sube al siguiente paso (11px), gana peso y pasa a la tinta media,
 * que sí despega de las celdas. El fondo se expresa en tokens para que el
  * tema oscuro no lo aclare (antes mezclaba con un #e8edf3 fijo).
  */
@@ -1664,44 +1654,6 @@ gana peso y pasa a la tinta media,
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
-}
-
-.igControl {
-  appearance: none;
-  width: 100%;
-  max-width: 280px;
-  padding: 6px 9px;
-  border: 1px solid var(--ig-line);
-  border-radius: var(--ig-radius);
-  background: var(--ig-panel);
-  color: var(--ig-ink);
-  font: inherit;
-  font-size: var(--ig-fs-md);
-  line-height: 1.3;
-}
-
-.igControl:hover {
-  border-color: color-mix(in srgb, var(--ig-accent) 35%, var(--ig-line));
-}
-
-.igControl:focus-visible {
-  outline: none;
-  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
-  box-shadow: var(--ig-focus);
-}
-
-.igControl:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-select.igControl {
-  max-width: 320px;
-  padding-right: 28px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235b6b7c' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 9px center;
-  background-color: var(--ig-panel);
 }
 
 .igCheckList {
@@ -2556,9 +2508,7 @@ select.igControl {
 .personOpList li[data-ok="1"] { color: var(--ig-ok); }
 .personOpList li[data-ok="0"] { color: var(--ig-danger); }
 
-/* La IP del terminal,
-debajo de su nombre: dato de instalación,
-no titular. */
+/* La IP del terminal, debajo de su nombre: dato de instalación, no titular. */
 .personFactSub {
   display: block;
   margin-top: 1px;
@@ -2660,10 +2610,8 @@ no titular. */
 
 /* ── Puesto de puerta ───────────────────────────────────────────────────
  * Ver quién llama y accionar la puerta sin cambiar de pantalla. El video a
- * la izquierda porque es lo que se mira; las acciones a la derecha,
-donde
- * cae la mano,
-y con el motivo obligatorio de por medio.
+ * la izquierda porque es lo que se mira; las acciones a la derecha, donde
+ * cae la mano, y con el motivo obligatorio de por medio.
  */
 .doorConsole {
   display: grid;
@@ -2760,163 +2708,12 @@ y con el motivo obligatorio de por medio.
   pointer-events: none;
 }
 
-.detMotionChip {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  top: auto;
-  right: auto;
-  z-index: 5;
-  padding: 3px 8px;
-  border-radius: var(--ig-radius-sm);
-  font-size: var(--ig-fs-micro);
-  font-weight: 650;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--ig-video-fg-amber);
-  background: rgb(120 53 15 / 0.82);
-  border: 1px solid var(--ig-amber);
-}
-
-.detPresenceChip {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  top: auto;
-  right: auto;
-  z-index: 5;
-  padding: 3px 8px;
-  border-radius: var(--ig-radius-sm);
-  font-size: var(--ig-fs-micro);
-  font-weight: 650;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--ig-cyan-tint);
-  background: rgb(8 47 73 / 0.86);
-  border: 1px solid var(--ig-cyan);
-}
-
-.detPresenceChip[data-kind="vehicle"] {
-  color: var(--ig-video-fg-amber);
-  background: rgb(67 40 12 / 0.86);
-  border-color: var(--ig-amber);
-}
-
-.detEmpty {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  z-index: 5;
-  max-width: min(280px, 70%);
-  padding: 5px 9px;
-  border-radius: var(--ig-radius-sm);
-  font-size: var(--ig-fs-xs);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1.35;
-  color: var(--ig-video-fg-faint);
-  background: rgb(15 23 42 / 0.72);
-  border: 1px solid rgb(148 163 184 / 0.35);
-}
-
-.detBox {
-  position: absolute;
-  border: 2px solid var(--ig-accent);
-  border-radius: var(--ig-radius-xs);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
-  animation: detFade var(--det-ttl, 10s) ease-out forwards;
-  transition: left 180ms linear, top 180ms linear, width 180ms linear, height 180ms linear, opacity 120ms linear;
-}
-
-.detBox[data-kind="vehicle"] {
-  border-color: var(--ig-amber);
-}
-
-.detBox[data-kind="face"] {
-  border-color: var(--ig-violet);
-}
-
-.detTag {
-  position: absolute;
-  bottom: 100%;
-  left: -2px;
-  margin-bottom: 2px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: min(240px, 72vw);
-  padding: 2px 6px 2px 2px;
-  border-radius: var(--ig-radius-xs);
-  background: rgb(4 18 26 / 0.9);
-  color: var(--ig-video-fg-cyan);
-  border: 1px solid color-mix(in srgb, var(--ig-accent) 70%, #fff);
-  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: var(--ig-fs-xs);
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  z-index: 2;
-}
-
-.detTag[data-inside="1"] {
-  bottom: auto;
-  top: 2px;
-  left: 2px;
-  margin-bottom: 0;
-}
-
-.detTagFace {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--ig-radius-xs);
-  object-fit: cover;
-  flex-shrink: 0;
-  background: rgb(255 255 255 / 0.1);
-}
-
-.detTag[data-named="1"] {
-  border-color: var(--ig-cyan-bright);
-  background: rgb(2 28 36 / 0.92);
-}
-
-.detTagName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.detTagAge {
-  flex-shrink: 0;
-  opacity: 0.72;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-
-.detBox[data-kind="vehicle"] .detTag {
-  border-color: var(--ig-amber);
-  color: var(--ig-video-fg-amber);
-}
-
-.detBox[data-kind="face"] .detTag {
-  border-color: var(--ig-violet-soft);
-  color: var(--ig-violet-tint);
-}
-
-.detBox[data-named="1"] {
-  border-color: var(--ig-cyan-bright);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55), 0 0 12px rgb(34 211 238 / 0.25);
-}
-
-/* El aviso es puntual: el recuadro se apaga solo en vez de quedarse clavado
-   donde ya no hay nadie. Duración la fija `--det-ttl` / style animationDuration. */
-@keyframes detFade {
-  0% { opacity: 0; }
-  4% { opacity: 1; }
-  78% { opacity: 1; }
-  100% { opacity: 0.15; }
-}
+/*
+ * Los recuadros, las etiquetas y los chips de detección vivían aquí y ahora
+ * están en `_detection.module.css` (`.box`, `.tag`, `.chip`…), que es lo que
+ * importa `_DetectionOverlay.tsx`. Solo queda `.detOverlay`, que sigue
+ * componiéndose con `det.overlay` para poner la capa sobre el vídeo.
+ */
 
 /* Flash de acceso ACS a nivel sitio (Video). */
 .liveAccessBanner {
@@ -3004,8 +2801,7 @@ y con el motivo obligatorio de por medio.
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Contenedor del foco: da el marco de referencia a los recuadros,
-que se
+/* Contenedor del foco: da el marco de referencia a los recuadros, que se
    posicionan en porcentaje sobre el video. */
 .focusStage {
   position: relative;
@@ -4425,34 +4221,6 @@ button.evCard {
   font-style: italic;
 }
 
-.schedWeekGrid {
-  display: grid;
-  gap: 4px;
-}
-
-.schedWeekRow {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 8px;
-  align-items: baseline;
-  font-size: var(--ig-fs-sm);
-}
-
-.schedWeekDay {
-  font-weight: 700;
-  color: var(--ig-ink-soft);
-}
-
-.schedWeekRanges {
-  color: var(--ig-ink);
-  font-family: var(--ig-font-mono);
-  font-size: var(--ig-fs-xs);
-}
-
-.schedWeekRanges[data-off="1"] {
-  color: var(--ig-muted);
-}
-
 .schedWeekEmpty {
   font-size: var(--ig-fs-md);
   color: var(--ig-muted);
@@ -4586,12 +4354,14 @@ button.evCard {
 }
 
 /* ── Movimiento reducido ──────────────────────────────────────────────────
- * Las animaciones del panel son de estado o decorativas: ninguna dice nada
- * que no diga ya el texto de al lado. Con `prefers-reduced-motion: reduce`
- * se apagan las cinco (igSpin, igPulse, detFade, liveAccessIn e igSkelSweep)
- * dejando visible su estado FINAL — o el inicial cuando el final es un
- * apagado, como en detFade, donde el recuadro debe seguir viéndose hasta que
- * el overlay lo retire por TTL.
+ * Las animaciones de este módulo son de estado o decorativas: ninguna dice
+ * nada que no diga ya el texto de al lado. Con `prefers-reduced-motion:
+ * reduce` se apagan todas (igSpin, igPulse, liveAccessIn e igSkelSweep)
+ * dejando visible su estado FINAL, que es el informativo: el esqueleto se
+ * queda gris quieto y el banner de acceso, colocado y opaco.
+ *
+ * Ojo: los recuadros de detección ya no se animan desde aquí. Viven en
+ * `_detection.module.css`, que tiene que traerse su propio bloque.
  */
 @media (prefers-reduced-motion: reduce) {
   .playerSpinner,
@@ -4602,17 +4372,16 @@ button.evCard {
     animation: none;
   }
 
-  .detBox {
-    animation: none;
-    opacity: 1;
-  }
-
-  /* El recuadro seguía al objetivo interpolando: sin movimiento, salta. */
-  .detBox,
+  /* Sin movimiento, el cambio de estado salta en vez de deslizarse. */
   .btnPrimary,
   .btnGhost,
   .doorCell,
-  .schedPreset {
+  .schedPreset,
+  .igTable tbody tr[data-click="1"],
+  .igFeedItem,
+  .igTreeRow,
+  .igCanvasTab,
+  .errorRetry {
     transition: none;
   }
 }
