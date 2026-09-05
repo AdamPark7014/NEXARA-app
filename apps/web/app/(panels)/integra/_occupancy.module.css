@@ -1,0 +1,250 @@
+/* ───────────────────────────────────────────────────────────────────────────
+ * Panel de ocupación — NEXARA Integra.
+ *
+ * Módulo propio (no `integra.module.css`, que está compartido con el resto de
+ * la consola). Todo lo que se pinta aquí sale de `integra/occupancy`: personas
+ * con acceso concedido hoy y su último paso. No hay aforo máximo configurado en
+ * ningún sitio, así que no se dibuja ningún porcentaje de capacidad.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--ig-radius-md, 8px);
+  border: 1px solid var(--ig-line, rgb(15 28 46 / 0.12));
+  background: var(--ig-panel, #fff);
+  color: var(--ig-ink, #0f1c2e);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.head strong {
+  font-family: var(--ig-font-display, "Space Grotesk", sans-serif);
+  font-size: var(--ig-fs-md, 13px);
+  letter-spacing: 0.01em;
+}
+
+.headDay {
+  margin-left: auto;
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ig-muted, #606f83);
+}
+
+/* ── Cifra + tendencia ──────────────────────────────────────────────────── */
+.figure {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.count {
+  font-family: var(--ig-font-display, "Space Grotesk", sans-serif);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ig-ink, #0f1c2e);
+}
+
+.countUnit {
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 600;
+  color: var(--ig-muted, #606f83);
+}
+
+.trend {
+  --trend-color: var(--ig-muted, #606f83);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: var(--ig-radius-pill, 999px);
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--trend-color);
+  border: 1px solid color-mix(in srgb, var(--trend-color) 40%, transparent);
+  background: color-mix(in srgb, var(--trend-color) 8%, transparent);
+}
+
+.trend[data-dir="up"] {
+  --trend-color: var(--ig-ok, #0f766e);
+}
+
+.trend[data-dir="down"] {
+  --trend-color: var(--ig-warn, #b45309);
+}
+
+/* ── Métricas derivadas del propio listado ──────────────────────────────── */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: var(--ig-radius-sm, 4px);
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 7%, transparent);
+}
+
+.metric b {
+  font-size: var(--ig-fs-lg, 15px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.metric span {
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ig-muted, #606f83);
+}
+
+/* ── Historial de lecturas de esta sesión ───────────────────────────────── */
+.history {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 34px;
+  padding-top: 2px;
+}
+
+.bar {
+  flex: 1 1 0;
+  min-width: 3px;
+  border-radius: 2px 2px 0 0;
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 45%, transparent);
+  transition: height 240ms ease-out;
+}
+
+.bar[data-last="1"] {
+  background: var(--ig-accent, #0e7490);
+}
+
+/* ── Lista de quién está dentro ─────────────────────────────────────────── */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--ig-radius-sm, 4px);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.row:hover,
+.row:focus-visible {
+  border-color: color-mix(in srgb, var(--ig-accent, #0e7490) 35%, transparent);
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 8%, transparent);
+}
+
+.photo {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ig-radius-sm, 4px);
+  overflow: hidden;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.body strong {
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.body span {
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted, #606f83);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowAge {
+  font-size: var(--ig-fs-micro, 10px);
+  font-variant-numeric: tabular-nums;
+  color: var(--ig-muted, #606f83);
+  white-space: nowrap;
+}
+
+.rowNew {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--ig-radius-pill, 999px);
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ig-ok, #0f766e);
+  border: 1px solid color-mix(in srgb, var(--ig-ok, #0f766e) 40%, transparent);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--ig-fs-xs, 11px);
+  line-height: 1.4;
+  color: var(--ig-muted, #606f83);
+}
+
+.hint[data-tone="error"] {
+  color: var(--ig-danger, #b91c1c);
+}
+
+.empty {
+  margin: 0;
+  padding: 10px 8px;
+  border-radius: var(--ig-radius-sm, 4px);
+  border: 1px dashed var(--ig-line, rgb(15 28 46 / 0.12));
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted, #606f83);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+  }
+}

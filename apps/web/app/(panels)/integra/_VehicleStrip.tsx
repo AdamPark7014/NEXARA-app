@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
+import SensorsIcon from "@mui/icons-material/Sensors";
+import TimelineIcon from "@mui/icons-material/Timeline";
 import { integraApi } from "./_lib";
+import det from "./_detection.module.css";
 import styles from "./integra.module.css";
 
 type PlateEv = {
@@ -132,6 +136,9 @@ export function IntegraVehicleStrip({
       {isPtz && honesty && <p className={styles.ptzHint}>{honesty}</p>}
       {isPtz && ptzMotionAt && (
         <p className={styles.ptzHint} data-tone="ok">
+          <span className={`${det.icon} ${det.iconInline}`} aria-hidden="true">
+            <SensorsIcon fontSize="inherit" />
+          </span>
           Motion PTZ hace {relAge(ptzMotionAt)} — movimiento, no ID de vehículo.
         </p>
       )}
@@ -168,7 +175,9 @@ export function IntegraVehicleStrip({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={h.photoPath} alt="" />
               ) : (
-                <span aria-hidden>V</span>
+                <span className={`${det.icon} ${det.iconLg}`} aria-hidden="true">
+                  <DirectionsCarIcon fontSize="inherit" />
+                </span>
               )}
             </div>
             <div className={styles.accessStripBody}>
@@ -190,7 +199,13 @@ export function IntegraVehicleStrip({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={h.photoPath} alt="" />
                 ) : (
-                  <span aria-hidden>{h.kind === "motion" ? "M" : "·"}</span>
+                  <span className={`${det.icon} ${det.iconLg}`} aria-hidden="true">
+                    {h.kind === "motion" ? (
+                      <SensorsIcon fontSize="inherit" />
+                    ) : (
+                      <TimelineIcon fontSize="inherit" />
+                    )}
+                  </span>
                 )}
               </div>
               <div className={styles.accessStripBody}>

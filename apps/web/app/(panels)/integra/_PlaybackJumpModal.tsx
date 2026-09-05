@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IgBtn, IgError } from "./_Console";
+import CloseIcon from "@mui/icons-material/Close";
+import { IgError } from "./_Console";
 import { IntegraLivePlayer } from "./_LivePlayer";
 import { integraApi, toDatetimeLocalValue } from "./_lib";
+import wall from "./_wall.module.css";
 
 type Props = {
   open: boolean;
@@ -56,6 +58,19 @@ export function PlaybackJumpModal({ open, cameraId, atIso, onClose }: Props) {
     };
   }, [open, cameraId, atIso]);
 
+  // Esc cierra: un modal que solo se cierra con el ratón no es un modal.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
@@ -88,7 +103,16 @@ export function PlaybackJumpModal({ open, cameraId, atIso, onClose }: Props) {
           <strong style={{ fontSize: 14 }}>
             Playback ±30s · {cameraId}
           </strong>
-          <IgBtn onClick={onClose}>Cerrar</IgBtn>
+          <button
+            type="button"
+            className={wall.iconBtn}
+            data-tone="light"
+            onClick={onClose}
+            title="Cerrar (Esc)"
+            aria-label="Cerrar el playback"
+          >
+            <CloseIcon sx={{ fontSize: 16 }} />
+          </button>
         </div>
         <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
           {atIso ? new Date(atIso).toLocaleString("es-MX", { hour12: false }) : "—"}

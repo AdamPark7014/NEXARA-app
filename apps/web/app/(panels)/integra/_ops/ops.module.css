@@ -1,0 +1,427 @@
+/*
+ * NEXARA Integra · piezas de consola compartidas por ANPR, Auditoría,
+ * Vehículos y Plano.
+ *
+ * No toca `integra.module.css`: solo consume sus tokens (--ig-*), que se
+ * declaran en `.shell` y por tanto están vivos en cualquier página del panel.
+ */
+
+/* ── Esqueletos de carga ──────────────────────────────────────────────── */
+
+.skel {
+  display: block;
+  border-radius: var(--ig-radius-sm);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ig-ink) 6%, transparent) 25%,
+    color-mix(in srgb, var(--ig-ink) 11%, transparent) 37%,
+    color-mix(in srgb, var(--ig-ink) 6%, transparent) 63%
+  );
+  background-size: 400% 100%;
+  animation: opsShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes opsShimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* Sin animación para quien la pidió apagada; el bloque sigue visible. */
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+  }
+}
+
+.skelTable {
+  padding: 10px 14px 14px;
+}
+
+.skelRow {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 60%, transparent);
+}
+
+.skelRow:last-child {
+  border-bottom: 0;
+}
+
+.skelHeadRow .skelCell {
+  height: 9px;
+  opacity: 0.75;
+}
+
+.skelCell {
+  height: 12px;
+}
+
+.skelBlock {
+  width: 100%;
+}
+
+.skelLabel {
+  display: block;
+  margin-top: 10px;
+  font-size: var(--ig-fs-xs);
+  color: var(--ig-muted);
+  letter-spacing: 0.02em;
+}
+
+/* ── Estado de error con título y reintento ───────────────────────────── */
+
+.errorBox {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--ig-danger) 32%, var(--ig-line));
+  border-left: 3px solid var(--ig-danger);
+  border-radius: var(--ig-radius-md);
+  background: color-mix(in srgb, var(--ig-danger) 6%, var(--ig-panel));
+}
+
+.errorIcon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--ig-danger);
+  display: inline-flex;
+}
+
+.errorBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.errorTitle {
+  display: block;
+  margin: 0 0 3px;
+  font-family: var(--ig-font-display);
+  font-size: var(--ig-fs-md);
+  font-weight: 700;
+  color: var(--ig-ink);
+}
+
+.errorText {
+  margin: 0;
+  font-size: var(--ig-fs-sm);
+  line-height: 1.5;
+  color: var(--ig-ink-soft);
+}
+
+.errorActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.errorDetail {
+  margin-top: 8px;
+  font-size: var(--ig-fs-xs);
+}
+
+.errorDetail > summary {
+  cursor: pointer;
+  color: var(--ig-muted);
+  font-weight: 650;
+  list-style: revert;
+}
+
+.errorDetail > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus);
+  border-radius: var(--ig-radius-xs);
+}
+
+.errorPre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--ig-radius-sm);
+  background: color-mix(in srgb, var(--ig-ink) 5%, transparent);
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs);
+  line-height: 1.5;
+  color: var(--ig-ink-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Recuento honesto: «mostrando 40 de 200» ──────────────────────────── */
+
+.countLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 8px 14px;
+  font-size: var(--ig-fs-xs);
+  color: var(--ig-muted);
+  border-bottom: 1px solid var(--ig-line);
+}
+
+.countStrong {
+  color: var(--ig-ink-soft);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.countWarn {
+  color: var(--ig-warn);
+  font-weight: 650;
+}
+
+/* ── Paginación ───────────────────────────────────────────────────────── */
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--ig-line);
+}
+
+.pagerInfo {
+  font-size: var(--ig-fs-xs);
+  color: var(--ig-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pagerBtns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagerPage {
+  font-size: var(--ig-fs-xs);
+  font-weight: 700;
+  color: var(--ig-ink-soft);
+  font-variant-numeric: tabular-nums;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.pagerSize {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ig-fs-xs);
+  color: var(--ig-muted);
+}
+
+.pagerSelect {
+  appearance: none;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm);
+  background: var(--ig-panel);
+  color: var(--ig-ink);
+  font: inherit;
+  font-size: var(--ig-fs-xs);
+  padding: 4px 6px;
+}
+
+.pagerSelect:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus);
+}
+
+/* ── Botones icónicos ─────────────────────────────────────────────────── */
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ig-accent) 8%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
+  color: var(--ig-accent);
+}
+
+.iconBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus);
+}
+
+.iconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.iconBtn[data-tone="danger"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ig-danger) 9%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-danger) 45%, var(--ig-line));
+  color: var(--ig-danger);
+}
+
+.iconBtn[data-tone="ok"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ig-ok) 10%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-ok) 45%, var(--ig-line));
+  color: var(--ig-ok);
+}
+
+.iconBtn[data-active="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-accent) 50%, var(--ig-line));
+  color: var(--ig-accent);
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+/* ── Fila expandible con JSON legible ─────────────────────────────────── */
+
+.expandBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px 3px 4px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-pill);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  font: inherit;
+  font-size: var(--ig-fs-xs);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.expandBtn:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
+  color: var(--ig-accent);
+}
+
+.expandBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus);
+}
+
+.expandChevron {
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+
+.expandBtn[aria-expanded="true"] .expandChevron {
+  transform: rotate(90deg);
+}
+
+.detailPanel {
+  margin: 0;
+  padding: 12px 14px 14px;
+  background: color-mix(in srgb, var(--ig-ink) 3%, var(--ig-panel));
+  border-top: 1px solid var(--ig-line);
+}
+
+.detailHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.detailTitle {
+  margin: 0;
+  font-size: var(--ig-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.jsonPre {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 340px;
+  overflow: auto;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm);
+  background: var(--ig-panel);
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs);
+  line-height: 1.55;
+  color: var(--ig-ink);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.kvGrid {
+  display: grid;
+  grid-template-columns: minmax(90px, max-content) 1fr;
+  gap: 4px 14px;
+  margin: 0 0 10px;
+  font-size: var(--ig-fs-sm);
+}
+
+.kvKey {
+  color: var(--ig-muted);
+  font-size: var(--ig-fs-xs);
+  letter-spacing: 0.02em;
+  align-self: center;
+}
+
+.kvVal {
+  color: var(--ig-ink);
+  word-break: break-word;
+}
+
+.kvMono {
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs);
+}
+
+/* ── Envolturas menores ───────────────────────────────────────────────── */
+
+.emptyWrap {
+  padding: 18px 16px 20px;
+}
+
+.inlineHint {
+  margin: 0;
+  font-size: var(--ig-fs-xs);
+  line-height: 1.5;
+  color: var(--ig-muted);
+}
+
+.stack {
+  display: grid;
+  gap: 10px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

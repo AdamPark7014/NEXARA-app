@@ -1,0 +1,835 @@
+/*
+ * Estilos propios de las cinco pantallas del panel INTEGRA que arregla este
+ * turno: inicio (workbench), horarios, visitas, asistencia y espacios.
+ *
+ * Vive aparte de `integra.module.css` a propósito: ese fichero lo tienen
+ * abierto otros agentes y las primitivas compartidas se están moviendo. Aquí
+ * solo entra lo que estas cinco páginas necesitan y nadie más usa.
+ *
+ * Los tokens `--ig-*` los declara `.shell` en `integra.module.css` y envuelve
+ * a `{children}`, así que heredan hasta aquí por cascada.
+ */
+
+/* ── Texto truncado que SÍ se puede leer ──────────────────────────────
+ * Toda celda que corta con puntos suspensivos se pinta con esta clase y
+ * siempre acompañada de `title`: si no, el nombre largo se pierde y no hay
+ * forma de recuperarlo salvo abrir el inspector.
+ */
+.trunc {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.truncInline {
+  display: inline-block;
+  vertical-align: bottom;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Anillo de foco ───────────────────────────────────────────────────
+ * Los `<Link>` de navegación del panel no recibían ninguno: con teclado no
+ * había manera de saber dónde estabas. `:focus-visible` no molesta al ratón.
+ */
+.focusLink,
+.focusable {
+  border-radius: var(--ig-radius-sm, 6px);
+  outline: none;
+}
+
+.focusLink:focus-visible,
+.focusable:focus-visible {
+  outline: 2px solid var(--ig-accent, #0e7490);
+  outline-offset: 2px;
+}
+
+/* Enlace de texto dentro del panel (Híbrido ERP, Ver eventos, Empujar horario) */
+.inlineLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--ig-fs-xs, 12px);
+  font-weight: 600;
+  color: var(--ig-accent, #0e7490);
+  text-decoration: none;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: var(--ig-radius-sm, 6px);
+  outline: none;
+}
+
+.inlineLink:hover {
+  text-decoration: underline;
+}
+
+.inlineLink:focus-visible {
+  outline: 2px solid var(--ig-accent, #0e7490);
+  outline-offset: 2px;
+}
+
+.inlineLink .icon {
+  font-size: 15px;
+}
+
+/* ── Estados: vacío, error, carga ─────────────────────────────────────
+ * Los tres tienen título. Un bloque de texto suelto no dice si estás ante un
+ * fallo, un filtro demasiado estrecho o un sitio recién dado de alta.
+ */
+.state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  text-align: center;
+  border: 1px dashed var(--ig-line, rgba(15, 28, 46, 0.12));
+  border-radius: var(--ig-radius, 10px);
+  background: color-mix(in srgb, var(--ig-surface, #f4f6f9) 55%, transparent);
+}
+
+.state[data-tone="danger"] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--ig-danger, #b91c1c) 40%, var(--ig-line, #ccc));
+  background: color-mix(in srgb, var(--ig-danger, #b91c1c) 6%, transparent);
+}
+
+.stateIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 10%, transparent);
+  color: var(--ig-accent, #0e7490);
+}
+
+.state[data-tone="danger"] .stateIcon {
+  background: color-mix(in srgb, var(--ig-danger, #b91c1c) 12%, transparent);
+  color: var(--ig-danger, #b91c1c);
+}
+
+.stateTitle {
+  font-size: var(--ig-fs-md, 13px);
+  font-weight: 700;
+  color: var(--ig-ink, #0f1c2e);
+}
+
+.stateHint {
+  max-width: 46ch;
+  font-size: var(--ig-fs-sm, 12px);
+  line-height: 1.5;
+  color: var(--ig-muted, #606f83);
+}
+
+.stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* Botón de reintento del bloque de error. */
+.retryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--ig-danger, #b91c1c) 45%, var(--ig-line, #ccc));
+  border-radius: var(--ig-radius-sm, 6px);
+  background: var(--ig-panel, #fff);
+  color: var(--ig-danger, #b91c1c);
+  font: inherit;
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+
+.retryBtn:hover {
+  background: color-mix(in srgb, var(--ig-danger, #b91c1c) 8%, var(--ig-panel, #fff));
+}
+
+.retryBtn:focus-visible {
+  outline: 2px solid var(--ig-danger, #b91c1c);
+  outline-offset: 2px;
+}
+
+/* Texto solo para lector de pantalla: el proyecto no traía utilidad global. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Esqueleto de carga: la forma de lo que va a llegar, no un spinner mudo. */
+.skeleton {
+  display: grid;
+  gap: 8px;
+}
+
+.skelRow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 84px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--ig-line, rgba(15, 28, 46, 0.12));
+  border-radius: var(--ig-radius, 10px);
+}
+
+.skelBar {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ig-line, #ccc) 60%, transparent) 25%,
+    color-mix(in srgb, var(--ig-line, #ccc) 100%, transparent) 50%,
+    color-mix(in srgb, var(--ig-line, #ccc) 60%, transparent) 75%
+  );
+  background-size: 300% 100%;
+  animation: skelSweep 1.4s ease-in-out infinite;
+}
+
+.skelDot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ig-line, #ccc) 70%, transparent);
+  animation: skelSweep 1.4s ease-in-out infinite;
+}
+
+.skelStack {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.skelStack .skelBar:last-child {
+  width: 45%;
+  height: 8px;
+}
+
+@keyframes skelSweep {
+  0% {
+    background-position: 100% 0;
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 0 0;
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skelBar,
+  .skelDot {
+    animation: none;
+  }
+}
+
+/* ── Resultado de una operación ───────────────────────────────────────
+ * Antes se volcaba `JSON.stringify` en un `<pre>` de 10px: el operador no
+ * tiene por qué leer el sobre del API para saber si su cita quedó registrada.
+ * Arriba el resumen; el crudo, plegado, para cuando algo falla.
+ */
+.opResult {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ig-line, rgba(15, 28, 46, 0.12));
+  border-radius: var(--ig-radius, 10px);
+  background: color-mix(in srgb, var(--ig-surface, #f4f6f9) 60%, transparent);
+}
+
+.opResult[data-tone="ok"] {
+  border-color: color-mix(in srgb, var(--ig-ok, #0f766e) 40%, var(--ig-line, #ccc));
+  background: color-mix(in srgb, var(--ig-ok, #0f766e) 7%, transparent);
+}
+
+.opResult[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--ig-danger, #b91c1c) 40%, var(--ig-line, #ccc));
+  background: color-mix(in srgb, var(--ig-danger, #b91c1c) 7%, transparent);
+}
+
+.opHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--ig-fs-md, 13px);
+  font-weight: 700;
+  color: var(--ig-ink, #0f1c2e);
+}
+
+.opHead .icon {
+  font-size: 18px;
+}
+
+.opResult[data-tone="ok"] .opHead .icon {
+  color: var(--ig-ok, #0f766e);
+}
+
+.opResult[data-tone="danger"] .opHead .icon {
+  color: var(--ig-danger, #b91c1c);
+}
+
+.opFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.opFact {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.opFactLabel {
+  font-size: var(--ig-fs-micro, 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ig-muted, #606f83);
+}
+
+.opFactValue {
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 600;
+  color: var(--ig-ink, #0f1c2e);
+  overflow-wrap: anywhere;
+}
+
+.opFactValue[data-mono="1"] {
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+}
+
+.rawBlock summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--ig-fs-xs, 12px);
+  font-weight: 600;
+  color: var(--ig-muted, #606f83);
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: var(--ig-radius-sm, 6px);
+  outline: none;
+}
+
+.rawBlock summary::-webkit-details-marker {
+  display: none;
+}
+
+.rawBlock summary:focus-visible {
+  outline: 2px solid var(--ig-accent, #0e7490);
+  outline-offset: 2px;
+}
+
+.rawBlock summary .icon {
+  font-size: 16px;
+  transition: transform 0.15s ease;
+}
+
+.rawBlock[open] summary .icon {
+  transform: rotate(180deg);
+}
+
+.rawPre {
+  margin: 6px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--ig-radius-sm, 6px);
+  background: color-mix(in srgb, var(--ig-ink, #0f1c2e) 6%, transparent);
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: var(--ig-fs-micro, 10px);
+  line-height: 1.5;
+  color: var(--ig-ink-soft, #243247);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ── Cifra con icono (reemplaza ∞ y ⏱ sueltos en el texto) ────────── */
+.metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.metric .icon {
+  font-size: 15px;
+  color: var(--ig-muted, #606f83);
+}
+
+.metric[data-tone="ok"] .icon {
+  color: var(--ig-ok, #0f766e);
+}
+
+.metric[data-tone="warn"] .icon {
+  color: var(--ig-warn, #b45309);
+}
+
+.metricRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+/* ── Matriz de horarios ───────────────────────────────────────────────
+ * La pantalla más densa del panel: quién puede pasar por una puerta y en qué
+ * franja de cada día. Cabecera y columna de persona fijas al hacer scroll;
+ * cada día, una barra de 24 h con las franjas reales dibujadas encima.
+ */
+.matrixWrap {
+  position: relative;
+  max-height: min(62vh, 620px);
+  overflow: auto;
+  border: 1px solid var(--ig-line, rgba(15, 28, 46, 0.12));
+  border-radius: var(--ig-radius, 10px);
+  background: var(--ig-panel, #fff);
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--ig-fs-sm, 12px);
+}
+
+.matrix th,
+.matrix td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ig-line, rgba(15, 28, 46, 0.12));
+  vertical-align: top;
+  text-align: left;
+}
+
+/* Cabecera fija */
+.matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--ig-panel, #fff);
+  box-shadow: inset 0 -1px 0 var(--ig-line, rgba(15, 28, 46, 0.12));
+  font-size: var(--ig-fs-micro, 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  color: var(--ig-muted, #606f83);
+  white-space: nowrap;
+}
+
+/* Columna de persona fija: es el ancla de lectura de toda la fila. */
+.matrix .colPerson {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 190px;
+  max-width: 240px;
+  background: var(--ig-panel, #fff);
+  box-shadow: inset -1px 0 0 var(--ig-line, rgba(15, 28, 46, 0.12));
+}
+
+.matrix thead .colPerson {
+  z-index: 4;
+}
+
+.matrix tbody tr:hover .colPerson {
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 6%, var(--ig-panel, #fff));
+}
+
+.matrix tbody tr:hover td {
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 4%, transparent);
+}
+
+.matrixPerson {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.matrixPerson strong {
+  font-size: var(--ig-fs-md, 13px);
+  font-weight: 700;
+}
+
+.matrixPersonMeta {
+  font-size: var(--ig-fs-micro, 10px);
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  color: var(--ig-muted, #606f83);
+}
+
+.matrixDayCol {
+  min-width: 104px;
+}
+
+.matrixDayHead {
+  display: grid;
+  gap: 2px;
+}
+
+.matrixDayHead em {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ig-muted, #606f83);
+}
+
+/* Franja de 24 h: la regla horaria vive en la cabecera y las bandas debajo. */
+.hourRuler {
+  position: relative;
+  height: 12px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ig-line, #ccc) 45%, transparent);
+}
+
+.hourTick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--ig-ink, #0f1c2e) 22%, transparent);
+}
+
+.hourTickLabel {
+  position: absolute;
+  top: 12px;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--ig-muted, #606f83);
+}
+
+.dayCell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dayTrack {
+  position: relative;
+  height: 14px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ig-line, #ccc) 35%, transparent);
+  overflow: hidden;
+}
+
+.dayTrack::before,
+.dayTrack::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--ig-ink, #0f1c2e) 12%, transparent);
+}
+
+.dayTrack::before {
+  left: 33.333%;
+}
+
+.dayTrack::after {
+  left: 66.666%;
+}
+
+.dayBand {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: var(--band-start, 0%);
+  width: var(--band-width, 0%);
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--ig-accent, #0e7490);
+}
+
+.dayText {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--ig-ink-soft, #243247);
+  overflow-wrap: anywhere;
+}
+
+.dayOff {
+  font-size: 10px;
+  color: var(--ig-muted, #606f83);
+}
+
+.matrixNoDetail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ig-fs-sm, 12px);
+  color: var(--ig-muted, #606f83);
+}
+
+.matrixNoDetail .icon {
+  font-size: 16px;
+  color: var(--ig-warn, #b45309);
+}
+
+.matrixLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0 0 8px;
+  font-size: var(--ig-fs-xs, 12px);
+  color: var(--ig-muted, #606f83);
+}
+
+.legendSwatch {
+  display: inline-block;
+  width: 22px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--ig-accent, #0e7490);
+  vertical-align: middle;
+  margin-right: 5px;
+}
+
+.legendSwatch[data-kind="off"] {
+  background: color-mix(in srgb, var(--ig-line, #ccc) 60%, transparent);
+}
+
+/* Vista semanal de una plantilla (panel lateral de «por persona») */
+.weekTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ig-fs-sm, 12px);
+}
+
+.weekTable th,
+.weekTable td {
+  padding: 5px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--ig-line, rgba(15, 28, 46, 0.12));
+  vertical-align: middle;
+}
+
+.weekTable th[scope="row"] {
+  width: 46px;
+  font-size: var(--ig-fs-micro, 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ig-muted, #606f83);
+  font-weight: 700;
+}
+
+.weekTable tbody tr:last-child th,
+.weekTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.weekTable caption {
+  caption-side: top;
+  text-align: left;
+  font-size: var(--ig-fs-micro, 10px);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ig-muted, #606f83);
+  padding-bottom: 6px;
+}
+
+/* ── Pestañas accesibles ──────────────────────────────────────────────
+ * El panel tenía `role="tablist"` sin `aria-controls` ni panel asociado: el
+ * lector de pantalla anunciaba pestañas que no llevaban a ningún sitio.
+ */
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.tabPanel:focus-visible {
+  outline: 2px solid var(--ig-accent, #0e7490);
+  outline-offset: 2px;
+}
+
+.tabList {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* ── Inicio · tarjetas del cliente ────────────────────────────────────
+ * Eran 100 % estilos en línea. Es la primera pantalla que ve el cliente.
+ */
+.clientCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.clientCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--ig-line, rgba(15, 28, 46, 0.12));
+  border-radius: var(--ig-radius, 12px);
+  background: var(--ig-panel, #fff);
+  color: inherit;
+  text-decoration: none;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.clientCard:hover {
+  border-color: color-mix(in srgb, var(--ig-accent, #0e7490) 50%, var(--ig-line, #ccc));
+  transform: translateY(-1px);
+}
+
+.clientCard:focus-visible {
+  outline: 2px solid var(--ig-accent, #0e7490);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clientCard {
+    transition: none;
+  }
+  .clientCard:hover {
+    transform: none;
+  }
+}
+
+.clientCardIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 11%, transparent);
+  color: var(--ig-accent, #0e7490);
+}
+
+.clientCardBody {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.clientCardTitle {
+  font-size: var(--ig-fs-md, 13px);
+  font-weight: 700;
+  color: var(--ig-ink, #0f1c2e);
+}
+
+.clientCardHint {
+  font-size: var(--ig-fs-sm, 12px);
+  line-height: 1.4;
+  color: var(--ig-muted, #606f83);
+}
+
+/* ── Inicio · canvas del workbench ────────────────────────────────── */
+.canvasSelect {
+  font-size: var(--ig-fs-xs, 12px);
+  padding: 3px 6px;
+  border: 1px solid var(--ig-line, rgba(15, 28, 46, 0.12));
+  border-radius: var(--ig-radius-sm, 6px);
+  background: var(--ig-panel, #fff);
+  color: var(--ig-ink, #0f1c2e);
+  outline: none;
+}
+
+.canvasSelect:focus-visible {
+  outline: 2px solid var(--ig-accent, #0e7490);
+  outline-offset: 1px;
+}
+
+.focusStack {
+  display: grid;
+  gap: 10px;
+}
+
+.focusDoorCard {
+  max-width: 360px;
+}
+
+.focusCamCard {
+  max-width: 640px;
+}
+
+.focusDoorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.camTileButton {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: var(--ig-radius-sm, 6px);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  outline: none;
+}
+
+.camTileButton:focus-visible {
+  outline: 2px solid var(--ig-accent, #0e7490);
+  outline-offset: 1px;
+}
+
+.camTileSlot {
+  min-height: 120px;
+}
+
+.camTilePlaceholder {
+  font-size: var(--ig-fs-xs, 12px);
+}
+
+.iconBtnLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.iconBtnLabel .icon {
+  font-size: 16px;
+}
+
+/* ── Asistencia ───────────────────────────────────────────────────── */
+.attFootnote {
+  margin-top: 4px;
+}

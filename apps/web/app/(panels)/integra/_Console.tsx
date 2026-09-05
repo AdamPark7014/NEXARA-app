@@ -163,9 +163,120 @@ export function IgBadge({
   return <span className={styles.igBadge} data-tone={tone}>{children}</span>;
 }
 
-export function IgError({ children }: { children: ReactNode }) {
+/**
+ * Error de consola.
+ *
+ * Antes pintaba el mensaje crudo de la API y nada más: el operador leía
+ * «Request failed with status code 502» sin saber qué había fallado ni qué
+ * podía hacer. Ahora lleva titular, cuerpo y una acción opcional de reintento.
+ *
+ * La firma vieja `<IgError>{error}</IgError>` sigue funcionando igual: todas
+ * las props nuevas son opcionales y el titular tiene texto por defecto.
+ */
+export function IgError({
+  children,
+  title,
+  tone = "danger",
+  onRetry,
+  retryLabel = "Reintentar",
+  retrying,
+}: {
+  children: ReactNode;
+  /** Qué ha fallado, en cristiano. Por defecto según el tono. */
+  title?: string;
+  /** `danger` = la operación no salió. `warn` = salió a medias. */
+  tone?: "danger" | "warn";
+  /** Si se pasa, aparece el botón de reintento. */
+  onRetry?: () => void;
+  retryLabel?: string;
+  /** Deshabilita el botón mientras el reintento está en vuelo. */
+  retrying?: boolean;
+}) {
   if (!children) return null;
-  return <p className={styles.error} role="alert">{children}</p>;
+  const heading = title ?? (tone === "warn" ? "Terminó con avisos" : "No se pudo completar");
+  return (
+    <div className={styles.error} data-tone={tone} role="alert">
+      <strong className={styles.errorTitle}>{heading}</strong>
+      <span className={styles.errorBody}>{children}</span>
+      {onRetry != null && (
+        <div className={styles.errorActions}>
+          <button
+            type="button"
+            className={styles.errorRetry}
+            onClick={onRetry}
+            disabled={retrying}
+          >
+            {retrying ? "Reintentando…" : retryLabel}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Skeleton de carga.
+ *
+ * No había ni uno en todo el panel: el contenido saltaba de vacío a lleno y,
+ * mientras el ISAPI respondía, la consola parecía colgada. La gracia está en
+ * calcar la geometría de lo que va a aparecer, así que la variante `row` lleva
+ * el mismo número de columnas que la tabla a la que sustituye.
+ */
+export function IgSkeleton({
+  variant = "block",
+  rows = 3,
+  columns = 4,
+  height,
+  width,
+  label = "Cargando…",
+}: {
+  /** `block` = un rectángulo. `text` = líneas de párrafo. `row` = filas de tabla/lista. */
+  variant?: "block" | "text" | "row";
+  /** Cuántas líneas o filas pintar. Ignorado en `block`. */
+  rows?: number;
+  /** Columnas de cada fila en `row`: pásale las mismas que la tabla real. */
+  columns?: number;
+  /** Alto del bloque en `block` (por defecto 72px). */
+  height?: string;
+  width?: string;
+  label?: string;
+}) {
+  const n = Math.max(1, rows);
+  const body =
+    variant === "block" ? (
+      <div
+        className={styles.igSkelBlock}
+        style={{ height: height ?? "72px", width: width ?? "100%" }}
+      />
+    ) : variant === "text" ? (
+      Array.from({ length: n }, (_, i) => (
+        <div
+          key={i}
+          className={`${styles.igSkelBlock} ${styles.igSkelLine}`}
+          // La última línea corta, como corta un párrafo de verdad.
+          style={{ width: i === n - 1 ? "62%" : `${92 - (i % 3) * 7}%` }}
+        />
+      ))
+    ) : (
+      Array.from({ length: n }, (_, r) => (
+        <div
+          key={r}
+          className={styles.igSkelRow}
+          style={{ ["--ig-skel-cols" as string]: Math.max(1, columns) }}
+        >
+          {Array.from({ length: Math.max(1, columns) }, (_, c) => (
+            <div key={c} className={styles.igSkelBlock} />
+          ))}
+        </div>
+      ))
+    );
+
+  return (
+    <div className={styles.igSkeleton} role="status" aria-busy="true" aria-live="polite">
+      {body}
+      <span className={styles.igSrOnly}>{label}</span>
+    </div>
+  );
 }
 
 export function IgNotice({
@@ -186,20 +297,44 @@ export function IgNotice({
   );
 }
 
+/**
+ * Vacío con explicación. Admite icono, título, descripción y acción para que
+ * las páginas puedan pasar de «Sin datos» a decir qué falta y qué hacer.
+ *
+ * `title` y `hint` se mantienen tal cual porque son las props que ya usan las
+ * páginas; `description` es la versión ReactNode de `hint` (para meter un
+ * <code> o un enlace) y gana si se pasan las dos.
+ */
 export function IgEmptyState({
+  icon,
   title,
   hint,
+  description,
+  action,
   children,
 }: {
+  /** Glifo o SVG decorativo. No se anuncia: el texto ya lo dice. */
+  icon?: ReactNode;
   title?: string;
   hint?: string;
+  description?: ReactNode;
+  /** Botón o enlace que resuelve el vacío (crear, sincronizar, cambiar filtro). */
+  action?: ReactNode;
   children?: ReactNode;
 }) {
+  const body = description ?? (hint ? hint : null);
+  const bare = !title && body == null && !icon && !action;
   return (
     <div className={styles.igEmpty}>
+      {icon != null && (
+        <span className={styles.igEmptyIcon} aria-hidden>
+          {icon}
+        </span>
+      )}
       {title ? <strong className={styles.igEmptyTitle}>{title}</strong> : null}
-      {hint ? <span className={styles.igEmptyHint}>{hint}</span> : null}
-      {!title && !hint ? children || "Sin datos" : children}
+      {body != null ? <span className={styles.igEmptyHint}>{body}</span> : null}
+      {bare ? children || "Sin datos" : children}
+      {action != null && <div className={styles.igEmptyActions}>{action}</div>}
     </div>
   );
 }

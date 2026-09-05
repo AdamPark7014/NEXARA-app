@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SyncIcon from "@mui/icons-material/Sync";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import {
   IgBadge,
   IgBtn,
-  IgError,
   IgField,
   IgPage,
   IgPanel,
@@ -14,9 +16,12 @@ import {
   IgTable,
   IgToolbar,
 } from "../_Console";
+import { RetryNotice, RowsSkeleton } from "../_AccessUi";
+import { ModuleSwitch } from "../_ModuleSwitch";
 import { getActiveCompanyId } from "@/lib/tenant";
-import { inputStyle, integraApi, selectStyle } from "../_lib";
+import { integraApi } from "../_lib";
 import styles from "../integra.module.css";
+import a from "../_access.module.css";
 
 type Site = {
   id: number;
@@ -68,10 +73,14 @@ export default function IntegraSettingsPage() {
   const [targetCompanyId, setTargetCompanyId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Site | null>(null);
+  /** Diálogo del producto — sustituye al `window.confirm` del navegador. */
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
+    setLoading(true);
     try {
       setSites(await integraApi<Site[]>("integra/sites"));
       try {
@@ -87,6 +96,8 @@ export default function IntegraSettingsPage() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -148,12 +159,25 @@ export default function IntegraSettingsPage() {
       <IgToolbar
         title="Sitios"
         meta={sites.length ? `${sites.length} conectados` : "Administración"}
-        actions={<IgBtn onClick={() => void load()}>Actualizar</IgBtn>}
+        actions={
+          <IgBtn
+            onClick={() => void load()}
+            disabled={loading}
+            aria-label="Actualizar la lista de sitios"
+          >
+            {loading ? "Actualizando…" : "Actualizar"}
+            <RefreshIcon className={a.btnIcon} aria-hidden />
+          </IgBtn>
+        }
       />
-      <IgError>{error}</IgError>
+      {error && <RetryNotice message={error} onRetry={() => void load()} busy={loading} />}
 
-      {sites.length === 0 ? (
-        <div className={styles.igOnboard} style={{ minHeight: 280, flex: "0 0 auto", marginBottom: 8 }}>
+      {loading && sites.length === 0 ? (
+        <RowsSkeleton rows={4} />
+      ) : null}
+
+      {!loading && sites.length === 0 ? (
+        <div className={`${styles.igOnboard} ${a.onboard}`}>
           <div className={styles.igOnboardCard}>
             <EmptyState
               title="Agrega tu primer sitio"

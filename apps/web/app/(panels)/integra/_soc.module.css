@@ -1,0 +1,946 @@
+/*
+ * Consola SOC — cola de alarmas y correlación de eventos.
+ *
+ * Módulo propio: `integra.module.css` lo tienen abierto otros agentes. Aquí solo
+ * hay lo que la cola y el timeline necesitan y no existía. Los tokens `--ig-*`
+ * se heredan de `.shell` (IntegraChrome), así que el tema claro/oscuro y la
+ * escala tipográfica son los mismos que el resto del panel.
+ */
+
+/* ── Severidad ────────────────────────────────────────────────────────────
+ * Color + FORMA + icono. El color solo no vale: un daltónico protán no
+ * distingue el rojo del ámbar, y en una cola de vigilancia eso es el trabajo.
+ */
+.sevPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  color: var(--soc-sev-ink, var(--ig-muted));
+  background: var(--soc-sev-bg, transparent);
+  border-color: var(--soc-sev-line, var(--ig-line));
+}
+
+.sevPill svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+/* Alta: octógono achaflanado, como una señal de alto. */
+.sevPill[data-sev="alta"] {
+  --soc-sev-ink: var(--ig-danger, #b42318);
+  --soc-sev-bg: color-mix(in srgb, var(--ig-danger, #b42318) 12%, transparent);
+  --soc-sev-line: color-mix(in srgb, var(--ig-danger, #b42318) 45%, transparent);
+  clip-path: polygon(
+    6px 0,
+    calc(100% - 6px) 0,
+    100% 6px,
+    100% calc(100% - 6px),
+    calc(100% - 6px) 100%,
+    6px 100%,
+    0 calc(100% - 6px),
+    0 6px
+  );
+}
+
+/* Media: rectángulo recto. */
+.sevPill[data-sev="media"] {
+  --soc-sev-ink: color-mix(in srgb, var(--ig-warn, #b54708) 88%, var(--ig-ink));
+  --soc-sev-bg: color-mix(in srgb, var(--ig-warn, #b54708) 14%, transparent);
+  --soc-sev-line: color-mix(in srgb, var(--ig-warn, #b54708) 45%, transparent);
+  border-radius: var(--ig-radius-xs, 3px);
+}
+
+/* Baja: cápsula. */
+.sevPill[data-sev="baja"] {
+  --soc-sev-ink: color-mix(in srgb, var(--ig-accent, #0e7490) 85%, var(--ig-ink));
+  --soc-sev-bg: color-mix(in srgb, var(--ig-accent, #0e7490) 10%, transparent);
+  --soc-sev-line: color-mix(in srgb, var(--ig-accent, #0e7490) 38%, transparent);
+  border-radius: var(--ig-radius-pill, 999px);
+}
+
+/* Desconocida: sin relleno y de trazo discontinuo — se ve que es un hueco. */
+.sevPill[data-sev="desconocida"] {
+  --soc-sev-ink: var(--ig-muted);
+  --soc-sev-bg: transparent;
+  --soc-sev-line: var(--ig-line);
+  border-style: dashed;
+  border-radius: var(--ig-radius-xs, 3px);
+}
+
+/* ── Estado del flujo de atención ─────────────────────────────────────── */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--ig-radius-pill, 999px);
+  border: 1px solid var(--ig-line);
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  white-space: nowrap;
+  color: var(--ig-muted);
+}
+
+.statusPill svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+.statusPill[data-status="OPEN"] {
+  color: var(--ig-danger, #b42318);
+  border-color: color-mix(in srgb, var(--ig-danger, #b42318) 42%, transparent);
+  background: color-mix(in srgb, var(--ig-danger, #b42318) 9%, transparent);
+}
+
+.statusPill[data-status="TICKETED"] {
+  color: color-mix(in srgb, var(--ig-warn, #b54708) 88%, var(--ig-ink));
+  border-color: color-mix(in srgb, var(--ig-warn, #b54708) 42%, transparent);
+  background: color-mix(in srgb, var(--ig-warn, #b54708) 10%, transparent);
+}
+
+.statusPill[data-status="ACK"] {
+  color: color-mix(in srgb, var(--ig-accent, #0e7490) 88%, var(--ig-ink));
+  border-color: color-mix(in srgb, var(--ig-accent, #0e7490) 40%, transparent);
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 9%, transparent);
+}
+
+.statusPill[data-status="CLEARED"] {
+  color: var(--ig-ok, #0f766e);
+  border-color: color-mix(in srgb, var(--ig-ok, #0f766e) 38%, transparent);
+  background: color-mix(in srgb, var(--ig-ok, #0f766e) 9%, transparent);
+}
+
+/* ── Contador de repeticiones ─────────────────────────────────────────── */
+.dupChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--ig-radius-pill, 999px);
+  border: 1px solid color-mix(in srgb, var(--ig-ink) 16%, transparent);
+  background: color-mix(in srgb, var(--ig-ink) 5%, transparent);
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 700;
+  color: var(--ig-ink-soft);
+  white-space: nowrap;
+}
+
+.dupChip[data-hot="1"] {
+  border-color: color-mix(in srgb, var(--ig-danger, #b42318) 45%, transparent);
+  background: color-mix(in srgb, var(--ig-danger, #b42318) 12%, transparent);
+  color: var(--ig-danger, #b42318);
+}
+
+.dupChip svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* ── Tabla ordenable ──────────────────────────────────────────────────────
+ * `IgTable` no ordena y no puedo tocarla (otro agente la tiene abierta).
+ * Esta es la misma densidad visual, con cabeceras que sí ordenan.
+ */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-md, 8px);
+  background: var(--ig-panel);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ig-fs-sm, 12px);
+  color: var(--ig-ink);
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0;
+  text-align: left;
+  background: color-mix(in srgb, var(--ig-ink) 4%, var(--ig-panel));
+  border-bottom: 1px solid var(--ig-line);
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+  white-space: nowrap;
+}
+
+.thPad {
+  display: block;
+  padding: 7px 10px;
+}
+
+.sortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sortBtn:hover {
+  color: var(--ig-ink);
+}
+
+.sortBtn[data-active="1"] {
+  color: var(--ig-accent);
+}
+
+.sortBtn svg {
+  width: 13px;
+  height: 13px;
+  opacity: 0.35;
+  flex: none;
+}
+
+.sortBtn[data-active="1"] svg {
+  opacity: 1;
+}
+
+.table tbody td {
+  padding: 7px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 60%, transparent);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr[data-click="1"] {
+  cursor: pointer;
+}
+
+.table tbody tr[data-click="1"]:hover td {
+  background: color-mix(in srgb, var(--ig-accent) 5%, transparent);
+}
+
+.table tbody tr[data-selected="1"] td {
+  background: color-mix(in srgb, var(--ig-accent) 9%, transparent);
+}
+
+/* Franja de severidad a la izquierda: se lee la cola de un vistazo. */
+.table tbody tr[data-sev="alta"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ig-danger, #b42318);
+}
+
+.table tbody tr[data-sev="media"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ig-warn, #b54708);
+}
+
+.table tbody tr[data-sev="baja"] td:first-child {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--ig-accent) 60%, transparent);
+}
+
+.table tbody tr[data-attended="1"] td {
+  opacity: 0.72;
+}
+
+.cellMain {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cellTitle {
+  font-weight: 650;
+  color: var(--ig-ink);
+  overflow-wrap: anywhere;
+}
+
+.cellSub {
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+  overflow-wrap: anywhere;
+}
+
+.cellMono {
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-ink-soft);
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* ── Foco visible en todo lo interactivo del módulo ───────────────────── */
+.sortBtn:focus-visible,
+.iconBtn:focus-visible,
+.seqCard:focus-visible,
+.seqItem:focus-visible,
+.toggle:focus-visible,
+.table tbody tr[data-click="1"]:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: -2px;
+  border-radius: var(--ig-radius-xs, 3px);
+}
+
+/* ── Botón icónico ────────────────────────────────────────────────────── */
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 7px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius, 6px);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.iconBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, transparent);
+  color: var(--ig-accent);
+}
+
+.iconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.iconBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.iconBtn[data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--ig-accent) 10%, transparent);
+  color: var(--ig-accent);
+}
+
+/* ── Detalle de alarma ────────────────────────────────────────────────── */
+.detail {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detailMedia {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.photo {
+  width: 132px;
+  height: 132px;
+  border-radius: var(--ig-radius-md, 8px);
+  border: 1px solid var(--ig-line);
+  background: color-mix(in srgb, var(--ig-ink) 6%, var(--ig-panel));
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ig-muted);
+  font-size: var(--ig-fs-xl, 17px);
+  font-weight: 700;
+}
+
+.photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photoNote {
+  font-size: var(--ig-fs-micro, 10px);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+  text-align: center;
+}
+
+.detailBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.detailHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.detailTitle {
+  font-size: var(--ig-fs-lg, 15px);
+  font-weight: 700;
+  color: var(--ig-ink);
+  margin-right: 4px;
+}
+
+/* ── Pares clave-valor (adiós al volcado de JSON) ─────────────────────── */
+.kv {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  gap: 2px 12px;
+  margin: 0;
+  font-size: var(--ig-fs-sm, 12px);
+}
+
+.kvKey {
+  color: var(--ig-muted);
+  font-size: var(--ig-fs-xs, 11px);
+  padding: 3px 0;
+  white-space: nowrap;
+}
+
+.kvVal {
+  margin: 0;
+  color: var(--ig-ink);
+  padding: 3px 0;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 45%, transparent);
+}
+
+.kvVal:last-of-type {
+  border-bottom: 0;
+}
+
+.kvVal[data-empty="1"] {
+  color: var(--ig-muted);
+}
+
+.raw {
+  margin-top: 8px;
+  border-top: 1px dashed var(--ig-line);
+  padding-top: 6px;
+}
+
+.rawSummary {
+  cursor: pointer;
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  color: var(--ig-muted);
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rawSummary::-webkit-details-marker {
+  display: none;
+}
+
+.rawSummary:hover {
+  color: var(--ig-accent);
+}
+
+.rawSummary svg {
+  width: 13px;
+  height: 13px;
+}
+
+.rawPre {
+  margin: 6px 0 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--ig-radius, 6px);
+  background: color-mix(in srgb, var(--ig-ink) 5%, var(--ig-panel));
+  border: 1px solid var(--ig-line);
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs, 11px);
+  line-height: 1.5;
+  color: var(--ig-ink-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Ficha de registro histórico: clave-valor + crudo plegado. */
+.recordCard {
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-md, 8px);
+  padding: 10px 12px;
+  background: var(--ig-panel);
+}
+
+.recordGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+}
+
+.recordHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.recordTitle {
+  font-weight: 650;
+  font-size: var(--ig-fs-md, 13px);
+  color: var(--ig-ink);
+}
+
+/* ── Esqueletos ───────────────────────────────────────────────────────── */
+.skel {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+}
+
+.skelRow {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 2fr) minmax(0, 1fr) 70px 110px 90px;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 55%, transparent);
+}
+
+@media (max-width: 720px) {
+  .skelRow {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+  .skelRow span:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+.skelBar {
+  display: block;
+  height: 10px;
+  border-radius: var(--ig-radius-pill, 999px);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ig-ink) 7%, transparent) 25%,
+    color-mix(in srgb, var(--ig-ink) 13%, transparent) 37%,
+    color-mix(in srgb, var(--ig-ink) 7%, transparent) 63%
+  );
+  background-size: 320% 100%;
+  animation: socShimmer 1.4s ease-in-out infinite;
+}
+
+.skelCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.skelCard {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-md, 8px);
+}
+
+.skelAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ig-radius, 6px);
+  background: color-mix(in srgb, var(--ig-ink) 8%, transparent);
+  animation: socShimmer 1.4s ease-in-out infinite;
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ig-ink) 7%, transparent) 25%,
+    color-mix(in srgb, var(--ig-ink) 13%, transparent) 37%,
+    color-mix(in srgb, var(--ig-ink) 7%, transparent) 63%
+  );
+  background-size: 320% 100%;
+}
+
+.skelLines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@keyframes socShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skelBar,
+  .skelAvatar {
+    animation: none;
+  }
+}
+
+/* ── Vacío que se lee como buena noticia ──────────────────────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 18px;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--ig-radius-pill, 999px);
+  border: 1px solid var(--ig-line);
+  color: var(--ig-muted);
+  background: color-mix(in srgb, var(--ig-ink) 4%, transparent);
+}
+
+.emptyIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.empty[data-tone="ok"] .emptyIcon {
+  color: var(--ig-ok, #0f766e);
+  border-color: color-mix(in srgb, var(--ig-ok, #0f766e) 40%, transparent);
+  background: color-mix(in srgb, var(--ig-ok, #0f766e) 10%, transparent);
+}
+
+.emptyTitle {
+  font-size: var(--ig-fs-md, 13px);
+  font-weight: 700;
+  color: var(--ig-ink);
+}
+
+.emptyHint {
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+  max-width: 46ch;
+  line-height: 1.55;
+}
+
+.emptyActions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+/* ── Correlación de eventos: secuencias por puerta ────────────────────── */
+.seqList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.seqCard {
+  border: 1px solid var(--ig-line);
+  border-left: 3px solid var(--ig-line);
+  border-radius: var(--ig-radius-md, 8px);
+  background: var(--ig-panel);
+  overflow: hidden;
+}
+
+.seqCard[data-tone="danger"] {
+  border-left-color: var(--ig-danger, #b42318);
+  background: color-mix(in srgb, var(--ig-danger, #b42318) 4%, var(--ig-panel));
+}
+
+.seqCard[data-tone="warn"] {
+  border-left-color: var(--ig-warn, #b54708);
+}
+
+.seqCard[data-tone="ok"] {
+  border-left-color: color-mix(in srgb, var(--ig-ok, #0f766e) 65%, transparent);
+}
+
+.seqHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 60%, transparent);
+  background: color-mix(in srgb, var(--ig-ink) 3%, transparent);
+}
+
+.seqDoor {
+  font-size: var(--ig-fs-md, 13px);
+  font-weight: 700;
+  color: var(--ig-ink);
+}
+
+.seqWindow {
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+}
+
+.seqTags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.seqStory {
+  padding: 6px 12px 0;
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-ink-soft);
+  line-height: 1.55;
+}
+
+.seqRail {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 6px 8px;
+}
+
+.seqItem {
+  display: grid;
+  grid-template-columns: 62px 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: var(--ig-radius, 6px);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--ig-ink);
+  cursor: pointer;
+  position: relative;
+}
+
+.seqItem:hover {
+  background: color-mix(in srgb, var(--ig-accent) 6%, transparent);
+}
+
+.seqItem[data-selected="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 11%, transparent);
+}
+
+/* Hilo vertical: la secuencia se lee como una historia, no como filas sueltas. */
+.seqItem::before {
+  content: "";
+  position: absolute;
+  left: 76px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--ig-line) 80%, transparent);
+}
+
+.seqItem:first-child::before {
+  top: 50%;
+}
+
+.seqItem:last-child::before {
+  bottom: 50%;
+}
+
+.seqTime {
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+  white-space: nowrap;
+}
+
+.seqDot {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--ig-radius-pill, 999px);
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  color: var(--ig-muted);
+  justify-self: center;
+}
+
+.seqDot svg {
+  width: 14px;
+  height: 14px;
+}
+
+.seqDot[data-tone="danger"] {
+  color: var(--ig-danger, #b42318);
+  border-color: color-mix(in srgb, var(--ig-danger, #b42318) 50%, transparent);
+  background: color-mix(in srgb, var(--ig-danger, #b42318) 10%, var(--ig-panel));
+}
+
+.seqDot[data-tone="ok"] {
+  color: var(--ig-ok, #0f766e);
+  border-color: color-mix(in srgb, var(--ig-ok, #0f766e) 45%, transparent);
+  background: color-mix(in srgb, var(--ig-ok, #0f766e) 9%, var(--ig-panel));
+}
+
+.seqWho {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.seqName {
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 620;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seqLabel {
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seqRepeat {
+  font-family: var(--ig-font-mono);
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+  white-space: nowrap;
+}
+
+.seqMore {
+  padding: 4px 12px 2px 76px;
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--ig-radius-pill, 999px);
+  border: 1px solid var(--ig-line);
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+  white-space: nowrap;
+}
+
+.tag[data-tone="danger"] {
+  color: var(--ig-danger, #b42318);
+  border-color: color-mix(in srgb, var(--ig-danger, #b42318) 45%, transparent);
+  background: color-mix(in srgb, var(--ig-danger, #b42318) 10%, transparent);
+}
+
+.tag[data-tone="ok"] {
+  color: var(--ig-ok, #0f766e);
+  border-color: color-mix(in srgb, var(--ig-ok, #0f766e) 40%, transparent);
+}
+
+.tag[data-tone="warn"] {
+  color: color-mix(in srgb, var(--ig-warn, #b54708) 88%, var(--ig-ink));
+  border-color: color-mix(in srgb, var(--ig-warn, #b54708) 45%, transparent);
+  background: color-mix(in srgb, var(--ig-warn, #b54708) 10%, transparent);
+}
+
+/* ── Barra de utilidades (orden, sonido, agrupación) ──────────────────── */
+.utilBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.utilSpacer {
+  flex: 1 1 auto;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-pill, 999px);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.toggle[data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--ig-accent) 10%, transparent);
+  color: var(--ig-accent);
+}
+
+.toggle svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Región viva: se anuncia sin ocupar sitio. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hint {
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+  line-height: 1.55;
+  margin: 6px 0 0;
+}

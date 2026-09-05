@@ -5038,6 +5038,7 @@ model CompanyProfile {
   integraCameras            IntegraCamera[]
   integraDoors              IntegraDoor[]
   integraPeople             IntegraPerson[]
+  integraPersonCards        IntegraPersonCard[]
   integraPersonDeletePending IntegraPersonDeletePending[]
   integraDevices            IntegraDevice[]
   integraVehicles           IntegraVehicle[]
@@ -5738,6 +5739,7 @@ model IntegraSite {
   cameras  IntegraCamera[]
   doors    IntegraDoor[]
   people   IntegraPerson[]
+  personCards IntegraPersonCard[]
   personDeletePending IntegraPersonDeletePending[]
   devices  IntegraDevice[]
   vehicles IntegraVehicle[]
@@ -6075,6 +6077,14 @@ model IntegraMapPin {
   @@map("integra_map_pins")
 }
 
+/// Espejo de una persona del ACS.
+///
+/// Lo que el terminal entrega en `UserInfo` vivía entero dentro de `raw`, y un
+/// JSON opaco no se filtra, no se ordena y no se indexa: no había forma de
+/// preguntar «quién vence este mes» sin traerse las filas a memoria. Las
+/// columnas de abajo son ese mismo dato, promovido. `raw` se conserva como red
+/// de seguridad — el firmware manda campos que aquí no se tipan (RightPlan,
+/// doorRight, password…) y perderlos sería peor que duplicarlos.
 model IntegraPerson {
   id            Int      @id @default(autoincrement())
   companyId     Int
@@ -6083,7 +6093,26 @@ model IntegraPerson {
   personName    String   @db.VarChar(220)
   personCode    String?  @db.VarChar(120)
   orgIndexCode  String?  @db.VarChar(120)
+  /// Departamento REAL. El DS-K1T no entrega organización en `UserInfo`, así
+  /// que por ISAPI queda null a propósito: antes se le metía aquí el
+  /// `userType`, que es otra cosa. Con Artemis/HikCentral sí viene poblado.
   orgName       String?  @db.VarChar(220)
+  /// `male` | `female` | `unknown` — tal cual lo manda el terminal.
+  gender        String?  @db.VarChar(32)
+  /// `normal` | `visitor` | `blackList` | `patrol` — tipo de usuario ACS.
+  userType      String?  @db.VarChar(64)
+  /// `Valid.enable`: la vigencia está activa.
+  validEnable   Boolean?
+  /// `Valid.beginTime` / `Valid.endTime` del terminal (hora local del equipo).
+  validFrom     DateTime?
+  validTo       DateTime?
+  numOfFace     Int?
+  numOfFP       Int?
+  numOfCard     Int?
+  /// URL de rostro EN EL TERMINAL. Muchos DS-K1T la anuncian y devuelven 404.
+  faceUrl       String?  @db.VarChar(500)
+  /// IP del ACS donde se leyó. Desempata puertas cuando hay varios lectores.
+  sourceIp      String?  @db.VarChar(64)
   raw           Json?
   syncedAt      DateTime @default(now())
 
@@ -6092,7 +6121,38 @@ model IntegraPerson {
 
   @@unique([siteId, personId])
   @@index([companyId])
+  /// Vencimientos próximos por empresa sin escanear la tabla.
+  @@index([companyId, validTo])
+  /// Segmentar por tipo de usuario dentro de un sitio (visitantes, patrulla…).
+  @@index([siteId, userType])
   @@map("integra_people")
+}
+
+/// Credenciales de tarjeta de una persona.
+///
+/// `numOfCard` dice CUÁNTAS tiene; esto dice CUÁLES. Se puebla desde
+/// `CardInfo/Search` (HikGateway §4.3.3) en cada sync. La tarjeta pertenece al
+/// terminal donde está grabada, así que `deviceIp` es parte del dato, no
+/// metadato: la misma persona puede tener credenciales distintas por lector.
+model IntegraPersonCard {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  siteId    Int
+  /// `employeeNo` del ACS — mismo valor que `IntegraPerson.personId`.
+  personId  String   @db.VarChar(120)
+  cardNo    String   @db.VarChar(120)
+  /// `normalCard` | `patrolCard` | `hijackCard` | `superCard` |
+  /// `dismissingCard` | `emergencyCard`. Ausente = normal.
+  cardType  String?  @db.VarChar(48)
+  deviceIp  String   @db.VarChar(64)
+  syncedAt  DateTime @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, cardNo])
+  @@index([companyId, personId])
+  @@map("integra_person_cards")
 }
 
 /// Baja forzada / parcial: el sync ISAPI NO reimporta estos personId mientras

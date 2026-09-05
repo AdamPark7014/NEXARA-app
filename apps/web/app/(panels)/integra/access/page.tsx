@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import LockOpenOutlinedIcon from "@mui/icons-material/LockOpenOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import TuneIcon from "@mui/icons-material/Tune";
 import {
-  IgBadge,
   IgBtn,
-  IgError,
   IgField,
   IgFilters,
   IgNotice,
@@ -15,12 +18,24 @@ import {
   IgTable,
   IgToolbar,
 } from "../_Console";
+import {
+  DOOR_STATE_FILTERS,
+  DoorGridSkeleton,
+  DoorStateBadge,
+  RetryNotice,
+  RowsSkeleton,
+  ShowingCount,
+  doorState,
+  doorStateLabel,
+  type DoorStateKey,
+} from "../_AccessUi";
 import { DoorConfirmModal } from "../_DoorConfirmModal";
 import { IntegraLivePlayer } from "../_LivePlayer";
 import { getCachedCapabilities, subscribeCapabilities } from "../_caps";
 import {
   DOOR_CONTROL_OPTIONS,
   DoorControlType,
+  getActiveIntegraSiteId,
   inputStyle,
   integraApi,
   selectStyle,
@@ -28,6 +43,7 @@ import {
 } from "../_lib";
 import { toast } from "@/components/Toast";
 import styles from "../integra.module.css";
+import a from "../_access.module.css";
 
 type Door = {
   id: string;
@@ -47,9 +63,36 @@ type Cam = {
   doorIndexCode?: string | null;
   isDoorCamera?: boolean;
 };
+type Site = { id: number; name: string; label?: string | null; isDefault?: boolean };
 
+type KindFilter = "ALL" | "ACS" | "ENCODE";
+
+/** Cuántos elementos se pintan de primeras en cada lista. */
+const DOOR_PAGE = 24;
+const DEVICE_PAGE = 40;
+const PERSON_PAGE = 80;
+
+/**
+ * `useSearchParams` obliga a una frontera de Suspense en el App Router.
+ * La consola vive dentro para que los filtros puedan viajar en la URL.
+ */
 export default function IntegraAccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <IgPage>
+          <DoorGridSkeleton />
+        </IgPage>
+      }
+    >
+      <IntegraAccessConsole />
+    </Suspense>
+  );
+}
+
+function IntegraAccessConsole() {
   const router = useRouter();
+  const sp = useSearchParams();
   const [doors, setDoors] = useState<Door[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -59,11 +102,34 @@ export default function IntegraAccessPage() {
   const [assignBusy, setAssignBusy] = useState(false);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
-  const [personFilter, setPersonFilter] = useState("");
-  const [doorQ, setDoorQ] = useState("");
   const [controlType, setControlType] = useState<DoorControlType>("2");
-  const [kindFilter, setKindFilter] = useState<"ALL" | "ACS" | "ENCODE">("ALL");
-  const [liveDoors, setLiveDoors] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sites, setSites] = useState<Site[]>([]);
+
+  /*
+   * Filtros compartibles. Arrancan de la URL y vuelven a ella (con retardo,
+   * para que teclear no dispare una navegación por letra): así un operador
+   * puede pegar en el chat de turno el enlace exacto de «puertas mantenidas
+   * abiertas en Planta Norte» y el siguiente ve lo mismo.
+   */
+  const [personFilter, setPersonFilter] = useState(() => sp.get("persona") ?? "");
+  const [doorQ, setDoorQ] = useState(() => sp.get("q") ?? "");
+  const [stateFilter, setStateFilter] = useState<DoorStateKey | "ALL">(() => {
+    const v = sp.get("estado");
+    return v && DOOR_STATE_FILTERS.some((o) => o.value === v) ? (v as DoorStateKey) : "ALL";
+  });
+  const [regionFilter, setRegionFilter] = useState(() => sp.get("region") ?? "ALL");
+  const [kindFilter, setKindFilter] = useState<KindFilter>(() => {
+    const v = sp.get("equipos");
+    return v === "ACS" || v === "ENCODE" ? v : "ALL";
+  });
+  const [liveDoors, setLiveDoors] = useState(() => sp.get("live") === "1");
+
+  /* Cuánto se pinta de cada lista. Nunca se corta en silencio. */
+  const [doorLimit, setDoorLimit] = useState(DOOR_PAGE);
+  const [deviceLimit, setDeviceLimit] = useState(DEVICE_PAGE);
+  const [personLimit, setPersonLimit] = useState(PERSON_PAGE);
+
   const [selectedDoor, setSelectedDoor] = useState<Door | null>(null);
   const [confirmDoor, setConfirmDoor] = useState<Door | null>(null);
   const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
@@ -79,30 +145,65 @@ export default function IntegraAccessPage() {
 
   const canControl = caps == null ? true : Boolean(caps.canControlDoors);
 
+  // Filtros → URL. Se compara antes de navegar para no meter entradas
+  // redundantes en el historial mientras el operador teclea.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (doorQ) next.set("q", doorQ);
+    if (stateFilter !== "ALL") next.set("estado", stateFilter);
+    if (regionFilter !== "ALL") next.set("region", regionFilter);
+    if (kindFilter !== "ALL") next.set("equipos", kindFilter);
+    if (personFilter) next.set("persona", personFilter);
+    if (liveDoors) next.set("live", "1");
+    const qs = next.toString();
+    const path = window.location.pathname;
+    const url = qs ? `${path}?${qs}` : path;
+    if (url === path + window.location.search) return;
+    const t = window.setTimeout(() => router.replace(url, { scroll: false }), 300);
+    return () => window.clearTimeout(t);
+  }, [doorQ, stateFilter, regionFilter, kindFilter, personFilter, liveDoors, router]);
+
   const load = useCallback(async () => {
     setError(null);
+    setLoading(true);
     try {
       const doorPath = liveDoors ? "integra/doors?live=1" : "integra/doors";
-      const [d, g, p, dev, c] = await Promise.all([
+      const [d, g, p, dev, c, s] = await Promise.all([
         integraApi<{ items: Door[] }>(doorPath),
         integraApi<{ items: Group[] }>("integra/privilege-groups").catch(() => ({ items: [] })),
         integraApi<{ items: Person[] }>("integra/people").catch(() => ({ items: [] })),
         integraApi<{ items: Device[] }>("integra/devices").catch(() => ({ items: [] })),
         integraApi<{ items: Cam[] }>("integra/cameras").catch(() => ({ items: [] })),
+        // Solo para poder decir en el modal EN QUÉ SITIO está la puerta.
+        integraApi<Site[]>("integra/sites").catch(() => [] as Site[]),
       ]);
       setDoors(d.items);
       setGroups(g.items);
       setPeople(p.items);
       setDevices(dev.items);
       setCams(c.items);
+      setSites(Array.isArray(s) ? s : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setLoading(false);
     }
   }, [liveDoors]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Nombre del sitio activo — el mismo que elige la barra superior. */
+  const activeSiteName = useMemo(() => {
+    if (sites.length === 0) return null;
+    const id = getActiveIntegraSiteId();
+    const site =
+      (id != null ? sites.find((s) => s.id === id) : null) ||
+      sites.find((s) => s.isDefault) ||
+      (sites.length === 1 ? sites[0] : null);
+    return site ? site.label || site.name : null;
+  }, [sites]);
 
   const requestControl = (d: Door) => {
     if (!canControl) {
@@ -127,24 +228,42 @@ export default function IntegraAccessPage() {
       setConfirmDoor(null);
       await load();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error al controlar la puerta";
-      setError(msg);
-      toast.error(msg);
+      // Un solo aviso: el error vive en el panel de reintento de la página.
+      // Antes salía además un toast con el mismo texto y el operador veía
+      // dos alertas por el mismo fallo.
+      setError(e instanceof Error ? e.message : "Error al controlar la puerta");
     } finally {
       setBusy(null);
     }
   };
 
-  const filteredDoors = useMemo(
-    () =>
-      doors.filter(
-        (d) =>
-          !doorQ ||
-          d.name.toLowerCase().includes(doorQ.toLowerCase()) ||
-          d.id.toLowerCase().includes(doorQ.toLowerCase()) ||
-          (d.location || "").toLowerCase().includes(doorQ.toLowerCase()),
-      ),
-    [doors, doorQ],
+  /** Regiones presentes en el inventario — no se inventa ninguna. */
+  const regions = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of doors) if (d.location) set.add(d.location);
+    return Array.from(set).sort((x, y) => x.localeCompare(y, "es"));
+  }, [doors]);
+
+  const filteredDoors = useMemo(() => {
+    const q = doorQ.trim().toLowerCase();
+    return doors.filter((d) => {
+      if (
+        q &&
+        !d.name.toLowerCase().includes(q) &&
+        !d.id.toLowerCase().includes(q) &&
+        !(d.location || "").toLowerCase().includes(q)
+      ) {
+        return false;
+      }
+      if (regionFilter !== "ALL" && (d.location || "") !== regionFilter) return false;
+      if (stateFilter !== "ALL" && doorState(d) !== stateFilter) return false;
+      return true;
+    });
+  }, [doors, doorQ, regionFilter, stateFilter]);
+
+  const visibleDoors = useMemo(
+    () => filteredDoors.slice(0, doorLimit),
+    [filteredDoors, doorLimit],
   );
 
   const filteredPeople = people.filter(
@@ -204,7 +323,7 @@ export default function IntegraAccessPage() {
     <IgPage>
       <IgToolbar
         title="Accesos"
-        meta={`${onlineN}/${doors.length} puertas online · ${devices.length} equipos · ${groups.length} grupos`}
+        meta={`${activeSiteName ? `${activeSiteName} · ` : ""}${onlineN}/${doors.length} puertas online · ${devices.length} equipos · ${groups.length} grupos`}
         actions={
           <>
             <IgBtn onClick={() => router.push("/integra/espacios")}>Espacios</IgBtn>
@@ -212,6 +331,7 @@ export default function IntegraAccessPage() {
             <IgBtn onClick={() => router.push("/integra/schedules")}>Horarios</IgBtn>
             <IgBtn onClick={() => router.push("/integra/events")}>Eventos Face</IgBtn>
             <IgBtn
+              aria-pressed={liveDoors}
               onClick={() => setLiveDoors((v) => !v)}
               title={
                 liveDoors
@@ -221,11 +341,20 @@ export default function IntegraAccessPage() {
             >
               {liveDoors ? "Estado live ON" : "Espejo sync"}
             </IgBtn>
-            <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
+            <IgBtn
+              onClick={() => void load()}
+              disabled={loading}
+              aria-label="Actualizar el inventario de accesos"
+            >
+              {loading ? "Actualizando…" : "Actualizar"}
+              <RefreshIcon className={a.btnIcon} aria-hidden />
+            </IgBtn>
           </>
         }
       />
-      <IgError>{error}</IgError>
+      {error && (
+        <RetryNotice message={error} onRetry={() => void load()} busy={loading} />
+      )}
       {!canControl && (
         <IgNotice tone="warn">
           Modo consulta: esta cuenta no puede abrir ni cerrar puertas.
@@ -233,8 +362,9 @@ export default function IntegraAccessPage() {
       )}
       {canControl && (
         <IgNotice>
-          Clic en una puerta = seleccionar · Doble clic = abrir (momentáneo) con
-          confirmación. Toda acción pide motivo y queda en auditoría.
+          Clic en una puerta = seleccionar · los botones de cada tarjeta la abren
+          o la cierran. Toda acción pide confirmación con motivo y queda en
+          auditoría.
         </IgNotice>
       )}
 
@@ -257,15 +387,61 @@ export default function IntegraAccessPage() {
         <IgField label="Filtrar puertas">
           <input
             value={doorQ}
-            onChange={(e) => setDoorQ(e.target.value)}
+            onChange={(e) => {
+              setDoorQ(e.target.value);
+              setDoorLimit(DOOR_PAGE);
+            }}
             style={inputStyle}
             placeholder="nombre / región / id"
           />
         </IgField>
+        <IgField label="Estado">
+          <select
+            value={stateFilter}
+            onChange={(e) => {
+              const v = e.target.value;
+              setStateFilter(
+                DOOR_STATE_FILTERS.some((o) => o.value === v) ? (v as DoorStateKey) : "ALL",
+              );
+              setDoorLimit(DOOR_PAGE);
+            }}
+            style={selectStyle}
+          >
+            <option value="ALL">Todos los estados</option>
+            {DOOR_STATE_FILTERS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </IgField>
+        {/* El sitio lo elige la barra superior; dentro del sitio, lo que separa
+            unas puertas de otras es la región que reporta el ACS. */}
+        <IgField label="Región del sitio">
+          <select
+            value={regionFilter}
+            onChange={(e) => {
+              setRegionFilter(e.target.value);
+              setDoorLimit(DOOR_PAGE);
+            }}
+            style={selectStyle}
+            disabled={regions.length === 0}
+          >
+            <option value="ALL">Todo el sitio</option>
+            {regions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </IgField>
         <IgField label="Equipos">
           <select
             value={kindFilter}
-            onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
+            onChange={(e) => {
+              setKindFilter(e.target.value as KindFilter);
+              setDeviceLimit(DEVICE_PAGE);
+            }}
             style={selectStyle}
           >
             <option value="ALL">ACS + Encode</option>
@@ -278,61 +454,120 @@ export default function IntegraAccessPage() {
             <IgBtn
               variant="primary"
               disabled={busy === selectedDoor.id}
-              onClick={() => setConfirmDoor(selectedDoor)}
+              onClick={() => requestControl(selectedDoor)}
+              aria-label={`Ejecutar la acción por defecto en ${selectedDoor.name}`}
             >
-              Ejecutar → {selectedDoor.name}
+              Ejecutar · {selectedDoor.name}
+              <ArrowForwardIcon className={a.btnIcon} aria-hidden />
             </IgBtn>
           </IgField>
         )}
       </IgFilters>
 
-      <div className={styles.doorMatrix}>
-        {filteredDoors.slice(0, 24).map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            className={styles.doorCell}
-            data-online={d.online === false ? "0" : "1"}
-            onClick={() => setSelectedDoor(d)}
-            onDoubleClick={() => {
-              if (!canControl) {
-                setError("Sin permiso para controlar puertas");
-                return;
-              }
-              setSelectedDoor(d);
-              setControlType("2");
-              setConfirmDoor(d);
-            }}
-            data-selected={selectedDoor?.id === d.id ? "1" : undefined}
-            title={
-              canControl
-                ? `${d.name} · clic = detalle · doble clic = abrir`
-                : `${d.name} · solo consulta`
-            }
-          >
-            <span className={styles.doorCellName}>{d.name}</span>
-            <span className={styles.doorCellMeta}>{d.location || d.id}</span>
-            <IgBadge tone={d.online === false ? "warn" : "ok"}>
-              {d.status || (d.online === false ? "off" : "online")}
-            </IgBadge>
-          </button>
-        ))}
-      </div>
-      {filteredDoors.length === 0 && (
+      {loading && doors.length === 0 ? (
+        <DoorGridSkeleton />
+      ) : (
+        <>
+          <ShowingCount
+            shown={visibleDoors.length}
+            matching={filteredDoors.length}
+            total={doors.length}
+            noun="puertas"
+            onMore={() => setDoorLimit((n) => n + DOOR_PAGE)}
+            onAll={() => setDoorLimit(filteredDoors.length)}
+          />
+          <div className={a.doorGrid}>
+            {visibleDoors.map((d) => {
+              const st = doorState(d);
+              const selected = selectedDoor?.id === d.id;
+              return (
+                <div
+                  key={d.id}
+                  className={a.doorCard}
+                  data-selected={selected ? "1" : undefined}
+                  data-offline={st === "offline" ? "1" : undefined}
+                >
+                  <button
+                    type="button"
+                    className={a.doorPick}
+                    aria-pressed={selected}
+                    aria-label={`${d.name} · ${doorStateLabel(st)}${
+                      d.location ? ` · ${d.location}` : ""
+                    } · ver detalle`}
+                    title={`${d.name} · ${doorStateLabel(st)}`}
+                    onClick={() => setSelectedDoor(d)}
+                  >
+                    <span className={a.doorName}>{d.name}</span>
+                    <span className={a.doorMeta}>{d.location || d.id}</span>
+                    <DoorStateBadge state={st} />
+                  </button>
+                  {canControl && (
+                    <div className={a.doorActions}>
+                      <button
+                        type="button"
+                        className={a.iconBtn}
+                        disabled={busy === d.id}
+                        aria-label={`Abrir ${d.name} (momentáneo)`}
+                        title={`Abrir (momentáneo) · ${d.name}`}
+                        onClick={() => runAction(d, "2")}
+                      >
+                        <LockOpenOutlinedIcon className={a.icon} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        className={a.iconBtn}
+                        disabled={busy === d.id}
+                        aria-label={`Cerrar ${d.name}`}
+                        title={`Cerrar · ${d.name}`}
+                        onClick={() => runAction(d, "1")}
+                      >
+                        <LockOutlinedIcon className={a.icon} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        className={a.iconBtn}
+                        disabled={busy === d.id}
+                        aria-label={`Más acciones para ${d.name}`}
+                        title={`Todas las acciones · ${d.name}`}
+                        onClick={() => requestControl(d)}
+                      >
+                        <TuneIcon className={a.icon} aria-hidden />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {!loading && filteredDoors.length === 0 && (
         <div className={styles.igEmpty}>
           <strong className={styles.igEmptyTitle}>Sin puertas</strong>
           <span className={styles.igEmptyHint}>
             {doors.length === 0
               ? "Sincroniza el sitio (barra superior) para cargar el inventario ACS."
-              : "Ninguna puerta coincide con el filtro."}
+              : `Ninguna de las ${doors.length} puertas cargadas coincide con el filtro.`}
           </span>
+          {doors.length > 0 && (
+            <IgBtn
+              onClick={() => {
+                setDoorQ("");
+                setStateFilter("ALL");
+                setRegionFilter("ALL");
+                setDoorLimit(DOOR_PAGE);
+              }}
+            >
+              Quitar filtros
+            </IgBtn>
+          )}
         </div>
       )}
 
       {selectedDoor && (
         <IgPanel
           title={`Puerta · ${selectedDoor.name}`}
-          count={selectedDoor.online === false ? "OFFLINE" : "ONLINE"}
+          count={<DoorStateBadge state={doorState(selectedDoor)} />}
         >
           <div className={styles.doorConsole}>
             <div className={styles.doorConsoleVideo}>
@@ -374,6 +609,7 @@ export default function IntegraAccessPage() {
                     key={o.value}
                     variant={o.value === "2" ? "primary" : undefined}
                     disabled={!canControl || busy === selectedDoor.id}
+                    aria-label={`${o.label} · ${selectedDoor.name}`}
                     onClick={() => runAction(selectedDoor, o.value)}
                   >
                     {busy === selectedDoor.id && controlType === o.value
@@ -383,6 +619,10 @@ export default function IntegraAccessPage() {
                 ))}
               </div>
               <dl className={styles.doorConsoleFacts}>
+                <div>
+                  <dt>Estado</dt>
+                  <dd>{doorStateLabel(doorState(selectedDoor))}</dd>
+                </div>
                 <div>
                   <dt>Terminal</dt>
                   <dd>{selectedDoor.location || selectedDoor.id}</dd>
@@ -394,9 +634,11 @@ export default function IntegraAccessPage() {
                     <button
                       type="button"
                       className={styles.techToggle}
+                      aria-label="Ir a la pantalla de Personas"
                       onClick={() => router.push("/integra/people")}
                     >
-                      gestionar →
+                      gestionar
+                      <ArrowForwardIcon className={a.btnIcon} aria-hidden />
                     </button>
                   </dd>
                 </div>
@@ -408,26 +650,40 @@ export default function IntegraAccessPage() {
 
       <IgSplit
         left={
-          <IgPanel title="Equipos">
-            <IgTable
-              columns={[
-                { key: "name", label: "Nombre" },
-                { key: "kind", label: "Tipo", width: "80px" },
-                { key: "ip", label: "IP", width: "110px", mono: true },
-                { key: "on", label: "Estado", width: "70px" },
-              ]}
-              rows={filteredDevices.slice(0, 40).map((d) => ({
-                key: d.id,
-                cells: {
-                  name: d.name,
-                  kind: d.kind,
-                  ip: d.ip || "—",
-                  on: d.online === false ? "off" : "online",
-                },
-                tone: d.online === false ? "warn" : "ok",
-              }))}
-              empty="Sin equipos — sincroniza el sitio"
-            />
+          <IgPanel title="Equipos" count={devices.length}>
+            {loading && devices.length === 0 ? (
+              <RowsSkeleton rows={6} />
+            ) : (
+              <>
+                <IgTable
+                  columns={[
+                    { key: "name", label: "Nombre" },
+                    { key: "kind", label: "Tipo", width: "80px" },
+                    { key: "ip", label: "IP", width: "110px", mono: true },
+                    { key: "on", label: "Estado", width: "70px" },
+                  ]}
+                  rows={filteredDevices.slice(0, deviceLimit).map((d) => ({
+                    key: d.id,
+                    cells: {
+                      name: d.name,
+                      kind: d.kind,
+                      ip: d.ip || "—",
+                      on: d.online === false ? "caído" : "en línea",
+                    },
+                    tone: d.online === false ? "warn" : "ok",
+                  }))}
+                  empty="Sin equipos — sincroniza el sitio"
+                />
+                <ShowingCount
+                  shown={Math.min(deviceLimit, filteredDevices.length)}
+                  matching={filteredDevices.length}
+                  total={devices.length}
+                  noun="equipos"
+                  onMore={() => setDeviceLimit((n) => n + DEVICE_PAGE)}
+                  onAll={() => setDeviceLimit(filteredDevices.length)}
+                />
+              </>
+            )}
           </IgPanel>
         }
         right={
@@ -450,14 +706,26 @@ export default function IntegraAccessPage() {
               <IgField label="Personas">
                 <input
                   value={personFilter}
-                  onChange={(e) => setPersonFilter(e.target.value)}
+                  onChange={(e) => {
+                    setPersonFilter(e.target.value);
+                    setPersonLimit(PERSON_PAGE);
+                  }}
                   style={inputStyle}
                   placeholder="filtrar…"
                 />
               </IgField>
             </IgFilters>
+            {loading && people.length === 0 && <RowsSkeleton rows={8} />}
+            <ShowingCount
+              shown={Math.min(personLimit, filteredPeople.length)}
+              matching={filteredPeople.length}
+              total={people.length}
+              noun="personas"
+              onMore={() => setPersonLimit((n) => n + PERSON_PAGE)}
+              onAll={() => setPersonLimit(filteredPeople.length)}
+            />
             <div className={styles.igCheckList}>
-              {filteredPeople.slice(0, 80).map((p) => (
+              {filteredPeople.slice(0, personLimit).map((p) => (
                 <label key={p.id} className={styles.igCheckRow}>
                   <input
                     type="checkbox"
@@ -473,15 +741,21 @@ export default function IntegraAccessPage() {
                   </span>
                 </label>
               ))}
-              {filteredPeople.length === 0 && (
+              {!loading && filteredPeople.length === 0 && (
                 <div className={styles.igEmpty}>
                   <strong className={styles.igEmptyTitle}>Sin personas</strong>
                   <span className={styles.igEmptyHint}>
-                    Da de alta en Personas o sincroniza el directorio ACS.
+                    {people.length === 0
+                      ? "Da de alta en Personas o sincroniza el directorio ACS."
+                      : `Ninguna de las ${people.length} personas cargadas coincide con el filtro.`}
                   </span>
-                  <IgBtn variant="primary" onClick={() => router.push("/integra/people")}>
-                    Ir a Personas
-                  </IgBtn>
+                  {people.length === 0 ? (
+                    <IgBtn variant="primary" onClick={() => router.push("/integra/people")}>
+                      Ir a Personas
+                    </IgBtn>
+                  ) : (
+                    <IgBtn onClick={() => setPersonFilter("")}>Quitar filtro</IgBtn>
+                  )}
                 </div>
               )}
             </div>
@@ -504,9 +778,9 @@ export default function IntegraAccessPage() {
                   );
                   setSelectedPeople([]);
                 } catch (e) {
-                  const msg = e instanceof Error ? e.message : "No se pudo asignar al grupo";
-                  setError(msg);
-                  toast.error(msg);
+                  // Igual que en el control de puerta: un solo aviso. El texto
+                  // vive arriba, en el panel de error con reintento.
+                  setError(e instanceof Error ? e.message : "No se pudo asignar al grupo");
                 } finally {
                   setAssignBusy(false);
                 }
@@ -522,6 +796,9 @@ export default function IntegraAccessPage() {
         open={Boolean(confirmDoor)}
         doorName={confirmDoor?.name || ""}
         doorId={confirmDoor?.id || ""}
+        doorLocation={confirmDoor?.location || null}
+        doorStateLabel={confirmDoor ? doorStateLabel(doorState(confirmDoor)) : null}
+        siteName={activeSiteName}
         controlType={controlType}
         busy={busy === confirmDoor?.id}
         allowTypeSelect
