@@ -315,34 +315,88 @@ export class IntegraArtemisService {
     };
   }
 
+  /**
+   * Bitácora de INTEGRA.
+   *
+   * Antes admitía **solo** `limit`, topado a 200, y devolvía `total: rows.length`
+   * — o sea, el total era el tamaño de la página. El «N mutaciones» de la
+   * pantalla mentía en cuanto se topaba, y como no había filtros ni paginación,
+   * el navegador tenía que filtrar a mano sobre las 200 últimas: reconstruir qué
+   * pasó un martes por la tarde de hace un mes era sencillamente imposible.
+   *
+   * También se dejaban sin devolver `ipAddress`, `userAgent` y `previousData`,
+   * que la tabla sí guarda. Para una bitácora eso es justo lo que se pide en una
+   * investigación: la IP desde la que alguien abrió una puerta a distancia, y
+   * qué valor tenía antes lo que cambió.
+   */
   async listAudit(
     companyId: number | null,
-    opts: { limit?: number; siteId?: number | null } = {},
+    opts: {
+      limit?: number;
+      skip?: number;
+      from?: Date | null;
+      to?: Date | null;
+      action?: string | null;
+      userId?: number | null;
+      q?: string | null;
+      order?: 'asc' | 'desc';
+    } = {},
   ) {
     const limit = Math.min(Math.max(opts.limit ?? 40, 1), 200);
-    const rows = await this.prisma.auditLog.findMany({
-      where: {
-        ...(companyId != null ? { companyId } : {}),
-        OR: [
-          { entityType: 'Integra' },
-          { source: 'integra' },
-          { action: { startsWith: 'integra.' } },
-        ],
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: { user: { select: { id: true, email: true, nombre: true } } },
-    });
+    const skip = Math.max(opts.skip ?? 0, 0);
+
+    const where = {
+      ...(companyId != null ? { companyId } : {}),
+      OR: [
+        { entityType: 'Integra' },
+        { source: 'integra' },
+        { action: { startsWith: 'integra.' } },
+      ],
+      ...(opts.from || opts.to
+        ? {
+            createdAt: {
+              ...(opts.from ? { gte: opts.from } : {}),
+              ...(opts.to ? { lte: opts.to } : {}),
+            },
+          }
+        : {}),
+      ...(opts.action ? { action: opts.action } : {}),
+      ...(opts.userId != null ? { userId: opts.userId } : {}),
+      // Búsqueda libre sobre la acción. `changes` es JSON y filtrarlo en SQL
+      // exigiría un índice que hoy no existe; se deja al cliente y se dice.
+      ...(opts.q ? { action: { contains: opts.q, mode: 'insensitive' as const } } : {}),
+    };
+
+    // El total sale de un `count` sobre el MISMO filtro, no del tamaño de la
+    // página. Es la diferencia entre «hay 1.240 y ves 50» y mentir con «hay 50».
+    const [total, rows] = await Promise.all([
+      this.prisma.auditLog.count({ where }),
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: opts.order === 'asc' ? 'asc' : 'desc' },
+        take: limit,
+        skip,
+        include: { user: { select: { id: true, email: true, nombre: true } } },
+      }),
+    ]);
+
     return {
-      total: rows.length,
+      total,
+      limit,
+      skip,
       items: rows.map((r) => ({
         id: r.id,
         action: r.action,
         entityId: r.entityId,
         createdAt: r.createdAt.toISOString(),
+        userId: r.userId ?? null,
         userEmail: r.user?.email || null,
         userName: r.user?.nombre || null,
         changes: r.changes,
+        // Los tres que la tabla guardaba y nadie devolvía.
+        ipAddress: r.ipAddress ?? null,
+        userAgent: r.userAgent ?? null,
+        previousData: r.previousData ?? null,
       })),
     };
   }
