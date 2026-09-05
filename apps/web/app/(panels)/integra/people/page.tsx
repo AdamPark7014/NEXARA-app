@@ -1,7 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import ArrowBackRounded from "@mui/icons-material/ArrowBackRounded";
+import ArrowForwardRounded from "@mui/icons-material/ArrowForwardRounded";
+import BadgeRounded from "@mui/icons-material/BadgeRounded";
+import DeleteForeverRounded from "@mui/icons-material/DeleteForeverRounded";
+import EventBusyRounded from "@mui/icons-material/EventBusyRounded";
+import FingerprintRounded from "@mui/icons-material/FingerprintRounded";
+import LinkOffRounded from "@mui/icons-material/LinkOffRounded";
+import LinkRounded from "@mui/icons-material/LinkRounded";
+import OpenInNewRounded from "@mui/icons-material/OpenInNewRounded";
+import PersonAddAlt1Rounded from "@mui/icons-material/PersonAddAlt1Rounded";
+import PhotoCameraRounded from "@mui/icons-material/PhotoCameraRounded";
+import RefreshRounded from "@mui/icons-material/RefreshRounded";
+import ScheduleRounded from "@mui/icons-material/ScheduleRounded";
+import SyncRounded from "@mui/icons-material/SyncRounded";
 import {
   IgBadge,
   IgBtn,
@@ -17,6 +31,7 @@ import { getCachedProvider, subscribeProvider } from "../_caps";
 import { PersonFaceThumb, invalidatePersonFaceCache, prefetchPersonFace } from "../_PersonFace";
 import { inputStyle, integraApi, selectStyle } from "../_lib";
 import { toast } from "@/components/Toast";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import styles from "../integra.module.css";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -30,6 +45,33 @@ import {
   generateTempPassword,
   type AltaMode,
 } from "../_personIdentity";
+import people$ from "./_people.module.css";
+import {
+  ActionGroup,
+  CredentialList,
+  DetailFacts,
+  DetailSkeleton,
+  DirectorySkeleton,
+  SuspendedFlag,
+  ValidityPill,
+  ViewBar,
+} from "./_PeopleBits";
+import { PeopleDirectory } from "./_PeopleDirectory";
+import { PersonAccessPanel } from "./_PersonAccessPanel";
+import {
+  VALIDITY_FILTER_OPTIONS,
+  credentialScore,
+  describeError,
+  describeValidity,
+  faceOn,
+  formatWhen,
+  genderLabel,
+  sortPeople,
+  userTypeLabel,
+  type Person,
+  type SortKey,
+} from "./_peopleView";
+import { usePeopleQuery, type ViewMode } from "./_usePeopleQuery";
 
 type Person = {
   id: string;

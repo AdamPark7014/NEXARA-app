@@ -1,0 +1,576 @@
+/*
+ * Consola de accesos y ajustes de sitio — estilos propios.
+ *
+ * Vive aparte de `integra.module.css` a propósito: esas dos páginas necesitan
+ * piezas que el resto de la consola no usa (conmutadores reales, matriz de
+ * puertas con acciones, esqueletos de carga). Los tokens `--ig-*` los define
+ * `.shell` en `integra.module.css` y aquí solo se leen, siempre con
+ * alternativa global por si algún día este módulo se monta fuera del shell.
+ */
+
+/* ── Matriz de puertas ──────────────────────────────────────────────── */
+
+.doorGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: 8px;
+}
+
+.doorCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ig-line, var(--border, #d9e0e8));
+  border-radius: var(--ig-radius, 6px);
+  background: var(--ig-panel, var(--surface, #fff));
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.doorCard:hover {
+  border-color: color-mix(in srgb, var(--ig-accent, #0e7490) 45%, var(--ig-line, #d9e0e8));
+}
+
+.doorCard[data-selected="1"] {
+  border-color: var(--ig-accent, #0e7490);
+  box-shadow: 0 0 0 1px var(--ig-accent, #0e7490) inset;
+}
+
+/* Equipo caído: se atenúa el fondo, nunca el texto — el nombre de la puerta
+   tiene que seguir siendo legible aunque la terminal esté fuera de línea. */
+.doorCard[data-offline="1"] {
+  background: color-mix(in srgb, var(--ig-danger, #b91c1c) 4%, var(--ig-panel, #fff));
+  border-color: color-mix(in srgb, var(--ig-danger, #b91c1c) 26%, var(--ig-line, #d9e0e8));
+}
+
+.doorPick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 10px 7px;
+  border: 0;
+  border-radius: var(--ig-radius, 6px) var(--ig-radius, 6px) 0 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.doorPick:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus, 0 0 0 2px #fff, 0 0 0 4px #0e7490);
+}
+
+.doorName {
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--ig-ink, var(--text-primary, #0f1c2e));
+}
+
+.doorMeta {
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: var(--ig-fs-micro, 10px);
+  color: var(--ig-muted, var(--text-tertiary, #5c6b80));
+}
+
+.doorActions {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Insignia de estado en vivo ─────────────────────────────────────── */
+
+.stateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 7px 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--ig-radius-pill, 999px);
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.stateDot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.stateBadge[data-state="open"] {
+  color: var(--ig-ok, #0f766e);
+  background: color-mix(in srgb, var(--ig-ok, #0f766e) 10%, transparent);
+}
+
+.stateBadge[data-state="closed"] {
+  color: var(--ig-ink-soft, var(--text-secondary, #243247));
+  background: color-mix(in srgb, var(--ig-ink, #0f1c2e) 6%, transparent);
+}
+
+.stateBadge[data-state="remain_open"] {
+  color: var(--ig-warn, #b45309);
+  background: color-mix(in srgb, var(--ig-warn, #b45309) 12%, transparent);
+}
+
+.stateBadge[data-state="remain_closed"] {
+  color: var(--ig-accent, #0e7490);
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 10%, transparent);
+}
+
+.stateBadge[data-state="offline"] {
+  color: var(--ig-danger, #b91c1c);
+  background: color-mix(in srgb, var(--ig-danger, #b91c1c) 10%, transparent);
+}
+
+.stateBadge[data-state="unknown"] {
+  color: var(--ig-muted, #5c6b80);
+  background: transparent;
+}
+
+/* ── «Mostrando X de N» ─────────────────────────────────────────────── */
+
+.showing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 6px 2px 2px;
+  font-size: var(--ig-fs-sm, 12px);
+  color: var(--ig-muted, var(--text-tertiary, #5c6b80));
+}
+
+.showingStrong {
+  color: var(--ig-ink-soft, var(--text-secondary, #243247));
+  font-weight: 650;
+}
+
+.showingWarn {
+  color: var(--ig-warn, #b45309);
+  font-weight: 650;
+}
+
+/* ── Botón icónico ──────────────────────────────────────────────────── */
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--ig-line, var(--border, #d9e0e8));
+  border-radius: var(--ig-radius, 6px);
+  background: var(--ig-panel, var(--surface, #fff));
+  color: var(--ig-ink-soft, var(--text-secondary, #243247));
+  cursor: pointer;
+}
+
+.iconBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ig-accent, #0e7490) 55%, var(--ig-line, #d9e0e8));
+  color: var(--ig-accent, #0e7490);
+}
+
+.iconBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus, 0 0 0 2px #fff, 0 0 0 4px #0e7490);
+}
+
+.iconBtn:disabled {
+  cursor: not-allowed;
+  color: var(--ig-muted, #5c6b80);
+}
+
+.icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.iconSm {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+/* Icono alineado dentro de un botón de texto (IgBtn). */
+.btnIcon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  margin-inline-start: 4px;
+}
+
+/* ── Esqueletos de carga ────────────────────────────────────────────── */
+
+.skel {
+  border-radius: var(--ig-radius, 6px);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--ig-ink, #0f1c2e) 7%, var(--ig-panel, #fff)) 0%,
+    color-mix(in srgb, var(--ig-ink, #0f1c2e) 13%, var(--ig-panel, #fff)) 50%,
+    color-mix(in srgb, var(--ig-ink, #0f1c2e) 7%, var(--ig-panel, #fff)) 100%
+  );
+  background-size: 220% 100%;
+  animation: skelShimmer 1.3s linear infinite;
+}
+
+@keyframes skelShimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+  }
+}
+
+.skelDoor {
+  height: 96px;
+}
+
+.skelRow {
+  height: 28px;
+  margin-bottom: 6px;
+}
+
+.skelList {
+  padding: 4px 0;
+}
+
+/* ── Error con reintento ────────────────────────────────────────────── */
+
+.retryBox {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin: 0 0 8px;
+  padding: 12px 13px;
+  border: 1px solid color-mix(in srgb, var(--ig-danger, #b91c1c) 30%, var(--ig-line, #d9e0e8));
+  border-left: 3px solid var(--ig-danger, #b91c1c);
+  border-radius: var(--ig-radius, 6px);
+  background: color-mix(in srgb, var(--ig-danger, #b91c1c) 6%, var(--ig-panel, #fff));
+}
+
+.retryTitle {
+  margin: 0;
+  font-size: var(--ig-fs-md, 13px);
+  font-weight: 700;
+  color: var(--ig-danger, #b91c1c);
+}
+
+.retryMsg {
+  margin: 0;
+  font-size: var(--ig-fs-sm, 12px);
+  line-height: 1.45;
+  color: var(--ig-ink-soft, var(--text-secondary, #243247));
+}
+
+/* ── Modal de control de puerta ─────────────────────────────────────── */
+
+.modalBody {
+  display: grid;
+  gap: 12px;
+}
+
+/* Bloque «qué puerta y dónde». Abrir la equivocada es un incidente, así que
+   el destino se lee antes que cualquier otra cosa del diálogo. */
+.target {
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--ig-accent, #0e7490) 28%, var(--ig-line, #d9e0e8));
+  border-left: 3px solid var(--ig-accent, #0e7490);
+  border-radius: var(--ig-radius, 6px);
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 6%, var(--ig-panel, #fff));
+}
+
+.targetEyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted, var(--text-tertiary, #5c6b80));
+}
+
+.targetIcon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  vertical-align: -3px;
+  margin-inline-end: 6px;
+}
+
+.targetName {
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.2;
+  color: var(--ig-ink, var(--text-primary, #0f1c2e));
+}
+
+.targetWhere {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  font-size: 12.5px;
+  color: var(--ig-ink-soft, var(--text-secondary, #243247));
+}
+
+.targetWhereItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.targetId {
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--ig-muted, var(--text-tertiary, #5c6b80));
+  word-break: break-all;
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--ig-line, var(--border, #d9e0e8));
+  border-radius: var(--ig-radius, 6px);
+  font-size: 13px;
+  color: var(--ig-ink, var(--text-primary, #0f1c2e));
+}
+
+/* Las dos acciones que dejan pasar a alguien se marcan aparte. */
+.action[data-risk="1"] {
+  border-color: color-mix(in srgb, var(--ig-warn, #b45309) 40%, var(--ig-line, #d9e0e8));
+  background: color-mix(in srgb, var(--ig-warn, #b45309) 9%, var(--ig-panel, #fff));
+  color: var(--ig-warn, #b45309);
+  font-weight: 650;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ig-ink-soft, var(--text-secondary, #243247));
+}
+
+.control {
+  width: 100%;
+  max-width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--ig-line, var(--border, #d9e0e8));
+  border-radius: var(--ig-radius, 6px);
+  background: var(--ig-panel, var(--surface, #fff));
+  color: var(--ig-ink, var(--text-primary, #0f1c2e));
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+.control:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus, 0 0 0 2px #fff, 0 0 0 4px #0e7490);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 62px;
+}
+
+.fieldHint {
+  font-size: 11.5px;
+  color: var(--ig-muted, var(--text-tertiary, #5c6b80));
+}
+
+/* ── Conmutadores de módulo (settings) ──────────────────────────────── */
+
+.switchGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 11px 6px 9px;
+  border: 1px solid var(--ig-line, var(--border, #d9e0e8));
+  border-radius: var(--ig-radius, 6px);
+  background: var(--ig-panel, var(--surface, #fff));
+  color: var(--ig-ink, var(--text-primary, #0f1c2e));
+  font: inherit;
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.switch:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ig-accent, #0e7490) 50%, var(--ig-line, #d9e0e8));
+}
+
+.switch:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus, 0 0 0 2px #fff, 0 0 0 4px #0e7490);
+}
+
+.switch[aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--ig-accent, #0e7490) 45%, var(--ig-line, #d9e0e8));
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 6%, var(--ig-panel, #fff));
+}
+
+/*
+ * Deshabilitado sin bajar el contraste del texto: el `opacity: .35` anterior
+ * dejaba la etiqueta por debajo del mínimo AA. Aquí el motivo se explica con
+ * una insignia y el estado se lee en el carril, no en la opacidad.
+ */
+.switch:disabled {
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--ig-ink, #0f1c2e) 4%, var(--ig-panel, #fff));
+}
+
+.switchTrack {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ig-ink, #0f1c2e) 26%, transparent);
+  transition: background 0.15s ease;
+}
+
+.switch[aria-checked="true"] .switchTrack {
+  background: var(--ig-accent, #0e7490);
+}
+
+.switch:disabled .switchTrack {
+  background: color-mix(in srgb, var(--ig-ink, #0f1c2e) 16%, transparent);
+}
+
+.switchThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(11, 21, 36, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.switch[aria-checked="true"] .switchThumb {
+  transform: translateX(16px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switchTrack,
+  .switchThumb {
+    transition: none;
+  }
+}
+
+.switchLabel {
+  line-height: 1.2;
+}
+
+.switchState {
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ig-muted, var(--text-tertiary, #5c6b80));
+}
+
+.switchTag {
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--ig-warn, #b45309) 35%, var(--ig-line, #d9e0e8));
+  border-radius: var(--ig-radius-sm, 4px);
+  background: color-mix(in srgb, var(--ig-warn, #b45309) 10%, transparent);
+  color: var(--ig-warn, #b45309);
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Formulario de sitio y avisos (settings) ────────────────────────── */
+
+.formGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ig-muted, var(--text-tertiary, #5c6b80));
+}
+
+.hintLeft {
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.linkWarn {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ig-line, var(--border, #d9e0e8));
+  background: color-mix(in srgb, var(--ig-warn, #b45309) 12%, transparent);
+  color: var(--ig-warn, #b45309);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.linkWarnAnchor {
+  color: var(--ig-accent, #0e7490);
+  font-weight: 650;
+}
+
+.syncLine {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ig-ink-soft, var(--text-secondary, #243247));
+}
+
+.syncError {
+  display: block;
+  margin-top: 2px;
+  color: var(--ig-danger, #b91c1c);
+}
+
+.rowActions {
+  display: flex;
+  gap: 4px;
+}
+
+.onboard {
+  min-height: 280px;
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+
+.advancedNote {
+  padding: 4px 0;
+  text-align: left;
+}

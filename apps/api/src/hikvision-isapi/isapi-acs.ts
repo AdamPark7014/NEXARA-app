@@ -10,6 +10,7 @@ import { IsapiApiError, type HikvisionIsapiClient } from './isapi.client';
  * | Método + ruta                                      | Uso                |
  * |----------------------------------------------------|--------------------|
  * | `POST /ISAPI/AccessControl/UserInfo/Search?format=json` | listar personas |
+ * | `POST /ISAPI/AccessControl/CardInfo/Search?format=json` | listar tarjetas |
  * | `POST /ISAPI/AccessControl/AcsEvent?format=json`        | eventos acceso  |
  *
  * Tope de página del firmware: **30**. `major/minor = 0` = todos los tipos.
@@ -36,7 +37,12 @@ export type IntegraPersonDto = {
   name: string;
   code?: string;
   orgId?: string;
+  /**
+   * Departamento REAL, no el tipo de usuario. Por ISAPI queda vacío: el
+   * `UserInfo` del DS-K1T no trae organización. Se llena por Artemis.
+   */
   orgName?: string;
+  /** `normal` | `visitor` | `blackList` | `patrol`. */
   userType?: string;
   gender?: string;
   validEnable?: boolean;
@@ -47,6 +53,11 @@ export type IntegraPersonDto = {
   numOfFace?: number;
   numOfFP?: number;
   numOfCard?: number;
+  /**
+   * Números de tarjeta ya resueltos (`CardInfo/Search`). `numOfCard` dice
+   * cuántas tiene; esto dice cuáles. Vacío si el sync aún no las ha leído.
+   */
+  cardNos?: string[];
   /** URL en el terminal; el navegador usa el proxy autenticado. */
   faceUrl?: string | null;
   hasFace?: boolean;
@@ -63,7 +74,7 @@ export type IntegraPersonDto = {
 
 export function mapIsapiUserToPersonDto(
   u: IsapiUserInfo,
-  extras?: { sourceIp?: string },
+  extras?: { sourceIp?: string; cardNos?: string[] },
 ): IntegraPersonDto {
   const id = String(u.employeeNo ?? '').trim();
   const valid = u.Valid;
@@ -76,7 +87,10 @@ export function mapIsapiUserToPersonDto(
     id,
     name: String(u.name || id).trim() || id,
     code: id,
-    orgName: userType,
+    // `orgName` es DEPARTAMENTO. El `UserInfo` de ISAPI no trae organización,
+    // así que se queda vacío: meterle el `userType` —lo que se hacía antes—
+    // era guardar el tipo de usuario en la columna del departamento.
+    orgName: undefined,
     userType,
     gender: u.gender != null ? String(u.gender) : undefined,
     validEnable: valid?.enable,
@@ -87,21 +101,72 @@ export function mapIsapiUserToPersonDto(
     numOfFace: Number.isFinite(numOfFace) ? numOfFace : undefined,
     numOfFP: u.numOfFP != null ? Number(u.numOfFP) : undefined,
     numOfCard: u.numOfCard != null ? Number(u.numOfCard) : undefined,
+    cardNos: extras?.cardNos?.length ? extras.cardNos : undefined,
     faceUrl,
     hasFace: Boolean(faceUrl) || (numOfFace != null && numOfFace > 0),
     sourceIp: extras?.sourceIp,
   };
 }
 
-/** Reconstruye el DTO desde la fila espejo (`raw` + columnas). */
-export function mapMirrorPersonToDto(row: {
+/**
+ * Fila espejo mínima que el DTO necesita. Las columnas promovidas son
+ * opcionales a propósito: una fila leída antes de la migración —o un `select`
+ * parcial— sigue funcionando, cayendo a `raw`.
+ */
+export type MirrorPersonRow = {
   personId: string;
   personName: string;
   personCode: string | null;
   orgIndexCode: string | null;
   orgName: string | null;
+  gender?: string | null;
+  userType?: string | null;
+  validEnable?: boolean | null;
+  validFrom?: Date | string | null;
+  validTo?: Date | string | null;
+  numOfFace?: number | null;
+  numOfFP?: number | null;
+  numOfCard?: number | null;
+  faceUrl?: string | null;
+  sourceIp?: string | null;
   raw: unknown;
-}): IntegraPersonDto {
+};
+
+/**
+ * `Date` → el mismo `2037-12-31T23:59:59` que mandó el terminal.
+ *
+ * Se formatea con los componentes LOCALES, no con `toISOString()`: la columna
+ * se guardó haciendo `new Date('2037-12-31T23:59:59')` sobre la hora local del
+ * equipo, así que pasar por UTC devolvería un día y una hora distintos a los
+ * que el DS-K1T tiene grabados — y esa cadena se vuelve a escribir en el
+ * terminal y se compara contra `2037-12-31` para decidir «indefinido».
+ */
+function isoLocal(v: Date | string | null | undefined): string | undefined {
+  if (v == null) return undefined;
+  if (typeof v === 'string') return v.trim() || undefined;
+  if (Number.isNaN(v.getTime())) return undefined;
+  const p = (n: number, w = 2) => String(n).padStart(w, '0');
+  return (
+    `${p(v.getFullYear(), 4)}-${p(v.getMonth() + 1)}-${p(v.getDate())}` +
+    `T${p(v.getHours())}:${p(v.getMinutes())}:${p(v.getSeconds())}`
+  );
+}
+
+function numOrUndefined(v: number | null | undefined): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+
+/**
+ * Reconstruye el DTO desde la fila espejo.
+ *
+ * La columna gana sobre `raw`: `raw` es el respaldo para filas que aún no ha
+ * tocado el sync tras la migración, no la fuente. Así el DTO no cambia de forma
+ * mientras las filas se van repoblando.
+ */
+export function mapMirrorPersonToDto(
+  row: MirrorPersonRow,
+  extras?: { cardNos?: string[] },
+): IntegraPersonDto {
   const raw = (row.raw && typeof row.raw === 'object' ? row.raw : {}) as IsapiUserInfo & {
     sourceIp?: string;
   };
@@ -111,13 +176,30 @@ export function mapMirrorPersonToDto(row: {
       employeeNo: row.personId,
       name: row.personName || raw.name || row.personId,
     },
-    { sourceIp: raw.sourceIp },
+    { sourceIp: row.sourceIp ?? raw.sourceIp },
   );
+  const validFrom = isoLocal(row.validFrom) ?? fromRaw.validFrom;
+  const validTo = isoLocal(row.validTo) ?? fromRaw.validTo;
+  const numOfFace = numOrUndefined(row.numOfFace) ?? fromRaw.numOfFace;
+  const faceUrl = row.faceUrl ?? fromRaw.faceUrl ?? null;
   return {
     ...fromRaw,
     code: row.personCode || fromRaw.code,
     orgId: row.orgIndexCode || undefined,
-    orgName: row.orgName || fromRaw.orgName,
+    // Departamento real y solo eso. Si el terminal no lo da, va vacío — ya no
+    // se rellena con el `userType`, que tiene columna propia.
+    orgName: row.orgName || undefined,
+    userType: row.userType || fromRaw.userType,
+    gender: row.gender || fromRaw.gender,
+    validEnable: row.validEnable ?? fromRaw.validEnable,
+    validFrom,
+    validTo,
+    numOfFace,
+    numOfFP: numOrUndefined(row.numOfFP) ?? fromRaw.numOfFP,
+    numOfCard: numOrUndefined(row.numOfCard) ?? fromRaw.numOfCard,
+    cardNos: extras?.cardNos?.length ? extras.cardNos : undefined,
+    faceUrl,
+    hasFace: Boolean(faceUrl) || (numOfFace != null && numOfFace > 0),
   };
 }
 
@@ -221,6 +303,109 @@ export async function listAllUserInfo(
     const batch = await searchUserInfo(client, { position: pos, maxResults: 30, searchID });
     all.push(...batch.users);
     if (batch.users.length < 30) break;
+    if (batch.total > 0 && all.length >= batch.total) break;
+  }
+  return all;
+}
+
+/**
+ * Tarjeta tal y como la describe el mensaje `CardInfo`
+ * (HikGateway APÉNDICE-A → `CardInfo`): empleado, número y tipo. Nada más:
+ * lo que el firmware añada queda en el índice abierto, sin inventarlo aquí.
+ */
+export type IsapiCardInfo = {
+  employeeNo?: string;
+  cardNo?: string;
+  /**
+   * `normalCard` (por omisión), `patrolCard`, `hijackCard`, `superCard`,
+   * `dismissingCard`, `emergencyCard`.
+   */
+  cardType?: string;
+  [key: string]: unknown;
+};
+
+export type CardInfoPage = {
+  total: number;
+  position: number;
+  cards: IsapiCardInfo[];
+  responseStatus?: string;
+};
+
+/**
+ * Página de tarjetas del terminal. `position` es offset 0-based.
+ *
+ * Ruta: `POST /ISAPI/AccessControl/CardInfo/Search?format=json`
+ * (HikGateway README §4.3.3 «Buscar tarjetas», línea 523; el `devIndex` de la
+ * doc es del gateway — aquí hablamos ISAPI directo al equipo, igual que
+ * `UserInfo/Search`). Cuerpo `CardInfoSearchCond` con `searchID`,
+ * `searchResultPosition` y `maxResults`, y el filtro opcional `CardNoList`
+ * tal cual lo trae el Postman oficial (`HikGateway.postman_collection.json`,
+ * «Consultar no. tarjeta por no. empleado»).
+ *
+ * Sin filtro devuelve todas las tarjetas del equipo, y cada `CardInfo` viene
+ * con su `employeeNo`: así es como se sabe de quién es cada credencial.
+ */
+export async function searchCardInfo(
+  client: HikvisionIsapiClient,
+  opts: {
+    position?: number;
+    maxResults?: number;
+    searchID?: string;
+    /** Filtro documentado del cond: `CardInfoSearchCond.CardNoList`. */
+    cardNos?: string[];
+  } = {},
+): Promise<CardInfoPage> {
+  const maxResults = Math.min(Math.max(1, opts.maxResults ?? 30), 30);
+  const position = Math.max(0, opts.position ?? 0);
+  const nos = (opts.cardNos || [])
+    .map((n) => String(n).trim())
+    .filter(Boolean)
+    .slice(0, 30);
+  const body = {
+    CardInfoSearchCond: {
+      searchID: opts.searchID || randomUUID(),
+      searchResultPosition: position,
+      maxResults,
+      ...(nos.length ? { CardNoList: nos.map((cardNo) => ({ cardNo })) } : {}),
+    },
+  };
+  const raw = await client.postJson(
+    '/ISAPI/AccessControl/CardInfo/Search?format=json',
+    body,
+  );
+  const search = (raw.CardInfoSearch ?? raw) as Record<string, unknown>;
+  // El contenedor de resultados no está tabulado en la doc: unos firmwares
+  // devuelven `CardInfo`, otros el `MatchList` que usan AcsEvent y FDSearch.
+  // Se aceptan los dos nombres documentados — ninguno inventado.
+  const list = asArray(search.CardInfo as IsapiCardInfo | IsapiCardInfo[]).length
+    ? asArray(search.CardInfo as IsapiCardInfo | IsapiCardInfo[])
+    : asArray(search.MatchList as IsapiCardInfo | IsapiCardInfo[]);
+  const cards = list.filter((c) => c && String(c.cardNo ?? '').trim().length > 0);
+  return {
+    total: num(search.totalMatches ?? search.numOfMatches, cards.length),
+    position,
+    cards,
+    responseStatus:
+      search.responseStatus != null
+        ? String(search.responseStatus)
+        : search.responseStatusStrg != null
+          ? String(search.responseStatusStrg)
+          : undefined,
+  };
+}
+
+/** Drena todas las páginas de CardInfo (mismo tope de 30 que UserInfo). */
+export async function listAllCardInfo(
+  client: HikvisionIsapiClient,
+  maxPages = 50,
+): Promise<IsapiCardInfo[]> {
+  const all: IsapiCardInfo[] = [];
+  const searchID = randomUUID();
+  for (let page = 0; page < maxPages; page++) {
+    const pos = page * 30;
+    const batch = await searchCardInfo(client, { position: pos, maxResults: 30, searchID });
+    all.push(...batch.cards);
+    if (batch.cards.length < 30) break;
     if (batch.total > 0 && all.length >= batch.total) break;
   }
   return all;

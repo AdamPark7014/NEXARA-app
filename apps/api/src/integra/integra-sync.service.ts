@@ -2,12 +2,77 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HikConnectTeamsClient } from '../hikvision-hct/index';
-import { describeDevice, deleteUserInfo, listAllUserInfo, supportsAnpr, supportsPtz } from '../hikvision-isapi/index';
+import {
+  describeDevice,
+  deleteUserInfo,
+  listAllCardInfo,
+  listAllUserInfo,
+  supportsAnpr,
+  supportsPtz,
+  type IsapiUserInfo,
+} from '../hikvision-isapi/index';
 import { IntegraSiteService, type ResolvedIntegraClient } from './integra-site.service';
 
 /** `http://192.168.9.34` → `192.168.9.34`. */
 function hostnameOf(host: string): string {
   return host.replace(/^https?:\/\//, '').replace(/[:/].*$/, '');
+}
+
+/**
+ * `2020-01-01T00:00:00` del terminal → `Date`.
+ *
+ * El equipo manda hora LOCAL suya, sin zona. `new Date(...)` sobre esa cadena
+ * la interpreta como local del servidor, que es la lectura correcta mientras
+ * terminal y API compartan huso; una vigencia mal parseada es peor que nula,
+ * así que lo que no encaje con el patrón se descarta.
+ */
+function parseDeviceTime(v: unknown): Date | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s)) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function intOrNull(v: unknown): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+function strOrNull(v: unknown, max: number): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s ? s.slice(0, max) : null;
+}
+
+/**
+ * Columnas tipadas de una persona ACS a partir del `UserInfo` del terminal.
+ *
+ * Todo esto vivía dentro de `raw`, donde no se puede filtrar ni indexar.
+ * `raw` se sigue guardando entero: es la red de seguridad para los campos que
+ * el firmware manda y aquí no se tipan.
+ */
+export function personColumnsFromUserInfo(u: IsapiUserInfo, sourceIp: string) {
+  const valid = u.Valid;
+  const faceRaw = u.faceURL ?? (u as Record<string, unknown>).FaceURL;
+  return {
+    // `orgName` es DEPARTAMENTO. El `UserInfo` de ISAPI no trae organización
+    // —ni `orgIndexCode`— así que ambos quedan null a propósito: antes se le
+    // metía aquí el `userType`, que ahora tiene su propia columna.
+    orgIndexCode: null,
+    orgName: null,
+    userType: strOrNull(u.userType, 64),
+    gender: strOrNull(u.gender, 32),
+    validEnable: valid?.enable ?? null,
+    validFrom: parseDeviceTime(valid?.beginTime),
+    validTo: parseDeviceTime(valid?.endTime),
+    numOfFace: intOrNull(u.numOfFace),
+    numOfFP: intOrNull(u.numOfFP),
+    numOfCard: intOrNull(u.numOfCard),
+    faceUrl: strOrNull(faceRaw, 500),
+    sourceIp: strOrNull(sourceIp, 64),
+  };
 }
 
 @Injectable()
@@ -644,6 +709,7 @@ export class IntegraSyncService {
     // en varios lectores → mismo employeeNo → un solo IntegraPerson.
     const peopleSeen = new Set<string>();
     let peopleCount = 0;
+    let cardCount = 0;
     let peopleFetchOk = false;
     const deletePending = await this.prisma.integraPersonDeletePending.findMany({
       where: { siteId },
@@ -684,6 +750,7 @@ export class IntegraSyncService {
           }
           peopleSeen.add(personId);
           const personName = String(u.name || personId).trim() || personId;
+          const cols = personColumnsFromUserInfo(u, ip);
           await this.prisma.integraPerson.upsert({
             where: { siteId_personId: { siteId, personId } },
             create: {
@@ -692,19 +759,66 @@ export class IntegraSyncService {
               personId,
               personName,
               personCode: personId,
-              orgIndexCode: null,
-              orgName: u.userType != null ? String(u.userType) : null,
+              ...cols,
               raw: { ...u, sourceIp: ip } as any,
               syncedAt: now,
             },
             update: {
               personName,
               personCode: personId,
-              orgName: u.userType != null ? String(u.userType) : null,
+              ...cols,
               raw: { ...u, sourceIp: ip } as any,
               syncedAt: now,
             },
           });
+        }
+
+        // ── Tarjetas del terminal (CardInfo/Search) ───────────────────────
+        // `numOfCard` decía cuántas; esto dice cuáles. Va aparte del bucle de
+        // personas porque es un solo drenado por equipo, no uno por persona.
+        //
+        // La tarjeta es única POR SITIO (`@@unique([siteId, cardNo])`): la
+        // misma credencial dada de alta en dos lectores del mismo sitio es una
+        // sola fila, y `deviceIp` acaba siendo el último equipo leído. El dato
+        // que faltaba —el número— queda bien; saber en cuántos lectores está
+        // grabada la misma tarjeta no lo responde esta tabla.
+        try {
+          const cards = await listAllCardInfo(client);
+          const seenHere: string[] = [];
+          for (const c of cards) {
+            const cardNo = String(c.cardNo ?? '').trim();
+            const owner = String(c.employeeNo ?? '').trim();
+            // Tarjeta sin dueño o de alguien con baja pendiente: no se espeja.
+            if (!cardNo || !owner || tombstoned.has(owner)) continue;
+            seenHere.push(cardNo);
+            const data = {
+              companyId,
+              siteId,
+              personId: owner,
+              cardNo,
+              cardType: strOrNull(c.cardType, 48),
+              deviceIp: ip,
+              syncedAt: now,
+            };
+            await this.prisma.integraPersonCard.upsert({
+              where: { siteId_cardNo: { siteId, cardNo } },
+              create: data,
+              update: data,
+            });
+          }
+          // Purga solo lo de ESTE equipo: otro lector del mismo sitio tiene
+          // sus propias tarjetas y no se han leído en esta vuelta.
+          await this.prisma.integraPersonCard.deleteMany({
+            where: {
+              siteId,
+              deviceIp: ip,
+              ...(seenHere.length ? { cardNo: { notIn: seenHere } } : {}),
+            },
+          });
+          cardCount += seenHere.length;
+        } catch (e) {
+          // Firmware sin CardInfo/Search: el resto del sync no se cae por eso.
+          this.logger.warn(`ISAPI CardInfo en ${ip}: ${String(e)}`);
         }
       } catch (e) {
         this.logger.warn(`ISAPI UserInfo en ${ip}: ${String(e)}`);
@@ -719,11 +833,19 @@ export class IntegraSyncService {
         await this.prisma.integraPerson.deleteMany({
           where: { siteId, personId: t.personId },
         });
+        // Sin persona no hay credencial: la tarjeta huérfana sería una llave
+        // en el espejo de alguien que ya no existe.
+        await this.prisma.integraPersonCard.deleteMany({
+          where: { siteId, personId: t.personId },
+        });
       }
     }
     peopleCount = peopleSeen.size;
     if (peopleFetchOk && peopleSeen.size) {
       await this.prisma.integraPerson.deleteMany({
+        where: { siteId, personId: { notIn: [...peopleSeen] } },
+      });
+      await this.prisma.integraPersonCard.deleteMany({
         where: { siteId, personId: { notIn: [...peopleSeen] } },
       });
     }
@@ -761,6 +883,9 @@ export class IntegraSyncService {
       cameras: cameraCount,
       doors: doorCount,
       people: peopleCount,
+      // `IntegraSyncRun` no tiene columna de tarjetas; el conteo viaja en la
+      // respuesta para que la consola pueda decir si el drenado leyó algo.
+      cards: cardCount,
       devices: deviceCount,
       vehicles: 0,
       regions: 0,

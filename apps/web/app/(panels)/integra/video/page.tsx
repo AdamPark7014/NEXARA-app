@@ -1,6 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import PauseIcon from "@mui/icons-material/Pause";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import {
   IgBadge,
   IgBtn,
@@ -35,7 +46,28 @@ import {
   subscribeCapabilities,
   subscribeProvider,
 } from "../_caps";
+import {
+  WALL_DND_MIME,
+  WallCell,
+  WallEmptyCell,
+  encodeWallDrag,
+  type WallDragPayload,
+} from "../_WallCell";
+import { PlaybackTimeline } from "../_PlaybackTimeline";
+import { WallShortcutsHelp } from "../_ShortcutsHelp";
+import { WallViewsBar } from "../_WallViewsBar";
+import { useFullscreen } from "../_useFullscreen";
+import {
+  newViewId,
+  readDefaultViewId,
+  readWallViews,
+  sameLayoutAsView,
+  writeDefaultViewId,
+  writeWallViews,
+  type WallView,
+} from "../_wallViews";
 import styles from "../integra.module.css";
+import wall from "../_wall.module.css";
 
 type Cam = {
   id: string;
@@ -149,6 +181,32 @@ export default function IntegraVideoPage() {
   const autoOpened = useRef(false);
   const isHct = provider === "HCT" || slots.some((s) => s.provider === "HCT");
 
+  /* ── Vistas guardadas, atajos, pantalla completa ───────────────── */
+  const [views, setViews] = useState<WallView[]>([]);
+  const [currentViewId, setCurrentViewId] = useState<string | null>(null);
+  const [defaultViewId, setDefaultViewId] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  /** Celda «recogida» con `M`: alternativa por teclado al arrastre. */
+  const [pickedIndex, setPickedIndex] = useState<number | null>(null);
+  /** La imagen visible está pausada a mano (Espacio). */
+  const [frozen, setFrozen] = useState(false);
+
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const focusStageRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  /** Nodo DOM de cada celda, por índice: pantalla completa y foco de teclado. */
+  const cellEls = useRef(new Map<number, HTMLDivElement>());
+  /**
+   * Espejo de `slots` para los callbacks que se pasan a las celdas: si
+   * dependieran del array, cada cambio de muro rompería el `memo` de los
+   * dieciséis mosaicos.
+   */
+  const slotsRef = useRef<StreamSlot[]>(slots);
+  slotsRef.current = slots;
+
+  const { element: fsElement, toggle: toggleFullscreen, exit: exitFullscreen } = useFullscreen();
+  const gridFullscreen = fsElement != null && fsElement === stageRef.current;
+
   const [caps, setCaps] = useState(() => getCachedCapabilities());
   /** Última detección / acceso por IP de equipo (rail + contador toolbar). */
   const [detByIp, setDetByIp] = useState<Record<string, number>>({});
@@ -159,6 +217,12 @@ export default function IntegraVideoPage() {
   useEffect(() => subscribeCapabilities(setCaps), []);
   useEffect(() => {
     preloadGo2rtcPlayer();
+  }, []);
+
+  // Vistas guardadas: se leen tras montar (en SSR no hay `localStorage`).
+  useEffect(() => {
+    setViews(readWallViews());
+    setDefaultViewId(readDefaultViewId());
   }, []);
 
   useEffect(() => {
@@ -377,10 +441,82 @@ export default function IntegraVideoPage() {
     [fetchStream, layout],
   );
 
-  // Primera visita: muro lleno (o una cámara en foco).
+  const setViewMode = useCallback((m: ViewMode) => {
+    setMode(m);
+    window.localStorage.setItem(MODE_KEY, m);
+  }, []);
+
+  const setLayoutN = useCallback((n: LayoutN) => {
+    setLayout(n);
+    window.localStorage.setItem(LAYOUT_KEY, String(n));
+  }, []);
+
+  /**
+   * Carga una vista guardada: rejilla + qué cámara va en cada celda, en orden.
+   *
+   * Ojo con el auto-rellenado: si la vista tiene menos cámaras que celdas, el
+   * efecto de `layout` volvería a llenar los huecos y desharía la vista. Por
+   * eso se marca `lastFillKey` como ya atendido — la celda vacía de una vista
+   * guardada es una decisión del operador, no un hueco que arreglar.
+   */
+  const applyView = useCallback(
+    async (view: WallView) => {
+      autoOpened.current = true;
+      setLayoutN(view.layout);
+      setCurrentViewId(view.id);
+      setPickedIndex(null);
+      setPlayback(null);
+      setError(null);
+      setFilling(true);
+      try {
+        const wanted = view.cells.filter((c): c is string => Boolean(c));
+        const cams = wanted
+          .map((id) => items.find((c) => c.id === id))
+          .filter((c): c is Cam => Boolean(c));
+        const gone = wanted.length - cams.length;
+        const results = await Promise.allSettled(cams.map((c) => fetchStream(c)));
+        const got: StreamSlot[] = [];
+        const issues: Array<{ name: string; reason: string }> = [];
+        results.forEach((r, i) => {
+          if (r.status === "fulfilled") got.push(r.value);
+          else {
+            issues.push({
+              name: cams[i].name || cams[i].id,
+              reason: r.reason instanceof Error ? r.reason.message : "no respondió",
+            });
+          }
+        });
+        if (gone > 0) {
+          issues.push({
+            name: `${gone} cámara(s) de la vista`,
+            reason: "ya no están en el inventario del sitio",
+          });
+        }
+        setWallIssues(issues);
+        setSlots(got);
+        setSelected(got[0]?.id ?? null);
+        setNote(got[0]?.note || null);
+        lastFillKey.current = `${view.layout}:${filtered.length}`;
+        setViewMode("wall");
+        window.sessionStorage.setItem(AUTOOPEN_KEY, "0");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error al cargar la vista");
+      } finally {
+        setFilling(false);
+      }
+    },
+    [items, fetchStream, filtered.length, setLayoutN, setViewMode],
+  );
+
+  // Primera visita: la vista predeterminada si la hay; si no, muro lleno.
   useEffect(() => {
     if (autoOpened.current || items.length === 0 || slots.length > 0) return;
     if (typeof window !== "undefined" && window.sessionStorage.getItem(AUTOOPEN_KEY) === "0") {
+      return;
+    }
+    const preferred = defaultViewId ? views.find((v) => v.id === defaultViewId) : undefined;
+    if (preferred) {
+      void applyView(preferred);
       return;
     }
     autoOpened.current = true;
@@ -390,7 +526,7 @@ export default function IntegraVideoPage() {
       const first = filtered.find((c) => onlineish(c.status)) || filtered[0];
       if (first) void playLive(first, false);
     }
-  }, [items, filtered, slots.length, mode, fillWall, playLive]);
+  }, [items, filtered, slots.length, mode, fillWall, playLive, views, defaultViewId, applyView]);
 
   /**
    * Cambiar de rejilla: al encoger se recorta, al crecer se RELLENA. Antes solo
@@ -423,16 +559,6 @@ export default function IntegraVideoPage() {
   const playbackActive =
     Boolean(playback && focus && playback.cameraId === focus.id && playback.hls);
   const focusSrc = playbackActive && playback ? playback.hls : focus?.hls ?? null;
-
-  const setViewMode = (m: ViewMode) => {
-    setMode(m);
-    window.localStorage.setItem(MODE_KEY, m);
-  };
-
-  const setLayoutN = (n: LayoutN) => {
-    setLayout(n);
-    window.localStorage.setItem(LAYOUT_KEY, String(n));
-  };
 
   const clearAll = () => {
     setSlots([]);
@@ -605,6 +731,381 @@ export default function IntegraVideoPage() {
   const handleTileState = useCallback((id: string, st: PlayerState) => {
     setTileState((prev) => (prev[id] === st ? prev : { ...prev, [id]: st }));
   }, []);
+
+  /* ── Celdas: selección, arrastre, teclado, pantalla completa ───── */
+
+  const selectedIndex = useMemo(
+    () => wallCells.findIndex((s) => s != null && s.id === selected),
+    [wallCells, selected],
+  );
+
+  const registerCellEl = useCallback((index: number, el: HTMLDivElement | null) => {
+    if (el) cellEls.current.set(index, el);
+    else cellEls.current.delete(index);
+  }, []);
+
+  const handleSelectCell = useCallback((index: number) => {
+    const s = slotsRef.current[index];
+    if (s) setSelected(s.id);
+  }, []);
+
+  const handleRemoveCam = useCallback((camId: string) => {
+    setSlots((prev) => {
+      const next = prev.filter((x) => x.id !== camId);
+      setSelected((sel) => (sel === camId ? next[0]?.id ?? null : sel));
+      return next;
+    });
+    setPickedIndex(null);
+  }, []);
+
+  const handleCellFullscreen = useCallback(
+    (index: number, el: HTMLElement | null) => {
+      toggleFullscreen(el ?? cellEls.current.get(index) ?? null);
+    },
+    [toggleFullscreen],
+  );
+
+  /** Intercambia dos celdas. Es lo que espera un operador de VMS al reordenar. */
+  const swapCells = useCallback((a: number, b: number) => {
+    setSlots((prev) => {
+      if (a === b || a < 0 || b < 0 || a >= prev.length || b >= prev.length) return prev;
+      const next = [...prev];
+      const tmp = next[a];
+      next[a] = next[b];
+      next[b] = tmp;
+      return next;
+    });
+  }, []);
+
+  /**
+   * Soltar sobre una celda. Del rail sobre una celda ocupada = sustituir; sobre
+   * un hueco = añadir al final (el muro se llena desde el principio, invariante
+   * que dejó `8bf4451` y que no conviene romper). Entre celdas = intercambiar.
+   */
+  const handleDropOnCell = useCallback(
+    (targetIndex: number, payload: WallDragPayload) => {
+      setPickedIndex(null);
+      if (payload.fromIndex != null) {
+        swapCells(payload.fromIndex, Math.min(targetIndex, slotsRef.current.length - 1));
+        return;
+      }
+      const already = slotsRef.current.findIndex((s) => s.id === payload.cameraId);
+      if (already >= 0) {
+        swapCells(already, Math.min(targetIndex, slotsRef.current.length - 1));
+        return;
+      }
+      const cam = items.find((c) => c.id === payload.cameraId);
+      if (!cam) return;
+      setBusy(cam.id);
+      setError(null);
+      void fetchStream(cam)
+        .then((slot) => {
+          setSlots((prev) => {
+            const next = [...prev];
+            if (targetIndex < next.length) next[targetIndex] = slot;
+            else next.push(slot);
+            return next.slice(0, layout);
+          });
+          setSelected(cam.id);
+        })
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : "No se pudo abrir esa cámara");
+        })
+        .finally(() => setBusy(null));
+    },
+    [items, fetchStream, layout, swapCells],
+  );
+
+  /** Colocar por teclado: `M` recoge, `M` sobre otra celda intercambia. */
+  const handleCellKeyCommand = useCallback(
+    (index: number, key: string, el: HTMLElement | null) => {
+      if (key === "Delete") {
+        const s = slotsRef.current[index];
+        if (s) handleRemoveCam(s.id);
+        return;
+      }
+      if (key !== "m") return;
+      setPickedIndex((prev) => {
+        if (prev == null) return index;
+        if (prev !== index) swapCells(prev, index);
+        return null;
+      });
+      el?.focus();
+    },
+    [handleRemoveCam, swapCells],
+  );
+
+  const handleAddAt = useCallback(
+    (index: number) => {
+      const taken = new Set(slotsRef.current.map((s) => s.id));
+      const nextCam =
+        filtered.find((c) => !taken.has(c.id) && onlineish(c.status)) ||
+        filtered.find((c) => !taken.has(c.id));
+      if (!nextCam) return;
+      handleDropOnCell(index, { cameraId: nextCam.id, fromIndex: null });
+    },
+    [filtered, handleDropOnCell],
+  );
+
+  const openFocusCb = useCallback(
+    (camId: string) => {
+      setSelected(camId);
+      setViewMode("focus");
+    },
+    [setViewMode],
+  );
+
+  /* ── Vistas guardadas: guardar, borrar, predeterminada ─────────── */
+
+  const currentCellIds = useMemo(() => wallCells.map((s) => s?.id ?? null), [wallCells]);
+
+  const currentView = useMemo(
+    () => views.find((v) => v.id === currentViewId) ?? null,
+    [views, currentViewId],
+  );
+
+  const viewDirty = useMemo(
+    () => (currentView ? !sameLayoutAsView(currentView, layout, currentCellIds) : false),
+    [currentView, layout, currentCellIds],
+  );
+
+  const persistViews = useCallback((next: WallView[]) => {
+    setViews(next);
+    writeWallViews(next);
+  }, []);
+
+  const handleLoadView = useCallback(
+    (id: string) => {
+      const v = views.find((x) => x.id === id);
+      if (v) void applyView(v);
+    },
+    [views, applyView],
+  );
+
+  const handleSaveAsView = useCallback(
+    (name: string) => {
+      const view: WallView = {
+        id: newViewId(),
+        name,
+        layout,
+        cells: currentCellIds,
+        savedAt: new Date().toISOString(),
+      };
+      persistViews([view, ...views.filter((v) => v.name !== name)]);
+      setCurrentViewId(view.id);
+    },
+    [layout, currentCellIds, persistViews, views],
+  );
+
+  const handleSaveOverView = useCallback(() => {
+    if (!currentViewId) return;
+    persistViews(
+      views.map((v) =>
+        v.id === currentViewId
+          ? { ...v, layout, cells: currentCellIds, savedAt: new Date().toISOString() }
+          : v,
+      ),
+    );
+  }, [currentViewId, layout, currentCellIds, persistViews, views]);
+
+  const handleDeleteView = useCallback(
+    (id: string) => {
+      persistViews(views.filter((v) => v.id !== id));
+      if (currentViewId === id) setCurrentViewId(null);
+      if (defaultViewId === id) {
+        setDefaultViewId(null);
+        writeDefaultViewId(null);
+      }
+    },
+    [views, persistViews, currentViewId, defaultViewId],
+  );
+
+  const handleToggleDefaultView = useCallback(
+    (id: string) => {
+      const next = defaultViewId === id ? null : id;
+      setDefaultViewId(next);
+      writeDefaultViewId(next);
+    },
+    [defaultViewId],
+  );
+
+  /* ── Pantalla completa y congelado ─────────────────────────────── */
+
+  const toggleGridFullscreen = useCallback(() => {
+    toggleFullscreen(stageRef.current);
+  }, [toggleFullscreen]);
+
+  /**
+   * Congelar / reanudar la imagen visible. Se actúa sobre el `<video>` que ya
+   * está en el DOM; el reproductor no expone controles y no es de este panel.
+   */
+  const togglePlayPause = useCallback(() => {
+    const root =
+      mode === "focus" ? focusStageRef.current : cellEls.current.get(selectedIndex) ?? null;
+    const v = root?.querySelector("video");
+    if (!v) return;
+    if (v.paused) {
+      void v.play().catch(() => undefined);
+      setFrozen(false);
+    } else {
+      v.pause();
+      setFrozen(true);
+    }
+  }, [mode, selectedIndex]);
+
+  /* ── Atajos de teclado ─────────────────────────────────────────── */
+
+  /**
+   * Un único listener en `window`. Los componentes que necesitan las teclas
+   * para sí —el mando PTZ, la línea de tiempo, los campos de texto— cortan la
+   * propagación, así que aquí no hace falta un mapa de excepciones.
+   *
+   * Cambia el listener en cada render, no el muro: colgar y descolgar un
+   * `keydown` no repinta nada.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (t instanceof HTMLElement) {
+        const tag = t.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "SELECT" ||
+          tag === "TEXTAREA" ||
+          t.isContentEditable
+        ) {
+          return;
+        }
+      }
+
+      if (e.key === "Escape") {
+        if (helpOpen) {
+          e.preventDefault();
+          setHelpOpen(false);
+          return;
+        }
+        if (fsElement) {
+          e.preventDefault();
+          exitFullscreen();
+          return;
+        }
+        if (pickedIndex != null) {
+          e.preventDefault();
+          setPickedIndex(null);
+          return;
+        }
+        if (mode === "focus") {
+          e.preventDefault();
+          setViewMode("wall");
+        }
+        return;
+      }
+
+      if (e.key === "?") {
+        e.preventDefault();
+        setHelpOpen((v) => !v);
+        return;
+      }
+      if (helpOpen) return;
+
+      if (e.key === "/") {
+        e.preventDefault();
+        setRailOpen(true);
+        // El input aún puede estar por montar si el rail estaba plegado.
+        window.setTimeout(() => searchRef.current?.focus(), 0);
+        return;
+      }
+
+      if (e.key === "1" || e.key === "2" || e.key === "3" || e.key === "4") {
+        e.preventDefault();
+        const map: Record<string, LayoutN> = { "1": 1, "2": 4, "3": 9, "4": 16 };
+        setLayoutN(map[e.key]);
+        setViewMode("wall");
+        return;
+      }
+
+      if (e.key === "w" || e.key === "W") {
+        e.preventDefault();
+        setViewMode("wall");
+        return;
+      }
+      if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        setViewMode("focus");
+        return;
+      }
+
+      if (e.key === "F") {
+        e.preventDefault();
+        toggleFullscreen(stageRef.current);
+        return;
+      }
+      if (e.key === "f") {
+        e.preventDefault();
+        if (mode === "focus") toggleFullscreen(focusStageRef.current);
+        else if (selectedIndex >= 0) toggleFullscreen(cellEls.current.get(selectedIndex) ?? null);
+        return;
+      }
+
+      if (e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+        togglePlayPause();
+        return;
+      }
+
+      if (mode !== "wall") return;
+
+      if (e.key === "Delete" && selectedIndex >= 0) {
+        e.preventDefault();
+        const s = slotsRef.current[selectedIndex];
+        if (s) handleRemoveCam(s.id);
+        return;
+      }
+
+      if ((e.key === "m" || e.key === "M") && selectedIndex >= 0) {
+        e.preventDefault();
+        handleCellKeyCommand(selectedIndex, "m", cellEls.current.get(selectedIndex) ?? null);
+        return;
+      }
+
+      const cols = colsFor(layout);
+      const delta =
+        e.key === "ArrowRight" ? 1
+          : e.key === "ArrowLeft" ? -1
+            : e.key === "ArrowDown" ? cols
+              : e.key === "ArrowUp" ? -cols
+                : 0;
+      if (delta === 0) return;
+      e.preventDefault();
+      const total = slotsRef.current.length;
+      if (total === 0) return;
+      const from = selectedIndex >= 0 ? selectedIndex : 0;
+      const to = from + delta;
+      if (to < 0 || to >= total) return;
+      const target = slotsRef.current[to];
+      if (!target) return;
+      setSelected(target.id);
+      cellEls.current.get(to)?.focus();
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    helpOpen,
+    mode,
+    layout,
+    selectedIndex,
+    pickedIndex,
+    fsElement,
+    exitFullscreen,
+    toggleFullscreen,
+    togglePlayPause,
+    handleRemoveCam,
+    handleCellKeyCommand,
+    setLayoutN,
+    setViewMode,
+  ]);
 
   /**
    * Control de admisión. Recorre las celdas en orden y deja arrancar solo a

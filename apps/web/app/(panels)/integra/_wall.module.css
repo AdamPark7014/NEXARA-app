@@ -1,0 +1,480 @@
+/*
+ * Estilos propios del muro de video. `integra.module.css` lo tienen abierto
+ * otros agentes, así que todo lo nuevo vive aquí y se compone junto a las
+ * clases de allí (`className={`${styles.wallCell} ${wall.cell}`}`).
+ *
+ * Se reutilizan los tokens `--ig-*` de la consola para no inventar una segunda
+ * paleta.
+ */
+
+/* ── Columna derecha del banco de trabajo ───────────────────── */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* En pantalla completa el escenario ocupa el monitor entero. */
+.stage:fullscreen {
+  background: #071018;
+  padding: 6px;
+}
+
+.stage:fullscreen .grid {
+  flex: 1;
+}
+
+/* ── Barra de vistas guardadas ──────────────────────────────── */
+
+.viewsBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 5px 7px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  background: var(--ig-panel);
+}
+
+.viewsLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.viewsSelect {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  min-width: 170px;
+  max-width: 260px;
+  border-radius: 7px;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-surface);
+  color: var(--ig-ink);
+}
+
+.viewsSpacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.viewsHint {
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.viewsDirty {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #b45309;
+}
+
+/* Botón cuadrado de icono: mismo peso visual que IgBtn pero sin texto. */
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, #fff 14%, transparent);
+  background: color-mix(in srgb, #0b1524 55%, transparent);
+  color: #dbe6f3;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.iconBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ig-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--ig-accent) 18%, #0b1524);
+  color: #fff;
+}
+
+.iconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 2px;
+}
+
+/* En la barra de vistas y en los modales el fondo es claro, no el negro del mosaico. */
+.viewsBar .iconBtn,
+.iconBtn[data-tone="light"] {
+  border-color: var(--ig-line);
+  background: var(--ig-surface);
+  color: var(--ig-ink);
+}
+
+.viewsBar .iconBtn[data-on="1"] {
+  border-color: color-mix(in srgb, #f59e0b 65%, transparent);
+  background: color-mix(in srgb, #f59e0b 16%, transparent);
+  color: #b45309;
+}
+
+/* ── Celda del muro: foco visible, arrastre, recogida ───────── */
+
+.cell:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: -2px;
+  border-color: var(--ig-accent);
+}
+
+.cell[data-drop="1"] {
+  outline: 2px dashed color-mix(in srgb, var(--ig-accent) 85%, #fff);
+  outline-offset: -3px;
+}
+
+.cell[data-picked="1"] {
+  outline: 2px solid #f59e0b;
+  outline-offset: -2px;
+}
+
+.cell[data-dragging="1"] {
+  opacity: 0.45;
+}
+
+.cell:fullscreen {
+  border-radius: 0;
+  aspect-ratio: auto;
+}
+
+.cell:fullscreen .cellBody {
+  aspect-ratio: auto;
+  flex: 1;
+}
+
+.cellBody:fullscreen {
+  aspect-ratio: auto;
+}
+
+.grip {
+  display: inline-flex;
+  align-items: center;
+  color: #64748b;
+  cursor: grab;
+  line-height: 0;
+}
+
+.cellNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: color-mix(in srgb, #fff 12%, transparent);
+  font-size: 9px;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.pickedFlag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fbbf24;
+}
+
+/* Hueco vacío: también acepta soltar. */
+.emptyDrop[data-drop="1"] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--ig-accent) 80%, transparent);
+  background: color-mix(in srgb, var(--ig-accent) 14%, #0b1524);
+  color: #e2e8f0;
+}
+
+/* Fila lógica del muro: no debe romper la rejilla CSS del padre. */
+.gridRow {
+  display: contents;
+}
+
+/* ── Fila del rail arrastrable ──────────────────────────────── */
+
+.railRowDragging {
+  opacity: 0.5;
+}
+
+/* ── Ayuda de atajos ────────────────────────────────────────── */
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, #0b1524 62%, transparent);
+}
+
+.modalCard {
+  width: min(620px, 100%);
+  max-height: min(80dvh, 640px);
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  color: var(--ig-ink);
+  box-shadow: 0 18px 48px rgba(2, 6, 23, 0.38);
+}
+
+.modalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.modalTitle {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.shortcutList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 4px 16px;
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px dashed color-mix(in srgb, var(--ig-line) 70%, transparent);
+  font-size: 12px;
+}
+
+.shortcutKeys {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--ig-line);
+  border-bottom-width: 2px;
+  background: var(--ig-surface);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ig-ink);
+}
+
+.modalNote {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ig-muted);
+}
+
+/* ── Línea de tiempo de grabación ───────────────────────────── */
+
+.timeline {
+  display: grid;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.timelineHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.timelineNow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ig-ink);
+}
+
+.timelineTrack {
+  position: relative;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--ig-line);
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, #0b1524 6%, transparent) 0,
+    color-mix(in srgb, #0b1524 6%, transparent) 1px,
+    transparent 1px,
+    transparent 24px
+  );
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.timelineTrack:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 2px;
+}
+
+.timelineTrack[data-empty="1"] {
+  cursor: not-allowed;
+}
+
+.timelineSeg {
+  position: absolute;
+  top: 8px;
+  bottom: 14px;
+  min-width: 2px;
+  border-radius: 3px;
+  border: 0;
+  padding: 0;
+  background: color-mix(in srgb, #0ea5e9 55%, transparent);
+  cursor: pointer;
+}
+
+.timelineSeg:hover {
+  background: color-mix(in srgb, #0ea5e9 75%, transparent);
+}
+
+.timelineSeg[data-active="1"] {
+  background: #0284c7;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #fff 55%, transparent);
+}
+
+.timelineSeg:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 1px;
+}
+
+.timelineMark {
+  position: absolute;
+  top: 4px;
+  bottom: 12px;
+  width: 1px;
+  background: color-mix(in srgb, #0f172a 35%, transparent);
+  pointer-events: none;
+}
+
+.timelineHead2 {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ef4444;
+  pointer-events: none;
+}
+
+.timelineHead2::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #ef4444;
+}
+
+.timelineTicks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  pointer-events: none;
+}
+
+.timelineTick {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 12px;
+  color: var(--ig-muted);
+  white-space: nowrap;
+}
+
+.timelineEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.timelineFoot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+/* ── PTZ: velocidad y presets ───────────────────────────────── */
+
+.ptzSpeed {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.ptzSpeedRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ptzSpeedRow input[type="range"] {
+  flex: 1;
+  min-width: 90px;
+  accent-color: var(--ig-accent);
+}
+
+.ptzSpeedVal {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: var(--ig-ink);
+  min-width: 34px;
+  text-align: right;
+}
+
+.ptzKeyHint {
+  margin: 4px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--ig-muted);
+}
+
+.ptzFocusRing:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 2px;
+}

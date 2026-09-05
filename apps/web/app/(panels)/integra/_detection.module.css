@@ -1,0 +1,453 @@
+/* ───────────────────────────────────────────────────────────────────────────
+ * Capa de detección sobre el video — NEXARA Integra.
+ *
+ * Vive en su propio módulo a propósito: `integra.module.css` son ~4.6k líneas
+ * compartidas por todos los paneles. Aquí solo está lo que se pinta encima del
+ * cuadro: cajas, estela, placas y chips.
+ *
+ * Lenguaje visual VMS (Genetec / Avigilon / Milestone): **esquinas en L, no
+ * marco cerrado**. El marco completo tapa justo lo que el operador quiere
+ * mirar —la cara, la puerta, la matrícula— y en un mosaico de 16 celdas
+ * convierte el video en una rejilla de rectángulos. Cuatro esquinas marcan el
+ * objetivo y dejan ver la escena.
+ *
+ * El posicionamiento de la capa (`position/inset/z-index`) sigue viniendo de
+ * `.detOverlay` del módulo grande: el foco lo sube a z-index 6 con
+ * `.focusStage .detOverlay` y esa regla debe seguir mandando.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+.overlay {
+  /* Verde «identificado»: no existe en los tokens de la consola porque --ig-ok
+     es el verde de estado del tema claro y sobre video negro se apaga. */
+  --det-green: #34d399;
+  /* Consultas de contenedor: en el mosaico las placas van en versión corta y
+     en el foco enseñan la línea de origen. Sin prop nueva ni JS de medida. */
+  container-type: inline-size;
+  font-family: var(--ig-font-mono, ui-monospace, "Cascadia Mono", Menlo, monospace);
+  color: var(--ig-video-fg-cyan, #e8f7ff);
+}
+
+/* ── Paleta por tipo de objeto ──────────────────────────────────────────────
+ * Un color = una pregunta respondida:
+ *   verde   → identificado (el ACS le puso nombre)
+ *   cian    → persona sin identificar (AcuSense human/unknown)
+ *   violeta → rostro sin nombre (FaceRect sin identidad detrás)
+ *   ámbar   → vehículo
+ *   rojo    → acceso denegado (viene del propio evento, no es decoración)
+ */
+.box {
+  --det-color: var(--ig-cyan, #22d3ee);
+  /* Brazo de la esquina proporcional a la caja, con suelo y techo: en una
+     caja de 30 px no puede ser el 24 % (invisible) ni 28 px (marco entero). */
+  --det-arm: clamp(8px, 24%, 26px);
+  --det-thick: 2px;
+  position: absolute;
+  pointer-events: none;
+  animation:
+    detPop 220ms cubic-bezier(0.2, 0.75, 0.25, 1) both,
+    detLife var(--det-ttl, 15s) linear forwards;
+  /* El equipo manda posiciones a saltos; interpolar el rect evita el tembleque. */
+  transition:
+    left 180ms linear,
+    top 180ms linear,
+    width 180ms linear,
+    height 180ms linear;
+}
+
+.box[data-kind="named"] {
+  --det-color: var(--det-green, #34d399);
+}
+
+.box[data-kind="face"] {
+  --det-color: var(--ig-violet, #a78bfa);
+}
+
+.box[data-kind="vehicle"] {
+  --det-color: var(--ig-amber, #f59e0b);
+}
+
+.box[data-denied="1"] {
+  --det-color: #f87171;
+}
+
+/* Las cuatro esquinas en L, sin un solo nodo extra: ocho capas de gradiente
+   plano, dos por esquina (brazo horizontal + brazo vertical). */
+.box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--det-color), var(--det-color)),
+    linear-gradient(var(--det-color), var(--det-color)),
+    linear-gradient(var(--det-color), var(--det-color)),
+    linear-gradient(var(--det-color), var(--det-color)),
+    linear-gradient(var(--det-color), var(--det-color)),
+    linear-gradient(var(--det-color), var(--det-color)),
+    linear-gradient(var(--det-color), var(--det-color)),
+    linear-gradient(var(--det-color), var(--det-color));
+  background-repeat: no-repeat;
+  background-size:
+    var(--det-arm) var(--det-thick),
+    var(--det-thick) var(--det-arm),
+    var(--det-arm) var(--det-thick),
+    var(--det-thick) var(--det-arm),
+    var(--det-arm) var(--det-thick),
+    var(--det-thick) var(--det-arm),
+    var(--det-arm) var(--det-thick),
+    var(--det-thick) var(--det-arm);
+  background-position:
+    left top,
+    left top,
+    right top,
+    right top,
+    left bottom,
+    left bottom,
+    right bottom,
+    right bottom;
+  /* Contraste contra escenas claras sin recurrir a un marco negro completo. */
+  filter: drop-shadow(0 0 1.5px rgb(2 6 23 / 0.75));
+}
+
+/* Identificado: un halo mínimo que lo separa del resto sin tapar la cara. */
+.box[data-kind="named"]::before {
+  filter:
+    drop-shadow(0 0 1.5px rgb(2 6 23 / 0.75))
+    drop-shadow(0 0 5px color-mix(in srgb, var(--det-color) 45%, transparent));
+}
+
+/* ── Placa ────────────────────────────────────────────────────────────────
+ * Se ancla arriba-izquierda de la caja y se reubica sola cuando la caja está
+ * pegada a un borde: `data-place=inside` si no cabe encima, `data-align=right`
+ * si anclada a la izquierda se saldría por la derecha del cuadro.
+ */
+.tag {
+  position: absolute;
+  bottom: 100%;
+  left: -1px;
+  margin-bottom: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: min(280px, 80cqw);
+  padding: 2px 7px 3px 3px;
+  border-radius: var(--ig-radius-xs, 3px);
+  background: rgb(3 12 20 / 0.86);
+  border: 1px solid color-mix(in srgb, var(--det-color) 65%, transparent);
+  border-left: 3px solid var(--det-color);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(2px);
+  animation: detTagIn 200ms ease-out both;
+}
+
+.tag[data-place="inside"] {
+  bottom: auto;
+  top: 2px;
+  left: 2px;
+  margin-bottom: 0;
+}
+
+.tag[data-align="right"] {
+  left: auto;
+  right: -1px;
+}
+
+.tag[data-place="inside"][data-align="right"] {
+  left: auto;
+  right: 2px;
+}
+
+.tagHead {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tagName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  color: var(--ig-video-fg-cyan, #e8f7ff);
+}
+
+.tagAge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 4px;
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--ig-video-fg-cyan, #e8f7ff) 62%, transparent);
+}
+
+/* Segunda línea: origen + qué disparó el aviso. Solo datos del evento; si un
+   dato no viene, la línea se acorta — nunca se rellena con un guion. */
+.tagMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 2px;
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--ig-video-fg-faint, #cbd5e1) 78%, transparent);
+}
+
+.tagSource {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--det-color);
+  background: color-mix(in srgb, var(--det-color) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--det-color) 34%, transparent);
+}
+
+.tagDot {
+  flex-shrink: 0;
+  opacity: 0.45;
+}
+
+.tagDenied {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #fca5a5;
+}
+
+.tagFace {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  object-fit: cover;
+  background: rgb(255 255 255 / 0.08);
+}
+
+/* En el mosaico la caja mide 80 px: la segunda línea sobra y la foto también. */
+@container (max-width: 559px) {
+  .tagMeta {
+    display: none;
+  }
+
+  .tagFace {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* ── Estela de trayectoria ────────────────────────────────────────────────
+ * Las últimas posiciones del mismo track. `preserveAspectRatio: none` deja
+ * trabajar en 0..100 (los mismos porcentajes que las cajas) y
+ * `non-scaling-stroke` impide que el trazo se deforme con el cuadro.
+ */
+.trails {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.trail {
+  fill: none;
+  stroke: var(--ig-cyan, #22d3ee);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.trail[data-kind="named"] {
+  stroke: var(--det-green, #34d399);
+}
+
+.trail[data-kind="face"] {
+  stroke: var(--ig-violet, #a78bfa);
+}
+
+.trail[data-kind="vehicle"] {
+  stroke: var(--ig-amber, #f59e0b);
+}
+
+/* ── Chips de estado (abajo-izquierda) ───────────────────────────────────── */
+.hud {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.chip {
+  --chip-color: var(--ig-cyan, #22d3ee);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--ig-radius-pill, 999px);
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--ig-video-fg-cyan, #e8f7ff);
+  background: rgb(3 12 20 / 0.8);
+  border: 1px solid color-mix(in srgb, var(--chip-color) 58%, transparent);
+  box-shadow: 0 1px 8px rgb(0 0 0 / 0.4);
+  backdrop-filter: blur(3px);
+}
+
+.chip b {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--chip-color);
+}
+
+.chip[data-kind="named"] {
+  --chip-color: var(--det-green, #34d399);
+}
+
+.chip[data-kind="vehicle"] {
+  --chip-color: var(--ig-amber, #f59e0b);
+  color: var(--ig-video-fg-amber, #fff7ed);
+}
+
+.chip[data-kind="motion"] {
+  --chip-color: var(--ig-amber, #f59e0b);
+  color: var(--ig-video-fg-amber, #fff7ed);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.chip[data-kind="idle"] {
+  --chip-color: var(--ig-video-fg-dim, #94a3b8);
+  color: var(--ig-video-fg-faint, #cbd5e1);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+  max-width: min(300px, 80cqw);
+}
+
+/* ── Iconos ──────────────────────────────────────────────────────────────
+ * Los SVG de MUI se dimensionan con emocion (`font-size` del root). En el
+ * primer render del servidor esa hoja aún no está, así que el tamaño se fija
+ * también aquí, desde el CSS module que Next sí extrae: sin esto los iconos
+ * parpadean a 300×150 (tamaño por defecto de un <svg> sin CSS).
+ */
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 0;
+  font-size: 13px;
+  color: var(--det-color, currentColor);
+}
+
+.icon svg {
+  width: 1em;
+  height: 1em;
+  display: block;
+  fill: currentColor;
+}
+
+.chip .icon {
+  font-size: 12px;
+  color: var(--chip-color);
+}
+
+/* Hueco de foto de las tiras laterales (48–52 px): el icono ocupa el sitio de
+   la miniatura cuando el evento no trae captura. */
+.iconLg {
+  font-size: 22px;
+}
+
+/* Icono en línea dentro de texto corrido (avisos de la tira de vehículos). */
+.iconInline {
+  font-size: 14px;
+  vertical-align: -2px;
+  margin-right: 4px;
+  color: currentColor;
+}
+
+/* ── Animaciones ─────────────────────────────────────────────────────────
+ * `detPop` = aparición (transform). `detLife` = vida útil (opacity), con la
+ * duración del TTL real de la caja. Van separadas por propiedad: si las dos
+ * animaran `opacity`, la última de la lista pisaría a la otra.
+ */
+@keyframes detPop {
+  from {
+    transform: scale(1.06);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes detLife {
+  0% {
+    opacity: 0;
+  }
+
+  2% {
+    opacity: 1;
+  }
+
+  72% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.34;
+  }
+}
+
+@keyframes detTagIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Movimiento reducido: se queda la información (la caja sigue apagándose con
+   su TTL) y se van el zoom, el deslizamiento y la interpolación del rect. */
+@media (prefers-reduced-motion: reduce) {
+  .box {
+    animation: detLife var(--det-ttl, 15s) linear forwards;
+    transition: none;
+  }
+
+  .tag {
+    animation: none;
+  }
+}
+
+/* Solo para lectores de pantalla: el aviso de detección nueva. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

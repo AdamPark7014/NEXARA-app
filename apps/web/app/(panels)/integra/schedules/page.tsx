@@ -1,11 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import DoorFrontIcon from "@mui/icons-material/DoorFront";
+import GridOnIcon from "@mui/icons-material/GridOn";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   IgBadge,
   IgBtn,
-  IgError,
   IgField,
   IgFilters,
   IgNotice,
@@ -13,10 +18,20 @@ import {
   IgPanel,
   IgToolbar,
 } from "../_Console";
+import {
+  OpResult as OpResultCard,
+  PanelEmpty,
+  PanelError,
+  PanelSkeleton,
+  TabPanel,
+  Trunc,
+  useTabIds,
+} from "../_PanelKit";
 import { getCachedProvider, subscribeProvider } from "../_caps";
 import { inputStyle, selectStyle } from "../_lib";
 import { toast } from "@/components/Toast";
 import styles from "../integra.module.css";
+import css from "../_panels.module.css";
 import {
   ACCESS_PRESETS,
   ISAPI_INDEFINITE_END,
@@ -32,19 +47,86 @@ import {
   type DoorAccessRow,
   type OpResult,
   type PersonSchedule,
+  type ScheduleDayPlan,
+  type ScheduleSegment,
   type SchedulesCatalog,
   WEEK_DAYS,
 } from "../_schedulesApi";
 
 type ViewMode = "person" | "door" | "matrix";
 
-function readQuery(): { person: string; door: string; view: ViewMode } {
-  if (typeof window === "undefined") return { person: "", door: "", view: "person" };
-  const q = new URLSearchParams(window.location.search);
-  const viewRaw = q.get("view");
-  const view: ViewMode =
-    viewRaw === "door" || viewRaw === "matrix" || viewRaw === "person" ? viewRaw : "person";
-  return { person: q.get("person") || "", door: q.get("door") || "", view };
+const VIEWS: Array<{ id: ViewMode; label: string }> = [
+  { id: "person", label: "Por persona" },
+  { id: "door", label: "Por puerta" },
+  { id: "matrix", label: "Matriz puerta" },
+];
+
+function asViewMode(raw: string | null): ViewMode {
+  return raw === "door" || raw === "matrix" || raw === "person" ? raw : "person";
+}
+
+/* ── Geometría de la barra de 24 h ──────────────────────────────────── */
+
+/** Minutos desde medianoche de un `HH:MM[:SS]` del ACS. */
+function minutesOfDay(value: string | undefined): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(value || "");
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
+  return Math.min(1440, h * 60 + min);
+}
+
+/**
+ * Una franja como porcentaje del día. Un fin en `00:00` es la medianoche
+ * siguiente, no el mismo instante que el principio: el terminal escribe así
+ * el 24 h completo y sin esto la banda salía de ancho cero.
+ */
+function bandGeometry(seg: ScheduleSegment): { start: number; width: number } | null {
+  const a = minutesOfDay(seg.beginTime);
+  const rawEnd = minutesOfDay(seg.endTime);
+  if (a == null || rawEnd == null) return null;
+  const b = rawEnd <= a ? 1440 : rawEnd;
+  return { start: (a / 1440) * 100, width: Math.max(1, ((b - a) / 1440) * 100) };
+}
+
+function segmentLabel(seg: ScheduleSegment): string {
+  const a = (seg.beginTime || "").slice(0, 5) || "??:??";
+  const b = (seg.endTime || "").slice(0, 5) || "??:??";
+  return `${a}–${b}`;
+}
+
+function enabledSegments(days: ScheduleDayPlan[] | undefined, key: string): ScheduleSegment[] {
+  return days?.find((d) => d.week === key)?.segments.filter((s) => s.enable !== false) || [];
+}
+
+/** Barra de 24 h de un día con sus franjas dibujadas encima. */
+function DayBar({ segments, dayLabel }: { segments: ScheduleSegment[]; dayLabel: string }) {
+  if (!segments.length) {
+    return <span className={css.dayOff}>Cerrado</span>;
+  }
+  const text = segments.map(segmentLabel).join(" · ");
+  return (
+    <div className={css.dayCell}>
+      <div className={css.dayTrack} title={`${dayLabel}: ${text}`}>
+        {segments.map((s, i) => {
+          const g = bandGeometry(s);
+          if (!g) return null;
+          return (
+            <span
+              key={`${s.beginTime}-${s.endTime}-${i}`}
+              className={css.dayBand}
+              style={{
+                ["--band-start" as string]: `${g.start}%`,
+                ["--band-width" as string]: `${g.width}%`,
+              }}
+            />
+          );
+        })}
+      </div>
+      <span className={css.dayText}>{text}</span>
+    </div>
+  );
 }
 
 function OpFanout({ results }: { results: OpResult[] | null }) {
@@ -65,16 +147,23 @@ function WeekStrip({ summary }: { summary?: string }) {
   if (!summary) {
     return <span className={styles.schedWeekMuted}>Sin franjas publicadas</span>;
   }
-  return <span className={styles.schedWeekSummary}>{summary}</span>;
+  return (
+    <Trunc text={summary} className={styles.schedWeekSummary} inline />
+  );
 }
 
-function WeekGridPreview({
-  planId,
-  catalog,
-}: {
-  planId: string;
-  catalog: SchedulesCatalog;
-}) {
+/**
+ * Vista semanal de la plantilla asignada a una puerta.
+ *
+ * Hasta `b4ea923` nada poblaba `days` y esto pintaba un heurístico cableado
+ * por id de plantilla (id 2 = 08:00–18:00, id 4 = 18:00–08:00…). Ese mapa
+ * describía el catálogo local de respaldo, no el terminal: en cuanto alguien
+ * reprogramaba el WeekPlanCfg del ACS, la pantalla seguía enseñando el horario
+ * viejo con toda la confianza. Ahora los días llegan del ACS y el heurístico
+ * sobra: cuando no hay detalle se dice, y se enseña el resumen que sí publica
+ * la API en vez de inventarse franjas.
+ */
+function WeekGridPreview({ planId, catalog }: { planId: string; catalog: SchedulesCatalog }) {
   const tpl = catalog.templates.find((t) => t.id === planId);
   if (!tpl || planId === "0") {
     return (
@@ -83,56 +172,75 @@ function WeekGridPreview({
       </div>
     );
   }
-  if (tpl.days?.length) {
+  if (!tpl.days?.length) {
     return (
-      <div className={styles.schedWeekGrid} role="table" aria-label="Horario semanal">
-        {WEEK_DAYS.map((d) => {
-          const day = tpl.days?.find((x) => x.week === d.key);
-          const segs =
-            day?.segments.filter((s) => s.enable).map((s) => {
-              const a = (s.beginTime || "").slice(0, 5);
-              const b = (s.endTime || "").slice(0, 5);
-              return `${a}–${b}`;
-            }) || [];
-          return (
-            <div key={d.key} className={styles.schedWeekRow} role="row">
-              <span className={styles.schedWeekDay}>{d.short}</span>
-              <span className={styles.schedWeekRanges}>
-                {segs.length ? segs.join(" · ") : "—"}
-              </span>
-            </div>
-          );
-        })}
+      <div className={styles.schedWeekEmpty}>
+        <p className={css.matrixNoDetail}>
+          <InfoOutlinedIcon className={css.icon} fontSize="small" aria-hidden />
+          El terminal no publica el detalle semanal de «{tpl.name}».
+        </p>
+        {tpl.summary ? (
+          <p className={css.dayText}>Resumen del catálogo: {tpl.summary}</p>
+        ) : null}
       </div>
     );
   }
   return (
-    <div className={styles.schedWeekGrid} role="table" aria-label="Resumen horario">
-      {WEEK_DAYS.map((d) => {
-        const weekend = d.key === "Saturday" || d.key === "Sunday";
-        let label = "—";
-        if (planId === "1") label = "00:00–24:00";
-        else if (planId === "2" && !weekend) label = "08:00–18:00";
-        else if (planId === "3" && !weekend) label = "08:00–20:00";
-        else if (planId === "4" && !weekend) label = "18:00–08:00";
-        else if (planId === "5" && weekend) label = "00:00–24:00";
-        return (
-          <div key={d.key} className={styles.schedWeekRow} role="row">
-            <span className={styles.schedWeekDay}>{d.short}</span>
-            <span className={styles.schedWeekRanges} data-off={label === "—" ? "1" : undefined}>
-              {label}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+    <table className={css.weekTable}>
+      <caption>Horario semanal · {tpl.name}</caption>
+      <tbody>
+        {WEEK_DAYS.map((d) => {
+          const segs = enabledSegments(tpl.days, d.key);
+          return (
+            <tr key={d.key}>
+              <th scope="row" title={d.label}>
+                {d.short}
+              </th>
+              <td>
+                <DayBar segments={segs} dayLabel={d.label} />
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
+/**
+ * `useSearchParams` obliga a un límite de Suspense para que Next no falle al
+ * prerenderizar. El envoltorio existe solo para eso.
+ */
 export default function IntegraSchedulesPage() {
+  return (
+    <Suspense
+      fallback={
+        <IgPage>
+          <IgToolbar title="Horarios de acceso" meta="Cargando…" />
+          <PanelSkeleton rows={5} />
+        </IgPage>
+      }
+    >
+      <SchedulesConsole />
+    </Suspense>
+  );
+}
+
+function SchedulesConsole() {
   const router = useRouter();
-  const initialQ = readQuery();
+  const searchParams = useSearchParams();
   const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
+  const initialQ = useMemo(
+    () => ({
+      person: searchParams.get("person") || "",
+      door: searchParams.get("door") || "",
+      view: asViewMode(searchParams.get("view")),
+    }),
+    // Solo la lectura inicial: a partir de ahí manda el estado y la URL lo sigue.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const tabIds = useTabIds("sched");
   const [view, setView] = useState<ViewMode>(initialQ.view);
   const [catalog, setCatalog] = useState<SchedulesCatalog | null>(null);
   const [people, setPeople] = useState<Array<{ id: string; name: string; code?: string }>>(
@@ -153,6 +261,22 @@ export default function IntegraSchedulesPage() {
   const [previewDoorId, setPreviewDoorId] = useState<string | null>(null);
 
   useEffect(() => subscribeProvider(setProvider), []);
+
+  /**
+   * Vista, persona y puerta viven en la URL: así una incidencia se comparte
+   * pegando el enlace en vez de explicando qué hay que seleccionar. `replace`
+   * y no `push` para no llenar el historial con cada cambio de selector.
+   */
+  useEffect(() => {
+    const next = new URLSearchParams();
+    next.set("view", view);
+    if (personId) next.set("person", personId);
+    if (doorId) next.set("door", doorId);
+    const qs = next.toString();
+    if (qs !== window.location.search.replace(/^\?/, "")) {
+      router.replace(`/integra/schedules?${qs}`, { scroll: false });
+    }
+  }, [router, view, personId, doorId]);
 
   const isIsapi = provider === "ISAPI";
 
@@ -228,12 +352,27 @@ export default function IntegraSchedulesPage() {
     if (view === "door" || view === "matrix") void loadDoor();
   }, [view, loadDoor]);
 
-  const matrix = useMemo(() => {
-    if (!catalog || view !== "matrix") return null;
-    // Matriz ligera: reutiliza personas del directorio + RightPlan via door fetch es caro;
-    // mostramos por puerta seleccionada + selector de puerta, y filas de personas.
-    return { doors: catalog.doors, people: doorPeople };
+  /**
+   * Filas de la matriz: una persona con acceso a la puerta elegida y, por día
+   * de la semana, las franjas reales de su plantilla. Leer RightPlan de todas
+   * las puertas a la vez es caro, así que la matriz es persona × día para UNA
+   * puerta; el selector de arriba cambia de columna activa.
+   */
+  const matrixRows = useMemo(() => {
+    if (!catalog || view !== "matrix") return [];
+    return doorPeople.map((p) => {
+      const tpl = catalog.templates.find((t) => t.id === p.planTemplateNo);
+      const noAccess = !p.planTemplateNo || p.planTemplateNo === "0";
+      return {
+        row: p,
+        planName: p.planName || templateLabel(catalog.templates, p.planTemplateNo),
+        noAccess,
+        days: noAccess ? undefined : tpl?.days,
+      };
+    });
   }, [catalog, doorPeople, view]);
+
+  const matrixHasDetail = matrixRows.some((r) => r.days?.length);
 
   const onPreset = (id: AccessPresetId) => {
     if (!catalog || !draft) return;
@@ -312,14 +451,38 @@ export default function IntegraSchedulesPage() {
         }
         actions={
           <>
-            <IgBtn onClick={() => router.push("/integra/people")}>Personas</IgBtn>
-            <IgBtn onClick={() => router.push("/integra/access")}>Puertas</IgBtn>
-            <IgBtn onClick={() => void loadCatalog()}>Actualizar</IgBtn>
+            <IgBtn onClick={() => router.push("/integra/people")}>
+              <span className={css.iconBtnLabel}>
+                <PeopleAltIcon className={css.icon} fontSize="small" aria-hidden />
+                Personas
+              </span>
+            </IgBtn>
+            <IgBtn onClick={() => router.push("/integra/access")}>
+              <span className={css.iconBtnLabel}>
+                <DoorFrontIcon className={css.icon} fontSize="small" aria-hidden />
+                Puertas
+              </span>
+            </IgBtn>
+            <IgBtn onClick={() => void loadCatalog()} disabled={busy}>
+              <span className={css.iconBtnLabel}>
+                <RefreshIcon className={css.icon} fontSize="small" aria-hidden />
+                {busy ? "Actualizando…" : "Actualizar"}
+              </span>
+            </IgBtn>
           </>
         }
       />
 
-      <IgError>{error}</IgError>
+      {error && (
+        <PanelError
+          title="No se pudieron cargar los horarios"
+          message={error}
+          onRetry={() => {
+            setError(null);
+            void loadCatalog();
+          }}
+        />
+      )}
 
       {catalog?.note && (
         <IgNotice tone="warn">{catalog.note}</IgNotice>
@@ -333,18 +496,15 @@ export default function IntegraSchedulesPage() {
       )}
 
       <div className={styles.schedTabs} role="tablist" aria-label="Vistas de horario">
-        {(
-          [
-            ["person", "Por persona"],
-            ["door", "Por puerta"],
-            ["matrix", "Matriz puerta"],
-          ] as const
-        ).map(([id, label]) => (
+        {VIEWS.map(({ id, label }) => (
           <button
             key={id}
             type="button"
             role="tab"
+            id={tabIds.tabId(id)}
             aria-selected={view === id}
+            aria-controls={tabIds.panelId(id)}
+            tabIndex={view === id ? 0 : -1}
             className={styles.schedTab}
             data-on={view === id ? "1" : undefined}
             onClick={() => setView(id)}
@@ -354,7 +514,11 @@ export default function IntegraSchedulesPage() {
         ))}
       </div>
 
-      {view === "person" && (
+      <TabPanel
+        id={tabIds.panelId("person")}
+        labelledBy={tabIds.tabId("person")}
+        active={view === "person"}
+      >
         <>
           <IgFilters>
             <IgField label="Persona">
@@ -379,16 +543,22 @@ export default function IntegraSchedulesPage() {
             )}
           </IgFilters>
 
+          {busy && !draft && <PanelSkeleton rows={4} />}
+
           {!people.length && !busy && (
-            <div className={styles.igEmpty}>
-              <strong className={styles.igEmptyTitle}>Sin personas en el sitio</strong>
-              <span className={styles.igEmptyHint}>
-                Da de alta en Personas o sincroniza el directorio ACS.
-              </span>
-              <IgBtn variant="primary" onClick={() => router.push("/integra/people")}>
-                Ir a Personas
-              </IgBtn>
-            </div>
+            <PanelEmpty
+              icon={<PeopleAltIcon fontSize="small" />}
+              title="Sin personas en el sitio"
+              hint="Da de alta en Personas o sincroniza el directorio ACS para que aparezcan aquí."
+              action={
+                <>
+                  <IgBtn variant="primary" onClick={() => router.push("/integra/people")}>
+                    Ir a Personas
+                  </IgBtn>
+                  <IgBtn onClick={() => void loadCatalog()}>Reintentar carga</IgBtn>
+                </>
+              }
+            />
           )}
 
           {draft && catalog && (
@@ -505,15 +675,24 @@ export default function IntegraSchedulesPage() {
                   count={`${draft.doorPlans.filter((d) => d.planTemplateNo !== "0").length}/${draft.doorPlans.length} con acceso`}
                 >
                   {!catalog.doors.length ? (
-                    <div className={styles.igEmpty}>
-                      <strong className={styles.igEmptyTitle}>Sin puertas</strong>
-                      <span className={styles.igEmptyHint}>
-                        Sincroniza el sitio para cargar el inventario ACS.
-                      </span>
-                    </div>
+                    <PanelEmpty
+                      icon={<DoorFrontIcon fontSize="small" />}
+                      title="Sin puertas"
+                      hint="Sincroniza el sitio para cargar el inventario ACS."
+                      action={<IgBtn onClick={() => void loadCatalog()}>Reintentar</IgBtn>}
+                    />
                   ) : (
                     <ul className={styles.schedDoorList}>
-                      {draft.doorPlans.map((dp) => (
+                      {draft.doorPlans.map((dp) => {
+                        const doorTitle = dp.doorName || dp.doorId;
+                        const doorMeta = [
+                          dp.deviceIp,
+                          dp.present === false ? "no enrolado" : null,
+                          dp.error || null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ");
+                        return (
                         <li
                           key={dp.doorId || dp.deviceIp}
                           className={styles.schedDoorRow}
@@ -524,13 +703,10 @@ export default function IntegraSchedulesPage() {
                             type="button"
                             className={styles.schedDoorName}
                             onClick={() => setPreviewDoorId(dp.doorId)}
+                            title={`${doorTitle} — ${doorMeta}`}
                           >
-                            <strong>{dp.doorName || dp.doorId}</strong>
-                            <span>
-                              {dp.deviceIp}
-                              {dp.present === false ? " · no enrolado" : ""}
-                              {dp.error ? ` · ${dp.error}` : ""}
-                            </span>
+                            <strong className={css.trunc}>{doorTitle}</strong>
+                            <span className={css.trunc}>{doorMeta}</span>
                           </button>
                           <select
                             value={dp.planTemplateNo}
@@ -551,7 +727,8 @@ export default function IntegraSchedulesPage() {
                             }
                           />
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                   )}
                 </IgPanel>
@@ -570,12 +747,27 @@ export default function IntegraSchedulesPage() {
                 </div>
 
                 {opNote && (
-                  <p
-                    className={styles.personNote}
-                    data-tone={opOk ? "ok" : "warn"}
-                  >
-                    {opNote}
-                  </p>
+                  <OpResultCard
+                    tone={opOk ? "ok" : "danger"}
+                    title={opOk ? "Horario guardado" : "Guardado incompleto"}
+                    hint={opNote}
+                    facts={[
+                      { label: "Persona", value: draft.name || draft.personId },
+                      {
+                        label: "Puertas con acceso",
+                        value: `${draft.doorPlans.filter((d) => d.planTemplateNo !== "0").length} de ${draft.doorPlans.length}`,
+                      },
+                      { label: "Vigencia", value: formatValidityLabel(draft) },
+                      ...(opResults?.length
+                        ? [
+                            {
+                              label: "Terminales",
+                              value: `${opResults.filter((r) => r.ok).length} de ${opResults.length} aceptaron`,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 )}
                 <OpFanout results={opResults} />
               </div>
@@ -591,17 +783,25 @@ export default function IntegraSchedulesPage() {
                 >
                   <WeekGridPreview planId={previewPlan} catalog={catalog} />
                   <p className={styles.personNote}>
-                    La plantilla se asigna por puerta (`RightPlan.planTemplateNo`). El
-                    detalle de franjas vive en el calendario del terminal.
+                    La plantilla se asigna por puerta (`RightPlan.planTemplateNo`). Las
+                    franjas son las que publica el WeekPlanCfg del terminal: si no
+                    llegan, aquí se dice en vez de rellenarlas por convención.
                   </p>
                 </IgPanel>
               </aside>
             </div>
           )}
         </>
-      )}
+      </TabPanel>
 
-      {view === "door" && catalog && (
+      <TabPanel
+        id={tabIds.panelId("door")}
+        labelledBy={tabIds.tabId("door")}
+        active={view === "door"}
+      >
+        {!catalog ? (
+          <PanelSkeleton rows={4} />
+        ) : (
         <>
           <IgFilters>
             <IgField label="Puerta">
@@ -618,7 +818,12 @@ export default function IntegraSchedulesPage() {
                 ))}
               </select>
             </IgField>
-            <IgBtn onClick={() => void loadDoor()}>Actualizar lista</IgBtn>
+            <IgBtn onClick={() => void loadDoor()} disabled={busy}>
+              <span className={css.iconBtnLabel}>
+                <RefreshIcon className={css.icon} fontSize="small" aria-hidden />
+                {busy ? "Actualizando…" : "Actualizar lista"}
+              </span>
+            </IgBtn>
           </IgFilters>
 
           {doorNote && <IgNotice>{doorNote}</IgNotice>}
@@ -627,47 +832,68 @@ export default function IntegraSchedulesPage() {
             title={selectedDoor?.name || "Puerta"}
             count={`${doorPeople.length} con acceso`}
           >
-            {!doorPeople.length && !busy ? (
-              <div className={styles.igEmpty}>
-                <strong className={styles.igEmptyTitle}>Nadie asignado</strong>
-                <span className={styles.igEmptyHint}>
-                  Nadie tiene horario activo en esta puerta, o el espejo aún no trae
-                  RightPlan. Asigna desde la vista Por persona.
-                </span>
-              </div>
+            {busy && !doorPeople.length ? (
+              <PanelSkeleton rows={4} />
+            ) : !doorPeople.length ? (
+              <PanelEmpty
+                icon={<DoorFrontIcon fontSize="small" />}
+                title="Nadie asignado a esta puerta"
+                hint="Nadie tiene horario activo aquí, o el espejo aún no trae RightPlan. Se asigna desde la vista Por persona."
+                action={
+                  <>
+                    <IgBtn variant="primary" onClick={() => setView("person")}>
+                      Ir a Por persona
+                    </IgBtn>
+                    <IgBtn onClick={() => void loadDoor()}>Reintentar</IgBtn>
+                  </>
+                }
+              />
             ) : (
               <ul className={styles.schedDoorPeople}>
-                {doorPeople.map((p) => (
-                  <li key={p.personId}>
-                    <div>
-                      <strong>{p.name}</strong>
-                      <span className={styles.schedMeta}>
-                        {p.code || p.personId}
-                        {" · "}
-                        {formatValidityLabel(p)}
-                      </span>
-                    </div>
-                    <div className={styles.schedDoorPeopleRight}>
-                      <IgBadge>{p.planName || templateLabel(catalog.templates, p.planTemplateNo)}</IgBadge>
-                      <WeekStrip summary={p.weekSummary} />
-                      <IgBtn
-                        onClick={() => {
-                          setPersonId(p.personId);
-                          setView("person");
-                        }}
-                      >
-                        Editar
-                      </IgBtn>
-                    </div>
-                  </li>
-                ))}
+                {doorPeople.map((p) => {
+                  const meta = `${p.code || p.personId} · ${formatValidityLabel(p)}`;
+                  return (
+                    <li key={p.personId}>
+                      <div>
+                        <strong className={css.trunc} title={p.name}>
+                          {p.name}
+                        </strong>
+                        <span className={`${styles.schedMeta} ${css.trunc}`} title={meta}>
+                          {meta}
+                        </span>
+                      </div>
+                      <div className={styles.schedDoorPeopleRight}>
+                        <IgBadge>
+                          {p.planName || templateLabel(catalog.templates, p.planTemplateNo)}
+                        </IgBadge>
+                        <WeekStrip summary={p.weekSummary} />
+                        <IgBtn
+                          onClick={() => {
+                            setPersonId(p.personId);
+                            setView("person");
+                          }}
+                        >
+                          Editar
+                        </IgBtn>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </IgPanel>
         </>
-      )}
+        )}
+      </TabPanel>
 
-      {view === "matrix" && catalog && (
+      <TabPanel
+        id={tabIds.panelId("matrix")}
+        labelledBy={tabIds.tabId("matrix")}
+        active={view === "matrix"}
+      >
+        {!catalog ? (
+          <PanelSkeleton rows={5} />
+        ) : (
         <>
           <IgFilters>
             <IgField label="Puerta (columna activa)">

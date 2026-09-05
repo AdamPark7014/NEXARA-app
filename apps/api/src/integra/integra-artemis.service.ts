@@ -44,6 +44,19 @@ import { ARTEMIS_DOOR_CONTROL, ARTEMIS_DOOR_STATE } from '../hikvision-artemis/a
 
 type Actor = { id?: number; email?: string };
 
+/**
+ * Traductor de IP→nombre de terminal y RightPlan→nombres de puerta. Siempre
+ * pide el sitio: las IPs privadas se repiten entre instalaciones.
+ */
+type PersonLabelResolver = {
+  name: (siteId: number | null | undefined, ip?: string) => string | undefined;
+  doors: (
+    siteId: number | null | undefined,
+    ip: string | undefined,
+    plan: unknown,
+  ) => string[] | undefined;
+};
+
 /** ISO con offset local — el firmware ACS lo espera así (no siempre acepta Z). */
 function toIsapiLocalIso(d: Date): string {
   const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
@@ -62,6 +75,21 @@ function toIsapiLocalIso(d: Date): string {
  * Los cuatro `controlType` de Artemis, traducidos al `cmd` que documenta
  * ISAPI en `/AccessControl/RemoteControl/door/{id}`.
  */
+/**
+ * Cuánto se recuerda que una persona NO tiene foto servible.
+ *
+ * El listado abierto vuelve a pedir cada rostro cada 2 min. Con 21 personas
+ * sin JPEG local y un `faceURL` que el DS-K1T anuncia pero devuelve 404, eso
+ * son 21 viajes al terminal por vuelta que siempre acaban igual. Diez minutos
+ * es el compromiso: no se castiga al equipo y una foto recién subida no tarda
+ * en verse — la subida invalida la entrada de todas formas.
+ */
+const FACE_MISS_TTL_MS = 10 * 60 * 1000;
+
+function faceMissKey(companyId: number, personId: string): string {
+  return `${companyId}|${personId}`;
+}
+
 const ISAPI_DOOR_CMD: Record<string, 'open' | 'close' | 'alwaysOpen' | 'alwaysClose'> = {
   [ARTEMIS_DOOR_CONTROL.OPEN]: 'open',
   [ARTEMIS_DOOR_CONTROL.CLOSE]: 'close',
@@ -72,6 +100,13 @@ const ISAPI_DOOR_CMD: Record<string, 'open' | 'close' | 'alwaysOpen' | 'alwaysCl
 @Injectable()
 export class IntegraArtemisService {
   private readonly logger = new Logger(IntegraArtemisService.name);
+
+  /**
+   * Solo NEGATIVOS: «esta persona no tiene foto que servir», con su motivo.
+   * Los positivos ya viven en disco (`uploads`), cachearlos en memoria sería
+   * guardar el mismo JPEG dos veces. Clave `companyId|personId`.
+   */
+  private readonly faceMisses = new Map<string, { until: number; reason: string }>();
 
   constructor(
     private readonly sites: IntegraSiteService,
@@ -982,38 +1017,83 @@ export class IntegraArtemisService {
    * Cambia la IP del terminal por su nombre y resuelve las puertas del
    * `RightPlan`. La ficha de una persona tiene que decir «Acceso General», no
    * «192.168.9.163»: la IP es un detalle de instalación, no un dato de negocio.
+   *
+   * Resuelve **por sitio**: se le pasan todos los sitios del listado y cada
+   * persona pregunta por el suyo. Antes se resolvía el listado entero contra
+   * el sitio de la primera persona, así que en una empresa con dos sitios el
+   * segundo salía sin nombres de puerta.
    */
-  private async personLabels(siteId: number | null | undefined) {
-    if (!siteId) return { name: () => undefined, doors: () => undefined };
+  private async personLabels(
+    siteIds: Array<number | null | undefined>,
+  ): Promise<PersonLabelResolver> {
+    const ids = [
+      ...new Set(siteIds.filter((n): n is number => typeof n === 'number' && n > 0)),
+    ];
+    const empty: PersonLabelResolver = {
+      name: () => undefined,
+      doors: () => undefined,
+    };
+    if (!ids.length) return empty;
     const [devices, doors] = await Promise.all([
       this.prisma.integraDevice.findMany({
-        where: { siteId, ip: { not: null } },
-        select: { ip: true, name: true },
+        where: { siteId: { in: ids }, ip: { not: null } },
+        select: { siteId: true, ip: true, name: true },
       }),
       this.prisma.integraDoor.findMany({
-        where: { siteId },
-        select: { doorIndexCode: true, name: true },
+        where: { siteId: { in: ids } },
+        select: { siteId: true, doorIndexCode: true, name: true },
       }),
     ]);
-    const byIp = new Map(devices.map((d) => [d.ip as string, d.name]));
+    // Las claves llevan el sitio delante. Dos sitios distintos usan el mismo
+    // rango privado —`192.168.9.163` existe en los dos—, así que un mapa por
+    // IP a secas mezcla terminales de instalaciones diferentes.
+    const byIp = new Map(devices.map((d) => [`${d.siteId}|${d.ip as string}`, d.name]));
     // `doorIndexCode` es `<ip>|<doorNo>`; el RightPlan de la persona trae el
     // `doorNo` relativo a **su** terminal, así que la IP desempata.
-    const byKey = new Map(doors.map((d) => [d.doorIndexCode, d.name]));
+    const byKey = new Map(doors.map((d) => [`${d.siteId}|${d.doorIndexCode}`, d.name]));
     return {
-      name: (ip?: string) => (ip ? byIp.get(ip) : undefined),
-      doors: (ip: string | undefined, plan: unknown) => {
-        if (!ip) return undefined;
+      name: (siteId: number | null | undefined, ip?: string) =>
+        siteId && ip ? byIp.get(`${siteId}|${ip}`) : undefined,
+      doors: (siteId: number | null | undefined, ip: string | undefined, plan: unknown) => {
+        if (!siteId || !ip) return undefined;
         const nos = Array.isArray(plan)
           ? plan
               .map((r) => (r && typeof r === 'object' ? (r as { doorNo?: unknown }).doorNo : null))
               .filter((n): n is number => typeof n === 'number')
           : [];
         const names = nos
-          .map((no) => byKey.get(`${ip}|${no}`))
+          .map((no) => byKey.get(`${siteId}|${ip}|${no}`))
           .filter((n): n is string => Boolean(n));
         return names.length ? names : undefined;
       },
     };
+  }
+
+  /**
+   * Números de tarjeta por persona, desde el espejo que puebla `CardInfo/Search`.
+   * Una consulta para todo el listado — no una por ficha.
+   */
+  private async cardsByPerson(
+    companyId: number | null,
+    personIds: string[],
+  ): Promise<Map<string, string[]>> {
+    const out = new Map<string, string[]>();
+    const ids = [...new Set(personIds.filter(Boolean))];
+    if (!companyId || !ids.length) return out;
+    const rows = await this.prisma.integraPersonCard.findMany({
+      where: { companyId, personId: { in: ids } },
+      select: { personId: true, cardNo: true },
+      orderBy: { cardNo: 'asc' },
+    });
+    for (const r of rows) {
+      const list = out.get(r.personId);
+      if (list) {
+        if (!list.includes(r.cardNo)) list.push(r.cardNo);
+      } else {
+        out.set(r.personId, [r.cardNo]);
+      }
+    }
+    return out;
   }
 
   async listPeople(companyId: number | null, live = false, siteId?: number | null) {
@@ -1022,9 +1102,14 @@ export class IntegraArtemisService {
         where: { companyId, ...(siteId ? { siteId } : {}) },
         orderBy: { personName: 'asc' },
       });
-      const label = await this.personLabels(siteId ?? items[0]?.siteId ?? null);
+      // Todos los sitios presentes en el listado, no el de la primera fila.
+      const label = await this.personLabels(items.map((p) => p.siteId));
+      const cardsByPerson = await this.cardsByPerson(
+        companyId,
+        items.map((p) => p.personId),
+      );
       const mapped = items.map((p) => {
-        const dto = mapMirrorPersonToDto(p);
+        const dto = mapMirrorPersonToDto(p, { cardNos: cardsByPerson.get(p.personId) });
         const localFace = hasLocalPersonFace(companyId, p.personId);
         const localFpIds = listLocalFingerIds(companyId, p.personId);
         return {
@@ -1032,8 +1117,8 @@ export class IntegraArtemisService {
           hasLocalFace: localFace,
           hasFace: Boolean(dto.hasFace || localFace),
           localFpIds,
-          sourceName: label.name(dto.sourceIp),
-          doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+          sourceName: label.name(p.siteId, dto.sourceIp),
+          doorNames: label.doors(p.siteId, dto.sourceIp, dto.rightPlan),
         };
       });
       const withErp = await this.identity.attachErpUsers(companyId, mapped);
@@ -1068,18 +1153,23 @@ export class IntegraArtemisService {
           this.logger.warn(`UserInfo live ${d.ip}: ${String(e)}`);
         }
       }
-      const label = await this.personLabels(resolved.siteId);
+      const label = await this.personLabels([resolved.siteId]);
+      // Las tarjetas salen del espejo, no de otra ronda de ISAPI: un listado
+      // live ya drena UserInfo de cada terminal y duplicar el tráfico por una
+      // credencial que apenas cambia no lo vale.
+      const liveCards = await this.cardsByPerson(companyId, [...byId.keys()]);
       const items = [...byId.values()]
         .map((dto) => {
           const localFace = companyId ? hasLocalPersonFace(companyId, dto.id) : false;
           const localFpIds = companyId ? listLocalFingerIds(companyId, dto.id) : [];
           return {
             ...dto,
+            cardNos: liveCards.get(dto.id) ?? dto.cardNos,
             hasLocalFace: localFace,
             hasFace: Boolean(dto.hasFace || localFace),
             localFpIds,
-            sourceName: label.name(dto.sourceIp),
-            doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+            sourceName: label.name(resolved.siteId, dto.sourceIp),
+            doorNames: label.doors(resolved.siteId, dto.sourceIp, dto.rightPlan),
           };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -1124,8 +1214,9 @@ export class IntegraArtemisService {
       if (!row) {
         throw new NotFoundException(`Persona ${personId} no está en el espejo — sincroniza el sitio`);
       }
-      const dto = mapMirrorPersonToDto(row);
-      const label = await this.personLabels(row.siteId);
+      const cards = await this.cardsByPerson(companyId, [personId]);
+      const dto = mapMirrorPersonToDto(row, { cardNos: cards.get(personId) });
+      const label = await this.personLabels([row.siteId]);
       const localFace = hasLocalPersonFace(companyId, personId);
       const localFpIds = listLocalFingerIds(companyId, personId);
       const person = {
@@ -1133,8 +1224,8 @@ export class IntegraArtemisService {
         hasLocalFace: localFace,
         hasFace: Boolean(dto.hasFace || localFace),
         localFpIds,
-        sourceName: label.name(dto.sourceIp),
-        doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+        sourceName: label.name(row.siteId, dto.sourceIp),
+        doorNames: label.doors(row.siteId, dto.sourceIp, dto.rightPlan),
       };
       const erpUser = await this.identity.resolvePerson(
         companyId,
@@ -1178,8 +1269,17 @@ export class IntegraArtemisService {
       throw new BadRequestException('Foto por proxy solo disponible en sitios ISAPI');
     }
 
+    // El disco manda: si hay JPEG local se sirve aunque hubiera un fallo
+    // apuntado. Se comprueba ANTES que la caché para que una foto recién
+    // subida se vea al momento incluso si nadie invalidó la entrada.
     const local = readLocalPersonFace(companyId, personId);
-    if (local) return local;
+    if (local) {
+      this.faceMisses.delete(faceMissKey(companyId, personId));
+      return local;
+    }
+
+    const miss = this.readFaceMiss(companyId, personId);
+    if (miss) throw new NotFoundException(miss);
 
     const row = await this.prisma.integraPerson.findFirst({
       where: {
@@ -1193,7 +1293,11 @@ export class IntegraArtemisService {
     const dto = mapMirrorPersonToDto(row);
     if (!dto.faceUrl) {
       throw new NotFoundException(
-        `Persona ${personId}: sin JPEG local ni faceURL. El terminal puede tener solo modelo biométrico — sube una foto JPEG desde la ficha.`,
+        this.rememberFaceMiss(
+          companyId,
+          personId,
+          `Persona ${personId}: sin JPEG local ni faceURL. El terminal puede tener solo modelo biométrico — sube una foto JPEG desde la ficha.`,
+        ),
       );
     }
 
@@ -1213,10 +1317,50 @@ export class IntegraArtemisService {
     try {
       return await client.getBinary(dto.faceUrl);
     } catch (e) {
+      // Aquí es donde dolía: `faceURL` da 404 en el DS-K1T real, y el listado
+      // reintentaba a los 2 minutos por cada persona sin foto.
       throw new NotFoundException(
-        `No se pudo descargar faceURL (${e instanceof Error ? e.message : String(e)}). Sube un JPEG para guardarlo en NEXARA.`,
+        this.rememberFaceMiss(
+          companyId,
+          personId,
+          `No se pudo descargar faceURL (${e instanceof Error ? e.message : String(e)}). Sube un JPEG para guardarlo en NEXARA.`,
+        ),
       );
     }
+  }
+
+  /** Motivo vigente del fallo, o `null` si nunca falló o ya caducó. */
+  private readFaceMiss(companyId: number, personId: string): string | null {
+    const key = faceMissKey(companyId, personId);
+    const hit = this.faceMisses.get(key);
+    if (!hit) return null;
+    if (hit.until <= Date.now()) {
+      this.faceMisses.delete(key);
+      return null;
+    }
+    return hit.reason;
+  }
+
+  /** Apunta el fallo y devuelve el mismo motivo, para usarlo en el throw. */
+  private rememberFaceMiss(companyId: number, personId: string, reason: string): string {
+    // Barrido perezoso: sin esto el mapa crece con cada persona que pasó por
+    // aquí alguna vez y nunca se vacía en un proceso de larga vida.
+    if (this.faceMisses.size > 500) {
+      const now = Date.now();
+      for (const [k, v] of this.faceMisses) {
+        if (v.until <= now) this.faceMisses.delete(k);
+      }
+    }
+    this.faceMisses.set(faceMissKey(companyId, personId), {
+      until: Date.now() + FACE_MISS_TTL_MS,
+      reason,
+    });
+    return reason;
+  }
+
+  /** Olvida el fallo apuntado: la persona vuelve a tener derecho a intentarlo. */
+  private forgetFaceMiss(companyId: number, personId: string): void {
+    this.faceMisses.delete(faceMissKey(companyId, personId));
   }
 
   async addPerson(
@@ -1596,6 +1740,8 @@ export class IntegraArtemisService {
     // Siempre guardar copia local primero: la ficha muestra esta imagen aunque
     // el terminal solo guarde modelo biométrico y no re-entregue JPEG.
     writeLocalPersonFace(companyId, personId, jpeg);
+    // Ya hay foto: el «no tiene» apuntado deja de ser cierto ahora mismo.
+    this.forgetFaceMiss(companyId, personId);
 
     const results = await this.fanoutAcs(
       companyId,
@@ -1689,6 +1835,9 @@ export class IntegraArtemisService {
       },
     );
     deleteLocalPersonFace(companyId, personId);
+    // Se borró a propósito: que el próximo intento lo compruebe de verdad en
+    // vez de arrastrar un motivo de hace diez minutos.
+    this.forgetFaceMiss(companyId, personId);
     await this.auditMut('integra.person.face.delete', actor, companyId, resolved.siteId, {
       personId,
       results,

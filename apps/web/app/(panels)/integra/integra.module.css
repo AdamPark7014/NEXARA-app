@@ -1,23 +1,113 @@
 /* NEXARA Integra — consola ops; tokens alineados al shell global */
 .shell {
+  /* ── Tinta y superficie ─────────────────────────────────────────────── */
   --ig-ink: var(--text-primary, #0f1c2e);
   --ig-ink-soft: var(--text-secondary, #243247);
-  --ig-muted: var(--text-tertiary, #6b7a8f);
+  /*
+   * Contraste AA — la causa directa de que la consola se viera «apagada».
+   * `--text-tertiary` es #6b7a8f en el tema claro y se usa 82 veces:
+   *     #6b7a8f sobre #ffffff (--ig-panel)  → 4.37:1   ✗ (AA pide 4.5:1)
+   *     #6b7a8f sobre #f8f9fc (--ig-surface) → 4.15:1  ✗
+   * En vez de clavar un hex (que rompería el tema oscuro) oscurecemos el token
+   * global tirando hacia --text-primary, que en oscuro es claro: el mismo
+   * color-mix sube el contraste en los DOS temas.
+   *     claro:  88% #6b7a8f + 12% #0f1c2e = #606f83
+   *             → 5.12:1 sobre #ffffff · 4.87:1 sobre #f8f9fc   ✓ AA
+   *     oscuro: 88% #91acc7 + 12% #eaf4ff = #9cb5ce
+   *             → 7.80:1 sobre #11202f (antes 7.02:1)           ✓
+   */
+  --ig-muted: color-mix(in srgb, var(--text-tertiary, #6b7a8f) 88%, var(--text-primary, #0f1c2e));
   --ig-line: var(--nx-panel-hairline, color-mix(in srgb, #0f1c2e 12%, transparent));
   --ig-surface: var(--background, #f4f6f9);
   --ig-panel: var(--surface, #ffffff);
   --ig-accent: var(--panel-accent, #0e7490);
   --ig-accent-deep: color-mix(in srgb, var(--panel-accent, #0e7490) 82%, #000);
+
+  /*
+   * Alias de compatibilidad. El CSS ya escribía `var(--ig-text)`, `var(--ig-bg)`,
+   * `var(--ig-border)`, `var(--ig-fg)` y `var(--ig-mono)` sin que nadie los
+   * declarara: resolvían a «invalid at computed-value time» y el color acababa
+   * heredado del padre por accidente. Declararlos aquí los ancla al token real.
+   */
+  --ig-text: var(--ig-ink);
+  --ig-fg: var(--ig-ink);
+  --ig-bg: var(--ig-panel);
+  --ig-border: var(--ig-line);
+  --ig-mono: var(--ig-font-mono);
+
+  /* ── Estados ────────────────────────────────────────────────────────── */
   --ig-ok: var(--success, #0f766e);
+  /* Un solo ámbar de estado: antes convivían #b45309 y #c47a2c como respaldo. */
   --ig-warn: var(--warning, #b45309);
-  --ig-danger: var(--danger, #b91c1c);
-  --ig-radius: 6px;
+  /* Un solo rojo: antes convivían #b91c1c y #dc2626 como respaldo. */
+  --ig-red: #b91c1c;
+  --ig-danger: var(--danger, var(--ig-red));
+  /*
+   * Ámbar de señal SOBRE video. No se funde con --ig-warn a propósito: los
+   * recuadros de vehículo y los chips de movimiento viven sobre negro, y el
+   * ámbar oscuro del estado (#b45309) pierde ahí el contraste que es justo
+   * el trabajo del color.
+   */
+  --ig-amber: #f59e0b;
+
+  /* ── Familia cian / violeta (overlays de detección y accesos live) ──── */
+  --ig-cyan: #22d3ee;
+  --ig-cyan-bright: #67e8f9;
+  --ig-cyan-deep: #0ea5e9;
+  --ig-cyan-tint: #ecfeff;
+  --ig-violet: #a78bfa;
+  --ig-violet-soft: #c4b5fd;
+  --ig-violet-tint: #f5f3ff;
+
+  /* ── Superficies de video: siempre oscuras, no siguen el tema ───────── */
+  --ig-video-bg: #020617;
+  --ig-video-cell: #0b1524;
+  --ig-video-ink: #05070d;
+  --ig-video-wall: #071018;
+  --ig-video-wall-line: #0f1c2a;
+  --ig-video-fg: #e2e8f0;
+  --ig-video-fg-dim: #94a3b8;
+  --ig-video-fg-faint: #cbd5e1;
+  --ig-video-fg-cyan: #e8f7ff;
+  --ig-video-fg-amber: #fff7ed;
+  --ig-video-fg-danger: #fca5a5;
+
+  /*
+   * ── Escala tipográfica ───────────────────────────────────────────────
+   * La consola vivía entre 10 y 13px con 20 tamaños distintos (12.5, 11.5,
+   * 13.5, 10.5 incluidos): nada guiaba la mirada. Cinco pasos y un micro.
+   */
+  --ig-fs-micro: 10px; /* solo versalitas: cabeceras de ficha, eyebrows */
+  --ig-fs-xs: 11px;
+  --ig-fs-sm: 12px;
+  --ig-fs-md: 13px;
+  --ig-fs-lg: 15px;
+  --ig-fs-xl: 17px;
+
+  /* ── Radios ─────────────────────────────────────────────────────────── */
+  --ig-radius-xs: 3px;
   --ig-radius-sm: 4px;
+  --ig-radius: 6px;
+  --ig-radius-md: 8px;
+  --ig-radius-lg: 10px;
+  --ig-radius-xl: 12px;
+  --ig-radius-pill: 999px;
+
+  /* ── Tipografía ─────────────────────────────────────────────────────── */
   --ig-font-display: var(--nx-font-display, "Space Grotesk", "Segoe UI", sans-serif);
   --ig-font-mono: var(--nx-font-mono, "IBM Plex Mono", ui-monospace, monospace);
   --ig-font-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+
+  /* ── Foco y elevación ───────────────────────────────────────────────── */
   --ig-focus: 0 0 0 2px var(--ig-panel), 0 0 0 4px color-mix(in srgb, var(--ig-accent) 55%, transparent);
+  /* 1 = pegado al papel (paneles, barras). 2 = popover/menú. 3 = modal. */
   --ig-elev-1: 0 1px 0 color-mix(in srgb, var(--ig-ink) 4%, transparent);
+  --ig-elev-2:
+    0 1px 2px color-mix(in srgb, var(--ig-ink) 8%, transparent),
+    0 6px 16px color-mix(in srgb, var(--ig-ink) 12%, transparent);
+  --ig-elev-3:
+    0 2px 6px color-mix(in srgb, var(--ig-ink) 10%, transparent),
+    0 16px 40px color-mix(in srgb, var(--ig-ink) 20%, transparent);
 
   color: var(--ig-ink);
   font-family: var(--ig-font-body);
@@ -60,10 +150,6 @@
   overflow: visible;
 }
 
-.hud {
-  display: none;
-}
-
 .contextBar {
   display: flex;
   flex-wrap: wrap;
@@ -94,19 +180,13 @@
   align-items: center;
 }
 
-.contextLabel {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ig-ink-soft);
-}
-
 .healthPill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 8px 4px 7px;
   border-radius: var(--ig-radius-sm);
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 650;
   letter-spacing: 0.01em;
   border: 1px solid var(--ig-line);
@@ -139,7 +219,7 @@
 }
 
 .kpiChip {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
   padding: 3px 7px;
   border-radius: var(--ig-radius-sm);
@@ -155,7 +235,7 @@
 }
 
 .siteMuted {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 600;
   color: var(--ig-muted);
 }
@@ -172,15 +252,9 @@
 }
 
 .siteChipName {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 700;
   color: var(--ig-ink);
-}
-
-.siteChipMeta {
-  font-size: 11px;
-  font-family: var(--ig-font-mono);
-  color: var(--ig-muted);
 }
 
 .siteSwitcher {
@@ -190,7 +264,7 @@
 }
 
 .siteSwitcherLabel {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -209,7 +283,7 @@
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235b6b7c' d='M1 1l5 5 5-5'/%3E%3C/svg%3E")
     no-repeat right 9px center;
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
   font-weight: 600;
   color: var(--ig-ink);
   cursor: pointer;
@@ -270,7 +344,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -298,7 +372,7 @@
 
 .pageSub {
   margin: 0;
-  font-size: 13.5px;
+  font-size: var(--ig-fs-md);
   line-height: 1.45;
   color: var(--ig-muted);
   max-width: 56ch;
@@ -342,68 +416,12 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ig-danger) 25%, transparent);
 }
 
-.hudCompany {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ig-ink);
-  padding-left: 12px;
-  border-left: 2px solid var(--ig-accent);
-}
-
-.hudUser {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ig-muted);
-  padding: 0 4px;
-}
-
-.hudMods {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
-  align-items: center;
-}
-
-.hudChip {
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-  padding: 6px 11px;
-  border: 1px solid var(--ig-line);
-  border-radius: var(--ig-radius-sm);
-  background: var(--ig-panel);
-  color: var(--ig-ink-soft);
-  text-decoration: none;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-}
-
-.hudChip:hover {
-  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
-  color: var(--ig-accent-deep);
-  background: color-mix(in srgb, var(--ig-accent) 8%, var(--ig-panel));
-}
-
-.hudChip[data-active="1"] {
-  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
-  color: var(--ig-accent-deep);
-  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
-  font-weight: 700;
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--ig-ink) 6%, transparent);
-}
-
-.hudChip:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 /* ── Buttons ──────────────────────────────────────────────── */
 .btnPrimary,
 .btnGhost {
   appearance: none;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
   letter-spacing: 0.01em;
   padding: 7px 12px;
@@ -452,106 +470,105 @@
   cursor: not-allowed;
 }
 
-/* ── Stats HUD ────────────────────────────────────────────── */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 1px;
-  background: var(--ig-line);
-  border: 1px solid var(--ig-line);
-  overflow: hidden;
-}
-
-.stat {
-  background: var(--ig-panel);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.statLabel {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ig-muted);
-}
-
-.statValue {
-  font-family: var(--ig-font-mono);
-  font-size: 1.35rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--ig-ink);
-  line-height: 1.1;
-}
-
-.statOk { color: var(--ig-ok); }
-.statWarn { color: var(--ig-warn); }
-.statDanger { color: var(--ig-danger); }
-
-/* ── Panels / sections ────────────────────────────────────── */
-.section {
-  background: var(--ig-panel);
-  border: 1px solid var(--ig-line);
-  padding: 16px 18px 18px;
-}
-
-.sectionHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 14px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--ig-line);
-}
-
-.sectionTitle {
-  margin: 0;
-  font-family: var(--ig-font-display);
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--ig-ink);
-}
-
-.sectionSub {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ig-muted);
-}
-
 /* ── Shared messages ──────────────────────────────────────── */
 .empty {
   margin: 0;
   padding: 20px 12px;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   color: var(--ig-muted);
   text-align: center;
 }
 
+/*
+ * Error de la consola. Antes era un <p> con el mensaje crudo de la API pegado
+ * tal cual: «Request failed with status code 500» sin decir qué había fallado
+ * ni qué hacer. Ahora lleva titular (qué ha pasado), cuerpo (el detalle de la
+ * API, en su tipografía de dato) y una acción opcional de reintento.
+ */
 .error {
   margin: 0;
-  padding: 8px 10px;
-  font-size: 12.5px;
+  padding: 9px 11px;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  font-size: var(--ig-fs-md);
   line-height: 1.4;
-  color: var(--ig-danger);
+  color: var(--ig-ink);
   background: color-mix(in srgb, var(--ig-danger) 7%, var(--ig-panel));
   border: 1px solid color-mix(in srgb, var(--ig-danger) 22%, transparent);
   border-radius: var(--ig-radius);
   border-left: 3px solid var(--ig-danger);
+  word-break: break-word;
+}
+
+.errorTitle {
+  font-size: var(--ig-fs-md);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ig-danger);
+}
+
+.errorBody {
+  font-size: var(--ig-fs-sm);
+  line-height: 1.45;
+  color: var(--ig-ink-soft);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.errorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.errorRetry {
+  appearance: none;
+  font: inherit;
+  font-size: var(--ig-fs-sm);
+  font-weight: 650;
+  padding: 5px 10px;
+  border-radius: var(--ig-radius);
+  border: 1px solid color-mix(in srgb, var(--ig-danger) 40%, var(--ig-line));
+  background: var(--ig-panel);
+  color: var(--ig-danger);
+  cursor: pointer;
+}
+
+.errorRetry:hover {
+  background: color-mix(in srgb, var(--ig-danger) 10%, var(--ig-panel));
+}
+
+.errorRetry:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus);
+}
+
+/* Tono de aviso: el mismo bloque cuando la operación no ha muerto, solo cojea. */
+.error[data-tone="warn"] {
+  background: color-mix(in srgb, var(--ig-warn) 8%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-warn) 26%, transparent);
+  border-left-color: var(--ig-warn);
+}
+
+.error[data-tone="warn"] .errorTitle {
+  color: var(--ig-warn);
+}
+
+.error[data-tone="warn"] .errorRetry {
+  border-color: color-mix(in srgb, var(--ig-warn) 40%, var(--ig-line));
+  color: var(--ig-warn);
+}
+
+.error[data-tone="warn"] .errorRetry:hover {
+  background: color-mix(in srgb, var(--ig-warn) 12%, var(--ig-panel));
 }
 
 .igNotice {
   margin: 0;
   padding: 8px 10px;
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
   line-height: 1.4;
   color: var(--ig-ink-soft);
   background: color-mix(in srgb, var(--ig-accent) 6%, var(--ig-panel));
@@ -574,15 +591,6 @@
   border-left-color: var(--ig-ok);
 }
 
-@media (max-width: 720px) {
-  .hud {
-    grid-template-columns: 1fr;
-  }
-  .hudMods {
-    justify-content: flex-start;
-  }
-}
-
 .filterBar {
   display: flex;
   flex-wrap: wrap;
@@ -603,23 +611,17 @@
 }
 
 .filterLabel {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ig-muted);
 }
 
-.camGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 10px;
-}
-
 .camTile {
   border: 1px solid var(--ig-line);
   border-radius: var(--ig-radius-sm);
-  background: #0b1524;
+  background: var(--ig-video-cell);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -631,15 +633,15 @@
   gap: 8px;
   align-items: center;
   padding: 8px 10px;
-  background: color-mix(in srgb, #0b1524 92%, white);
-  color: #e2e8f0;
-  font-size: 12px;
+  background: color-mix(in srgb, var(--ig-video-cell) 92%, white);
+  color: var(--ig-video-fg);
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
 }
 
 .camTileBody {
   aspect-ratio: 16 / 9;
-  background: #020617;
+  background: var(--ig-video-bg);
   position: relative;
 }
 
@@ -651,7 +653,7 @@
 }
 
 .camTile[data-active="1"] {
-  outline: 2px solid var(--ig-accent, #0e7490);
+  outline: 2px solid var(--ig-accent);
   outline-offset: 1px;
 }
 
@@ -659,7 +661,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #020617;
+  background: var(--ig-video-bg);
   border-radius: var(--ig-radius);
   overflow: hidden;
 }
@@ -669,7 +671,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #020617;
+  background: var(--ig-video-bg);
 }
 
 /* go2rtc pone controls=true; el play azul nativo tapa el mosaico. */
@@ -678,7 +680,7 @@
   width: 100% !important;
   height: 100% !important;
   object-fit: contain;
-  background: #020617;
+  background: var(--ig-video-bg);
 }
 
 .playerVideo :global(video-stream video) {
@@ -692,7 +694,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background: #020617;
+  background: var(--ig-video-bg);
 }
 
 .playerVideo :global(video-stream .info),
@@ -707,8 +709,8 @@
   inset: 0;
   display: grid;
   place-items: center;
-  color: #94a3b8;
-  font-size: 13px;
+  color: var(--ig-video-fg-dim);
+  font-size: var(--ig-fs-md);
 }
 
 .playerOverlay {
@@ -719,23 +721,23 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: color-mix(in srgb, #020617 72%, transparent);
-  color: #e2e8f0;
-  font-size: 13px;
+  background: color-mix(in srgb, var(--ig-video-bg) 72%, transparent);
+  color: var(--ig-video-fg);
+  font-size: var(--ig-fs-md);
   font-weight: 600;
   pointer-events: none;
 }
 
 .playerOverlay[data-tone="error"] {
-  color: #fca5a5;
+  color: var(--ig-video-fg-danger);
 }
 
 .playerSpinner {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, #94a3b8 35%, transparent);
-  border-top-color: #e2e8f0;
+  border: 2px solid color-mix(in srgb, var(--ig-video-fg-dim) 35%, transparent);
+  border-top-color: var(--ig-video-fg);
   animation: igSpin 0.7s linear infinite;
 }
 
@@ -747,7 +749,8 @@
 
 /*
  * Altavoz sobre el video. Arranca en 🔇 siempre: el navegador solo deja sonar
- * un video tras un gesto del usuario, así que el gesto es este botón.
+ * un video tras un gesto del usuario,
+así que el gesto es este botón.
  */
 .playerSound {
   position: absolute;
@@ -762,10 +765,10 @@
   gap: 6px;
   padding: 0 10px;
   border: 1px solid rgb(255 255 255 / 0.22);
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   background: rgb(0 0 0 / 0.55);
   color: #fff;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
   line-height: 1;
   cursor: pointer;
@@ -784,10 +787,10 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  border-radius: 6px;
-  background: color-mix(in srgb, #b91c1c 88%, #000);
+  border-radius: var(--ig-radius);
+  background: color-mix(in srgb, var(--ig-red) 88%, #000);
   color: #fff;
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 800;
   letter-spacing: 0.08em;
   pointer-events: none;
@@ -797,7 +800,7 @@
   top: 6px;
   left: 6px;
   padding: 2px 6px;
-  font-size: 9px;
+  font-size: var(--ig-fs-micro);
   gap: 4px;
 }
 
@@ -840,9 +843,9 @@
   width: 32px;
   height: 32px;
   border: 1px solid color-mix(in srgb, #fff 18%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, #0b1524 78%, transparent);
-  color: #e2e8f0;
+  border-radius: var(--ig-radius-md);
+  background: color-mix(in srgb, var(--ig-video-cell) 78%, transparent);
+  color: var(--ig-video-fg);
   font-size: 14px;
   cursor: pointer;
   display: grid;
@@ -851,7 +854,7 @@
 }
 
 .playerMuteBtn:hover {
-  background: color-mix(in srgb, #0b1524 92%, #fff);
+  background: color-mix(in srgb, var(--ig-video-cell) 92%, #fff);
 }
 
 .playerPlayCue {
@@ -859,7 +862,7 @@
   inset: 0;
   z-index: 2;
   border: 0;
-  background: color-mix(in srgb, #020617 45%, transparent);
+  background: color-mix(in srgb, var(--ig-video-bg) 45%, transparent);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -869,7 +872,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--ig-accent, #0e7490) 92%, #000);
+  background: color-mix(in srgb, var(--ig-accent) 92%, #000);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   position: relative;
 }
@@ -890,29 +893,29 @@
   display: grid;
   place-items: center;
   gap: 6px;
-  background: #0b1524;
+  background: var(--ig-video-cell);
   border-radius: var(--ig-radius);
-  color: #94a3b8;
+  color: var(--ig-video-fg-dim);
   text-align: center;
   padding: 24px;
 }
 
 .videoFocusEmpty strong {
   display: block;
-  color: #e2e8f0;
-  font-size: 14px;
+  color: var(--ig-video-fg);
+  font-size: var(--ig-fs-lg);
   font-weight: 700;
 }
 
 .videoFocusEmpty span {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   max-width: 280px;
   line-height: 1.4;
 }
 
 .videoNote {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
   font-family: var(--ig-font-mono);
   word-break: break-all;
@@ -923,7 +926,7 @@
   display: inline-flex;
   align-items: stretch;
   border: 1px solid var(--ig-line);
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   overflow: hidden;
   background: var(--ig-surface);
 }
@@ -934,7 +937,7 @@
   margin: 0;
   padding: 5px 10px;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
   color: var(--ig-ink-soft);
   background: transparent;
@@ -975,9 +978,11 @@
 
 /*
  * El muro y el foco viven montados a la vez y se alternan con `hidden`. Un
- * `display` de clase le gana al `hidden` del navegador, así que sin esto el
+ * `display` de clase le gana al `hidden` del navegador,
+así que sin esto el
  * muro seguía a la vista en modo Foco: se veían los mosaicos «En cola» —
- * porque en Foco el muro deja de tener cupo— y el foco quedaba debajo, oculto.
+ * porque en Foco el muro deja de tener cupo— y el foco quedaba debajo,
+oculto.
  */
 .wallWorkbench[hidden] {
   display: none;
@@ -985,7 +990,7 @@
 
 @media (max-width: 900px) {
   .wallWorkbench,
-  .wallWorkbench[data-rail="closed"] {
+.wallWorkbench[data-rail="closed"] {
     grid-template-columns: 1fr;
     min-height: auto;
   }
@@ -1008,7 +1013,7 @@
   gap: 8px;
   padding: 7px 9px;
   border-bottom: 1px solid var(--ig-line);
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1040,12 +1045,12 @@
   width: 100%;
   text-align: left;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   padding: 8px 9px;
   background: transparent;
   color: var(--ig-ink);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 600;
   cursor: pointer;
 }
@@ -1068,7 +1073,7 @@
 }
 
 .wallCamRow[data-det="1"] {
-  box-shadow: inset 2px 0 0 #f59e0b;
+  box-shadow: inset 2px 0 0 var(--ig-amber);
 }
 
 .wallCamDot {
@@ -1084,7 +1089,7 @@
 }
 
 .wallCamDot[data-err="1"] {
-  background: var(--ig-danger, #dc2626);
+  background: var(--ig-danger);
 }
 
 .wallCamName {
@@ -1104,7 +1109,7 @@
   margin: 0;
   padding: 8px 10px;
   border-top: 1px solid var(--ig-line);
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   line-height: 1.35;
   color: var(--ig-muted);
 }
@@ -1114,8 +1119,8 @@
   gap: 6px;
   min-height: 0;
   min-width: 0;
-  background: #071018;
-  border: 1px solid #0f1c2a;
+  background: var(--ig-video-wall);
+  border: 1px solid var(--ig-video-wall-line);
   border-radius: var(--ig-radius);
   padding: 6px;
   align-content: stretch;
@@ -1126,9 +1131,9 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #0b1524;
+  background: var(--ig-video-cell);
   border: 1px solid color-mix(in srgb, #fff 8%, transparent);
-  border-radius: 6px;
+  border-radius: var(--ig-radius);
   overflow: hidden;
   cursor: pointer;
 }
@@ -1143,7 +1148,7 @@
 }
 
 .wallCell[data-queued="1"] .wallCellHead {
-  color: #94a3b8;
+  color: var(--ig-video-fg-dim);
 }
 
 .techToggle {
@@ -1174,15 +1179,10 @@
 }
 
 .focusPlaybackLabel {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ig-muted);
-}
-
-.playbackUrl {
-  font-size: 10px;
-  word-break: break-all;
 }
 
 .playbackSegments {
@@ -1199,24 +1199,24 @@
   width: 100%;
   text-align: left;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--ig-border, #cbd5e1) 80%, transparent);
-  background: color-mix(in srgb, var(--ig-surface, #fff) 92%, #0b1524);
+  border-radius: var(--ig-radius);
+  border: 1px solid color-mix(in srgb, var(--ig-border) 80%, transparent);
+  background: color-mix(in srgb, var(--ig-surface) 92%, var(--ig-video-cell));
   color: inherit;
   cursor: pointer;
 }
 
 .playbackSegBtn[data-active="1"] {
-  border-color: color-mix(in srgb, #0ea5e9 55%, var(--ig-border, #cbd5e1));
-  background: color-mix(in srgb, #0ea5e9 12%, transparent);
+  border-color: color-mix(in srgb, var(--ig-cyan-deep) 55%, var(--ig-border));
+  background: color-mix(in srgb, var(--ig-cyan-deep) 12%, transparent);
   font-weight: 650;
 }
 
 .playerOverlay[data-tone="queued"] {
-  color: #94a3b8;
-  background: color-mix(in srgb, #020617 75%, transparent);
+  color: var(--ig-video-fg-dim);
+  background: color-mix(in srgb, var(--ig-video-bg) 75%, transparent);
 }
 
 .wallCellHead {
@@ -1225,9 +1225,9 @@
   justify-content: space-between;
   gap: 6px;
   padding: 5px 8px;
-  background: color-mix(in srgb, #0b1524 88%, #fff);
-  color: #e2e8f0;
-  font-size: 11px;
+  background: color-mix(in srgb, var(--ig-video-cell) 88%, #fff);
+  color: var(--ig-video-fg);
+  font-size: var(--ig-fs-xs);
   font-weight: 650;
 }
 
@@ -1240,7 +1240,7 @@
   flex: 1;
   min-height: 0;
   position: relative;
-  background: #020617;
+  background: var(--ig-video-bg);
   aspect-ratio: 16 / 9;
 }
 
@@ -1260,20 +1260,20 @@
   gap: 4px;
   min-height: 0;
   aspect-ratio: 16 / 9;
-  border: 1px dashed color-mix(in srgb, #94a3b8 35%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, #0b1524 70%, transparent);
-  color: #94a3b8;
+  border: 1px dashed color-mix(in srgb, var(--ig-video-fg-dim) 35%, transparent);
+  border-radius: var(--ig-radius);
+  background: color-mix(in srgb, var(--ig-video-cell) 70%, transparent);
+  color: var(--ig-video-fg-dim);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 600;
   cursor: pointer;
 }
 
 .wallEmpty:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--ig-accent) 55%, transparent);
-  color: #e2e8f0;
-  background: color-mix(in srgb, var(--ig-accent) 10%, #0b1524);
+  color: var(--ig-video-fg);
+  background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-video-cell));
 }
 
 .wallEmpty:disabled {
@@ -1289,7 +1289,7 @@
 }
 
 .wallEmptyMeta {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 500;
   opacity: 0.75;
 }
@@ -1298,11 +1298,6 @@
   display: inline-flex;
   gap: 6px;
   align-items: center;
-}
-
-.tableScroll {
-  max-height: calc(100dvh - 200px);
-  overflow: auto;
 }
 
 /* ── Console kit (dense ops) ─────────────────────────────── */
@@ -1338,11 +1333,18 @@
   min-width: 0;
 }
 
+/*
+ * El título de página era 0.95rem (≈15px): apenas dos píxeles por encima del
+ * cuerpo de la consola,
+así que la barra superior no leía como cabecera de
+ * nada. Al paso más alto de la escala y con peso,
+ya manda sobre el resto.
+ */
 .igToolbarTitle {
   margin: 0;
   font-family: var(--ig-font-display);
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: var(--ig-fs-xl);
+  font-weight: 750;
   letter-spacing: -0.02em;
   color: var(--ig-ink);
   line-height: 1.2;
@@ -1350,7 +1352,7 @@
 
 .igToolbarMeta {
   font-family: var(--ig-font-mono);
-  font-size: 10.5px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1408,7 +1410,7 @@
 .igPanelTitle {
   margin: 0;
   display: inline;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1418,7 +1420,7 @@
 .igPanelCount {
   margin-left: 8px;
   font-family: var(--ig-font-mono);
-  font-size: 10.5px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1436,33 +1438,60 @@
   max-height: none;
 }
 
+/*
+ * Antes: `max-height: calc(100dvh - 168px)`. Ese 168 era la altura supuesta del
+ * chrome (barra global + toolbar + filtros): en cuanto una página añadía o
+ * quitaba una fila de filtros el número dejaba de cuadrar,
+y dentro de IgSplit
+ * abría un segundo scroll dentro del scroll del panel.
+ * Ahora el tope lo pone la cadena flex (.igPanel flex:1 + min-height:0),
+que ya
+ * sabe la altura real; el max-height solo queda como respaldo para cuando la
+ * tabla cuelga de un bloque de altura automática.
+ */
 .igTableWrap {
   width: 100%;
   overflow: auto;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
-  max-height: calc(100dvh - 168px);
+  max-height: min(72dvh, 820px);
+}
+
+/* Dentro de un panel «flush» o de un split la altura ya es definida: sin tope. */
+.igPanelBodyFlush .igTableWrap,
+.igSplitPane .igTableWrap {
+  max-height: none;
 }
 
 .igTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   line-height: 1.25;
 }
 
+/*
+ * La cabecera iba a 10px,
+en versalitas y con el gris de texto secundario: el
+ * peor caso posible de legibilidad,
+y encima es lo que dice qué se está
+ * mirando. Sube al siguiente paso (11px),
+gana peso y pasa a la tinta media,
+* que sí despega de las celdas. El fondo se expresa en tokens para que el
+ * tema oscuro no lo aclare (antes mezclaba con un #e8edf3 fijo).
+ */
 .igTable thead th {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 5px 8px;
+  padding: 6px 8px;
   text-align: left;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  font-size: var(--ig-fs-xs);
+  font-weight: 750;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ig-muted);
-  background: color-mix(in srgb, var(--ig-surface) 80%, #e8edf3);
+  color: var(--ig-ink-soft);
+  background: color-mix(in srgb, var(--ig-surface) 98%, var(--ig-ink));
   border-bottom: 1px solid var(--ig-line);
   white-space: nowrap;
 }
@@ -1480,7 +1509,7 @@
 
 .igTable tbody td[data-mono="1"] {
   font-family: var(--ig-font-mono);
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-ink-soft);
 }
 
@@ -1522,7 +1551,7 @@
   margin: 0;
   padding: 22px 14px;
   text-align: center;
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
   line-height: 1.45;
   color: var(--ig-muted);
 }
@@ -1530,7 +1559,7 @@
 .igEmptyTitle {
   display: block;
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 650;
   color: var(--ig-ink-soft);
 }
@@ -1538,10 +1567,103 @@
 .igEmptyHint {
   display: block;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
   max-width: 36ch;
   margin-inline: auto;
+}
+
+/* Icono opcional del vacío: decorativo, el texto ya dice lo que pasa. */
+.igEmptyIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 8px;
+  border-radius: var(--ig-radius-lg);
+  border: 1px solid var(--ig-line);
+  background: color-mix(in srgb, var(--ig-accent) 7%, var(--ig-panel));
+  color: var(--ig-accent-deep);
+  font-size: var(--ig-fs-lg);
+  line-height: 1;
+}
+
+.igEmptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/*
+ * ── Skeletons ────────────────────────────────────────────────────────────
+ * No había ni uno en todo el panel: el contenido saltaba de vacío a lleno y
+ * la consola parecía colgada mientras el ISAPI respondía. El bloque calca la
+ * geometría de lo que va a aparecer para que no salte el layout al llegar.
+ */
+.igSkeleton {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.igSkelBlock {
+  border-radius: var(--ig-radius-sm);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ig-ink) 7%, transparent) 0%,
+      color-mix(in srgb, var(--ig-ink) 12%, transparent) 40%,
+      color-mix(in srgb, var(--ig-ink) 7%, transparent) 80%
+    )
+    0 0 / 200% 100%;
+  animation: igSkelSweep 1.25s ease-in-out infinite;
+}
+
+.igSkelLine {
+  height: 10px;
+}
+
+/* Fila de tabla o de lista: mismas columnas y mismo alto que la fila real. */
+.igSkelRow {
+  display: grid;
+  grid-template-columns: repeat(var(--ig-skel-cols, 4), minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 70%, transparent);
+}
+
+.igSkelRow .igSkelBlock {
+  height: 10px;
+}
+
+/* La primera columna es casi siempre el nombre: más ancha, como en la real. */
+.igSkelRow .igSkelBlock:first-child {
+  height: 11px;
+}
+
+.igSkelRow .igSkelBlock:last-child {
+  width: 60%;
+}
+
+@keyframes igSkelSweep {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Etiqueta solo para lectores de pantalla: el skeleton no dice nada en voz. */
+.igSrOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .igControl {
@@ -1554,7 +1676,7 @@
   background: var(--ig-panel);
   color: var(--ig-ink);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
   line-height: 1.3;
 }
 
@@ -1598,7 +1720,7 @@ select.igControl {
   margin: 0;
   padding: 5px 6px;
   border-radius: var(--ig-radius-sm);
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-ink);
   cursor: pointer;
 }
@@ -1616,7 +1738,7 @@ select.igControl {
   display: inline-flex;
   align-items: center;
   padding: 1px 6px;
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1692,58 +1814,15 @@ select.igControl {
 }
 
 .doorCellName {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
   line-height: 1.2;
 }
 
 .doorCellMeta {
   font-family: var(--ig-font-mono);
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   color: var(--ig-muted);
-}
-
-.opsGrid {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 10px;
-}
-
-@media (max-width: 960px) {
-  .opsGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.modRail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.modChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 650;
-  text-decoration: none;
-  color: var(--ig-ink);
-  border: 1px solid var(--ig-line);
-  background: white;
-}
-
-.modChip:hover {
-  border-color: var(--ig-accent);
-  color: var(--ig-accent-deep);
-}
-
-.modChipMark {
-  font-family: var(--ig-font-mono);
-  font-size: 9px;
-  letter-spacing: 0.06em;
-  color: var(--ig-accent-deep);
 }
 
 /* ── Ops workbench (3 panes) ──────────────────────────────── */
@@ -1844,7 +1923,7 @@ select.igControl {
 
 .igTreeTwist {
   width: 12px;
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   color: var(--ig-muted);
   flex-shrink: 0;
 }
@@ -1855,7 +1934,7 @@ select.igControl {
   display: grid;
   place-items: center;
   font-family: var(--ig-font-mono);
-  font-size: 9px;
+  font-size: var(--ig-fs-micro);
   font-weight: 700;
   color: var(--ig-accent-deep);
   border: 1px solid color-mix(in srgb, var(--ig-accent) 30%, var(--ig-line));
@@ -1875,7 +1954,7 @@ select.igControl {
 .igTreeLabel {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1926,7 +2005,7 @@ select.igControl {
   border: 1px solid transparent;
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 650;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1979,7 +2058,7 @@ select.igControl {
 
 .igFeedTitle {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2024,7 +2103,7 @@ select.igControl {
 
 .igFeedTime {
   font-family: var(--ig-font-mono);
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   color: var(--ig-muted);
   flex-shrink: 0;
   width: 52px;
@@ -2038,7 +2117,7 @@ select.igControl {
 }
 
 .igFeedItemTitle {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2046,7 +2125,7 @@ select.igControl {
 }
 
 .igFeedMeta {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2088,7 +2167,7 @@ select.igControl {
   border: 1px solid var(--ig-line);
   border-radius: var(--ig-radius-sm);
   background: var(--ig-panel);
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   color: var(--ig-ink-soft);
   line-height: 1.4;
 }
@@ -2097,22 +2176,14 @@ select.igControl {
   flex-shrink: 0;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
+  border-radius: var(--ig-radius-pill);
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 700;
   color: var(--ig-accent-deep);
   background: color-mix(in srgb, var(--ig-accent) 14%, var(--ig-panel));
   border: 1px solid color-mix(in srgb, var(--ig-accent) 30%, var(--ig-line));
-}
-
-.igEmptyCta {
-  display: none;
-}
-
-.igEmptySteps {
-  display: none;
 }
 
 .igAdvanced {
@@ -2123,7 +2194,7 @@ select.igControl {
 
 .igAdvanced summary {
   padding: 8px 10px;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2186,10 +2257,10 @@ select.igControl {
 .personAvatar,
 .personAvatarLg {
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   overflow: hidden;
   background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
-  color: var(--ig-accent-deep, var(--ig-accent));
+  color: var(--ig-accent-deep);
   display: grid;
   place-items: center;
   font-weight: 700;
@@ -2205,7 +2276,7 @@ select.igControl {
   width: 96px;
   height: 96px;
   font-size: 28px;
-  border-radius: 12px;
+  border-radius: var(--ig-radius-xl);
 }
 
 .personAvatar img,
@@ -2235,7 +2306,7 @@ select.igControl {
 }
 
 .personRowTop strong {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 650;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2246,12 +2317,12 @@ select.igControl {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
 }
 
 .personMono {
-  font-family: var(--ig-mono, "IBM Plex Mono", ui-monospace, monospace);
+  font-family: var(--ig-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2263,7 +2334,7 @@ select.igControl {
 }
 
 .personChip {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 650;
   letter-spacing: 0.02em;
   padding: 2px 7px;
@@ -2274,7 +2345,7 @@ select.igControl {
 }
 
 .personChip[data-on="1"] {
-  color: var(--ig-accent-deep, var(--ig-accent));
+  color: var(--ig-accent-deep);
   border-color: color-mix(in srgb, var(--ig-accent) 35%, var(--ig-line));
   background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
 }
@@ -2287,7 +2358,7 @@ select.igControl {
 }
 
 .personStatusChip {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 650;
   padding: 2px 7px;
   border-radius: var(--ig-radius-sm);
@@ -2297,9 +2368,9 @@ select.igControl {
 }
 
 .personStatusChip[data-on="1"][data-tone="ok"] {
-  color: var(--ig-ok, #0a7a4a);
-  border-color: color-mix(in srgb, #0a7a4a 30%, var(--ig-line));
-  background: color-mix(in srgb, #0a7a4a 8%, var(--ig-panel));
+  color: var(--ig-ok);
+  border-color: color-mix(in srgb, var(--ig-ok) 30%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-ok) 8%, var(--ig-panel));
 }
 
 .personStatusChip[data-tone="off"] {
@@ -2312,8 +2383,8 @@ select.igControl {
   margin-bottom: 10px;
   padding: 3px;
   border: 1px solid var(--ig-line);
-  border-radius: var(--ig-radius-sm, 8px);
-  background: color-mix(in srgb, var(--ig-surface, #fff) 55%, var(--ig-panel));
+  border-radius: var(--ig-radius-sm);
+  background: color-mix(in srgb, var(--ig-surface) 55%, var(--ig-panel));
 }
 
 .personModeTab {
@@ -2321,16 +2392,16 @@ select.igControl {
   border: 0;
   background: transparent;
   color: var(--ig-muted);
-  font-size: 11.5px;
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
   padding: 7px 8px;
-  border-radius: 6px;
+  border-radius: var(--ig-radius);
   cursor: pointer;
 }
 
 .personModeTab[data-on="1"] {
   background: var(--ig-panel);
-  color: var(--ig-fg, var(--foreground));
+  color: var(--ig-fg);
   box-shadow: 0 1px 2px color-mix(in srgb, #000 8%, transparent);
 }
 
@@ -2352,13 +2423,13 @@ select.igControl {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
 }
 
 .personErpOnly > header strong {
-  font-size: 12px;
-  color: var(--ig-fg, var(--foreground));
+  font-size: var(--ig-fs-sm);
+  color: var(--ig-fg);
 }
 
 .personErpOnlyRow {
@@ -2370,18 +2441,13 @@ select.igControl {
 
 .personErpOnlyRow strong {
   display: block;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
 }
 
 .personErpOnlyRow span {
   display: block;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
-}
-
-.personCard {
-  display: grid;
-  gap: 12px;
 }
 
 .personCardHead {
@@ -2392,16 +2458,16 @@ select.igControl {
 
 .personCardName {
   margin: 0 0 2px;
-  font-size: 18px;
+  font-size: var(--ig-fs-xl);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .personCardCode {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
-  font-family: var(--ig-mono, "IBM Plex Mono", ui-monospace, monospace);
+  font-family: var(--ig-mono);
 }
 
 .personFacts {
@@ -2410,8 +2476,8 @@ select.igControl {
   margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--ig-line);
-  border-radius: var(--ig-radius-sm, 8px);
-  background: color-mix(in srgb, var(--ig-surface, #fff) 60%, var(--ig-panel));
+  border-radius: var(--ig-radius-sm);
+  background: color-mix(in srgb, var(--ig-surface) 60%, var(--ig-panel));
 }
 
 .personFacts > div {
@@ -2420,7 +2486,7 @@ select.igControl {
 }
 
 .personFacts dt {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2429,19 +2495,19 @@ select.igControl {
 
 .personFacts dd {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
 }
 
 .personNote {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   line-height: 1.4;
   color: var(--ig-muted);
 }
 
 .personNote[data-tone="warn"] {
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   border: 1px solid color-mix(in srgb, var(--ig-warn) 32%, transparent);
   background: color-mix(in srgb, var(--ig-warn) 10%, var(--ig-panel));
   color: var(--ig-text);
@@ -2449,7 +2515,7 @@ select.igControl {
 
 .personNote[data-tone="ok"] {
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   border: 1px solid color-mix(in srgb, var(--ig-ok) 32%, transparent);
   background: color-mix(in srgb, var(--ig-ok) 10%, var(--ig-panel));
   color: var(--ig-text);
@@ -2464,7 +2530,7 @@ select.igControl {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-text);
 }
 
@@ -2473,8 +2539,8 @@ select.igControl {
   align-items: center;
   padding: 6px 10px;
   border: 1px solid var(--ig-line);
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: var(--ig-radius-md);
+  font-size: var(--ig-fs-sm);
   cursor: pointer;
   background: var(--ig-panel);
 }
@@ -2483,49 +2549,38 @@ select.igControl {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-family: ui-monospace, monospace;
 }
 
 .personOpList li[data-ok="1"] { color: var(--ig-ok); }
-.personOpList li[data-ok="0"] { color: var(--ig-danger, #dc2626); }
+.personOpList li[data-ok="0"] { color: var(--ig-danger); }
 
-/* La IP del terminal, debajo de su nombre: dato de instalación, no titular. */
+/* La IP del terminal,
+debajo de su nombre: dato de instalación,
+no titular. */
 .personFactSub {
   display: block;
   margin-top: 1px;
-  font-family: var(--ig-mono, ui-monospace, monospace);
-  font-size: 10px;
+  font-family: var(--ig-mono);
+  font-size: var(--ig-fs-micro);
   color: var(--ig-muted);
 }
 
-.personRaw {
-  font-size: 11px;
-  color: var(--ig-muted);
-}
-
-.personRaw pre,
 .personRawPre {
   margin: 6px 0 0;
   padding: 8px;
   max-height: 180px;
   overflow: auto;
-  font-size: 10px;
-  border-radius: 8px;
-  background: #0b1524;
-  color: #e2e8f0;
-}
-
-.personEmptyHint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ig-muted);
-  line-height: 1.45;
+  font-size: var(--ig-fs-micro);
+  border-radius: var(--ig-radius-md);
+  background: var(--ig-video-cell);
+  color: var(--ig-video-fg);
 }
 
 .personLead {
   margin: 0 0 10px;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   line-height: 1.45;
   color: var(--ig-muted);
   max-width: 72ch;
@@ -2544,12 +2599,12 @@ select.igControl {
 }
 
 .personEmptyBox strong {
-  font-size: 14px;
+  font-size: var(--ig-fs-lg);
 }
 
 .personEmptyBox p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
   line-height: 1.45;
 }
@@ -2564,8 +2619,8 @@ select.igControl {
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--ig-line);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--ig-surface, #fff) 55%, var(--ig-panel));
+  border-radius: var(--ig-radius-lg);
+  background: color-mix(in srgb, var(--ig-surface) 55%, var(--ig-panel));
 }
 
 .personSection[data-tone="accent"] {
@@ -2574,8 +2629,8 @@ select.igControl {
 }
 
 .personSection[data-tone="danger"] {
-  border-color: color-mix(in srgb, var(--ig-danger, #dc2626) 35%, var(--ig-line));
-  background: color-mix(in srgb, var(--ig-danger, #dc2626) 6%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-danger) 35%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger) 6%, var(--ig-panel));
 }
 
 .personSectionHead {
@@ -2583,7 +2638,7 @@ select.igControl {
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ig-muted);
@@ -2591,7 +2646,7 @@ select.igControl {
 
 .personSectionHead strong {
   color: var(--ig-text);
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -2603,21 +2658,12 @@ select.igControl {
   align-items: center;
 }
 
-.personDivider {
-  border: 0;
-  border-top: 1px solid var(--ig-line);
-  margin: 14px 0;
-}
-
-.personCreate {
-  display: grid;
-  gap: 8px;
-}
-
 /* ── Puesto de puerta ───────────────────────────────────────────────────
  * Ver quién llama y accionar la puerta sin cambiar de pantalla. El video a
- * la izquierda porque es lo que se mira; las acciones a la derecha, donde
- * cae la mano, y con el motivo obligatorio de por medio.
+ * la izquierda porque es lo que se mira; las acciones a la derecha,
+donde
+ * cae la mano,
+y con el motivo obligatorio de por medio.
  */
 .doorConsole {
   display: grid;
@@ -2635,9 +2681,9 @@ select.igControl {
 .doorConsoleVideo {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   overflow: hidden;
-  background: #05070d;
+  background: var(--ig-video-ink);
 }
 
 .doorConsoleNoCam {
@@ -2648,12 +2694,12 @@ select.igControl {
   padding: 16px;
   text-align: center;
   color: var(--ig-muted);
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
 }
 
 .doorConsoleNoCam strong {
   color: var(--ig-text);
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
 }
 
 .doorConsoleSide {
@@ -2663,7 +2709,7 @@ select.igControl {
 
 .doorConsoleHint {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   line-height: 1.4;
   color: var(--ig-muted);
 }
@@ -2680,12 +2726,12 @@ select.igControl {
   margin: 0;
   padding: 10px;
   border: 1px solid var(--ig-line);
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   background: var(--ig-panel);
 }
 
 .doorConsoleFacts dt {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ig-muted);
@@ -2693,7 +2739,7 @@ select.igControl {
 
 .doorConsoleFacts dd {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-text);
 }
 
@@ -2722,14 +2768,14 @@ select.igControl {
   right: auto;
   z-index: 5;
   padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 10px;
+  border-radius: var(--ig-radius-sm);
+  font-size: var(--ig-fs-micro);
   font-weight: 650;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #fff7ed;
+  color: var(--ig-video-fg-amber);
   background: rgb(120 53 15 / 0.82);
-  border: 1px solid #f59e0b;
+  border: 1px solid var(--ig-amber);
 }
 
 .detPresenceChip {
@@ -2740,20 +2786,20 @@ select.igControl {
   right: auto;
   z-index: 5;
   padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 10px;
+  border-radius: var(--ig-radius-sm);
+  font-size: var(--ig-fs-micro);
   font-weight: 650;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #ecfeff;
+  color: var(--ig-cyan-tint);
   background: rgb(8 47 73 / 0.86);
-  border: 1px solid #22d3ee;
+  border: 1px solid var(--ig-cyan);
 }
 
 .detPresenceChip[data-kind="vehicle"] {
-  color: #fff7ed;
+  color: var(--ig-video-fg-amber);
   background: rgb(67 40 12 / 0.86);
-  border-color: #f59e0b;
+  border-color: var(--ig-amber);
 }
 
 .detEmpty {
@@ -2763,31 +2809,31 @@ select.igControl {
   z-index: 5;
   max-width: min(280px, 70%);
   padding: 5px 9px;
-  border-radius: 4px;
-  font-size: 11px;
+  border-radius: var(--ig-radius-sm);
+  font-size: var(--ig-fs-xs);
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.35;
-  color: #cbd5e1;
+  color: var(--ig-video-fg-faint);
   background: rgb(15 23 42 / 0.72);
   border: 1px solid rgb(148 163 184 / 0.35);
 }
 
 .detBox {
   position: absolute;
-  border: 2px solid var(--ig-accent, #22d3ee);
-  border-radius: 3px;
+  border: 2px solid var(--ig-accent);
+  border-radius: var(--ig-radius-xs);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
   animation: detFade var(--det-ttl, 10s) ease-out forwards;
   transition: left 180ms linear, top 180ms linear, width 180ms linear, height 180ms linear, opacity 120ms linear;
 }
 
 .detBox[data-kind="vehicle"] {
-  border-color: #f59e0b;
+  border-color: var(--ig-amber);
 }
 
 .detBox[data-kind="face"] {
-  border-color: #a78bfa;
+  border-color: var(--ig-violet);
 }
 
 .detTag {
@@ -2800,12 +2846,12 @@ select.igControl {
   gap: 6px;
   max-width: min(240px, 72vw);
   padding: 2px 6px 2px 2px;
-  border-radius: 3px;
+  border-radius: var(--ig-radius-xs);
   background: rgb(4 18 26 / 0.9);
-  color: #e8f7ff;
-  border: 1px solid color-mix(in srgb, var(--ig-accent, #22d3ee) 70%, #fff);
+  color: var(--ig-video-fg-cyan);
+  border: 1px solid color-mix(in srgb, var(--ig-accent) 70%, #fff);
   font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 650;
   letter-spacing: 0.02em;
   line-height: 1.3;
@@ -2825,14 +2871,14 @@ select.igControl {
 .detTagFace {
   width: 22px;
   height: 22px;
-  border-radius: 3px;
+  border-radius: var(--ig-radius-xs);
   object-fit: cover;
   flex-shrink: 0;
   background: rgb(255 255 255 / 0.1);
 }
 
 .detTag[data-named="1"] {
-  border-color: #67e8f9;
+  border-color: var(--ig-cyan-bright);
   background: rgb(2 28 36 / 0.92);
 }
 
@@ -2849,17 +2895,17 @@ select.igControl {
 }
 
 .detBox[data-kind="vehicle"] .detTag {
-  border-color: #f59e0b;
-  color: #fff7ed;
+  border-color: var(--ig-amber);
+  color: var(--ig-video-fg-amber);
 }
 
 .detBox[data-kind="face"] .detTag {
-  border-color: #c4b5fd;
-  color: #f5f3ff;
+  border-color: var(--ig-violet-soft);
+  color: var(--ig-violet-tint);
 }
 
 .detBox[data-named="1"] {
-  border-color: #67e8f9;
+  border-color: var(--ig-cyan-bright);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55), 0 0 12px rgb(34 211 238 / 0.25);
 }
 
@@ -2879,23 +2925,25 @@ select.igControl {
   gap: 14px;
   margin: 0 0 10px;
   padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, #22d3ee 55%, transparent);
+  border-radius: var(--ig-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--ig-cyan) 55%, transparent);
   background: linear-gradient(90deg, rgb(2 28 36 / 0.94), rgb(8 40 52 / 0.9));
-  color: #e8f7ff;
-  box-shadow: 0 10px 28px rgb(0 0 0 / 0.22);
+  color: var(--ig-video-fg-cyan);
+  box-shadow: var(--ig-elev-3);
   animation: liveAccessIn 220ms ease-out;
 }
 
 .liveAccessBanner[data-fresh="1"] {
-  border-color: #67e8f9;
-  box-shadow: 0 0 0 1px rgb(103 232 249 / 0.35), 0 12px 32px rgb(0 0 0 / 0.28);
+  border-color: var(--ig-cyan-bright);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ig-cyan-bright) 35%, transparent),
+    var(--ig-elev-3);
 }
 
 .liveAccessPhoto {
   width: 64px;
   height: 64px;
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   overflow: hidden;
   flex-shrink: 0;
   background: rgb(255 255 255 / 0.08);
@@ -2919,7 +2967,7 @@ select.igControl {
 }
 
 .liveAccessPhoto[data-empty="1"] {
-  border: 1px solid color-mix(in srgb, #67e8f9 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ig-cyan-bright) 40%, transparent);
 }
 
 .liveAccessBody {
@@ -2930,23 +2978,23 @@ select.igControl {
 }
 
 .liveAccessEyebrow {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #67e8f9;
+  color: var(--ig-cyan-bright);
   opacity: 0.9;
 }
 
 .liveAccessBody strong {
-  font-size: 17px;
+  font-size: var(--ig-fs-xl);
   font-weight: 750;
   letter-spacing: 0.01em;
   line-height: 1.2;
 }
 
 .liveAccessBody span {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   opacity: 0.8;
   font-variant-numeric: tabular-nums;
 }
@@ -2956,7 +3004,8 @@ select.igControl {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Contenedor del foco: da el marco de referencia a los recuadros, que se
+/* Contenedor del foco: da el marco de referencia a los recuadros,
+que se
    posicionan en porcentaje sobre el video. */
 .focusStage {
   position: relative;
@@ -2972,7 +3021,7 @@ select.igControl {
   margin: 0 0 10px;
   padding: 8px 10px;
   border: 1px solid var(--ig-line);
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   background: color-mix(in srgb, var(--ig-panel) 92%, var(--ig-accent) 8%);
 }
 
@@ -3004,11 +3053,11 @@ select.igControl {
 }
 
 .ptzCapChips span {
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: var(--ig-radius-sm);
   border: 1px solid var(--ig-line);
   color: var(--ig-muted);
   background: color-mix(in srgb, var(--ig-panel) 80%, transparent);
@@ -3027,17 +3076,17 @@ select.igControl {
 
 .ptzCapBanner {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   line-height: 1.35;
   color: var(--ig-text);
   padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--ig-warn, #c47a2c) 35%, var(--ig-line));
-  background: color-mix(in srgb, var(--ig-warn, #c47a2c) 10%, var(--ig-panel));
+  border-radius: var(--ig-radius);
+  border: 1px solid color-mix(in srgb, var(--ig-warn) 35%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-warn) 10%, var(--ig-panel));
 }
 
 .ptzCapBanner[data-tone="limit"] {
-  border-color: color-mix(in srgb, #b45309 40%, var(--ig-line));
+  border-color: color-mix(in srgb, var(--ig-warn) 40%, var(--ig-line));
 }
 
 .focusStage .detOverlay {
@@ -3074,7 +3123,7 @@ select.igControl {
   gap: 6px;
   padding: 10px;
   border: 1px solid var(--ig-line);
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   background: var(--ig-panel);
   min-width: 0;
 }
@@ -3083,7 +3132,7 @@ select.igControl {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ig-muted);
@@ -3107,9 +3156,9 @@ select.igControl {
   flex-wrap: wrap;
   gap: 4px 8px;
   align-items: baseline;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   padding: 4px 6px;
-  border-radius: 6px;
+  border-radius: var(--ig-radius);
   border: 1px solid var(--ig-line);
   background: color-mix(in srgb, var(--ig-panel) 92%, var(--ig-muted));
 }
@@ -3119,7 +3168,7 @@ select.igControl {
 }
 
 .vehicleSourceList li strong {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 650;
   color: var(--ig-text);
 }
@@ -3141,7 +3190,7 @@ select.igControl {
 .accessStripPhoto {
   width: 48px;
   height: 48px;
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   overflow: hidden;
   background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
   display: grid;
@@ -3169,7 +3218,7 @@ select.igControl {
   gap: 10px;
   align-items: center;
   padding: 4px;
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
 }
 
 .accessStripRow[data-fresh="1"] {
@@ -3191,14 +3240,14 @@ select.igControl {
   display: grid;
   gap: 1px;
   min-width: 0;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
 }
 
 .accessStripBody strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
 }
 
 .accessStripBody span,
@@ -3216,7 +3265,7 @@ select.igControl {
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--ig-line);
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   background: var(--ig-panel);
   max-width: 280px;
 }
@@ -3230,7 +3279,7 @@ select.igControl {
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ig-muted);
@@ -3252,10 +3301,10 @@ select.igControl {
   min-height: 36px;
   padding: 6px 8px;
   border: 1px solid var(--ig-line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--ig-bg, var(--ig-panel)) 70%, #000);
+  border-radius: var(--ig-radius-md);
+  background: color-mix(in srgb, var(--ig-bg) 70%, #000);
   color: var(--ig-text);
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 600;
   cursor: pointer;
   user-select: none;
@@ -3272,7 +3321,7 @@ select.igControl {
 }
 
 .ptzKey[data-stop="1"] {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
 }
 
 .ptzKey:disabled {
@@ -3293,7 +3342,7 @@ select.igControl {
 .ptzPresets {
   display: grid;
   gap: 3px;
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ig-muted);
@@ -3302,22 +3351,22 @@ select.igControl {
 .ptzPresets select {
   padding: 6px 8px;
   border: 1px solid var(--ig-line);
-  border-radius: 6px;
-  background: var(--ig-bg, var(--ig-panel));
+  border-radius: var(--ig-radius);
+  background: var(--ig-bg);
   color: var(--ig-text);
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   text-transform: none;
   letter-spacing: 0;
 }
 
 .ptzHint {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
 }
 
 .ptzHint[data-tone="error"] {
-  color: var(--ig-danger, #dc2626);
+  color: var(--ig-danger);
 }
 
 .ptzHint[data-tone="ok"] {
@@ -3326,7 +3375,7 @@ select.igControl {
 
 /* ── Asistencia ─────────────────────────────────────────────────────────
  * Fichas y no tabla: lo primero que se busca es la cara y la hora de entrada,
- * y en una fila de tabla la foto no cabe sin encogerla hasta ser inútil.
+* y en una fila de tabla la foto no cabe sin encogerla hasta ser inútil.
  */
 .attGrid {
   display: grid;
@@ -3340,14 +3389,14 @@ select.igControl {
   gap: 10px;
   padding: 10px;
   border: 1px solid var(--ig-line);
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   background: var(--ig-panel);
 }
 
 .attPhoto {
   width: 64px;
   height: 64px;
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   overflow: hidden;
   background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
   display: grid;
@@ -3363,7 +3412,7 @@ select.igControl {
 .attPhoto[data-empty="1"] span {
   font-size: 22px;
   font-weight: 700;
-  color: var(--ig-accent-deep, var(--ig-accent));
+  color: var(--ig-accent-deep);
 }
 
 .attBody {
@@ -3374,14 +3423,14 @@ select.igControl {
 }
 
 .attName {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
 .attCode {
-  font-family: var(--ig-mono, ui-monospace, monospace);
-  font-size: 10px;
+  font-family: var(--ig-mono);
+  font-size: var(--ig-fs-micro);
   color: var(--ig-muted);
 }
 
@@ -3389,13 +3438,13 @@ select.igControl {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
 }
 
 .attTimes b {
   color: var(--ig-text);
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
 }
 
 .attChips {
@@ -3406,13 +3455,13 @@ select.igControl {
 }
 
 .attDoor {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
 }
 
 .attNote {
   margin: 4px 0 0;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   line-height: 1.45;
   color: var(--ig-muted);
 }
@@ -3426,12 +3475,15 @@ select.igControl {
   min-height: 40vh;
 }
 
+/* Tarjeta de error de ruta: flota centrada sobre la página, así que va a
+   elevación 2 — es lo más cerca de un modal que hay estilado en este archivo. */
 .igBoundaryCard {
   width: min(520px, 100%);
   padding: 18px 18px 16px;
   border-radius: var(--ig-radius);
   border: 1px solid color-mix(in srgb, var(--ig-danger) 28%, var(--ig-line));
   background: color-mix(in srgb, var(--ig-danger) 6%, var(--ig-panel));
+  box-shadow: var(--ig-elev-2);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3448,7 +3500,7 @@ select.igControl {
 
 .igBoundaryCopy {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   line-height: 1.45;
   color: var(--ig-muted);
 }
@@ -3460,7 +3512,7 @@ select.igControl {
   border: 1px solid var(--ig-line);
   background: var(--ig-panel);
   font-family: var(--ig-font-mono);
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   line-height: 1.4;
   color: var(--ig-ink-soft);
   white-space: pre-wrap;
@@ -3482,7 +3534,7 @@ select.igControl {
   border-radius: var(--ig-radius);
   border: 1px solid color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
   color: var(--ig-accent-deep);
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
   text-decoration: none;
   background: var(--ig-panel);
@@ -3517,7 +3569,7 @@ select.igControl {
 }
 
 .igLoadingLabel {
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
   font-weight: 650;
   letter-spacing: 0.02em;
 }
@@ -3536,10 +3588,10 @@ select.igControl {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: var(--ig-radius-pill);
   border: 1px solid var(--ig-line);
   background: var(--ig-panel);
 }
@@ -3550,7 +3602,7 @@ select.igControl {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--ig-fs-micro);
   font-weight: 700;
   background: color-mix(in srgb, var(--ig-muted) 14%, transparent);
 }
@@ -3574,7 +3626,7 @@ select.igControl {
 .personAltaPreview {
   width: 140px;
   height: 140px;
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   overflow: hidden;
   border: 1px solid var(--ig-line);
   background: var(--ig-surface);
@@ -3590,7 +3642,7 @@ select.igControl {
   display: grid;
   gap: 10px;
   padding: 14px;
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   border: 2px solid color-mix(in srgb, var(--ig-danger) 55%, var(--ig-line));
   background: color-mix(in srgb, var(--ig-danger) 9%, var(--ig-panel));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ig-danger) 18%, transparent);
@@ -3598,7 +3650,7 @@ select.igControl {
 
 .personDangerZone .personSectionHead strong {
   color: var(--ig-danger);
-  font-size: 14px;
+  font-size: var(--ig-fs-lg);
 }
 
 .personForceBox {
@@ -3607,10 +3659,10 @@ select.igControl {
   align-items: flex-start;
   margin: 0;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   border: 1px solid color-mix(in srgb, var(--ig-danger) 35%, var(--ig-line));
   background: color-mix(in srgb, var(--ig-danger) 6%, var(--ig-panel));
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
   line-height: 1.4;
   color: var(--ig-ink);
   cursor: pointer;
@@ -3632,7 +3684,7 @@ select.igControl {
 
 .personForceBox strong {
   display: block;
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
   font-weight: 700;
   color: var(--ig-danger);
   margin-bottom: 2px;
@@ -3641,135 +3693,14 @@ select.igControl {
 .personDangerError {
   margin: 0;
   padding: 8px 10px;
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
   line-height: 1.4;
   color: var(--ig-danger);
   background: color-mix(in srgb, var(--ig-danger) 10%, var(--ig-panel));
   border: 1px solid color-mix(in srgb, var(--ig-danger) 28%, transparent);
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-/* Eventos: cards con cara */
-.eventTimeline {
-  display: grid;
-  gap: 6px;
-  padding: 8px;
-  max-height: min(68vh, 720px);
-  overflow: auto;
-}
-
-.eventCard {
-  display: grid;
-  grid-template-columns: 48px 1fr auto;
-  gap: 10px;
-  align-items: center;
-  width: 100%;
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--ig-line);
-  background: var(--ig-panel);
-  cursor: pointer;
-  color: inherit;
-  font: inherit;
-}
-
-.eventCard:hover {
-  border-color: color-mix(in srgb, var(--ig-accent) 35%, var(--ig-line));
-}
-
-.eventCard[data-selected="1"] {
-  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
-  background: color-mix(in srgb, var(--ig-accent) 8%, var(--ig-panel));
-  box-shadow: inset 2px 0 0 var(--ig-accent);
-}
-
-.eventCardFace,
-.eventIdentityFace {
-  border-radius: 8px;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  color: var(--ig-accent-deep);
-  flex-shrink: 0;
-}
-
-.eventCardFace {
-  width: 48px;
-  height: 48px;
-  font-size: 16px;
-}
-
-.eventCardFace img,
-.eventIdentityFace img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.eventCardFace[data-empty="1"],
-.eventIdentityFace[data-empty="1"] {
-  border: 1px solid var(--ig-line);
-}
-
-.eventCardBody {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.eventCardBody strong {
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.eventCardMeta {
-  font-size: 11px;
-  color: var(--ig-muted);
-}
-
-.eventIdentity {
-  display: grid;
-  gap: 10px;
-  justify-items: start;
-}
-
-.eventIdentity h3 {
-  margin: 0;
-  font-size: 1.15rem;
-  font-family: var(--ig-font-display);
-}
-
-.eventIdentityFace {
-  width: 160px;
-  height: 160px;
-  font-size: 42px;
-  border-radius: 12px;
-}
-
-.eventCapture {
-  display: grid;
-  gap: 6px;
-  width: 100%;
-}
-
-.eventCapture span {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ig-muted);
-}
-
-.eventCapture img {
-  max-width: 100%;
-  border-radius: 8px;
-  border: 1px solid var(--ig-line);
 }
 
 .accessStripRow[data-fresh="1"] {
@@ -3791,7 +3722,7 @@ select.igControl {
   text-align: left;
   padding: 12px;
   border: 1px solid var(--ig-line);
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   background: var(--ig-panel);
   color: inherit;
   font: inherit;
@@ -3814,7 +3745,7 @@ button.evCard {
 }
 
 .evCard[data-live="1"] {
-  border-color: color-mix(in srgb, #22d3ee 50%, var(--ig-line));
+  border-color: color-mix(in srgb, var(--ig-cyan) 50%, var(--ig-line));
 }
 
 .evCard[data-denied="1"] {
@@ -3825,14 +3756,14 @@ button.evCard {
 .evPhoto {
   width: 72px;
   height: 72px;
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   overflow: hidden;
   background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
   display: grid;
   place-items: center;
   font-size: 24px;
   font-weight: 700;
-  color: var(--ig-accent-deep, var(--ig-accent));
+  color: var(--ig-accent-deep);
 }
 
 .evPhoto img {
@@ -3848,7 +3779,7 @@ button.evCard {
 }
 
 .evName {
-  font-size: 14px;
+  font-size: var(--ig-fs-lg);
   font-weight: 750;
   line-height: 1.25;
   overflow-wrap: anywhere;
@@ -3856,7 +3787,7 @@ button.evCard {
 
 .evMeta,
 .evTime {
-  font-size: 11.5px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -3876,7 +3807,7 @@ button.evCard {
 }
 
 .evPagerMeta {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -3891,7 +3822,7 @@ button.evCard {
 .evDetailPhoto {
   width: 96px;
   height: 96px;
-  border-radius: 12px;
+  border-radius: var(--ig-radius-xl);
   overflow: hidden;
   background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
   display: grid;
@@ -3909,15 +3840,15 @@ button.evCard {
 .evDetailBody {
   display: grid;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
 }
 
 .evDetailBody strong {
-  font-size: 16px;
+  font-size: var(--ig-fs-lg);
 }
 
 .accessStripBody strong {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 750;
 }
 
@@ -3946,7 +3877,7 @@ button.evCard {
 }
 
 .spaceKpi span {
-  font-size: 11.5px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
 }
 
@@ -3999,7 +3930,7 @@ button.evCard {
 }
 
 .spaceRowHead strong {
-  font-size: 13.5px;
+  font-size: var(--ig-fs-md);
   font-weight: 700;
 }
 
@@ -4007,12 +3938,12 @@ button.evCard {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 12px;
-  font-size: 11.5px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
 }
 
 .spaceRowLive {
-  font-size: 11.5px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-ink-soft);
 }
 
@@ -4040,18 +3971,18 @@ button.evCard {
 
 .spaceSection h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 750;
   font-family: var(--ig-font-display);
 }
 
 .spaceSection header span {
-  font-size: 11.5px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
 }
 
 .spaceLink {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-accent-deep);
   text-decoration: none;
   font-weight: 650;
@@ -4094,14 +4025,14 @@ button.evCard {
 .spaceLive li strong,
 .spaceWindows li strong {
   display: block;
-  font-size: 12.5px;
+  font-size: var(--ig-fs-md);
 }
 
 .spacePeople li span,
 .spaceLive li span,
 .spaceWindows li span {
   display: block;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
 }
 
@@ -4146,7 +4077,7 @@ button.evCard {
 /* ── Visitas: recurrente + acceso limitado ──────────────────────────── */
 .visitLead {
   margin: 0 0 12px;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   line-height: 1.45;
   color: var(--ig-ink-soft);
 }
@@ -4160,7 +4091,7 @@ button.evCard {
 }
 
 .visitBlockLabel {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4201,13 +4132,13 @@ button.evCard {
 }
 
 .visitDoorName {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 650;
   color: var(--ig-ink);
 }
 
 .visitDoorMeta {
-  font-size: 11.5px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
 }
 
@@ -4228,10 +4159,10 @@ button.evCard {
   border: 1px solid var(--ig-line);
   background: var(--ig-panel);
   color: var(--ig-ink-soft);
-  border-radius: 8px;
+  border-radius: var(--ig-radius-md);
   padding: 7px 10px;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 700;
   cursor: pointer;
   min-width: 44px;
@@ -4259,7 +4190,7 @@ button.evCard {
   background: transparent;
   color: var(--ig-accent-deep);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   font-weight: 650;
   cursor: pointer;
   padding: 2px 4px;
@@ -4277,13 +4208,13 @@ button.evCard {
 .visitPhotoPrev {
   width: 72px;
   height: 72px;
-  border-radius: 10px;
+  border-radius: var(--ig-radius-lg);
   border: 1px solid var(--ig-line);
   background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
   display: grid;
   place-items: center;
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-weight: 700;
   color: var(--ig-muted);
 }
@@ -4315,7 +4246,7 @@ button.evCard {
 }
 
 .visitCellStack strong {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 700;
 }
 
@@ -4339,10 +4270,10 @@ button.evCard {
   background: var(--ig-panel);
   color: var(--ig-ink-soft);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 600;
   padding: 7px 12px;
-  border-radius: 999px;
+  border-radius: var(--ig-radius-pill);
   cursor: pointer;
 }
 
@@ -4393,13 +4324,13 @@ button.evCard {
 }
 
 .schedPreset strong {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 700;
   color: var(--ig-ink);
 }
 
 .schedPreset span {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
   line-height: 1.35;
 }
@@ -4473,19 +4404,19 @@ button.evCard {
 }
 
 .schedDoorName strong {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   font-weight: 700;
 }
 
 .schedDoorName span {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   color: var(--ig-muted);
   font-family: var(--ig-font-mono);
 }
 
 .schedWeekSummary,
 .schedWeekMuted {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
   line-height: 1.35;
 }
@@ -4504,7 +4435,7 @@ button.evCard {
   grid-template-columns: 36px minmax(0, 1fr);
   gap: 8px;
   align-items: baseline;
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
 }
 
 .schedWeekDay {
@@ -4515,7 +4446,7 @@ button.evCard {
 .schedWeekRanges {
   color: var(--ig-ink);
   font-family: var(--ig-font-mono);
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
 }
 
 .schedWeekRanges[data-off="1"] {
@@ -4523,7 +4454,7 @@ button.evCard {
 }
 
 .schedWeekEmpty {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
   color: var(--ig-muted);
   padding: 8px 0;
 }
@@ -4542,7 +4473,7 @@ button.evCard {
   padding: 6px 10px;
   border-radius: var(--ig-radius-sm);
   border: 1px solid var(--ig-line);
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
 }
 
 .schedOpList li[data-ok="1"] {
@@ -4579,7 +4510,7 @@ button.evCard {
 }
 
 .schedMeta {
-  font-size: 12px;
+  font-size: var(--ig-fs-sm);
   color: var(--ig-muted);
 }
 
@@ -4590,7 +4521,7 @@ button.evCard {
 .schedMatrix {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
 }
 
 .schedMatrix th,
@@ -4602,7 +4533,7 @@ button.evCard {
 }
 
 .schedMatrix th {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ig-muted);
@@ -4630,11 +4561,11 @@ button.evCard {
 }
 
 .schedAllDoorBtn strong {
-  font-size: 13px;
+  font-size: var(--ig-fs-md);
 }
 
 .schedAllDoorBtn span {
-  font-size: 11px;
+  font-size: var(--ig-fs-xs);
   font-family: var(--ig-font-mono);
   color: var(--ig-muted);
 }
@@ -4651,5 +4582,37 @@ button.evCard {
   }
   .schedValidGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Movimiento reducido ──────────────────────────────────────────────────
+ * Las animaciones del panel son de estado o decorativas: ninguna dice nada
+ * que no diga ya el texto de al lado. Con `prefers-reduced-motion: reduce`
+ * se apagan las cinco (igSpin, igPulse, detFade, liveAccessIn e igSkelSweep)
+ * dejando visible su estado FINAL — o el inicial cuando el final es un
+ * apagado, como en detFade, donde el recuadro debe seguir viéndose hasta que
+ * el overlay lo retire por TTL.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .playerSpinner,
+  .igLoadingSpin,
+  .playerLiveDot,
+  .liveAccessBanner,
+  .igSkelBlock {
+    animation: none;
+  }
+
+  .detBox {
+    animation: none;
+    opacity: 1;
+  }
+
+  /* El recuadro seguía al objetivo interpolando: sin movimiento, salta. */
+  .detBox,
+  .btnPrimary,
+  .btnGhost,
+  .doorCell,
+  .schedPreset {
+    transition: none;
   }
 }
