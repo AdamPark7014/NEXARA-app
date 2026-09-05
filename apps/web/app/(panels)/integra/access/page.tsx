@@ -25,6 +25,7 @@ import {
   RetryNotice,
   RowsSkeleton,
   ShowingCount,
+  diagLocal,
   doorState,
   doorStateLabel,
   type DoorStateKey,
@@ -32,12 +33,12 @@ import {
 import { DoorConfirmModal } from "../_DoorConfirmModal";
 import { IntegraLivePlayer } from "../_LivePlayer";
 import { getCachedCapabilities, subscribeCapabilities } from "../_caps";
+import { diagnosticar, pedirIntegra, type Diagnostico } from "../_fallosApi";
 import {
   DOOR_CONTROL_OPTIONS,
   DoorControlType,
   getActiveIntegraSiteId,
   inputStyle,
-  integraApi,
   selectStyle,
   type IntegraCapabilities,
 } from "../_lib";
@@ -65,12 +66,25 @@ type Cam = {
 };
 type Site = { id: number; name: string; label?: string | null; isDefault?: boolean };
 
+/** `GET integra/doors` — `source` distingue el espejo de la consulta al ACS. */
+type DoorList = { items: Door[]; total?: number; source?: string };
+
 type KindFilter = "ALL" | "ACS" | "ENCODE";
 
 /** Cuántos elementos se pintan de primeras en cada lista. */
 const DOOR_PAGE = 24;
 const DEVICE_PAGE = 40;
 const PERSON_PAGE = 80;
+
+/**
+ * El permiso lo comprobó la propia pantalla con las capacidades ya cargadas:
+ * no hubo petición, así que no hay `status` que diagnosticar ni nada que
+ * reintentar.
+ */
+const SIN_PERMISO_PUERTAS = diagLocal(
+  "No tienes permiso para accionar puertas",
+  "Tu rol puede consultar el estado, pero no abrir ni cerrar. Pídele el permiso a un administrador del sitio.",
+);
 
 /**
  * `useSearchParams` obliga a una frontera de Suspense en el App Router.
@@ -97,7 +111,12 @@ function IntegraAccessConsole() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * Un solo canal de error para la pantalla. Guarda el diagnóstico, no la
+   * cadena: quien lo pinta necesita saber si el servidor está caído (rojo, con
+   * reintento) o si es un permiso (ámbar, sin reintento).
+   */
+  const [fallo, setFallo] = useState<Diagnostico | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [assignBusy, setAssignBusy] = useState(false);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
@@ -124,6 +143,8 @@ function IntegraAccessConsole() {
     return v === "ACS" || v === "ENCODE" ? v : "ALL";
   });
   const [liveDoors, setLiveDoors] = useState(() => sp.get("live") === "1");
+  /** De dónde vino la última lista de puertas, según el propio backend. */
+  const [doorSource, setDoorSource] = useState<"mirror" | "live" | null>(null);
 
   /* Cuánto se pinta de cada lista. Nunca se corta en silencio. */
   const [doorLimit, setDoorLimit] = useState(DOOR_PAGE);
@@ -164,27 +185,32 @@ function IntegraAccessConsole() {
   }, [doorQ, stateFilter, regionFilter, kindFilter, personFilter, liveDoors, router]);
 
   const load = useCallback(async () => {
-    setError(null);
+    setFallo(null);
     setLoading(true);
     try {
       const doorPath = liveDoors ? "integra/doors?live=1" : "integra/doors";
       const [d, g, p, dev, c, s] = await Promise.all([
-        integraApi<{ items: Door[] }>(doorPath),
-        integraApi<{ items: Group[] }>("integra/privilege-groups").catch(() => ({ items: [] })),
-        integraApi<{ items: Person[] }>("integra/people").catch(() => ({ items: [] })),
-        integraApi<{ items: Device[] }>("integra/devices").catch(() => ({ items: [] })),
-        integraApi<{ items: Cam[] }>("integra/cameras").catch(() => ({ items: [] })),
+        pedirIntegra<DoorList>(doorPath),
+        pedirIntegra<{ items: Group[] }>("integra/privilege-groups").catch(() => ({ items: [] })),
+        pedirIntegra<{ items: Person[] }>("integra/people").catch(() => ({ items: [] })),
+        pedirIntegra<{ items: Device[] }>("integra/devices").catch(() => ({ items: [] })),
+        pedirIntegra<{ items: Cam[] }>("integra/cameras").catch(() => ({ items: [] })),
         // Solo para poder decir en el modal EN QUÉ SITIO está la puerta.
-        integraApi<Site[]>("integra/sites").catch(() => [] as Site[]),
+        pedirIntegra<Site[]>("integra/sites").catch(() => [] as Site[]),
       ]);
       setDoors(d.items);
+      // El backend dice de dónde salió la lista ('mirror' | 'live'). Se guarda
+      // para poder confesarlo en la barra: pedir estado en vivo y recibir el
+      // espejo sin avisar es exactamente la clase de mentira que hace que un
+      // operador confíe en el estado de una cerradura que nadie ha consultado.
+      setDoorSource(d.source === "live" || d.source === "mirror" ? d.source : null);
       setGroups(g.items);
       setPeople(p.items);
       setDevices(dev.items);
       setCams(c.items);
       setSites(Array.isArray(s) ? s : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setFallo(diagnosticar(e, "cargar el inventario de accesos"));
     } finally {
       setLoading(false);
     }
@@ -207,7 +233,7 @@ function IntegraAccessConsole() {
 
   const requestControl = (d: Door) => {
     if (!canControl) {
-      setError("Sin permiso para controlar puertas");
+      setFallo(SIN_PERMISO_PUERTAS);
       return;
     }
     setSelectedDoor(d);
@@ -216,9 +242,9 @@ function IntegraAccessConsole() {
 
   const control = async (id: string, reason: string) => {
     setBusy(id);
-    setError(null);
+    setFallo(null);
     try {
-      await integraApi(`integra/doors/${encodeURIComponent(id)}/control`, {
+      await pedirIntegra(`integra/doors/${encodeURIComponent(id)}/control`, {
         method: "POST",
         body: JSON.stringify({ controlType, reason }),
       });
@@ -231,7 +257,7 @@ function IntegraAccessConsole() {
       // Un solo aviso: el error vive en el panel de reintento de la página.
       // Antes salía además un toast con el mismo texto y el operador veía
       // dos alertas por el mismo fallo.
-      setError(e instanceof Error ? e.message : "Error al controlar la puerta");
+      setFallo(diagnosticar(e, `enviar la orden a «${confirmDoor?.name || id}»`));
     } finally {
       setBusy(null);
     }
@@ -279,6 +305,17 @@ function IntegraAccessConsole() {
 
   const onlineN = doors.filter((d) => d.online !== false).length;
 
+  /**
+   * De dónde salió el estado que se está leyendo, dicho por el backend y no
+   * deducido del botón. Son las dos únicas fuentes que `listDoors` declara.
+   */
+  const sourceLabel =
+    doorSource === "live"
+      ? "estado consultado al ACS"
+      : doorSource === "mirror"
+        ? "espejo sincronizado"
+        : null;
+
   /** La cámara de la terminal que gobierna esa puerta, si la tiene. */
   const doorCam = useMemo(
     () => (selectedDoor ? cams.find((c) => c.doorIndexCode === selectedDoor.id) || null : null),
@@ -294,7 +331,7 @@ function IntegraAccessConsole() {
     }
     let cancelled = false;
     setDoorFeed(null);
-    void integraApi<{ hls: string | null; audio?: boolean }>(
+    void pedirIntegra<{ hls: string | null; audio?: boolean }>(
       `integra/cameras/${encodeURIComponent(doorCam.id)}/stream${doorCam.hasAudio ? "?audio=1" : ""}`,
       { method: "POST" },
     )
@@ -311,7 +348,7 @@ function IntegraAccessConsole() {
 
   const runAction = (d: Door, type: DoorControlType) => {
     if (!canControl) {
-      setError("Sin permiso para controlar puertas");
+      setFallo(SIN_PERMISO_PUERTAS);
       return;
     }
     setSelectedDoor(d);
@@ -323,7 +360,7 @@ function IntegraAccessConsole() {
     <IgPage>
       <IgToolbar
         title="Accesos"
-        meta={`${activeSiteName ? `${activeSiteName} · ` : ""}${onlineN}/${doors.length} puertas online · ${devices.length} equipos · ${groups.length} grupos`}
+        meta={`${activeSiteName ? `${activeSiteName} · ` : ""}${onlineN}/${doors.length} puertas online · ${devices.length} equipos · ${groups.length} grupos${sourceLabel ? ` · ${sourceLabel}` : ""}`}
         actions={
           <>
             <IgBtn onClick={() => router.push("/integra/espacios")}>Espacios</IgBtn>
@@ -352,9 +389,7 @@ function IntegraAccessConsole() {
           </>
         }
       />
-      {error && (
-        <RetryNotice message={error} onRetry={() => void load()} busy={loading} />
-      )}
+      {fallo && <RetryNotice diag={fallo} onRetry={() => void load()} busy={loading} />}
       {!canControl && (
         <IgNotice tone="warn">
           Modo consulta: esta cuenta no puede abrir ni cerrar puertas.
@@ -764,9 +799,9 @@ function IntegraAccessConsole() {
               disabled={!selectedGroup || selectedPeople.length === 0 || assignBusy}
               onClick={async () => {
                 setAssignBusy(true);
-                setError(null);
+                setFallo(null);
                 try {
-                  await integraApi(
+                  await pedirIntegra(
                     `integra/privilege-groups/${encodeURIComponent(selectedGroup)}/persons`,
                     {
                       method: "POST",
@@ -780,7 +815,7 @@ function IntegraAccessConsole() {
                 } catch (e) {
                   // Igual que en el control de puerta: un solo aviso. El texto
                   // vive arriba, en el panel de error con reintento.
-                  setError(e instanceof Error ? e.message : "No se pudo asignar al grupo");
+                  setFallo(diagnosticar(e, "asignar las personas al grupo"));
                 } finally {
                   setAssignBusy(false);
                 }

@@ -1,8 +1,11 @@
 "use client";
 
+import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import { IgBtn } from "./_Console";
+import type { Diagnostico } from "./_fallosApi";
 import a from "./_access.module.css";
 
 /* ── Estado de puerta ──────────────────────────────────────────────────
@@ -144,26 +147,46 @@ export function RowsSkeleton({ rows = 6 }: { rows?: number }) {
   );
 }
 
-/** Error con reintento — sustituye al par `setError` + `toast.error`. */
+/**
+ * Error con reintento — sustituye al par `setError` + `toast.error`.
+ *
+ * Recibe un `Diagnostico` (de `_fallosApi`), no una cadena suelta: «no tienes
+ * permiso» y «el servidor no responde» son dos problemas distintos con dos
+ * soluciones distintas, y hasta ahora llegaban a la pantalla como el mismo
+ * texto gris. El botón solo aparece cuando reintentar puede arreglarlo: un 403
+ * no cambia por pulsar otra vez, y ofrecerlo es mandar al operador a un bucle.
+ */
 export function RetryNotice({
-  title = "No se pudo cargar",
-  message,
+  diag,
   onRetry,
   busy,
 }: {
-  title?: string;
-  message: string;
+  diag: Diagnostico;
   onRetry: () => void;
   busy?: boolean;
 }) {
+  const Icono = diag.tono === "warn" ? WarningAmberOutlinedIcon : CloudOffOutlinedIcon;
   return (
-    <div className={a.retryBox} role="alert">
-      <p className={a.retryTitle}>{title}</p>
-      <p className={a.retryMsg}>{message}</p>
-      <IgBtn onClick={onRetry} disabled={busy} aria-label="Reintentar la carga">
-        {busy ? "Reintentando…" : "Reintentar"}
-        <RefreshIcon className={a.btnIcon} aria-hidden />
-      </IgBtn>
+    <div className={a.retryBox} role="alert" data-tone={diag.tono}>
+      <p className={a.retryTitle}>
+        <Icono className={a.icon} aria-hidden />
+        {diag.titulo}
+      </p>
+      <p className={a.retryMsg}>{diag.cuerpo}</p>
+      {diag.reintentable ? (
+        <IgBtn onClick={onRetry} disabled={busy} aria-label="Reintentar la carga">
+          {busy ? "Reintentando…" : "Reintentar"}
+          <RefreshIcon className={a.btnIcon} aria-hidden />
+        </IgBtn>
+      ) : null}
     </div>
   );
+}
+
+/**
+ * Diagnóstico para un fallo que no viene de la API: el permiso lo comprobó la
+ * propia pantalla con las capacidades ya cargadas, sin llegar a llamar a nadie.
+ */
+export function diagLocal(titulo: string, cuerpo: string): Diagnostico {
+  return { titulo, cuerpo, tono: "warn", reintentable: false };
 }
