@@ -6,6 +6,19 @@
 
 /* ── Barra de vista: orden + tarjetas/tabla ───────────────────────────── */
 
+/*
+ * Contenedor del directorio. NO desplaza a propósito: el scroll vive en
+ * `.cardGrid` y `.tableWrap`, para que la barra de vista y el contador se
+ * queden arriba mientras la lista corre por debajo. Con el contenedor viejo
+ * —que también tenía `overflow: auto`— salían dos cajas de scroll anidadas y
+ * la barra se iba con el contenido.
+ */
+.directory {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .viewBar {
   display: flex;
   align-items: center;
@@ -93,6 +106,8 @@
 .sortSelect:focus-visible,
 .card:focus-visible,
 .tableRow:focus-visible,
+/* En la tabla el control que se enfoca es este botón: una <tr> no es tabulable. */
+.rowNameBtn:focus-visible,
 .rawToggle:focus-visible,
 .iconBtn:focus-visible,
 .chipReset:focus-visible {

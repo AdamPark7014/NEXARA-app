@@ -301,6 +301,132 @@ export function sortPeople(list: Person[], key: SortKey, now: number = Date.now(
   });
 }
 
+/* ── Filtrado ─────────────────────────────────────────────────────────── */
+
+/**
+ * Lo que el usuario ha pedido ver. Es el mismo objeto que viaja en la URL, así
+ * que filtrar es una función pura de (personas, enlace) → personas: la vista se
+ * puede compartir por chat y se puede probar sin montar React.
+ */
+export type PeopleFilters = {
+  /** Texto libre: nombre, código, id y también los datos del ERP. */
+  q: string;
+  estado: ValidityKey | "";
+  /** `si` = solo con rostro enrolado. `no` = solo sin él. */
+  rostro: "" | "si" | "no";
+  /** `si` = solo las que tienen usuario ERP detrás. */
+  erp: "" | "si" | "no";
+  /** `userType` crudo del terminal (`normal`, `visitor`…). */
+  tipo: string;
+  /** Nombre exacto de una puerta que la persona puede abrir. */
+  puerta: string;
+  /** `orgId` — solo tiene sentido con Artemis detrás. */
+  org: string;
+};
+
+export const EMPTY_FILTERS: PeopleFilters = {
+  q: "",
+  estado: "",
+  rostro: "",
+  erp: "",
+  tipo: "",
+  puerta: "",
+  org: "",
+};
+
+/**
+ * Datos del usuario ERP que entran en la búsqueda. Se define por forma y no
+ * importando `ApiUserRow` para que este módulo siga sin depender del cliente
+ * HTTP y se pueda probar en aislamiento.
+ */
+export type ErpLink = {
+  nombre?: string;
+  email?: string;
+  role?: { nombre?: string } | null;
+} | null;
+
+/** Puertas de una persona, ya resueltas a nombre por el sync. */
+export function personDoors(p: Person): string[] {
+  return p.doorNames?.filter((d) => Boolean(d && d.trim())) ?? [];
+}
+
+/** Todo el texto por el que se puede encontrar a alguien, en minúsculas. */
+function haystack(p: Person, erp: ErpLink): string {
+  return [
+    p.name,
+    p.code,
+    p.id,
+    p.orgName,
+    erp?.nombre,
+    erp?.email,
+    erp?.role?.nombre,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+export function personMatches(
+  p: Person,
+  f: PeopleFilters,
+  erp: ErpLink,
+  now: number = Date.now(),
+): boolean {
+  if (f.org && p.orgId !== f.org) return false;
+  if (f.estado && describeValidity(p, now).key !== f.estado) return false;
+
+  if (f.rostro) {
+    const tiene = faceOn(p);
+    if (f.rostro === "si" && !tiene) return false;
+    if (f.rostro === "no" && tiene) return false;
+  }
+
+  if (f.erp) {
+    if (f.erp === "si" && !erp) return false;
+    if (f.erp === "no" && erp) return false;
+  }
+
+  // El tipo se compara sin distinguir mayúsculas: el terminal devuelve
+  // `blackList` y el catálogo de Hikvision lo documenta como `blacklist`.
+  if (f.tipo && String(p.userType || "").toLowerCase() !== f.tipo.toLowerCase()) return false;
+
+  if (f.puerta && !personDoors(p).includes(f.puerta)) return false;
+
+  const q = f.q.trim().toLowerCase();
+  if (!q) return true;
+  return haystack(p, erp).includes(q);
+}
+
+export function filterPeople(
+  list: Person[],
+  f: PeopleFilters,
+  erpOf: (p: Person) => ErpLink,
+  now: number = Date.now(),
+): Person[] {
+  return list.filter((p) => personMatches(p, f, erpOf(p), now));
+}
+
+/** Tipos de usuario presentes de verdad en el directorio, ya con su etiqueta. */
+export function userTypeOptions(list: Person[]): Array<{ value: string; label: string }> {
+  const vistos = new Map<string, string>();
+  for (const p of list) {
+    const raw = String(p.userType || "").trim();
+    if (!raw) continue;
+    const clave = raw.toLowerCase();
+    if (!vistos.has(clave)) vistos.set(clave, raw);
+  }
+  return [...vistos.entries()]
+    .map(([value, raw]) => ({ value, label: userTypeLabel(raw) }))
+    .sort((a, b) => a.label.localeCompare(b.label, "es"));
+}
+
+/** Puertas que aparecen en el directorio. Filtrar por «quién abre esta puerta». */
+export function doorOptions(list: Person[]): string[] {
+  const vistas = new Set<string>();
+  for (const p of list) for (const d of personDoors(p)) vistas.add(d);
+  return [...vistas].sort((a, b) => a.localeCompare(b, "es"));
+}
+
 /* ── Errores ──────────────────────────────────────────────────────────── */
 
 export type ErrorKind =
