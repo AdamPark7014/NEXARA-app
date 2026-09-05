@@ -24,7 +24,7 @@ import {
   type UserInfoWrite,
 } from '../hikvision-isapi/index';
 import { IntegraSiteService } from './integra-site.service';
-import { IntegraMediaService } from './integra-media.service';
+import { IntegraMediaService, type StreamQuality } from './integra-media.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraPortfolioService } from './integra-portfolio.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
@@ -480,7 +480,7 @@ export class IntegraArtemisService {
     companyId: number | null,
     cameraIndexCode: string,
     siteId?: number | null,
-    opts?: { audio?: boolean },
+    opts?: { audio?: boolean; quality?: StreamQuality },
   ) {
     return this.media.liveStream(companyId, cameraIndexCode, siteId, opts);
   }

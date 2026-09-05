@@ -1,0 +1,148 @@
+/*
+ * Estilos del relevo de calidad. Van en su propio módulo a propósito:
+ * `integra.module.css` lo está tocando otro agente en esta misma rama.
+ *
+ * Las variables `--ig-*` son propiedades personalizadas y se heredan, así que
+ * el aspecto sigue siendo el del panel sin duplicar ni un color.
+ */
+
+/*
+ * La pila sostiene los dos reproductores a la vez. Es la pieza que hace posible
+ * que no haya corte: el secundario sigue pintando en su capa mientras el
+ * principal negocia en la de al lado, invisible.
+ */
+.pila {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.capa {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/*
+ * Exactamente una capa lleva `data-flujo`: es la que da altura a la pila.
+ *
+ * Hace falta porque el reproductor se coloca distinto según dónde esté. En
+ * Foco, `.playerShell` va en flujo con `aspect-ratio: 16/9` y es él quien
+ * define la altura; en un mosaico del muro va `position:absolute; inset:0` y la
+ * altura viene de la celda. `height:100%` resuelve bien los dos casos: contra
+ * una celda con altura real da esa altura, y contra un contenedor de altura
+ * automática se colapsa a `auto` y manda el contenido.
+ */
+.capa[data-flujo="1"] {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * Capa oculta. `opacity` y no `visibility` ni `display`: el `<video>` tiene que
+ * seguir decodificando mientras espera su primer fotograma — es lo único que
+ * estamos esperando— y además debe seguir intersecando para que su
+ * `IntersectionObserver` no lo dé por fuera de pantalla.
+ */
+.capa[data-oculta="1"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.capa[data-encima="1"] {
+  z-index: 2;
+}
+
+/* ── Indicador de calidad ─────────────────────────────────────────── */
+
+/*
+ * Discreto y arriba a la derecha: el badge LIVE ya ocupa la izquierda.
+ * Sin esto el operador no tiene forma de saber por qué una cámara se ve mejor
+ * que la de al lado.
+ */
+.chip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--ig-video-fg, #fff) 22%, transparent);
+  border-radius: var(--ig-radius, 8px);
+  background: color-mix(in srgb, var(--ig-video-bg, #000) 70%, transparent);
+  color: var(--ig-video-fg, #fff);
+  font-size: var(--ig-fs-micro, 11px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.chip[data-compact="1"] {
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+}
+
+/* Alta calidad puesta: el único estado que se destaca. */
+.chip[data-alta="1"] {
+  border-color: color-mix(in srgb, var(--ig-ok, #3fb950) 55%, transparent);
+  color: var(--ig-video-fg, #fff);
+}
+
+/* El principal está negociando por detrás; el secundario sigue en pantalla. */
+.punto {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ig-video-fg, #fff) 55%, transparent);
+}
+
+.chip[data-alta="1"] .punto {
+  background: var(--ig-ok, #3fb950);
+}
+
+.chip[data-subiendo="1"] .punto {
+  animation: pulsoCalidad 1.2s ease-in-out infinite;
+}
+
+@keyframes pulsoCalidad {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip[data-subiendo="1"] .punto {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/*
+ * El motivo de la degradación dentro del propio indicador. No es un error, así
+ * que no grita: es la explicación de por qué esta cámara se queda en 640 px.
+ * En peso normal y algo apagado, para que la etiqueta siga leyéndose primero.
+ */
+.motivoChip {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--ig-video-fg, #fff) 72%, transparent);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* En un mosaico pequeño no cabe la explicación; la etiqueta sí. */
+.chip[data-compact="1"] .motivoChip {
+  display: none;
+}

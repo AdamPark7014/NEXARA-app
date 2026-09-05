@@ -1,9 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import styles from "./integra.module.css";
+import q from "./_quality.module.css";
+import {
+  HD_FIRST_FRAME_TIMEOUT_MS,
+  RELEVO_INICIAL,
+  SUB_RELEASE_AFTER_SWAP_MS,
+  etiquetaCalidad,
+  reducirRelevo,
+  textoCortoSinHd,
+  textoSinHd,
+  type MotivoSinHd,
+  type VideoSize,
+} from "./_quality";
 
 type StreamMode = "mse" | "mjpeg" | "auto";
+
+/**
+ * Oferta de alta calidad para ESTE cuadro, ya negociada por la página.
+ *
+ * La página decide a quién le toca —como máximo una cámara— y habla con la API;
+ * el reproductor solo se encarga de que el cambio no se vea. Si `src` es `null`
+ * no hay principal que valga y `motivo` dice por qué, que es lo que se le
+ * enseña al operador.
+ */
+export type HdOffer = {
+  /** Fuente HLS del canal principal, distinta de la del secundario. */
+  src: string | null;
+  /** Se está pidiendo ahora mismo. */
+  pidiendo: boolean;
+  /** Por qué no hay alta calidad, cuando no la hay. */
+  motivo: MotivoSinHd | null;
+  /** Detalle del backend, p. ej. «el principal va en H.265». */
+  detalle: string | null;
+};
 
 type Props = {
   /** URL HLS que devuelve la API. De ella se deriva WS / frame.jpeg. */
@@ -35,9 +66,29 @@ type Props = {
    * y en cuanto uno llega a `live` admite al siguiente de la cola.
    */
   onStateChange?: (state: PlayerState) => void;
+  /**
+   * Oferta de alta calidad. Con ella el cuadro pasa a mejora progresiva:
+   * arranca con el secundario —que ya está caliente— y sube al principal sin
+   * corte cuando ese entrega imagen. Sin ella se comporta exactamente como
+   * antes, que es lo que hace el muro.
+   */
+  hd?: HdOffer | null;
 };
 
-export type PlayerState = "idle" | "queued" | "loading" | "live" | "snapshot" | "error";
+/**
+ * `offscreen` no es un estado del stream, es del cuadro: está fuera del
+ * viewport y su `IntersectionObserver` no lo deja arrancar. Se reporta aparte
+ * de `queued` porque el control de admisión del muro necesita distinguirlos —un
+ * cuadro invisible no debe ocupar turno de conexión, y antes lo ocupaba—.
+ */
+export type PlayerState =
+  | "idle"
+  | "queued"
+  | "offscreen"
+  | "loading"
+  | "live"
+  | "snapshot"
+  | "error";
 
 /**
  * Espera mínima entre fotogramas del respaldo, ya recibido el anterior. Es un
@@ -179,7 +230,9 @@ function SnapshotWallPlayer({
 
   // Hacia fuera esto NO es «live»: es un JPEG por segundo. Llamarlo live es lo
   // que hacía que un respaldo a 0,9 fps se leyera como «el video se traba».
-  useReportState(state === "live" ? "snapshot" : state, onStateChange);
+  // Y si el cuadro está fuera de pantalla se dice, para que no ocupe turno de
+  // conexión en el muro esperando algo que no va a pasar.
+  useReportState(!visible ? "offscreen" : state === "live" ? "snapshot" : state, onStateChange);
 
   const parsed = src ? parseHls(src) : null;
 
@@ -309,8 +362,17 @@ function MseFocusPlayer({
   enabled = true,
   audio = false,
   onLive,
+  onSize,
   onStateChange,
-}: ShellProps & { onLive?: (live: boolean) => void }) {
+}: ShellProps & {
+  /**
+   * Primer fotograma pintado. El segundo argumento trae las dimensiones reales
+   * del `<video>`, que es lo único honesto para decir si esto es SD o HD.
+   */
+  onLive?: (live: boolean, size?: VideoSize | null) => void;
+  /** Las dimensiones cambiaron (o llegaron tarde). */
+  onSize?: (size: VideoSize) => void;
+}) {
   const shellRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const nodeRef = useRef<VideoStreamEl | null>(null);
@@ -321,7 +383,14 @@ function MseFocusPlayer({
     src ? (enabled ? "loading" : "queued") : "idle",
   );
 
-  useReportState(state, onStateChange);
+  useReportState(!visible ? "offscreen" : state, onStateChange);
+
+  // Las dimensiones reales del `<video>` viajan por un ref para no meter otra
+  // dependencia en el efecto de montaje, que es el que no hay que despertar.
+  const onLiveRef = useRef(onLive);
+  onLiveRef.current = onLive;
+  const onSizeRef = useRef(onSize);
+  onSizeRef.current = onSize;
 
   // El turno de arranque solo se lee al montar. Si fuera dependencia del efecto,
   // quitar un mosaico del muro reindexaría el turno de todos los siguientes y
@@ -372,6 +441,8 @@ function MseFocusPlayer({
     let stuckTimer: number | null = null;
     let kickTimers: number[] = [];
     let sawLive = false;
+    let lastW = 0;
+    let lastH = 0;
     setState("loading");
 
     const timer = window.setTimeout(() => {
@@ -415,10 +486,22 @@ function MseFocusPlayer({
             if (!v) return;
             if (v.paused || v.ended) kickPlay(node);
             if (v.readyState >= 2 && !v.paused) {
+              const size =
+                v.videoWidth > 0 && v.videoHeight > 0
+                  ? { width: v.videoWidth, height: v.videoHeight }
+                  : null;
               if (!sawLive) {
                 sawLive = true;
                 setState("live");
-                onLive?.(true);
+                onLiveRef.current?.(true, size);
+              }
+              // Las dimensiones pueden llegar un ciclo más tarde que el primer
+              // fotograma. Se vigilan igual porque de ellas sale la etiqueta de
+              // calidad, y una etiqueta que miente es peor que ninguna.
+              if (size && (size.width !== lastW || size.height !== lastH)) {
+                lastW = size.width;
+                lastH = size.height;
+                onSizeRef.current?.(size);
               }
             }
           }, 500);
@@ -565,11 +648,139 @@ function AutoPlayer(props: ShellProps) {
   return <MseFocusPlayer {...props} onLive={setLive} />;
 }
 
-export function IntegraLivePlayer({ mode = "mse", ...rest }: Props) {
+/**
+ * Mejora progresiva de calidad, que es lo que quita a la vez la espera y el
+ * pixelado al abrir una cámara.
+ *
+ * Antes, abrir Foco cerraba el stream del muro y abría otro: se pagaba el
+ * handshake RTSP entero —0,7 a 2,5 s con RTT de 87 ms— y durante ese rato el
+ * cuadro estaba en negro. Aquí no se cierra nada:
+ *
+ * 1. Se arranca con **el mismo stream del muro**, que ya está caliente en
+ *    go2rtc. Primer fotograma inmediato, sin handshake nuevo.
+ * 2. En paralelo, y en su propia capa invisible, se monta el canal principal.
+ * 3. Cuando el principal entrega su primer fotograma se cambia de capa. React
+ *    aplica opacidad y desmontaje en el mismo commit, así que no hay parpadeo.
+ * 4. Si el principal no llega nunca —H.265, error, timeout— se retira él y el
+ *    secundario sigue donde estaba. **Nunca se queda peor que antes.**
+ *
+ * La regla que sostiene el punto 4 está en `reducirRelevo`, con pruebas: el
+ * `<video-stream>` del secundario no se desmonta hasta que el principal está
+ * pintando de verdad.
+ */
+function ProgressiveQualityPlayer({ hd, ...base }: ShellProps & { hd: HdOffer }) {
+  const [relevo, despachar] = useReducer(reducirRelevo, RELEVO_INICIAL);
+  const [subSize, setSubSize] = useState<VideoSize | null>(null);
+  const [hdSize, setHdSize] = useState<VideoSize | null>(null);
+
+  const hdSrc = hd.src;
+  const baseSrc = base.src;
+
+  // Cambiar de cámara reinicia el relevo entero: la suerte de una no se hereda.
+  useEffect(() => {
+    despachar({ t: "reinicio" });
+    setSubSize(null);
+    setHdSize(null);
+  }, [baseSrc]);
+
+  // La página ofrece o retira el principal. `baseSrc` va en las dependencias
+  // porque el reinicio de arriba corre en el mismo commit y hay que volver a
+  // ofrecer lo que siga vigente.
+  useEffect(() => {
+    if (hdSrc) despachar({ t: "hd-ofrecido" });
+    else despachar({ t: "hd-retirado", motivo: hd.motivo });
+  }, [hdSrc, hd.motivo, baseSrc]);
+
+  // Rendición por tiempo. No cuesta imagen —el secundario nunca se soltó— pero
+  // libera la segunda sesión RTSP contra el NVR, que es el recurso escaso.
+  useEffect(() => {
+    if (!hdSrc || !relevo.hdMontado || relevo.hdVisible) return;
+    const t = window.setTimeout(() => despachar({ t: "hd-timeout" }), HD_FIRST_FRAME_TIMEOUT_MS);
+    return () => window.clearTimeout(t);
+  }, [hdSrc, relevo.hdMontado, relevo.hdVisible]);
+
+  // Ya cambiada la capa, el secundario aguanta un momento más como red y luego
+  // se suelta: dos sesiones abiertas para siempre sí serían un problema.
+  useEffect(() => {
+    if (!relevo.hdVisible || !relevo.subMontado) return;
+    const t = window.setTimeout(() => despachar({ t: "sub-liberado" }), SUB_RELEASE_AFTER_SWAP_MS);
+    return () => window.clearTimeout(t);
+  }, [relevo.hdVisible, relevo.subMontado]);
+
+  const alta = relevo.hdVisible;
+  const size = alta ? hdSize ?? subSize : subSize;
+  const etiqueta = etiquetaCalidad(size);
+  const subiendo = Boolean(hd.pidiendo || (relevo.hdMontado && !relevo.hdVisible));
+  const motivoCorto = alta ? null : textoCortoSinHd(relevo.motivo, hd.detalle);
+  const motivoLargo = alta ? null : textoSinHd(relevo.motivo, hd.detalle);
+
+  const marcarHd = (s?: VideoSize | null) => {
+    if (!s || s.width <= 0) return;
+    setHdSize(s);
+    despachar({ t: "hd-fotograma" });
+  };
+
+  return (
+    <div className={q.pila} data-compact={base.compact ? "1" : undefined}>
+      {relevo.subMontado && (
+        <div className={q.capa} data-flujo="1">
+          <MseFocusPlayer
+            {...base}
+            onStateChange={alta ? undefined : base.onStateChange}
+            onLive={(_live, s) => {
+              if (s) setSubSize(s);
+            }}
+            onSize={setSubSize}
+          />
+        </div>
+      )}
+      {relevo.hdMontado && hdSrc && (
+        <div
+          className={q.capa}
+          data-flujo={relevo.subMontado ? undefined : "1"}
+          data-encima="1"
+          data-oculta={alta ? undefined : "1"}
+        >
+          <MseFocusPlayer
+            {...base}
+            src={hdSrc}
+            // Mientras negocia por detrás no debe anunciar nada: el badge que
+            // se ve es el de la capa que está pintando.
+            showLiveBadge={alta ? base.showLiveBadge : false}
+            onStateChange={(st) => {
+              if (st === "error") despachar({ t: "hd-error" });
+              if (alta) base.onStateChange?.(st);
+            }}
+            onLive={(_live, s) => marcarHd(s)}
+            onSize={marcarHd}
+          />
+        </div>
+      )}
+      {etiqueta && (
+        <span
+          className={q.chip}
+          data-alta={alta ? "1" : undefined}
+          data-subiendo={subiendo ? "1" : undefined}
+          data-compact={base.compact ? "1" : undefined}
+          aria-label={motivoLargo ? `${etiqueta}. ${motivoLargo}` : etiqueta}
+        >
+          <span className={q.punto} />
+          {etiqueta}
+          {motivoCorto && <span className={q.motivoChip}>· {motivoCorto}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function IntegraLivePlayer({ mode = "mse", hd, ...rest }: Props) {
   if (mode === "mjpeg") {
     const { audio: _audio, ...wall } = rest;
     return <SnapshotWallPlayer {...wall} />;
   }
+  // Con oferta de alta calidad el cuadro pasa a mejora progresiva. Sin ella —el
+  // caso del muro— el camino es exactamente el de antes, byte por byte.
+  if (hd) return <ProgressiveQualityPlayer {...rest} hd={hd} />;
   if (mode === "auto") return <AutoPlayer {...rest} />;
   return <MseFocusPlayer {...rest} />;
 }
