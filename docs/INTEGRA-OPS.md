@@ -165,10 +165,46 @@ su credencial embebida — porque así es como go2rtc guarda un RTSP autenticado
 Restringir la ruta de Traefik a lo que el navegador de verdad usa, y bloquear el
 resto:
 
-- Permitir: `/go2rtc/video-stream.js`, `/go2rtc/video-rtc.js`,
-  `/go2rtc/api/ws`, `/go2rtc/api/frame.jpeg`, `/go2rtc/api/stream.m3u8`.
-- Bloquear: todo lo demás bajo `/go2rtc`, en particular `/api/streams` y
-  `/api/config`.
+El cambio exacto en `deploy/traefik/nexara.yml`, listo para aplicar. La regla
+actual del router `integra-go2rtc` es:
+
+```yaml
+      rule: 'Host(`integra.nexara.com.mx`) && PathPrefix(`/go2rtc`)'
+```
+
+Y pasa a enumerar lo que el navegador de verdad usa. `Path()` compara la ruta
+exacta e ignora la cadena de consulta, así que `?src=camara` sigue funcionando:
+
+```yaml
+      rule: >-
+        Host(`integra.nexara.com.mx`) && (
+        Path(`/go2rtc/video-stream.js`) ||
+        Path(`/go2rtc/video-rtc.js`) ||
+        Path(`/go2rtc/api/ws`) ||
+        Path(`/go2rtc/api/frame.jpeg`) ||
+        Path(`/go2rtc/api/stream.m3u8`) ||
+        Path(`/go2rtc/api/stream.mp4`) )
+```
+
+Todo lo que no esté en esa lista deja de enrutarse y devuelve 404, incluidos
+`/api/streams` y `/api/config`, que son los que filtran las credenciales.
+
+**Comprobación después de aplicar** — las dos primeras deben dar 404 y las dos
+últimas seguir vivas, y hay que abrir el muro para confirmar que se ve:
+
+```
+curl -s -o /dev/null -w "%{http_code}
+" https://integra.nexara.com.mx/go2rtc/api/streams
+curl -s -o /dev/null -w "%{http_code}
+" https://integra.nexara.com.mx/go2rtc/api/config
+curl -s -o /dev/null -w "%{http_code}
+" https://integra.nexara.com.mx/go2rtc/video-stream.js
+curl -s -o /dev/null -w "%{http_code}
+" "https://integra.nexara.com.mx/go2rtc/api/frame.jpeg?src=cam_192_168_9_34_301"
+```
+
+Traefik relee el fichero dinámico solo, sin reiniciar. Si el muro dejara de
+verse, revertir es volver a poner la regla de una línea.
 
 No basta con poner usuario y contraseña a la API de go2rtc: el navegador entra
 por esas mismas rutas y se quedaría sin video. La separación tiene que ser por
