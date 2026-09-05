@@ -1,4 +1,7 @@
 import type { NormalizedEvent } from './integra-push.service';
+import { ACS_MAJOR_DEVICE, acsCodeLabel } from './integra-acs-codes';
+import { cameraFaultLabel } from './integra-acs-alarms.policy';
+import { isCameraHealthEventType } from '../hikvision-isapi/isapi.detection';
 
 /**
  * Traduce lo que manda un equipo Hikvision a un evento nuestro.
@@ -70,22 +73,35 @@ function when(v: unknown): Date {
   return d;
 }
 
-/** Etiqueta legible de un evento de control de acceso (major/minor Hikvision). */
+/**
+ * Etiqueta legible de un evento de control de acceso.
+ *
+ * Esta función era la CUARTA copia del mapa de códigos, y estaba mal como las
+ * otras tres: llamaba «Acceso concedido (salida)» al `76` —que es un fallo de
+ * reconocimiento facial— y «Acceso denegado» a los `21/22/23/24`, que son la
+ * puerta abriéndose y el botón de salida. Esa etiqueta es la que se persiste
+ * en `label` y la que lee el operador en la consola.
+ *
+ * Ahora delega en `integra-acs-codes.ts`, que es la única fuente. Aquí solo
+ * quedan los `major` que ese catálogo todavía no cubre.
+ */
 export function acsLabel(major: number | null, minor: number | null): string {
-  if (major === 5) {
-    if (minor === 75 || minor === 1) return 'Acceso concedido';
-    if (minor === 76) return 'Acceso concedido (salida)';
-    if (minor === 21 || minor === 22 || minor === 23 || minor === 24) return 'Acceso denegado';
-    return `Autenticación ${minor}`;
-  }
+  if (major === ACS_MAJOR_DEVICE) return acsCodeLabel(major, minor);
   if (major === 1) return `Alarma ${minor}`;
   if (major === 2) return `Puerta ${minor}`;
   if (major === 3) return `Excepción ${minor}`;
   return `Evento ${major}.${minor}`;
 }
 
-/** Etiqueta de un evento de cámara. */
+/**
+ * Etiqueta de un evento de cámara.
+ *
+ * Las tres de salud —tapada, desenfocada, movida— salen de
+ * `cameraFaultLabel`, que es la misma que se pinta en el título de la alarma
+ * SOC. Un evento y su alarma no pueden llamarse distinto en dos pantallas.
+ */
 function camLabel(eventType: string): string {
+  if (isCameraHealthEventType(eventType)) return cameraFaultLabel(eventType);
   switch (eventType) {
     case 'linedetection':
       return 'Cruce de línea';
@@ -96,7 +112,6 @@ function camLabel(eventType: string): string {
     case 'VMD':
       return 'Movimiento';
     case 'tamper':
-    case 'shelteralarm':
       return 'Cámara manipulada';
     case 'videoloss':
       return 'Pérdida de video';

@@ -9,6 +9,8 @@ import {
   ACS_EXIT_MINORS,
   acsOpsDirection,
 } from './acs-ops-bridge.match';
+import { classifyAcsMinor, isAcsDoorAlarm } from './integra-acs-codes';
+import { classifyCameraForAlarm } from './integra-acs-alarms.policy';
 import { deviceMatchesDoorScope } from './access-schedule-defaults';
 
 export type AcsDoorRole = 'general' | 'meeting' | 'restricted' | 'other';
@@ -20,7 +22,15 @@ export type AcsBusinessRoute =
   | 'employee_exit'
   | 'presence_clear'
   | 'visitor_arrived'
+  /**
+   * Cola SOC de control de acceso. Se llama `denied_alarm` por historia: hoy
+   * lleva además puerta forzada, puerta mantenida abierta y las ráfagas de
+   * fallo de reconocimiento. Quién decide si hay alarma es
+   * `classifyPushForAlarm`; esta ruta solo dice «esto va a la cola».
+   */
   | 'denied_alarm'
+  /** Salud de cámara: tapada, desenfocada o movida. No es control de acceso. */
+  | 'camera_alarm'
   | 'meeting_usage'
   | 'restricted_audit'
   | 'first_access_host'
@@ -100,6 +110,12 @@ export const ACS_BUSINESS_MATRIX = [
     condicion: 'Acceso General → OT del día',
     destino: 'AcsOpsBridgeService (no duplicar aquí)',
   },
+  {
+    id: 'camera_alarm' as const,
+    caso: 'Salud de cámara',
+    condicion: 'shelteralarm / defocus / scenechangedetection',
+    destino: 'Cola SOC (tapada · desenfocada · movida)',
+  },
 ] as const;
 
 export function classifyDoorRole(device: {
@@ -134,6 +150,22 @@ export function decideAcsRoutes(ev: AcsRouteEvent): AcsRouteDecision {
   const routes: AcsBusinessRoute[] = [];
 
   if (ev.eventType && ev.eventType !== 'AccessControllerEvent') {
+    // Aquí moría todo lo óptico. Un `shelteralarm` —la cámara tapada— salía por
+    // esta puerta con `not_acs` y no llegaba a ninguna regla de negocio.
+    //
+    // Se abre SOLO para los tres avisos de salud de cámara. Las detecciones
+    // normales (`fielddetection` a todas horas, `VMD`, `linedetection`) siguen
+    // saliendo por aquí a propósito: meterlas en la cola SOC sería sustituir un
+    // KPI inútil por otro.
+    if (classifyCameraForAlarm(ev.eventType)) {
+      return {
+        doorRole: 'other',
+        personKind: 'unknown',
+        direction: null,
+        routes: ['camera_alarm'],
+        reasons: ['camera_health'],
+      };
+    }
     return {
       doorRole: 'other',
       personKind: 'unknown',
@@ -150,6 +182,33 @@ export function decideAcsRoutes(ev: AcsRouteEvent): AcsRouteDecision {
     hasErpLink: ev.hasErpLink,
     doorRole,
   });
+
+  // Incidente de puerta: no hay credencial ni persona a la que atribuirlo, así
+  // que no toca ni asistencia ni presencia. Va derecho a la cola SOC.
+  // `acsOpsDirection` devuelve `null` para estos minor, y antes eso los dejaba
+  // en `unknown_minor`: llegaban a la cola solo de rebote, por el repesque de
+  // AFTER_HOURS del servicio. Ahora es explícito y se ve en `listRecent`.
+  if (isAcsDoorAlarm(ev.major, ev.minor)) {
+    return {
+      doorRole,
+      personKind,
+      direction: null,
+      routes: ['denied_alarm'],
+      reasons: ['door_alarm'],
+    };
+  }
+
+  // Fallo de reconocimiento: NO es una denegación. Se manda a la cola para que
+  // la política mire si es una ráfaga; un fallo suelto no abre nada.
+  if (classifyAcsMinor(ev.major, ev.minor).kind === 'auth_failed') {
+    return {
+      doorRole,
+      personKind,
+      direction: null,
+      routes: ['denied_alarm'],
+      reasons: ['auth_failed'],
+    };
+  }
 
   if (!direction) {
     return { doorRole, personKind, direction: null, routes: [], reasons: ['unknown_minor'] };

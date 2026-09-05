@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AcsOpsBridgeService, type AcsOpsEventInput } from './acs-ops-bridge.service';
 import { IntegraAcsAlarmsService } from './integra-acs-alarms.service';
+import { classifyCameraForAlarm } from './integra-acs-alarms.policy';
 import {
   ACS_BUSINESS_MATRIX,
   decideAcsRoutes,
@@ -69,7 +70,8 @@ export class IntegraEventRouterService {
         ACS_OPS_BRIDGE: this.acsOps.enabled() ? '1' : '0',
       },
       note:
-        'ops_activity + denied_alarm son E2E desde push. Resto: stub/audit (sin nómina).',
+        'ops_activity + denied_alarm + camera_alarm son E2E desde push. ' +
+        'Resto: stub/audit (sin nómina).',
     };
   }
 
@@ -90,19 +92,29 @@ export class IntegraEventRouterService {
    */
   async onPushEvent(
     site: { id: number; companyId: number },
-    ev: AcsOpsEventInput & { deviceIp?: string | null },
+    ev: AcsOpsEventInput & {
+      deviceIp?: string | null;
+      /** Repeticiones que declara el equipo (Apéndice A.49), si las declara. */
+      activePostCount?: number | null;
+    },
     opts?: { pushEventId?: number | null; photoPath?: string | null },
   ): Promise<EventRouterResult> {
     const at = new Date().toISOString();
     if (!this.enabled()) {
       return { skipped: true, reason: 'router_off', decision: null, dispatches: [], at };
     }
-    if (ev.eventType !== 'AccessControllerEvent' || ev.major !== 5) {
+    const isAcs = ev.eventType === 'AccessControllerEvent' && ev.major === 5;
+    // El muro donde moría todo lo óptico. Ahora pasan también los tres avisos
+    // de salud de cámara; el resto de detecciones sigue sin entrar.
+    const isCameraHealth = Boolean(classifyCameraForAlarm(ev.eventType));
+    if (!isAcs && !isCameraHealth) {
       return { skipped: true, reason: 'not_acs', decision: null, dispatches: [], at };
     }
 
     try {
-      const hasErpLink = await this.resolveHasErpLink(site.companyId, ev.personId);
+      const hasErpLink = isAcs
+        ? await this.resolveHasErpLink(site.companyId, ev.personId)
+        : false;
       const ctx: AcsRouteEvent = {
         eventType: ev.eventType,
         major: ev.major,
@@ -131,7 +143,9 @@ export class IntegraEventRouterService {
       }
 
       // AFTER_HOURS: classifyPushForAlarm también aplica en entradas concedidas.
-      if (!alarmAttempted && opts?.pushEventId) {
+      // Solo para ACS: un evento de cámara ya despachó su `camera_alarm` y
+      // repescarlo por aquí lo metería en la cola dos veces.
+      if (isAcs && !alarmAttempted && opts?.pushEventId) {
         dispatches.push(
           await this.dispatch('denied_alarm', site, ev, opts, decision).catch((e) => ({
             route: 'denied_alarm' as const,
@@ -168,7 +182,10 @@ export class IntegraEventRouterService {
   private async dispatch(
     route: AcsBusinessRoute,
     site: { id: number; companyId: number },
-    ev: AcsOpsEventInput & { deviceIp?: string | null },
+    ev: AcsOpsEventInput & {
+      deviceIp?: string | null;
+      activePostCount?: number | null;
+    },
     opts: { pushEventId?: number | null; photoPath?: string | null } | undefined,
     decision: AcsRouteDecision,
   ): Promise<EventRouterDispatch> {
@@ -200,6 +217,28 @@ export class IntegraEventRouterService {
           personId: ev.personId,
           personName: ev.personName,
           doorNo: ev.doorNo,
+          deviceIp: ev.deviceIp,
+          deviceName: ev.deviceName,
+          photoPath: opts.photoPath,
+          activePostCount: ev.activePostCount,
+        });
+        return {
+          route,
+          handled: Boolean(r),
+          reason: r ? (r.escalated ? 'alarm_escalated' : 'alarm_open') : 'not_alarmable',
+          detail: r,
+        };
+      }
+      case 'camera_alarm': {
+        if (!opts?.pushEventId) {
+          return { route, handled: false, reason: 'sin_push_event_id' };
+        }
+        const r = await this.alarms.onCameraEvent({
+          companyId: site.companyId,
+          siteId: site.id,
+          pushEventId: opts.pushEventId,
+          eventType: ev.eventType,
+          occurredAt: ev.occurredAt,
           deviceIp: ev.deviceIp,
           deviceName: ev.deviceName,
           photoPath: opts.photoPath,

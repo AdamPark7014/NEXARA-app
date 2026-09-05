@@ -55,9 +55,55 @@ export const SMART_EVENT_TYPES = [
   'facedetection',
   'VMD',
   'videoloss',
+  // — Salud de la propia cámara. Ver `CAMERA_HEALTH_EVENT_TYPES` abajo.
+  'shelteralarm',
+  'defocus',
+  'scenechangedetection',
 ] as const;
 
 export type SmartEventType = (typeof SMART_EVENT_TYPES)[number];
+
+/**
+ * **El sistema se vigila a sí mismo.**
+ *
+ * Estos tres no detectan a nadie: detectan que la cámara ha dejado de servir.
+ *
+ * - `shelteralarm` — el objetivo está **tapado** (una bolsa, pintura, una mano).
+ * - `defocus` — la imagen se ha ido de foco (alguien giró el anillo, o el
+ *   enfoque automático se perdió).
+ * - `scenechangedetection` — el encuadre ya no es el que se configuró: **la
+ *   movieron**. Las zonas de detección apuntan entonces a otro sitio, así que
+ *   este evento invalida en silencio todo lo demás que hace la cámara.
+ *
+ * Los tres están en el Apéndice B (catálogo de abajo), así que no hay nada
+ * inventado. Entran en la base y no en «lo que amplía un perfil» porque no son
+ * una preferencia del cliente: una cámara tapada es una cámara tapada en las
+ * dieciséis.
+ *
+ * **Encenderlos no escribe nada nuevo en el equipo.**
+ * `ensureSmartEventTriggersCenter` solo marca `notificationMethod = center` en
+ * los `EventTrigger` que el equipo YA declara. Si un firmware no soporta
+ * `defocus`, no hay `EventTrigger` con ese `eventType` y no pasa nada: no se
+ * crea, no se inventa un tag y la cámara queda igual que estaba.
+ *
+ * **Sin observación en campo todavía.** `camLabel` de `integra-push.parse.ts`
+ * llevaba desde el principio la etiqueta de `shelteralarm` y era código muerto:
+ * el tipo nunca llegaba porque nadie lo había cableado a `center`.
+ */
+export const CAMERA_HEALTH_EVENT_TYPES = [
+  'shelteralarm',
+  'defocus',
+  'scenechangedetection',
+] as const;
+
+export type CameraHealthEventType = (typeof CAMERA_HEALTH_EVENT_TYPES)[number];
+
+/** ¿Es uno de los tres avisos de salud de cámara? Insensible a la caja. */
+export function isCameraHealthEventType(v: unknown): v is CameraHealthEventType {
+  if (typeof v !== 'string') return false;
+  const k = v.trim().toLowerCase();
+  return CAMERA_HEALTH_EVENT_TYPES.some((t) => t.toLowerCase() === k);
+}
 
 /**
  * Catálogo **documentado** del Apéndice B («Event Types») del

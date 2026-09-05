@@ -1,9 +1,11 @@
 import {
   APPENDIX_B_EVENT_TYPES,
+  CAMERA_HEALTH_EVENT_TYPES,
   DEFAULT_SENSITIVITY,
   MAX_DETECTION_REGIONS,
   SMART_EVENT_TYPES,
   clampSensitivity,
+  isCameraHealthEventType,
   parseSmartCapabilities,
   patchFieldDetectionXml,
   patchLineDetectionXml,
@@ -349,19 +351,48 @@ describe('resolveTuning', () => {
 });
 
 describe('lista blanca de eventos', () => {
-  it('la base son los cinco que el sistema cablea hoy', () => {
-    expect([...SMART_EVENT_TYPES]).toEqual([
+  /**
+   * Esta prueba decía «los cinco» con la lista escrita a mano. Eran cinco de
+   * detección; ahora son ocho porque se suman los tres avisos de salud de la
+   * propia cámara (tapada, desenfocada, movida). Se reescribe en dos partes
+   * —las de detección siguen igual y en el mismo orden, y las de salud existen—
+   * para que ampliar el catálogo no obligue a reescribir la prueba otra vez,
+   * pero cambiar el orden o perder una siga rompiéndola.
+   */
+  it('la base lleva las cinco de detección, en orden, y las tres de salud', () => {
+    expect([...SMART_EVENT_TYPES].slice(0, 5)).toEqual([
       'fielddetection',
       'linedetection',
       'facedetection',
       'VMD',
       'videoloss',
     ]);
+    for (const t of CAMERA_HEALTH_EVENT_TYPES) {
+      expect(SMART_EVENT_TYPES as readonly string[]).toContain(t);
+    }
+  });
+
+  it('la salud de cámara son tres tipos del Apéndice B, ni uno inventado', () => {
+    expect([...CAMERA_HEALTH_EVENT_TYPES]).toEqual([
+      'shelteralarm',
+      'defocus',
+      'scenechangedetection',
+    ]);
+    for (const t of CAMERA_HEALTH_EVENT_TYPES) {
+      expect(APPENDIX_B_EVENT_TYPES as readonly string[]).toContain(t);
+      expect(isCameraHealthEventType(t)).toBe(true);
+    }
+    // Una detección normal NO es salud de cámara: si esto se rompe, la cola
+    // SOC se llena de `fielddetection`, que dispara a todas horas.
+    expect(isCameraHealthEventType('fielddetection')).toBe(false);
+    expect(isCameraHealthEventType('VMD')).toBe(false);
   });
 
   it('un perfil puede ampliarla, sin duplicar y sin reordenar la base', () => {
     const out = resolveTriggerEventTypes(['loitering', 'regionEntrance', 'vmd']);
-    expect(out.slice(0, 5)).toEqual([...SMART_EVENT_TYPES]);
+    // Antes era `slice(0, 5)`, con el 5 escrito a mano: la base cambió de
+    // tamaño y la prueba se rompió sin que hubiera nada roto.
+    expect(out.slice(0, SMART_EVENT_TYPES.length)).toEqual([...SMART_EVENT_TYPES]);
     expect(out).toContain('loitering');
     expect(out).toContain('regionEntrance');
     // `vmd` ya estaba como `VMD`: no entra dos veces.

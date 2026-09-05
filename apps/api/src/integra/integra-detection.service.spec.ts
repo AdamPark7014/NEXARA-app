@@ -192,7 +192,11 @@ describe('IntegraDetectionService · edición', () => {
       { eventTypes: ['loitering', 'regionEntrance'] },
       SITE,
     );
-    expect(dto.effective.eventTypes.slice(0, 5)).toEqual([...SMART_EVENT_TYPES]);
+    // El 5 estaba escrito a mano y la base creció a ocho al entrar los avisos
+    // de salud de cámara. Se ata al tamaño real de la base, no a un número.
+    expect(dto.effective.eventTypes.slice(0, SMART_EVENT_TYPES.length)).toEqual([
+      ...SMART_EVENT_TYPES,
+    ]);
     expect(dto.effective.eventTypes).toContain('loitering');
     // En la fila solo se guarda lo que AMPLÍA: la base no se duplica.
     expect(dto.stored?.eventTypes).toEqual(['loitering', 'regionEntrance']);
