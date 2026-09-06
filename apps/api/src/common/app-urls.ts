@@ -58,6 +58,8 @@ export const appUrls = {
     const qs = params ? new URLSearchParams(params).toString() : "";
     return qs ? `/ops/support/new?${qs}` : `/ops/support/new`;
   },
+  /** Portal cliente (subdominio /tickets). */
+  portalTicket: (id: number) => `/tickets/${id}`,
   erpUsers: (id?: number) => (id ? `/erp/users?highlight=${id}` : `/erp/users`),
   erpProcurement: (tab: string, id?: number) =>
     id ? `/erp/procurement?tab=${tab}&id=${id}` : `/erp/procurement?tab=${tab}`,

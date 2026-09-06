@@ -1,2 +1,2 @@
 -- AlterEnum: actividad iniciada en campo
-ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'ACTIVITY_STARTED';
+ALTER TYPE "NotificationType" ADD VALUE 'ACTIVITY_STARTED';

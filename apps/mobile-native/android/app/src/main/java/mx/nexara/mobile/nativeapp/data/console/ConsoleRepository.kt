@@ -364,6 +364,55 @@ class ConsoleRepository(context: Context) {
 
     suspend fun vehicleInventoryFetch() = api.getVehicleInventory()
 
+    suspend fun createVehicleInventory(
+        nombre: String,
+        placas: String? = null,
+        estatus: String = "Disponible",
+        notas: String? = null,
+    ) = api.createVehicleInventory(
+        mx.nexara.mobile.nativeapp.data.api.UpsertVehicleAssetRequest(
+            nombre = nombre,
+            placas = placas,
+            estatus = estatus,
+            activo = true,
+            notas = notas,
+        ),
+    )
+
+    suspend fun updateVehicleInventory(
+        id: Long,
+        nombre: String? = null,
+        placas: String? = null,
+        estatus: String? = null,
+        activo: Boolean? = null,
+        notas: String? = null,
+    ) = api.updateVehicleInventory(
+        id = id,
+        body = mx.nexara.mobile.nativeapp.data.api.UpsertVehicleAssetRequest(
+            nombre = nombre,
+            placas = placas,
+            estatus = estatus,
+            activo = activo,
+            notas = notas,
+        ),
+    )
+
+    suspend fun approveVehicleRequest(
+        id: Long,
+        approve: Boolean,
+        note: String? = null,
+        fechaInicioAprobada: String? = null,
+        fechaFinAprobada: String? = null,
+    ) = api.approveVehicleRequest(
+        id = id,
+        body = mx.nexara.mobile.nativeapp.data.api.ApproveVehicleRequest(
+            action = if (approve) "approve" else "reject",
+            note = note,
+            fechaInicioAprobada = fechaInicioAprobada,
+            fechaFinAprobada = fechaFinAprobada,
+        ),
+    )
+
     suspend fun createVehicleRequest(
         activityId: Long,
         vehicleId: Long? = null,

@@ -3,6 +3,12 @@ import { NotificationsService, INotificationPayload } from './notifications.serv
 import { PrismaService } from '../prisma/prisma.service';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { appUrls } from '../common/app-urls.js';
+import {
+  portalTicketActionNotifyMeta,
+  portalTicketCommentNotifyMeta,
+  supportRequestStaffUrl,
+  type PortalTicketClientAction,
+} from './portal-ticket-notify.js';
 
 /**
  * Servicio que maneja notificaciones jerárquicas
@@ -213,6 +219,183 @@ export class NotificationHierarchyService {
       }
     } catch (error) {
       this.logger.error(`Error notifying activity started:`, error);
+    }
+  }
+
+  /** Admins de consola + cuentas plataforma (solicitudes de soporte sin actor User). */
+  private async getSupportStaffRecipientIds(): Promise<number[]> {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { role: { accesoConsoleAdmin: true }, ...this.companyScope() },
+          { email: { in: this.platformSuperEmails.map((e) => e.toLowerCase()) } },
+        ],
+      },
+      select: { id: true },
+    });
+    return [...new Set(rows.map((r) => r.id))];
+  }
+
+  /**
+   * Cliente comentó una OT desde el portal → staff (responsable + fallback soporte).
+   */
+  async notifyPortalTicketComment(params: {
+    activityId: number;
+    anNumber?: string | null;
+    message: string;
+    responsableId?: number | null;
+    companyId?: number | null;
+  }) {
+    try {
+      const meta = portalTicketCommentNotifyMeta(params.activityId, params.anNumber, params.message);
+      const targets = new Set<number>();
+      if (params.responsableId) targets.add(params.responsableId);
+      if (targets.size === 0) {
+        for (const id of await this.getSupportStaffRecipientIds()) targets.add(id);
+      } else if (params.responsableId) {
+        for (const s of await this.getSupervisors(params.responsableId)) targets.add(s.id);
+      }
+
+      for (const userId of targets) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: meta.type,
+          category: meta.category,
+          channel: meta.channel,
+          title: meta.title,
+          message: meta.message,
+          relatedEntityId: params.activityId,
+          entityType: meta.entityType,
+          relatedUrl: meta.relatedUrl,
+          companyId: params.companyId,
+          priority: 'high',
+          excludeActor: true,
+        });
+      }
+    } catch (error) {
+      this.logger.error(`Error notifying portal ticket comment:`, error);
+    }
+  }
+
+  /**
+   * Cliente ACK / confirmó resolución / pidió reapertura → staff.
+   */
+  async notifyPortalTicketClientAction(params: {
+    action: PortalTicketClientAction;
+    activityId: number;
+    anNumber?: string | null;
+    title?: string | null;
+    note?: string;
+    responsableId?: number | null;
+    companyId?: number | null;
+  }) {
+    try {
+      const meta = portalTicketActionNotifyMeta(
+        params.action,
+        params.activityId,
+        params.anNumber,
+        params.title,
+        params.note,
+      );
+      const targets = new Set<number>();
+      if (params.responsableId) targets.add(params.responsableId);
+      if (params.action === 'REQUEST_REOPEN') {
+        for (const id of await this.getSupportStaffRecipientIds()) targets.add(id);
+      }
+      if (targets.size === 0) {
+        for (const id of await this.getSupportStaffRecipientIds()) targets.add(id);
+      }
+
+      for (const userId of targets) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: meta.type,
+          category: meta.category,
+          channel: meta.channel,
+          title: meta.title,
+          message: meta.message,
+          relatedEntityId: params.activityId,
+          entityType: meta.entityType,
+          relatedUrl: meta.relatedUrl,
+          companyId: params.companyId,
+          priority: meta.priority,
+          excludeActor: true,
+        });
+      }
+    } catch (error) {
+      this.logger.error(`Error notifying portal ticket client action:`, error);
+    }
+  }
+
+  /** Nueva solicitud de soporte desde portal → staff (ops/support). */
+  async notifySupportRequestCreated(params: {
+    requestId: number;
+    description: string;
+    clientName?: string | null;
+    companyId: number;
+    urgency?: string | null;
+  }) {
+    try {
+      const who = (params.clientName && params.clientName.trim()) || 'Cliente';
+      const urg = params.urgency ? ` [${params.urgency}]` : '';
+      const url = supportRequestStaffUrl(params.requestId);
+      for (const userId of await this.getSupportStaffRecipientIds()) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_ASSIGNED',
+          category: 'tickets',
+          channel: 'tickets',
+          title: `Nueva solicitud de soporte${urg}`,
+          message: `${who}: ${params.description.slice(0, 240)}`,
+          relatedEntityId: params.requestId,
+          entityType: 'ClientTicketRequest',
+          relatedUrl: url,
+          companyId: params.companyId,
+          priority: params.urgency === 'HIGH' ? 'high' : 'normal',
+          excludeActor: true,
+        });
+      }
+    } catch (error) {
+      this.logger.error(`Error notifying support request created:`, error);
+    }
+  }
+
+  /**
+   * Staff cambió estatus de ClientTicketRequest → responsable de la OT vinculada.
+   */
+  async notifySupportRequestStatusChanged(params: {
+    requestId: number;
+    status: string;
+    actorUserId: number;
+    activityResponsableId?: number | null;
+    description?: string | null;
+    companyId?: number | null;
+  }) {
+    try {
+      if (
+        !params.activityResponsableId ||
+        params.activityResponsableId === params.actorUserId
+      ) {
+        return;
+      }
+      const url = supportRequestStaffUrl(params.requestId);
+      await this.notificationsService.createNotification({
+        userId: params.activityResponsableId,
+        type: 'ACTIVITY_ASSIGNED',
+        category: 'tickets',
+        channel: 'tickets',
+        title: `Soporte → ${params.status}`,
+        message: (params.description || `Solicitud #${params.requestId}`).slice(0, 280),
+        triggerUserId: params.actorUserId,
+        relatedEntityId: params.requestId,
+        entityType: 'ClientTicketRequest',
+        relatedUrl: url,
+        companyId: params.companyId,
+        excludeActor: true,
+      });
+    } catch (error) {
+      this.logger.error(`Error notifying support request status:`, error);
     }
   }
 
