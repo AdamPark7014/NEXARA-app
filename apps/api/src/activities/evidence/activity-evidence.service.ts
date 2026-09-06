@@ -1106,12 +1106,16 @@ export class ActivityEvidenceService {
    * Aprobar evidencias (Admin)
    */
   async approveEvidence(activityId: number, reviewerId: number, notes?: string, companyId?: number | null) {
+    // `isSuperAdmin` NO es columna de `User` —se calcula en el JWT
+    // (`rbac.guard.ts`) o desde el correo (`platform-accounts.ts`)—, así que
+    // pedirlo aquí no compilaba. El objeto solo se usa para comprobar que el
+    // revisor existe: quién puede revisar ya lo exige `EVIDENCES_REVIEW` en el
+    // controlador. Se selecciona solo lo que se lee.
     const reviewer = await this.prisma.user.findUnique({
       where: { id: reviewerId },
-      select: { id: true, isSuperAdmin: true, permissions: true },
+      select: { id: true },
     });
-    // permissions may live on JWT only — also accept caller-passed via notes path;
-    // controller already enforces EVIDENCES_REVIEW; this blocks forged reviewerId if called internally.
+    // Bloquea un `reviewerId` inventado cuando se llama desde dentro del servidor.
     if (!reviewer) {
       throw new ForbiddenException('Revisor inválido');
     }

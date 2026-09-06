@@ -12,13 +12,34 @@ import { getUserHomeUrl, getUserHomeUrlAbsolute } from "@/lib/panel-home";
 import { canUserAccessPanel } from "@/lib/user-access";
 import {
   buildCrossPanelUrl,
+  detectCurrentPanelId,
   panelHomeInternalPath,
-  resolvePanelId,
 } from "@/lib/cross-panel-handoff";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { setSharedCookie, SHARED_COOKIE_KEYS } from "@/lib/shared-cookies";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import styles from './PanelLogin.module.scss';
+
+/**
+ * Ruta de aterrizaje tras el login, respetando el panel del subdominio.
+ *
+ * Antes esto estaba cableado a `integra`/`lab`: en cualquier otro subdominio
+ * —`sales`, `core`, `ops`, `studio`— el login ignoraba dónde estabas y te
+ * mandaba al panel HOME de tu rol. Como solo `vendedor` y `coord_ventas`
+ * tienen CRM por home, entrar a `sales.nexara.com.mx` y loguearte te expulsaba
+ * a otro subdominio. `detectCurrentPanelId` ya mapea los 15 subdominios, así
+ * que la regla se deriva en vez de enumerarse.
+ *
+ * El caso que la regla vieja resolvía sigue cubierto: los paneles cuyo home no
+ * es `/dashboard` (integra y lab entran por `/panel`) caen a `/` en vez de a
+ * una ruta que ahí no existe.
+ */
+function resolveLandingPath(redirectTo: string): string {
+  if (redirectTo !== "/dashboard") return redirectTo;
+  const panel = detectCurrentPanelId();
+  if (!panel) return redirectTo;
+  return panelHomeInternalPath(panel).endsWith("/dashboard") ? redirectTo : "/";
+}
 
 type PanelLoginProps = {
   redirectTo: string;
@@ -135,10 +156,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         setUser(userData);
         window.history.replaceState({}, "", window.location.pathname);
         if (smartRedirect) {
-          const host = window.location.hostname;
-          const sub = host.split(".")[0]?.toLowerCase() || "";
-          const currentPanel =
-            sub === "integra" || sub === "lab" ? resolvePanelId(sub) : null;
+          const currentPanel = detectCurrentPanelId();
           if (currentPanel && canUserAccessPanel(userData, currentPanel)) {
             const path = panelHomeInternalPath(currentPanel);
             window.location.assign(
@@ -148,12 +166,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
           router.replace(getUserHomeUrl(userData));
         } else {
-          const sub = window.location.hostname.split(".")[0]?.toLowerCase() || "";
-          router.replace(
-            redirectTo === "/dashboard" && (sub === "integra" || sub === "lab")
-              ? "/"
-              : redirectTo,
-          );
+          router.replace(resolveLandingPath(redirectTo));
         }
       })();
     } catch {
@@ -344,12 +357,10 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       }
 
       if (smartRedirect) {
-        // En subdominios de panel dedicado (integra/lab), quédate ahí si el
-        // usuario tiene acceso — no mandar a ERP home.
-        const host = typeof window !== "undefined" ? window.location.hostname : "";
-        const sub = host.split(".")[0]?.toLowerCase() || "";
-        const currentPanel =
-          sub === "integra" || sub === "lab" ? resolvePanelId(sub) : null;
+        // Te quedas en el panel del subdominio donde te has logueado, si tienes
+        // acceso. Ver `resolveLandingPath` para por qué esto no puede ir
+        // cableado a integra/lab.
+        const currentPanel = detectCurrentPanelId();
         if (currentPanel && canUserAccessPanel(userData, currentPanel)) {
           const path = panelHomeInternalPath(currentPanel);
           window.location.assign(
@@ -362,14 +373,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         return;
       }
 
-      // /dashboard no existe en integra/lab — caer a /
-      const host = typeof window !== "undefined" ? window.location.hostname : "";
-      const sub = host.split(".")[0]?.toLowerCase() || "";
-      if ((sub === "integra" || sub === "lab") && redirectTo === "/dashboard") {
-        router.replace("/");
-        return;
-      }
-      router.replace(redirectTo);
+      router.replace(resolveLandingPath(redirectTo));
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError("Error desconocido");
