@@ -60,6 +60,19 @@ import {
   subscribeCapabilities,
   subscribeProvider,
 } from "../_caps";
+import { claveArranqueActual, tomarArranque } from "../_arranque";
+import {
+  guardarSemillaCamaras,
+  idsFantasma,
+  leerSemillaCamaras,
+  semillaAcerto,
+} from "../_camarasCache";
+import { HITOS, marcarHito } from "../_perf";
+import {
+  abrirStreamsEnLote,
+  pedirLoteApi,
+  type RespuestaStream,
+} from "../_streamsLote";
 import {
   WALL_DND_MIME,
   WallCell,
@@ -82,6 +95,7 @@ import {
 } from "../_wallViews";
 import styles from "../integra.module.css";
 import wall from "../_wall.module.css";
+import skel from "../_wallSkeleton.module.css";
 
 type Cam = {
   id: string;
@@ -143,8 +157,53 @@ function onlineish(status?: string | number) {
   return s === "1" || s === "online" || s === "";
 }
 
+/**
+ * Un `StreamSlot` a partir de la cámara y de lo que devolvió la API. Lo usan
+ * los dos caminos —una a una y lote—, y por eso está fuera del componente: si
+ * divergieran, un mosaico abierto por lote se comportaría distinto al mismo
+ * mosaico abierto a mano.
+ */
+function slotDesde(cam: Cam, data: RespuestaStream): StreamSlot {
+  return {
+    id: cam.id,
+    name: cam.name,
+    hls: data.hls,
+    rtsp: data.rtsp,
+    note: data.note,
+    provider: data.provider,
+    stream: data.stream,
+    hasAudio: data.hasAudio,
+    audio: data.audio,
+    streamName: data.streamName ?? null,
+  };
+}
+
 export default function IntegraVideoPage() {
-  const [items, setItems] = useState<Cam[]>([]);
+  /**
+   * ⚠️ SIEMBRA OPTIMISTA ⚠️
+   *
+   * La última lista de cámaras conocida, leída de `localStorage`. Está aquí para
+   * UNA sola cosa: que la rejilla salga con mosaicos reales en el primer render,
+   * sin esperar el viaje a `integra/cameras`. El inventario de un sitio cambia
+   * unas pocas veces al año, así que acierta casi siempre — y cuando no acierta,
+   * la lista buena la sustituye entera y las cámaras fantasma se sueltan del
+   * muro en `load()`.
+   *
+   * Nunca decide una acción: ni abre puertas, ni borra, ni sirve para contar en
+   * un informe. Es tinta en la pantalla mientras llega la verdad. Los detalles y
+   * las defensas (versión, caducidad, saneo campo a campo) viven en
+   * `_camarasCache.ts`.
+   */
+  const [semillaInicial] = useState<Cam[]>(() => {
+    const sembradas = leerSemillaCamaras(claveArranqueActual());
+    if (sembradas?.length) {
+      marcarHito(HITOS.listaCamaras, { detalle: `siembra · ${sembradas.length} cámaras` });
+    }
+    return sembradas ?? [];
+  });
+  const [items, setItems] = useState<Cam[]>(semillaInicial);
+  /** La lista del servidor ya llegó (con éxito o con error): se deja de fingir. */
+  const [inventarioListo, setInventarioListo] = useState(false);
   const [region, setRegion] = useState("");
   const [q, setQ] = useState("");
   const [slots, setSlots] = useState<StreamSlot[]>([]);
@@ -194,6 +253,14 @@ export default function IntegraVideoPage() {
 
   /* ── Vistas guardadas, atajos, pantalla completa ───────────────── */
   const [views, setViews] = useState<WallView[]>([]);
+  /**
+   * Las vistas guardadas ya se leyeron de `localStorage`. Con la siembra, el
+   * inventario existe en el primer render y el auto-abrir dispararía **antes**
+   * de saber si hay vista predeterminada: llenaría el muro y se cargaría la
+   * vista del operador. Es una lectura síncrona, así que esto cuesta un render,
+   * no un viaje.
+   */
+  const [vistasCargadas, setVistasCargadas] = useState(false);
   const [currentViewId, setCurrentViewId] = useState<string | null>(null);
   const [defaultViewId, setDefaultViewId] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -234,7 +301,22 @@ export default function IntegraVideoPage() {
   useEffect(() => {
     setViews(readWallViews());
     setDefaultViewId(readDefaultViewId());
+    setVistasCargadas(true);
   }, []);
+
+  /**
+   * Primer píxel de rejilla. `requestAnimationFrame` dispara justo antes de que
+   * el navegador pinte, así que es lo más cerca del píxel real a lo que se llega
+   * sin instrumentar el navegador por fuera.
+   */
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      marcarHito(HITOS.rejillaVisible, {
+        detalle: semillaInicial.length ? "con siembra" : "en blanco",
+      });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [semillaInicial.length]);
 
   useEffect(() => {
     return subscribePushEvents((events) => {
@@ -302,13 +384,42 @@ export default function IntegraVideoPage() {
 
   const load = useCallback(async () => {
     setError(null);
+    const clave = claveArranqueActual();
     try {
-      const data = await integraApi<{ items: Cam[] }>("integra/cameras");
-      setItems(data.items);
+      // El layout ya pidió las cámaras al entrar en la consola, a la vez que
+      // capacidades, salud y panel. Aquí se recoge esa respuesta en vez de
+      // empezar otro viaje. Si no la hay —«Actualizar», cambio de sitio— se
+      // pide como siempre.
+      const data = await (tomarArranque<{ items: Cam[] }>("cameras", clave) ??
+        integraApi<{ items: Cam[] }>("integra/cameras"));
+      const reales = data.items ?? [];
+      marcarHito(HITOS.listaCamaras, { detalle: `servidor · ${reales.length} cámaras` });
+      setItems(reales);
+      guardarSemillaCamaras(clave, reales);
+      if (semillaInicial.length > 0 && !semillaAcerto(semillaInicial, reales)) {
+        // La siembra no acertó. La lista buena manda y la rejilla se corrige:
+        // se sueltan del muro las cámaras que ya no existen. Dejar en pantalla
+        // el cuadro de una cámara dada de baja es exactamente el fallo que hace
+        // peligrosa una caché optimista.
+        const fantasmas = new Set(idsFantasma(semillaInicial, reales));
+        if (fantasmas.size > 0) {
+          setSlots((prev) => prev.filter((s) => !fantasmas.has(s.id)));
+          setSelected((sel) => (sel && fantasmas.has(sel) ? null : sel));
+          setWallIssues((prev) => [
+            ...prev,
+            {
+              name: `${fantasmas.size} cámara(s) de la última visita`,
+              reason: "ya no están en el inventario del sitio",
+            },
+          ]);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setInventarioListo(true);
     }
-  }, []);
+  }, [semillaInicial]);
 
   useEffect(() => {
     void load();
@@ -356,20 +467,25 @@ export default function IntegraVideoPage() {
         audio?: boolean;
         streamName?: string;
       }>(`integra/cameras/${encodeURIComponent(cam.id)}/stream${qs}`, { method: "POST" });
-      return {
-        id: cam.id,
-        name: cam.name,
-        hls: data.hls,
-        rtsp: data.rtsp,
-        note: data.note,
-        provider: data.provider,
-        stream: data.stream,
-        hasAudio: data.hasAudio,
-        audio: data.audio,
-        streamName: data.streamName ?? null,
-      };
+      return slotDesde(cam, data);
     },
     [],
+  );
+
+  /**
+   * Abrir VARIAS cámaras. Un solo viaje contra `cameras/streams/batch` —el
+   * endpoint de lote que ya existe en la API— y, si ese camino se cae entero,
+   * N viajes en paralelo como respaldo. Toda la política vive en
+   * `_streamsLote.ts`; aquí solo se dice cómo se construye un mosaico.
+   */
+  const abrirMuro = useCallback(
+    (cams: readonly Cam[]) =>
+      abrirStreamsEnLote<Cam, StreamSlot>(
+        cams,
+        (c) => fetchStream(c),
+        (lote) => pedirLoteApi(lote, slotDesde),
+      ),
+    [fetchStream],
   );
 
   const playLive = useCallback(
@@ -435,16 +551,12 @@ export default function IntegraVideoPage() {
         while (got.length < layout && i < queue.length) {
           const batch = queue.slice(i, i + (layout - got.length));
           i += batch.length;
-          const results = await Promise.allSettled(batch.map((c) => fetchStream(c)));
-          results.forEach((r, k) => {
-            if (r.status === "fulfilled") got.push(r.value);
-            else {
-              issues.push({
-                name: batch[k].name || batch[k].id,
-                reason: r.reason instanceof Error ? r.reason.message : "no respondió",
-              });
-            }
-          });
+          // La tanda entera en UNA petición. El único motivo por el que puede
+          // haber una segunda vuelta es reponer las que fallaron; con el muro
+          // sano, abrir dieciséis cámaras es un solo viaje.
+          const { abiertos, fallos } = await abrirMuro(batch);
+          got.push(...abiertos);
+          issues.push(...fallos);
         }
         setWallIssues(issues);
         if (got.length === 0) throw new Error("No se pudo abrir ninguna cámara");
@@ -459,7 +571,7 @@ export default function IntegraVideoPage() {
         setBusy(null);
       }
     },
-    [fetchStream, layout],
+    [abrirMuro, layout],
   );
 
   const setViewMode = useCallback((m: ViewMode) => {
@@ -495,18 +607,7 @@ export default function IntegraVideoPage() {
           .map((id) => items.find((c) => c.id === id))
           .filter((c): c is Cam => Boolean(c));
         const gone = wanted.length - cams.length;
-        const results = await Promise.allSettled(cams.map((c) => fetchStream(c)));
-        const got: StreamSlot[] = [];
-        const issues: Array<{ name: string; reason: string }> = [];
-        results.forEach((r, i) => {
-          if (r.status === "fulfilled") got.push(r.value);
-          else {
-            issues.push({
-              name: cams[i].name || cams[i].id,
-              reason: r.reason instanceof Error ? r.reason.message : "no respondió",
-            });
-          }
-        });
+        const { abiertos: got, fallos: issues } = await abrirMuro(cams);
         if (gone > 0) {
           issues.push({
             name: `${gone} cámara(s) de la vista`,
@@ -526,11 +627,14 @@ export default function IntegraVideoPage() {
         setFilling(false);
       }
     },
-    [items, fetchStream, filtered.length, setLayoutN, setViewMode],
+    [items, abrirMuro, filtered.length, setLayoutN, setViewMode],
   );
 
   // Primera visita: la vista predeterminada si la hay; si no, muro lleno.
   useEffect(() => {
+    // Sin las vistas leídas no se decide nada: con la siembra el inventario ya
+    // existe en el primer render y abrir aquí se cargaría la vista predeterminada.
+    if (!vistasCargadas) return;
     if (autoOpened.current || items.length === 0 || slots.length > 0) return;
     if (typeof window !== "undefined" && window.sessionStorage.getItem(AUTOOPEN_KEY) === "0") {
       return;
@@ -547,7 +651,18 @@ export default function IntegraVideoPage() {
       const first = filtered.find((c) => onlineish(c.status)) || filtered[0];
       if (first) void playLive(first, false);
     }
-  }, [items, filtered, slots.length, mode, fillWall, playLive, views, defaultViewId, applyView]);
+  }, [
+    items,
+    filtered,
+    slots.length,
+    mode,
+    fillWall,
+    playLive,
+    views,
+    defaultViewId,
+    applyView,
+    vistasCargadas,
+  ]);
 
   /**
    * Cambiar de rejilla: al encoger se recorta, al crecer se RELLENA. Antes solo
@@ -887,7 +1002,22 @@ export default function IntegraVideoPage() {
     return cells.slice(0, layout);
   }, [slots, layout]);
 
+  /**
+   * La rejilla existe desde el primer instante, con sus huecos, y se llena
+   * encima. Mientras el muro está trabajando, un hueco va de esqueleto en vez de
+   * ofrecer «Añadir cámara»: ese botón invita a un clic que va a chocar con el
+   * llenado automático, y una rejilla vacía y muda es justo lo que se vivía como
+   * «entrar tarda».
+   */
+  const celdasEnEsqueleto =
+    mode === "wall" && (filling || (!inventarioListo && slots.length === 0));
+
   const handleTileState = useCallback((id: string, st: PlayerState) => {
+    // Primer mosaico con imagen de verdad. Es el hito que cierra el arranque:
+    // hasta aquí el operador no ha visto una sola escena.
+    if (st === "live" || st === "snapshot") {
+      marcarHito(HITOS.primerMosaico, { detalle: st === "live" ? "vivo" : "respaldo" });
+    }
     setTileState((prev) => (prev[id] === st ? prev : { ...prev, [id]: st }));
   }, []);
 
@@ -1498,6 +1628,7 @@ export default function IntegraVideoPage() {
           <div
             className={styles.wallGrid}
             style={{ gridTemplateColumns: `repeat(${colsFor(layout)}, minmax(0, 1fr))` }}
+            aria-busy={celdasEnEsqueleto || undefined}
           >
             {wallCells.map((s, i) =>
               s ? (
@@ -1564,6 +1695,15 @@ export default function IntegraVideoPage() {
                       </>
                     )}
                   </div>
+                </div>
+              ) : celdasEnEsqueleto ? (
+                <div
+                  key={`esqueleto-${i}`}
+                  className={skel.esqueleto}
+                  aria-hidden="true"
+                  data-slot={i + 1}
+                >
+                  <span className={skel.esqueletoTitulo} />
                 </div>
               ) : (
                 <button
