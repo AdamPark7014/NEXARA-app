@@ -8,6 +8,7 @@ import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
 import mx.nexara.mobile.nativeapp.data.realtime.RealtimeBus
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.time.Instant
 
 class AuthRepository(
     context: Context,
@@ -28,7 +29,7 @@ class AuthRepository(
             )
 
             val dto = response.user
-            val user = SessionUser(
+            var user = SessionUser(
                 id = dto.id,
                 nombre = dto.nombre,
                 email = dto.email,
@@ -42,10 +43,15 @@ class AuthRepository(
                 clientId = null,
                 branchId = null,
                 avatarUrl = dto.avatarUrl,
+                roleKey = dto.roleKey,
+                orgRoleKey = dto.orgRoleKey,
+                expiresAt = response.expiresAt,
             )
 
             sessionStore.save(user)
             RealtimeBus.start(user.token)
+            user = enrichSession(user)
+            sessionStore.save(user)
             return user
         } catch (e: Exception) {
             lastError = e
@@ -157,11 +163,65 @@ class AuthRepository(
         }
     }
 
+    /** companyId + navegación RBAC desde API (best-effort). */
+    private suspend fun enrichSession(user: SessionUser): SessionUser {
+        if (user.isClient || user.isBranchUser) return user
+        val api = ApiClient.authed(
+            tokenProvider = { sessionStore.load()?.token ?: user.token },
+            companyIdProvider = { sessionStore.load()?.companyId },
+        ).create(mx.nexara.mobile.nativeapp.data.api.AuthApi::class.java)
+
+        val companyId = runCatching {
+            val companies = api.companyMine()
+            companies.firstOrNull { it.isPrimary == true }?.id
+                ?: companies.firstOrNull()?.id
+        }.getOrNull()?.takeIf { it > 0L } ?: user.companyId
+
+        val nav = runCatching { api.meNavigation() }.getOrNull()
+
+        return user.copy(
+            companyId = companyId,
+            roleKey = nav?.roleKey ?: user.roleKey,
+            orgRoleKey = nav?.orgRoleKey ?: user.orgRoleKey,
+            navModuleKeys = nav?.moduleKeys?.takeIf { it.isNotEmpty() },
+        )
+    }
+
+    /**
+     * Sliding session: si faltan < 20 min para expiresAt, pide token nuevo.
+     */
+    suspend fun maybeExtendSession() {
+        val current = sessionStore.load() ?: return
+        if (current.isClient || current.isBranchUser) return
+        val expiresRaw = current.expiresAt ?: return
+        val expires = runCatching { Instant.parse(expiresRaw) }.getOrNull() ?: return
+        val remainingMs = expires.toEpochMilli() - System.currentTimeMillis()
+        if (remainingMs > 20L * 60_000L) return
+
+        val api = ApiClient.authed(
+            tokenProvider = { sessionStore.load()?.token },
+            companyIdProvider = { sessionStore.load()?.companyId },
+        ).create(mx.nexara.mobile.nativeapp.data.api.AuthApi::class.java)
+
+        runCatching {
+            val res = api.extendSession()
+            sessionStore.save(
+                current.copy(
+                    token = res.access_token,
+                    expiresAt = res.expiresAt ?: current.expiresAt,
+                ),
+            )
+            RealtimeBus.start(res.access_token)
+        }
+    }
+
     fun loadSession(): SessionUser? = sessionStore.load()
 
     fun quickProfiles(): List<QuickProfile> = sessionStore.loadQuickProfiles()
 
     fun token(): String? = sessionStore.load()?.token
+
+    fun companyId(): Long? = sessionStore.load()?.companyId
 
     fun logout() {
         val bearer = sessionStore.load()?.token
@@ -183,4 +243,3 @@ class AuthRepository(
         }
     }
 }
-

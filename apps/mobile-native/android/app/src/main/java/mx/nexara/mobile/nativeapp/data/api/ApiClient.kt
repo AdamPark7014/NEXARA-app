@@ -18,7 +18,10 @@ object ApiClient {
         .add(KotlinJsonAdapterFactory())
         .build()
 
-    private fun httpClient(tokenProvider: (() -> String?)? = null): OkHttpClient {
+    private fun httpClient(
+        tokenProvider: (() -> String?)? = null,
+        companyIdProvider: (() -> Long?)? = null,
+    ): OkHttpClient {
         val logging = HttpLoggingInterceptor()
         logging.level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
 
@@ -32,10 +35,13 @@ object ApiClient {
                 if (token.isNullOrBlank()) {
                     return@addInterceptor chain.proceed(original)
                 }
-                val next: Request = original.newBuilder()
+                val builder = original.newBuilder()
                     .header("Authorization", "Bearer $token")
-                    .build()
-                val response = chain.proceed(next)
+                val companyId = companyIdProvider?.invoke()
+                if (companyId != null && companyId > 0L) {
+                    builder.header("X-Company-Id", companyId.toString())
+                }
+                val response = chain.proceed(builder.build())
                 if (response.code == 401) {
                     SessionEvents.notifyExpired()
                 }
@@ -57,7 +63,10 @@ object ApiClient {
 
     private val retrofitNoAuth: Retrofit = retrofit(httpClient(tokenProvider = null))
 
-    fun authed(tokenProvider: () -> String?): Retrofit = retrofit(httpClient(tokenProvider))
+    fun authed(
+        tokenProvider: () -> String?,
+        companyIdProvider: (() -> Long?)? = null,
+    ): Retrofit = retrofit(httpClient(tokenProvider, companyIdProvider))
 
     val auth: AuthApi = retrofitNoAuth.create(AuthApi::class.java)
     val portalAuth: PortalAuthApi = retrofitNoAuth.create(PortalAuthApi::class.java)
@@ -65,4 +74,3 @@ object ApiClient {
 
     fun healthApi(tokenProvider: () -> String?): HealthApi = authed(tokenProvider).create(HealthApi::class.java)
 }
-

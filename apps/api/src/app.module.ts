@@ -15,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { FolioModule } from './common/folio/folio.module.js';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { MeModule } from './me/me.module.js';
 import { ActivitiesModule } from './activities/activities.module';
 import { EvidencesModule } from './evidences/evidences.module';
 import { VehiclesModule } from './vehicles/vehicles.module';
@@ -108,6 +109,7 @@ import { DomainEventsModule } from './domain-events/domain-events.module.js';
     ClientsModule,
     UsersModule,
     AuthModule,
+    MeModule,
     ActivitiesModule,
     EvidencesModule,
     VehiclesModule,

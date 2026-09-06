@@ -51,13 +51,13 @@ enum class PanelId(
         accentArgb = 0xFF64748B,
         legacyRoute = "lab",
     ),
-    PORTAL(
-        key = "portal",
-        displayName = "Portal clientes",
-        icon = "🎫",
-        tagline = "Tickets, sucursales e inventarios",
-        accentArgb = 0xFF0D9488,
-        legacyRoute = "tickets",
+    INTEGRA(
+        key = "integra",
+        displayName = "NEXARA INTEGRA",
+        icon = "🔐",
+        tagline = "Acceso, eventos, personas y visitantes",
+        accentArgb = 0xFF2563EB,
+        legacyRoute = "integra",
     ),
     ;
 
