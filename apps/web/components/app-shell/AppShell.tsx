@@ -64,6 +64,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
 import {
   fetchMeNavigationAuthed,
+  filterModulesByNavigation,
   type MeNavigation,
 } from "@/lib/me-navigation";
 import styles from "./AppShell.module.scss";
@@ -309,25 +310,15 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
   const sidebarGroups = useMemo(() => {
     const groups = buildUserSidebar(panel, user);
-    const pagePaths = (serverNav?.paths ?? []).filter((p) => !p.startsWith("/api/"));
-    const moduleKeys = serverNav?.moduleKeys ?? [];
-    const filteredByNav =
-      pagePaths.length === 0 && moduleKeys.length === 0
-        ? groups
-        : groups
-            .map((g) => ({
-              ...g,
-              items: g.items.filter((item) => {
-                if (moduleKeys.includes(item.id)) return true;
-                const full = `/${item.panel}${item.path === "/" ? "" : item.path.startsWith("/") ? item.path : `/${item.path}`}`;
-                return pagePaths.some((rule) => {
-                  const base = rule.replace(/\/\*\*$/, "").replace(/\/\*$/, "").replace(/\/$/, "");
-                  if (!base) return false;
-                  return full === base || full.startsWith(`${base}/`) || base.startsWith(full);
-                });
-              }),
-            }))
-            .filter((g) => g.items.length > 0);
+    // Integración: misma fuente /me/navigation (webModuleIds + paths), no clip por claves Android.
+    const filteredByNav = !serverNav
+      ? groups
+      : groups
+          .map((g) => ({
+            ...g,
+            items: filterModulesByNavigation(g.items, serverNav),
+          }))
+          .filter((g) => g.items.length > 0);
 
     if (panel !== "integra" || !integraCaps) return filteredByNav;
     const isClient = v2RoleKey === "cliente";
@@ -1058,6 +1049,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
         onClose={() => setPaletteOpen(false)}
         user={user}
         token={user.token}
+        navigation={serverNav}
         onToggleDark={toggleDarkMode}
         onLogout={handleLogout}
       />

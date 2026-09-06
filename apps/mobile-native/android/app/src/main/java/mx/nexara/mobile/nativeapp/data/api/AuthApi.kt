@@ -46,6 +46,7 @@ data class MeNavigationDto(
     val panels: List<String>? = null,
     val paths: List<String>? = null,
     val moduleKeys: List<String>? = null,
+    val webModuleIds: List<String>? = null,
 )
 
 data class CompanyMineItemDto(

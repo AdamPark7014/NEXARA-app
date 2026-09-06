@@ -105,30 +105,6 @@ object DeepLinkParser {
         "chat" to "chat",
         "dispatch" to "dispatch",
         "tickets" to "tickets",
-        "access" to "integra-access",
-        "acceso" to "integra-access",
-        "puertas" to "integra-access",
-        "doors" to "integra-access",
-        "eventos" to "integra-events",
-        "personas" to "integra-people",
-        "visitantes" to "integra-visitors",
-        "integra-access" to "integra-access",
-        "integra-events" to "integra-events",
-        "integra-people" to "integra-people",
-        "integra-attendance" to "integra-attendance",
-        "integra-visitors" to "integra-visitors",
-        "alarms" to "integra-alarms",
-        "alarmas" to "integra-alarms",
-        "occupancy" to "integra-occupancy",
-        "en-sitio" to "integra-occupancy",
-        "devices" to "integra-devices",
-        "equipos" to "integra-devices",
-        "sites" to "integra-sites",
-        "sitios" to "integra-sites",
-        "integra-alarms" to "integra-alarms",
-        "integra-occupancy" to "integra-occupancy",
-        "integra-devices" to "integra-devices",
-        "integra-sites" to "integra-sites",
     )
 
     /** Rutas web tipo `/crm/opportunities/123` o URL absoluta con path y query. */
@@ -231,7 +207,8 @@ object DeepLinkParser {
 
         val rawKey = parts.lastOrNull() ?: "dashboard"
         val rawLower = rawKey.lowercase()
-        val key = panelKey(panel, rawLower, segmentAliases[rawLower] ?: rawLower)
+        val globalAlias = segmentAliases[rawLower] ?: rawLower
+        val key = panelKey(panel, rawLower, globalAlias)
 
         if (key == "notifications-center") return DeepLinkDestination.Notifications
         if (key == "panels" || key == "paneles") return DeepLinkDestination.PanelHub
@@ -264,6 +241,7 @@ object DeepLinkParser {
     private fun panelKey(panel: PanelId, raw: String, aliased: String): String = when {
         panel == CRM -> CRM_KEY_ALIASES[aliased] ?: aliased
         panel == OPS && raw in OPS_SUPPORT_SEGMENTS -> "support"
+        panel == INTEGRA -> INTEGRA_KEY_ALIASES[raw] ?: INTEGRA_KEY_ALIASES[aliased] ?: aliased
         else -> aliased
     }
 
@@ -278,6 +256,41 @@ object DeepLinkParser {
     )
 
     private val OPS_SUPPORT_SEGMENTS = setOf("support", "soporte")
+
+    /** Solo bajo /integra/ — no contaminar ERP attendance ni OPS events. */
+    private val INTEGRA_KEY_ALIASES = mapOf(
+        "access" to "integra-access",
+        "acceso" to "integra-access",
+        "puertas" to "integra-access",
+        "doors" to "integra-access",
+        "events" to "integra-events",
+        "eventos" to "integra-events",
+        "people" to "integra-people",
+        "personas" to "integra-people",
+        "attendance" to "integra-attendance",
+        "asistencia" to "integra-attendance",
+        "visitors" to "integra-visitors",
+        "visitantes" to "integra-visitors",
+        "alarms" to "integra-alarms",
+        "alarmas" to "integra-alarms",
+        "occupancy" to "integra-occupancy",
+        "en-sitio" to "integra-occupancy",
+        "presencia" to "integra-occupancy",
+        "devices" to "integra-devices",
+        "equipos" to "integra-devices",
+        "sites" to "integra-sites",
+        "sitios" to "integra-sites",
+        "settings" to "integra-sites",
+        "integra-access" to "integra-access",
+        "integra-events" to "integra-events",
+        "integra-people" to "integra-people",
+        "integra-attendance" to "integra-attendance",
+        "integra-visitors" to "integra-visitors",
+        "integra-alarms" to "integra-alarms",
+        "integra-occupancy" to "integra-occupancy",
+        "integra-devices" to "integra-devices",
+        "integra-sites" to "integra-sites",
+    )
 
     private fun resolveEntityId(
         key: String,

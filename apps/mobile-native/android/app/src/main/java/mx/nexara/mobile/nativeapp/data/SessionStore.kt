@@ -23,8 +23,12 @@ data class SessionUser(
     val orgRoleKey: String? = null,
     val companyId: Long? = null,
     val expiresAt: String? = null,
-    /** Claves de módulo permitidas desde GET /me/navigation (null = usar reglas locales). */
+    /** Claves de módulo Android desde GET /me/navigation (null = reglas locales). */
     val navModuleKeys: List<String>? = null,
+    /** Paneles hub desde /me/navigation (erp, ops, crm, integra, …). */
+    val navPanels: List<String>? = null,
+    /** Paths url-matrix para matching por webPath. */
+    val navPaths: List<String>? = null,
 )
 
 data class QuickProfile(
@@ -55,6 +59,14 @@ class SessionStore(context: Context) {
             ?.split(",")
             ?.map { it.trim() }
             ?.filter { it.isNotBlank() }
+        val navPanels = prefs.getString("nav_panels_csv", null)
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+        val navPaths = prefs.getString("nav_paths_csv", null)
+            ?.split("\n")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
         return SessionUser(
             id = id,
             nombre = nombre,
@@ -74,6 +86,8 @@ class SessionStore(context: Context) {
             companyId = companyId,
             expiresAt = prefs.getString("expires_at", null),
             navModuleKeys = navKeys,
+            navPanels = navPanels,
+            navPaths = navPaths,
         )
     }
 
@@ -97,6 +111,8 @@ class SessionStore(context: Context) {
             .putLong("company_id", user.companyId ?: 0L)
             .putString("expires_at", user.expiresAt)
             .putString("nav_module_keys_csv", user.navModuleKeys?.joinToString(","))
+            .putString("nav_panels_csv", user.navPanels?.joinToString(","))
+            .putString("nav_paths_csv", user.navPaths?.joinToString("\n"))
             .apply()
 
         saveQuickProfile(user)
@@ -166,6 +182,8 @@ class SessionStore(context: Context) {
             .remove("company_id")
             .remove("expires_at")
             .remove("nav_module_keys_csv")
+            .remove("nav_panels_csv")
+            .remove("nav_paths_csv")
             .apply()
     }
 

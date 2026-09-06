@@ -184,16 +184,30 @@ class AuthRepository(
             roleKey = nav?.roleKey ?: user.roleKey,
             orgRoleKey = nav?.orgRoleKey ?: user.orgRoleKey,
             navModuleKeys = nav?.moduleKeys?.takeIf { it.isNotEmpty() },
+            navPanels = nav?.panels?.takeIf { it.isNotEmpty() },
+            navPaths = nav?.paths?.takeIf { it.isNotEmpty() },
         )
+    }
+
+    /** Refresca paneles/módulos desde /me/navigation (login o resume). */
+    suspend fun refreshNavigation() {
+        val current = sessionStore.load() ?: return
+        if (current.isClient || current.isBranchUser) return
+        val enriched = enrichSession(current)
+        sessionStore.save(enriched)
     }
 
     /**
      * Sliding session: si faltan < 20 min para expiresAt, pide token nuevo.
+     * También refresca navegación RBAC en cada llamada (integración, no solo login).
      */
     suspend fun maybeExtendSession() {
         val current = sessionStore.load() ?: return
         if (current.isClient || current.isBranchUser) return
-        val expiresRaw = current.expiresAt ?: return
+
+        runCatching { refreshNavigation() }
+
+        val expiresRaw = sessionStore.load()?.expiresAt ?: current.expiresAt ?: return
         val expires = runCatching { Instant.parse(expiresRaw) }.getOrNull() ?: return
         val remainingMs = expires.toEpochMilli() - System.currentTimeMillis()
         if (remainingMs > 20L * 60_000L) return
@@ -205,10 +219,11 @@ class AuthRepository(
 
         runCatching {
             val res = api.extendSession()
+            val latest = sessionStore.load() ?: current
             sessionStore.save(
-                current.copy(
+                latest.copy(
                     token = res.access_token,
-                    expiresAt = res.expiresAt ?: current.expiresAt,
+                    expiresAt = res.expiresAt ?: latest.expiresAt,
                 ),
             )
             RealtimeBus.start(res.access_token)

@@ -110,20 +110,49 @@ private fun normalizedConsolePath(module: ModuleEntry): String {
     }
 }
 
+/** Match url-matrix paths (con o sin comodín **) contra webPath del módulo. */
+private fun navigationPathAllows(module: ModuleEntry, navPaths: List<String>): Boolean {
+    val candidates = buildList {
+        val raw = module.webPath.trim()
+        if (raw.isNotBlank()) {
+            add(if (raw.startsWith("/")) raw else "/$raw")
+            add(normalizedConsolePath(module).let { if (it.startsWith("/")) it else "/$it" })
+        }
+    }.distinct().filter { it.isNotBlank() && it != "/" }
+    if (candidates.isEmpty()) return false
+
+    return navPaths.any { rule ->
+        val base = rule
+            .replace(Regex("/\\*\\*$"), "")
+            .replace(Regex("/\\*$"), "")
+            .trimEnd('/')
+        if (base.isBlank() || base.startsWith("/api")) return@any false
+        candidates.any { path ->
+            path == base || path.startsWith("$base/") || base.startsWith(path)
+        }
+    }
+}
+
 fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
     if (user == null) return false
 
     if (module.superAdminOnly && !user.isSuperAdmin) return false
     if (module.permissions.isNotEmpty() && !user.hasAnyPermission(*module.permissions.toTypedArray())) return false
 
-    // Fuente de verdad del servidor (GET /me/navigation) cuando está disponible.
+    // Integración /me/navigation: allow por clave O por path; si no matchea, cae a reglas legacy
+    // (nunca clip duro incompleto que esconda pantallas ya pagadas).
     val navKeys = user.navModuleKeys
-    if (!navKeys.isNullOrEmpty() && !user.isSuperAdmin) {
-        return module.key in navKeys
+    val navPaths = user.navPaths?.filter { !it.startsWith("/api/") }
+    if (!user.isSuperAdmin) {
+        if (!navKeys.isNullOrEmpty() && module.key in navKeys) {
+            return true
+        }
+        if (!navPaths.isNullOrEmpty() && navigationPathAllows(module, navPaths)) {
+            return true
+        }
     }
 
     val path = normalizedConsolePath(module)
-    val roleLower = user.role.lowercase()
 
     val isPlatformAdmin = user.isPlatformAdmin()
     val isAdmin = !user.isSuperAdmin && isPlatformAdmin

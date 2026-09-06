@@ -20,8 +20,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,11 +33,27 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import mx.nexara.mobile.nativeapp.access.ModulePanelMap
 import mx.nexara.mobile.nativeapp.access.PanelId
+import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxModuleScaffold
+
+/** Claves INTEGRA visibles: catálogo ∩ navModuleKeys (soft si nav no trae integra-*). */
+private fun allowedIntegraKeys(user: SessionUser?): Set<String> {
+    val all = ModulePanelMap.integraKeysFor(PanelId.INTEGRA) ?: emptySet()
+    if (user == null || user.isSuperAdmin) return all
+    val navIntegra = user.navModuleKeys
+        ?.filter { it.startsWith("integra-", ignoreCase = true) }
+        ?.toSet()
+        .orEmpty()
+    if (navIntegra.isEmpty()) return all
+    val clipped = all.intersect(navIntegra)
+    return clipped.ifEmpty { all }
+}
 
 private const val Home = "integra/home"
 private const val Access = "integra/access"
@@ -67,6 +85,9 @@ private fun personDetailRoute(personId: String) = "integra/people/$personId"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IntegraNavHost(onExitToPanels: () -> Unit) {
+    val context = LocalContext.current
+    val session = remember(context) { AuthRepository(context).loadSession() }
+    val allowedKeys = remember(session) { allowedIntegraKeys(session) }
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
     val currentRoute = entry?.destination?.route ?: Home
@@ -110,6 +131,7 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
         ) {
             composable(Home) {
                 IntegraHomeScreen(
+                    allowedKeys = allowedKeys,
                     onOpenAccess = { nav.navigate(Access) { launchSingleTop = true } },
                     onOpenEvents = { nav.navigate(Events) { launchSingleTop = true } },
                     onOpenPeople = { nav.navigate(People) { launchSingleTop = true } },
@@ -147,8 +169,18 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
     }
 }
 
+private data class IntegraHubCard(
+    val key: String,
+    val icon: String,
+    val title: String,
+    val subtitle: String,
+    val bg: Color,
+    val onClick: () -> Unit,
+)
+
 @Composable
 private fun IntegraHomeScreen(
+    allowedKeys: Set<String>,
     onOpenAccess: () -> Unit,
     onOpenEvents: () -> Unit,
     onOpenPeople: () -> Unit,
@@ -159,6 +191,23 @@ private fun IntegraHomeScreen(
     onOpenDevices: () -> Unit,
     onOpenSites: () -> Unit,
 ) {
+    fun show(key: String) = key in allowedKeys
+
+    val accessCards = listOf(
+        IntegraHubCard("integra-access", "🚪", "Acceso", "Puertas y apertura", Color(0xFF2563EB), onOpenAccess),
+        IntegraHubCard("integra-events", "📋", "Eventos", "Bitácora ACS", Color(0xFF0D9488), onOpenEvents),
+        IntegraHubCard("integra-people", "👤", "Personas", "Directorio ACS", Color(0xFF7C3AED), onOpenPeople),
+        IntegraHubCard("integra-attendance", "🕒", "Asistencia", "Entradas / salidas", Color(0xFFF97316), onOpenAttendance),
+        IntegraHubCard("integra-visitors", "🪪", "Visitantes", "Citas y registro", Color(0xFF059669), onOpenVisitors),
+    ).filter { show(it.key) }
+
+    val opsCards = listOf(
+        IntegraHubCard("integra-alarms", "🚨", "Alarmas", "Cola SOC", Color(0xFFDC2626), onOpenAlarms),
+        IntegraHubCard("integra-occupancy", "📍", "En sitio", "Ocupación hoy", Color(0xFF0891B2), onOpenOccupancy),
+        IntegraHubCard("integra-devices", "🖥️", "Equipos", "Inventario ACS", Color(0xFF4B5563), onOpenDevices),
+        IntegraHubCard("integra-sites", "🏢", "Sitios", "Lista de sitios", Color(0xFF9333EA), onOpenSites),
+    ).filter { show(it.key) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -166,123 +215,64 @@ private fun IntegraHomeScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item {
-            Column {
-                Text(
-                    "Control de accesos",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = NxColors.Slate,
-                )
-                Text(
-                    "Puertas, eventos, personas, asistencia, visitantes y operación SOC",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxColors.Muted,
-                )
+        if (accessCards.isNotEmpty()) {
+            item {
+                Column {
+                    Text(
+                        "Control de accesos",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = NxColors.Slate,
+                    )
+                    Text(
+                        "Puertas, eventos, personas, asistencia y visitantes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Muted,
+                    )
+                }
             }
+            item { IntegraCardGrid(cards = accessCards) }
         }
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    IntegraQuickCard(
-                        modifier = Modifier.weight(1f),
-                        icon = "🚪",
-                        title = "Acceso",
-                        subtitle = "Puertas y apertura",
-                        bg = Color(0xFF2563EB),
-                        onClick = onOpenAccess,
+        if (opsCards.isNotEmpty()) {
+            item {
+                Column {
+                    Text(
+                        "Operación",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = NxColors.Slate,
                     )
-                    IntegraQuickCard(
-                        modifier = Modifier.weight(1f),
-                        icon = "📋",
-                        title = "Eventos",
-                        subtitle = "Bitácora ACS",
-                        bg = Color(0xFF0D9488),
-                        onClick = onOpenEvents,
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    IntegraQuickCard(
-                        modifier = Modifier.weight(1f),
-                        icon = "👤",
-                        title = "Personas",
-                        subtitle = "Directorio ACS",
-                        bg = Color(0xFF7C3AED),
-                        onClick = onOpenPeople,
-                    )
-                    IntegraQuickCard(
-                        modifier = Modifier.weight(1f),
-                        icon = "🕒",
-                        title = "Asistencia",
-                        subtitle = "Entradas / salidas",
-                        bg = Color(0xFFF97316),
-                        onClick = onOpenAttendance,
-                    )
-                }
-                IntegraQuickCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = "🪪",
-                    title = "Visitantes",
-                    subtitle = "Citas y registro",
-                    bg = Color(0xFF059669),
-                    onClick = onOpenVisitors,
-                )
-            }
-        }
-        item {
-            Column {
-                Text(
-                    "Operación",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = NxColors.Slate,
-                )
-                Text(
-                    "Alarmas, presencia, equipos y sitios",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxColors.Muted,
-                )
-            }
-        }
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    IntegraQuickCard(
-                        modifier = Modifier.weight(1f),
-                        icon = "🚨",
-                        title = "Alarmas",
-                        subtitle = "Cola SOC",
-                        bg = Color(0xFFDC2626),
-                        onClick = onOpenAlarms,
-                    )
-                    IntegraQuickCard(
-                        modifier = Modifier.weight(1f),
-                        icon = "📍",
-                        title = "En sitio",
-                        subtitle = "Ocupación hoy",
-                        bg = Color(0xFF0891B2),
-                        onClick = onOpenOccupancy,
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    IntegraQuickCard(
-                        modifier = Modifier.weight(1f),
-                        icon = "🖥️",
-                        title = "Equipos",
-                        subtitle = "Inventario ACS",
-                        bg = Color(0xFF4B5563),
-                        onClick = onOpenDevices,
-                    )
-                    IntegraQuickCard(
-                        modifier = Modifier.weight(1f),
-                        icon = "🏢",
-                        title = "Sitios",
-                        subtitle = "Lista de sitios",
-                        bg = Color(0xFF9333EA),
-                        onClick = onOpenSites,
+                    Text(
+                        "Alarmas, presencia, equipos y sitios",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Muted,
                     )
                 }
             }
+            item { IntegraCardGrid(cards = opsCards) }
         }
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun IntegraCardGrid(cards: List<IntegraHubCard>) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        cards.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { card ->
+                    IntegraQuickCard(
+                        modifier = Modifier.weight(1f),
+                        icon = card.icon,
+                        title = card.title,
+                        subtitle = card.subtitle,
+                        bg = card.bg,
+                        onClick = card.onClick,
+                    )
+                }
+                if (row.size == 1) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+        }
     }
 }
 
