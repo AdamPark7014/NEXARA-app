@@ -12,6 +12,26 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
+import {
+  decidirLiberacionHd,
+  dentroDelMargenHd,
+  elegirModoHd,
+  hdTranscodeSource,
+  mainStreamPlayable,
+  notaHd,
+  requiereTranscodificacion,
+  reservarRanuraHd,
+  type RanuraHd,
+  type StreamQuality,
+} from './integra-media.hd';
+
+/**
+ * La decisión de calidad vive en `integra-media.hd.ts`, que es lógica pura y se
+ * prueba sin levantar Nest. Se reexporta desde aquí porque este es el módulo
+ * por el que entra el resto del código.
+ */
+export { mainStreamPlayable };
+export type { StreamQuality };
 
 /**
  * En Hikvision el id de stream es `<canal><perfil>`: 301 es el principal del
@@ -27,44 +47,6 @@ function subStreamOf(channelId: string): string {
 
 function mainStreamOf(channelId: string): string {
   return /^\d{3,}$/.test(channelId) ? `${channelId.slice(0, -1)}1` : channelId;
-}
-
-/**
- * Calidad pedida para un stream.
- *
- * `sub` es el secundario (medido en Oficinas: **640×360**) y `main` el
- * principal (1920×1080 en las DS-2CD2123G2 del parque, nueve veces más píxeles).
- *
- * Hasta ahora TODO —muro y Foco— consumía el secundario, y por eso al abrir una
- * cámara a pantalla completa se veía pixelada: se ampliaban 640 px a 1920.
- *
- * La regla es asimétrica a propósito. En un mosaico de 3×3 sobre una pantalla
- * de 1920 cada celda mide unos 600 px, así que el secundario ya la llena: subir
- * ahí a principal no añadiría un solo píxel visible y multiplicaría por nueve el
- * ancho de banda, la CPU de decodificación y —lo que de verdad escuece— las
- * sesiones RTSP contra un NVR que corta a las pocas simultáneas. Solo sube de
- * calidad lo que se está mirando grande, que es como máximo una.
- */
-export type StreamQuality = 'sub' | 'main';
-
-/**
- * ¿Puede el navegador reproducir el canal principal de esta cámara?
- *
- * Medido en Oficinas: las 13 cámaras de vigilancia tienen el principal a
- * 1920×1080 pero en **H.265**, que MSE no decodifica. Pedirlo daría un cuadro
- * negro girando para siempre, que es peor que el secundario pixelado.
- *
- * Ante un códec desconocido se responde que SÍ, a propósito: el espejo puede no
- * haberlo guardado todavía, y en ese caso vale más intentarlo y que el
- * reproductor caiga a respaldo que negar alta calidad a un equipo que sí puede.
- * Lo único que se bloquea es lo que sabemos con certeza que no funciona.
- */
-export function mainStreamPlayable(codec?: string | null): boolean {
-  const c = String(codec ?? '')
-    .toUpperCase()
-    .replace(/[.\s_-]/g, '');
-  if (!c) return true;
-  return !(c === 'H265' || c === 'HEVC' || c === 'MPEGH' || c.startsWith('H265'));
 }
 
 /**
@@ -88,6 +70,15 @@ function audioSourceFor(rtsp: string): string {
 @Injectable()
 export class IntegraMediaService {
   private readonly logger = new Logger(IntegraMediaService.name);
+
+  /**
+   * La única ranura de transcodificación HD del servidor.
+   *
+   * Vive en el proceso, no en Redis, porque lo que protege es la CPU **de esta
+   * máquina**: si algún día hay una segunda réplica de la API, cada una tendrá
+   * su propia ranura y su propio ffmpeg, que es exactamente lo correcto.
+   */
+  private ranuraHd: RanuraHd | null = null;
 
   constructor(
     private readonly sites: IntegraSiteService,
@@ -113,6 +104,11 @@ export class IntegraMediaService {
     opts?: { audio?: boolean; quality?: StreamQuality },
   ) {
     const quality: StreamQuality = opts?.quality === 'main' ? 'main' : 'sub';
+    // Cada petición de vivo —también las 13 del muro, que son las que llegan
+    // seguro— aprovecha para comprobar si la transcodificación sigue haciendo
+    // falta. Así la ranura se libera aunque nadie vuelva a pedir alta calidad,
+    // sin montar un temporizador con su propio ciclo de vida.
+    await this.liberarRanuraHdSiNadieMira(Date.now());
     const resolved = await this.sites.resolveClient({ companyId, siteId });
 
     if (resolved.provider === 'HCT' && resolved.hct) {
@@ -144,6 +140,8 @@ export class IntegraMediaService {
         hasAudio: source.hasAudio,
         withAudio: Boolean(opts?.audio) && source.hasAudio,
         quality,
+        principal: source.principal,
+        codec: source.codec,
       });
     }
 
@@ -181,12 +179,15 @@ export class IntegraMediaService {
    * pocas sesiones RTSP simultáneas, y con 13 canales se agota enseguida. Las
    * que están en plug & play no tienen alternativa: van por el grabador.
    *
-   * Se sirve el **stream secundario**, no el principal. El principal de estos
-   * equipos va en H.265, que el navegador no decodifica: el reproductor se
-   * queda girando para siempre aunque go2rtc esté entregando imagen. El
-   * secundario va en H.264 y a 640×360, que es exactamente lo que necesita un
-   * muro de 13 cámaras — y así no hay que transcodificar, que en un servidor
-   * compartido no es opción.
+   * Por defecto se sirve el **stream secundario**: va en H.264 a 640×360, que
+   * es exactamente lo que necesita un muro de 13 cámaras y no cuesta un ciclo
+   * de CPU. El principal de estas cámaras va en H.265, que el navegador no
+   * decodifica.
+   *
+   * Esta función ya NO degrada por su cuenta. Devuelve la fuente por defecto
+   * **y aparte** el principal en crudo con su códec, para que `publish()` —que
+   * es quien conoce el estado de la ranura de transcodificación— decida entre
+   * servirlo tal cual, pasarlo por ffmpeg, o quedarse en el secundario.
    */
   private async isapiRtsp(
     resolved: Awaited<ReturnType<IntegraSiteService['resolveClient']>>,
@@ -195,10 +196,12 @@ export class IntegraMediaService {
   ): Promise<{
     rtsp: string;
     redacted: string;
+    /** Principal en crudo, cuando existe uno distinto del que va en `rtsp`. */
+    principal: { rtsp: string; redacted: string } | null;
+    /** Códec del principal, tal como lo guardó el sync. */
+    codec: string | null;
     note: string;
     hasAudio: boolean;
-    quality: StreamQuality;
-    degradada: boolean;
   } | null> {
     if (!resolved.isapi || !resolved.siteId) return null;
 
@@ -222,20 +225,20 @@ export class IntegraMediaService {
     const hasAudio = raw.hasAudio === true;
 
     /**
-     * El principal solo sirve si el navegador puede decodificarlo.
+     * El principal se pasa tal cual solo si el navegador puede decodificarlo.
      *
      * Medido en Oficinas: las 13 cámaras de vigilancia tienen el canal
-     * principal a 1920×1080 pero en **H.265**, que MSE no reproduce. Pedirlo
-     * daría un cuadro negro girando para siempre —que es peor que el
-     * secundario pixelado— así que aquí se degrada a `sub` en silencio y se
-     * dice por qué en la nota, en vez de fallar en el navegador.
+     * principal a 1920×1080 pero en **H.265**, que MSE no reproduce. Cuando el
+     * códec no da, la fuente por defecto sigue siendo el secundario —nunca peor
+     * que antes— y el principal viaja aparte, en `principal`, por si se le
+     * puede poner un ffmpeg delante.
      *
      * Cuando alguien ponga el principal en H.264 (o habilite un tercer stream),
-     * esta comprobación lo deja pasar sola, sin tocar código.
+     * esta comprobación lo deja pasar sola, sin tocar código y sin gastar CPU.
      */
-    const mainIsPlayable = mainStreamPlayable(raw.codec);
-    const efectiva: StreamQuality = quality === 'main' && mainIsPlayable ? 'main' : 'sub';
-    const degradada = quality === 'main' && !mainIsPlayable;
+    const efectiva: StreamQuality =
+      quality === 'main' && mainStreamPlayable(raw.codec) ? 'main' : 'sub';
+    const codec = raw.codec ?? null;
 
     const directIp = raw.source?.reachableDirectly ? raw.source.ipAddress : null;
     if (directIp && resolved.isapiForHost) {
@@ -245,38 +248,40 @@ export class IntegraMediaService {
       // sean el canal 7.
       // La terminal de acceso publica un solo perfil: pedirle otro da 404, así
       // que su `streamId` explícito manda por encima de la calidad pedida.
-      const streamId =
-        raw.streamId ?? (efectiva === 'main' ? MAIN_STREAM_ID : SUB_STREAM_ID);
+      const streamId = raw.streamId ?? (efectiva === 'main' ? MAIN_STREAM_ID : SUB_STREAM_ID);
       return {
         rtsp: direct.rtspUrl(streamId),
         redacted: direct.rtspUrlRedacted(streamId),
-        note: [
-          raw.streamId
-            ? `RTSP directo a la terminal (${directIp}), canal ${streamId}`
-            : `RTSP directo a la cámara (${directIp}), sin cargar el grabador`,
-          degradada ? `alta calidad no disponible: el principal va en ${raw.codec}` : '',
-        ]
-          .filter(Boolean)
-          .join(' · '),
+        // Con `streamId` explícito no hay un segundo perfil que transcodificar.
+        principal: raw.streamId
+          ? null
+          : {
+              rtsp: direct.rtspUrl(MAIN_STREAM_ID),
+              redacted: direct.rtspUrlRedacted(MAIN_STREAM_ID),
+            },
+        codec,
+        note: raw.streamId
+          ? `RTSP directo a la terminal (${directIp}), canal ${streamId}`
+          : `RTSP directo a la cámara (${directIp}), sin cargar el grabador`,
         hasAudio,
-        quality: efectiva,
-        degradada,
       };
     }
 
-    const ch = efectiva === 'main' ? mainStreamOf(channelId) : subStreamOf(channelId);
+    const chSub = subStreamOf(channelId);
+    const chMain = mainStreamOf(channelId);
+    const ch = efectiva === 'main' ? chMain : chSub;
     return {
       rtsp: resolved.isapi.rtspUrl(ch),
       redacted: resolved.isapi.rtspUrlRedacted(ch),
-      note: [
-        `RTSP vía grabador ${resolved.host}, canal ${channelId}`,
-        degradada ? `alta calidad no disponible: el principal va en ${raw.codec}` : '',
-      ]
-        .filter(Boolean)
-        .join(' · '),
+      // Un canal que no numera `<canal><perfil>` solo tiene un perfil: ahí
+      // `mainStreamOf` y `subStreamOf` devuelven lo mismo y no hay principal.
+      principal:
+        chMain === chSub
+          ? null
+          : { rtsp: resolved.isapi.rtspUrl(chMain), redacted: resolved.isapi.rtspUrlRedacted(chMain) },
+      codec,
+      note: `RTSP vía grabador ${resolved.host}, canal ${channelId}`,
       hasAudio,
-      quality: efectiva,
-      degradada,
     };
   }
 
@@ -601,11 +606,7 @@ export class IntegraMediaService {
       if (!res.ok) return;
       const all = (await res.json()) as Record<string, unknown>;
       const stale = Object.keys(all).filter((n) => n.startsWith(prefix));
-      for (const name of stale) {
-        await fetch(`${internal}/api/streams?src=${encodeURIComponent(name)}`, {
-          method: 'DELETE',
-        }).catch(() => undefined);
-      }
+      for (const name of stale) await this.borrarStreamGo2rtc(name);
       if (stale.length) {
         this.logger.log(`go2rtc: ${stale.length} playback(s) viejos de ${cameraIndexCode} borrados`);
       }
@@ -615,16 +616,90 @@ export class IntegraMediaService {
     }
   }
 
+  /** Borra un stream de go2rtc. Con ffmpeg detrás, esto mata el proceso. */
+  private async borrarStreamGo2rtc(name: string): Promise<void> {
+    const internal = this.go2rtcInternal();
+    if (!internal) return;
+    await fetch(`${internal}/api/streams?src=${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    }).catch(() => undefined);
+  }
+
+  /**
+   * Cuántos consumidores tiene un stream en go2rtc. `null` = no se pudo saber.
+   *
+   * Es la única señal fiable de «esto ya no lo mira nadie». El reloj no vale:
+   * el front pide la URL una vez y luego se queda con el HLS abierto minutos,
+   * así que un simple TTL mataría justo el stream que alguien está mirando.
+   */
+  private async consumidoresGo2rtc(name: string): Promise<number | null> {
+    const internal = this.go2rtcInternal();
+    if (!internal) return null;
+    try {
+      const res = await fetch(`${internal}/api/streams?src=${encodeURIComponent(name)}`);
+      // 404: el stream ya no existe (reinicio de go2rtc). Nadie lo consume.
+      if (res.status === 404) return 0;
+      if (!res.ok) return null;
+      const info = (await res.json()) as { consumers?: unknown };
+      return Array.isArray(info.consumers) ? info.consumers.length : 0;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Suelta la ranura de transcodificación cuando ya nadie mira ese stream.
+   *
+   * Sin esto, la primera cámara que pidiera alta calidad se quedaría el único
+   * cupo del servidor para siempre y ninguna otra volvería a tener HD hasta el
+   * siguiente despliegue.
+   */
+  private async liberarRanuraHdSiNadieMira(ahora: number): Promise<void> {
+    const ranura = this.ranuraHd;
+    if (!ranura) return;
+    // Dentro del margen ni se pregunta: es el caso normal —cambiar de cámara y
+    // volver— y preguntar en cada una de las 13 peticiones del muro sería una
+    // llamada de más por nada.
+    if (dentroDelMargenHd(ranura, ahora)) return;
+
+    const consumidores = await this.consumidoresGo2rtc(ranura.streamName);
+    switch (decidirLiberacionHd(ranura, ahora, consumidores)) {
+      case 'renovar':
+        // Alguien la está mirando: se refresca el reloj para que un turno largo
+        // de vigilancia no acabe cortándose solo.
+        this.ranuraHd = { ...ranura, pedidoEn: ahora };
+        break;
+      case 'liberar':
+        await this.borrarStreamGo2rtc(ranura.streamName);
+        this.ranuraHd = null;
+        this.logger.log(
+          `go2rtc: transcodificación HD de ${ranura.cameraIndexCode} liberada, no la miraba nadie`,
+        );
+        break;
+      default:
+        break;
+    }
+  }
+
   private async publish(
     provider: 'ARTEMIS' | 'ISAPI',
     cameraIndexCode: string,
     rtsp: string,
     rtspForResponse: string,
     sourceNote?: string,
-    audio?: { hasAudio: boolean; withAudio: boolean; quality?: StreamQuality },
+    opts?: {
+      hasAudio: boolean;
+      withAudio: boolean;
+      quality?: StreamQuality;
+      /** Principal en crudo, cuando existe uno distinto del que va en `rtsp`. */
+      principal?: { rtsp: string; redacted: string } | null;
+      /** Códec del principal, tal como lo guardó el sync. */
+      codec?: string | null;
+    },
   ) {
-    const hasAudio = Boolean(audio?.hasAudio);
-    const withAudio = Boolean(audio?.withAudio);
+    const hasAudio = Boolean(opts?.hasAudio);
+    const withAudio = Boolean(opts?.withAudio);
+    const quality: StreamQuality = opts?.quality === 'main' ? 'main' : 'sub';
     const internal = this.go2rtcInternal();
     if (!internal) {
       return {
@@ -641,12 +716,65 @@ export class IntegraMediaService {
     // El principal va con su propio nombre: si compartiera el del secundario,
     // pedir alta calidad reescribiria el stream que esta alimentando al muro
     // entero y todos los mosaicos saltarian de golpe.
-    const hd = audio?.quality === 'main' ? '_hd' : '';
-    const base = `cam_${cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_')}${hd}`;
+    const slug = cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const hd = quality === 'main' ? '_hd' : '';
+    const base = `cam_${slug}${hd}`;
     // Stream aparte para el audio: el mudo lo comparten todos los mosaicos del
     // muro y no debe cargar con el transcodificado.
     const streamName = withAudio ? `${base}_a` : base;
-    const src = withAudio ? audioSourceFor(rtsp) : rtsp;
+
+    /* ── Alta calidad: nativo, transcodificado o secundario ───────────────
+     *
+     * Aquí es donde se reparte la única ranura de transcodificación. Se pide
+     * SOLO cuando hace falta de verdad —principal existente y en un códec que
+     * el navegador no decodifica—; una terminal en H.264 no gasta cupo.
+     */
+    const principal = opts?.principal ?? null;
+    let cupo = false;
+    if (requiereTranscodificacion({ quality, codec: opts?.codec, hayPrincipal: Boolean(principal) })) {
+      const ahora = Date.now();
+      const reserva = reservarRanuraHd(this.ranuraHd, { cameraIndexCode, streamName }, ahora);
+      cupo = reserva.concedida;
+      if (reserva.concedida) {
+        this.ranuraHd = reserva.ranura;
+        // La misma cámara volviendo con otro nombre (le encendieron el micro):
+        // se mata el ffmpeg anterior o quedaría uno huérfano comiendo CPU.
+        if (reserva.liberar) await this.borrarStreamGo2rtc(reserva.liberar);
+      }
+    }
+    const { modo, razon } = elegirModoHd({
+      quality,
+      codec: opts?.codec,
+      hayPrincipal: Boolean(principal),
+      cupo,
+    });
+
+    let src = withAudio ? audioSourceFor(rtsp) : rtsp;
+    let rtspDevuelto = rtspForResponse;
+    if (modo === 'transcodificado' && principal) {
+      src = hdTranscodeSource(principal.rtsp, withAudio);
+      rtspDevuelto = principal.redacted;
+    } else if (modo === 'secundario' && quality === 'main') {
+      /*
+       * Pidió alta calidad y no la hay. No se registra un stream nuevo: se le
+       * devuelve el que YA está alimentando al muro, caliente, sin abrir una
+       * segunda sesión RTSP contra un equipo que las cuenta. El front compara
+       * el nombre con el suyo, ve que es el mismo y se queda donde estaba.
+       */
+      const publicBase = this.go2rtcPublic() || internal;
+      const nombreSub = withAudio ? `cam_${slug}_a` : `cam_${slug}`;
+      return {
+        cameraIndexCode,
+        provider,
+        rtsp: rtspForResponse,
+        hls: `${publicBase}/api/stream.m3u8?src=${encodeURIComponent(nombreSub)}`,
+        streamName: nombreSub,
+        hasAudio,
+        audio: withAudio,
+        note: [sourceNote, notaHd(modo, razon)].filter(Boolean).join(' · '),
+      };
+    }
+
     try {
       // Query PUT: registra en memoria aunque go2rtc responda 400 al persistir
       // YAML (URLs con `?starttime=` o claves con caracteres raros). El PUT JSON
@@ -663,17 +791,28 @@ export class IntegraMediaService {
       return {
         cameraIndexCode,
         provider,
-        rtsp: rtspForResponse,
+        rtsp: rtspDevuelto,
         hls,
         streamName,
         hasAudio,
         audio: withAudio,
-        note: [sourceNote, withAudio ? 'go2rtc MSE, audio AAC' : 'go2rtc MSE']
+        note: [
+          sourceNote,
+          withAudio ? 'go2rtc MSE, audio AAC' : 'go2rtc MSE',
+          // Solo cuando alguien pidió alta calidad: al muro no le interesa.
+          quality === 'main' ? notaHd(modo, razon) : null,
+        ]
           .filter(Boolean)
           .join(' · '),
       };
     } catch (e) {
       this.logger.warn(`go2rtc falló: ${String(e)}`);
+      // Si go2rtc no llegó a registrar nada, la ranura reservada no está
+      // sujetando ningún ffmpeg: soltarla ya, o la siguiente cámara se comería
+      // un «no» por un cupo que en realidad está libre.
+      if (modo === 'transcodificado' && this.ranuraHd?.streamName === streamName) {
+        this.ranuraHd = null;
+      }
       return {
         cameraIndexCode,
         provider,
