@@ -21,25 +21,43 @@ Guía para compilar, versionar y publicar el AAB de Play Store con R8 habilitado
 
 Los valores viven en [`apps/mobile-native/android/gradle.properties`](../apps/mobile-native/android/gradle.properties):
 
+Valores actuales (06-09-2026):
+
 ```properties
-VERSION_CODE=1
-VERSION_NAME=0.1.0
+VERSION_CODE=7
+VERSION_NAME=1.0.1
 ```
 
 `build.gradle.kts` los lee en `defaultConfig`; no hace falta editar el `.kts` en cada release.
 
 ### Reglas de bump
 
-1. **`VERSION_CODE`** — entero monótono. **Subir en cada subida a Play Console.** Google rechaza un `versionCode` repetido aunque el `versionName` cambie.
-2. **`VERSION_NAME`** — semver legible para usuarios (p. ej. `0.2.0`, `1.0.0`). No afecta la aceptación en Play, pero conviene alinearlo con el release del monorepo.
-3. Tras cambiar los valores, recompila el AAB; no uses un bundle viejo con código nuevo.
+1. **`VERSION_CODE`** — entero monótono. **Subir en cada subida a Play Console.** Google
+   rechaza un `versionCode` repetido aunque el `versionName` cambie. Y «repetido» significa
+   **subido**, no publicado: un bundle que subiste y luego descartaste consume su número
+   para siempre. El valor de referencia está en *Play Console → Versiones → Panel de la app*,
+   no en este repositorio.
+2. **`VERSION_NAME`** — semver legible para usuarios. No afecta la aceptación en Play, pero
+   conviene alinearlo con el release del monorepo.
+3. Tras cambiar los valores, **recompila el AAB**; no uses un bundle viejo con código nuevo.
+   `scripts/mobile-smoke-checklist.ps1` ahora falla si el AAB en disco es más antiguo que el
+   último fichero fuente modificado, justo para impedirlo.
 
-Ejemplo para la segunda subida:
+La forma recomendada de subir la versión es dejar que el script lo haga, así el bump y la
+compilación no pueden desincronizarse:
 
-```properties
-VERSION_CODE=2
-VERSION_NAME=0.2.0
+```powershell
+pwsh -File scripts/build-play-aab.ps1 -BumpVersionCode -Clean
+pwsh -File scripts/build-play-aab.ps1 -VersionCode 9 -VersionName 1.1.0   # valor explícito
 ```
+
+### Preflight de release
+
+`app/build.gradle.kts` aborta cualquier tarea `bundleRelease` / `assembleRelease` si falta
+`key.properties`, si `GOOGLE_MAPS_API_KEY` está vacía o vale el placeholder, o si
+`VERSION_CODE`/`VERSION_NAME` no están declarados. Los tres casos producían antes un AAB que
+compilaba bien y fallaba después: firmado con la llave de debug, con los mapas en blanco, o
+con `versionCode=1`. Las tareas de debug y los tests no se ven afectados.
 
 ---
 

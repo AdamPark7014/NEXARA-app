@@ -1,305 +1,397 @@
-# 10 — Preparación de la v2 para Google Play
+# 10 — Lanzamiento de la v2 en Google Play
 
-Auditoría de **solo lectura**. Rama `mejora/calidad-y-web`, árbol limpio en `bd6143ce`.
-Ningún archivo fuente fue modificado. No se abrió el keystore ni `key.properties`, y no
-se transcribe ningún secreto.
+**Fecha:** 06-09-2026 · **Rama:** `mejora/calidad-y-web` · **Turno:** remediación (Claude Code)
 
-Alcance: `apps/mobile-native/android/`, `apps/mobile-native/play-assets/`,
-`docs/ANDROID-RELEASE.md`, `docs/PLAY-STORE-CHECKLIST.md`, `docs/PLAY-STORE-LISTING.md`,
-`docs/STORE-UPLOAD-READY.md`, `docs/PLAY-SCREENSHOTS-GUIDE.md`, `scripts/build-play-aab.ps1`,
-`scripts/mobile-smoke-checklist.ps1`, `CHANGELOG-MOBILE.md`, `.github/workflows/ci.yml`.
+Este documento **reemplaza** la auditoría de solo lectura anterior. Aquella se escribió
+sobre el estado del 31-08 y **quedó obsoleta**: entre medias hubo un turno de remediación
+grande. Todo lo que sigue está reverificado contra el código de hoy, y varios de los
+bloqueantes de la versión anterior ya no existen.
 
----
-
-## 0. Resumen ejecutivo
-
-La configuración de release es **sólida**: AAB firmado, R8 con reglas correctas para Moshi,
-cleartext bloqueado, `allowBackup=false`, `targetSdk=36`, alineación de 16 KB verificada en
-los cuatro ABIs, assets de ficha completos y con las medidas exactas, y **ningún secreto
-versionado**. Eso ya está resuelto y no hay que volver a tocarlo.
-
-Lo que bloquea la v2 no es la configuración: es **el versionado** y **una declaración de
-la ficha que nadie llenó**. Y lo que la puede hundir en campo son tres defectos de
-runtime que ninguna prueba del repo detecta, porque **no hay telemetría de fallos ni CI
-que compile Android**.
-
-Historial relevante que encontré en `git log` — la app ya fue rechazada **dos veces**:
-
-| Fecha | Bundle | Motivo del rechazo | Estado |
-|---|---|---|---|
-| 31-08-2026 | 3 (Producción) | `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO` | Resuelto sin cambios (el manifiesto ya usaba Photo Picker) |
-| 31-08-2026 | — | «Afirmaciones engañosas»: el icono instalado no coincidía con el de la ficha | Corregido en `1a8f8051` |
+No se abrió `key.properties` ni `nexara-upload.jks`. No se ejecutó ninguna build de release
+ni se firmó nada. No se transcribe ningún secreto.
 
 ---
 
-## 1. Tabla de bloqueantes
+## 0. Resumen en diez líneas
 
-Impiden publicar o garantizan rechazo.
+La configuración de release está **mejor que nunca**: Crashlytics ya integrado, Firebase
+Analytics fuera (y con él los tres permisos de publicidad), permisos reducidos a los seis que
+la app realmente usa, `targetSdk=36`, cleartext bloqueado, 16 KB verificado, y `VERSION_CODE`
+ya en 7.
 
-| # | Bloqueante | Evidencia | Qué hacer |
-|---|---|---|---|
-| **B1** | **`VERSION_CODE=5` ya está consumido y el AAB en disco está obsoleto respecto al código.** El commit `1a8f8051` dice literalmente «VERSION_CODE 4 -> 5; el 4 ya se habia subido a Play». Peor: el AAB (`app-release.aab`, 26 MB) se escribió el **31-08-2026 a las 14:06**, y el commit `c8bccea5` (*paridad de rutas app-web*) tocó `DeepLinkParser.kt`, `ModulePanelMap.kt`, `WebPanelUrl.kt` y `PlaceholderScreen.kt` a las **14:08** — dos minutos después. Ese AAB **no lleva** la corrección de rutas. | `apps/mobile-native/android/gradle.properties:8` → `VERSION_CODE=5`; manifiesto fusionado de release → `android:versionCode="5"`; `git show c8bccea5` | Verificar en Play Console el `versionCode` más alto **subido** (no publicado: Play tampoco reutiliza los de bundles descartados) y poner `VERSION_CODE` en ese número **+1** — previsiblemente `6`. Subir también `VERSION_NAME` a `1.1.0` (hoy sigue en `1.0.0` con cinco bundles a cuestas). **Recompilar**: el AAB de disco no sirve. |
-| **B2** | **Declaración de «ID de publicidad» pendiente o incoherente.** El manifiesto fusionado de release trae `com.google.android.gms.permission.AD_ID`, `android.permission.ACCESS_ADSERVICES_AD_ID` y `ACCESS_ADSERVICES_ATTRIBUTION`. Play exige responder **sí** en *Contenido de la app → ID de publicidad*; si la declaración dice que no, bloquea la versión. `docs/PLAY-STORE-CHECKLIST.md` §6 **no menciona esta declaración en ningún punto**. Lo irónico: **`FirebaseAnalytics` no se invoca ni una sola vez en todo el código Kotlin** — los tres permisos entran solos con la dependencia. | `app/build/outputs/logs/manifest-merger-release-report.txt:923` → `ADDED from play-services-measurement-impl:22.1.2`; `grep -r "FirebaseAnalytics\|logEvent" app/src/main/java` → 0 resultados; `app/build.gradle.kts:169` → `firebase-analytics-ktx` | **Opción A (recomendada):** quitar `implementation("com.google.firebase:firebase-analytics-ktx")`. Desaparecen los tres permisos y el `BIND_GET_INSTALL_REFERRER_SERVICE`, y la fila «Interacciones en la app» sale de Data Safety. **Opción B:** conservarla y declarar el ID de publicidad en Play Console. Lo que no se puede es dejarlo sin contestar. |
+Lo que queda **no es configuración**: es **un AAB obsoleto en disco** que cualquiera puede
+subir por error, **una declaración de Data Safety que ya no coincide con la app**, y **tres
+defectos de runtime** que solo se ven en release o en teléfonos concretos.
 
-> **B2 es condicional:** si la v1 ya se publicó con esta declaración contestada correctamente,
-> queda resuelto y solo hay que confirmarlo. Pero el checklist del repo no lo documenta,
-> así que hay que verificarlo en la consola antes de enviar.
+Y una cosa que sí estaba a punto de hundir la v2 y ya no: las reglas de R8 eran correctas
+**por coincidencia**, no por diseño. Ver §4.
 
 ---
 
-## 2. Tabla de riesgos
+## 1. Qué cambió desde la auditoría del 31-08
 
-Pasan la revisión, pero rompen la app en campo o provocan un rechazo posterior.
+Reverificado uno por uno. Esto importa porque el documento anterior sigue circulando.
 
-| # | Riesgo | Severidad | Evidencia | Impacto |
+| Hallazgo anterior | Estado hoy | Evidencia |
+|---|---|---|
+| **B2** — `AD_ID` + `ACCESS_ADSERVICES_*` en el manifiesto por `firebase-analytics-ktx` | ✅ **RESUELTO** | `firebase-analytics-ktx` ya no está en `build.gradle.kts`. El informe de fusión **del 06-09** (`manifest-merger-debug-report.txt`) no contiene `AD_ID`, `ADSERVICES`, ni `BIND_GET_INSTALL_REFERRER_SERVICE`. Solo queda `firebase-measurement-connector`, que no aporta permisos |
+| **R1** — Cero telemetría de fallos | ✅ **RESUELTO** | Plugin `com.google.firebase.crashlytics` 3.0.2 + `firebase-crashlytics-ktx`. La tarea `injectCrashlyticsMappingFileIdRelease` aparece en el grafo de `bundleRelease` → el `mapping.txt` se sube solo |
+| **R9** — `VIBRATE` y `READ_EXTERNAL_STORAGE` declarados sin usarse | ✅ **RESUELTO** | Ninguno de los dos aparece ya ni en el manifiesto fuente ni en el fusionado |
+| **R2** — Crash al arranque si falla el Keystore | ✅ **RESUELTO** (con matiz) | `SessionStore.openPrefs()` ya envuelve `EncryptedSharedPreferences.create` en `try/catch`. **Matiz nuevo:** el fallback guarda el token en `SharedPreferences` **sin cifrar** → ver R-C |
+| **R3** — Cámara rota en Android 7–9 | ⚠️ **PARCIAL** | Ya hay gate `SDK_INT >= Q` para `RELATIVE_PATH`. Pero sigue el `insert()` sobre `EXTERNAL_CONTENT_URI` → ver R-B |
+| **R4** — Banner offline bajo la barra de estado | ❌ **ABIERTO** | `grep` de `statusBarsPadding\|systemBarsPadding\|safeDrawingPadding\|WindowInsets\.` sobre todo `app/src/main/java` → **0 resultados** |
+| **R7** — Sin reglas de transferencia D2D | ✅ **ARREGLADO ESTE TURNO** | Ver §7 |
+| **R5/R6** — Placeholder de Maps y firma de debug silenciosa | ✅ **ARREGLADO ESTE TURNO** | Ver §7 |
+| **R12** — Sin `values-night` ni icono monocromo | ❌ **ABIERTO** | `res/values-night/` no existe; `mipmap-anydpi-v26/ic_launcher.xml` sin `<monochrome>` |
+| **B1** — Versionado | ⚠️ **CAMBIÓ DE FORMA** | `VERSION_CODE=7` ya está puesto. Pero el AAB en disco sigue siendo el del 31-08 → ver **B1** abajo |
+
+---
+
+## 2. Bloqueantes
+
+Impiden publicar, o publican algo distinto de lo que crees.
+
+### B1 — El AAB en disco tiene seis días y le falta una semana de trabajo
+
+**Verificado ejecutando el smoke:**
+
+```
+AAB    : 31/08/2026 14:06:10   app-release.aab  (24.85 MB)
+Fuente : 06/09/2026 17:38:49   ui/console/ConsoleAccessRules.kt
+```
+
+Ese bundle se compiló con `versionCode 5` y **no contiene** ninguno de los commits del 06-09
+(las tres olas de paridad móvil, `/me/navigation`, INTEGRA, portal de sucursal…). Si se sube,
+se publica código de hace una semana con un número de versión nuevo — y Play consume ese
+`versionCode` para siempre.
+
+Peor: hasta este turno, `scripts/mobile-smoke-checklist.ps1` **daba ese AAB por bueno**. Solo
+comprobaba que el fichero existiera.
+
+**Acción:** recompilar. El script de build ahora borra el bundle anterior antes de compilar,
+y el smoke falla si el AAB es más viejo que la fuente.
+
+```powershell
+pwsh -File scripts/build-play-aab.ps1 -BumpVersionCode -Clean
+```
+
+### B2 — La declaración de Data Safety ya no coincide con la app
+
+La v1 se declaró (según `PLAY-STORE-CHECKLIST.md` §6.5 tal como estaba) con **«Interacciones
+en la app — Firebase Analytics»**. Analytics **ya no está en el build**. Y Crashlytics, que sí
+está ahora, obliga a declarar **«Registros de fallos»** y **«Diagnósticos»**, que antes no
+figuraban.
+
+Declarar datos que ya no recoges es tan sancionable como omitir los que sí. Y la respuesta a
+*Contenido de la app → **ID de publicidad*** pasa de **Sí** a **No**.
+
+**Acción:** rehacer el formulario con el borrador de §5. Ya está redactado y cruzado contra
+el código.
+
+### B3 — Confirmar el `versionCode` real contra Play Console
+
+`VERSION_CODE=7` es una suposición del repositorio, no un dato. Play no reutiliza un
+`versionCode` **subido**, aunque el bundle se descartara o nunca se publicara — y el historial
+dice que hubo al menos dos rechazos con bundles intermedios.
+
+**Acción:** *Play Console → Versiones → Panel de la app* → anotar el mayor **subido** y poner
+ese número + 1. Es un minuto y evita un ciclo de subida perdido.
+
+---
+
+## 3. Riesgos
+
+Pasan la revisión, pero rompen la app en campo. **Los tres primeros son Kotlin: no los toqué**
+(este turno tenía prohibido tocar `.kt`). Quedan para el siguiente turno.
+
+| # | Riesgo | Sev. | Evidencia | Arreglo |
 |---|---|---|---|---|
-| **R1** | **Cero telemetría de fallos.** No hay Crashlytics, ni Sentry, ni Bugsnag. Ninguna referencia en gradle ni en Kotlin. | **Alta** | `grep -rn "crashlytics\|Sentry\|bugsnag"` en `android/` → 0 resultados | La v2 se publica a ciegas. Solo se verían los ANR/crashes que Play recoge de usuarios que aceptan compartir, sin *stack trace* desofuscado. Firebase ya está integrado: añadir Crashlytics es una dependencia y un plugin, y el `mapping.txt` se sube solo. |
-| **R2** | **Crash irrecuperable al arranque si falla el Keystore.** `SessionStore` construye `MasterKey` + `EncryptedSharedPreferences.create(...)` como `val` de constructor, **sin `try/catch`**. `AuthRepository` instancia `SessionStore` también en el constructor, y `MainActivity` crea `AuthRepository` dentro de `setContent`. Además `androidx.security:security-crypto` está en **`1.1.0-alpha06`** — una alfa sosteniendo el token de sesión en producción. | **Alta** | `data/SessionStore.kt:31-41`; `data/AuthRepository.kt:12-13`; `MainActivity.kt` (`AuthRepository(this@MainActivity)`); `app/build.gradle.kts:145` | Si el Keystore se invalida (restauración desde backup, cambio del bloqueo de pantalla, actualización de Android, OEM con Keystore roto) la app **crashea al abrir y no se recupera nunca** salvo borrando datos. Es exactamente el fallo que genera reseñas de una estrella y que, sin R1, nadie ve. Envolver en `try/catch` con borrado y recreación del fichero cifrado. |
-| **R3** | **La captura de evidencias por cámara está rota en Android 7–9.** `freshCameraOutputUri()` mete `MediaStore.MediaColumns.RELATIVE_PATH` en el `ContentValues` **sin ningún gate de versión**, y esa columna existe desde API 29. Encima hace `insert()` sobre `MediaStore.Images.Media.EXTERNAL_CONTENT_URI`, que en API 24–28 exige `WRITE_EXTERNAL_STORAGE` — permiso **no declarado**. `minSdk = 24`. | **Alta** | `ui/common/MediaPickerBar.kt:29-40`; `grep -n "VERSION" MediaPickerBar.kt` → 0 resultados; manifiesto: no hay `WRITE_EXTERNAL_STORAGE` | En Android 7.0–9.0 el `insert` devuelve `null` (el botón de cámara no hace nada) o lanza `IllegalArgumentException`. Evidencias en campo = módulo OPS, el caso de uso principal. Gate por `Build.VERSION.SDK_INT >= Q`, o mejor: `FileProvider` + `TakePicture` sobre `getExternalFilesDir` (ya está el provider configurado en `xml/nexara_file_paths.xml`). |
-| **R4** | **El banner de sin-conexión queda debajo de la barra de estado.** `MainActivity` llama `enableEdgeToEdge()`, y `NexaraScaffold` mete `OfflineBanner` como primer hijo de una `Column(Modifier.fillMaxSize())` **sin ningún padding de insets**. En todo el proyecto hay **0 usos** de `statusBarsPadding`, `systemBarsPadding`, `safeDrawingPadding`, `contentWindowInsets` o `WindowInsets.*`. | **Media-alta** | `MainActivity.kt:52`; `ui/NexaraScaffold.kt:51-62`; `ui/shared/OfflineBanner.kt`; `grep -rn "systemBarsPadding\|WindowInsets\."` → 0 | Con `targetSdk=36`, Android 15+ **fuerza** edge-to-edge sin opción de salida. El banner naranja («Sin conexión · N en cola») se dibuja bajo el reloj y la batería: ilegible justo cuando más importa. Los 62 `Scaffold(` internos sí están bien (Material3 aplica sus insets por defecto y `NxModuleScaffold` propaga el `PaddingValues`); el defecto es solo del banner. Un `Modifier.statusBarsPadding()` en la `Column` lo resuelve. |
-| **R5** | **La API key de Maps depende de la máquina que compila y el fallback no rompe el build.** `build.gradle.kts` lee `GOOGLE_MAPS_API_KEY` de `-P` o de `local.properties`; si no está, pone `manifestPlaceholders["MAPS_API_KEY"] = "AIzaSyPLACEHOLDER"` **y compila igual**. `local.properties` está en `.gitignore`. | **Media-alta** | `app/build.gradle.kts:32-42`. Verificado: el manifiesto fusionado de release actual **sí** lleva una clave real, no el placeholder — pero solo porque se compiló en esta máquina | Un AAB generado en otra máquina, en un runner de CI o tras reinstalar el sistema sale con mapas en blanco, sin error de compilación y sin que nadie se entere hasta que un usuario lo reporta. Hacer que `bundleRelease` **falle** si la clave está en blanco o es el placeholder. |
-| **R6** | **`bundleRelease` cae silenciosamente a la firma de debug.** `signingConfig = if (keystorePropertiesFile.exists()) release else debug`. Sin `key.properties`, Gradle produce un AAB firmado con la llave de debug, sin avisar. | **Media** | `app/build.gradle.kts:70-74` | Play lo rechaza con *«el certificado de subida no coincide»*, pero solo después de subir 26 MB. `scripts/build-play-aab.ps1:80-82` sí lanza una excepción si falta el fichero — la trampa es para quien invoque `gradlew bundleRelease` a mano (que es justo lo que documenta `docs/ANDROID-RELEASE.md` §Verificación local). Mejor: fallar en el propio Gradle en vez de degradar a debug. |
-| **R7** | **Transferencia dispositivo-a-dispositivo sin reglas.** `allowBackup="false"` corta el backup en la nube, pero en Android 12+ la transferencia D2D **sigue activa** salvo que se declare `android:dataExtractionRules`. No hay ese atributo ni fichero de reglas. | **Media** | Manifiesto fusionado: `android:allowBackup="false"`, sin `dataExtractionRules` ni `fullBackupContent` | El fichero cifrado de sesión viaja a un teléfono nuevo. En la práctica es ilegible (la clave maestra vive en el Keystore y no se transfiere), pero eso es justo lo que dispara **R2**: el usuario estrena teléfono, la app restaura el fichero, no puede descifrarlo y crashea al abrir. Añadir `data_extraction_rules.xml` con `<device-transfer><exclude domain="sharedpref" path="nexara_session.xml"/></device-transfer>`. |
-| **R8** | **Los tests existen pero nadie los ejecuta, y no hay ni un test instrumentado.** 6 ficheros JVM con **51 `@Test`** (`DeepLinkParser` 15, `NotificationDeepLinkResolver` 13, `AuthErrorMapper` 10, `WebPanelUrl` 6, `FinanceStatusTone` 5, `AppUrlsParity` 2). Directorio `app/src/androidTest` **no existe**. `.github/workflows/ci.yml` **no tiene ningún paso de Android**: solo Node, Prisma, typecheck de API y web, Jest y Vitest. | **Media** | `find app/src/test app/src/androidTest`; `grep -c "@Test"`; `.github/workflows/ci.yml` completo | Lo que cubren los 51 tests es la capa de deep links y el mapeo de errores — nada de UI, nada de red, nada de serialización. Y ni eso corre automáticamente: `npm run mobile:smoke` es local y manual (`scripts/mobile-smoke-checklist.ps1` hace `assembleDebug` + `testDebugUnitTest`, pero solo si alguien lo lanza). Añadir un job `gradlew testDebugUnitTest lintRelease` al CI cuesta poco. |
-| **R9** | **Dos permisos declarados que el código no usa.** `VIBRATE` y `READ_EXTERNAL_STORAGE` (`maxSdkVersion=32`). | **Media** | `grep -rn "VIBRATE\|READ_EXTERNAL_STORAGE"` en Kotlin → **0 resultados**. La vibración que existe es `performHapticFeedback` de Compose (`NxNavigation.kt:119`, `SmartQuoteBuilderScreen.kt:504`), que **no requiere** `VIBRATE`. El picker usa `PickMultipleVisualMedia` + `OpenMultipleDocuments` + `TakePicture` (`MediaPickerBar.kt:64-79`), ninguno de los cuales requiere permiso de almacenamiento en **ninguna** versión de Android | Un permiso declarado y no usado aumenta la superficie de escrutinio de Play y hincha la ficha de permisos. Y `READ_EXTERNAL_STORAGE` es de la misma familia que ya provocó el rechazo del bundle 3. Quitar los dos. |
-| **R10** | **Repo público con `google-services.json` versionado.** El remoto es `github.com/AdamPark7014/NEXARA-app` y el propio `ci.yml` dice «El repositorio es público y hay credenciales en claro dentro del árbol». `google-services.json` está en `git ls-files`. | **Media** | `git ls-files \| grep google-services` → `apps/mobile-native/android/app/google-services.json`; `.github/workflows/ci.yml:60-64` | Versionar `google-services.json` es práctica estándar (la clave que lleva es de cliente), **pero solo si está restringida**. Con el repo público es obligatorio confirmar que la API key de Firebase y la de Maps están limitadas por *package name* + **SHA-1 de las dos llaves**: la de subida (`A9:86:2A:...`, documentada en el checklist) **y la de distribución de Play**, que Google genera al activar Play App Signing. Si falta la segunda, el mapa sale en blanco en la versión de la tienda aunque funcione en local — está avisado en `PLAY-STORE-CHECKLIST.md` §4, pero no consta que se haya hecho. |
-| **R11** | `@JsonClass(generateAdapter = true)` sin procesador de anotaciones. `QueuedMutation` la lleva, pero no hay `ksp` ni `kapt` de `moshi-kotlin-codegen` en el build. | **Baja** | `data/offline/OfflineMutationQueue.kt:14`; `app/build.gradle.kts` sin plugin KSP | Hoy funciona: Moshi no encuentra el adaptador generado, captura el `ClassNotFoundException` y cae al adaptador reflexivo. La anotación es decorativa **pero salva la clase de R8** (`-keep @com.squareup.moshi.JsonClass class * { *; }`). Verificado en `mapping.txt:668824`: `QueuedMutation` **no fue renombrada** mientras el resto de `data.offline` sí (`NetworkMonitor -> rc.b`). Si alguien añade KSP más adelante, el comportamiento cambia. |
-| **R12** | Sin tema oscuro en recursos ni icono monocromo. No existe `values-night/`, `windowBackground` es `@color/white`, y los `adaptive-icon` no declaran `<monochrome>`. | **Baja** | `app/src/main/res/` sin `values-night`; `values/themes.xml:6`; `mipmap-anydpi-v26/ic_launcher.xml` | Destello blanco al abrir en modo oscuro (Compose sí gestiona el tema, el problema es el `windowBackground` de Android antes de que Compose pinte). Y en Android 13+ el icono temático no se aplica. Calidad de ficha, no bloqueo. |
+| **R-A** | **Edge-to-edge obligatorio y cero gestión de insets.** `MainActivity` llama `enableEdgeToEdge()` y `NexaraScaffold` pone `OfflineBanner` como primer hijo de una `Column(fillMaxSize())` sin padding. Con `targetSdk=36`, Android 15+ **fuerza** edge-to-edge sin escapatoria | **Alta** | 0 resultados de `statusBarsPadding\|systemBarsPadding\|safeDrawingPadding\|WindowInsets\.` en todo `app/src/main/java` | `Modifier.statusBarsPadding()` en la `Column` de `NexaraScaffold`. Los 62 `Scaffold(` internos sí están bien (Material3 aplica insets por defecto) |
+| **R-B** | **Captura de evidencias en Android 7–9.** El gate de `RELATIVE_PATH` ya está, pero `freshCameraOutputUri()` sigue haciendo `insert()` sobre `MediaStore.Images.Media.EXTERNAL_CONTENT_URI`, que en API 24–28 exige `WRITE_EXTERNAL_STORAGE` — permiso **no declarado** (y que no conviene declarar). `minSdk=24` | **Alta** | `ui/common/MediaPickerBar.kt` | Migrar a `FileProvider` + `getExternalFilesDir`. El provider ya existe y `xml/nexara_file_paths.xml` ya está configurado. Probar en emulador API 24 **y** 28 |
+| **R-C** | **El fallback de sesión guarda el token sin cifrar.** Si el Keystore falla, `SessionStore.openPrefs()` cae a `getSharedPreferences("nexara_session_fallback", MODE_PRIVATE)` — texto plano. Ya no crashea (bien), pero degrada en silencio la seguridad de la sesión | **Media-alta** | `data/SessionStore.kt:207-209` | Mejor forzar re-login que persistir el token en claro. Como mínimo, marcarlo y no persistir el token en esa rama. Ya lo excluí de backup y D2D (§7), pero eso no lo cifra |
+| **R-D** | **`security-crypto` en `1.1.0-alpha06`.** Una versión alfa sosteniendo el token de sesión en producción | **Media** | `app/build.gradle.kts` | Evaluar salida a una estable, o asumirlo conscientemente. Cambiar la versión toca el árbol de dependencias: no lo hice sin poder probar el release |
+| **R-E** | **Artefacto de build versionado con la API key de Maps.** `apps/mobile-native/android/base/manifest/AndroidManifest.xml` está **en git** (`git ls-files` lo lista) y es el manifiesto descompilado del AAB de la v1: lleva la clave de Maps en claro y `versionCode=4` | **Media** | `git ls-files apps/mobile-native/android/base` | La clave viaja igual dentro de cualquier APK, así que el control real **no** es ocultarla sino **restringirla** por *package name* + SHA-1 (ver C-4). Aun así ese fichero no pinta nada en el repo: es basura de build. Borrarlo y añadir `base/` al `.gitignore`. **No lo toqué: está fuera de mi propiedad de ficheros en este turno** |
+| **R-F** | **Sin CI de Android.** 51 `@Test` JVM existen y nadie los ejecuta automáticamente. `.github/workflows/ci.yml` no tiene ningún paso de Android | **Media** | `ci.yml` | Job con `setup-java@v4` (JDK 17) + `gradlew testDebugUnitTest lintRelease` |
+| **R-G** | **Sin `values-night` ni icono monocromo.** `windowBackground` es `@color/white`: destello blanco al abrir en modo oscuro, antes de que Compose pinte | **Baja** | `res/values/themes.xml:6`; `mipmap-anydpi-v26/*.xml` sin `<monochrome>` | Calidad de ficha, no bloqueo. `res/values/` está fuera de mi propiedad este turno |
 
 ---
 
-## 3. Listado de permisos
+## 4. Veredicto ProGuard / R8
 
-### 3.1 Declarados en `AndroidManifest.xml`
+### Antes de este turno: **correcto por coincidencia, no por diseño**
 
-| Permiso | ¿Lo usa el código? | Evidencia | ¿Exige declaración en la ficha? |
+El riesgo era real y sigue siendo el más caro posible. La app usa Moshi con
+**`KotlinJsonAdapterFactory`** — adaptador **reflexivo**, no generado por KSP — en **ocho
+sitios distintos**:
+
+```
+data/api/ApiClient.kt              data/crm/CrmRepository.kt
+data/extra/ExtraRepository.kt      data/integra/IntegraRepository.kt
+data/offline/OfflineMutationQueue.kt   data/ops/OpsRepository.kt
+data/studio/StudioRepository.kt    ui/studio/StudioMoreScreens.kt
+```
+
+Ese adaptador deriva las claves JSON de los nombres de propiedad que lee de
+`@kotlin.Metadata`. Si R8 renombra un DTO, **no falla al compilar ni al arrancar**: las listas
+salen vacías o con campos nulos, **solo en release**. El debug nunca lo detecta porque el
+debug no pasa por R8.
+
+**Por qué funcionaba:** las reglas cubrían cuatro paquetes (`data.api`, `data.console`,
+`data.realtime`, `data.tickets`) y resulta que **todos los DTOs viven en `data.api`** —
+verificado: los `import` de `crm`, `extra`, `studio`, `integra`, `ops`, `console`, `tickets`,
+`offline` y `realtime` traen sus tipos exclusivamente de `mx.nexara.mobile.nativeapp.data.api`.
+Los `parseList<reified T>` se instancian siempre con tipos de ahí, y el resto parsea a
+`Map<String, Any?>`, inmune por definición.
+
+**Por qué era frágil:** el día que alguien declare un DTO fuera de esos cuatro paquetes —y hay
+16 paquetes bajo `data/`— R8 lo ofusca, la app no se queja, y el listado sale vacío en
+producción. La garantía dependía de una convención que nadie hacía cumplir.
+
+Había además **un DTO que ya estaba fuera**: `data.offline.QueuedMutation`, salvado únicamente
+por la regla `-keep @com.squareup.moshi.JsonClass class * { *; }`, es decir, por una anotación
+decorativa (no hay procesador KSP que la implemente). **Y esa clase se persiste en disco**
+(`nexara_offline_queue.json`) y sobrevive a las actualizaciones: si un cambio en las reglas la
+hubiera ofuscado, las mutaciones que la v1 dejó encoladas serían ilegibles para la v2 y **el
+trabajo de campo pendiente se perdería en silencio al actualizar**.
+
+### Después de este turno: **correcto por diseño**
+
+Reescribí `proguard-rules.pro` para que la garantía sea estructural (§7). Ahora protege por
+**forma del nombre** (`**Dto`, `**Request`, `**Response`, `**Body`, `**Payload`, `**Event` en
+cualquier paquete) y por **anotación**, no por una lista de paquetes que se queda obsoleta.
+`data.offline` queda protegido explícitamente, no por accidente.
+
+### Veredicto
+
+**La deserialización JSON no se rompe en release.** Pero esto sigue siendo verificable solo de
+una forma, y no hay atajo: **instalar el AAB minificado en un teléfono real y recorrer un
+listado por panel.** Un listado vacío en release y lleno en debug es la firma exacta de una
+regla `keep` que falta. Está en el checklist de §6 como paso no omitible.
+
+---
+
+## 5. Permisos
+
+### 5.1 Declarados en `AndroidManifest.xml` — los seis
+
+Cruzado por `grep` contra el uso real en `app/src/main/java`.
+
+| Permiso | ¿Usado? | Evidencia en código | ¿Declaración en la ficha? |
 |---|---|---|---|
-| `INTERNET` | **Usado** | Retrofit/OkHttp — `data/api/ApiClient.kt` | No |
-| `ACCESS_NETWORK_STATE` | **Usado** | `data/offline/NetworkMonitor.kt:22-33` (`ConnectivityManager.registerNetworkCallback`) | No |
-| `ACCESS_FINE_LOCATION` | **Usado** | `util/DeviceLocation.kt:40-54`, `ui/console/screens/ConsoleGpsScreen.kt:282,345`, `ui/common/LocationPermissionBanner.kt:51` | **Sí** — Data Safety: *Ubicación precisa*, opcional. **No** dispara el formulario de ubicación en segundo plano (no hay `ACCESS_BACKGROUND_LOCATION`, no hay `FOREGROUND_SERVICE`) |
-| `ACCESS_COARSE_LOCATION` | **Usado** | Mismos ficheros | **Sí** — Data Safety: *Ubicación aproximada*, opcional |
-| `CAMERA` | **Usado** | `ui/common/BarcodeScannerScreen.kt:59-173` (CameraX + ML Kit), `MediaPickerBar.kt` (`TakePicture`) | **Sí** — Data Safety: *Fotos y videos*, opcional |
-| `POST_NOTIFICATIONS` | **Usado** | `MainActivity.kt:177-179`, `push/NexaraNotifications.kt:73` | No, pero conviene justificar el push en la descripción (ya está) |
-| `VIBRATE` | **NO USADO** | 0 referencias. La vibración real es `performHapticFeedback` de Compose, que no requiere este permiso | No, pero **quitar** |
-| `READ_EXTERNAL_STORAGE` (`maxSdkVersion=32`) | **NO USADO** | 0 referencias. El picker usa Photo Picker + SAF | No en 2026, pero **quitar** — es la familia de permisos que ya provocó el rechazo del bundle 3 |
+| `INTERNET` | **Sí** | Retrofit/OkHttp — `data/api/ApiClient.kt` | No |
+| `ACCESS_NETWORK_STATE` | **Sí** | `data/offline/NetworkMonitor.kt:21-38` (`registerNetworkCallback`) | No |
+| `ACCESS_FINE_LOCATION` | **Sí** | `util/DeviceLocation.kt`, `ui/console/screens/ConsoleGpsScreen.kt`, `ui/common/LocationPermissionBanner.kt` | **Sí** → Data Safety: *Ubicación precisa*, opcional. **No** dispara el formulario de ubicación en segundo plano |
+| `ACCESS_COARSE_LOCATION` | **Sí** | Mismos ficheros | **Sí** → *Ubicación aproximada*, opcional |
+| `CAMERA` | **Sí** | `ui/common/BarcodeScannerScreen.kt` (CameraX + ML Kit), `ui/common/MediaPickerBar.kt` (`TakePicture`) | **Sí** → *Fotos y videos*, opcional |
+| `POST_NOTIFICATIONS` | **Sí** | `MainActivity.kt`, `push/NexaraNotifications.kt` | No, pero conviene justificar el push en la descripción (ya está) |
 
-### 3.2 Heredados de librerías (aparecen en el manifiesto fusionado)
+**Ningún permiso declarado está sin usar.** Los dos que sobraban (`VIBRATE`,
+`READ_EXTERNAL_STORAGE`) ya se quitaron en el turno anterior.
 
-| Permiso | Origen | ¿Se usa? | ¿Exige declaración? |
-|---|---|---|---|
-| `USE_BIOMETRIC` | `androidx.biometric` | **Sí** — `security/AppLock.kt` | No |
-| `USE_FINGERPRINT` | `androidx.biometric` (legacy, API < 28) | Indirecto | No |
-| `WAKE_LOCK` | Play Services / FCM | Indirecto | No |
-| `com.google.android.c2dm.permission.RECEIVE` | FCM | **Sí** — `push/NexaraFirebaseService.kt` | No |
-| `BIND_GET_INSTALL_REFERRER_SERVICE` | `play-services-measurement` | **No** por código propio | Contribuye a la declaración de Data Safety de analítica |
-| **`com.google.android.gms.permission.AD_ID`** | `play-services-measurement-impl:22.1.2` | **No** — `FirebaseAnalytics` nunca se invoca | **SÍ — declaración obligatoria de ID de publicidad. Ver B2** |
-| `ACCESS_ADSERVICES_AD_ID` | `play-services-measurement-api:22.1.2` | No | Ídem B2 |
-| `ACCESS_ADSERVICES_ATTRIBUTION` | `play-services-measurement-api:22.1.2` | No | Ídem B2 |
-| `mx.nexara...DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | `androidx.core` | Interno (`protectionLevel="signature"`) | No |
+### 5.2 Heredados de librerías — manifiesto fusionado del 06-09
 
-### 3.3 Permisos sensibles: lo que **no** está (y está bien)
+| Permiso | Origen | ¿Declaración? |
+|---|---|---|
+| `USE_BIOMETRIC` | `androidx.biometric` — usado en `security/AppLock.kt` | No |
+| `USE_FINGERPRINT` | `androidx.biometric` (legacy API < 28) | No |
+| `WAKE_LOCK` | FCM / Play Services | No |
+| `com.google.android.c2dm.permission.RECEIVE` | FCM — usado en `push/NexaraFirebaseService.kt` | No |
+| `mx.nexara...DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | `androidx.core`, `protectionLevel="signature"` | No |
 
-`QUERY_ALL_PACKAGES`, `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM`, `MANAGE_EXTERNAL_STORAGE`,
-`ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE*`, `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO`,
-SMS, registro de llamadas, `REQUEST_INSTALL_PACKAGES`, accesibilidad.
+**Once permisos en total en el manifiesto fusionado. Ninguno es sensible.**
 
-**Ninguno está declarado.** No hace falta el formulario de permisos restringidos. El único
-`<queries>` es `com.google.android.apps.maps`, inyectado por el SDK de Maps — inocuo.
+### 5.3 Lo que **no** está — y por eso no hay formularios extra
 
-### 3.4 Política de privacidad y borrado de cuenta
+`QUERY_ALL_PACKAGES`, `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM`, `MANAGE_EXTERNAL_STORAGE`,
+`ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE*`, `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO`,
+`WRITE_EXTERNAL_STORAGE`, SMS, registro de llamadas, `REQUEST_INSTALL_PACKAGES`, accesibilidad.
 
-| Requisito | Estado |
-|---|---|
-| Política de privacidad | `https://nexara.com.mx/legal/privacidad` → existe en el código: `apps/web/app/legal/privacidad/page.tsx` |
-| URL pública de eliminación de cuenta | `https://nexara.com.mx/legal/eliminar-cuenta` → existe: `apps/web/app/legal/eliminar-cuenta/page.tsx` |
-| ¿Referenciada en el manifiesto? | No, y no hace falta: Play la toma de la ficha |
-| **Pendiente** | `PLAY-STORE-CHECKLIST.md` §7 dice **«Falta desplegar web»**. Confirmar con `curl` que las dos URLs responden 200 **antes** de enviar a revisión |
+Y, nuevo desde el 31-08: **`AD_ID`, `ACCESS_ADSERVICES_AD_ID` y `ACCESS_ADSERVICES_ATTRIBUTION`
+tampoco están** (verificado en el informe de fusión del 06-09). No hace falta el formulario de
+permisos restringidos, y el **ID de publicidad se declara «No»**.
+
+El único `<queries>` es `com.google.android.apps.maps`, inyectado por el SDK de Maps. Inocuo.
 
 ---
 
-## 4. Veredicto ProGuard: ¿la ofuscación puede romper el JSON?
+## 6. Borrador de Seguridad de los datos (Data Safety)
 
-### **NO — hoy no lo rompe. Verificado sobre el `mapping.txt` real, no sobre las reglas.**
+Redactado para copiar al formulario. **Lo llena Adam.** La versión de referencia, con las
+rutas de código de cada fila, vive en `docs/PLAY-STORE-CHECKLIST.md` §6.5 — que también se
+actualizó en este turno.
 
-El riesgo era legítimo: la app usa **Moshi con `KotlinJsonAdapterFactory`** (adaptador
-**reflexivo**, no generado), que deriva los nombres de las claves JSON de los nombres de las
-propiedades Kotlin leídos del `@Metadata`. R8 reescribe ese metadata al renombrar, así que
-cualquier DTO ofuscado pasaría a serializar `{"a":...,"b":...}` y a fallar en silencio.
+### Datos recopilados
 
-Pero las reglas lo cubren. La evidencia:
+| Categoría Play | Tipo | Recopila | Comparte | Oblig./Opc. | Fin |
+|---|---|---|---|---|---|
+| Información personal | Nombre | Sí | No | Obligatorio | Funciones de la app; gestión de la cuenta |
+| Información personal | Correo electrónico | Sí | No | Obligatorio | Funciones de la app; gestión de la cuenta |
+| Información personal | Otros ID de usuario | Sí | No | Obligatorio | Funciones de la app |
+| Ubicación | Ubicación precisa | Sí | No | **Opcional** | Funciones de la app (asistencia, trabajo en campo) |
+| Ubicación | Ubicación aproximada | Sí | No | **Opcional** | Funciones de la app |
+| Fotos y videos | Fotos | Sí | No | **Opcional** | Funciones de la app (evidencias) |
+| Archivos y documentos | Archivos y documentos | Sí | No | **Opcional** | Funciones de la app (adjuntos) |
+| Actividad en la app | Otras acciones | Sí | No | Obligatorio | Funciones de la app (asistencia y actividad operativa) |
+| Info. y rendimiento | **Registros de fallos** | **Sí — NUEVO** | No | Obligatorio | Análisis de fallos |
+| Info. y rendimiento | **Diagnósticos** | **Sí — NUEVO** | No | Obligatorio | Análisis de fallos |
+| ID de dispositivo | ID del dispositivo | Sí | No | Obligatorio | Funciones de la app (push) |
 
-**1. Toda la superficie de DTOs vive en un solo paquete, y ese paquete está protegido.**
+### Responder «No» explícitamente
 
-`-keep class mx.nexara.mobile.nativeapp.data.api.** { *; }` cubre **275 `data class`** —
-el 84 % de todas las del proyecto. Y no es teoría: en
-`app/build/outputs/mapping/release/mapping.txt` hay **365 entradas** que empiezan por
-`mx.nexara.mobile.nativeapp.data.api`, y **ninguna fue renombrada** (todas mapean a sí
-mismas, con getters y campos intactos):
+- **Interacciones en la app / analítica de producto** — *estaba en «Sí» en la v1; ahora es
+  **No***: Firebase Analytics ya no está en el build.
+- **ID de publicidad** — *ahora es **No***.
+- Información financiera o de pago, contactos, calendario, SMS, salud, mensajes, historial de
+  navegación, audio.
 
-```
-mx.nexara.mobile.nativeapp.data.api.ActivityDto -> mx.nexara.mobile.nativeapp.data.api.ActivityDto:
-```
+### Transversales
 
-**2. No hay DTOs de Retrofit fuera de ese paquete.** Los únicos `import mx.nexara.*` dentro
-de `data/api/` son `BuildConfig`, `NexaraOffline` y `SessionEvents` — ninguna clase de datos
-externa entra en un `@GET`/`@POST`. Los helpers `parseList<reified T>` de
-`CrmRepository:45`, `ExtraRepository:76` y `StudioRepository:55` se instancian siempre con
-tipos de `data.api` (`CotizacionDto`, `NewsPostDto`, `WorkflowDecideRequest`…). El resto de
-esos repositorios parsea a `Map<String, Any?>` genéricos, inmunes a la ofuscación por
-definición.
+| Pregunta | Respuesta | Sustento |
+|---|---|---|
+| ¿Cifrado en tránsito? | **Sí** | `network_security_config.xml` → `cleartextTrafficPermitted="false"` |
+| ¿Se puede pedir la eliminación de datos? | **Sí** | https://nexara.com.mx/legal/eliminar-cuenta |
+| ¿Se comparten con terceros? | **No** | Google (FCM, Crashlytics) es **encargado del tratamiento**, no destinatario — en el formulario de Play eso no cuenta como «compartir» |
+| ¿Recopilación opcional? | **Parcial** | Ubicación, fotos y archivos se piden en runtime; identidad y push son necesarios |
+| Ubicación en segundo plano | **No aplica** | Sin `ACCESS_BACKGROUND_LOCATION` ni `FOREGROUND_SERVICE` |
+| ¿Auditoría de seguridad externa? | **No** | No es requisito |
 
-**3. Los otros tres paquetes con `-keep` son exactamente los que hacían falta:**
-`data.console` (`DashboardPayload`), `data.realtime` (5 clases de eventos Socket.IO) y
-`data.tickets`.
-
-**4. El único DTO fuera de esos paquetes está salvado por otra regla.**
-`data.offline.QueuedMutation` lleva `@JsonClass(generateAdapter = true)`, y
-`-keep @com.squareup.moshi.JsonClass class * { *; }` lo preserva. Confirmado en
-`mapping.txt:668824`: `QueuedMutation` conserva su nombre y sus nueve getters, mientras sus
-vecinos del mismo paquete sí se ofuscaron (`NetworkMonitor -> rc.b`,
-`OfflineMutationQueue -> rc.e`). **Esto importa más de lo que parece:** la cola offline se
-persiste en disco y sobrevive a las actualizaciones. Si se hubiera ofuscado, las mutaciones
-pendientes escritas por la v1 serían ilegibles para la v2 y el trabajo de campo encolado se
-perdería en silencio al actualizar.
-
-**5. Las reglas de consumidor de las librerías están aplicadas.** En
-`mapping/release/configuration.txt` aparecen `META-INF/proguard/moshi.pro` (línea 1208) y
-`kotlin-reflect.pro` (línea 1232) — esta última es imprescindible, porque el adaptador
-reflexivo de Moshi depende de `kotlin-reflect`, que sí está en el bundle (1 035 entradas
-`kotlin.reflect` en el mapping).
-
-**6. `SessionStore` no usa Moshi.** Lee y escribe claves de `EncryptedSharedPreferences`
-como literales (`"token"`, `"email"`, `"permissions_csv"`). Inmune.
-
-### La condición que sostiene el veredicto
-
-Es una garantía **frágil por construcción**: depende de que nadie declare un DTO de Moshi
-fuera de los cuatro paquetes cubiertos. Hoy hay 42 `data class` en `ui/console`, 14 en
-`ui/tickets`, 12 en `ui/studio` y 9 en `ui/ventas` — todas son estado de UI, ninguna toca
-Moshi. Pero el día que alguien ponga un `Dto` en `ui/…` o en `data/crm`, R8 lo ofuscará y
-**la app no fallará al compilar ni al arrancar**: el listado saldrá vacío o con campos nulos,
-y sin R1 nadie lo verá.
-
-**Blindaje barato:** sustituir los cuatro `-keep` por paquete por una regla estructural,
-y anotar todos los DTOs:
-
-```proguard
-# Cualquier data class que Moshi vaya a deserializar, esté donde esté.
--keep @com.squareup.moshi.JsonClass class * { *; }
--keepclassmembers class * {
-    @com.squareup.moshi.Json <fields>;
-}
--keep class mx.nexara.mobile.nativeapp.data.api.** { *; }
-```
-
-Y, ya en modo defensivo, un test JVM que compruebe que ningún fichero fuera de
-`data/api/` declara una clase cuyo nombre termine en `Dto` — el mismo patrón que ya usa
-`AppUrlsParityTest`.
+**Antes de enviar:** confirmar que https://nexara.com.mx/legal/privacidad menciona ubicación,
+fotos, identificadores de dispositivo **y registros de fallos**. Si el aviso no los nombra, el
+formulario y la política se contradicen — y eso sí es motivo de retirada.
 
 ---
 
-## 5. Cumplimiento técnico: lo que sí está bien
+## 7. Qué se arregló en código en este turno
 
-Vale la pena dejarlo por escrito para no volver a auditarlo.
+Todo verificado: `gradlew help`, `gradlew bundleRelease --dry-run` (dispara el preflight sin
+compilar ni firmar) y `gradlew :app:processDebugResources` pasan. Los dos scripts pasan el
+parser de PowerShell y el smoke se ejecutó de verdad.
+
+| Fichero | Cambio | Por qué |
+|---|---|---|
+| `app/proguard-rules.pro` | **Reglas de Moshi estructurales**: `**Dto`, `**Request`, `**Response`, `**Body`, `**Payload`, `**Event` en cualquier paquete + `@Json` en campos. `keep` explícito de `data.offline` (cola persistida), `data.crm`, `data.extra`, `data.integra`, `data.ops`, `data.studio` | La garantía dependía de una convención no verificada. Ver §4 |
+| `app/proguard-rules.pro` | `-keepattributes SourceFile,LineNumberTable` + `-renamesourcefileattribute SourceFile` | Sin esto los stack traces de Crashlytics llegan sin número de línea. Se acababa de integrar Crashlytics; habría reportado a ciegas |
+| `app/proguard-rules.pro` | Reglas estándar que faltaban: enums (Moshi los serializa por nombre), `Parcelable.CREATOR`, `Serializable`, métodos nativos, `DefaultConstructorMarker` | Huecos clásicos de R8. Los enums son el más peligroso con Moshi |
+| `app/proguard-rules.pro` | `keep` + `dontwarn` de `com.google.crypto.tink.**` y `com.google.protobuf.**` | `security-crypto` empaqueta Tink, que resuelve primitivas por reflexión. Si R8 recorta ahí, `EncryptedSharedPreferences` revienta al abrir la sesión — crash al arranque solo en release |
+| `res/xml/data_extraction_rules.xml` (nuevo) | Excluye `nexara_session`, `nexara_session_fallback`, `nexara_offline_queue.json` y `nexara_device` de `<cloud-backup>` y `<device-transfer>` | `allowBackup="false"` corta la nube pero **no** la transferencia D2D en Android 12+. El fichero de sesión cifrado viajaría a un teléfono nuevo **sin su clave maestra** (vive en el Keystore y no se transfiere) |
+| `AndroidManifest.xml` | `android:dataExtractionRules="@xml/data_extraction_rules"` | Referencia del anterior. Verificado que enlaza con `processDebugResources` |
+| `app/build.gradle.kts` | **Preflight de release**: aborta `bundleRelease`/`assembleRelease` si falta `key.properties`, si `GOOGLE_MAPS_API_KEY` está vacía o es el placeholder, o si falta `VERSION_CODE`/`VERSION_NAME` | Los tres producían un AAB que compilaba bien y fallaba después: firmado en debug, mapas en blanco, o `versionCode=1`. Debug y tests no se tocan. **Probado con `--dry-run`: imprime `Preflight de release OK — versionCode=7 versionName=1.0.1`** |
+| `app/build.gradle.kts` | Deduplicadas `datastore-preferences` (1.1.1 + 1.1.7) y `activity-compose` (x2); bloque `lint` con `checkReleaseBuilds` | Ruido que confunde al leer el árbol de dependencias |
+| `scripts/build-play-aab.ps1` | `-BumpVersionCode`, `-VersionCode`, `-VersionName`; **borra el AAB anterior antes de compilar**; archiva `mapping.txt` con su `versionCode` en `play-releases/` (con `.gitignore` propio) | El bump y la compilación ya no pueden desincronizarse. Y si el build falla, no queda un bundle viejo en disco al que subir por error — que es exactamente **B1** |
+| `scripts/mobile-smoke-checklist.ps1` | **Falla si el AAB es más viejo que el último fichero fuente** | Antes solo comprobaba que existiera, y por eso dio por bueno un bundle de hace seis días. Ejecutado: detecta el AAB obsoleto actual |
+| `docs/PLAY-STORE-CHECKLIST.md` §6.5 | Data Safety rehecho: fuera Analytics, dentro Crashlytics, `AD_ID` → «No» | La tabla anterior describía una app que ya no existe |
+| `docs/ANDROID-RELEASE.md` | Versionado real (7 / 1.0.1), sección de preflight, y la regla de que Play no reutiliza un `versionCode` **subido** | Documentaba `VERSION_CODE=1` / `0.1.0` |
+| `docs/STORE-UPLOAD-READY.md` | Versión real y aviso sobre el AAB obsoleto | Documentaba `VERSION_CODE=2` |
+
+**No se tocó ningún `.kt`, ni `apps/web/`, ni `apps/api/`.** Los hallazgos que requieren Kotlin
+están en §3 como R-A, R-B y R-C.
+
+---
+
+## 8. Cumplimiento técnico — verificado hoy
 
 | Requisito | Estado | Evidencia |
 |---|---|---|
-| **AAB, no APK** | ✅ | `scripts/build-play-aab.ps1` → `gradlew bundleRelease`; salida `app-release.aab` (26 MB) |
-| **`targetSdk` vigente** | ✅ **sin margen** | `targetSdk = 36`, `compileSdk = 36`, `minSdk = 24`. Cumple el corte del 31-08-2026. Ya no hay colchón: el siguiente corte (agosto 2027) exigirá API 37. Conviene confirmarlo en Play Console, que muestra el nivel exigido vigente |
-| **16 KB page size** | ✅ **verificado ELF a ELF** | Los 10 `.so` de 64 bits del AAB (`arm64-v8a` y `x86_64`) tienen **`p_align = 0x4000`** en todos sus segmentos `PT_LOAD`: `libbarhopper_v3` (ML Kit), `libimage_processing_util_jni` (CameraX 1.4.2), `libandroidx.graphics.path`, `libdatastore_shared_counter`, `libsurface_util_jni`. Además `packaging.jniLibs.useLegacyPackaging = false` |
-| **Tráfico en claro bloqueado** | ✅ | `src/main/res/xml/network_security_config.xml` → `cleartextTrafficPermitted="false"`. El overlay que permite HTTP a `localhost`/`10.0.2.2` vive en `src/debug/` y **no entra en release**. Manifiesto fusionado de release: sin `usesCleartextTraffic` |
-| **R8 activo con símbolos nativos** | ✅ | `isMinifyEnabled = true`, `isShrinkResources = true`, `ndk.debugSymbolLevel = "SYMBOL_TABLE"` |
-| **`allowBackup`** | ✅ nube / ⚠️ D2D | `android:allowBackup="false"`. Falta `dataExtractionRules` — ver **R7** |
-| **Secretos fuera de git** | ✅ | `git ls-files` no lista `key.properties`, `nexara-upload.jks` ni `local.properties`. `git check-ignore -v` confirma las tres reglas (`.gitignore:74,77,78`). `NEXARA-credenciales-usuarios-v4.xlsx` tampoco está versionado |
-| **Firma configurada** | ✅ | `signingConfigs { create("release") }` leyendo `key.properties`; cert válido hasta 2053 según `PLAY-STORE-CHECKLIST.md` §4 (Play exige ≥ 2033). Salvedad en **R6** |
-| **Assets de ficha** | ✅ | `icon-512.png` = **512×512, RGB sin canal alfa** (Play rechaza transparencia); `feature-graphic-1024x500.png` = **1024×500**; **8 capturas** en `screenshots/phone/` a **1080×1920** |
-| **Iconos adaptativos** | ✅ | `mipmap-anydpi-v26/ic_launcher.xml` + `ic_launcher_round.xml`, PNG reales en los 5 densidades (48→192) y foreground en lienzo 108 dp con zona segura de 72 dp (`scripts/gen-native-app-icons.py:59`). Es la corrección de `1a8f8051` tras el rechazo por icono |
-| **Splash screen** | ✅ | `Theme.Nexara.Splash` con `core-splashscreen:1.0.1` y fallback para API < 31 |
-| **Predictive back** | ✅ | `android:enableOnBackInvokedCallback="true"` — obligatorio de facto en Android 15+ |
-| **Baseline profile** | ✅ | El AAB incluye `BUNDLE-METADATA/com.android.tools.build.profiles/baseline.prof` |
-| **Cuenta demo para revisores** | ✅ | `apps/api/prisma/seed-play-reviewer.ts` — tenant `nexara-demo` aislado, contraseña aleatoria fuera del repo, rol acotado (nunca `super_admin`). Es la mejor pieza de todo el checklist |
-| **Automatización de screenshots gated** | ✅ | `ScreenshotAutomation` (deep link `nexara://debug/auto-login`) está protegida por `BuildConfig.DEBUG` en las **dos** puertas de entrada (`isDebugAutomationUri` y `handle`), así que R8 la elimina del release. Aun así vive en `src/main` — ver mejora M2 |
+| Salida AAB, no APK | ✅ | `bundleRelease` → `app-release.aab` |
+| `targetSdk` vigente | ✅ | `targetSdk = 36`, `compileSdk = 36`, `minSdk = 24`. Es el nivel estable más alto. **Confirmar en Play Console el nivel exigido vigente**: el corte es anual y no conviene deducirlo |
+| 16 KB page size | ✅ | `packaging.jniLibs.useLegacyPackaging = false`; CameraX 1.4.2 (trae `libimage_processing_util_jni.so` alineado) y ML Kit 17.3.0. Los `.so` presentes: `libbarhopper_v3`, `libimage_processing_util_jni`, `libandroidx.graphics.path`, `libdatastore_shared_counter`, `libsurface_util_jni` |
+| Tráfico en claro bloqueado | ✅ | `src/main/res/xml/network_security_config.xml` → `cleartextTrafficPermitted="false"`. El overlay que permite HTTP a `localhost`/`10.0.2.2` vive en `src/debug/` y **no entra en release** |
+| `allowBackup` | ✅ nube **y** ✅ D2D | `allowBackup="false"` + `dataExtractionRules` añadido este turno |
+| R8 activo + símbolos nativos | ✅ | `isMinifyEnabled = true`, `isShrinkResources = true`, `ndk.debugSymbolLevel = "SYMBOL_TABLE"` |
+| Telemetría de fallos | ✅ | Crashlytics integrado; `injectCrashlyticsMappingFileIdRelease` en el grafo de `bundleRelease` |
+| Secretos fuera de git | ✅ con salvedad | `key.properties`, `*.jks`, `local.properties` y `*.aab` están en `.gitignore` y no aparecen en `git ls-files`. **Salvedad:** `android/base/manifest/AndroidManifest.xml` sí está versionado — ver R-E |
+| Predictive back | ✅ | `android:enableOnBackInvokedCallback="true"` |
+| Política de privacidad y borrado de cuenta | ✅ existen en código | `apps/web/app/legal/privacidad/` y `apps/web/app/legal/eliminar-cuenta/`. **Falta confirmar que responden 200 en producción** — ver C-3 |
 
 ---
 
-## 6. Mejoras (no bloquean nada)
+## 9. Checklist final — en el orden exacto de ejecución
 
-| # | Mejora |
-|---|---|
-| **M1** | Automatizar el bump de `VERSION_CODE` en `scripts/build-play-aab.ps1` (leer, incrementar y reescribir `gradle.properties` antes de compilar). Es la causa raíz de **B1** y del riesgo de repetirlo en la v3 |
-| **M2** | Mover `screenshots/ScreenshotAutomation.kt` a `app/src/debug/java/`. Hoy R8 lo elimina, pero depender de que las dos guardas `BuildConfig.DEBUG` sigan ahí es más frágil que separarlo por source set |
-| **M3** | Dependencias duplicadas en `app/build.gradle.kts`: `androidx.datastore:datastore-preferences` declarado en `1.1.1` (línea 143) **y** `1.1.7` (línea 144); `androidx.activity:activity-compose:1.11.0` declarado dos veces (líneas 112 y 164). Gradle resuelve al mayor, pero es ruido que confunde |
-| **M4** | Documentación desalineada con el disco. `docs/ANDROID-RELEASE.md` §Versionado muestra `VERSION_CODE=1` / `VERSION_NAME=0.1.0`; `docs/STORE-UPLOAD-READY.md` y `CHANGELOG-MOBILE.md` dicen `VERSION_CODE=2`; el real es **5**. Y `CHANGELOG-MOBILE.md` no tiene entrada para los bundles 3, 4 ni 5 — el historial de los dos rechazos solo existe en el mensaje de `1a8f8051` |
-| **M5** | `play-assets/ASSETS-README.md` marca las capturas como «❌ Pendiente» en la tabla de inventario, aunque tres párrafos más abajo (y en el disco) están las 8 |
-| **M6** | `MainActivity.askNotificationPermissionIfNeeded()` pide `POST_NOTIFICATIONS` nada más abrir, **antes del login** y sin contexto. Pedirlo tras el primer login, explicando que es para asignaciones, sube mucho la aceptación |
-| **M7** | Las reglas `-keep class com.google.android.gms.** { *; }` y `-keep class com.google.firebase.** { *; }` desactivan el *shrinking* de las dos librerías más grandes del proyecto. Acotarlas bajaría el AAB bastante por debajo de los 26 MB actuales |
-| **M8** | Añadir `<monochrome>` a los `adaptive-icon` y un `values-night/themes.xml` (ver **R12**) |
+Cada bloque depende del anterior. No saltes de bloque.
+
+### A · Antes de compilar (Play Console y web, 15 min)
+
+- [ ] **C-1** — *Play Console → Versiones → Panel de la app*: anotar el **`versionCode` más alto
+      SUBIDO** (incluidos bundles descartados). Si es ≥ 7, poner `VERSION_CODE` a ese + 1.
+- [ ] **C-2** — *Contenido de la app → ID de publicidad*: cambiar a **NO**. Analytics ya no está.
+- [ ] **C-3** — Confirmar que las dos URLs responden **200** en producción:
+      ```bash
+      curl -o /dev/null -w "%{http_code}\n" https://nexara.com.mx/legal/privacidad
+      curl -o /dev/null -w "%{http_code}\n" https://nexara.com.mx/legal/eliminar-cuenta
+      ```
+- [ ] **C-4** — Confirmar que el **SHA-1 de la llave de distribución de Play** (*Play Console →
+      Configuración → Integridad de la app*) está en las restricciones de la API key de Maps
+      **y** en Firebase. Sin eso el mapa sale en blanco **solo** en la versión de la tienda.
+- [ ] **C-5** — Confirmar que el aviso de privacidad menciona ubicación, fotos, ID de
+      dispositivo **y registros de fallos** (Crashlytics es nuevo).
+
+### B · Compilar (10 min)
+
+- [ ] **C-6** — Regenerar la cuenta de revisores y **guardar la contraseña**:
+      `cd apps/api && npm run seed:play-reviewer`
+- [ ] **C-7** — Compilar. El script sube el `versionCode`, borra el AAB viejo y archiva el
+      `mapping.txt`:
+      ```powershell
+      pwsh -File scripts/build-play-aab.ps1 -BumpVersionCode -Clean
+      ```
+      Debe imprimir `Preflight de release OK — versionCode=N versionName=…`. **Si el preflight
+      aborta, léelo: te está diciendo exactamente qué falta.**
+- [ ] **C-8** — `npm run mobile:smoke`. Ahora falla si el AAB es más viejo que la fuente.
+
+### C · Verificar el AAB **minificado** en un teléfono real — no omitible
+
+Esto es lo único que prueba R8. El debug no pasa por R8 y no vale como prueba.
+
+- [ ] **C-9** — Instalar: `bundletool build-apks --local-testing` sobre el `.aab`.
+- [ ] **C-10** — Login con `play.review@nexara.com.mx`.
+- [ ] **C-11** — **Un listado por panel** (ERP, Ventas, OPS, Contabilidad, STUDIO, LAB, Portal,
+      CRM, INTEGRA). Confirmar que **traen datos**. Un listado vacío en release y lleno en
+      debug es la firma de una regla `keep` que falta. *Este paso es el que justifica §4.*
+- [ ] **C-12** — Push FCM recibido + deep link abriendo la pantalla correcta.
+- [ ] **C-13** — Mapa renderizando (prueba del SHA-1 de distribución, C-4).
+- [ ] **C-14** — Escáner de códigos con permiso **concedido y denegado**.
+- [ ] **C-15** — Visor PDF abriendo un documento.
+- [ ] **C-16** — Cola offline: modo avión → crear algo → reconectar → sincroniza. **Y actualizar
+      sobre la v1 instalada** para confirmar que la cola persistida se sigue leyendo (§4).
+- [ ] **C-17** — Rechazar ubicación y cámara: la app no debe truenar. El texto que se entrega a
+      los revisores lo promete explícitamente.
+- [ ] **C-18** — Abrir con el teléfono en **modo oscuro** y comprobar el banner de sin-conexión
+      bajo la barra de estado (R-A). Si se ve mal, decidir si bloquea o se acepta para la v2.
+
+### D · Play Console (20 min)
+
+- [ ] **C-19** — Subir el AAB a **prueba interna** primero. Nunca directo a producción.
+- [ ] **C-20** — Rehacer **Seguridad de los datos** con §6. Sacar «Interacciones en la app»,
+      meter «Registros de fallos» y «Diagnósticos».
+- [ ] **C-21** — *Acceso a la app*: pegar las credenciales de C-6.
+- [ ] **C-22** — Revisar que la ficha, el icono y las capturas siguen coincidiendo con lo
+      instalado. Un icono distinto al de la ficha **ya causó un rechazo** en esta app.
+- [ ] **C-23** — Promover a producción solo cuando el bloque C esté completo.
+
+### E · Después de publicar
+
+- [ ] **C-24** — Archivar `play-releases/mapping-vN-*.txt` junto al `versionCode` subido.
+- [ ] **C-25** — Vigilar Crashlytics las primeras 48 h. Es la primera versión con telemetría:
+      va a enseñar cosas que la v1 escondía.
+- [ ] **C-26** — Abrir el siguiente turno con R-A, R-B y R-C (los tres son Kotlin).
 
 ---
 
-## 7. Checklist accionable para la v2
+## 10. Notas de método
 
-En orden. Lo de arriba bloquea lo de abajo.
-
-### Antes de tocar código
-
-- [ ] Entrar a Play Console → *Versiones → Panel de la app* y anotar el **`versionCode` más alto subido** (incluidos bundles descartados o nunca publicados: Play no reutiliza ninguno).
-- [ ] Comprobar en *Contenido de la app* qué se contestó en **ID de publicidad**, **Seguridad de los datos** y **Acceso a la app**.
-- [ ] `curl -o /dev/null -w "%{http_code}\n" https://nexara.com.mx/legal/privacidad` y lo mismo con `/legal/eliminar-cuenta`. Ambas deben dar **200**.
-- [ ] Confirmar que el **SHA-1 de la llave de distribución de Play** (Play Console → Configuración → Integridad de la app) está en las restricciones de la API key de Maps **y** en Firebase. Sin eso, el mapa sale en blanco solo en la versión de la tienda.
-
-### Bloqueantes
-
-- [ ] **B1** — `apps/mobile-native/android/gradle.properties`: `VERSION_CODE` = (el más alto subido) + 1, previsiblemente `6`. Subir `VERSION_NAME` a `1.1.0`.
-- [ ] **B1** — Borrar el AAB obsoleto y **recompilar desde cero**: `npm run mobile:android:play-aab` con `-Clean`. El de disco es anterior a `c8bccea5`.
-- [ ] **B2** — Decidir: quitar `firebase-analytics-ktx` de `app/build.gradle.kts` (recomendado, no se usa en ninguna línea de Kotlin) **o** declarar el ID de publicidad en Play Console. Si se quita, revisar también la fila «Interacciones en la app» de Data Safety.
-
-### Riesgos que deberían entrar en la v2
-
-- [ ] **R1** — Añadir **Firebase Crashlytics** (`com.google.firebase:firebase-crashlytics-ktx` + plugin `com.google.firebase.crashlytics`). Firebase ya está integrado y el plugin sube el `mapping.txt` automáticamente en cada `bundleRelease`. Sin esto, ningún otro punto de esta lista se puede verificar en campo.
-- [ ] **R2** — Envolver `SessionStore.prefs` en `try/catch`: si `EncryptedSharedPreferences.create` lanza, borrar el fichero `nexara_session` y reintentar una vez; si vuelve a fallar, degradar a sesión vacía (login limpio) en vez de crashear. Evaluar además salir de `security-crypto:1.1.0-alpha06`.
-- [ ] **R3** — `MediaPickerBar.freshCameraOutputUri()`: gate por `Build.VERSION.SDK_INT >= Q` para `RELATIVE_PATH`, o migrar a `FileProvider` sobre `getExternalFilesDir` (el provider ya existe en `xml/nexara_file_paths.xml`). Probar la captura de evidencias en un emulador **API 24 y API 28**.
-- [ ] **R4** — `Modifier.statusBarsPadding()` en la `Column` de `NexaraScaffold`, o `WindowInsets.systemBars` en el `OfflineBanner`. Verificar en Android 15+ con el banner visible (modo avión).
-- [ ] **R9** — Quitar `VIBRATE` y `READ_EXTERNAL_STORAGE` del `AndroidManifest.xml`.
-- [ ] **R5** — Hacer que `bundleRelease` **falle** si `MAPS_API_KEY` está en blanco o vale `AIzaSyPLACEHOLDER`.
-- [ ] **R6** — Hacer que `bundleRelease` **falle** si no existe `key.properties`, en vez de degradar a la firma de debug.
-- [ ] **R7** — Añadir `app/src/main/res/xml/data_extraction_rules.xml` excluyendo `nexara_session` de `<device-transfer>`, y referenciarlo con `android:dataExtractionRules`.
-- [ ] **R8** — Añadir al `.github/workflows/ci.yml` un job Android con `setup-java@v4` (JDK 17) + `gradlew testDebugUnitTest lintRelease`. Los 51 tests ya existen; solo falta que alguien los ejecute.
-
-### Blindaje del veredicto ProGuard
-
-- [ ] Anotar con `@JsonClass(generateAdapter = true)` los DTOs nuevos, y añadir `-keepclassmembers class * { @com.squareup.moshi.Json <fields>; }` a `proguard-rules.pro`.
-- [ ] Test JVM que falle si aparece una clase terminada en `Dto` fuera de `data/api/` (mismo patrón que `AppUrlsParityTest`).
-
-### Verificación en release antes de enviar
-
-Todo esto **sobre el AAB minificado**, no sobre debug. Es lo que `docs/ANDROID-RELEASE.md`
-§Checklist ya pide y lo que ninguna prueba automática cubre:
-
-- [ ] Instalar el AAB con `bundletool build-apks --local-testing` en un teléfono real.
-- [ ] Login con `play.review@nexara.com.mx` (regenerar con `npm run seed:play-reviewer`).
-- [ ] Recorrer **un flujo por panel**: ERP, Ventas, OPS, Contabilidad, STUDIO, LAB, Portal. Confirmar que las listas traen datos — un listado vacío en release y lleno en debug es la firma de una regla `-keep` que falta.
-- [ ] Push FCM recibido y deep link abriendo la pantalla correcta.
-- [ ] Mapa (GPS) renderizando — es la prueba de que el SHA-1 de distribución está bien registrado.
-- [ ] Visor PDF abriendo un documento.
-- [ ] Escáner de códigos de barras (ML Kit) con permiso de cámara concedido **y** denegado.
-- [ ] Cola offline: modo avión, crear algo, reconectar, verificar que sincroniza. Y **actualizar sobre la v1 instalada** para confirmar que la cola persistida se sigue leyendo.
-- [ ] Rechazar ubicación y cámara y confirmar que la app no truena — el texto que se entrega a los revisores lo promete explícitamente.
-- [ ] Archivar `app/build/outputs/mapping/release/mapping.txt` junto al `versionCode` subido.
-
----
-
-## 8. Notas de método
-
-- Auditoría de solo lectura: no se ejecutó Gradle, no se abrió el keystore ni `key.properties`,
-  no se transcribió ninguna contraseña ni clave.
-- El manifiesto fusionado, el `mapping.txt` (128 MB), el `configuration.txt` y el `.aab` que
-  se citan son artefactos **preexistentes** en `app/build/`, generados el 31-08-2026 a las
-  14:05–14:06. Reflejan `versionCode 5`, es decir el estado del código **antes** de `c8bccea5`.
-- La alineación de 16 KB se comprobó parseando las cabeceras de programa ELF de los `.so`
-  extraídos del AAB, no leyendo la documentación de las librerías.
-- El cruce «permiso declarado ↔ permiso usado» se hizo por `grep` de `Manifest.permission.*`
-  y de las APIs equivalentes (`FusedLocationProviderClient`, `ProcessCameraProvider`,
-  `ConnectivityManager`, `performHapticFeedback`) sobre todo `app/src/main/java`.
-- El 502 del dashboard móvil y el manejo de errores HTTP están cubiertos por
-  `.ai/auditoria-2026-09/03-movil-502-dashboard.md`; no se duplican aquí.
+- Se ejecutaron: `gradlew help`, `gradlew bundleRelease --dry-run` (construye el grafo de
+  tareas y dispara el preflight **sin compilar ni firmar**), `gradlew :app:processDebugResources`
+  (valida que el nuevo XML compila y que el manifiesto lo enlaza) y
+  `scripts/mobile-smoke-checklist.ps1 -SkipCompile -SkipTests`. **Ninguna build de release,
+  ninguna firma.**
+- El cruce «permiso declarado ↔ permiso usado» se hizo por `grep` de las APIs equivalentes
+  (`FusedLocationProviderClient`, `ProcessCameraProvider`, `ConnectivityManager`,
+  `performHapticFeedback`) sobre `app/src/main/java`, no por la lista del manifiesto.
+- El manifiesto fusionado citado es
+  `app/build/outputs/logs/manifest-merger-debug-report.txt`, **del 06-09-2026 11:38** — es
+  decir, posterior a la remediación. El informe de *release* del mismo directorio es del 31-08
+  y **está obsoleto**: es el que sostenía el bloqueante `AD_ID` de la auditoría anterior.
+- `apps/mobile-native/android/base/` es un artefacto descompilado del AAB de la v1
+  (`versionCode=4`), no código fuente. Se leyó como evidencia histórica.
+- No se abrió `key.properties` ni `nexara-upload.jks`. No se transcribe ninguna contraseña,
+  clave ni token.

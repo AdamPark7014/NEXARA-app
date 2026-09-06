@@ -71,6 +71,38 @@ O omite esta comprobación con -SkipAabCheck (solo para desarrollo local).
 
   $aab = Get-Item $aabPath
   Pass "AAB encontrado ($([math]::Round($aab.Length / 1MB, 2)) MB) — $($aab.FullName)"
+
+  # --- 1b) El AAB tiene que ser MÁS NUEVO que el código -------------------
+  # Que el fichero exista no significa nada: el 31-08 el AAB en disco era dos
+  # minutos anterior a un commit de correcciones de rutas, y este script lo
+  # daba por bueno. Comprobar la fecha es lo único que distingue "hay un
+  # bundle" de "hay un bundle de este código".
+  $sourceRoots = @(
+    (Join-Path $androidDir "app\src\main"),
+    (Join-Path $androidDir "app\build.gradle.kts"),
+    (Join-Path $androidDir "build.gradle.kts"),
+    (Join-Path $androidDir "gradle.properties"),
+    (Join-Path $androidDir "app\proguard-rules.pro")
+  ) | Where-Object { Test-Path $_ }
+
+  $newestSource = Get-ChildItem -Path $sourceRoots -Recurse -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+
+  if ($null -ne $newestSource -and $newestSource.LastWriteTime -gt $aab.LastWriteTime) {
+    Fail @"
+El AAB es MÁS VIEJO que el código fuente.
+
+  AAB      : $($aab.LastWriteTime)  ($($aab.FullName))
+  Fuente   : $($newestSource.LastWriteTime)  ($($newestSource.FullName))
+
+Ese bundle NO contiene los cambios más recientes. Si lo subes a Play, publicas
+código viejo con un versionCode nuevo. Recompila:
+
+  pwsh -File scripts/build-play-aab.ps1 -BumpVersionCode -Clean
+"@
+  }
+  Pass "El AAB es posterior al último cambio de código ($($newestSource.LastWriteTime))"
 }
 else {
   Write-Step "1/3 AAB omitido (-SkipAabCheck)"
