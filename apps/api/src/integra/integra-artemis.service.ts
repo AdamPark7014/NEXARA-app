@@ -540,6 +540,21 @@ export class IntegraArtemisService {
   }
 
   /**
+   * El muro entero en una sola petición.
+   *
+   * Los fallos van DENTRO de la respuesta, cámara por cámara: que la 7 no esté
+   * en el espejo no puede dejar sin video a las otras doce.
+   */
+  streamsEnLote(
+    companyId: number | null,
+    cameraIndexCodes: string[],
+    siteId?: number | null,
+    opts?: { audio?: boolean; quality?: StreamQuality },
+  ) {
+    return this.media.liveStreamsEnLote(companyId, cameraIndexCodes, siteId, opts);
+  }
+
+  /**
    * Mover la domo es una acción operativa, no una consulta: va con el mismo
    * permiso que abrir una puerta. No se audita cada pulsación —serían cientos
    * por minuto— pero sí ir a una posición memorizada, que es la que cambia

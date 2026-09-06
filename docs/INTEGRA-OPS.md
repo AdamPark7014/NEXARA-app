@@ -112,9 +112,56 @@ a mano desde dentro de la LAN hasta que el agente empuje el espejo.
 
 ## Sync
 
-- Cron cada 15 min por sitio activo.
+- Cron cada 15 min por sitio activo, con guardia de no solapamiento y **espera
+  creciente por sitio que falla** (15 min → 30 → 60 → 120, techo 2 h). Un NVR
+  apagado deja de recibir un intento fallido cada cuarto de hora.
 - Manual: `POST /api/integra/sync` o botón en home/settings.
 - Listados leen espejo Prisma; `?live=1` fuerza Artemis.
+
+## Automatización (lo que ya no espera a un botón)
+
+Todo lo periódico lleva intervalo documentado, guardia de reentrada e
+interruptor. **Todos vienen encendidos**; se apagan poniendo `0`.
+
+| Tarea | Cuándo | Interruptor |
+|-------|--------|-------------|
+| Precalentado de streams en go2rtc + deriva base↔go2rtc | al arrancar la API (+20 s) y cada 10 min | `INTEGRA_WARMUP_ENABLED=0` |
+| Reconciliación del espejo | cada 15 min | `INTEGRA_SYNC_CRON=0` |
+| Sondeo de capacidades de cámaras nunca sondeadas | 03:41 diario | `INTEGRA_CAPABILITIES_PROBE_ENABLED=0` |
+
+Afinado (todos opcionales, con techo):
+
+```
+INTEGRA_WARMUP_STAGGER_MS=400          # pausa entre registros en go2rtc
+INTEGRA_WARMUP_MAX_POR_VUELTA=40       # tope de registros por vuelta
+INTEGRA_WARMUP_BOOT_DELAY_MS=20000     # espera tras arrancar la API
+INTEGRA_CAPABILITIES_STAGGER_MS=1500   # pausa entre sondeos
+INTEGRA_CAPABILITIES_MAX_POR_VUELTA=25 # tope de sondeos por vuelta
+```
+
+**Precalentar NO abre sesiones RTSP.** go2rtc conecta con la fuente cuando
+llega el primer consumidor y la suelta cuando se queda sin ninguno —por eso
+«preload» es una opción aparte de go2rtc, que aquí no se usa—. El precalentado
+registra solo el **secundario y mudo** (`cam_<slug>`, fuente `rtsp://` pelada,
+nunca `ffmpeg:`), que es exactamente el que pedirá el muro. Antes de registrar
+pregunta a go2rtc qué tiene ya: en régimen estacionario la vuelta es un GET y
+cero escrituras, lo que importa porque go2rtc reescribe su YAML en cada PUT.
+
+Esa misma vuelta corrige la **deriva**: una cámara que está en el espejo y no
+en go2rtc se registra sola (el caso «17 en la base, 16 en go2rtc»).
+
+## Muro en un solo viaje
+
+`POST /api/integra/cameras/streams/batch`
+
+```json
+{ "cameraIds": ["192.168.9.34|301", "192.168.9.34|401"], "audio": false, "quality": "sub" }
+```
+
+Sustituye a N `POST /integra/cameras/:id/stream`. Máximo 40 ids. **Los fallos
+van dentro de la respuesta**, no en el código HTTP: cada elemento trae `ok`,
+`stream` (lo mismo que devuelve el endpoint de una cámara) y `error`. Una
+cámara rota no deja al muro sin las demás.
 
 ## Smoke
 
