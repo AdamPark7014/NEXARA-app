@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { CreateLunchBreakDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
 import { companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
-import { workDateColumn, workDayAtClock } from '../../common/time/workday.js';
+import { parseWorkDate, workDateColumn, workDayAtClock } from '../../common/time/workday.js';
 
 @Injectable()
 export class LunchBreaksService {
@@ -12,10 +12,35 @@ export class LunchBreaksService {
     private notificationHierarchy: NotificationHierarchyService,
   ) {}
 
+  /**
+   * Día de comida listo para la columna `date`, que es `@db.Date`.
+   *
+   * Nunca `setHours(0,0,0,0)`: el contenedor corre en UTC, así que eso cortaba
+   * el día seis horas antes que en México y la comida de la tarde caía en el
+   * día siguiente. En los datos de producción 10 de 15 registros de asistencia
+   * caían en el día equivocado por esta misma causa, y de aquí sale la nómina.
+   */
+  private dayColumn(instante: Date = new Date()) {
+    return workDateColumn(instante);
+  }
+
+  /**
+   * Extremo de un rango de consulta, normalizado al día laboral de la empresa.
+   *
+   * `AAAA-MM-DD` se ancla con `parseWorkDate` (mediodía UTC) para que no se
+   * corra de día; un instante completo se traduce al día de México que lo
+   * contiene. Sin esto, pedir "hoy" desde la tarde mexicana devolvía mañana.
+   */
+  private rangeDayColumn(valor?: Date | string | null) {
+    if (valor === undefined || valor === null || valor === '') return undefined;
+    if (typeof valor === 'string') return workDateColumn(parseWorkDate(valor));
+    return workDateColumn(valor);
+  }
+
   async createCheckin(usuarioId: number, data: CreateLunchBreakDto, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const now = new Date();
-    const today = workDateColumn(now);
+    const today = this.dayColumn(now);
 
     // Verificar si ya existe un registro de comida hoy
     const existingLunch = await this.prisma.lunchBreak.findFirst({
@@ -39,7 +64,10 @@ export class LunchBreaksService {
     if (checkinTime < lunchStartHour) {
       notes = `Entraste a comida ${this.getMinutesDiff(checkinTime, lunchStartHour)} minutos antes`;
     } else if (checkinTime > lunchEndHour) {
-      notes = `Entraste a comida ${this.getMinutesDiff(lunchStartHour, checkinTime)} minutos después del horario permitido (3 PM)`;
+      // Se mide contra el FIN de la ventana (16:00), que es lo que se rebasó.
+      // Antes se medía contra las 15:00 y se guardaba en `notes` un retraso
+      // inflado en 60 minutos: un dato falso en la base.
+      notes = `Entraste a comida ${this.getMinutesDiff(lunchEndHour, checkinTime)} minutos después del horario permitido (4 PM)`;
     }
 
     let lunchBreak;
@@ -88,7 +116,7 @@ export class LunchBreaksService {
   async createCheckout(usuarioId: number, data: UpdateLunchBreakDto, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const now = new Date();
-    const today = workDateColumn(now);
+    const today = this.dayColumn(now);
 
     const lunch = await this.prisma.lunchBreak.findFirst({
       where: {
@@ -110,7 +138,9 @@ export class LunchBreaksService {
     const lunchEndHour = workDayAtClock(now, 16, 5);
 
     const isLate = checkoutTime > lunchEndHour;
-    let notes = lunch.notes;
+    // `lunch.notes` es nullable: sin el `?? ''`, concatenar dejaba en la base
+    // notas que empezaban literalmente por "null".
+    let notes = lunch.notes ?? '';
 
     if (isLate) {
       notes += `\nVolviste del almuerzo ${this.getMinutesDiff(lunchEndHour, checkoutTime)} minutos después de lo esperado`;
@@ -143,18 +173,17 @@ export class LunchBreaksService {
 
   async getUserLunchBreaks(
     usuarioId: number,
-    startDate?: Date,
-    endDate?: Date,
+    startDate?: Date | string,
+    endDate?: Date | string,
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
     const where: any = { userId: usuarioId, ...companyWhere(tenantId) };
 
-    if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
+    const start = this.rangeDayColumn(startDate);
+    const end = this.rangeDayColumn(endDate);
+    if (start && end) {
+      where.date = { gte: start, lte: end };
     }
 
     return await this.prisma.lunchBreak.findMany({
@@ -164,15 +193,18 @@ export class LunchBreaksService {
     });
   }
 
-  async getAllLunchBreaks(startDate?: Date, endDate?: Date, companyId?: number | null) {
+  async getAllLunchBreaks(
+    startDate?: Date | string,
+    endDate?: Date | string,
+    companyId?: number | null,
+  ) {
     const tenantId = requireCompanyId(companyId);
     const where: any = { ...companyWhere(tenantId) };
 
-    if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
+    const start = this.rangeDayColumn(startDate);
+    const end = this.rangeDayColumn(endDate);
+    if (start && end) {
+      where.date = { gte: start, lte: end };
     }
 
     return await this.prisma.lunchBreak.findMany({
@@ -184,8 +216,10 @@ export class LunchBreaksService {
 
   async getTodayLunchBreaks(companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // "Hoy" es hoy en México. Con `setHours(0,0,0,0)` sobre la hora del
+    // contenedor —UTC— el panel de comidas se vaciaba a las 18:00 de México y
+    // mostraba ya las del día siguiente.
+    const today = this.dayColumn();
 
     return await this.prisma.lunchBreak.findMany({
       where: { date: today, ...companyWhere(tenantId) },

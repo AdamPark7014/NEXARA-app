@@ -167,16 +167,12 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         photoBase64 = photoBase64,
                     )
                 }
-                val hasGps =
-                    coords != null &&
-                        coords.lat.isFinite() &&
-                        coords.lng.isFinite() &&
-                        !(coords.lat == 0.0 && coords.lng == 0.0)
-                if (type == "entrada" && hasGps) {
-                    runCatching {
-                        withContext(Dispatchers.IO) { repo.gpsUpdateConsent(enabled = true) }
-                    }
-                }
+                // Aquí se llamaba a `gpsUpdateConsent(enabled = true)` en cada
+                // entrada con GPS. Fichar no es consentir el rastreo: eso
+                // encendía el consentimiento sin que nadie lo otorgara y dejaba
+                // al usuario visible en el mapa del equipo el resto del día.
+                // El consentimiento se otorga en el interruptor de la pantalla
+                // de GPS (`ConsoleGpsScreen`), que es donde se explica.
                 val base = res.message ?: if (type == "entrada") "✅ Entrada registrada" else "✅ Salida registrada"
                 val geoHint = when {
                     coords == null -> " (sin GPS — activa ubicación)"

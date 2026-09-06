@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { WORKDAY_TIMEZONE, workDateColumn } from '../../common/time/workday.js';
 
 @Injectable()
 export class LunchBreaksCronService {
@@ -9,8 +10,11 @@ export class LunchBreaksCronService {
 
   constructor(private prisma: PrismaService) {}
 
-  // Notificación a las 14:50 (2:50 PM) - Lunes a Viernes
-  @Cron('50 14 * * 1-5') // Minuto 50, hora 14, cualquier día del mes, cualquier mes, lunes a viernes
+  // Notificación a las 14:50 (2:50 PM) hora de México - Lunes a Viernes.
+  //
+  // Sin `timeZone` el cron usa la del proceso, que en el contenedor es UTC:
+  // el aviso de "tu comida es en 10 minutos" salía a las 08:50 de México.
+  @Cron('50 14 * * 1-5', { timeZone: WORKDAY_TIMEZONE })
   async notifyLunchBreakApproaching() {
     this.logger.debug('CRON: Enviando notificaciones de hora de comida próxima');
 
@@ -58,14 +62,16 @@ export class LunchBreaksCronService {
     }
   }
 
-  // Notificación a las 16:05 (4:05 PM) - Lunes a Viernes
-  @Cron('5 16 * * 1-5') // Minuto 5, hora 16, cualquier día del mes, cualquier mes, lunes a viernes
+  // Notificación a las 16:05 (4:05 PM) hora de México - Lunes a Viernes.
+  @Cron('5 16 * * 1-5', { timeZone: WORKDAY_TIMEZONE })
   async notifyLunchBreakExpired() {
     this.logger.debug('CRON: Enviando notificaciones de hora de comida expirada');
 
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Mismo día que escribe `LunchBreaksService`: el de México, no el del
+      // contenedor. Con `setHours(0,0,0,0)` este cron buscaba el día UTC y no
+      // encontraba las comidas abiertas de la tarde mexicana.
+      const today = workDateColumn(new Date());
 
       // Obtener usuarios que no han hecho checkout de comida
       const usersWithoutCheckout = await this.prisma.lunchBreak.findMany({
