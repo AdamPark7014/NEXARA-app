@@ -8,9 +8,19 @@ import { ActivitiesModule } from '../activities/activities.module.js';
 import { InventoriesModule } from '../inventories/inventories.module.js';
 import { AccountingModule } from '../accounting/accounting.module.js';
 import { CotizacionesModule } from '../cotizaciones/cotizaciones.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ServiceClientsModule, ActivitiesModule, InventoriesModule, AccountingModule, CotizacionesModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    ServiceClientsModule,
+    ActivitiesModule,
+    InventoriesModule,
+    AccountingModule,
+    CotizacionesModule,
+    NotificationsModule,
+  ],
   controllers: [ClientPortalController],
   providers: [ClientPortalGuard],
 })

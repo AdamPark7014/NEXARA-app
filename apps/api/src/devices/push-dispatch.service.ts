@@ -19,6 +19,9 @@ export type PushPayload = {
   event?: string;
   /** Collapse key FCM — una acción/entidad = una tarjeta en bandeja. */
   collapseKey?: string;
+  entityType?: string | null;
+  relatedEntityId?: number | null;
+  category?: string | null;
 };
 
 @Injectable()
@@ -86,6 +89,9 @@ export class PushDispatchService {
       event,
       collapse_key: collapseKey,
       nexara_notification_id: nid,
+      entityType: payload.entityType || '',
+      relatedEntityId: payload.relatedEntityId != null ? String(payload.relatedEntityId) : '',
+      category: payload.category || '',
     };
 
     const fcmOk = this.tryInitFirebase();
@@ -107,6 +113,9 @@ export class PushDispatchService {
               event,
               collapse_key: collapseKey,
               nexara_notification_id: nid,
+              entityType: data.entityType,
+              relatedEntityId: data.relatedEntityId,
+              category: data.category,
             },
             android: {
               priority: priority === 'high' ? 'high' : 'normal',

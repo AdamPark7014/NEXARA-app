@@ -382,6 +382,9 @@ export class NotificationsService {
           channel,
           event: String(payload.type),
           collapseKey,
+          entityType: payload.entityType,
+          relatedEntityId: payload.relatedEntityId,
+          category: payload.category,
         })
         .catch((err) => this.logger.warn(`Push dispatch: ${err instanceof Error ? err.message : err}`));
 

@@ -17,6 +17,10 @@ import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
 import { Request } from 'express';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { isFinishedStatus, statusVariants, ACTIVITY_STATUS } from '../activities/activity-status.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import type { PortalTicketClientAction } from '../notifications/portal-ticket-notify.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
+import { appUrls } from '../common/app-urls.js';
 
 const ensureBranchUploadsDir = () => {
   const segments = __dirname.split(path.sep);
@@ -58,6 +62,7 @@ export class ClientPortalController {
     private readonly inventoriesService: InventoriesService,
     private readonly accountingService: AccountingService,
     private readonly cotizacionesService: CotizacionesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private normalizeBoolean(value: unknown) {
@@ -765,9 +770,9 @@ export class ClientPortalController {
       select: { id: true, comentariosFeedback: true },
     });
 
-    try {
-      await this.prisma.notification.create({
-        data: {
+    if (activity.responsableId) {
+      void this.notifications
+        .createNotification({
           userId: activity.responsableId,
           type: 'ACTIVITY_ASSIGNED',
           category: 'tickets',
@@ -775,12 +780,12 @@ export class ClientPortalController {
           message: text.slice(0, 280),
           relatedEntityId: activity.id,
           entityType: 'activity',
-          relatedUrl: `/ops/activities/${activity.id}`,
+          relatedUrl: appUrls.opsActivity(activity.id),
           companyId: activity.companyId,
-        },
-      });
-    } catch {
-      /* no bloquear el comentario si la notif falla */
+          channel: 'tickets',
+          priority: 'high',
+        })
+        .catch(() => undefined);
     }
 
     return {
@@ -815,9 +820,9 @@ export class ClientPortalController {
     const stamp = new Date().toISOString();
 
     if (action === 'ACK') {
-      try {
-        await this.prisma.notification.create({
-          data: {
+      if (activity.responsableId) {
+        void this.notifications
+          .createNotification({
             userId: activity.responsableId,
             type: 'ACTIVITY_ASSIGNED',
             category: 'tickets',
@@ -825,11 +830,13 @@ export class ClientPortalController {
             message: note || activity.titulo,
             relatedEntityId: activity.id,
             entityType: 'activity',
-            relatedUrl: `/ops/activities/${activity.id}`,
+            relatedUrl: appUrls.opsActivity(activity.id),
             companyId: activity.companyId,
-          },
-        });
-      } catch { /* ignore */ }
+            channel: 'tickets',
+            priority: 'high',
+          })
+          .catch(() => undefined);
+      }
       return { ok: true, action, estatus: activity.estatus };
     }
 
@@ -846,6 +853,23 @@ export class ClientPortalController {
           comentariosFeedback: (prev ? `${prev}\n${line}` : line).slice(0, 8000),
         },
       });
+      if (activity.responsableId) {
+        void this.notifications
+          .createNotification({
+            userId: activity.responsableId,
+            type: 'ACTIVITY_APPROVED',
+            category: 'tickets',
+            title: `Cliente confirmó resolución · OT ${activity.anNumber}`,
+            message: note || activity.titulo,
+            relatedEntityId: activity.id,
+            entityType: 'activity',
+            relatedUrl: appUrls.opsActivity(activity.id),
+            companyId: activity.companyId,
+            channel: 'tickets',
+            priority: 'normal',
+          })
+          .catch(() => undefined);
+      }
       return { ok: true, action, estatus: activity.estatus };
     }
 
@@ -863,9 +887,9 @@ export class ClientPortalController {
         comentariosFeedback: (prev ? `${prev}\n${line}` : line).slice(0, 8000),
       },
     });
-    try {
-      await this.prisma.notification.create({
-        data: {
+    if (activity.responsableId) {
+      void this.notifications
+        .createNotification({
           userId: activity.responsableId,
           type: 'ACTIVITY_REJECTED',
           category: 'tickets',
@@ -873,11 +897,13 @@ export class ClientPortalController {
           message: note || activity.titulo,
           relatedEntityId: activity.id,
           entityType: 'activity',
-          relatedUrl: `/ops/activities/${activity.id}`,
+          relatedUrl: appUrls.opsActivity(activity.id),
           companyId: activity.companyId,
-        },
-      });
-    } catch { /* ignore */ }
+          channel: 'tickets',
+          priority: 'high',
+        })
+        .catch(() => undefined);
+    }
     return { ok: true, action, estatus: updated.estatus };
   }
 

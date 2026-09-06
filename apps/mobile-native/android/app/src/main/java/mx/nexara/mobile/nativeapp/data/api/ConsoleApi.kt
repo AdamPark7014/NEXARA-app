@@ -522,6 +522,23 @@ interface ConsoleApi {
     @GET("vehicles/inventory")
     suspend fun getVehicleInventory(): List<VehicleAssetDto>
 
+    @retrofit2.http.POST("vehicles/inventory")
+    suspend fun createVehicleInventory(
+        @retrofit2.http.Body body: UpsertVehicleAssetRequest,
+    ): VehicleAssetDto
+
+    @PATCH("vehicles/inventory/{id}")
+    suspend fun updateVehicleInventory(
+        @Path("id") id: Long,
+        @retrofit2.http.Body body: UpsertVehicleAssetRequest,
+    ): VehicleAssetDto
+
+    @PATCH("vehicles/{id}/approve")
+    suspend fun approveVehicleRequest(
+        @Path("id") id: Long,
+        @retrofit2.http.Body body: ApproveVehicleRequest,
+    ): VehicleControlDto
+
     @retrofit2.http.POST("vehicles")
     suspend fun createVehicleRequest(
         @retrofit2.http.Body body: CreateVehicleRequest,
@@ -1083,6 +1100,22 @@ data class VehicleAssetDto(
     val placas: String? = null,
     val estatus: String? = null,
     val activo: Boolean? = null,
+    val notas: String? = null,
+)
+
+data class UpsertVehicleAssetRequest(
+    val nombre: String? = null,
+    val placas: String? = null,
+    val estatus: String? = null,
+    val activo: Boolean? = null,
+    val notas: String? = null,
+)
+
+data class ApproveVehicleRequest(
+    val action: String, // approve | reject
+    val note: String? = null,
+    val fechaInicioAprobada: String? = null,
+    val fechaFinAprobada: String? = null,
 )
 
 data class CreateVehicleRequest(

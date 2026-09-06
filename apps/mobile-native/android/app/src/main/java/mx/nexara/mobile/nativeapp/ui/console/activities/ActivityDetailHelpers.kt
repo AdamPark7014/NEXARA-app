@@ -54,7 +54,15 @@ fun activStatusTone(estatus: String): NxTone {
 
 val STATUS_FILTER_OPTIONS = listOf("Todos", "Pendiente", "En proceso", "Asignada", "Finalizada", "Cancelada")
 
-val ACTIVITY_STATUSES = listOf("PROGRAMADA", "EN_CURSO", "COMPLETADA", "REPROGRAMAR", "CANCELADA")
+val ACTIVITY_STATUSES = listOf(
+    "Pendiente",
+    "Asignada",
+    "En Proceso",
+    "Por Validar",
+    "Finalizada",
+    "Cancelada",
+    "Reprogramar",
+)
 val ACTIVITY_PRIORITIES = listOf("BAJA", "MEDIA", "ALTA", "URGENTE")
 val VIATIC_CATEGORIES = listOf(
     "COMBUSTIBLE", "CASETA", "HOSPEDAJE", "ALIMENTACION", "TRANSPORTE", "OTROS",
