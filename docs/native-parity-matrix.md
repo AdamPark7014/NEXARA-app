@@ -46,19 +46,19 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Mis evidencias | `/operacion/my-evidences` | NATIVO | NATIVO |
 | Viáticos (revisión) | `/operacion/viatics` | NATIVO · approveViatic | NATIVO |
 | Mis viáticos | `/operacion/my-viatics` | NATIVO · create + estatus | NATIVO |
-| Vehículos | `/operacion/vehicles` | CASCARON · solo lista | CASCARON |
+| Vehículos | `/operacion/vehicles` | NATIVO · approve + flotilla | NATIVO |
 | Mis vehículos | `/operacion/my-vehicles` | NATIVO · solicitud + salida/devolución 9 fotos | NATIVO |
 | GPS | `/operacion/gps` | NATIVO · ConsoleGpsScreen | NATIVO |
 | Herramientas | `/operacion/tools` | NATIVO · hub + inventario/kit/renovaciones | NATIVO |
 | Clientes | `/console/clients` | NATIVO · CRUD | NATIVO |
 | Proyectos | `/operacion/projects` | NATIVO · patchProjectStatus | NATIVO |
-| Proyectos internos | `/operacion/work-projects` | CASCARON · WorkProjectsRichScreen | CASCARON |
+| Proyectos internos | `/operacion/work-projects` | NATIVO · ConsoleProjectsScreen | NATIVO |
 | Usuarios | `/console/users` | NATIVO · create/edit | NATIVO |
 | Asistencia | `/console/attendance` | NATIVO · check-in geo + foto | NATIVO |
 | Comidas (admin) | `/console/lunch-breaks` | NATIVO · KPIs + check-in/out | NATIVO |
 | Mis comidas | `/console/my-lunch-breaks` | NATIVO | NATIVO |
 | RRHH | `/console/hr` | NATIVO · aprobar ausencias | NATIVO |
-| Pagos empleados | `/console/employee-payments` | CASCARON | CASCARON |
+| Pagos empleados | `/console/employee-payments` | NATIVO · CRUD + pagado | NATIVO |
 | Contabilidad | `/console/accounting` | NATIVO · pólizas create/post | NATIVO |
 | Banca | `/console/banking` | NATIVO · cuentas | NATIVO |
 | Facturación | `/console/invoicing` | NATIVO · pagos/match | NATIVO |
@@ -67,7 +67,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Cotizaciones ERP | `/console/cotizaciones` | SOLO_LECTURA | SOLO_LECTURA |
 | Gestión vendedores | `/console/gestion-vendedores` | SOLO_LECTURA · VentasSalesTeamScreen | SOLO_LECTURA |
 | Vista ejecutiva | `/erp/executive` | SOLO_LECTURA · ExecutiveScreen | SOLO_LECTURA |
-| Despacho OT | `/ops/dispatch` | CASCARON · pantalla OK, menú oculto | CASCARON |
+| Despacho OT | `/ops/dispatch` | NATIVO · board + reassign | NATIVO |
 | Aprobaciones | `/erp/approvals` | NATIVO · workflowDecide | NATIVO |
 | Notificaciones | `/erp/notifications-center` | NATIVO · NotificationsScreen | NATIVO |
 | Chat | `/erp/chat` | NATIVO · ChatScreen (a veces oculto en menú) | NATIVO |
@@ -81,18 +81,18 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Mantenimiento | `/operacion/maintenance` | NATIVO · OT start/complete | NATIVO |
 | Hojas de servicio | `/operacion/service-sheets` | NATIVO · ServiceSheetsModuleScreen | NATIVO |
 | Documentos | `/console/documents` | NATIVO · upload | NATIVO |
-| CVs | `/console/cvs` | CASCARON | CASCARON |
-| Reclutamiento | `/ops/recruiting` | CASCARON · inalcanzable en sidebar | CASCARON |
+| CVs | `/console/cvs` | NATIVO · create + move stage | NATIVO |
+| Reclutamiento | `/ops/recruiting` | NATIVO · RecruitingScreen | NATIVO |
 | Tickets clientes | `/operacion/client-tickets` | NATIVO · ClientTicketsModuleScreen | NATIVO |
 | Clientes servicio | `/ops/service-clients` | NATIVO · ConsoleClientsScreen | NATIVO |
 | Bandeja soporte | `/ops/support` | NATIVO | NATIVO |
 | NOC | `/ops/noc` | SOLO_LECTURA · sin reconocer alarma | SOLO_LECTURA |
 | SLA | `/ops/support/sla` | SOLO_LECTURA | SOLO_LECTURA |
-| Contratos mant. | `/ops/maintenance/contracts` | CASCARON | CASCARON |
+| Contratos mant. | `/ops/maintenance/contracts` | NATIVO · create/status/OT | NATIVO |
 | Mensajes contacto | `/console/contact-messages` | SOLO_LECTURA | SOLO_LECTURA |
 | Noticias ERP | `/console/news` | CASCARON · lista sin CRUD | CASCARON |
-| Newsletter ERP | `/console/newsletter` | CASCARON | CASCARON |
-| Mi perfil | `/console/my-profile` | CASCARON · sin updateProfile | CASCARON |
+| Newsletter ERP | `/console/newsletter` | SOLO_LECTURA | SOLO_LECTURA |
+| Mi perfil | `/console/my-profile` | NATIVO · MyProfileScreen | NATIVO |
 | Mis preferencias | `/console/my-preferences` | SOLO_LECTURA | SOLO_LECTURA |
 | Cola offline | `/console/offline-queue` | NATIVO · OfflineQueueScreen | NATIVO |
 | Ajustes | `/console/settings` | NATIVO · parcial (faltan api-keys/webhooks) | NATIVO |
@@ -117,7 +117,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Cotizador inteligente | `/ventas/cotizaciones/nueva` | NATIVO · SmartQuoteBuilderScreen | NATIVO |
 | Productos | `/ventas/productos` | SOLO_LECTURA | SOLO_LECTURA |
 | Clientes | `/ventas/clientes` | NATIVO · CRUD | NATIVO |
-| Proyectos | `/ventas/proyectos` | CASCARON · sin costos/orden | CASCARON |
+| Proyectos | `/ventas/proyectos` | NATIVO · status/costos/close | NATIVO |
 | Pipeline | `/crm/pipeline` | NATIVO · updateStage | NATIVO |
 | Agenda | `/crm/agenda` | NATIVO | NATIVO |
 | Licitaciones | `/crm/tenders` | SOLO_LECTURA | SOLO_LECTURA |
@@ -129,7 +129,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Reportes | `/ventas/reportes` | SOLO_LECTURA | SOLO_LECTURA |
 | Notificaciones | `/ventas/notificaciones` | NATIVO | NATIVO |
 | Chat | `/erp/chat` | NATIVO | NATIVO |
-| Mi perfil | `/ventas/my-profile` | CASCARON | CASCARON |
+| Mi perfil | `/ventas/my-profile` | NATIVO | NATIVO |
 | Equipo CRM | `/crm/team` | AUSENTE (expuesto como gestion-vendedores) | AUSENTE |
 
 ## Panel Contabilidad (ModuleCatalog.contabilidad)
@@ -141,13 +141,13 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Banca | `/contabilidad/banking` | NATIVO · cuentas | NATIVO |
 | Facturación | `/contabilidad/invoicing` | NATIVO | NATIVO |
 | Gastos | `/contabilidad/expenses` | NATIVO | NATIVO |
-| Pagos empleados | `/contabilidad/employee-payments` | CASCARON | CASCARON |
+| Pagos empleados | `/contabilidad/employee-payments` | NATIVO · CRUD + pagado | NATIVO |
 | Viáticos | `/contabilidad/viaticos` | CASCARON · MyViaticsScreen RO | CASCARON |
 | Pagos | `/contabilidad/pagos` | CASCARON | CASCARON |
 | Horas | `/contabilidad/horas` | SOLO_LECTURA | SOLO_LECTURA |
 | Proyectos | `/contabilidad/proyectos` | NATIVO · ConsoleProjectsScreen | NATIVO |
-| Proyectos internos | `/contabilidad/work-projects` | CASCARON | CASCARON |
-| Multas | `/contabilidad/multas` | CASCARON | CASCARON |
+| Proyectos internos | `/contabilidad/work-projects` | NATIVO · ConsoleProjectsScreen | NATIVO |
+| Multas | `/contabilidad/multas` | NATIVO · FinesRichScreen | NATIVO |
 | Chat | `/erp/chat` | NATIVO | NATIVO |
 
 ## Panel STUDIO (ModuleCatalog.studio)
@@ -160,7 +160,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Casos | `/studio/cases` | NATIVO · CRUD + publicar | NATIVO |
 | Noticias | `/studio/news` | NATIVO | NATIVO |
 | Redes | `/studio/social` | NATIVO | NATIVO |
-| Newsletter | `/studio/newsletter` | CASCARON · sin mutaciones | CASCARON |
+| Newsletter | `/studio/newsletter` | SOLO_LECTURA | SOLO_LECTURA |
 | Contactos | `/studio/contacts` | NATIVO | NATIVO |
 | Leads sitio | `/studio/leads` | NATIVO | NATIVO |
 | Chat | `/erp/chat` | NATIVO | NATIVO |
@@ -185,7 +185,7 @@ MVP operativo contra `/api/integra/**` (sin inventar ISAPI).
 | Inicio hub | `/integra/` | NATIVO · IntegraNavHost | AUSENTE |
 | Accesos | `/integra/access` | NATIVO · puertas + open | AUSENTE |
 | Eventos | `/integra/events` | NATIVO · lista | AUSENTE |
-| Personas | `/integra/people` | NATIVO · lista/detalle | AUSENTE |
+| Personas | `/integra/people` | NATIVO · CRUD + face | NATIVO |
 | Asistencia ACS | `/integra/attendance` | NATIVO · lista | AUSENTE |
 | Visitas | `/integra/visitors` | NATIVO · lista + registro | AUSENTE |
 | Alarmas | `/integra/alarms` | NATIVO · queue + ack/clear | AUSENTE |

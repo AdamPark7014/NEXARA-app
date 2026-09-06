@@ -583,7 +583,7 @@ fun ConsoleNavHost(
                             },
                         )
                     } }
-                    "work-projects" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.WorkProjectsRichScreen() } }
+                    "work-projects" -> { { ConsoleProjectsScreen() } }
                     "hr" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.HrLeavesScreen() } }
                     "warehouse" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.WarehouseHubScreen(initialTab = 1) } }
                     "stock" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.WarehouseHubScreen(initialTab = 0) } }
@@ -591,7 +591,7 @@ fun ConsoleNavHost(
                     "maintenance" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MaintenanceModuleScreen(initialTab = 0) } }
                     "assets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MaintenanceModuleScreen(initialTab = 1) } }
                     "service-sheets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ServiceSheetsModuleScreen() } }
-                    "cvs" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.CvsRichScreen() } }
+                    "cvs" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.RecruitingScreen() } }
                     "recruiting" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.RecruitingScreen() } }
                     "service-clients" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleClientsScreen() } }
                     "client-tickets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ClientTicketsModuleScreen() } }

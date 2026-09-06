@@ -88,6 +88,14 @@ data class SettingsUiState(
     val message: String? = null,
     val messageIsError: Boolean = false,
     val pendingDeleteKey: String? = null,
+    val apiKeys: List<Map<String, Any?>> = emptyList(),
+    val apiKeysError: String? = null,
+    val newApiKeyName: String = "",
+    val createdApiKeyToken: String? = null,
+    val webhooks: List<Map<String, Any?>> = emptyList(),
+    val webhookDlq: List<Map<String, Any?>> = emptyList(),
+    val webhooksError: String? = null,
+    val integrationsBusy: Boolean = false,
 )
 
 class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -98,10 +106,109 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         refresh()
+        refreshIntegrations()
         refreshOnModels(
             models = setOf("SystemSetting"),
             refresh = ::refresh,
         )
+    }
+
+    /**
+     * API keys y webhooks dependen del plan de la empresa (Nest responde 402/403
+     * si la feature no está incluida), así que cada bloque falla por separado.
+     */
+    fun refreshIntegrations() {
+        viewModelScope.launch {
+            val keys = withContext(Dispatchers.IO) { runCatching { repo.companyApiKeys() } }
+            val hooks = withContext(Dispatchers.IO) { runCatching { repo.webhooks() } }
+            val dlq = withContext(Dispatchers.IO) { runCatching { repo.webhooksDlq() } }
+            _state.update {
+                it.copy(
+                    apiKeys = keys.getOrDefault(emptyList()),
+                    apiKeysError = keys.exceptionOrNull()?.message,
+                    webhooks = hooks.getOrDefault(emptyList()),
+                    webhookDlq = dlq.getOrDefault(emptyList()),
+                    webhooksError = hooks.exceptionOrNull()?.message,
+                )
+            }
+        }
+    }
+
+    fun setNewApiKeyName(v: String) = _state.update { it.copy(newApiKeyName = v) }
+
+    fun dismissCreatedApiKey() = _state.update { it.copy(createdApiKeyToken = null) }
+
+    fun createApiKey() {
+        val name = _state.value.newApiKeyName.trim()
+        if (name.isEmpty()) return
+        _state.update { it.copy(integrationsBusy = true, message = null) }
+        viewModelScope.launch {
+            try {
+                val created = withContext(Dispatchers.IO) { repo.createCompanyApiKey(name) }
+                val token = listOf("token", "apiKey", "key", "plainKey")
+                    .firstNotNullOfOrNull { k -> created[k]?.toString()?.takeIf { t -> t.isNotBlank() } }
+                _state.update {
+                    it.copy(
+                        integrationsBusy = false,
+                        newApiKeyName = "",
+                        createdApiKeyToken = token,
+                        message = "API key \"$name\" creada",
+                        messageIsError = false,
+                    )
+                }
+                refreshIntegrations()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        integrationsBusy = false,
+                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo crear la API key",
+                        messageIsError = true,
+                    )
+                }
+            }
+        }
+    }
+
+    fun revokeApiKey(id: Long) {
+        _state.update { it.copy(integrationsBusy = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.revokeCompanyApiKey(id) }
+                _state.update {
+                    it.copy(integrationsBusy = false, message = "API key revocada", messageIsError = false)
+                }
+                refreshIntegrations()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        integrationsBusy = false,
+                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo revocar",
+                        messageIsError = true,
+                    )
+                }
+            }
+        }
+    }
+
+    fun replayDelivery(deliveryId: Long) {
+        _state.update { it.copy(integrationsBusy = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.replayWebhookDelivery(deliveryId) }
+                _state.update {
+                    it.copy(integrationsBusy = false, message = "Entrega reenviada", messageIsError = false)
+                }
+                refreshIntegrations()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        integrationsBusy = false,
+                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo reenviar",
+                        messageIsError = true,
+                    )
+                }
+            }
+        }
     }
 
     fun setActiveCategory(cat: String) = _state.update { it.copy(activeCategory = cat) }
@@ -297,6 +404,118 @@ fun ConsoleSettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = NxColors.Muted,
                     )
+                }
+            }
+        }
+
+        item {
+            NxPanelShell {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("API keys de la empresa", style = MaterialTheme.typography.titleSmall, color = NxColors.Slate)
+                    if (!state.apiKeysError.isNullOrBlank()) {
+                        Text(
+                            state.apiKeysError!!,
+                            color = NxColors.Danger,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    state.createdApiKeyToken?.let { token ->
+                        Text(
+                            "Token (solo se muestra ahora): $token",
+                            color = NxColors.Teal,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        TextButton(onClick = vm::dismissCreatedApiKey) { Text("Ocultar token") }
+                    }
+                    if (state.apiKeys.isEmpty() && state.apiKeysError.isNullOrBlank()) {
+                        Text("Sin API keys activas", color = NxColors.Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    state.apiKeys.forEach { row ->
+                        val id = (row["id"] as? Number)?.toLong() ?: return@forEach
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(row["name"]?.toString() ?: "API key #$id", fontWeight = FontWeight.SemiBold)
+                                val meta = listOfNotNull(
+                                    row["prefix"]?.toString(),
+                                    (row["scopes"] as? List<*>)?.joinToString(", "),
+                                ).filter { it.isNotBlank() }.joinToString(" · ")
+                                if (meta.isNotBlank()) {
+                                    Text(meta, style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+                                }
+                            }
+                            TextButton(
+                                onClick = { vm.revokeApiKey(id) },
+                                enabled = !state.integrationsBusy,
+                            ) { Text("Revocar", color = NxColors.Danger) }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = state.newApiKeyName,
+                        onValueChange = vm::setNewApiKeyName,
+                        label = { Text("Nombre de la nueva API key") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = vm::createApiKey,
+                        enabled = !state.integrationsBusy && state.newApiKeyName.trim().isNotEmpty(),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                    ) { Text("+ Crear API key") }
+                }
+            }
+        }
+
+        item {
+            NxPanelShell {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Webhooks outbound", style = MaterialTheme.typography.titleSmall, color = NxColors.Slate)
+                    if (!state.webhooksError.isNullOrBlank()) {
+                        Text(
+                            state.webhooksError!!,
+                            color = NxColors.Danger,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    if (state.webhooks.isEmpty() && state.webhooksError.isNullOrBlank()) {
+                        Text("Sin webhooks configurados", color = NxColors.Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    state.webhooks.forEach { row ->
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(row["name"]?.toString() ?: "Webhook", fontWeight = FontWeight.SemiBold)
+                            row["url"]?.toString()?.let {
+                                Text(it.take(70), style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+                            }
+                        }
+                    }
+                    if (state.webhookDlq.isNotEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Entregas fallidas (${state.webhookDlq.size})",
+                            fontWeight = FontWeight.SemiBold,
+                            color = NxColors.Danger,
+                        )
+                        state.webhookDlq.take(20).forEach { row ->
+                            val id = (row["id"] as? Number)?.toLong() ?: return@forEach
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(row["eventType"]?.toString() ?: "Entrega #$id")
+                                    row["lastError"]?.toString()?.takeIf { it.isNotBlank() }?.let {
+                                        Text(it.take(60), style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+                                    }
+                                }
+                                TextButton(
+                                    onClick = { vm.replayDelivery(id) },
+                                    enabled = !state.integrationsBusy,
+                                ) { Text("Reenviar") }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -748,6 +748,9 @@ data class MaintContractsState(
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val items: List<mx.nexara.mobile.nativeapp.data.api.MaintenanceContractDto> = emptyList(),
+    val visits: List<Map<String, Any?>> = emptyList(),
+    val acting: Boolean = false,
+    val message: String? = null,
 )
 
 class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
@@ -766,6 +769,81 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    fun loadVisits(contractId: Long) {
+        viewModelScope.launch {
+            val visits = withContext(Dispatchers.IO) {
+                runCatching { repo.maintenanceContractVisits(contractId) }.getOrDefault(emptyList())
+            }
+            _state.update { it.copy(visits = visits) }
+        }
+    }
+
+    fun create(
+        clientId: Long,
+        title: String,
+        frequency: String,
+        startDate: String,
+        monthlyFee: Double?,
+        onDone: () -> Unit,
+    ) {
+        if (clientId <= 0 || title.isBlank() || startDate.isBlank()) {
+            _state.update { it.copy(message = "❌ Cliente, título e inicio son obligatorios") }
+            return
+        }
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.createMaintenanceContract(clientId, title, frequency, startDate, monthlyFee)
+                }
+                _state.update { it.copy(acting = false, message = "✅ Contrato creado") }
+                load(refresh = true)
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
+    fun setStatus(id: Long, status: String) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.setMaintenanceContractStatus(id, status) }
+                _state.update { it.copy(acting = false, message = "✅ Estado → $status") }
+                load(refresh = true)
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
+    fun generateOt(visitId: Long, contractId: Long) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.generateMaintenanceVisitOt(visitId) }
+                _state.update { it.copy(acting = false, message = "✅ OT generada") }
+                loadVisits(contractId)
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
+    fun completeVisit(visitId: Long, contractId: Long) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.completeMaintenanceVisit(visitId) }
+                _state.update { it.copy(acting = false, message = "✅ Visita completada") }
+                loadVisits(contractId)
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -774,13 +852,97 @@ fun MaintenanceContractsScreen() {
     val vm: MaintContractsViewModel = viewModel()
     val state by vm.state.collectAsState()
     var selected by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.MaintenanceContractDto?>(null) }
+    var showCreate by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    var clientIdText by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") }
+    var frequency by remember { mutableStateOf("MONTHLY") }
+    var startDate by remember { mutableStateOf(java.time.LocalDate.now().toString()) }
+    var feeText by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.load() }
+    LaunchedEffect(selected?.id) {
+        val id = selected?.id
+        if (id != null && id > 0) vm.loadVisits(id)
+    }
+
+    if (showCreate) {
+        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, androidx.compose.ui.Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { showCreate = false }) { Text("← Lista") }
+                    Text("Nuevo contrato", fontWeight = FontWeight.Bold)
+                }
+            }
+            item {
+                OutlinedTextField(
+                    value = clientIdText,
+                    onValueChange = { clientIdText = it.filter { c -> c.isDigit() } },
+                    label = { Text("ID cliente") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Título") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = frequency,
+                    onValueChange = { frequency = it },
+                    label = { Text("Frecuencia (WEEKLY/MONTHLY/…)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = startDate,
+                    onValueChange = { startDate = it },
+                    label = { Text("Inicio YYYY-MM-DD") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = feeText,
+                    onValueChange = { feeText = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("Cuota mensual") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            state.message?.let { msg ->
+                item { Text(msg, color = if (msg.startsWith("✅")) NxColors.Success else MaterialTheme.colorScheme.error) }
+            }
+            item {
+                Button(
+                    onClick = {
+                        vm.create(
+                            clientId = clientIdText.toLongOrNull() ?: 0L,
+                            title = title.trim(),
+                            frequency = frequency.trim().ifBlank { "MONTHLY" },
+                            startDate = startDate.trim(),
+                            monthlyFee = feeText.toDoubleOrNull(),
+                        ) { showCreate = false }
+                    },
+                    enabled = !state.acting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (state.acting) "Guardando…" else "Crear contrato") }
+            }
+        }
+        return
+    }
 
     if (selected != null) {
         val c = selected!!
         var tab by remember { mutableStateOf(0) }
-        val tabs = listOf("Info", "Actividades", "SLA", "Inventario")
+        val tabs = listOf("Info", "Visitas", "SLA", "Inventario")
         val activities = c.activities
         val slaList = c.slaEntries
         val inventory = c.inventory
@@ -794,6 +956,9 @@ fun MaintenanceContractsScreen() {
                         OutlinedButton(onClick = { selected = null }) { Text("← Lista") }
                         if (c.status.isNotBlank()) Text(c.status, color = mcStatusColor(c.status), fontWeight = FontWeight.SemiBold)
                     }
+                }
+                state.message?.let { msg ->
+                    item { Text(msg, color = if (msg.startsWith("✅")) NxColors.Success else MaterialTheme.colorScheme.error) }
                 }
                 when (tab) {
                     0 -> {
@@ -813,15 +978,51 @@ fun MaintenanceContractsScreen() {
                                 }
                             }
                         }
+                        item {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("ACTIVE", "PAUSED", "CANCELLED").forEach { st ->
+                                    FilterChip(
+                                        selected = c.status.equals(st, true),
+                                        onClick = { vm.setStatus(c.id, st) },
+                                        enabled = !state.acting,
+                                        label = { Text(st) },
+                                    )
+                                }
+                            }
+                        }
                     }
                     1 -> {
-                        if (activities.isEmpty()) { item { Text("Sin actividades registradas.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-                        else items(activities) { a ->
-                            Card(Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(erpStr(a, "title", "titulo", "anNumber"), fontWeight = FontWeight.Bold)
-                                    val st2 = erpStr(a, "status", "estado")
-                                    if (st2.isNotBlank()) Text(st2, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val visits = state.visits
+                        if (visits.isEmpty() && activities.isEmpty()) {
+                            item { Text("Sin visitas registradas.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        } else {
+                            items(visits.ifEmpty { activities }) { v ->
+                                val visitId = erpLng(v, "id")
+                                Card(Modifier.fillMaxWidth()) {
+                                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            erpStr(v, "title", "titulo", "scheduledFor", "dueAt").ifBlank { "Visita #$visitId" },
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        val st2 = erpStr(v, "status", "estado")
+                                        if (st2.isNotBlank()) {
+                                            Text(st2, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        if (visitId > 0) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Button(
+                                                    onClick = { vm.generateOt(visitId, c.id) },
+                                                    enabled = !state.acting,
+                                                    modifier = Modifier.weight(1f),
+                                                ) { Text("Generar OT") }
+                                                OutlinedButton(
+                                                    onClick = { vm.completeVisit(visitId, c.id) },
+                                                    enabled = !state.acting,
+                                                    modifier = Modifier.weight(1f),
+                                                ) { Text("Completar") }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -876,7 +1077,15 @@ fun MaintenanceContractsScreen() {
             item {
                 NxSectionHeader("Contratos de servicio", "SLA, vigencias y alcance")
                 Spacer(Modifier.height(8.dp))
-                NxSearchField(value = query, onValueChange = { query = it }, placeholder = "Buscar contrato o cliente…")
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    NxSearchField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = "Buscar contrato o cliente…",
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { showCreate = true }) { Text("+ Nuevo") }
+                }
             }
             when {
                 state.loading -> item { NxLoadingBlock("Cargando contratos…") }
@@ -988,6 +1197,19 @@ private fun erpStr(m: Map<String, Any?>, vararg keys: String): String {
         if (s.isNotBlank() && s != "null") return s
     }
     return ""
+}
+
+private fun erpLng(m: Map<String, Any?>, vararg keys: String): Long {
+    for (k in keys) {
+        when (val v = m[k]) {
+            is Long -> return v
+            is Int -> return v.toLong()
+            is Double -> return v.toLong()
+            is Number -> return v.toLong()
+            is String -> v.toLongOrNull()?.let { return it }
+        }
+    }
+    return 0L
 }
 
 private fun erpMap(any: Any?): Map<String, Any?> = when (any) {

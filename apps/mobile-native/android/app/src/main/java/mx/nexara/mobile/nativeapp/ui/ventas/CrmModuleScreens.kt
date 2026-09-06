@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -69,6 +70,20 @@ private val CLIENT_INDUSTRIES = listOf(
     "Corporativo", "Gobierno", "PyME", "Hogar", "Retail", "Industrial", "Educación", "Salud", "Otro",
 )
 private val CLIENT_STATUSES = listOf("Activo", "Inactivo", "Prospecto")
+
+/** Espejo de `SalesProjectStatus` en prisma/schema.prisma. */
+private val SALES_PROJECT_STATUSES = listOf("PLANNED", "IN_PROGRESS", "ON_HOLD", "CLOSED")
+
+private fun salesProjectStatusLabel(status: String): String = when (status.uppercase()) {
+    "PLANNED" -> "Planeado"
+    "IN_PROGRESS" -> "En curso"
+    "ON_HOLD" -> "En pausa"
+    "CLOSED" -> "Cerrado"
+    else -> status
+}
+
+private fun amountFieldValue(value: Double): String =
+    if (value == 0.0) "" else java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
 
 private fun hasServiceClientLinked(raw: Map<String, Any?>): Boolean {
     val v = raw["serviceClientId"] ?: return false
@@ -718,7 +733,11 @@ fun VentasProyectosScreen() {
     val items by remember { derivedStateOf { vm.filtered } }
 
     if (selected != null) {
-        CrmProjectDetailScreen(project = selected!!, onBack = { selected = null })
+        CrmProjectDetailScreen(
+            project = selected!!,
+            onBack = { selected = null },
+            onChanged = { vm.refresh(pull = true) },
+        )
         return
     }
 
@@ -756,14 +775,42 @@ fun VentasProyectosScreen() {
 }
 
 @Composable
-private fun CrmProjectDetailScreen(project: CrmSalesProjectDto, onBack: () -> Unit) {
+private fun CrmProjectDetailScreen(
+    project: CrmSalesProjectDto,
+    onBack: () -> Unit,
+    onChanged: () -> Unit = {},
+) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var tab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Info", "Oportunidad", "Cotizaciones", "Costos", "Orden")
     val raw = project.raw
     var summary by remember { mutableStateOf<Map<String, Any?>?>(null) }
     var linkedQuotes by remember { mutableStateOf<List<CotizacionDto>>(emptyList()) }
     var loadingLinks by remember { mutableStateOf(true) }
+    var currentStatus by remember(project.id) { mutableStateOf(project.status) }
+    var acting by remember { mutableStateOf(false) }
+    var actionMsg by remember { mutableStateOf<String?>(null) }
+    var costProducts by remember(project.id) { mutableStateOf(amountFieldValue(project.costProducts)) }
+    var costViaticos by remember(project.id) { mutableStateOf(amountFieldValue(project.costViaticos)) }
+    var costOperativo by remember(project.id) { mutableStateOf(amountFieldValue(project.costOperativo)) }
+
+    fun mutate(okLabel: String, block: suspend (CrmRepository) -> Unit) {
+        acting = true
+        actionMsg = null
+        scope.launch {
+            try {
+                val crm = CrmRepository(ctx.applicationContext)
+                withContext(Dispatchers.IO) { block(crm) }
+                actionMsg = "✅ $okLabel"
+                onChanged()
+            } catch (e: Exception) {
+                actionMsg = "❌ ${e.message ?: "No se pudo completar la operación"}"
+            } finally {
+                acting = false
+            }
+        }
+    }
 
     LaunchedEffect(project.id) {
         loadingLinks = true
@@ -799,7 +846,7 @@ private fun CrmProjectDetailScreen(project: CrmSalesProjectDto, onBack: () -> Un
         when (tab) {
             0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 fun r(k: String, v: String) { if (v.isNotBlank()) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
-                item { CrmStageChip(project.status) }
+                item { CrmStageChip(currentStatus) }
                 r("Cliente", project.clientName)
                 r("Responsable", project.ownerName)
                 r("Tipo", project.projectType)
@@ -808,6 +855,51 @@ private fun CrmProjectDetailScreen(project: CrmSalesProjectDto, onBack: () -> Un
                 r("Inicio", project.startDate.take(10))
                 r("Fin", project.endDate.take(10))
                 r("Descripción", project.scopeSummary)
+                item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+                item { Text("Cambiar estado", fontWeight = FontWeight.SemiBold) }
+                item {
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        SALES_PROJECT_STATUSES.forEach { st ->
+                            FilterChip(
+                                selected = currentStatus.equals(st, true),
+                                enabled = !acting && !currentStatus.equals(st, true),
+                                onClick = {
+                                    mutate("Estado → ${salesProjectStatusLabel(st)}") { crm ->
+                                        crm.updateProjectStatus(project.id, st)
+                                        currentStatus = st
+                                    }
+                                },
+                                label = { Text(salesProjectStatusLabel(st), style = MaterialTheme.typography.labelSmall) },
+                            )
+                        }
+                    }
+                }
+                if (!currentStatus.equals("CLOSED", true)) {
+                    item {
+                        Button(
+                            onClick = {
+                                mutate("Proyecto cerrado y orden generada") { crm ->
+                                    crm.closeProject(project.id)
+                                    currentStatus = "CLOSED"
+                                }
+                            },
+                            enabled = !acting,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(if (acting) "Procesando…" else "Cerrar proyecto y generar orden") }
+                    }
+                }
+                actionMsg?.let { msg ->
+                    item {
+                        Text(
+                            msg,
+                            color = if (msg.startsWith("✅")) CrmGreen else MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
             }
             1 -> {
                 @Suppress("UNCHECKED_CAST")
@@ -860,10 +952,10 @@ private fun CrmProjectDetailScreen(project: CrmSalesProjectDto, onBack: () -> Un
                 } else {
                     project.costRows
                 }
-                if (costRows.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin costos registrados", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                } else {
-                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (costRows.isEmpty()) {
+                        item { Text("Sin costos registrados", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    } else {
                         items(costRows.size) { i ->
                             val (label, amount) = costRows[i]
                             Card(Modifier.fillMaxWidth()) {
@@ -872,6 +964,63 @@ private fun CrmProjectDetailScreen(project: CrmSalesProjectDto, onBack: () -> Un
                                     Text(fmtMxnShort(amount), fontWeight = FontWeight.Bold)
                                 }
                             }
+                        }
+                    }
+                    item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
+                    item { Text("Actualizar costos", fontWeight = FontWeight.SemiBold) }
+                    item {
+                        OutlinedTextField(
+                            value = costProducts,
+                            onValueChange = { costProducts = it },
+                            label = { Text("Costo productos") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = costViaticos,
+                            onValueChange = { costViaticos = it },
+                            label = { Text("Costo viáticos") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
+                            value = costOperativo,
+                            onValueChange = { costOperativo = it },
+                            label = { Text("Costo operativo") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    item {
+                        Button(
+                            onClick = {
+                                mutate("Costos actualizados") { crm ->
+                                    crm.updateProjectCosts(
+                                        id = project.id,
+                                        costProducts = costProducts.trim().toDoubleOrNull(),
+                                        costViaticos = costViaticos.trim().toDoubleOrNull(),
+                                        costOperativo = costOperativo.trim().toDoubleOrNull(),
+                                    )
+                                }
+                            },
+                            enabled = !acting,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(if (acting) "Guardando…" else "Guardar costos") }
+                    }
+                    actionMsg?.let { msg ->
+                        item {
+                            Text(
+                                msg,
+                                color = if (msg.startsWith("✅")) CrmGreen else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                     }
                 }

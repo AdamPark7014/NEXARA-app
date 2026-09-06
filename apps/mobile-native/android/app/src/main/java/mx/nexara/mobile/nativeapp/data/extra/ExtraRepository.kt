@@ -65,6 +65,10 @@ import mx.nexara.mobile.nativeapp.data.api.PurchaseOrderDto
 import mx.nexara.mobile.nativeapp.data.api.RequisitionDto
 import mx.nexara.mobile.nativeapp.data.api.WarehouseDto
 import mx.nexara.mobile.nativeapp.data.api.MaintenanceContractDto
+import mx.nexara.mobile.nativeapp.data.api.CreateMaintenanceContractRequest
+import mx.nexara.mobile.nativeapp.data.api.GenerateMaintenanceOtBody
+import mx.nexara.mobile.nativeapp.data.api.MaintenanceContractStatusBody
+import mx.nexara.mobile.nativeapp.data.api.UpdateMaintenanceContractRequest
 import mx.nexara.mobile.nativeapp.data.api.NocAlertDto
 import mx.nexara.mobile.nativeapp.data.api.NocDeviceDto
 import mx.nexara.mobile.nativeapp.data.api.SlaStatsDto
@@ -242,6 +246,8 @@ class ExtraRepository(context: Context) {
     )
 
     suspend fun approveDocument(id: Long) = api.approveDocument(id)
+
+    suspend fun archiveDocument(id: Long) = api.archiveDocument(id)
     suspend fun journalEntries(): List<JournalEntryDto> = parseList(api.getJournalEntriesRaw())
     suspend fun chartAccounts(): List<ChartAccountDto> = parseList(api.getChartAccountsRaw())
 
@@ -484,6 +490,69 @@ class ExtraRepository(context: Context) {
     suspend fun cvs() = candidateDtos().map { it.toFlatMap() }
     suspend fun candidateDtos(): List<CandidateDto> =
         loadGeneric { api.getCvsRaw() }.map { CandidateDto.fromRaw(it) }
+
+    /**
+     * POST cvs. Nest exige el archivo (PDF o imagen) en la parte `file`; aquí
+     * se recibe como data URL producido por [mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl].
+     */
+    suspend fun createCv(
+        fullName: String,
+        fileDataUrl: String,
+        email: String? = null,
+        whatsapp: String? = null,
+        category: String? = null,
+        employmentStatus: String? = null,
+        recruiterNotes: String? = null,
+        tags: String? = null,
+    ): CandidateDto {
+        fun plain(v: String) = v.toRequestBody("text/plain".toMediaType())
+        val fields = buildMap<String, okhttp3.RequestBody> {
+            put("fullName", plain(fullName))
+            email?.takeIf { it.isNotBlank() }?.let { put("email", plain(it)) }
+            whatsapp?.takeIf { it.isNotBlank() }?.let { put("whatsapp", plain(it)) }
+            category?.takeIf { it.isNotBlank() }?.let { put("category", plain(it)) }
+            employmentStatus?.takeIf { it.isNotBlank() }?.let { put("employmentStatus", plain(it)) }
+            recruiterNotes?.takeIf { it.isNotBlank() }?.let { put("recruiterNotes", plain(it)) }
+            tags?.takeIf { it.isNotBlank() }?.let { put("tags", plain(it)) }
+        }
+        val part = dataUrlToPart("file", fileDataUrl, "cv")
+        return CandidateDto.fromRaw(parseObject(api.createCv(fields, part).string()))
+    }
+
+    suspend fun moveCv(id: Long, stage: String, sortOrder: Int? = null): CandidateDto {
+        val body = buildMap<String, Any?> {
+            put("stage", stage)
+            sortOrder?.let { put("sortOrder", it) }
+        }
+        return CandidateDto.fromRaw(parseObject(api.moveCv(id, body).string()))
+    }
+
+    private fun dataUrlToPart(
+        fieldName: String,
+        dataUrl: String,
+        baseName: String,
+    ): okhttp3.MultipartBody.Part {
+        val comma = dataUrl.indexOf(',')
+        require(comma > 0 && dataUrl.startsWith("data:")) { "Archivo inválido" }
+        val mime = dataUrl.substring(5, comma).substringBefore(';')
+            .ifBlank { "application/octet-stream" }
+        val bytes = android.util.Base64.decode(
+            dataUrl.substring(comma + 1),
+            android.util.Base64.DEFAULT,
+        )
+        val extension = when {
+            mime.contains("pdf") -> "pdf"
+            mime.contains("png") -> "png"
+            mime.contains("webp") -> "webp"
+            else -> "jpg"
+        }
+        return okhttp3.MultipartBody.Part.createFormData(
+            fieldName,
+            "$baseName.$extension",
+            bytes.toRequestBody(mime.toMediaType()),
+        )
+    }
+
     suspend fun clientTicketRequests() = loadGeneric { api.getClientTicketRequestsRaw() }
     suspend fun clientTicketLeadDtos(): List<CrmLeadDto> =
         clientTicketRequests().map { CrmLeadDto.fromRaw(it) }
@@ -522,6 +591,53 @@ class ExtraRepository(context: Context) {
         maintenanceContractDtos(status, clientId).map { it.toFlatMap() }
     suspend fun maintenanceContractDtos(status: String? = null, clientId: String? = null): List<MaintenanceContractDto> =
         loadGeneric { api.getMaintenanceContractsRaw(status, clientId) }.map { MaintenanceContractDto.fromRaw(it) }
+
+    suspend fun createMaintenanceContract(
+        clientId: Long,
+        title: String,
+        frequency: String,
+        startDate: String,
+        monthlyFee: Double? = null,
+        slaResponseHours: Int? = null,
+        slaResolutionHours: Int? = null,
+    ) = api.createMaintenanceContract(
+        CreateMaintenanceContractRequest(
+            clientId = clientId,
+            title = title,
+            frequency = frequency,
+            startDate = startDate,
+            monthlyFee = monthlyFee,
+            slaResponseHours = slaResponseHours,
+            slaResolutionHours = slaResolutionHours,
+        ),
+    )
+
+    suspend fun updateMaintenanceContract(
+        id: Long,
+        title: String? = null,
+        monthlyFee: Double? = null,
+        slaResponseHours: Int? = null,
+        slaResolutionHours: Int? = null,
+    ) = api.updateMaintenanceContract(
+        id = id,
+        body = UpdateMaintenanceContractRequest(
+            title = title,
+            monthlyFee = monthlyFee,
+            slaResponseHours = slaResponseHours,
+            slaResolutionHours = slaResolutionHours,
+        ),
+    )
+
+    suspend fun setMaintenanceContractStatus(id: Long, status: String) =
+        api.setMaintenanceContractStatus(id, MaintenanceContractStatusBody(status = status))
+
+    suspend fun maintenanceContractVisits(contractId: Long): List<Map<String, Any?>> =
+        loadGeneric { api.getMaintenanceContractVisitsRaw(contractId = contractId) }
+
+    suspend fun generateMaintenanceVisitOt(visitId: Long, assignedToId: Long? = null) =
+        api.generateMaintenanceVisitOt(visitId, GenerateMaintenanceOtBody(assignedToId = assignedToId))
+
+    suspend fun completeMaintenanceVisit(visitId: Long) = api.completeMaintenanceVisit(visitId)
 
     suspend fun serviceClientBranches(serviceClientId: String) =
         loadGeneric { api.getServiceClientBranchesRaw(serviceClientId) }

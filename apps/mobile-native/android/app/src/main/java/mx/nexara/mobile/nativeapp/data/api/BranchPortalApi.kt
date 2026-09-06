@@ -3,8 +3,10 @@ package mx.nexara.mobile.nativeapp.data.api
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
@@ -55,6 +57,18 @@ interface BranchPortalApi {
 
     @GET("branch-portal/tickets/{id}")
     suspend fun ticket(@Path("id") id: Long): ClientPortalTicketDto?
+
+    @POST("branch-portal/tickets/{id}/comments")
+    suspend fun postTicketComment(
+        @Path("id") id: Long,
+        @Body body: PortalTicketCommentBody,
+    ): okhttp3.ResponseBody
+
+    @PATCH("branch-portal/tickets/{id}/status")
+    suspend fun patchTicketStatus(
+        @Path("id") id: Long,
+        @Body body: PortalTicketStatusBody,
+    ): okhttp3.ResponseBody
 
     @Streaming
     @GET("branch-portal/tickets/{id}/report")

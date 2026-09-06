@@ -752,5 +752,33 @@ class ConsoleRepository(context: Context) {
     suspend fun settingsDelete(key: String) {
         api.deleteSetting(key)
     }
+
+    suspend fun companyApiKeys(): List<Map<String, Any?>> =
+        parseJsonArray(api.getCompanyApiKeysRaw().string())
+
+    /** La respuesta trae el token en claro una sola vez; se devuelve tal cual. */
+    suspend fun createCompanyApiKey(name: String, scopes: List<String>? = null): Map<String, Any?> =
+        parseJsonObject(
+            api.createCompanyApiKey(
+                mx.nexara.mobile.nativeapp.data.api.CreateCompanyApiKeyBody(
+                    name = name,
+                    scopes = scopes?.takeIf { it.isNotEmpty() },
+                ),
+            ).string(),
+        )
+
+    suspend fun revokeCompanyApiKey(id: Long) {
+        api.revokeCompanyApiKey(id)
+    }
+
+    suspend fun webhooks(): List<Map<String, Any?>> =
+        parseJsonArray(api.getWebhooksRaw().string())
+
+    suspend fun webhooksDlq(limit: Int = 50): List<Map<String, Any?>> =
+        parseJsonArray(api.getWebhooksDlqRaw(limit).string())
+
+    suspend fun replayWebhookDelivery(deliveryId: Long) {
+        api.replayWebhookDelivery(deliveryId)
+    }
 }
 

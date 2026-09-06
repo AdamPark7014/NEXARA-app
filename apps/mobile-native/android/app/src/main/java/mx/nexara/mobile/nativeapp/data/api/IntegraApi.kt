@@ -2,7 +2,9 @@ package mx.nexara.mobile.nativeapp.data.api
 
 import okhttp3.ResponseBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -15,6 +17,36 @@ data class IntegraOpenDoorRequest(
 /** Nota opcional al atender o cerrar alarma (`POST integra/alarms/:id/ack|clear`). */
 data class IntegraAlarmActionRequest(
     val note: String? = null,
+)
+
+data class IntegraAddPersonRequest(
+    val personName: String,
+    val orgIndexCode: String? = null,
+    val personCode: String? = null,
+    val employeeNo: String? = null,
+    val autoCode: Boolean? = null,
+    val gender: String? = null,
+    val userType: String? = null,
+    val validFrom: String? = null,
+    val validTo: String? = null,
+    val validEnable: Boolean? = null,
+    val doorRight: String? = null,
+    val rightPlan: String? = null,
+)
+
+data class IntegraUpdatePersonRequest(
+    val personName: String? = null,
+    val gender: String? = null,
+    val userType: String? = null,
+    val validFrom: String? = null,
+    val validTo: String? = null,
+    val validEnable: Boolean? = null,
+    val doorRight: String? = null,
+    val rightPlan: String? = null,
+)
+
+data class IntegraFaceUploadRequest(
+    val imageBase64: String,
 )
 
 interface IntegraApi {
@@ -51,6 +83,39 @@ interface IntegraApi {
 
     @GET("integra/people/{id}")
     suspend fun getPerson(
+        @Path("id") personId: String,
+        @Query("siteId") siteId: Int? = null,
+    ): ResponseBody
+
+    @POST("integra/people")
+    suspend fun addPerson(
+        @Body body: IntegraAddPersonRequest,
+        @Query("siteId") siteId: Int? = null,
+    ): ResponseBody
+
+    @PATCH("integra/people/{id}")
+    suspend fun updatePerson(
+        @Path("id") personId: String,
+        @Body body: IntegraUpdatePersonRequest,
+        @Query("siteId") siteId: Int? = null,
+    ): ResponseBody
+
+    @DELETE("integra/people/{id}")
+    suspend fun deletePerson(
+        @Path("id") personId: String,
+        @Query("siteId") siteId: Int? = null,
+        @Query("force") force: String? = null,
+    ): ResponseBody
+
+    @POST("integra/people/{id}/face")
+    suspend fun uploadPersonFace(
+        @Path("id") personId: String,
+        @Body body: IntegraFaceUploadRequest,
+        @Query("siteId") siteId: Int? = null,
+    ): ResponseBody
+
+    @DELETE("integra/people/{id}/face")
+    suspend fun deletePersonFace(
         @Path("id") personId: String,
         @Query("siteId") siteId: Int? = null,
     ): ResponseBody

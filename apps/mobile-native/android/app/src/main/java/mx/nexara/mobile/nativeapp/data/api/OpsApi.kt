@@ -23,6 +23,13 @@ interface OpsApi {
         @Body body: Map<String, Long>,
     ): ResponseBody
 
+    /** Notas internas — PATCH client-ticket-requests/:id con { notes }. */
+    @PATCH("client-ticket-requests/{id}")
+    suspend fun patchClientTicketNotes(
+        @Path("id") id: Long,
+        @Body body: Map<String, String>,
+    ): ResponseBody
+
     @PATCH("procurement/requisitions/{id}/approve")
     suspend fun approveRequisition(@Path("id") id: Long): ResponseBody
 

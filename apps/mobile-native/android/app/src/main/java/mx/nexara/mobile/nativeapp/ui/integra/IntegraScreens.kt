@@ -1,6 +1,8 @@
 package mx.nexara.mobile.nativeapp.ui.integra
 
 import android.app.Application
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -403,6 +405,8 @@ data class IntegraPeopleUiState(
     val error: String? = null,
     val items: List<Map<String, Any?>> = emptyList(),
     val query: String = "",
+    val acting: Boolean = false,
+    val message: String? = null,
 )
 
 class IntegraPeopleViewModel(app: Application) : AndroidViewModel(app) {
@@ -413,6 +417,7 @@ class IntegraPeopleViewModel(app: Application) : AndroidViewModel(app) {
     init { refresh() }
 
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
+    fun clearMessage() = _state.update { it.copy(message = null) }
 
     fun refresh(initial: Boolean = true) {
         _state.update {
@@ -429,6 +434,29 @@ class IntegraPeopleViewModel(app: Application) : AndroidViewModel(app) {
                         isRefreshing = false,
                         error = e.toUserMessage("No se pudieron cargar las personas"),
                     )
+                }
+            }
+        }
+    }
+
+    fun createPerson(name: String, onDone: (String?) -> Unit) {
+        if (name.isBlank()) {
+            _state.update { it.copy(message = "❌ Nombre obligatorio") }
+            return
+        }
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                val created = withContext(Dispatchers.IO) { repo.addPerson(personName = name) }
+                val id = str(created, "id", "personId").ifBlank {
+                    str(nestedPerson(created), "id", "personId")
+                }
+                _state.update { it.copy(acting = false, message = "✅ Persona creada") }
+                refresh(initial = false)
+                onDone(id.ifBlank { null })
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(acting = false, message = "❌ ${e.toUserMessage("No se pudo crear")}")
                 }
             }
         }
@@ -452,6 +480,48 @@ fun IntegraPeopleScreen(
 ) {
     val s by vm.state.collectAsState()
     val rows = vm.filtered()
+    var showCreate by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+
+    if (showCreate) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { Text("Nueva persona ACS", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Nombre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            if (!s.message.isNullOrBlank()) {
+                item { Text(s.message!!, color = if (s.message!!.startsWith("✅")) NxColors.Success else NxColors.Danger) }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { showCreate = false; vm.clearMessage() }, modifier = Modifier.weight(1f)) {
+                        Text("Cancelar")
+                    }
+                    Button(
+                        onClick = {
+                            vm.createPerson(newName.trim()) { id ->
+                                showCreate = false
+                                newName = ""
+                                if (!id.isNullOrBlank()) onOpenPerson(id)
+                            }
+                        },
+                        enabled = !s.acting,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(if (s.acting) "…" else "Crear") }
+                }
+            }
+        }
+        return
+    }
 
     PullToRefreshBox(
         isRefreshing = s.isRefreshing,
@@ -463,11 +533,18 @@ fun IntegraPeopleScreen(
             s.error != null && s.items.isEmpty() -> NxErrorBlock(s.error!!) { vm.refresh() }
             else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
-                    NxSearchField(
-                        value = s.query,
-                        onValueChange = vm::setQuery,
-                        placeholder = "Buscar por nombre o ID…",
-                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        NxSearchField(
+                            value = s.query,
+                            onValueChange = vm::setQuery,
+                            placeholder = "Buscar por nombre o ID…",
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { showCreate = true; vm.clearMessage() }) { Text("+ Alta") }
+                    }
+                }
+                if (!s.message.isNullOrBlank()) {
+                    item { Text(s.message!!, color = if (s.message!!.startsWith("✅")) NxColors.Success else NxColors.Danger) }
                 }
                 if (rows.isEmpty()) {
                     item { NxEmptyState("Sin personas", "El espejo ACS está vacío o no tienes acceso.") }
@@ -507,6 +584,8 @@ data class IntegraPersonDetailUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val data: Map<String, Any?> = emptyMap(),
+    val acting: Boolean = false,
+    val message: String? = null,
 )
 
 class IntegraPersonDetailViewModel(app: Application, private val personId: String) : AndroidViewModel(app) {
@@ -533,6 +612,60 @@ class IntegraPersonDetailViewModel(app: Application, private val personId: Strin
         }
     }
 
+    fun update(name: String?, gender: String?, validEnable: Boolean?) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.updatePerson(personId, personName = name, gender = gender, validEnable = validEnable)
+                }
+                _state.update { it.copy(acting = false, message = "✅ Actualizado") }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("No se pudo actualizar")}") }
+            }
+        }
+    }
+
+    fun delete(force: Boolean = false, onDone: () -> Unit) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.deletePerson(personId, force = force) }
+                _state.update { it.copy(acting = false, message = "✅ Eliminado") }
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("No se pudo eliminar")}") }
+            }
+        }
+    }
+
+    fun uploadFace(imageBase64: String) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.uploadPersonFace(personId, imageBase64) }
+                _state.update { it.copy(acting = false, message = "✅ Rostro cargado") }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("No se pudo cargar rostro")}") }
+            }
+        }
+    }
+
+    fun deleteFace() {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.deletePersonFace(personId) }
+                _state.update { it.copy(acting = false, message = "✅ Rostro eliminado") }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("No se pudo eliminar rostro")}") }
+            }
+        }
+    }
+
     companion object {
         fun factory(app: Application, personId: String) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -543,14 +676,27 @@ class IntegraPersonDetailViewModel(app: Application, private val personId: Strin
 }
 
 @Composable
-fun IntegraPersonDetailScreen(personId: String) {
+fun IntegraPersonDetailScreen(personId: String, onDeleted: (() -> Unit)? = null) {
     val app = LocalContext.current.applicationContext as Application
+    val context = LocalContext.current
     val vm: IntegraPersonDetailViewModel = viewModel(
         key = "integra-person-$personId",
         factory = IntegraPersonDetailViewModel.factory(app, personId),
     )
     val s by vm.state.collectAsState()
     val person = nestedPerson(s.data)
+    var editName by remember(person) { mutableStateOf(str(person, "name", "personName")) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val pickFace = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching
+            val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+            vm.uploadFace(b64)
+        }
+    }
 
     when {
         s.loading -> NxLoadingBlock("Cargando ficha…")
@@ -564,6 +710,14 @@ fun IntegraPersonDetailScreen(personId: String) {
                     str(person, "name", "personName").ifBlank { personId },
                     style = MaterialTheme.typography.titleLarge,
                 )
+            }
+            if (!s.message.isNullOrBlank()) {
+                item {
+                    Text(
+                        s.message!!,
+                        color = if (s.message!!.startsWith("✅")) NxColors.Success else NxColors.Danger,
+                    )
+                }
             }
             item { IntegraDetailLine("ID ACS", personId) }
             item { IntegraDetailLine("Código", str(person, "code", "personCode", "employeeNo")) }
@@ -591,6 +745,70 @@ fun IntegraPersonDetailScreen(personId: String) {
                 item { IntegraDetailLine("Puertas", doors.joinToString(", ")) }
             }
             item { IntegraDetailLine("Fuente", str(s.data, "source", "provider")) }
+
+            item {
+                OutlinedTextField(
+                    value = editName,
+                    onValueChange = { editName = it },
+                    label = { Text("Nombre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !s.acting,
+                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { vm.update(name = editName, gender = null, validEnable = null) },
+                        enabled = !s.acting,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Guardar") }
+                    OutlinedButton(
+                        onClick = {
+                            val cur = bool(person, "validEnable") != false
+                            vm.update(name = null, gender = null, validEnable = !cur)
+                        },
+                        enabled = !s.acting,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Toggle vigencia") }
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { pickFace.launch("image/*") },
+                        enabled = !s.acting,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Subir rostro") }
+                    OutlinedButton(
+                        onClick = { vm.deleteFace() },
+                        enabled = !s.acting,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Quitar rostro") }
+                }
+            }
+            item {
+                if (!showDeleteConfirm) {
+                    OutlinedButton(
+                        onClick = { showDeleteConfirm = true },
+                        enabled = !s.acting,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Eliminar persona", color = NxColors.Danger) }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("¿Confirmar baja en ACS?", fontWeight = FontWeight.SemiBold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { showDeleteConfirm = false }, modifier = Modifier.weight(1f)) {
+                                Text("Cancelar")
+                            }
+                            Button(
+                                onClick = { vm.delete(force = true) { onDeleted?.invoke() } },
+                                enabled = !s.acting,
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Eliminar") }
+                        }
+                    }
+                }
+            }
         }
     }
 }

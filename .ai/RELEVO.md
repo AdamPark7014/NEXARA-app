@@ -8,30 +8,40 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Notificaciones portal tickets / support / workflow
+## Este turno — Paridad móvil 3 olas (falso NATIVO → operable)
 
-### Qué se cableó
-- Hierarchy: `notifyPortalTicketComment`, `notifyPortalTicketClientAction`, `notifySupportRequestCreated`, `notifySupportRequestStatusChanged`.
-- Helpers + armor: `portal-ticket-notify.ts` (+ `.spec.ts`); `appUrls.portalTicket`.
-- Client-portal: comment / ACK / CONFIRM_RESOLVED / REQUEST_REOPEN / `POST requests` → hierarchy (push + canal `tickets`).
-- Ops support status PATCH → notifica responsable OT vinculada (`opsSupport` URL).
-- Workflow approve/reject/pending: `relatedUrl` `erpApprovals` + canal `approvals`.
-- `ACTIVITY_STARTED` ya existía y sigue cableado en `activities.service` al pasar a En Proceso.
+### Ola 1 — Mesa de dinero + evidencias
+- Employee-payments: create (multipart) / edit / delete / `PATCH …/pagado` + UI.
+- Viáticos y gastos: botón **Marcar pagado**.
+- Evidencias: reject multi-paso (`rejectedSteps[]`) + `resetFullFlow`.
+- Catálogo: `employee-payments` → NATIVO.
 
-### Nota
-Portal cliente **no** tiene `User.id` (JWT portal) → no hay inbox FCM al cliente; solo staff.
+### Ola 2 — Sitio / sucursal / contratos
+- Nest `branch-portal`: `POST tickets/:id/comments`, `PATCH tickets/:id/status` (ACK / CONFIRM_RESOLVED / REQUEST_REOPEN) + notify hierarchy; stamp `[SUCURSAL …]`.
+- Android `BranchPortalApi` + `TicketsRepository` (sin throws).
+- INTEGRA people: POST/PATCH/DELETE + face upload/delete + UI alta/ficha.
+- Maintenance-contracts: create / status / visits generate-ot / complete → NATIVO.
+
+### Ola 3 — CRM / gov / honestidad
+- CRM proyectos: PATCH status, costos, close → NATIVO.
+- CVs/recruiting: create multipart + move stage → NATIVO (`RecruitingScreen`).
+- Documents: approve (+ archive si aplica) en UI.
+- Support: notes PATCH (create ops no existe en Nest `client-ticket-requests`).
+- Settings: company api-keys + webhooks list/replay mínimo.
+- `work-projects` → `ConsoleProjectsScreen` (OPS, no portfolio).
+- Catálogo: my-profile NATIVO, newsletter SOLO_LECTURA, multas NATIVO.
 
 ### Verificación
-- `portal-ticket-notify.spec` + `notification-push-meta.spec` OK.
+- `:app:compileDebugKotlin` OK.
+- `python scripts/check-app-web-parity.py` → OK (matriz ↔ catálogo).
 
 ## A medias / Adam
 
 1. **Desplegar** Traefik/API P0 → `/go2rtc/api/streams` 404; rotar passwords + migrar `ACTIVITY_STARTED`.
 2. AAB Play VERSION_CODE 7+.
-3. Portal **sucursal**: comments/status API aún no.
-4. Employee-payments / work-projects mutaciones; INTEGRA people CRUD+face.
-5. DomainNotify facade formal (diseñado; hierarchy shortcuts ya cubren portal).
-6. INTEGRA video/ANPR/mapa = Bloque 2.
+3. Support **create** staff: Nest no tiene POST en `client-ticket-requests` (solo portal/branch).
+4. DomainNotify facade formal (hierarchy shortcuts ya cubren portal).
+5. INTEGRA video/ANPR/mapa = Bloque 2; FP/schedules/espacios fuera de esta ola.
 
 ## No tocar
 

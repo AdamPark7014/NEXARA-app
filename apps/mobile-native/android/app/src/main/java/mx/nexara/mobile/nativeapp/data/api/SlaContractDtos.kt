@@ -70,6 +70,35 @@ data class SlaStatsDto(
     }
 }
 
+data class CreateMaintenanceContractRequest(
+    val clientId: Long,
+    val title: String,
+    val frequency: String,
+    val startDate: String,
+    val monthlyFee: Double? = null,
+    val slaResponseHours: Int? = null,
+    val slaResolutionHours: Int? = null,
+    val endDate: String? = null,
+    val currency: String? = null,
+)
+
+data class UpdateMaintenanceContractRequest(
+    val title: String? = null,
+    val monthlyFee: Double? = null,
+    val slaResponseHours: Int? = null,
+    val slaResolutionHours: Int? = null,
+    val frequency: String? = null,
+    val endDate: String? = null,
+)
+
+data class MaintenanceContractStatusBody(
+    val status: String,
+)
+
+data class GenerateMaintenanceOtBody(
+    val assignedToId: Long? = null,
+)
+
 data class MaintenanceContractDto(
     val id: Long = 0L,
     val contractNumber: String = "",
