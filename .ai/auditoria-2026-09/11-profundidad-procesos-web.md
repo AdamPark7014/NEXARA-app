@@ -137,3 +137,88 @@ de plataforma con visión global (`gerencia@nexara.com.mx`, `developer@nexara.co
 (`AuditLog` con `previousData`/`changes`, `ipAddress`, `userAgent`, `source`).
 
 ---
+
+## 1. Fichas de profundidad (para reconstruir móvil sin aplanar)
+
+Cada ficha resume: disparador → estados → firmas → validaciones → efectos. El móvil no puede
+reducir esto a un botón sin perder nómina/compliance.
+
+### 1.1 Asistencia (`/api/attendance`)
+
+| Paso | Qué exige |
+|------|-----------|
+| Entrada | Foto obligatoria (desde Wave 3), GPS recomendado, un solo open day |
+| Durante | `AttendanceDay.isOpen`; ACS puede sugerir entrada aparte |
+| Salida | Foto + cierre; no nueva entrada con jornada abierta |
+| Día | `workday.ts` / `America/Mexico_City` (no `setHours` UTC) |
+
+**Trampa móvil:** un botón sin cámara o sin TZ parte jornadas y rompe nómina.
+
+### 1.2 Hora de comida (`/api/lunch-breaks`)
+
+| Paso | Qué exige |
+|------|-----------|
+| Check-in | Ventana 15:00–16:00 **hora México**; foto; late notes |
+| Check-out | ~16:05 esperado; foto; late notes |
+| Límite | Un ciclo completo por día laboral |
+
+### 1.3 Evidencias de actividad (`/api/activity-evidence`)
+
+| Paso | Estado | Validación |
+|------|--------|------------|
+| 1 | ENTRY_PHOTO | Foto + GPS |
+| 2 | EVIDENCE_PHOTOS | ≥4 fotos |
+| 3 | SERVICE_SHEET_PDF | PDF |
+| 4 | SERVICE_SHEET_DATA | Formulario |
+| 5 | EXIT_PHOTO | Foto + GPS ≠ 0,0 |
+| 6 | COMPLETED | Listo para revisión |
+| Review | APPROVED/REJECTED | Solo `EVIDENCES_REVIEW`; reviewer = JWT |
+
+**Trampa:** step 2 con 1 foto falla; approve con `reviewerId` cliente era auto-aprobación (parcheado).
+
+### 1.4 Viáticos
+
+Motor B jerárquico por monto (hasta 4 firmas en $12k) **y** workflow sembrado `VIATIC` (1 paso).
+No están cableados entre sí (Hallazgo B). Móvil debe preguntar al API el estado real, no inventar.
+
+### 1.5 Cotizaciones / descuentos
+
+Workflow A: 2 pasos por `%` descuento + auto-approve ≤18/≤22. Cadena B por monto no conectada.
+Estados: borrador → envío → aprobaciones → aceptada/rechazada.
+
+### 1.6 Compras / PO
+
+Workflow `PURCHASE_ORDER` (1 paso) + cadena B de compras. Confirmación dispara webhook
+`purchase_order.confirmed`.
+
+### 1.7 Cierre de actividad / OT
+
+Workflow `ACTIVITY_CLOSURE` + estatus actividad (`Aprobada` tras evidencias). Evidencias son
+prerrequisito operacional, no el mismo motor.
+
+### 1.8 CRM oportunidades / leads
+
+Estados lead: NEW → QUALIFIED → NURTURING → LOST/CONVERTED. Opp: pipeline stages hasta WON/LOST.
+Webhooks `opportunity.won/lost`. Sin workflow genérico; sí notificaciones jerárquicas.
+
+### 1.9 Facturación / CFDI
+
+Proceso PAC (`PAC_PROVIDER`), CSD, timbrado SAT. No es un workflow Nest genérico: es integraciones
+externas con reintentos. Móvil no debe “aprobar factura” sin el mismo camino web.
+
+### 1.10 NOC / tickets soporte
+
+SLA, alertas, `ticket.sla_breach` webhook. Roles NOC colapsan a `ing_soporte` en mapping — menú
+debe incluir `/ops/noc` (parche Wave 2).
+
+---
+
+## 2. Regla para el móvil
+
+Si un flujo tiene **más de un estado o una firma**, la app nativa debe:
+
+1. Pedir el estado al API (no hardcodear cadenas).
+2. Mostrar pasos pendientes (evidencias, firmas, SLA).
+3. Nunca omitir foto/GPS/Idempotency cuando el API los exige.
+
+Los procesos “de un botón” seguros hoy: chat, notificaciones, dashboard de solo lectura.

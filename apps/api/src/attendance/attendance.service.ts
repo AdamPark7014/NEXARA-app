@@ -448,6 +448,9 @@ export class AttendanceService {
 
   async register(dto: CreateAttendanceDto, userId: number, req?: any, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
+    if (!dto.photoBase64 || !String(dto.photoBase64).trim()) {
+      throw new BadRequestException('La foto es obligatoria para registrar asistencia');
+    }
     const tenantId = requireCompanyId(companyId);
     const now = dto.timestamp ? new Date(dto.timestamp) : new Date();
     const today = this.getDateOnly(now);

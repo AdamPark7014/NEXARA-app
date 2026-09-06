@@ -171,7 +171,7 @@ dependencies {
     // Firebase Cloud Messaging (push externo)
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-messaging-ktx")
-    implementation("com.google.firebase:firebase-analytics-ktx")
+    // Analytics removed: unused and declares AD_ID (Play Console rejection risk).
 
     // PDF renderer (in-app, sin depender de viewer externo)
     // El módulo android.graphics.pdf.PdfRenderer viene en el SDK, no requiere dep extra.

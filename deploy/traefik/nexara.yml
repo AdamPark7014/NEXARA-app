@@ -15,9 +15,9 @@
 ##   api       → Backend NestJS
 ##   (raíz)    → Sitio público
 ##
-## Hosts legacy (aliases): consola, console, app, ventas, operacion, contabilidad,
-## web, tickets, crm, admin, media, help, monitor, rh, hr, dev. Estos llegan al
-## mismo backend; el middleware de Next.js los redirige 308 al canónico.
+## Hosts legacy vivos (con router HTTPS): console, app, ventas, operacion,
+## contabilidad, web, tickets. Aliases rotos (consola, crm, admin, media, help,
+## monitor, rh, hr, dev) se retiraron del redirect HTTP→HTTPS permanente.
 
 http:
   routers:
@@ -25,33 +25,27 @@ http:
     # HTTP → HTTPS redirects (todos los subdominios)
     # ───────────────────────────────────────────────────────────
     erp-http:
+      # Solo hosts con router HTTPS real. Aliases muertos (consola, crm, admin,
+      # media, help, monitor, rh, hr, dev) NO van aquí: un 301 permanente + HSTS
+      # con includeSubDomains deja el host inaccesible un año en el navegador.
       rule: >-
         (Host(`core.nexara.com.mx`) ||
-        Host(`consola.nexara.com.mx`) ||
         Host(`console.nexara.com.mx`) ||
         Host(`app.nexara.com.mx`) ||
         Host(`sales.nexara.com.mx`) ||
         Host(`ventas.nexara.com.mx`) ||
-        Host(`crm.nexara.com.mx`) ||
         Host(`ops.nexara.com.mx`) ||
         Host(`operacion.nexara.com.mx`) ||
         Host(`finance.nexara.com.mx`) ||
         Host(`contabilidad.nexara.com.mx`) ||
-        Host(`admin.nexara.com.mx`) ||
         Host(`studio.nexara.com.mx`) ||
-        Host(`media.nexara.com.mx`) ||
         Host(`web.nexara.com.mx`) ||
         Host(`portal.nexara.com.mx`) ||
         Host(`tickets.nexara.com.mx`) ||
         Host(`support.nexara.com.mx`) ||
-        Host(`help.nexara.com.mx`) ||
         Host(`noc.nexara.com.mx`) ||
-        Host(`monitor.nexara.com.mx`) ||
         Host(`people.nexara.com.mx`) ||
-        Host(`rh.nexara.com.mx`) ||
-        Host(`hr.nexara.com.mx`) ||
         Host(`lab.nexara.com.mx`) ||
-        Host(`dev.nexara.com.mx`) ||
         Host(`integra.nexara.com.mx`)) && !PathPrefix(`/api/integra/hik`)
       entryPoints:
         - web
@@ -96,7 +90,9 @@ http:
     # Socket.IO backend (real-time) en TODOS los subdominios del ERP
     # ───────────────────────────────────────────────────────────
     socket-io:
-      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`) && PathPrefix(`/socket.io`)'
+      # Incluye aliases vivos (console/app/ventas/…) para que POST/WS no den 404
+      # de Traefik antes del redirect canónico de Next (que solo cubre GET).
+      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`ventas.nexara.com.mx`,`operacion.nexara.com.mx`,`contabilidad.nexara.com.mx`,`web.nexara.com.mx`,`tickets.nexara.com.mx`) && PathPrefix(`/socket.io`)'
       entryPoints:
         - websecure
       service: nexara-api
@@ -120,7 +116,7 @@ http:
     # API backend bajo /api en todos los subdominios del ERP
     # ───────────────────────────────────────────────────────────
     api:
-      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`) && PathPrefix(`/api`)'
+      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`ventas.nexara.com.mx`,`operacion.nexara.com.mx`,`contabilidad.nexara.com.mx`,`web.nexara.com.mx`,`tickets.nexara.com.mx`) && PathPrefix(`/api`)'
       entryPoints:
         - websecure
       service: nexara-api
@@ -228,9 +224,20 @@ http:
       tls:
         certResolver: letsencrypt
 
-    # Media gateway HLS (Integra) — strip /go2rtc prefix
+    # Media gateway — solo rutas que el navegador usa. /api/streams y /api/config
+    # filtran RTSP con credenciales en claro; no deben salir a internet.
     integra-go2rtc:
-      rule: 'Host(`integra.nexara.com.mx`) && PathPrefix(`/go2rtc`)'
+      rule: >-
+        Host(`integra.nexara.com.mx`) && (
+        Path(`/go2rtc/video-stream.js`) ||
+        Path(`/go2rtc/video-rtc.js`) ||
+        Path(`/go2rtc/api/ws`) ||
+        Path(`/go2rtc/api/frame.jpeg`) ||
+        Path(`/go2rtc/api/stream.m3u8`) ||
+        Path(`/go2rtc/api/stream.mp4`) ||
+        PathPrefix(`/go2rtc/api/stream.m3u8/`) ||
+        PathPrefix(`/go2rtc/api/hls/`) ||
+        PathPrefix(`/go2rtc/api/webrtc`) )
       entryPoints: [websecure]
       middlewares:
         - integra-go2rtc-strip
@@ -240,7 +247,7 @@ http:
         certResolver: letsencrypt
 
     erp-frontends:
-      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`ventas.nexara.com.mx`,`contabilidad.nexara.com.mx`,`web.nexara.com.mx`,`tickets.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`) && !PathPrefix(`/go2rtc`)'
+      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`integra.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`ventas.nexara.com.mx`,`operacion.nexara.com.mx`,`contabilidad.nexara.com.mx`,`web.nexara.com.mx`,`tickets.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`) && !PathPrefix(`/go2rtc`)'
       entryPoints:
         - websecure
       service: nexara-web
@@ -299,16 +306,28 @@ http:
   services:
     nexara-web:
       loadBalancer:
+        healthCheck:
+          path: /
+          interval: 15s
+          timeout: 5s
         servers:
           - url: 'http://nexara-web:3000'
 
     nexara-api:
       loadBalancer:
+        healthCheck:
+          path: /api/health/live
+          interval: 10s
+          timeout: 3s
         servers:
           - url: 'http://nexara-api:3001'
 
     nexara-go2rtc:
       loadBalancer:
+        healthCheck:
+          path: /api
+          interval: 15s
+          timeout: 5s
         servers:
           - url: 'http://nexara-go2rtc:1984'
 

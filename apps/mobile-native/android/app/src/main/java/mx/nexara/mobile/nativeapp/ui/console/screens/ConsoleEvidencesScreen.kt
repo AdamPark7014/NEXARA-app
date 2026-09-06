@@ -40,6 +40,7 @@ import mx.nexara.mobile.nativeapp.ui.common.NxAsyncImage
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 import mx.nexara.mobile.nativeapp.ui.util.savePdfToCache
 import mx.nexara.mobile.nativeapp.ui.util.openPdfFile
+import mx.nexara.mobile.nativeapp.access.WebPanelUrl
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -508,13 +509,8 @@ fun ConsoleEvidencesScreen(
     var pickPdf by remember { mutableStateOf(false) }
     var pickExitPhoto by remember { mutableStateOf(false) }
 
-    fun mediaToDataUrl(media: CapturedMedia): String? {
-        val bytes = runCatching { context.contentResolver.openInputStream(media.uri)?.use { it.readBytes() } }.getOrNull()
-            ?: return null
-        val mime = media.mimeType.takeIf { it.isNotBlank() } ?: "application/octet-stream"
-        val encoded = Base64.encodeToString(bytes, Base64.NO_WRAP)
-        return "data:$mime;base64,$encoded"
-    }
+    fun mediaToDataUrl(media: CapturedMedia): String? =
+        mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl.fromCaptured(context, media)
 
     PullToRefreshBox(
         isRefreshing = state.isRefreshing,
@@ -781,9 +777,11 @@ fun ConsoleEvidencesScreen(
 
                         OutlinedButton(
                             onClick = {
+                                val url = WebPanelUrl.forPath("/erp/my-evidences")
+                                    ?: "https://core.nexara.com.mx/erp/my-evidences"
                                 openExternalUrl(
                                     context = context,
-                                    url = "https://consola.nexara.com.mx/my-evidences",
+                                    url = url,
                                 )
                             },
                         ) {

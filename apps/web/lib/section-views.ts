@@ -237,7 +237,7 @@ export function shouldShowModuleInSidebar(
     case 'ops-noc':
     case 'ops-support-inbox':
     case 'ops-support-sla':
-      return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2);
+      return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2) || isSupportRole(v2);
     case 'ops-maintenance-contracts':
       // Contratos accesibles desde /ops/maintenance (pestaña/enlace), no duplicar menú.
       return false;
@@ -282,7 +282,7 @@ export function shouldShowModuleInSidebar(
     case 'invoicing':
     case 'banking':
     case 'employee-payments':
-      return FINANCE_ROLES.has(v2) || v2 === ROLES.RH;
+      return FINANCE_ROLES.has(v2) || v2 === ROLES.RH || v2 === ROLES.ADMINISTRATIVO;
     case 'hr':
     case 'fines':
     case 'kpis-hr':
@@ -290,7 +290,7 @@ export function shouldShowModuleInSidebar(
     case 'warehouse':
       return WAREHOUSE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO;
     case 'procurement':
-      return WAREHOUSE_ROLES.has(v2);
+      return WAREHOUSE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO;
     // CRM — gerente vs vendedor vs diseño
     case 'crm-sales-team':
     case 'crm-targets':
@@ -307,6 +307,7 @@ export function shouldShowModuleInSidebar(
         || v2 === ROLES.COORD_OPERACIONES
         || v2 === ROLES.CONTABILIDAD
         || v2 === ROLES.COORD_ADMIN
+        || v2 === ROLES.ADMINISTRATIVO
       );
     case 'crm-products':
       return DESIGN_TEAM.has(v2) || SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
@@ -314,9 +315,9 @@ export function shouldShowModuleInSidebar(
     case 'crm-agenda':
     case 'crm-clients':
     case 'crm-leads':
-      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
+      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN || v2 === ROLES.ADMINISTRATIVO;
     case 'crm-opportunities':
-      return EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2) || v2 === ROLES.COORD_ADMIN;
+      return EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-dashboard':
       return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-reports':

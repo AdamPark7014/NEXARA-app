@@ -31,6 +31,30 @@ class OfflineMediaStore(context: Context) {
         return sb.toString()
     }
 
+    fun saveBytes(bytes: ByteArray, mime: String): String? {
+        return try {
+            val id = UUID.randomUUID().toString()
+            File(dir, id).writeBytes(bytes)
+            File(dir, "$id.mime").writeText(mime)
+            mimeById[id] = mime
+            id
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun loadBytes(id: String): ByteArray? {
+        val file = File(dir, id)
+        if (!file.exists()) return null
+        return runCatching { file.readBytes() }.getOrNull()
+    }
+
+    fun delete(id: String) {
+        File(dir, id).delete()
+        mimeById.remove(id)
+        File(dir, "$id.mime").delete()
+    }
+
     fun expandMediaRefs(body: String?): String? {
         if (body.isNullOrBlank()) return body
         if (!body.contains("nexara-media://")) return body
@@ -45,28 +69,22 @@ class OfflineMediaStore(context: Context) {
         return sb.toString()
     }
 
-    fun delete(id: String) {
-        File(dir, id).delete()
-        mimeById.remove(id)
-        File(dir, "$id.mime").delete()
-    }
-
     fun purgeRefsInBody(body: String?) {
         if (body.isNullOrBlank()) return
         val matcher = MEDIA_REF.matcher(body)
         while (matcher.find()) {
             matcher.group(1)?.let { delete(it) }
         }
+        val binMatcher = MEDIA_BIN_REF.matcher(body)
+        while (binMatcher.find()) {
+            binMatcher.group(1)?.let { delete(it) }
+        }
     }
 
     private fun saveBase64(b64: String, mime: String): String? {
         return try {
             val bytes = Base64.decode(b64, Base64.DEFAULT)
-            val id = UUID.randomUUID().toString()
-            File(dir, id).writeBytes(bytes)
-            File(dir, "$id.mime").writeText(mime)
-            mimeById[id] = mime
-            id
+            saveBytes(bytes, mime)
         } catch (_: Exception) {
             null
         }
@@ -91,5 +109,7 @@ class OfflineMediaStore(context: Context) {
             Pattern.compile("data:([\\w/+.-]+);base64,([A-Za-z0-9+/=\\r\\n]+)")
         private val MEDIA_REF: Pattern =
             Pattern.compile("nexara-media://([0-9a-fA-F\\-]{36})")
+        private val MEDIA_BIN_REF: Pattern =
+            Pattern.compile("nexara-media-bin://([0-9a-fA-F\\-]{36})")
     }
 }

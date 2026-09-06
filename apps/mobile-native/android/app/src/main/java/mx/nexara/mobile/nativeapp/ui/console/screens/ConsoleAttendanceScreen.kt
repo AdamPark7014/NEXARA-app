@@ -39,6 +39,8 @@ import mx.nexara.mobile.nativeapp.data.api.AttendanceCurrentDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
+import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
 import mx.nexara.mobile.nativeapp.ui.console.util.currentMonthRange
 import mx.nexara.mobile.nativeapp.ui.console.util.currentWeekRange
 import mx.nexara.mobile.nativeapp.ui.console.util.lastWeekRange
@@ -150,7 +152,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearExportMessage() = _state.update { it.copy(exportMessage = null) }
 
-    fun checkIn(type: String) {
+    fun checkIn(type: String, photoBase64: String) {
         _state.update { it.copy(checkInLoading = true, checkInMessage = null) }
         viewModelScope.launch {
             try {
@@ -158,7 +160,12 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                     mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
                 }
                 val res = withContext(Dispatchers.IO) {
-                    repo.attendanceCheckIn(type, lat = coords?.lat, lng = coords?.lng)
+                    repo.attendanceCheckIn(
+                        type,
+                        lat = coords?.lat,
+                        lng = coords?.lng,
+                        photoBase64 = photoBase64,
+                    )
                 }
                 val base = res.message ?: if (type == "entrada") "✅ Entrada registrada" else "✅ Salida registrada"
                 val geoHint = when {
@@ -224,6 +231,7 @@ fun ConsoleAttendanceScreen(
     val vm: ConsoleAttendanceViewModel = viewModel()
     val state by vm.state.collectAsState()
     var selectedUser by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto?>(null) }
+    var pendingCheckInType by remember { mutableStateOf<String?>(null) }
 
     if (state.payload == null && state.isLoading && state.error == null) vm.refresh(initial = true)
 
@@ -369,36 +377,65 @@ fun ConsoleAttendanceScreen(
 
                         Spacer(Modifier.height(16.dp))
 
-                        // Check-in / Check-out buttons
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            if (!isCheckedIn) {
-                                Button(
-                                    onClick = { vm.checkIn("entrada") },
-                                    enabled = !state.checkInLoading,
-                                    modifier = Modifier.weight(1f).height(52.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = GreenColor),
-                                    shape = RoundedCornerShape(12.dp),
-                                ) {
-                                    Text(
-                                        if (state.checkInLoading) "Registrando..." else "▶  Registrar Entrada",
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                }
-                            } else {
-                                Button(
-                                    onClick = { vm.checkIn("salida") },
-                                    enabled = !state.checkInLoading,
-                                    modifier = Modifier.weight(1f).height(52.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = RedColor),
-                                    shape = RoundedCornerShape(12.dp),
-                                ) {
-                                    Text(
-                                        if (state.checkInLoading) "Registrando..." else "⏹  Registrar Salida",
-                                        fontWeight = FontWeight.Bold,
-                                    )
+                        // Check-in / Check-out buttons — foto obligatoria
+                        if (pendingCheckInType != null) {
+                            Text(
+                                if (pendingCheckInType == "entrada") "Toma una foto para registrar entrada"
+                                else "Toma una foto para registrar salida",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = SubText,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            MediaPickerBar(
+                                onPicked = { picked ->
+                                    val first = picked.firstOrNull() ?: return@MediaPickerBar
+                                    val dataUrl = ImageDataUrl.fromCaptured(context, first)
+                                    if (dataUrl.isNullOrBlank()) {
+                                        vm.clearMessage()
+                                        return@MediaPickerBar
+                                    }
+                                    val type = pendingCheckInType ?: return@MediaPickerBar
+                                    pendingCheckInType = null
+                                    vm.checkIn(type, dataUrl)
+                                },
+                                allowCamera = true,
+                                allowGallery = false,
+                                allowDocuments = false,
+                            )
+                            TextButton(onClick = { pendingCheckInType = null }) {
+                                Text("Cancelar")
+                            }
+                        } else {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                if (!isCheckedIn) {
+                                    Button(
+                                        onClick = { pendingCheckInType = "entrada" },
+                                        enabled = !state.checkInLoading,
+                                        modifier = Modifier.weight(1f).height(52.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = GreenColor),
+                                        shape = RoundedCornerShape(12.dp),
+                                    ) {
+                                        Text(
+                                            if (state.checkInLoading) "Registrando..." else "▶  Registrar Entrada",
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = { pendingCheckInType = "salida" },
+                                        enabled = !state.checkInLoading,
+                                        modifier = Modifier.weight(1f).height(52.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = RedColor),
+                                        shape = RoundedCornerShape(12.dp),
+                                    ) {
+                                        Text(
+                                            if (state.checkInLoading) "Registrando..." else "⏹  Registrar Salida",
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
                                 }
                             }
                         }

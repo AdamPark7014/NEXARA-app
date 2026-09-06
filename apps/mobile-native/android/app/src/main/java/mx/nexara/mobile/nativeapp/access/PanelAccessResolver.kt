@@ -10,6 +10,22 @@ private val CLIENT_OR_BRANCH_PERMISSION_PREFIXES = listOf(
     "client-tickets.",
 )
 
+private val ERP_ROLE_KEYS = setOf(
+    "ceo", "super_admin", "dir_admin", "coord_admin", "administrativo",
+    "rh", "contabilidad", "dir_operaciones",
+)
+private val CRM_ROLE_KEYS = setOf(
+    "ceo", "super_admin", "coord_ventas", "vendedor", "dir_admin",
+)
+private val OPS_ROLE_KEYS = setOf(
+    "ceo", "super_admin", "dir_operaciones", "coord_operaciones", "arquitecto",
+    "ing_campo", "ing_soporte", "noc_lead", "noc_operator",
+)
+private val STUDIO_ROLE_KEYS = setOf(
+    "ceo", "super_admin", "lider_diseno", "disenador",
+)
+private val LAB_ROLE_KEYS = setOf("ceo", "super_admin", "developer")
+
 private fun normalizePerms(perms: List<String>): Set<String> =
     perms.map { it.trim().lowercase().replace('_', '.').replace('-', '.') }.toSet()
 
@@ -29,10 +45,21 @@ private fun isClientOrBranchAccount(role: String, permissions: List<String>): Bo
     return byRole || byPerm
 }
 
-private fun roleHint(role: String): String = role.trim().lowercase()
+/** Prefer snake_case roleKey-like tokens; also keep display-name substrings as fallback. */
+private fun roleTokens(role: String): Set<String> {
+    val raw = role.trim().lowercase()
+    if (raw.isBlank()) return emptySet()
+    val snake = raw.replace(Regex("[\\s\\-]+"), "_")
+    return buildSet {
+        add(raw)
+        add(snake)
+        raw.split(Regex("[\\s_\\-/,]+")).filter { it.length >= 2 }.forEach { add(it) }
+    }
+}
 
 /**
  * Resuelve paneles accesibles — alineado con apps/web/lib/access-matrix.ts + panel-routing legacy.
+ * Usa claves v2 (`rh`, `ing_soporte`, …) además de substrings del nombre de rol.
  */
 object PanelAccessResolver {
     fun accessiblePanels(user: SessionUser?): List<PanelId> {
@@ -43,7 +70,7 @@ object PanelAccessResolver {
         }
 
         val perms = user.normalizedPerms()
-        val role = roleHint(user.role)
+        val tokens = roleTokens(user.role)
 
         if (user.isSuperAdmin) {
             return listOf(PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB)
@@ -58,25 +85,37 @@ object PanelAccessResolver {
                 "console_access", "console_admin",
             ),
             user.isSuperAdmin,
-        ) || role.contains("admin") || role.contains("rh") || role.contains("contab")
+        ) || tokens.any { it in ERP_ROLE_KEYS }
+            || tokens.any { t ->
+                t.contains("admin") || t.contains("rh") || t.contains("people")
+                    || t.contains("contab") || t.contains("administrativ")
+                    || t.contains("recurso") || t.contains("humano")
+            }
 
         val crm = hasAny(
             perms,
             listOf("panel.ventas", "sales.view", "sales.manage", "sales.reports.view"),
             user.isSuperAdmin,
-        ) || role.contains("vendedor") || role.contains("ventas")
+        ) || tokens.any { it in CRM_ROLE_KEYS }
+            || tokens.any { t -> t.contains("vendedor") || t.contains("ventas") || t.contains("sales") }
 
         val ops = hasAny(
             perms,
             listOf("console.access", "console.admin", "gps.view", "gps.manage", "activities.view"),
             user.isSuperAdmin,
-        ) || role.contains("ingenier") || role.contains("soporte") || role.contains("campo")
-            || role.contains("operac") || role.contains("noc")
+        ) || tokens.any { it in OPS_ROLE_KEYS }
+            || tokens.any { t ->
+                t.contains("ingenier") || t.contains("soporte") || t.contains("campo")
+                    || t.contains("operac") || t.contains("noc") || t.contains("arquitect")
+            }
 
         val studio = hasAny(perms, listOf("panel.web", "studio.access"), user.isSuperAdmin)
-            || role.contains("diseño") || role.contains("diseno") || role.contains("studio")
+            || tokens.any { it in STUDIO_ROLE_KEYS }
+            || tokens.any { t -> t.contains("diseño") || t.contains("diseno") || t.contains("studio") }
 
-        val lab = user.isSuperAdmin || role.contains("developer") || role.contains("desarroll")
+        val lab = user.isSuperAdmin
+            || tokens.any { it in LAB_ROLE_KEYS }
+            || tokens.any { t -> t.contains("developer") || t.contains("desarroll") }
 
         return buildList {
             if (erp) add(PanelId.ERP)

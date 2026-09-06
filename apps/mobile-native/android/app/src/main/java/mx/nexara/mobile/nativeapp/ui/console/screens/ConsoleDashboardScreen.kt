@@ -48,6 +48,7 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto
 import mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto
 import mx.nexara.mobile.nativeapp.data.api.ViaticDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.console.isAdministrativoRole
@@ -114,27 +115,38 @@ class ConsoleDashboardViewModel(app: Application) : AndroidViewModel(app) {
         val (from, to) = currentWeekRange()
         _state.update { it.copy(isLoading = true, error = null, weekFrom = from, weekTo = to) }
         viewModelScope.launch {
-            try {
-                val viatics    = withContext(Dispatchers.IO) { repo.viaticsFetch() }
-                val activities = withContext(Dispatchers.IO) { repo.activitiesFetch() }
-                val attendance = withContext(Dispatchers.IO) { runCatching { repo.attendanceRange(from, to) }.getOrNull() }
-                val executive  = withContext(Dispatchers.IO) { runCatching { extraRepo.executiveCLevelDto() }.getOrElse { ExecutiveCLevelDto() } }
-                val approvals  = withContext(Dispatchers.IO) { runCatching { extraRepo.workflowApprovals() }.getOrElse { emptyList() } }
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        viatics = viatics,
-                        activities = activities,
-                        attendance = attendance,
-                        executive = executive,
-                        approvals = approvals,
-                        error = null,
-                    )
-                }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(isLoading = false, error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cargar el dashboard")
-                }
+            val viaticsResult = withContext(Dispatchers.IO) { runCatching { repo.viaticsFetch() } }
+            val activitiesResult = withContext(Dispatchers.IO) { runCatching { repo.activitiesFetch() } }
+            val attendance = withContext(Dispatchers.IO) { runCatching { repo.attendanceRange(from, to) }.getOrNull() }
+            val executive = withContext(Dispatchers.IO) {
+                runCatching { extraRepo.executiveCLevelDto() }.getOrElse { ExecutiveCLevelDto() }
+            }
+            val approvals = withContext(Dispatchers.IO) {
+                runCatching { extraRepo.workflowApprovals() }.getOrElse { emptyList() }
+            }
+
+            val viaticsError = viaticsResult.exceptionOrNull()
+            val activitiesError = activitiesResult.exceptionOrNull()
+            val softError = when {
+                viaticsError != null && activitiesError != null ->
+                    (viaticsError ?: activitiesError).toUserMessage("No se pudo cargar el dashboard")
+                viaticsError != null ->
+                    viaticsError.toUserMessage("No se pudieron cargar los viáticos")
+                activitiesError != null ->
+                    activitiesError.toUserMessage("No se pudieron cargar las actividades")
+                else -> null
+            }
+
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    viatics = viaticsResult.getOrElse { emptyList() },
+                    activities = activitiesResult.getOrElse { emptyList() },
+                    attendance = attendance,
+                    executive = executive,
+                    approvals = approvals,
+                    error = softError,
+                )
             }
         }
     }

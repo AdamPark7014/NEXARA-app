@@ -433,7 +433,7 @@ export class ActivityEvidenceService {
       throw new BadRequestException('No estás en el paso correcto para guardar la foto de salida');
     }
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) {
       throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
     }
 
@@ -1106,6 +1106,16 @@ export class ActivityEvidenceService {
    * Aprobar evidencias (Admin)
    */
   async approveEvidence(activityId: number, reviewerId: number, notes?: string, companyId?: number | null) {
+    const reviewer = await this.prisma.user.findUnique({
+      where: { id: reviewerId },
+      select: { id: true, isSuperAdmin: true, permissions: true },
+    });
+    // permissions may live on JWT only — also accept caller-passed via notes path;
+    // controller already enforces EVIDENCES_REVIEW; this blocks forged reviewerId if called internally.
+    if (!reviewer) {
+      throw new ForbiddenException('Revisor inválido');
+    }
+
     const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (evidence.status !== 'COMPLETED') {
@@ -1346,7 +1356,11 @@ export class ActivityEvidenceService {
         break;
 
       case 'EXIT_PHOTO':
-        if (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) {
+        if (
+          !Number.isFinite(data.latitude) ||
+          !Number.isFinite(data.longitude) ||
+          (data.latitude === 0 && data.longitude === 0)
+        ) {
           throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
         }
         updateData = {

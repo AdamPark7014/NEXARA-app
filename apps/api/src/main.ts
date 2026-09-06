@@ -177,7 +177,8 @@ async function bootstrap() {
   });
 
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
-    const ip = getClientIpFromRequestMeta(request.headers['x-forwarded-for'], request.ip);
+    // Prefer Express req.ip (trust proxy = 1). Raw X-Forwarded-For[0] is spoofable.
+    const ip = getClientIpFromRequestMeta(undefined, request.ip);
 
     if (ipPenaltyBox.isBanned(ip)) {
       const retrySeconds = Math.max(1, Math.ceil(ipPenaltyBox.retryAfterMs(ip) / 1000));
@@ -336,7 +337,8 @@ async function bootstrap() {
   });
 
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
-    const ip = getClientIpFromRequestMeta(request.headers['x-forwarded-for'], request.ip);
+    // Prefer Express req.ip (trust proxy = 1). Raw X-Forwarded-For[0] is spoofable.
+    const ip = getClientIpFromRequestMeta(undefined, request.ip);
 
     const pathname = request.path || request.url || '/';
     if (isRateLimitExemptPath(pathname)) {
@@ -379,6 +381,8 @@ async function bootstrap() {
       'Accept',
       'Origin',
       'X-Requested-With',
+      'X-Company-Id',
+      'Idempotency-Key',
       'X-Device-Id',
       'X-Device-Name',
       'X-Device-Model',
@@ -533,9 +537,15 @@ async function bootstrap() {
   const port = process.env['PORT'] || 3001;
   const server = await app.listen(port);
 
-  const requestTimeoutMs = readPositiveIntEnv('HTTP_REQUEST_TIMEOUT_MS', 30_000);
-  const keepAliveTimeoutMs = readPositiveIntEnv('HTTP_KEEPALIVE_TIMEOUT_MS', 65_000);
-  const headersTimeoutMs = readPositiveIntEnv('HTTP_HEADERS_TIMEOUT_MS', 66_000);
+  // Keep-alive must outlive Traefik's idle pool (~90s). A short server.setTimeout
+  // used to kill idle sockets at 30s while Traefik still reused them → intermittent 502.
+  // Request timeout aligns with APP_REQUEST_TIMEOUT_MS so slow handlers get a real 408.
+  const requestTimeoutMs = readPositiveIntEnv('HTTP_REQUEST_TIMEOUT_MS', 120_000);
+  const keepAliveTimeoutMs = readPositiveIntEnv('HTTP_KEEPALIVE_TIMEOUT_MS', 95_000);
+  const headersTimeoutMs = readPositiveIntEnv(
+    'HTTP_HEADERS_TIMEOUT_MS',
+    Math.max(keepAliveTimeoutMs + 1_000, 96_000),
+  );
 
   if (server && typeof (server as any).setTimeout === 'function') {
     (server as any).setTimeout(requestTimeoutMs);
@@ -544,7 +554,7 @@ async function bootstrap() {
     (server as any).keepAliveTimeout = keepAliveTimeoutMs;
   }
   if (server && typeof (server as any).headersTimeout === 'number') {
-    (server as any).headersTimeout = headersTimeoutMs;
+    (server as any).headersTimeout = Math.max(headersTimeoutMs, keepAliveTimeoutMs + 1_000);
   }
 
   let isShuttingDown = false;

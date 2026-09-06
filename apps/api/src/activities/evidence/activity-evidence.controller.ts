@@ -6,15 +6,18 @@ import {
   Param,
   Query,
   BadRequestException,
+  ForbiddenException,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { ActivityEvidenceService } from './activity-evidence.service';
-import { RbacGuard } from '../../common/rbac.guard.js';
+import { RBAC, RbacGuard } from '../../common/rbac.guard.js';
 import { UrlAccessGuard } from '../../common/rbac/url-access.guard.js';
 import { saveBase64Photo, saveBase64Pdf } from '../../common/file-upload.util';
 import { CurrentCompanyId } from '../../common/tenant/current-company.decorator.js';
+import { CurrentUser } from '../../common/current-user.decorator.js';
+import { PERMISSIONS } from '../../common/permissions.js';
 import { Response } from 'express';
 
 @Controller('activity-evidence')
@@ -193,35 +196,44 @@ export class ActivityEvidenceController {
   }
 
   @Post(':activityId/approve')
+  @RBAC({ permissions: [PERMISSIONS.EVIDENCES_REVIEW] })
   async approveEvidence(
     @Param('activityId') activityId: string,
-    @Body() body: { reviewerId: number; notes?: string },
+    @Body() body: { notes?: string },
+    @CurrentUser() user: { id: number },
     @CurrentCompanyId() companyId: number | null,
   ) {
+    if (!user?.id) {
+      throw new ForbiddenException('Sesión inválida');
+    }
     return this.service.approveEvidence(
       parseInt(activityId, 10),
-      body.reviewerId,
+      user.id,
       body.notes,
       companyId,
     );
   }
 
   @Post(':activityId/reject')
+  @RBAC({ permissions: [PERMISSIONS.EVIDENCES_REVIEW] })
   async rejectEvidence(
     @Param('activityId') activityId: string,
     @Body()
     body: {
-      reviewerId: number;
       notes: string;
       rejectedStep?: string;
       rejectedSteps?: string[];
       resetFullFlow?: boolean;
     },
+    @CurrentUser() user: { id: number },
     @CurrentCompanyId() companyId: number | null,
   ) {
+    if (!user?.id) {
+      throw new ForbiddenException('Sesión inválida');
+    }
     return this.service.rejectEvidence(
       parseInt(activityId, 10),
-      body.reviewerId,
+      user.id,
       body.notes,
       {
         rejectedStep: body.rejectedStep,

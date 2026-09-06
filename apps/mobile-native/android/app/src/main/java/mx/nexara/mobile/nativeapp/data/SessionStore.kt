@@ -1,6 +1,7 @@
 package mx.nexara.mobile.nativeapp.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -28,17 +29,7 @@ data class QuickProfile(
 )
 
 class SessionStore(context: Context) {
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
-
-    private val prefs = EncryptedSharedPreferences.create(
-        context,
-        "nexara_session",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-    )
+    private val prefs: SharedPreferences = openPrefs(context.applicationContext)
 
     fun load(): SessionUser? {
         val token = prefs.getString("token", null) ?: return null
@@ -150,5 +141,27 @@ class SessionStore(context: Context) {
             .remove("branch_id")
             .apply()
     }
-}
 
+    companion object {
+        /**
+         * Encrypted prefs when Keystore works; plain MODE_PRIVATE fallback so a
+         * broken Keystore never crashes login (Play/device-specific Keystore bugs).
+         */
+        private fun openPrefs(context: Context): SharedPreferences {
+            return try {
+                val masterKey = MasterKey.Builder(context)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                EncryptedSharedPreferences.create(
+                    context,
+                    "nexara_session",
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                )
+            } catch (_: Exception) {
+                context.getSharedPreferences("nexara_session_fallback", Context.MODE_PRIVATE)
+            }
+        }
+    }
+}

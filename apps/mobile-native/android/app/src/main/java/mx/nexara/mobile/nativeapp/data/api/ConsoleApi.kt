@@ -265,6 +265,7 @@ data class AttendanceRegisterRequest(
     val timestamp: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val photoBase64: String,
 )
 
 data class AttendanceRegisterResponse(
@@ -893,14 +894,15 @@ data class InventoryStatusPatchRequest(
 )
 
 data class EvidenceReviewRequest(
-    val reviewerId: Long,
     val notes: String? = null,
+    // Ignorado por la API (reviewer = JWT). Se mantiene opcional por compat.
+    val reviewerId: Long? = null,
 )
 
 data class EvidenceRejectRequest(
-    val reviewerId: Long,
-    val rejectedStep: String = "EVIDENCE_PHOTOS",
     val notes: String,
+    val rejectedStep: String = "EVIDENCE_PHOTOS",
+    val reviewerId: Long? = null,
 )
 
 data class ActivityEvidenceActivityDto(

@@ -4,6 +4,7 @@ import android.content.Context
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.LoginRequest
 import mx.nexara.mobile.nativeapp.data.api.PortalLoginRequest
+import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
 import mx.nexara.mobile.nativeapp.data.realtime.RealtimeBus
 
 class AuthRepository(
@@ -163,6 +164,7 @@ class AuthRepository(
     fun logout() {
         sessionStore.clear()
         RealtimeBus.stop()
+        runCatching { NexaraOffline.apiCache().clear() }
     }
 }
 

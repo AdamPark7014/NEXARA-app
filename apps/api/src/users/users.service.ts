@@ -511,6 +511,17 @@ export class UsersService {
     throw new BadRequestException('Rol inválido');
   }
 
+  /** Prefer Role.orgRoleKey as User.roleKey so JWT/url-matrix resolve without the missing PATCH. */
+  private async resolveRoleKeyFromRoleId(roleId: number | null | undefined, tx: any = this.prisma): Promise<string | null> {
+    if (!roleId || !Number.isFinite(roleId)) return null;
+    const role = await tx.role.findUnique({
+      where: { id: roleId },
+      select: { orgRoleKey: true },
+    });
+    const key = typeof role?.orgRoleKey === 'string' ? role.orgRoleKey.trim() : '';
+    return key || null;
+  }
+
   private async resolveDepartmentId(value: unknown, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     if (value === undefined || value === null) return undefined;
@@ -641,6 +652,7 @@ export class UsersService {
             nombre: createUserDto.nombre,
             email: emailNorm,
             roleId,
+            roleKey: await this.resolveRoleKeyFromRoleId(roleId, tx),
             departmentId,
             avatarUrl: createUserDto.avatarUrl,
             passwordHash: hash,
@@ -1038,7 +1050,7 @@ export class UsersService {
     await this.clearEmployeeNumberForProtectedUsers();
 
     const data: any = { ...updateUserDto };
-    // roleKey sólo se cambia desde el endpoint dedicado PATCH /users/:id/role-key
+    // No aceptar roleKey del body (escalada). Se sincroniza desde roleId abajo.
     delete data.roleKey;
     const currentUser = await this.prisma['user'].findUnique({
       where: { id },
@@ -1055,6 +1067,7 @@ export class UsersService {
     }
     if (data.roleId !== undefined) {
       data.roleId = await this.resolveRoleId(data.roleId);
+      data.roleKey = await this.resolveRoleKeyFromRoleId(data.roleId);
     }
     if (data.departmentId !== undefined) {
       data.departmentId = await this.resolveDepartmentId(data.departmentId, companyId);

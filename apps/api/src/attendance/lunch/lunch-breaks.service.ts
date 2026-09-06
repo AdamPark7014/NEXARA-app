@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { CreateLunchBreakDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
 import { companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
+import { workDateColumn, workDayAtClock } from '../../common/time/workday.js';
 
 @Injectable()
 export class LunchBreaksService {
@@ -13,8 +14,8 @@ export class LunchBreaksService {
 
   async createCheckin(usuarioId: number, data: CreateLunchBreakDto, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const today = workDateColumn(now);
 
     // Verificar si ya existe un registro de comida hoy
     const existingLunch = await this.prisma.lunchBreak.findFirst({
@@ -30,10 +31,8 @@ export class LunchBreaksService {
     }
 
     const checkinTime = new Date(data.checkinTime);
-    const lunchStartHour = new Date();
-    lunchStartHour.setHours(15, 0, 0, 0); // 3 PM
-    const lunchEndHour = new Date();
-    lunchEndHour.setHours(16, 0, 0, 0); // 4 PM
+    const lunchStartHour = workDayAtClock(now, 15, 0);
+    const lunchEndHour = workDayAtClock(now, 16, 0);
 
     const isLate = checkinTime < lunchStartHour || checkinTime > lunchEndHour;
     let notes = '';
@@ -88,8 +87,8 @@ export class LunchBreaksService {
 
   async createCheckout(usuarioId: number, data: UpdateLunchBreakDto, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const today = workDateColumn(now);
 
     const lunch = await this.prisma.lunchBreak.findFirst({
       where: {
@@ -108,8 +107,7 @@ export class LunchBreaksService {
     }
 
     const checkoutTime = new Date(data.checkoutTime);
-    const lunchEndHour = new Date();
-    lunchEndHour.setHours(16, 5, 0, 0); // 4:05 PM (duración esperada ~1 hora 5 minutos)
+    const lunchEndHour = workDayAtClock(now, 16, 5);
 
     const isLate = checkoutTime > lunchEndHour;
     let notes = lunch.notes;

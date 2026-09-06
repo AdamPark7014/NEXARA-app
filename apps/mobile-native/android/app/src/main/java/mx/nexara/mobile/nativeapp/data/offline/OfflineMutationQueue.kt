@@ -22,6 +22,7 @@ data class QueuedMutation(
     val attempts: Int = 0,
     val lastAttemptAt: Long? = null,
     val lastError: String? = null,
+    val idempotencyKey: String? = null,
 )
 
 class OfflineMutationQueue(context: Context) {
