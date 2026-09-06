@@ -25,6 +25,7 @@ import mx.nexara.mobile.nativeapp.data.api.KbArticleDto
 import mx.nexara.mobile.nativeapp.data.api.OrgNodeDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.api.CreateDocumentRequest
+import mx.nexara.mobile.nativeapp.data.api.CreateEmployeePaymentRequest
 import mx.nexara.mobile.nativeapp.data.api.CreateExpenseRequest
 import mx.nexara.mobile.nativeapp.data.api.DocumentDto
 import mx.nexara.mobile.nativeapp.data.api.EmployeePaymentDto
@@ -48,6 +49,7 @@ import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
 import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
 import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
 import mx.nexara.mobile.nativeapp.data.api.CandidateDto
+import mx.nexara.mobile.nativeapp.data.api.UpdateEmployeePaymentRequest
 import mx.nexara.mobile.nativeapp.data.api.CatalogProductDto
 import mx.nexara.mobile.nativeapp.data.api.PortfolioProjectDto
 import mx.nexara.mobile.nativeapp.data.api.ServiceSheetListDto
@@ -157,6 +159,9 @@ class ExtraRepository(context: Context) {
                 note = note,
             ),
         )
+
+    suspend fun markExpensePagado(id: Long) = api.markExpensePagado(id)
+
     suspend fun fines(): List<FineDto> = parseList(api.getFinesRaw())
 
     suspend fun approveFine(id: Long, approve: Boolean, note: String? = null) =
@@ -168,6 +173,45 @@ class ExtraRepository(context: Context) {
             ),
         )
     suspend fun employeePayments(): List<EmployeePaymentDto> = parseList(api.getEmployeePaymentsRaw())
+
+    suspend fun createEmployeePayment(
+        userId: Long,
+        periodFrom: String,
+        periodTo: String,
+        amount: Double,
+        concepto: String?,
+        note: String?,
+        totalMinutes: Int? = null,
+    ) = api.createEmployeePayment(
+        CreateEmployeePaymentRequest(
+            userId = userId,
+            periodFrom = periodFrom,
+            periodTo = periodTo,
+            amount = amount,
+            concepto = concepto,
+            note = note,
+            totalMinutes = totalMinutes,
+            status = "Borrador",
+        ),
+    )
+
+    suspend fun markEmployeePaymentPagado(id: Long) = api.markEmployeePaymentPagado(id)
+
+    suspend fun updateEmployeePayment(
+        id: Long,
+        amount: Double? = null,
+        concepto: String? = null,
+        note: String? = null,
+    ) = api.updateEmployeePayment(
+        id = id,
+        body = UpdateEmployeePaymentRequest(
+            amount = amount,
+            concepto = concepto,
+            note = note,
+        ),
+    )
+
+    suspend fun deleteEmployeePayment(id: Long) = api.deleteEmployeePayment(id)
     suspend fun cotizaciones(): List<CotizacionDto> = parseList(api.getCotizacionesRaw())
     suspend fun lunchBreaks(): List<LunchBreakDto> = parseList(api.getLunchBreaksRaw())
     suspend fun myLunchBreaks(): List<LunchBreakDto> = parseList(api.getMyLunchBreaksRaw())

@@ -299,6 +299,11 @@ interface ConsoleApi {
         @retrofit2.http.Body body: ViaticApproveRequest,
     ): okhttp3.ResponseBody
 
+    @PATCH("viatics/{id}/pagado")
+    suspend fun markViaticPagado(
+        @Path("id") id: Long,
+    ): okhttp3.ResponseBody
+
     @GET("activities")
     suspend fun getActivities(
         @Query("scope") scope: String? = null,
@@ -980,7 +985,9 @@ data class EvidenceReviewRequest(
 
 data class EvidenceRejectRequest(
     val notes: String,
-    val rejectedStep: String = "EVIDENCE_PHOTOS",
+    val rejectedStep: String? = null,
+    val rejectedSteps: List<String>? = null,
+    val resetFullFlow: Boolean? = null,
     val reviewerId: Long? = null,
 )
 

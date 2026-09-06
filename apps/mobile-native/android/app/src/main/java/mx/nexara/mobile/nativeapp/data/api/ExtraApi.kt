@@ -547,6 +547,27 @@ data class FineDto(
     }
 }
 
+data class CreateEmployeePaymentRequest(
+    val userId: Long,
+    val periodFrom: String,
+    val periodTo: String,
+    val amount: Double,
+    val totalMinutes: Int? = null,
+    val note: String? = null,
+    val concepto: String? = null,
+    val status: String? = null,
+)
+
+data class UpdateEmployeePaymentRequest(
+    val amount: Double? = null,
+    val note: String? = null,
+    val concepto: String? = null,
+    val periodFrom: String? = null,
+    val periodTo: String? = null,
+    val totalMinutes: Int? = null,
+    val status: String? = null,
+)
+
 // ── Employee payments ─────────────────────────────────────────────────────
 data class EmployeePaymentDto(
     val id: Long,
@@ -822,6 +843,11 @@ interface ExtraApi {
         @retrofit2.http.Body body: ExpenseApproveRequest,
     ): okhttp3.ResponseBody
 
+    @PATCH("expenses/{id}/pagado")
+    suspend fun markExpensePagado(
+        @Path("id") id: Long,
+    ): okhttp3.ResponseBody
+
     // Fines
     @GET("fines")
     suspend fun getFinesRaw(): okhttp3.ResponseBody
@@ -835,6 +861,27 @@ interface ExtraApi {
     // Employee payments
     @GET("employee-payments")
     suspend fun getEmployeePaymentsRaw(): okhttp3.ResponseBody
+
+    @POST("employee-payments")
+    suspend fun createEmployeePayment(
+        @Body body: CreateEmployeePaymentRequest,
+    ): EmployeePaymentDto
+
+    @PATCH("employee-payments/{id}/pagado")
+    suspend fun markEmployeePaymentPagado(
+        @Path("id") id: Long,
+    ): EmployeePaymentDto
+
+    @PATCH("employee-payments/{id}")
+    suspend fun updateEmployeePayment(
+        @Path("id") id: Long,
+        @Body body: UpdateEmployeePaymentRequest,
+    ): EmployeePaymentDto
+
+    @DELETE("employee-payments/{id}")
+    suspend fun deleteEmployeePayment(
+        @Path("id") id: Long,
+    ): okhttp3.ResponseBody
 
     // Cotizaciones
     @GET("cotizaciones")
