@@ -3,10 +3,14 @@ import { ActivityWorkType, ClientTicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class ClientTicketRequestsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   async findAll(status?: ClientTicketStatus, query?: PaginationQueryDto, companyId?: number | null) {
     const where: any = { ...companyWhere(companyId ?? null) };
@@ -105,16 +109,35 @@ export class ClientTicketRequestsService {
     });
   }
 
-  async updateStatus(id: number, status: ClientTicketStatus, companyId?: number | null) {
+  async updateStatus(
+    id: number,
+    status: ClientTicketStatus,
+    companyId?: number | null,
+    actorUserId?: number | null,
+  ) {
     const tenantId = requireCompanyId(companyId);
     const request = await this.prisma.clientTicketRequest.findFirst({
       where: { id, ...companyWhere(tenantId) },
+      include: { activity: { select: { responsableId: true } } },
     });
     assertCompanyAccess(request, tenantId, 'Solicitud');
-    return this.prisma.clientTicketRequest.update({
+    const updated = await this.prisma.clientTicketRequest.update({
       where: { id },
       data: { status },
     });
+    if (actorUserId) {
+      void this.notificationHierarchy
+        .notifySupportRequestStatusChanged({
+          requestId: id,
+          status,
+          actorUserId,
+          activityResponsableId: request.activity?.responsableId,
+          description: request.description,
+          companyId: tenantId,
+        })
+        .catch(() => undefined);
+    }
+    return updated;
   }
 
   async updateNotes(id: number, notes: string, companyId?: number | null) {

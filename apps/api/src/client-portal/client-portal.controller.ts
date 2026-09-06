@@ -825,24 +825,17 @@ export class ClientPortalController {
     const stamp = new Date().toISOString();
 
     if (action === 'ACK') {
-      if (activity.responsableId) {
-        const meta = portalTicketActionNotifyMeta('ACK', activity.id, activity.anNumber, activity.titulo, note);
-        void this.notifications
-          .createNotification({
-            userId: activity.responsableId,
-            type: meta.type,
-            category: meta.category,
-            title: meta.title,
-            message: meta.message,
-            relatedEntityId: activity.id,
-            entityType: meta.entityType,
-            relatedUrl: meta.relatedUrl,
-            companyId: activity.companyId,
-            channel: meta.channel,
-            priority: meta.priority,
-          })
-          .catch(() => undefined);
-      }
+      void this.notificationHierarchy
+        .notifyPortalTicketClientAction({
+          action: 'ACK',
+          activityId: activity.id,
+          anNumber: activity.anNumber,
+          title: activity.titulo,
+          note,
+          responsableId: activity.responsableId,
+          companyId: activity.companyId,
+        })
+        .catch(() => undefined);
       return { ok: true, action, estatus: activity.estatus };
     }
 
@@ -859,30 +852,17 @@ export class ClientPortalController {
           comentariosFeedback: (prev ? `${prev}\n${line}` : line).slice(0, 8000),
         },
       });
-      if (activity.responsableId) {
-        const meta = portalTicketActionNotifyMeta(
-          'CONFIRM_RESOLVED',
-          activity.id,
-          activity.anNumber,
-          activity.titulo,
+      void this.notificationHierarchy
+        .notifyPortalTicketClientAction({
+          action: 'CONFIRM_RESOLVED',
+          activityId: activity.id,
+          anNumber: activity.anNumber,
+          title: activity.titulo,
           note,
-        );
-        void this.notifications
-          .createNotification({
-            userId: activity.responsableId,
-            type: meta.type,
-            category: meta.category,
-            title: meta.title,
-            message: meta.message,
-            relatedEntityId: activity.id,
-            entityType: meta.entityType,
-            relatedUrl: meta.relatedUrl,
-            companyId: activity.companyId,
-            channel: meta.channel,
-            priority: meta.priority,
-          })
-          .catch(() => undefined);
-      }
+          responsableId: activity.responsableId,
+          companyId: activity.companyId,
+        })
+        .catch(() => undefined);
       return { ok: true, action, estatus: activity.estatus };
     }
 
@@ -900,30 +880,17 @@ export class ClientPortalController {
         comentariosFeedback: (prev ? `${prev}\n${line}` : line).slice(0, 8000),
       },
     });
-    if (activity.responsableId) {
-      const meta = portalTicketActionNotifyMeta(
-        'REQUEST_REOPEN',
-        activity.id,
-        activity.anNumber,
-        activity.titulo,
+    void this.notificationHierarchy
+      .notifyPortalTicketClientAction({
+        action: 'REQUEST_REOPEN',
+        activityId: activity.id,
+        anNumber: activity.anNumber,
+        title: activity.titulo,
         note,
-      );
-      void this.notifications
-        .createNotification({
-          userId: activity.responsableId,
-          type: meta.type,
-          category: meta.category,
-          title: meta.title,
-          message: meta.message,
-          relatedEntityId: activity.id,
-          entityType: meta.entityType,
-          relatedUrl: meta.relatedUrl,
-          companyId: activity.companyId,
-          channel: meta.channel,
-          priority: meta.priority,
-        })
-        .catch(() => undefined);
-    }
+        responsableId: activity.responsableId,
+        companyId: activity.companyId,
+      })
+      .catch(() => undefined);
     return { ok: true, action, estatus: updated.estatus };
   }
 

@@ -8,31 +8,34 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Wave A paridad CASCARON (vehicles + dispatch)
+## Este turno — Push eficiente + paridad Wave A
 
-### Android — vehículos admin
-- `ConsoleApi` / `ConsoleRepository`: `approveVehicleRequest`, `createVehicleInventory`, `updateVehicleInventory`.
-- `ConsoleVehiclesScreen`: pestañas Solicitudes + Flotilla; aprobar/rechazar pendientes; crear/editar/desactivar inventario.
-- Catalog `vehicles` → **NATIVO**.
+### Push / notificaciones
+- FCM: `collapseKey`, `channel`, `event`, `entityType`, `relatedEntityId`, `category`.
+- `createNotification`: dedupe 120s + no auto-notif al actor.
+- Android canales: ops / chat / approvals + ID estable por tag.
+- `ACTIVITY_STARTED` (enum + migración) al pasar OT a En Proceso.
+- Portal cliente: comentarios/ACK/confirm/reopen → hierarchy → FCM (ya no prisma crudo).
+- Support request status change → notifica responsable OT.
+- Workflow approve/reject: `relatedUrl` + canal approvals.
 
-### Android — despacho
-- `ConsoleDispatchScreen`: búsqueda, reintento/actualizar, asignación masiva (check + picker), reasignación individual (long-press).
-- Catalog `dispatch` → **NATIVO**.
-
-### Catalog truth (sin mutaciones aún)
-- `work-projects` / `employee-payments` (console + contabilidad) → **SOLO_LECTURA** (lista+detalle ricos; API create/update existe pero no cableada en móvil).
+### Paridad móvil
+- Vehicles admin + dispatch → **NATIVO** (approve/flotilla CRUD; board + bulk reassign).
+- Campo: Iniciar/Finalizar en lista; statuses web; GPS con `actividadId`.
+- EP / work-projects → **SOLO_LECTURA** (sin mutaciones aún).
 
 ### Verificación
 - `:app:compileDebugKotlin` OK.
+- `notification-push-meta` + `portal-ticket-notify` specs OK.
 
 ## A medias / Adam
 
-1. **Desplegar** Traefik/API P0 → `/go2rtc/api/streams` 404; rotar passwords.
+1. **Desplegar** Traefik/API P0 → `/go2rtc/api/streams` 404; rotar passwords + migrar `ACTIVITY_STARTED`.
 2. AAB Play VERSION_CODE 7+.
-3. INTEGRA video/ANPR/mapa/detección = Bloque 2.
-4. Portal sucursal: comentarios OT aún no (solo client-portal).
-5. Cascarones / huecos: employee-payments mutaciones, work-projects internos (hoy lee portafolio), newsletter admin, checkout flotilla fotos admin, cambio de estatus OT desde despacho (web tampoco lo hace).
-6. (hecho) CommandPalette + `/me/navigation`; Wave A vehicles/dispatch.
+3. Portal **sucursal**: comments/status API aún no.
+4. Employee-payments / work-projects mutaciones; INTEGRA people CRUD+face.
+5. DomainNotify facade formal (diseñado; hierarchy shortcuts ya cubren portal).
+6. INTEGRA video/ANPR/mapa = Bloque 2.
 
 ## No tocar
 
