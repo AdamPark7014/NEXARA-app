@@ -27,6 +27,7 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 ### Verificación
 - `:app:compileDebugKotlin` OK.
 - `notification-push-meta` + `portal-ticket-notify` specs OK.
+- hierarchy: import limpio (sin `INotificationPayload` sin usar).
 
 ## A medias / Adam
 
