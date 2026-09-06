@@ -2,10 +2,13 @@ package mx.nexara.mobile.nativeapp.data.api
 
 import com.squareup.moshi.Json
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.PartMap
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -862,9 +865,10 @@ interface ExtraApi {
     @GET("employee-payments")
     suspend fun getEmployeePaymentsRaw(): okhttp3.ResponseBody
 
+    @Multipart
     @POST("employee-payments")
     suspend fun createEmployeePayment(
-        @Body body: CreateEmployeePaymentRequest,
+        @PartMap fields: Map<String, @JvmSuppressWildcards okhttp3.RequestBody>,
     ): EmployeePaymentDto
 
     @PATCH("employee-payments/{id}/pagado")

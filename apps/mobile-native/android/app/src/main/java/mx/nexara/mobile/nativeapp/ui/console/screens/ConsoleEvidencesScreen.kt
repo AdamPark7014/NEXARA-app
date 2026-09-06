@@ -151,10 +151,20 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun rejectEvidence(activityId: Long, reviewerId: Long, notes: String, rejectedStep: String = "EVIDENCE_PHOTOS") {
+    fun rejectEvidence(
+        activityId: Long,
+        reviewerId: Long,
+        notes: String,
+        rejectedSteps: List<String> = emptyList(),
+        resetFullFlow: Boolean = false,
+    ) {
         val reason = notes.trim()
         if (reason.isBlank()) {
             _state.update { it.copy(reviewMessage = "❌ Indica el motivo del rechazo") }
+            return
+        }
+        if (!resetFullFlow && rejectedSteps.isEmpty()) {
+            _state.update { it.copy(reviewMessage = "❌ Elige pasos a corregir o rehacer todo") }
             return
         }
         _state.update { it.copy(reviewingActivityId = activityId, reviewMessage = null) }
@@ -165,7 +175,8 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                         activityId = activityId,
                         reviewerId = reviewerId,
                         notes = reason,
-                        rejectedStep = rejectedStep,
+                        rejectedSteps = rejectedSteps.takeIf { !resetFullFlow && it.isNotEmpty() },
+                        resetFullFlow = resetFullFlow,
                     )
                 }
                 _state.update {
@@ -480,9 +491,17 @@ fun ConsoleEvidencesScreen(
                 val activityId = reviewRow.actividad?.id
                 if (activityId != null && user != null) vm.approveEvidence(activityId, user.id)
             },
-            onReject = {
+            onReject = { steps, resetFull ->
                 val activityId = reviewRow.actividad?.id
-                if (activityId != null && user != null) vm.rejectEvidence(activityId, user.id, state.rejectNotesDraft)
+                if (activityId != null && user != null) {
+                    vm.rejectEvidence(
+                        activityId = activityId,
+                        reviewerId = user.id,
+                        notes = state.rejectNotesDraft,
+                        rejectedSteps = steps,
+                        resetFullFlow = resetFull,
+                    )
+                }
             },
             onBack = vm::closeReviewDetail,
             context = context,
@@ -1238,7 +1257,7 @@ private fun EvidenceReviewDetailScreen(
     reviewMessage: String?,
     onRejectNotesChange: (String) -> Unit,
     onApprove: () -> Unit,
-    onReject: () -> Unit,
+    onReject: (steps: List<String>, resetFullFlow: Boolean) -> Unit,
     onBack: () -> Unit,
     context: android.content.Context,
 ) {
@@ -1253,6 +1272,8 @@ private fun EvidenceReviewDetailScreen(
             detail?.exitPhotoUrl?.takeIf { it.isNotBlank() && none { p -> p.second == it } }?.let { add("Salida" to it) }
         }
     }
+    var resetFullFlow by remember { mutableStateOf(false) }
+    var rejectedSteps by remember { mutableStateOf(setOf<String>()) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -1343,6 +1364,59 @@ private fun EvidenceReviewDetailScreen(
         }
         if (canReview) {
             item {
+                Text("Rechazo: pasos a corregir", fontWeight = FontWeight.SemiBold)
+            }
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !acting) {
+                            resetFullFlow = !resetFullFlow
+                            if (resetFullFlow) rejectedSteps = emptySet()
+                        },
+                ) {
+                    Checkbox(
+                        checked = resetFullFlow,
+                        onCheckedChange = {
+                            resetFullFlow = it
+                            if (it) rejectedSteps = emptySet()
+                        },
+                        enabled = !acting,
+                    )
+                    Text("Rehacer todo desde cero", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            if (!resetFullFlow) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        EVIDENCE_REJECT_STEPS.forEach { (value, label) ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !acting) {
+                                        rejectedSteps = if (rejectedSteps.contains(value)) {
+                                            rejectedSteps - value
+                                        } else {
+                                            rejectedSteps + value
+                                        }
+                                    },
+                            ) {
+                                Checkbox(
+                                    checked = rejectedSteps.contains(value),
+                                    onCheckedChange = { checked ->
+                                        rejectedSteps = if (checked) rejectedSteps + value else rejectedSteps - value
+                                    },
+                                    enabled = !acting,
+                                )
+                                Text(label, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+            item {
                 OutlinedTextField(
                     value = rejectNotes,
                     onValueChange = onRejectNotesChange,
@@ -1362,8 +1436,8 @@ private fun EvidenceReviewDetailScreen(
                         modifier = Modifier.weight(1f),
                     ) { Text(if (acting) "…" else "Aprobar") }
                     OutlinedButton(
-                        onClick = onReject,
-                        enabled = !acting,
+                        onClick = { onReject(rejectedSteps.toList(), resetFullFlow) },
+                        enabled = !acting && rejectNotes.isNotBlank() && (resetFullFlow || rejectedSteps.isNotEmpty()),
                         modifier = Modifier.weight(1f),
                     ) { Text("Rechazar", color = EvRed) }
                 }
@@ -1372,4 +1446,12 @@ private fun EvidenceReviewDetailScreen(
         item { Spacer(Modifier.height(24.dp)) }
     }
 }
+
+private val EVIDENCE_REJECT_STEPS = listOf(
+    "ENTRY_PHOTO" to "Paso 1: Foto de Entrada",
+    "EVIDENCE_PHOTOS" to "Paso 2: Fotos de Evidencia",
+    "SERVICE_SHEET_PDF" to "Paso 3: PDF Hoja de Servicio",
+    "SERVICE_SHEET_DATA" to "Paso 4: Plantilla Interna",
+    "EXIT_PHOTO" to "Paso 5: Foto de Salida",
+)
 

@@ -136,6 +136,19 @@ class ExpensesRichViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun markPagado(id: Long) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.markExpensePagado(id) }
+                _state.update { it.copy(acting = false, message = "✅ Marcado como pagado") }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
     fun filtered(): List<ExpenseDto> {
         val q = _state.value.query.trim().lowercase()
         if (q.isBlank()) return _state.value.items
@@ -277,6 +290,21 @@ fun ExpensesRichScreen(vm: ExpensesRichViewModel = viewModel()) {
                             modifier = Modifier.weight(1f),
                         ) { Text("Rechazar", color = Color(0xFFC62828)) }
                     }
+                }
+            }
+            val approvedUnpaid = sel.displayStatus().equals("aprobado", true) ||
+                sel.displayStatus().equals("aprobada", true)
+            if (canManage && approvedUnpaid) {
+                item {
+                    Button(
+                        onClick = {
+                            vm.markPagado(sel.id)
+                            selected = null
+                        },
+                        enabled = !s.acting,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00695C)),
+                    ) { Text(if (s.acting) "Marcando…" else "Marcar pagado") }
                 }
             }
             if (!s.message.isNullOrBlank()) {
@@ -1056,6 +1084,8 @@ data class EmployeePaymentsRichUiState(
     val isRefreshing: Boolean = false,
     val query: String = "",
     val items: List<EmployeePaymentDto> = emptyList(),
+    val acting: Boolean = false,
+    val message: String? = null,
 )
 
 class EmployeePaymentsRichViewModel(app: Application) : AndroidViewModel(app) {
@@ -1065,13 +1095,89 @@ class EmployeePaymentsRichViewModel(app: Application) : AndroidViewModel(app) {
 
     init { refresh() }
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
+    fun clearMessage() = _state.update { it.copy(message = null) }
 
     fun refresh() {
         val hasData = _state.value.items.isNotEmpty()
         _state.update { it.copy(loading = !hasData, isRefreshing = hasData) }
         viewModelScope.launch {
-            val list = withContext(Dispatchers.IO) { repo.employeePayments() }
-            _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
+            try {
+                val list = withContext(Dispatchers.IO) { repo.employeePayments() }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(loading = false, isRefreshing = false, message = "❌ ${e.message ?: "Error al cargar"}")
+                }
+            }
+        }
+    }
+
+    fun create(
+        userId: Long,
+        periodFrom: String,
+        periodTo: String,
+        amount: Double,
+        concepto: String?,
+        note: String?,
+        onDone: () -> Unit,
+    ) {
+        if (userId <= 0L || amount <= 0 || periodFrom.isBlank() || periodTo.isBlank()) {
+            _state.update { it.copy(message = "❌ Completa empleado, periodo y monto") }
+            return
+        }
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.createEmployeePayment(userId, periodFrom, periodTo, amount, concepto, note)
+                }
+                _state.update { it.copy(acting = false, message = "✅ Pago registrado") }
+                refresh()
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
+    fun update(id: Long, amount: Double?, concepto: String?, note: String?, onDone: () -> Unit) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.updateEmployeePayment(id, amount, concepto, note) }
+                _state.update { it.copy(acting = false, message = "✅ Pago actualizado") }
+                refresh()
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
+    fun markPagado(id: Long) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.markEmployeePaymentPagado(id) }
+                _state.update { it.copy(acting = false, message = "✅ Marcado como pagado") }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
+    fun delete(id: Long, onDone: () -> Unit) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.deleteEmployeePayment(id) }
+                _state.update { it.copy(acting = false, message = "✅ Pago eliminado") }
+                refresh()
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
         }
     }
 
@@ -1094,7 +1200,137 @@ class EmployeePaymentsRichViewModel(app: Application) : AndroidViewModel(app) {
 fun EmployeePaymentsRichScreen(vm: EmployeePaymentsRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
     val context = LocalContext.current
+    val user = remember { AuthRepository(context).loadSession() }
+    val canManage = user?.isSuperAdmin == true ||
+        (user?.permissions ?: emptyList()).any {
+            it.contains("contabilidad.manage") || it.contains("console.admin")
+        }
+    val consoleRepo = remember(context) { mx.nexara.mobile.nativeapp.data.console.ConsoleRepository(context) }
+
     var selected by remember { mutableStateOf<EmployeePaymentDto?>(null) }
+    var showCreate by remember { mutableStateOf(false) }
+    var showEdit by remember { mutableStateOf(false) }
+    var users by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.VisibleUserDto>>(emptyList()) }
+    var userId by remember { mutableStateOf<Long?>(null) }
+    var periodFrom by remember { mutableStateOf(LocalDate.now().withDayOfMonth(1).toString()) }
+    var periodTo by remember { mutableStateOf(LocalDate.now().toString()) }
+    var amountText by remember { mutableStateOf("") }
+    var concepto by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+
+    LaunchedEffect(canManage, showCreate) {
+        if (canManage && showCreate && users.isEmpty()) {
+            users = runCatching {
+                withContext(Dispatchers.IO) { consoleRepo.usersFetch() }
+            }.getOrDefault(emptyList())
+        }
+    }
+
+    if (showCreate && canManage) {
+        FinanceDetailScaffold(onBack = { showCreate = false }) {
+            item { Text("Nuevo pago a empleado", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item {
+                OutlinedTextField(
+                    value = userId?.toString() ?: "",
+                    onValueChange = { userId = it.filter { c -> c.isDigit() }.toLongOrNull() },
+                    label = { Text("ID empleado") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    supportingText = {
+                        val name = users.firstOrNull { it.id == userId }?.nombre
+                        if (!name.isNullOrBlank()) Text(name)
+                    },
+                )
+            }
+            if (users.isNotEmpty()) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        users.take(12).forEach { u ->
+                            FilterChip(
+                                selected = userId == u.id,
+                                onClick = { userId = u.id },
+                                label = { Text(u.nombre ?: "#${u.id}") },
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                OutlinedTextField(
+                    value = periodFrom,
+                    onValueChange = { periodFrom = it },
+                    label = { Text("Periodo desde (YYYY-MM-DD)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = periodTo,
+                    onValueChange = { periodTo = it },
+                    label = { Text("Periodo hasta (YYYY-MM-DD)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("Monto") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = concepto,
+                    onValueChange = { concepto = it },
+                    label = { Text("Concepto") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("Nota") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (!s.message.isNullOrBlank()) {
+                item {
+                    Text(s.message!!, color = if (s.message!!.startsWith("✅")) Color(0xFF2E7D32) else Color(0xFFC62828))
+                }
+            }
+            item {
+                Button(
+                    onClick = {
+                        val amt = amountText.toDoubleOrNull() ?: return@Button
+                        vm.create(
+                            userId = userId ?: return@Button,
+                            periodFrom = periodFrom.trim(),
+                            periodTo = periodTo.trim(),
+                            amount = amt,
+                            concepto = concepto.ifBlank { null },
+                            note = note.ifBlank { null },
+                        ) {
+                            showCreate = false
+                            amountText = ""
+                            concepto = ""
+                            note = ""
+                        }
+                    },
+                    enabled = !s.acting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (s.acting) "Guardando…" else "Registrar pago") }
+            }
+        }
+        return
+    }
 
     val sel = selected
     if (sel != null) {
@@ -1106,7 +1342,60 @@ fun EmployeePaymentsRichScreen(vm: EmployeePaymentsRichViewModel = viewModel()) 
             !periodEnd.isNullOrBlank() -> periodEnd
             else -> null
         }
-        FinanceDetailScaffold(onBack = { selected = null }) {
+        val status = sel.displayStatus()
+        val isPaid = status.equals("pagado", true)
+        val canMarkPaid = canManage && !isPaid && !status.equals("cancelado", true)
+
+        if (showEdit && canManage) {
+            FinanceDetailScaffold(onBack = { showEdit = false }) {
+                item { Text("Editar pago #${sel.id}", fontWeight = FontWeight.Bold) }
+                item {
+                    OutlinedTextField(
+                        value = amountText.ifBlank { sel.displayAmount().toString() },
+                        onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' } },
+                        label = { Text("Monto") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = concepto.ifBlank { sel.concepto.orEmpty() },
+                        onValueChange = { concepto = it },
+                        label = { Text("Concepto") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = note.ifBlank { sel.note.orEmpty() },
+                        onValueChange = { note = it },
+                        label = { Text("Nota") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                item {
+                    Button(
+                        onClick = {
+                            vm.update(
+                                id = sel.id,
+                                amount = amountText.toDoubleOrNull() ?: sel.displayAmount(),
+                                concepto = concepto.ifBlank { sel.concepto },
+                                note = note.ifBlank { sel.note },
+                            ) {
+                                showEdit = false
+                                selected = null
+                            }
+                        },
+                        enabled = !s.acting,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(if (s.acting) "Guardando…" else "Guardar") }
+                }
+            }
+            return
+        }
+
+        FinanceDetailScaffold(onBack = { selected = null; showEdit = false }) {
             item {
                 NxPanelShell(contentPadding = PaddingValues(16.dp)) {
                     Column(
@@ -1160,44 +1449,101 @@ fun EmployeePaymentsRichScreen(vm: EmployeePaymentsRichViewModel = viewModel()) 
                     }
                 }
             }
+            if (canManage) {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!isPaid) {
+                            OutlinedButton(
+                                onClick = {
+                                    amountText = sel.displayAmount().toString()
+                                    concepto = sel.concepto.orEmpty()
+                                    note = sel.note.orEmpty()
+                                    showEdit = true
+                                },
+                                enabled = !s.acting,
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Editar") }
+                        }
+                        if (canMarkPaid) {
+                            Button(
+                                onClick = {
+                                    vm.markPagado(sel.id)
+                                    selected = null
+                                },
+                                enabled = !s.acting,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00695C)),
+                            ) { Text("Pagado") }
+                        }
+                    }
+                }
+                if (!isPaid) {
+                    item {
+                        OutlinedButton(
+                            onClick = {
+                                vm.delete(sel.id) { selected = null }
+                            },
+                            enabled = !s.acting,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Eliminar", color = Color(0xFFC62828)) }
+                    }
+                }
+            }
+            if (!s.message.isNullOrBlank()) {
+                item {
+                    Text(s.message!!, color = if (s.message!!.startsWith("✅")) Color(0xFF2E7D32) else Color(0xFFC62828))
+                }
+            }
         }
         return
     }
 
-    FinanceScaffold(
-        kpis = listOf(
-            NxKpi("Pagos", "${s.items.size}", tone = NxTone.Brand),
-            NxKpi("Total", fmtMoney(vm.totalAmount()), tone = NxTone.Success),
-            NxKpi("Pagado", fmtMoney(vm.paidTotal()), tone = NxTone.Info),
-        ),
-        query = s.query,
-        onQuery = vm::setQuery,
-        placeholder = "Buscar pago…",
-        loading = s.loading,
-        isRefreshing = s.isRefreshing,
-        onRefresh = vm::refresh,
-        isEmpty = vm.filtered().isEmpty(),
-        emptyTitle = "Sin pagos a empleados",
-        emptySubtitle = "No hay pagos registrados con los filtros actuales.",
-    ) {
-        items(vm.filtered().take(80), key = { it.id }) { p ->
-            NxPanelShell(onClick = { selected = p }) {
-                Text(p.displayConcepto(), fontWeight = FontWeight.Bold)
-                Text(p.displayUserName() ?: "", style = MaterialTheme.typography.bodySmall)
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(fmtMoney(p.displayAmount()), fontWeight = FontWeight.SemiBold, color = NxTone.Success.fg())
-                    NxStatusChip(p.displayStatus(), financeStatusTone(p.displayStatus()))
-                }
-                val period = listOfNotNull(
-                    p.displayPeriodStart()?.take(10),
-                    p.displayPeriodEnd()?.take(10),
-                ).joinToString(" → ")
-                if (period.isNotBlank()) {
-                    Text(period, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(Modifier.fillMaxSize()) {
+        if (canManage) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Button(onClick = { showCreate = true; vm.clearMessage() }) { Text("+ Pago") }
+            }
+        }
+        FinanceScaffold(
+            kpis = listOf(
+                NxKpi("Pagos", "${s.items.size}", tone = NxTone.Brand),
+                NxKpi("Total", fmtMoney(vm.totalAmount()), tone = NxTone.Success),
+                NxKpi("Pagado", fmtMoney(vm.paidTotal()), tone = NxTone.Info),
+            ),
+            query = s.query,
+            onQuery = vm::setQuery,
+            placeholder = "Buscar pago…",
+            loading = s.loading,
+            isRefreshing = s.isRefreshing,
+            onRefresh = vm::refresh,
+            isEmpty = vm.filtered().isEmpty(),
+            emptyTitle = "Sin pagos a empleados",
+            emptySubtitle = if (canManage) "Registra el primero con + Pago." else "No hay pagos con los filtros actuales.",
+            emptyActionLabel = if (canManage) "+ Pago" else null,
+            onEmptyAction = if (canManage) ({ showCreate = true; vm.clearMessage() }) else null,
+        ) {
+            items(vm.filtered().take(80), key = { it.id }) { p ->
+                NxPanelShell(onClick = { selected = p }) {
+                    Text(p.displayConcepto(), fontWeight = FontWeight.Bold)
+                    Text(p.displayUserName() ?: "", style = MaterialTheme.typography.bodySmall)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(fmtMoney(p.displayAmount()), fontWeight = FontWeight.SemiBold, color = NxTone.Success.fg())
+                        NxStatusChip(p.displayStatus(), financeStatusTone(p.displayStatus()))
+                    }
+                    val period = listOfNotNull(
+                        p.displayPeriodStart()?.take(10),
+                        p.displayPeriodEnd()?.take(10),
+                    ).joinToString(" → ")
+                    if (period.isNotBlank()) {
+                        Text(period, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
