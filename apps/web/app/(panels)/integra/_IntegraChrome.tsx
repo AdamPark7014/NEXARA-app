@@ -12,6 +12,12 @@ import {
   integraApi,
   type IntegraCapabilities,
 } from "./_lib";
+import {
+  arrancarConsolaIntegra,
+  claveArranqueActual,
+  olvidarArranque,
+  tomarArranque,
+} from "./_arranque";
 import { IntegraSiteSwitcher } from "./_SiteSwitcher";
 import {
   getCachedCapabilities,
@@ -62,6 +68,41 @@ type DashBrief = {
 const SYNC_STALE_MS = 60 * 60 * 1000;
 
 /**
+ * ¿Dice el health del panel que go2rtc está caído?
+ *
+ * Sin indicador no se alarma: un health que no reporta video no es un video
+ * caído. Y el health devuelve `status: 200` —el código HTTP— mientras que antes
+ * se comparaba contra los textos "up"/"ok"; como "200" no es ninguno, el aviso
+ * «Video offline» quedaba encendido de forma permanente con el video viéndose
+ * perfectamente. Una alarma que siempre miente enseña a ignorar las alarmas, así
+ * que se aceptan las dos formas.
+ *
+ * Estaba metido a mano dentro del efecto; sale aquí para que la respuesta pueda
+ * venir tanto del sondeo periódico como del arranque adelantado.
+ */
+export function mediaCaido(json: unknown): boolean {
+  if (!json || typeof json !== "object") return false;
+  const raiz = json as Record<string, unknown>;
+  let g: Record<string, unknown> | null = null;
+  for (const contenedor of [raiz.info, raiz.error, raiz.details]) {
+    if (!contenedor || typeof contenedor !== "object") continue;
+    const candidato = (contenedor as Record<string, unknown>).go2rtc;
+    if (candidato && typeof candidato === "object") {
+      g = candidato as Record<string, unknown>;
+      break;
+    }
+  }
+  if (!g) return false;
+  const crudo = g.status;
+  if (crudo == null) return false;
+  const comoNumero = Number(crudo);
+  const sano = Number.isFinite(comoNumero)
+    ? comoNumero >= 200 && comoNumero < 300
+    : ["up", "ok", "healthy"].includes(String(crudo).toLowerCase());
+  return !sano;
+}
+
+/**
  * Antigüedad del espejo en lenguaje llano. Importa más de lo que parece: todo
  * lo que enseña el panel —cámaras, puertas, personas— sale del espejo, así que
  * un espejo viejo no da una pantalla vacía, da una pantalla que miente con
@@ -95,9 +136,17 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [tick, setTick] = useState(0);
 
+  /**
+   * Capacidades, salud y panel ya no se piden en fila desde aquí: el layout las
+   * lanzó todas juntas antes de que este componente existiera. `tomarArranque`
+   * recoge la que ya viene volando; si no hay ninguna —refresco periódico,
+   * cambio de sitio, botón «Reconciliar»— se pide como siempre.
+   */
   const refreshCaps = useCallback(async () => {
     try {
-      const c = await integraApi<IntegraCapabilities>("integra/capabilities");
+      const clave = claveArranqueActual();
+      const c = await (tomarArranque<IntegraCapabilities>("capabilities", clave) ??
+        integraApi<IntegraCapabilities>("integra/capabilities"));
       setCaps(c);
       setCachedCapabilities(c);
     } catch {
@@ -107,9 +156,14 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
 
   const refreshHealth = useCallback(async () => {
     try {
+      const clave = claveArranqueActual();
       const [h, d] = await Promise.all([
-        integraApi<HealthBrief>("integra/health"),
-        integraApi<DashBrief>("integra/dashboard").catch(() => null),
+        tomarArranque<HealthBrief>("health", clave) ??
+          integraApi<HealthBrief>("integra/health"),
+        (
+          tomarArranque<DashBrief>("dashboard", clave) ??
+          integraApi<DashBrief>("integra/dashboard")
+        ).catch(() => null),
       ]);
       setHealth(h);
       if (h?.provider) setCachedProvider(h.provider);
@@ -121,43 +175,37 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setCaps(getCachedCapabilities());
+    // Red de seguridad: si por lo que sea el layout no llegó a lanzar el
+    // arranque (montaje directo de este componente en una prueba, ruta rara),
+    // se lanza aquí. Es idempotente por clave, así que no duplica tráfico.
+    arrancarConsolaIntegra();
     void refreshCaps();
     void refreshHealth();
     const unsub = subscribeActiveCompany(() => {
+      // Cambió la empresa: lo que viniera volando era de la anterior.
+      olvidarArranque();
       setTick((t) => t + 1);
       void refreshCaps();
       void refreshHealth();
     });
     const unsubCaps = subscribeCapabilities((c) => setCaps(c));
-    
-    const probeMedia = async () => {
+
+    const probeMedia = async (adelantada?: Promise<unknown> | null) => {
       try {
-        const res = await fetch("/api/health", { cache: "no-store" });
-        if (!res.ok) return;
-        const json = await res.json();
-        const g = json?.info?.go2rtc || json?.error?.go2rtc || json?.details?.go2rtc;
-        // Sin indicador no se alarma: un health que no reporta video no es un
-        // video caído.
-        if (!g || typeof g !== "object") {
-          setMediaDown(false);
-          return;
-        }
-        // El health devuelve `status: 200` —el código HTTP— pero antes se
-        // comparaba contra los textos "up"/"ok". Como "200" no es ninguno, el
-        // aviso "Video offline" quedaba encendido de forma permanente mientras
-        // el video se veía perfectamente. Una alarma que siempre miente enseña
-        // a ignorar las alarmas, así que se aceptan las dos formas.
-        const raw = g.status ?? g.status?.status;
-        const asNumber = Number(raw);
-        const healthy = Number.isFinite(asNumber)
-          ? asNumber >= 200 && asNumber < 300
-          : ["up", "ok", "healthy"].includes(String(raw ?? "").toLowerCase());
-        setMediaDown(raw != null && !healthy);
+        const json = adelantada
+          ? await adelantada
+          : await fetch("/api/health", { cache: "no-store" }).then((res) =>
+              res.ok ? (res.json() as Promise<unknown>) : null,
+            );
+        // Sin respuesta no se toca el estado anterior: un sondeo fallido no es
+        // un video caído.
+        if (json == null) return;
+        setMediaDown(mediaCaido(json));
       } catch {
         /* no tocar el estado anterior */
       }
     };
-    void probeMedia();
+    void probeMedia(tomarArranque<unknown>("media", claveArranqueActual()));
     const mediaIv = setInterval(() => void probeMedia(), 60000);
 
     const iv = setInterval(() => void refreshHealth(), 30000);
@@ -239,6 +287,8 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
           )}
           <IntegraSiteSwitcher
             onChange={() => {
+              // Otro sitio: lo adelantado era del anterior y no vale.
+              olvidarArranque();
               setTick((t) => t + 1);
               void refreshCaps();
               void refreshHealth();

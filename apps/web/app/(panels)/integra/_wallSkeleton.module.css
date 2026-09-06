@@ -1,0 +1,65 @@
+/*
+ * Esqueleto de la rejilla.
+ *
+ * La rejilla ya no espera a tener cámaras: sale con sus huecos desde el primer
+ * instante y se llena encima. Estas celdas son lo que ocupa cada hueco mientras
+ * el muro trabaja — mismo tamaño, misma relación de aspecto y misma posición que
+ * la celda de verdad, para que al llegar el video nada salte.
+ *
+ * Deliberadamente sordo: sin texto que leer y sin botón que pulsar. Un hueco que
+ * dice «Añadir cámara» mientras el muro está abriendo cámaras invita a un clic
+ * que va a chocar con el llenado automático.
+ */
+
+.esqueleto {
+  position: relative;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  border: 1px solid color-mix(in srgb, var(--ig-video-fg-dim, #7b8794) 18%, transparent);
+  border-radius: var(--ig-radius, 8px);
+  background: color-mix(in srgb, var(--ig-video-cell, #10151c) 85%, transparent);
+  overflow: hidden;
+}
+
+/* La banda que recorre la celda: lo que dice «esto está trabajando». */
+.esqueleto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--ig-video-fg-dim, #7b8794) 14%, transparent) 45%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: esqueletoBarrido 1.5s ease-in-out infinite;
+}
+
+/* Barra de título fantasma: reserva el sitio del nombre de la cámara. */
+.esqueletoTitulo {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 42%;
+  max-width: 160px;
+  height: 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ig-video-fg-dim, #7b8794) 22%, transparent);
+}
+
+@keyframes esqueletoBarrido {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/*
+ * Quien pide menos movimiento no debería recibir una rejilla entera latiendo.
+ * Se queda el hueco quieto, que sigue cumpliendo su función: reservar el sitio.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto::after {
+    animation: none;
+  }
+}
