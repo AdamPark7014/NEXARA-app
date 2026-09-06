@@ -9,7 +9,10 @@ export type MeNavigation = {
   orgRoleKey: string | null;
   panels: string[];
   paths: string[];
+  /** Claves Android ModuleCatalog */
   moduleKeys: string[];
+  /** ModuleId web (access-matrix) — preferir para sidebar */
+  webModuleIds: string[];
 };
 
 export async function fetchMeNavigation(
@@ -20,13 +23,18 @@ export async function fetchMeNavigation(
       ? fetcher()
       : fetch(buildApiUrl("me/navigation"), { credentials: "include" }));
     if (!res.ok) return null;
-    const data = (await res.json()) as MeNavigation;
+    const data = (await res.json()) as Partial<MeNavigation>;
+    const moduleKeys = Array.isArray(data.moduleKeys) ? data.moduleKeys : [];
+    const webModuleIds = Array.isArray(data.webModuleIds)
+      ? data.webModuleIds
+      : moduleKeys; // compat: builds antiguos sin webModuleIds
     return {
       roleKey: data.roleKey ?? null,
       orgRoleKey: data.orgRoleKey ?? null,
       panels: Array.isArray(data.panels) ? data.panels : [],
       paths: Array.isArray(data.paths) ? data.paths : [],
-      moduleKeys: Array.isArray(data.moduleKeys) ? data.moduleKeys : [],
+      moduleKeys,
+      webModuleIds,
     };
   } catch {
     return null;
@@ -43,13 +51,30 @@ export async function fetchMeNavigationAuthed(token: string): Promise<MeNavigati
   );
 }
 
-/** Si moduleKeys viene del servidor, úsalo; si no, cae al filtro local. */
-export function filterModulesByNavigation<T extends { id: string }>(
+/**
+ * Filtra módulos web por navegación servidor.
+ * Preferencia: webModuleIds; fallback: paths de página; nunca clippea si nav vacía.
+ */
+export function filterModulesByNavigation<T extends { id: string; panel?: string; path?: string }>(
   modules: T[],
   navigation: MeNavigation | null | undefined,
 ): T[] {
-  const keys = navigation?.moduleKeys;
-  if (!keys || keys.length === 0) return modules;
-  const set = new Set(keys);
-  return modules.filter((m) => set.has(m.id));
+  if (!navigation) return modules;
+  const ids = navigation.webModuleIds?.length
+    ? navigation.webModuleIds
+    : navigation.moduleKeys;
+  const pagePaths = (navigation.paths ?? []).filter((p) => !p.startsWith("/api/"));
+  if ((!ids || ids.length === 0) && pagePaths.length === 0) return modules;
+
+  const idSet = new Set(ids ?? []);
+  return modules.filter((m) => {
+    if (idSet.has(m.id)) return true;
+    if (!m.panel || m.path === undefined) return idSet.size === 0;
+    const full = `/${m.panel}${m.path === "/" ? "" : m.path.startsWith("/") ? m.path : `/${m.path}`}`;
+    return pagePaths.some((rule) => {
+      const base = rule.replace(/\/\*\*$/, "").replace(/\/\*$/, "").replace(/\/$/, "");
+      if (!base) return false;
+      return full === base || full.startsWith(`${base}/`) || base.startsWith(full);
+    });
+  });
 }

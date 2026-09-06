@@ -35,6 +35,10 @@ import {
   searchResultTypeLabel,
   searchResultUrl,
 } from "@/lib/search-routes";
+import {
+  filterModulesByNavigation,
+  type MeNavigation,
+} from "@/lib/me-navigation";
 
 type Action = {
   id: string;
@@ -53,6 +57,8 @@ type Props = {
   onClose: () => void;
   user: UserAccessInput | null;
   token?: string | null;
+  /** Misma fuente que AppShell sidebar (`GET /me/navigation`). */
+  navigation?: MeNavigation | null;
   onToggleDark: () => void;
   onLogout: () => void;
 };
@@ -190,6 +196,7 @@ export default function CommandPalette({
   onClose,
   user,
   token,
+  navigation = null,
   onToggleDark,
   onLogout,
 }: Props) {
@@ -245,23 +252,22 @@ export default function CommandPalette({
   const modules = useMemo<Action[]>(() => {
     const userJson = user ? JSON.stringify(user) : null;
     const current = detectCurrentPanelId();
-    const list = getUserAllowedModules(user)
-      .filter((m) => m.visible !== false)
-      .map<Action>((m) => {
-        const internal = getModuleEntryUrl(m);
-        return {
-          id: `mod:${m.id}`,
-          label: m.label,
-          description: m.description,
-          icon: m.icon ?? "•",
-          group: `${PANEL_LABEL[m.panel]} · ${m.group ?? "General"}`,
-          panel: m.panel,
-          url: resolveCrossPanelHref(internal, userJson, current),
-          keywords: [m.id, m.path],
-        };
-      });
+    const allowed = getUserAllowedModules(user).filter((m) => m.visible !== false);
+    const list = filterModulesByNavigation(allowed, navigation).map<Action>((m) => {
+      const internal = getModuleEntryUrl(m);
+      return {
+        id: `mod:${m.id}`,
+        label: m.label,
+        description: m.description,
+        icon: m.icon ?? "•",
+        group: `${PANEL_LABEL[m.panel]} · ${m.group ?? "General"}`,
+        panel: m.panel,
+        url: resolveCrossPanelHref(internal, userJson, current),
+        keywords: [m.id, m.path],
+      };
+    });
     return list;
-  }, [user]);
+  }, [user, navigation]);
 
   const globalActions = useMemo<Action[]>(() => {
     const userJson = user ? JSON.stringify(user) : null;

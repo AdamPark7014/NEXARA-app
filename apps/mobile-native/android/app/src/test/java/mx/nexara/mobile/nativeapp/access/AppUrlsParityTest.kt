@@ -81,6 +81,14 @@ class AppUrlsParityTest {
         Case("erpApprovals", "/erp/approvals?highlight=1", PanelId.ERP, "approvals", 1L),
         Case("erpFinanceViatics", "/erp/finance/viatics?highlight=1", PanelId.ERP, "viatics", 1L),
         Case("erpLunchBreaks", "/erp/hr/lunch-breaks?highlight=1", PanelId.ERP, "lunch-breaks", 1L),
+
+        // ── INTEGRA ──────────────────────────────────────────────────────────
+        Case("integraAccess", "/integra/access", PanelId.INTEGRA, "integra-access", null),
+        Case("integraEvents", "/integra/events", PanelId.INTEGRA, "integra-events", null),
+        Case("integraAlarms", "/integra/alarms", PanelId.INTEGRA, "integra-alarms", null),
+        Case("integraOccupancy", "/integra/occupancy", PanelId.INTEGRA, "integra-occupancy", null),
+        Case("integraDevices", "/integra/devices", PanelId.INTEGRA, "integra-devices", null),
+        Case("integraSites", "/integra/sites", PanelId.INTEGRA, "integra-sites", null),
     )
 
     @Test

@@ -8,30 +8,31 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Ola post mega-plan (huecos)
+## Este turno — Integración /me/navigation (paridad real)
 
-### Web RBAC
-- `AppShell` consume `GET /api/me/navigation` (paths + moduleKeys) con fallback local.
-- `me-navigation.ts` usa `buildApiUrl("me/navigation")`.
+Problema: pantallas nativas existían pero el menú/RBAC no estaba cableado igual que la web
+(keys Android vs ModuleId web, clip duro incompleto, panels locales, INTEGRA sin filtro).
 
-### Tickets portal
-- API: `POST client-portal/tickets/:id/comments`, `PATCH …/status` (ACK / CONFIRM_RESOLVED / REQUEST_REOPEN).
-- Android detalle OT: comentarios + acciones.
-- Fix web bug: `PATCH client-ticket-requests/:id` notas.
+### API
+- `navigation-module-map.ts`: path → `moduleKeys` (Android) + `webModuleIds` (web); sin ghost `integra-acs`.
+- `MeService.navigation` emite ambos namespaces + panels/paths.
 
-### Vehículos
-- `VehicleCheckoutSheet` 9 fotos → start-use / end-use.
+### Web
+- `me-navigation.ts`: `filterModulesByNavigation` prefiere `webModuleIds` + paths.
+- `AppShell` filtra sidebar con esa función (ya no clip por claves Android).
 
-### Cascarones → operar
-- Companies create/edit; banking cuentas; accounting pólizas.
-- Catalog/matriz: users, hr, fines, documents, my-viatics, accounting, banking, companies → NATIVO.
-
-### INTEGRA Bloque 2 ligero
-- Alarmas (ack/clear), occupancy, devices, sites lista.
-- `ModulePanelMap` + deep links para claves nuevas.
+### Android
+- Sesión persiste `navModuleKeys` + `navPanels` + `navPaths`.
+- `refreshNavigation` en resume (`maybeExtendSession` / hub).
+- `ConsoleAccessRules`: soft-allow por key/path; fallback legacy (no clip duro).
+- `PanelAccessResolver`: paneles desde `navPanels` cuando vienen del API.
+- Hub INTEGRA: cards ∩ `integraKeysFor` ∩ nav.
+- Deep links INTEGRA: aliases solo bajo panel INTEGRA (no pisan ERP attendance).
 
 ### Verificación
 - `:app:compileDebugKotlin` OK.
+- `AppUrlsParityTest` OK (casos INTEGRA añadidos).
+- `navigation-module-map.spec.ts` OK.
 - `python scripts/check-app-web-parity.py` OK.
 
 ## A medias / Adam
@@ -41,6 +42,7 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 3. INTEGRA video/ANPR/mapa/detección = Bloque 2.
 4. Portal sucursal: comentarios OT aún no (solo client-portal).
 5. Cascarones restantes: vehicles admin, employee-payments, work-projects, dispatch polish, newsletter admin.
+6. (hecho) CommandPalette web también filtra con `/me/navigation`.
 
 ## No tocar
 

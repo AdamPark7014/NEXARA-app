@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,7 +72,11 @@ fun PanelHubScreen(
 ) {
     val context = LocalContext.current
     val repo = remember(context) { AuthRepository(context) }
-    val user = repo.loadSession()
+    var user by remember { mutableStateOf(repo.loadSession()) }
+    LaunchedEffect(Unit) {
+        runCatching { repo.refreshNavigation() }
+        user = repo.loadSession()
+    }
     val panels = remember(user) { PanelAccessResolver.accessiblePanels(user) }
     val panelPrefs = remember(context) { PanelPreferencesStore(context) }
     val lastPanel by panelPrefs.lastPanel.collectAsState(initial = null)
@@ -122,7 +127,7 @@ fun PanelHubScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = user?.nombre?.ifBlank { user.email } ?: "Sin sesión",
+                                text = user?.nombre?.ifBlank { user?.email } ?: "Sin sesión",
                                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                                 color = NxColors.Slate,
                             )

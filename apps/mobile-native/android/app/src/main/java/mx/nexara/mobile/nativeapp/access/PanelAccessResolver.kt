@@ -63,9 +63,20 @@ private fun roleTokens(role: String): Set<String> {
     }
 }
 
+private fun panelFromNavKey(key: String): PanelId? = when (key.trim().lowercase()) {
+    "erp" -> PanelId.ERP
+    "crm" -> PanelId.CRM
+    "ops" -> PanelId.OPS
+    "studio" -> PanelId.STUDIO
+    "lab" -> PanelId.LAB
+    "integra" -> PanelId.INTEGRA
+    "portal" -> PanelId.PORTAL
+    else -> null
+}
+
 /**
  * Resuelve paneles accesibles — alineado con apps/web/lib/access-matrix.ts + panel-routing legacy.
- * Usa claves v2 (`rh`, `ing_soporte`, …) además de substrings del nombre de rol.
+ * Preferencia: `navPanels` de GET /me/navigation; fallback a heurística local.
  */
 object PanelAccessResolver {
     fun accessiblePanels(user: SessionUser?): List<PanelId> {
@@ -75,14 +86,21 @@ object PanelAccessResolver {
             return listOf(PanelId.PORTAL)
         }
 
+        if (user.isSuperAdmin) {
+            return listOf(PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA)
+        }
+
+        // Integración: paneles del servidor cuando vienen poblados.
+        val fromNav = user.navPanels
+            ?.mapNotNull { panelFromNavKey(it) }
+            ?.distinct()
+            .orEmpty()
+        if (fromNav.isNotEmpty()) return fromNav
+
         val perms = user.normalizedPerms()
         val tokens = buildSet {
             addAll(roleTokens(user.role))
             user.roleKey?.let { addAll(roleTokens(it)) }
-        }
-
-        if (user.isSuperAdmin) {
-            return listOf(PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA)
         }
 
         val erp = hasAny(
