@@ -30,6 +30,10 @@ object ModulePanelMap {
         "viatics", "my-viatics",
         "warehouse", "stock", "procurement",
         "documents", "audit", "analytics",
+        // RH vive en ERP: url-matrix le da `/api/cvs/**` y `/ops/recruiting/**`,
+        // pero su panel HOME es `core`. Sin esto, Recursos Humanos entraba a ERP
+        // y no veía ni CVs ni reclutamiento — su trabajo diario.
+        "cvs", "recruiting",
         "clients", "projects", "cotizaciones", "gestion-vendedores",
         "contact-messages", "news", "newsletter",
         "settings", "my-profile", "my-preferences", "offline-queue",

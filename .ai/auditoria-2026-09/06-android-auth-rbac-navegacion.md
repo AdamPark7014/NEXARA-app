@@ -433,3 +433,128 @@ degradación involuntaria.
 | 1 | `packages/access-matrix` extraído; `GET /me/navigation`; test de contrato web↔API | medio |
 | 2 | Android consume el endpoint; `PanelAccessResolver`/`ModulePanelMap`/`ConsoleAccessRules` se borran; `ModuleCatalog` se reduce a registro de pantallas | medio |
 | 3 | Selector de empresa + `X-Company-Id` + purga de caché; `session/extend`; `Idempotency-Key` | medio |
+
+---
+
+## Remediación 2026-09-06 (post-Cursor)
+
+Reverificado contra el disco después del turno de remediación de Cursor
+(`9f8c1755` integración `/me/navigation`, `181cc218` paridad móvil 3 olas).
+Donde el informe de arriba contradice al código actual, **gana el código**.
+
+### Qué ya estaba arreglado (informe desactualizado)
+
+- **`/me/navigation` sí está integrado.** `AuthRepository.enrichSession()` lo pide en
+  login y en cada `maybeExtendSession()`; `SessionUser` guarda `navPanels`,
+  `navModuleKeys` y `navPaths`, y `SessionStore` los persiste.
+- **Módulos huérfanos §3 recuperados por Cursor.** `chat`, `dispatch` y `recruiting`
+  ya estaban en `ModulePanelMap`, en los grupos de `consoleSidebarGroups` y despachados
+  en `ConsoleNavHost`. Verificado uno por uno: `ChatScreen.kt` (2 919 líneas),
+  `ConsoleDispatchScreen.kt` (498 líneas, tablero kanban con datos reales de
+  `ConsoleRepository`) y `RecruitingScreen` son pantallas funcionales, no cascarones.
+- **Barrido inverso limpio.** Las 64 entradas de `ModuleCatalog.console` tienen las tres
+  cosas: pantalla en `ConsoleNavHost`, clave en `ModulePanelMap` y grupo de menú. Ningún
+  menú lleva a la nada. Lo mismo en ventas / studio / lab / integra / contabilidad.
+
+### Qué seguía roto
+
+1. **La decisión por subcadena de rol seguía viva**, degradada a respaldo pero decidiendo
+   siempre que `/me/navigation` no responde. `PanelAccessResolver.kt:106-151` (antes):
+   `t.contains("admin")`, `t.contains("rh")`, `t.contains("ingenier")`, `t.contains("noc")`.
+   Cursor había añadido `contains("recurso")` para tapar el caso de RH, sin quitar el
+   mecanismo.
+2. **Cero paneles seguía siendo un estado alcanzable.** Si el rol no casaba con ninguna
+   subcadena y los permisos tampoco, `accessiblePanels()` devolvía lista vacía y
+   `PanelHubScreen.kt:163` pintaba «No hay paneles disponibles para tu cuenta»: pantalla
+   muerta, sin salida.
+3. **`isClientOrBranchAccount` degradaba internos al portal.** La regex
+   `(cliente|client|sucursal|branch)` sobre el nombre visible del rol mandaba a PORTAL a
+   cualquier interno con «Clientes» en el título. Los prefijos de permiso que también
+   consultaba (`client-portal.`, `client-tickets.`…) **no existen en toda la API**: código
+   muerto que solo podía disparar de más.
+4. **`normalizedConsolePath` solo pelaba `/console` y `/operacion`.** Los módulos con
+   ruta canónica nueva — `chat` (`/erp/chat`), `dispatch` (`/ops/dispatch`), `support`
+   (`/ops/support`), `noc` (`/ops/noc`) — nunca casaban con la lista de rutas permitidas
+   del ingeniero. **Estaban en el menú y en el mapa, y aun así invisibles para todo el
+   personal de campo**, que es el grupo más grande de usuarios de la app.
+5. **RH entraba a ERP y no veía CVs ni reclutamiento.** `roles.v2.ts` le da a `rh` el
+   panel HOME `core` (→ ERP), pero `cvs` y `recruiting` solo estaban en `OPS_KEYS`. El
+   filtro de panel los recortaba: RH llegaba a su panel sin su trabajo diario.
+6. **`consoleBottomTabModuleKeys` seguía con `roleLower.contains("ingenier")`** sin
+   ninguna condición previa (`ConsoleAccessRules.kt:306`, antes).
+7. **`chat`, `dispatch` y `recruiting` salían duplicados**, declarados en dos grupos del
+   sidebar cada uno.
+
+### Qué se arregló
+
+- **Nuevo `access/RolePanelMatrix.kt`** — espejo Android de `roles.v2.ts`
+  (`ROLE_HOME_PANEL` ∪ `ROLE_EXTRA_PANELS` ∪ `LEGACY_TO_V2`). Normaliza el rol
+  (minúsculas, sin acentos, separadores → `_`) y lo resuelve a clave canónica por
+  **igualdad exacta** contra una tabla de alias, más una segunda pasada de igualdad por
+  token para nombres compuestos («Recursos Humanos (RH)»). Cero `contains`.
+- **`PanelAccessResolver.accessiblePanels()` reescrito como cadena de decisión explícita:**
+  externo → super admin → `navPanels` de la API → rol canónico → permisos → **panel base
+  ERP**. Un usuario interno autenticado nunca sale con cero paneles. `navPanels` ahora
+  entiende los alias legacy (`core`, `sales`, `console`, `operacion`, `web`, `tickets`) y
+  filtra `portal`: la API no puede degradar a un interno a cuenta de cliente.
+- **`isClientOrBranchAccount` eliminada.** Lo externo lo marcan `isClient`/`isBranchUser`
+  (que pone el propio `portal/login`) o el rol canónico `cliente`/`sucursal`.
+- **`normalizedConsolePath` pela también `/ops`, `/erp` y `/crm`.** Con esto `chat`,
+  `dispatch`, `support` y `noc` vuelven a verse en el menú del ingeniero.
+- **`ConsoleAccessRules`: `isAdministrativoRole`, `isIngenieroRole`, `isVendedorRole` y
+  `consoleBottomTabModuleKeys` pasan por `RolePanelMatrix.canonicalRoleKey()`.** Ningún
+  `role.contains(...)` queda en la ruta de decisión de acceso.
+- **`ModulePanelMap`: `cvs` y `recruiting` añadidos a `ERP_KEYS`** — RH ve lo suyo.
+- **Listas de rol alineadas con `url-matrix.ts`:** al ingeniero se le añaden
+  `/support/sla`, `/maintenance`, `/maintenance/contracts`, `/assets`, `/service-clients`,
+  `/kb` y `/notifications-center` (unión ING_CAMPO ∪ ING_SOPORTE, que en la app es un solo
+  cubo); al vendedor `/chat`, `/notifications-center` y `/clients`.
+- **Menú sin duplicados:** `pick()` marca cada clave ya emitida; un módulo sale en el
+  primer grupo que lo reclama.
+- **`offline-queue` añadido al grupo «Administración interna»** — era la única entrada del
+  catálogo sin grupo de menú (solo se llegaba desde «Mi perfil»).
+
+### Pruebas añadidas
+
+No había ni una sobre `PanelAccessResolver` ni sobre `ConsoleAccessRules`, que es justo
+donde vivía el defecto. Ahora hay **39** (93 en total en el módulo, 0 fallos):
+
+- `app/src/test/.../access/PanelAccessResolverTest.kt` — **22 pruebas**: RH ve sus paneles
+  por `navPanels`, por `roleKey`, por `orgRoleKey` legacy y solo por nombre visible en cinco
+  grafías; un interno con rol desconocido nunca acaba en cero paneles; vendedor / ingeniero
+  de campo / diseñador / contabilidad no ven paneles ajenos; la API manda sobre el respaldo
+  local; la API no puede degradar un interno a portal; alias legacy de panel; permisos como
+  respaldo; ruta directa cuando solo hay un panel.
+- `app/src/test/.../ui/console/ConsoleAccessRulesTest.kt` — **17 pruebas**: RH ve
+  `hr`/`attendance`/`cvs`/`recruiting`/`employee-payments`/`orgchart`/`kpis-hr`/`chat`;
+  `chat` y `dispatch` visibles para el ingeniero de campo; `support`/`noc`/`support-sla`/
+  `maintenance`/`assets`/`service-clients` para el de soporte; ningún módulo duplicado;
+  el ingeniero no ve finanzas ni RH admin y el vendedor no ve operación; el administrativo
+  se queda en su lista; un rol sin mapear nunca ve un menú vacío; y tres barridos de
+  coherencia (mapa → catálogo, catálogo → panel, catálogo → menú alcanzable) que fallarán
+  si alguien vuelve a dejar un módulo huérfano o un menú a la nada.
+
+### Verificación
+
+```
+:app:compileDebugKotlin          BUILD SUCCESSFUL
+:app:testDebugUnitTest           BUILD SUCCESSFUL — 93 tests, 0 fallos
+scripts/check-app-web-parity.py  OK — web paths, matriz y catálogo alineados
+                                 (168 rutas web, 116 módulos, 110 con ruta real)
+```
+
+### Pendiente — no es de la app (`apps/api`, otro dueño)
+
+- **`me.service.ts:24` lee `profile?.roleKey` crudo**, no `resolveEffectiveRoleKey()`.
+  Un usuario cuyo rol canónico viene de `Role.orgRoleKey` (legacy, sin `User.roleKey`)
+  recibe `panels: []`, `paths: []` y `moduleKeys` con solo las tres claves semilla. Es la
+  causa más probable de que `/me/navigation` no gobierne para usuarios viejos — y por la
+  que el respaldo local de `RolePanelMatrix` tiene que existir y ser correcto. El login
+  (`auth.service.ts:692`, `mapSessionUser`) sí resuelve bien el `roleKey`, así que la app
+  tiene el dato aunque el endpoint de navegación no lo use.
+- **`ModuleEntry.permissions` sigue vacío en las 116 entradas del catálogo**, así que el
+  `if (module.permissions.isNotEmpty() && ...)` de `ConsoleAccessRules.kt` sigue sin
+  ejecutarse nunca. No se rellenó a propósito: `canAccessConsoleModule` termina en
+  `return true` y llenar esa lista convertiría el fallo en «módulo invisible», que es
+  exactamente el defecto reportado. El gate real vive hoy en las listas por rol; si se
+  quiere mover a permisos, hay que hacerlo con la matriz de permisos efectivos delante.

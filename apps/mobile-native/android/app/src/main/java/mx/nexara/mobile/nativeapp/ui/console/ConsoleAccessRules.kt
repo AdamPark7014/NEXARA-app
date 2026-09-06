@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console
 
+import mx.nexara.mobile.nativeapp.access.RolePanelMatrix
 import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleEntry
@@ -47,35 +48,32 @@ private fun SessionUser.isPlatformAdmin(): Boolean {
     return isSuperAdmin || permissions.contains(ConsolePermissions.CONSOLE_ADMIN)
 }
 
+/**
+ * Clave canónica del rol (`roles.v2.ts`). Una sola normalización por igualdad
+ * exacta contra la tabla de alias — nunca `role.contains("…")`, que es lo que
+ * dejaba a «Recursos Humanos» sin paneles y a «Ingeniero de Soporte» con los
+ * de un ingeniero de campo según cómo estuviera escrito el nombre en la BD.
+ */
+private fun SessionUser.canonicalRole(): String? = RolePanelMatrix.canonicalRoleKey(
+    roleKey = roleKey,
+    orgRoleKey = orgRoleKey,
+    roleDisplayName = role,
+)
+
 /** Rol «Administrativo» — operación día a día (espejo page-matrix web). */
 fun SessionUser.isAdministrativoRole(): Boolean {
     if (isSuperAdmin || isPlatformAdmin()) return false
-    val key = roleKey?.lowercase()
-    if (key == "administrativo") return true
-    if (key == "coord_admin" || key == "dir_admin") return false
-    val r = role.lowercase()
-    if (r == "coord_admin" || r == "dir_admin") return false
-    if (r.contains("coord") && r.contains("admin")) return false
-    if (r.contains("director") && r.contains("admin")) return false
-    return r == "administrativo" || r.contains("administrativ")
+    return canonicalRole() == RolePanelMatrix.ADMINISTRATIVO
 }
 
-private fun SessionUser.effectiveRoleKey(): String? =
-    roleKey?.lowercase()?.takeIf { it.isNotBlank() }
-
 private fun SessionUser.isIngenieroRole(): Boolean {
-    val key = effectiveRoleKey()
-    if (key == "ing_campo" || key == "ing_soporte") return true
-    if (key != null) return false
-    return role.lowercase().contains("ingenier")
+    val key = canonicalRole()
+    return key == RolePanelMatrix.ING_CAMPO || key == RolePanelMatrix.ING_SOPORTE
 }
 
 private fun SessionUser.isVendedorRole(): Boolean {
-    val key = effectiveRoleKey()
-    if (key == "vendedor" || key == "coord_ventas") return true
-    if (key != null) return false
-    val r = role.lowercase()
-    return r.contains("vendedor") || r.contains("ventas")
+    val key = canonicalRole()
+    return key == RolePanelMatrix.VENDEDOR || key == RolePanelMatrix.COORD_VENTAS
 }
 
 /** Módulos ERP permitidos para personal administrativo (Mónica / admin_staff). */
@@ -102,12 +100,21 @@ val ADMINISTRATIVO_ERP_MODULE_KEYS: Set<String> = setOf(
     "chat",
 )
 
+/**
+ * Prefijos de panel que hay que quitar para comparar contra las listas de
+ * módulos permitidos por rol.
+ *
+ * `/ops` y `/erp` son los prefijos canónicos nuevos (`url-matrix.ts`); sin
+ * ellos aquí, módulos como `chat` (`/erp/chat`), `dispatch` (`/ops/dispatch`),
+ * `support` (`/ops/support`) y `noc` (`/ops/noc`) nunca casaban con la lista
+ * del ingeniero y quedaban invisibles para todo el personal de campo.
+ */
+private val PANEL_PATH_PREFIXES = listOf("/operacion", "/console", "/ops", "/erp", "/crm")
+
 private fun normalizedConsolePath(module: ModuleEntry): String {
-    return when {
-        module.webPath.startsWith("/operacion") -> module.webPath.removePrefix("/operacion")
-        module.webPath.startsWith("/console") -> module.webPath.removePrefix("/console")
-        else -> module.webPath
-    }
+    val prefix = PANEL_PATH_PREFIXES.firstOrNull { module.webPath.startsWith("$it/") }
+        ?: return module.webPath
+    return module.webPath.removePrefix(prefix)
 }
 
 /** Match url-matrix paths (con o sin comodín **) contra webPath del módulo. */
@@ -175,11 +182,15 @@ fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
     }
 
     if (isIngeniero) {
+        // Espejo de URL_MATRIX[ING_CAMPO] ∪ URL_MATRIX[ING_SOPORTE] (url-matrix.ts):
+        // la app tiene un solo cubo «ingeniero», así que se toma la unión.
         val baseAllowed = setOf(
             "/dashboard", "/cotizaciones", "/cvs", "/ventas", "/attendance",
             "/activities", "/evidences", "/viatics", "/vehicles", "/gps", "/tools",
             "/lunch-breaks", "/chat", "/dispatch", "/support", "/noc",
             "/service-sheets", "/client-tickets",
+            "/support/sla", "/maintenance", "/maintenance/contracts", "/assets",
+            "/service-clients", "/kb", "/notifications-center",
         )
         if (!path.startsWith("/my-") && path !in baseAllowed) return false
         if (path == "/cotizaciones" && !user.canAccessCotizaciones()) return false
@@ -193,7 +204,12 @@ fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
     }
 
     if (isVendedor) {
-        val baseAllowed = setOf("/dashboard", "/ventas", "/cotizaciones", "/cvs", "/attendance")
+        // `chat` y `notifications-center` son transversales: los tiene todo el
+        // personal interno en url-matrix, incluido el equipo comercial.
+        val baseAllowed = setOf(
+            "/dashboard", "/ventas", "/cotizaciones", "/cvs", "/attendance",
+            "/chat", "/notifications-center", "/clients",
+        )
         if (!path.startsWith("/my-") && path !in baseAllowed) return false
         if (path == "/cotizaciones" && !user.canAccessCotizaciones()) return false
         if (path == "/cvs" && !user.canAccessCvs()) return false
@@ -222,10 +238,14 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
     }
     val allowedKeys = panelId?.let { mx.nexara.mobile.nativeapp.access.ModulePanelMap.consoleKeysFor(it) }
     val byKey = ModuleCatalog.console.associateBy { it.key }
+    // Un módulo se muestra en el PRIMER grupo que lo reclama: `chat`, `dispatch`
+    // y `recruiting` estaban declarados en dos grupos y salían duplicados.
+    val alreadyShown = mutableSetOf<String>()
     fun pick(vararg keys: String): List<ModuleEntry> =
         keys.mapNotNull { byKey[it] }
             .filter { canAccessConsoleModule(user, it) }
             .filter { allowedKeys == null || it.key in allowedKeys }
+            .filter { alreadyShown.add(it.key) }
 
     val groups = listOf(
         ConsoleSidebarGroup("profile", "Cuenta personal", pick("my-profile", "my-preferences", "calendar")),
@@ -247,7 +267,7 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ),
         ConsoleSidebarGroup(
             "system", "Administración interna",
-            pick("tools", "news", "newsletter", "settings", "companies", "kb", "architecture"),
+            pick("tools", "news", "newsletter", "settings", "companies", "kb", "architecture", "offline-queue"),
         ),
         ConsoleSidebarGroup(
             "inventory", "Inventario y compras",
@@ -300,10 +320,9 @@ fun consoleBottomTabModuleKeys(
         .toSet()
     fun has(key: String) = key in visible
 
-    val roleLower = user.role.lowercase()
     val isSuperAdmin = user.isSuperAdmin
     val isAdmin = !isSuperAdmin && user.isPlatformAdmin()
-    val isIngeniero = !isSuperAdmin && !isAdmin && roleLower.contains("ingenier")
+    val isIngeniero = !isSuperAdmin && !isAdmin && user.isIngenieroRole()
     val isAdministrativo = user.isAdministrativoRole()
 
     return buildSet {
