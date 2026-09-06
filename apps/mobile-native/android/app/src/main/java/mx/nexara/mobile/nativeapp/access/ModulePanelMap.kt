@@ -44,6 +44,10 @@ object ModulePanelMap {
         "integra-people",
         "integra-attendance",
         "integra-visitors",
+        "integra-alarms",
+        "integra-occupancy",
+        "integra-devices",
+        "integra-sites",
     )
 
     /** null = sin filtro (todos los módulos console). */
