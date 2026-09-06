@@ -12,6 +12,16 @@ import {
   type IsapiUserInfo,
 } from '../hikvision-isapi/index';
 import { IntegraSiteService, type ResolvedIntegraClient } from './integra-site.service';
+import { runScheduledJob } from '../common/cron/run-scheduled-job';
+import { interruptorEncendido } from './integra-automatizacion.env';
+
+/**
+ * Espera tras el primer fallo de un sitio: una vuelta entera del cron.
+ * Se dobla con cada fallo seguido hasta el techo.
+ */
+const BACKOFF_BASE_MS = 15 * 60_000;
+/** Techo de la espera. Dos horas: un sitio caído se sigue reintentando, sin prisa. */
+const BACKOFF_MAX_MS = 2 * 60 * 60_000;
 
 /** `http://192.168.9.34` → `192.168.9.34`. */
 function hostnameOf(host: string): string {
@@ -84,18 +94,102 @@ export class IntegraSyncService {
     private readonly sites: IntegraSiteService,
   ) {}
 
-  @Cron('*/15 * * * *')
+  /**
+   * Guardia de reentrada de la reconciliación periódica.
+   *
+   * Una vuelta drena páginas de personas y tarjetas de CADA terminal del sitio:
+   * con el parque por Tailscale eso puede pasar de los quince minutos del cron.
+   * Sin este cerrojo, dos vueltas se solaparían escribiendo el mismo espejo y
+   * pidiéndole al mismo equipo dos veces lo mismo a la vez.
+   */
+  private reconciliando = false;
+
+  /** Sitio → cuándo se le puede volver a preguntar (epoch ms). */
+  private readonly proximoIntento = new Map<number, number>();
+  /** Sitio → fallos seguidos, para alargar la espera. */
+  private readonly fallosSeguidos = new Map<number, number>();
+
+  @Cron('*/15 * * * *', { name: 'integra-reconciliar-espejo' })
   async cronSyncAll() {
-    const active = await this.prisma.integraSite.findMany({
-      where: { isActive: true },
-      select: { id: true, companyId: true },
-    });
-    for (const s of active) {
-      try {
-        await this.syncSite(s.companyId, s.id);
-      } catch (e) {
-        this.logger.warn(`Sync sitio ${s.id} falló: ${String(e)}`);
+    await runScheduledJob('integra-reconciliar-espejo', this.logger, () =>
+      this.reconciliarSitiosActivos(),
+    );
+  }
+
+  /**
+   * Reconcilia el espejo de todos los sitios activos. Cada 15 min.
+   *
+   * Esto es lo que hacía el botón «Reconciliar» y solo cuando alguien lo
+   * pulsaba. Ahora corre solo, con tres frenos:
+   *
+   * 1. **No se solapa consigo misma** (`reconciliando`).
+   * 2. **No machaca un sitio que falla**: tras un fallo, ese sitio se aparta un
+   *    rato que se dobla con cada fallo seguido, de 15 min a 2 h. Un NVR
+   *    apagado o una VPN caída no puede convertirse en un intento fallido cada
+   *    quince minutos durante el fin de semana.
+   * 3. **Se apaga sin desplegar**: `INTEGRA_SYNC_CRON=0`.
+   *
+   * Se lee de `process.env` y no del `ConfigService` a propósito: esta clase
+   * también se instancia a mano desde `hikvision-isapi/isapi-sync.ts`, y
+   * meterle una dependencia más al constructor rompería ese guion.
+   */
+  async reconciliarSitiosActivos(): Promise<{
+    ejecutado: boolean;
+    razon: 'apagado' | 'ya-en-curso' | null;
+    sitios: number;
+    ok: number;
+    fallos: number;
+    pospuestos: number;
+  }> {
+    const vacio = { ejecutado: false, sitios: 0, ok: 0, fallos: 0, pospuestos: 0 };
+    if (!interruptorEncendido(process.env.INTEGRA_SYNC_CRON)) {
+      return { ...vacio, razon: 'apagado' as const };
+    }
+    if (this.reconciliando) {
+      this.logger.warn('Reconciliación: la vuelta anterior sigue en curso, esta se salta');
+      return { ...vacio, razon: 'ya-en-curso' as const };
+    }
+
+    this.reconciliando = true;
+    try {
+      const active = await this.prisma.integraSite.findMany({
+        where: { isActive: true },
+        select: { id: true, companyId: true },
+      });
+      const ahora = Date.now();
+      let ok = 0;
+      let fallos = 0;
+      let pospuestos = 0;
+
+      for (const s of active) {
+        const espera = this.proximoIntento.get(s.id) ?? 0;
+        if (espera > ahora) {
+          pospuestos += 1;
+          continue;
+        }
+        try {
+          await this.syncSite(s.companyId, s.id);
+          ok += 1;
+          this.fallosSeguidos.delete(s.id);
+          this.proximoIntento.delete(s.id);
+        } catch (e) {
+          fallos += 1;
+          const seguidos = (this.fallosSeguidos.get(s.id) ?? 0) + 1;
+          this.fallosSeguidos.set(s.id, seguidos);
+          const pausa = Math.min(
+            BACKOFF_BASE_MS * 2 ** (seguidos - 1),
+            BACKOFF_MAX_MS,
+          );
+          this.proximoIntento.set(s.id, ahora + pausa);
+          this.logger.warn(
+            `Sync sitio ${s.id} falló (${seguidos} seguidos, se aparta ${Math.round(pausa / 60_000)} min): ${String(e)}`,
+          );
+        }
       }
+
+      return { ejecutado: true, razon: null, sitios: active.length, ok, fallos, pospuestos };
+    } finally {
+      this.reconciliando = false;
     }
   }
 

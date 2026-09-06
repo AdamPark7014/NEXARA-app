@@ -41,6 +41,29 @@ export type { StreamQuality };
 const SUB_STREAM_ID = 102;
 const MAIN_STREAM_ID = 101;
 
+/**
+ * `192.168.9.34|301` → `192_168_9_34_301`.
+ *
+ * go2rtc guarda los streams por nombre y ese nombre acaba en una URL y en su
+ * YAML: solo se dejan pasar caracteres que sobreviven a los dos.
+ */
+function slugDeCamara(cameraIndexCode: string): string {
+  return cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+/**
+ * Nombre con el que vive en go2rtc el stream que abre el muro.
+ *
+ * Es el secundario y mudo —`quality: 'sub'`, sin audio—, que es exactamente lo
+ * que pide un mosaico. Vive fuera de `publish()` porque el precalentado
+ * necesita saber, ANTES de registrar nada, si esa cámara ya está caliente; si
+ * los dos nombres se calcularan por separado acabarían divergiendo y el
+ * precalentado registraría streams que nadie consume.
+ */
+export function nombreStreamMuro(cameraIndexCode: string): string {
+  return `cam_${slugDeCamara(cameraIndexCode)}`;
+}
+
 function subStreamOf(channelId: string): string {
   return /^\d{3,}$/.test(channelId) ? `${channelId.slice(0, -1)}2` : channelId;
 }
@@ -168,6 +191,77 @@ export class IntegraMediaService {
     }
 
     return this.publish('ARTEMIS', cameraIndexCode, rtsp, rtsp);
+  }
+
+  /**
+   * Abre VARIAS cámaras en un solo viaje, y los fallos vienen dentro.
+   *
+   * El muro hacía N `POST /cameras/:id/stream`: trece peticiones, trece
+   * autenticaciones y trece resoluciones del sitio para pintar una rejilla.
+   * Aquí se resuelve el sitio las mismas veces —`liveStream` es quien sabe
+   * hacerlo bien— pero el navegador paga UN viaje.
+   *
+   * Regla que no se negocia: **una cámara rota no tumba el lote**. Si la 7 no
+   * está en el espejo o su equipo no contesta, las otras doce siguen saliendo y
+   * la 7 vuelve con `ok: false` y su motivo. Un 500 entero por una cámara mala
+   * es exactamente el «no se ven todas» de siempre.
+   *
+   * En serie a propósito: cada `liveStream` puede acabar en un PUT a go2rtc, y
+   * go2rtc reescribe su YAML en cada registro. Trece escrituras simultáneas
+   * sobre el mismo fichero es como se corrompió antes.
+   */
+  async liveStreamsEnLote(
+    companyId: number | null,
+    cameraIndexCodes: string[],
+    siteId?: number | null,
+    opts?: { audio?: boolean; quality?: StreamQuality },
+  ) {
+    // Sin duplicados y sin vacíos: dos mosaicos de la misma cámara son un solo
+    // registro en go2rtc, no dos.
+    const unicas = [
+      ...new Set(cameraIndexCodes.map((c) => String(c ?? '').trim()).filter(Boolean)),
+    ];
+
+    const items: Array<{
+      cameraIndexCode: string;
+      ok: boolean;
+      stream: Awaited<ReturnType<IntegraMediaService['liveStream']>> | null;
+      error: string | null;
+    }> = [];
+
+    for (const cameraIndexCode of unicas) {
+      try {
+        const stream = await this.liveStream(companyId, cameraIndexCode, siteId, opts);
+        items.push({ cameraIndexCode, ok: true, stream, error: null });
+      } catch (e) {
+        const error = e instanceof Error ? e.message.slice(0, 280) : String(e).slice(0, 280);
+        this.logger.warn(`Lote: ${cameraIndexCode} no abrió — ${error}`);
+        items.push({ cameraIndexCode, ok: false, stream: null, error });
+      }
+    }
+
+    const ok = items.filter((i) => i.ok).length;
+    return { total: items.length, ok, failed: items.length - ok, items };
+  }
+
+  /**
+   * Qué streams tiene go2rtc registrados AHORA MISMO. `null` = no se pudo saber.
+   *
+   * Es la lista contra la que el precalentado decide qué falta. La diferencia
+   * entre «no hay ninguno» y «no pude preguntar» es la que evita que, con
+   * go2rtc caído, se dispare un registro por cámara contra nada.
+   */
+  async streamsRegistrados(): Promise<Set<string> | null> {
+    const internal = this.go2rtcInternal();
+    if (!internal) return null;
+    try {
+      const res = await fetch(`${internal}/api/streams`);
+      if (!res.ok) return null;
+      const all = (await res.json()) as Record<string, unknown>;
+      return new Set(Object.keys(all ?? {}));
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -600,7 +694,7 @@ export class IntegraMediaService {
   private async dropStalePlaybackStreams(cameraIndexCode: string): Promise<void> {
     const internal = this.go2rtcInternal();
     if (!internal) return;
-    const prefix = `pb_${cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_')}_`;
+    const prefix = `pb_${slugDeCamara(cameraIndexCode)}_`;
     try {
       const res = await fetch(`${internal}/api/streams`);
       if (!res.ok) return;
@@ -716,7 +810,7 @@ export class IntegraMediaService {
     // El principal va con su propio nombre: si compartiera el del secundario,
     // pedir alta calidad reescribiria el stream que esta alimentando al muro
     // entero y todos los mosaicos saltarian de golpe.
-    const slug = cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const slug = slugDeCamara(cameraIndexCode);
     const hd = quality === 'main' ? '_hd' : '';
     const base = `cam_${slug}${hd}`;
     // Stream aparte para el audio: el mudo lo comparten todos los mosaicos del

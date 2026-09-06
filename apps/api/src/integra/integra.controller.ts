@@ -20,6 +20,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import {
+  ArrayMaxSize,
   ArrayNotEmpty,
   Allow,
   IsArray,
@@ -328,6 +329,27 @@ class DetectionPatchDto {
   @IsOptional() @Allow() deviceIp?: string | null;
 }
 
+/**
+ * Cuerpo de `POST /integra/cameras/streams/batch`.
+ *
+ * El tope de 40 no es capricho: cada id acaba en una resolución de sitio y en
+ * un registro en go2rtc, y un cuerpo con mil ids sería una tormenta contra el
+ * equipo de un cliente disfrazada de petición.
+ */
+class StreamsBatchDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  cameraIds!: string[];
+
+  /** El muro va mudo; el audio es de la cámara en foco. */
+  @IsOptional() @IsBoolean() audio?: boolean;
+
+  /** `main` = principal (HD). Cualquier otra cosa, secundario. */
+  @IsOptional() @IsIn(['main', 'sub']) quality?: 'main' | 'sub';
+}
+
 @ApiTags('Integra · Artemis')
 @ApiBearerAuth()
 @UseGuards(RbacGuard)
@@ -562,6 +584,42 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.preview(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  /**
+   * Abrir el muro de golpe: `POST /integra/cameras/streams/batch`.
+   *
+   * El front hacía N `POST /cameras/:id/stream` —trece peticiones y trece
+   * autenticaciones para pintar una rejilla—. Aquí van todas las cámaras en un
+   * cuerpo y vuelven todas las URLs.
+   *
+   * **Los fallos vienen dentro**: cada elemento trae `ok` y, si no salió, su
+   * `error`. La petición NO se cae porque una cámara esté mal; devolver 500 por
+   * la séptima es exactamente el «no se ven todas» de antes.
+   *
+   * No colisiona con `cameras/:id/stream`: el último segmento es `batch`.
+   */
+  @Post('cameras/streams/batch')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Abre varias cámaras en un solo viaje (muro). Los fallos van dentro de la respuesta.',
+  })
+  streamsBatch(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: StreamsBatchDto,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.streamsEnLote(
+      companyId,
+      body.cameraIds,
+      siteId ? parseInt(siteId, 10) : null,
+      {
+        audio: body.audio === true,
+        // Misma regla que la de una cámara: cualquier cosa que no sea 'main' es
+        // el secundario. El muro nunca debe acabar pidiendo HD por accidente.
+        quality: body.quality === 'main' ? 'main' : 'sub',
+      },
+    );
   }
 
   @Post('cameras/:id/stream')

@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { IntegraMediaService } from './integra-media.service';
+import { IntegraMediaService, nombreStreamMuro } from './integra-media.service';
 import { IntegraSiteService } from './integra-site.service';
 
 type Camera = { raw: unknown } | null;
@@ -392,6 +392,148 @@ describe('IntegraMediaService', () => {
       expect(out.url).toBeNull();
       expect(out.segments).toEqual([]);
       expect(out.note).toMatch(/Sin grabaciones/i);
+    });
+
+    /* ──────────────────────────────────────────────────────────────────
+     * El muro en un solo viaje
+     * ────────────────────────────────────────────────────────────────── */
+    describe('lote del muro', () => {
+      it('devuelve todas las cámaras en una sola respuesta', async () => {
+        const { svc } = await build(
+          jest.fn().mockResolvedValue(resolved),
+          { raw: { channelId: '301', source: { ipAddress: '192.168.9.171', reachableDirectly: true } } },
+          'http://go2rtc.test',
+        );
+        const fetchMock = jest
+          .spyOn(global, 'fetch')
+          .mockResolvedValue({ ok: true, status: 200, text: async () => '' } as Response);
+
+        const out = await svc.liveStreamsEnLote(1, ['192.168.9.34|301', '192.168.9.34|401'], 7);
+
+        expect(out.total).toBe(2);
+        expect(out.ok).toBe(2);
+        expect(out.failed).toBe(0);
+        expect(out.items.map((i) => i.cameraIndexCode)).toEqual([
+          '192.168.9.34|301',
+          '192.168.9.34|401',
+        ]);
+        expect(out.items[0].stream?.hls).toContain('stream.m3u8');
+        fetchMock.mockRestore();
+      });
+
+      it('una cámara rota NO tumba el lote: su fallo viene dentro', async () => {
+        // Devolver 500 por la séptima cámara es exactamente el «no se ven
+        // todas» de antes, pero peor: sin ninguna.
+        const resolveClient = jest.fn().mockResolvedValue(resolved);
+        const { svc } = await build(
+          resolveClient,
+          { raw: { channelId: '301', source: null } },
+          'http://go2rtc.test',
+        );
+        const fetchMock = jest
+          .spyOn(global, 'fetch')
+          .mockResolvedValue({ ok: true, status: 200, text: async () => '' } as Response);
+        resolveClient.mockRejectedValueOnce(new Error('sitio no configurado'));
+
+        const out = await svc.liveStreamsEnLote(1, ['rota', 'buena'], 7);
+
+        expect(out.total).toBe(2);
+        expect(out.ok).toBe(1);
+        expect(out.failed).toBe(1);
+        expect(out.items[0]).toMatchObject({
+          cameraIndexCode: 'rota',
+          ok: false,
+          stream: null,
+          error: 'sitio no configurado',
+        });
+        expect(out.items[1].ok).toBe(true);
+        fetchMock.mockRestore();
+      });
+
+      it('una cámara que no está en el espejo sale con su nota, no con un 500', async () => {
+        const { svc } = await build(jest.fn().mockResolvedValue(resolved), null, 'http://go2rtc.test');
+        const out = await svc.liveStreamsEnLote(1, ['192.168.9.34|999'], 7);
+        expect(out.ok).toBe(1);
+        expect(out.items[0].stream?.hls).toBeNull();
+        expect(out.items[0].stream?.note).toContain('sync');
+      });
+
+      it('el mismo id dos veces es un solo registro en go2rtc', async () => {
+        const { svc } = await build(
+          jest.fn().mockResolvedValue(resolved),
+          { raw: { channelId: '301', source: null } },
+          'http://go2rtc.test',
+        );
+        const fetchMock = jest
+          .spyOn(global, 'fetch')
+          .mockResolvedValue({ ok: true, status: 200, text: async () => '' } as Response);
+
+        const out = await svc.liveStreamsEnLote(1, ['192.168.9.34|301', '192.168.9.34|301', '  '], 7);
+
+        expect(out.total).toBe(1);
+        fetchMock.mockRestore();
+      });
+    });
+  });
+
+  /**
+   * El precalentado registra un nombre y el muro pide otro: si estos dos se
+   * separan, precalentar deja de servir para nada y nadie se entera, porque
+   * ambos «funcionan».
+   */
+  it('el nombre que precalienta el arranque es el que abre el muro', async () => {
+    const { svc } = await build(
+      jest.fn().mockResolvedValue({
+        provider: 'ISAPI',
+        client: null,
+        hct: null,
+        isapi: {
+          rtspUrl: (ch: string | number) => `rtsp://admin:secreto@192.168.9.34:554/x/${ch}`,
+          rtspUrlRedacted: (ch: string | number) => `rtsp://admin:***@192.168.9.34:554/x/${ch}`,
+        },
+        isapiForHost: null,
+        siteId: 7,
+        host: 'http://192.168.9.34',
+      }),
+      { raw: { channelId: '301', source: null } },
+      'http://go2rtc.test',
+    );
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({ ok: true, status: 200, text: async () => '' } as Response);
+
+    const out = await svc.liveStream(1, '192.168.9.34|301', 7, { audio: false, quality: 'sub' });
+
+    expect(out.streamName).toBe(nombreStreamMuro('192.168.9.34|301'));
+    fetchMock.mockRestore();
+  });
+
+  describe('streamsRegistrados', () => {
+    it('devuelve los nombres que go2rtc tiene ahora mismo', async () => {
+      const { svc } = await build(jest.fn(), null, 'http://go2rtc.test');
+      const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ cam_a: {}, cam_b: {} }),
+      } as unknown as Response);
+
+      await expect(svc.streamsRegistrados()).resolves.toEqual(new Set(['cam_a', 'cam_b']));
+      fetchMock.mockRestore();
+    });
+
+    it('sin GO2RTC_URL devuelve null, que NO es «no hay ninguno»', async () => {
+      const { svc } = await build(jest.fn(), null, '');
+      await expect(svc.streamsRegistrados()).resolves.toBeNull();
+    });
+
+    it('si go2rtc no contesta devuelve null en vez de un conjunto vacío', async () => {
+      const { svc } = await build(jest.fn(), null, 'http://go2rtc.test');
+      const fetchMock = jest
+        .spyOn(global, 'fetch')
+        .mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(svc.streamsRegistrados()).resolves.toBeNull();
+      fetchMock.mockRestore();
     });
   });
 });

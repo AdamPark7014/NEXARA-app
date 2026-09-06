@@ -8,6 +8,7 @@ import { IntegraArtemisService } from './integra-artemis.service';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraMediaService } from './integra-media.service';
+import { IntegraWarmupService } from './integra-warmup.service';
 import { IntegraDetectionService } from './integra-detection.service';
 import { IntegraPortfolioService } from './integra-portfolio.service';
 import { IntegraEdgeService } from './integra-edge.service';
@@ -48,6 +49,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     IntegraSiteService,
     IntegraSyncService,
     IntegraMediaService,
+    IntegraWarmupService,
     IntegraDetectionService,
     IntegraPortfolioService,
     IntegraEdgeService,
