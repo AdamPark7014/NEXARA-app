@@ -399,7 +399,7 @@ export class NotificationsService {
     const notifications = await Promise.all(
       payloads.map(payload => this.createNotification(payload)),
     );
-    return notifications;
+    return notifications.filter(Boolean);
   }
 
   /**
