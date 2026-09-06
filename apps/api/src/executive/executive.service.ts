@@ -3,6 +3,16 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { FINISHED_ACTIVITY_WHERE } from '../activities/activity-status.js';
 import { kpiFallback } from '../common/kpi-fallback.js';
+import type { SalesLeadStatus } from '@prisma/client';
+
+/**
+ * Leads que siguen vivos. Mismo criterio que `integra-presence.service.ts`.
+ *
+ * Tipado contra el enum de Prisma A PROPOSITO: aqui habia `'CONTACTED' as any`,
+ * que no existe en `SalesLeadStatus`, y la consulta reventaba en produccion cada
+ * vez que se pedia el KPI. Con el tipo puesto, un valor inventado no compila.
+ */
+const LEADS_ABIERTOS: SalesLeadStatus[] = ['NEW', 'QUALIFIED', 'NURTURING'];
 
 @Injectable()
 export class ExecutiveService {
@@ -80,7 +90,13 @@ export class ExecutiveService {
         _count: { _all: true },
       }),
       this.prisma.salesLead.count({
-        where: { ...tw, score: { gte: 70 }, status: { in: ['NEW' as any, 'CONTACTED' as any, 'QUALIFIED' as any] } },
+      // `CONTACTED` NO existe en SalesLeadStatus —los valores son NEW,
+        // QUALIFIED, NURTURING, LOST y CONVERTED— así que esta consulta
+        // reventaba en produccion cada vez que se pedia el KPI. Compilaba solo
+        // gracias a los `as any`, que es justo para lo que no sirven. Se usa el
+        // mismo conjunto de «lead abierto» que ya tenia nombre en
+        // integra-presence.service.ts.
+        where: { ...tw, score: { gte: 70 }, status: { in: LEADS_ABIERTOS } },
       }).catch(kpiFallback('executive.service.ts:83', 0)),
       (this.prisma as any).tender.count({
         where: { ...tw, status: { in: ['PROSPECT', 'INTERESTED', 'IN_PREP', 'SUBMITTED', 'EVALUATION'] } },

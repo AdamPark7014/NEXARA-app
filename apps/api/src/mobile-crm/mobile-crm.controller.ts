@@ -5,11 +5,21 @@ import { CrmActivitiesService } from '../crm-activities/crm-activities.service.j
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import type { SalesLeadStatus } from '@prisma/client';
 
 /**
  * Endpoints compactos para la app móvil (iOS/Android Native).
  * Devuelven payloads ligeros y precalculados, optimizados para conexiones lentas.
  */
+/**
+ * Leads que siguen vivos. Mismo criterio que `integra-presence.service.ts`.
+ *
+ * Tipado contra el enum de Prisma A PROPOSITO: aqui habia `'CONTACTED' as any`,
+ * que no existe en `SalesLeadStatus`, y la consulta reventaba en produccion cada
+ * vez que se pedia el KPI. Con el tipo puesto, un valor inventado no compila.
+ */
+const LEADS_ABIERTOS: SalesLeadStatus[] = ['NEW', 'QUALIFIED', 'NURTURING'];
+
 @Controller('mobile/crm')
 @UseGuards(AuthGuard('jwt'))
 export class MobileCrmController {
@@ -33,7 +43,13 @@ export class MobileCrmController {
     const [agenda, hotLeads, openOpps, monthClosed, target] = await Promise.all([
       this.crmActivities.getMyAgenda(user.id),
       this.prisma.salesLead.findMany({
-        where: { ...tw, ownerId: user.id, status: { in: ['NEW' as any, 'CONTACTED' as any, 'QUALIFIED' as any] } },
+      // `CONTACTED` NO existe en SalesLeadStatus —los valores son NEW,
+        // QUALIFIED, NURTURING, LOST y CONVERTED— así que esta consulta
+        // reventaba en produccion cada vez que se pedia el KPI. Compilaba solo
+        // gracias a los `as any`, que es justo para lo que no sirven. Se usa el
+        // mismo conjunto de «lead abierto» que ya tenia nombre en
+        // integra-presence.service.ts.
+        where: { ...tw, ownerId: user.id, status: { in: LEADS_ABIERTOS } },
         select: { id: true, name: true, company: true, score: true, status: true, createdAt: true },
         orderBy: { score: 'desc' },
         take: 10,
