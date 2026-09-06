@@ -237,26 +237,56 @@ drogas, apuestas y lenguaje: **No**. Resultado esperado: 3+ / Everyone.
 
 ### 6.5 Seguridad de los datos
 
-Basado en lo que la app realmente hace (`AndroidManifest.xml` + dependencias):
+> **⚠ CAMBIÓ EN LA v2.** Firebase **Analytics se eliminó** del build y Firebase
+> **Crashlytics se añadió**. Si la v1 se declaró con Analytics, esta sección **ya no
+> coincide** con lo que hace la app y hay que rehacerla en Play Console. Declarar datos
+> que ya no recoges es tan sancionable como omitir los que sí.
+>
+> Consecuencia directa: al desaparecer `play-services-measurement`, desaparecen también
+> `AD_ID`, `ACCESS_ADSERVICES_AD_ID` y `ACCESS_ADSERVICES_ATTRIBUTION` del manifiesto
+> fusionado (verificado el 06-09-2026). En *Contenido de la app → **ID de publicidad***
+> la respuesta correcta pasa a ser **NO**.
 
-| Tipo de dato | ¿Se recopila? | Por qué | Obligatorio |
-|---|---|---|---|
-| Nombre, correo, ID de usuario | Sí | Funcionalidad y gestión de la cuenta | Sí |
-| Ubicación precisa y aproximada | Sí | Operación en campo / registro de asistencia | Opcional |
-| Fotos y videos | Sí | Evidencias de trabajo en campo | Opcional |
-| Archivos y documentos | Sí | Adjuntos y documentos de la organización | Opcional |
-| ID del dispositivo | Sí | Notificaciones push (FCM) y analítica | Sí |
-| Interacciones en la app | Sí | Analítica (Firebase Analytics) | Sí |
+Borrador para copiar al formulario. Cada fila está cruzada contra el código, no supuesta.
 
-Respuestas transversales:
+#### Datos recopilados
 
-- **¿Se cifran los datos en tránsito?** Sí (HTTPS/TLS a `api.nexara.com.mx`).
-- **¿Se comparten con terceros?** No se venden ni comparten con fines publicitarios. Google
-  (Firebase) actúa como proveedor de procesamiento.
-- **Ubicación en segundo plano:** **no** se usa — el manifiesto solo pide
-  `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` en primer plano. No hay que llenar la
-  declaración de ubicación en segundo plano.
-- **Eliminación de datos:** ver punto 7.
+| Categoría Play | Tipo | ¿Se recopila? | ¿Se comparte? | Obligatorio / Opcional | Fin declarado | Dónde ocurre en el código |
+|---|---|---|---|---|---|---|
+| Información personal | Nombre | Sí | No | Obligatorio | Funciones de la app; gestión de la cuenta | `data/SessionStore.kt` (perfil de sesión) |
+| Información personal | Dirección de correo | Sí | No | Obligatorio | Funciones de la app; gestión de la cuenta | Login (`AuthRepository`) |
+| Información personal | Otros ID de usuario | Sí | No | Obligatorio | Funciones de la app | `data/DeviceIdentityProvider.kt` |
+| Ubicación | Ubicación precisa | Sí | No | **Opcional** | Funciones de la app (asistencia y trabajo en campo) | `util/DeviceLocation.kt`, `ui/console/screens/ConsoleGpsScreen.kt` |
+| Ubicación | Ubicación aproximada | Sí | No | **Opcional** | Funciones de la app | Mismos ficheros |
+| Fotos y videos | Fotos | Sí | No | **Opcional** | Funciones de la app (evidencias de trabajo) | `ui/common/MediaPickerBar.kt` |
+| Archivos y documentos | Archivos y documentos | Sí | No | **Opcional** | Funciones de la app (adjuntos de la organización) | `ui/common/MediaPickerBar.kt` (SAF) |
+| Actividad en la app | Otras acciones | Sí | No | Obligatorio | Funciones de la app (registros de asistencia y actividad operativa, guardados en el ERP de la organización) | Módulos OPS / actividades |
+| Info. y rendimiento de la app | **Registros de fallos** | **Sí (NUEVO)** | No | Obligatorio | Análisis de fallos | `firebase-crashlytics-ktx` |
+| Info. y rendimiento de la app | **Diagnósticos** | **Sí (NUEVO)** | No | Obligatorio | Análisis de fallos | `firebase-crashlytics-ktx` |
+| ID del dispositivo o de otro tipo | ID del dispositivo | Sí | No | Obligatorio | Funciones de la app (notificaciones push) | FCM — `push/NexaraFirebaseService.kt` |
+
+#### Lo que **NO** se recopila (responder «No» explícitamente)
+
+- **Interacciones en la app / analítica de producto** — Firebase Analytics ya no está en el
+  build. *Esta fila estaba en «Sí» y debe pasar a «No».*
+- **ID de publicidad** — ya no aparece en el manifiesto fusionado.
+- Información financiera o de pago, contactos, calendario personal, SMS, salud, mensajes,
+  historial de navegación, grabaciones de audio.
+
+#### Respuestas transversales
+
+| Pregunta del formulario | Respuesta | Sustento |
+|---|---|---|
+| ¿Se cifran los datos en tránsito? | **Sí** | `res/xml/network_security_config.xml` → `cleartextTrafficPermitted="false"`; todo va por HTTPS a `api.nexara.com.mx` |
+| ¿Los usuarios pueden pedir la eliminación de sus datos? | **Sí** | https://nexara.com.mx/legal/eliminar-cuenta (ver §7) |
+| ¿Se comparten datos con terceros? | **No** | No hay venta ni cesión publicitaria. Google (Firebase Cloud Messaging y Crashlytics) actúa como **encargado del tratamiento**, no como destinatario: en el formulario de Play eso **no** cuenta como «compartir» |
+| ¿La recopilación es opcional para el usuario? | **Parcial** | Ubicación, fotos y archivos son opcionales y se piden en tiempo de ejecución. Identidad y push son necesarios para operar |
+| Ubicación en segundo plano | **No aplica** | El manifiesto solo declara `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`. No hay `ACCESS_BACKGROUND_LOCATION` ni `FOREGROUND_SERVICE` → no hay que llenar la declaración de ubicación en segundo plano |
+| ¿Prácticas de seguridad revisadas por un tercero? | **No** | Responder «No» sin más; no es un requisito |
+
+> **Coherencia con el aviso de privacidad.** Lo que se marque aquí tiene que estar dicho en
+> https://nexara.com.mx/legal/privacidad. Antes de enviar, confirma que esa página menciona
+> ubicación, fotos, identificadores de dispositivo **y registros de fallos**.
 
 ### 6.6 Declaraciones que **no** aplican
 - App gubernamental: No.

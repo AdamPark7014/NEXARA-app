@@ -15,17 +15,22 @@ Checklist final antes de publicar. **Android está listo para Play Console.** iO
 | Feature graphic | `apps/mobile-native/play-assets/feature-graphic-1024x500.png` |
 | **8 capturas teléfono** | `apps/mobile-native/play-assets/screenshots/phone/*.png` |
 
-### Versión actual
+### Versión actual (06-09-2026)
 
-- `VERSION_NAME=1.0.0`
-- `VERSION_CODE=2` (subir en cada release futuro)
+- `VERSION_NAME=1.0.1`
+- `VERSION_CODE=7` — **confirma en Play Console cuál es el mayor ya SUBIDO** (incluidos
+  bundles descartados: Play no reutiliza ninguno) y usa ese número + 1.
 - `targetSdk=36`, `minSdk=24`
+
+> El AAB que hay en `app/build/outputs/bundle/release/` puede estar obsoleto. Comprueba
+> siempre su fecha contra la del código antes de subirlo — `npm run mobile:smoke` lo hace
+> por ti y falla si el bundle es más viejo que la fuente.
 
 ### Comandos finales
 
 ```powershell
-# 1. Build AAB firmado (sin clean, más rápido en Windows)
-npm run mobile:android:play-aab
+# 1. Build AAB firmado, subiendo el versionCode en el mismo paso
+pwsh -File scripts/build-play-aab.ps1 -BumpVersionCode -Clean
 
 # 2. Cuenta demo para revisores Play
 npm run seed:play-reviewer

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Reglas de extracción de datos (Android 12+ / API 31+).
+
+  `android:allowBackup="false"` corta la copia de seguridad en la nube, pero NO
+  corta la transferencia dispositivo-a-dispositivo: en Android 12+ esa ruta sigue
+  activa salvo que se declare explícitamente aquí.
+
+  Por qué importa aquí y no es teórico: la sesión vive en `nexara_session`
+  (EncryptedSharedPreferences). Su clave maestra está en el Keystore del equipo y
+  NO viaja con la transferencia. Si el fichero cifrado llega a un teléfono nuevo
+  sin su clave, la app arranca con un blob que no puede descifrar. Mejor que no
+  llegue nunca: aquí se excluye de las dos rutas.
+
+  `nexara_session_fallback` es el respaldo en claro que usa SessionStore cuando el
+  Keystore falla. Contiene el token de sesión SIN cifrar, así que con más razón
+  no debe salir del dispositivo.
+
+  `nexara_offline_queue.json` es la cola de mutaciones pendientes de campo y
+  `nexara_device` el identificador del equipo: clonarlos a un segundo teléfono
+  duplicaría envíos y colisionaría el identificador.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="nexara_session.xml" />
+        <exclude domain="sharedpref" path="nexara_session_fallback.xml" />
+        <exclude domain="file" path="nexara_offline_queue.json" />
+        <exclude domain="sharedpref" path="nexara_device.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="nexara_session.xml" />
+        <exclude domain="sharedpref" path="nexara_session_fallback.xml" />
+        <exclude domain="file" path="nexara_offline_queue.json" />
+        <exclude domain="sharedpref" path="nexara_device.xml" />
+    </device-transfer>
+</data-extraction-rules>
