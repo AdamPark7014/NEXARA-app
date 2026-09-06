@@ -1062,6 +1062,8 @@ data class VehicleControlDto(
     val evidenciaEntregaUrl: String? = null,
     val evidenciaDevolucionUrl: String? = null,
     val entregaFotos: List<String>? = null,
+    val fotosSalida: Any? = null,
+    val fotosDevolucion: Any? = null,
     val entregaEstatus: String? = null,
     val entregaObservaciones: String? = null,
     val entregaAprobada: Boolean? = null,

@@ -1014,6 +1014,7 @@ model ClientTicketRequest {
   latitud           Decimal?             @db.Decimal(10, 8)
   longitud          Decimal?             @db.Decimal(11, 8)
   evidenceUrls      String[]             @default([])
+  notes             String?              @db.Text
   activityId        Int?                 @unique
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt

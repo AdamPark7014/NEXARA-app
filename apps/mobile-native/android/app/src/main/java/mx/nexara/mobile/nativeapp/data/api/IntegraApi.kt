@@ -12,6 +12,11 @@ data class IntegraOpenDoorRequest(
     val reason: String,
 )
 
+/** Nota opcional al atender o cerrar alarma (`POST integra/alarms/:id/ack|clear`). */
+data class IntegraAlarmActionRequest(
+    val note: String? = null,
+)
+
 interface IntegraApi {
     @GET("integra/doors")
     suspend fun listDoors(
@@ -74,4 +79,37 @@ interface IntegraApi {
     suspend fun listRecurringVisitors(
         @Query("siteId") siteId: Int? = null,
     ): ResponseBody
+
+    @GET("integra/alarms/queue")
+    suspend fun alarmQueue(
+        @Query("siteId") siteId: Int? = null,
+        @Query("hours") hours: Int? = null,
+    ): ResponseBody
+
+    @POST("integra/alarms/{id}/ack")
+    suspend fun ackAlarm(
+        @Path("id") alarmId: String,
+        @Body body: IntegraAlarmActionRequest = IntegraAlarmActionRequest(),
+        @Query("siteId") siteId: Int? = null,
+    ): ResponseBody
+
+    @POST("integra/alarms/{id}/clear")
+    suspend fun clearAlarm(
+        @Path("id") alarmId: String,
+        @Body body: IntegraAlarmActionRequest = IntegraAlarmActionRequest(),
+        @Query("siteId") siteId: Int? = null,
+    ): ResponseBody
+
+    @GET("integra/occupancy")
+    suspend fun occupancy(
+        @Query("siteId") siteId: Int? = null,
+    ): ResponseBody
+
+    @GET("integra/devices")
+    suspend fun listDevices(
+        @Query("siteId") siteId: Int? = null,
+    ): ResponseBody
+
+    @GET("integra/sites")
+    suspend fun listSites(): ResponseBody
 }

@@ -247,6 +247,7 @@ fun MyVehiclesScreen() {
     var activityIdText by remember { mutableStateOf("") }
     var motivoUso by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
+    var checkoutMode by remember { mutableStateOf<VehicleCheckoutMode?>(null) }
     val scope = rememberCoroutineScope()
 
     fun reload() {
@@ -269,7 +270,7 @@ fun MyVehiclesScreen() {
     val sel = selected
     if (sel != null) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = { selected = null; actionMessage = null }) { Text("← Mis vehículos") }
+            OutlinedButton(onClick = { selected = null; actionMessage = null; checkoutMode = null }) { Text("← Mis vehículos") }
             NxPanelShell {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(nn(sel.nombreVehiculo ?: sel.vehiculo?.nombre), fontWeight = FontWeight.Bold)
@@ -305,15 +306,69 @@ fun MyVehiclesScreen() {
                             }
                         }
                     },
-                    enabled = !saving,
+                    enabled = !saving && checkoutMode == null,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Solicitar renovación") }
             }
-            Text(
-                "Bitácora km/combustible: requiere 9 fotos (4 int, 4 ext, odómetro) vía salida/devolución — usa consola web por ahora.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val mode = checkoutMode
+            if (mode != null) {
+                VehicleCheckoutSheet(
+                    mode = mode,
+                    saving = saving,
+                    formError = null,
+                    onDismiss = { checkoutMode = null },
+                    onSubmit = { km, fuel, parts ->
+                        saving = true
+                        scope.launch {
+                            try {
+                                val updatedId = sel.id
+                                withContext(Dispatchers.IO) {
+                                    when (mode) {
+                                        VehicleCheckoutMode.SALIDA ->
+                                            repo.startVehicleUse(updatedId, km, fuel, parts)
+                                        VehicleCheckoutMode.DEVOLUCION ->
+                                            repo.endVehicleUse(updatedId, km, fuel, parts)
+                                    }
+                                }
+                                actionMessage = if (mode == VehicleCheckoutMode.SALIDA) {
+                                    "✅ Salida registrada — vehículo en uso"
+                                } else {
+                                    "✅ Devolución registrada"
+                                }
+                                checkoutMode = null
+                                val list = withContext(Dispatchers.IO) { repo.vehiclesFetch() }
+                                items = list.filter { myId == null || it.solicitante?.id == myId }
+                                selected = items.firstOrNull { it.id == updatedId }
+                            } catch (e: Exception) {
+                                actionMessage = "❌ ${e.toUserMessage(
+                                    if (mode == VehicleCheckoutMode.SALIDA) {
+                                        "No se pudo registrar la salida"
+                                    } else {
+                                        "No se pudo registrar la devolución"
+                                    },
+                                )}"
+                            } finally {
+                                saving = false
+                            }
+                        }
+                    },
+                )
+            } else {
+                if (sel.canStartSalida()) {
+                    Button(
+                        onClick = { checkoutMode = VehicleCheckoutMode.SALIDA; actionMessage = null },
+                        enabled = !saving,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("📸 Registrar salida (4+4 + odómetro)") }
+                }
+                if (sel.canEndDevolucion()) {
+                    Button(
+                        onClick = { checkoutMode = VehicleCheckoutMode.DEVOLUCION; actionMessage = null },
+                        enabled = !saving,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("📸 Registrar entrega") }
+                }
+            }
         }
         return
     }

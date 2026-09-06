@@ -948,3 +948,624 @@ private fun IntegraDetailLine(label: String, value: String) {
         Text(value, style = MaterialTheme.typography.bodyLarge)
     }
 }
+
+// ── Alarmas SOC ───────────────────────────────────────────────────────────────
+
+private fun alarmStatusLabel(status: String): String = when (status.uppercase()) {
+    "OPEN" -> "Abierta"
+    "ACK" -> "Atendida"
+    "CLEARED" -> "Cerrada"
+    "TICKETED" -> "Con ticket"
+    else -> status.ifBlank { "—" }
+}
+
+private fun alarmSeverityLabel(severity: String): String = when (severity.lowercase()) {
+    "alta", "high" -> "Alta"
+    "media", "medium" -> "Media"
+    "baja", "low" -> "Baja"
+    else -> severity.ifBlank { "—" }
+}
+
+private fun alarmSeverityTone(severity: String): NxTone = when (severity.lowercase()) {
+    "alta", "high" -> NxTone.Danger
+    "media", "medium" -> NxTone.Warning
+    else -> NxTone.Neutral
+}
+
+private fun isAlarmPending(status: String): Boolean {
+    val s = status.uppercase()
+    return s == "OPEN" || s == "TICKETED"
+}
+
+data class IntegraAlarmsUiState(
+    val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
+    val message: String? = null,
+    val items: List<Map<String, Any?>> = emptyList(),
+    val openCount: Int = 0,
+    val pendingOnly: Boolean = true,
+    val selected: Map<String, Any?>? = null,
+    val note: String = "",
+    val acting: Boolean = false,
+)
+
+class IntegraAlarmsViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = IntegraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(IntegraAlarmsUiState())
+    val state: StateFlow<IntegraAlarmsUiState> = _state
+
+    init { refresh() }
+
+    fun setPendingOnly(v: Boolean) = _state.update { it.copy(pendingOnly = v) }
+    fun setNote(v: String) = _state.update { it.copy(note = v, message = null) }
+    fun select(item: Map<String, Any?>?) = _state.update { it.copy(selected = item, message = null) }
+
+    fun refresh(initial: Boolean = true) {
+        _state.update {
+            it.copy(
+                loading = initial && it.items.isEmpty(),
+                isRefreshing = !initial,
+                error = null,
+            )
+        }
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) { repo.alarmQueue() }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        items = result.items,
+                        openCount = result.openCount,
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        error = e.toUserMessage("No se pudo cargar la cola de alarmas"),
+                    )
+                }
+            }
+        }
+    }
+
+    fun filtered(): List<Map<String, Any?>> {
+        val rows = _state.value.items
+        if (!_state.value.pendingOnly) return rows
+        return rows.filter { isAlarmPending(str(it, "status")) }
+    }
+
+    fun ackSelected() = actOnSelected(ack = true)
+    fun clearSelected() = actOnSelected(ack = false)
+
+    private fun actOnSelected(ack: Boolean) {
+        val alarm = _state.value.selected ?: return
+        val id = str(alarm, "id")
+        if (id.isBlank()) {
+            _state.update { it.copy(error = "Alarma sin identificador") }
+            return
+        }
+        _state.update { it.copy(acting = true, error = null, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    if (ack) repo.ackAlarm(id, _state.value.note) else repo.clearAlarm(id, _state.value.note)
+                }
+                _state.update {
+                    it.copy(
+                        acting = false,
+                        message = if (ack) "Alarma marcada como atendida" else "Alarma cerrada",
+                        selected = null,
+                        note = "",
+                    )
+                }
+                refresh(initial = false)
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        acting = false,
+                        error = e.toUserMessage(
+                            if (ack) "No se pudo atender la alarma" else "No se pudo cerrar la alarma",
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun IntegraAlarmsScreen(vm: IntegraAlarmsViewModel = viewModel()) {
+    val s by vm.state.collectAsState()
+    val selected = s.selected
+    val rows = vm.filtered()
+
+    if (selected != null) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item {
+                Text(
+                    str(selected, "title").ifBlank { "Alarma" },
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
+            item { IntegraDetailLine("Estado", alarmStatusLabel(str(selected, "status"))) }
+            item { IntegraDetailLine("Severidad", alarmSeverityLabel(str(selected, "severity"))) }
+            item { IntegraDetailLine("Origen", str(selected, "srcName", "deviceName", "source")) }
+            item { IntegraDetailLine("Persona", str(selected, "personName")) }
+            item { IntegraDetailLine("Puerta", str(selected, "doorName")) }
+            item { IntegraDetailLine("Hora", str(selected, "timestamp")) }
+            item {
+                OutlinedTextField(
+                    value = s.note,
+                    onValueChange = vm::setNote,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Nota (opcional)") },
+                    minLines = 2,
+                )
+            }
+            if (isAlarmPending(str(selected, "status"))) {
+                item {
+                    Button(
+                        onClick = vm::ackSelected,
+                        enabled = !s.acting,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (s.acting) "Procesando…" else "Marcar atendida")
+                    }
+                }
+                item {
+                    OutlinedButton(
+                        onClick = vm::clearSelected,
+                        enabled = !s.acting,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Cerrar alarma")
+                    }
+                }
+            }
+            item {
+                TextButton(onClick = { vm.select(null) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Volver a la cola")
+                }
+            }
+            s.message?.let { msg -> item { Text(msg, color = NxColors.Success) } }
+            s.error?.let { err -> item { Text(err, color = NxColors.Danger) } }
+        }
+        return
+    }
+
+    PullToRefreshBox(
+        isRefreshing = s.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        when {
+            s.loading -> NxLoadingBlock("Cargando alarmas…")
+            s.error != null && s.items.isEmpty() -> NxErrorBlock(s.error!!) { vm.refresh() }
+            else -> LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item {
+                    NxSectionHeader(
+                        title = "Cola SOC",
+                        subtitle = if (s.openCount > 0) {
+                            "${s.openCount} pendiente(s)"
+                        } else {
+                            "Sin alarmas abiertas"
+                        },
+                    )
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = s.pendingOnly,
+                            onClick = { vm.setPendingOnly(true) },
+                            label = { Text("Pendientes") },
+                        )
+                        FilterChip(
+                            selected = !s.pendingOnly,
+                            onClick = { vm.setPendingOnly(false) },
+                            label = { Text("Todas") },
+                        )
+                    }
+                }
+                s.message?.let { msg ->
+                    item { Text(msg, color = NxColors.Success) }
+                }
+                s.error?.let { err ->
+                    item { Text(err, color = NxColors.Danger) }
+                }
+                if (rows.isEmpty()) {
+                    item {
+                        NxEmptyState(
+                            "Sin alarmas",
+                            if (s.pendingOnly) {
+                                "No hay alarmas pendientes en las últimas 24 horas."
+                            } else {
+                                "La cola está vacía en las últimas 24 horas."
+                            },
+                        )
+                    }
+                } else {
+                    items(rows, key = { str(it, "id") + it.hashCode() }) { alarm ->
+                        Card(
+                            onClick = { vm.select(alarm) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+                        ) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        str(alarm, "title").ifBlank { "Alarma" },
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    NxStatusChip(
+                                        alarmSeverityLabel(str(alarm, "severity")),
+                                        alarmSeverityTone(str(alarm, "severity")),
+                                    )
+                                }
+                                Text(
+                                    "${str(alarm, "personName", "deviceName")} · ${alarmStatusLabel(str(alarm, "status"))}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = NxColors.Muted,
+                                )
+                                Text(
+                                    str(alarm, "timestamp"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = NxColors.Muted,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Ocupación (en sitio) ──────────────────────────────────────────────────────
+
+data class IntegraOccupancyUiState(
+    val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
+    val items: List<Map<String, Any?>> = emptyList(),
+    val total: Int = 0,
+    val query: String = "",
+)
+
+class IntegraOccupancyViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = IntegraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(IntegraOccupancyUiState())
+    val state: StateFlow<IntegraOccupancyUiState> = _state
+
+    init { refresh() }
+
+    fun setQuery(v: String) = _state.update { it.copy(query = v) }
+
+    fun refresh(initial: Boolean = true) {
+        _state.update {
+            it.copy(loading = initial && it.items.isEmpty(), isRefreshing = !initial, error = null)
+        }
+        viewModelScope.launch {
+            try {
+                val (items, total) = withContext(Dispatchers.IO) { repo.occupancy() }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = items, total = total) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        error = e.toUserMessage("No se pudo cargar quién está en sitio"),
+                    )
+                }
+            }
+        }
+    }
+
+    fun filtered(): List<Map<String, Any?>> {
+        val q = _state.value.query.trim().lowercase()
+        if (q.isBlank()) return _state.value.items
+        return _state.value.items.filter {
+            str(it, "personName", "personId").lowercase().contains(q)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun IntegraOccupancyScreen(vm: IntegraOccupancyViewModel = viewModel()) {
+    val s by vm.state.collectAsState()
+    val rows = vm.filtered()
+
+    PullToRefreshBox(
+        isRefreshing = s.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        when {
+            s.loading -> NxLoadingBlock("Cargando presencia…")
+            s.error != null && s.items.isEmpty() -> NxErrorBlock(s.error!!) { vm.refresh() }
+            else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    NxSectionHeader(
+                        title = "En sitio ahora",
+                        subtitle = "${s.total} persona(s) · deducido de accesos de hoy",
+                    )
+                }
+                item {
+                    NxSearchField(
+                        value = s.query,
+                        onValueChange = vm::setQuery,
+                        placeholder = "Buscar persona…",
+                    )
+                }
+                if (rows.isEmpty()) {
+                    item {
+                        NxEmptyState(
+                            "Nadie en sitio",
+                            "No hay accesos concedidos activos hoy o el sitio no empuja eventos ACS.",
+                        )
+                    }
+                } else {
+                    items(rows, key = { str(it, "personId") }) { row ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+                        ) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    str(row, "personName").ifBlank { str(row, "personId") },
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    "Última puerta: ${str(row, "lastDoor", "deviceName")}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = NxColors.Muted,
+                                )
+                                Text(
+                                    "Entrada: ${str(row, "lastAt")} · Accesos: ${str(row, "passes")}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = NxColors.Muted,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Equipos ───────────────────────────────────────────────────────────────────
+
+data class IntegraDevicesUiState(
+    val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
+    val items: List<Map<String, Any?>> = emptyList(),
+    val query: String = "",
+)
+
+class IntegraDevicesViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = IntegraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(IntegraDevicesUiState())
+    val state: StateFlow<IntegraDevicesUiState> = _state
+
+    init { refresh() }
+
+    fun setQuery(v: String) = _state.update { it.copy(query = v) }
+
+    fun refresh(initial: Boolean = true) {
+        _state.update {
+            it.copy(loading = initial && it.items.isEmpty(), isRefreshing = !initial, error = null)
+        }
+        viewModelScope.launch {
+            try {
+                val list = withContext(Dispatchers.IO) { repo.devices() }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        error = e.toUserMessage("No se pudieron cargar los equipos"),
+                    )
+                }
+            }
+        }
+    }
+
+    fun filtered(): List<Map<String, Any?>> {
+        val q = _state.value.query.trim().lowercase()
+        if (q.isBlank()) return _state.value.items
+        return _state.value.items.filter {
+            str(it, "name", "ip", "kind", "deviceType").lowercase().contains(q)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun IntegraDevicesScreen(vm: IntegraDevicesViewModel = viewModel()) {
+    val s by vm.state.collectAsState()
+    val rows = vm.filtered()
+
+    PullToRefreshBox(
+        isRefreshing = s.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        when {
+            s.loading -> NxLoadingBlock("Cargando equipos…")
+            s.error != null && s.items.isEmpty() -> NxErrorBlock(s.error!!) { vm.refresh() }
+            else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    NxSectionHeader(
+                        title = "Inventario ACS",
+                        subtitle = "${s.items.size} equipo(s) en el espejo",
+                    )
+                }
+                item {
+                    NxSearchField(
+                        value = s.query,
+                        onValueChange = vm::setQuery,
+                        placeholder = "Buscar por nombre, IP o tipo…",
+                    )
+                }
+                if (rows.isEmpty()) {
+                    item { NxEmptyState("Sin equipos", "No hay dispositivos sincronizados en Integra.") }
+                } else {
+                    items(rows, key = { str(it, "id", "ip") + it.hashCode() }) { device ->
+                        val online = bool(device, "online") ?: false
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(str(device, "name"), fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "${str(device, "kind", "deviceType")} · ${str(device, "ip")}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = NxColors.Muted,
+                                    )
+                                }
+                                NxStatusChip(
+                                    if (online) "En línea" else "Offline",
+                                    if (online) NxTone.Success else NxTone.Neutral,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Sitios (solo lectura) ─────────────────────────────────────────────────────
+
+data class IntegraSitesUiState(
+    val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
+    val items: List<Map<String, Any?>> = emptyList(),
+)
+
+class IntegraSitesViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = IntegraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(IntegraSitesUiState())
+    val state: StateFlow<IntegraSitesUiState> = _state
+
+    init { refresh() }
+
+    fun refresh(initial: Boolean = true) {
+        _state.update {
+            it.copy(loading = initial && it.items.isEmpty(), isRefreshing = !initial, error = null)
+        }
+        viewModelScope.launch {
+            try {
+                val list = withContext(Dispatchers.IO) { repo.sites() }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        error = e.toUserMessage("No se pudieron cargar los sitios"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun IntegraSitesScreen(vm: IntegraSitesViewModel = viewModel()) {
+    val s by vm.state.collectAsState()
+
+    PullToRefreshBox(
+        isRefreshing = s.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        when {
+            s.loading -> NxLoadingBlock("Cargando sitios…")
+            s.error != null && s.items.isEmpty() -> NxErrorBlock(s.error!!) { vm.refresh() }
+            s.items.isEmpty() -> NxEmptyState("Sin sitios", "No hay sitios Integra configurados para tu empresa.")
+            else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    NxSectionHeader(
+                        title = "Sitios Integra",
+                        subtitle = "Solo lectura · administración en la consola web",
+                    )
+                }
+                items(s.items, key = { str(it, "id") }) { site ->
+                    val active = bool(site, "isActive") ?: true
+                    val isDefault = bool(site, "isDefault") == true
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    str(site, "label", "name"),
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (isDefault) {
+                                    NxStatusChip("Predeterminado", NxTone.Info)
+                                }
+                            }
+                            Text(
+                                "${str(site, "provider")} · ${str(site, "host")}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = NxColors.Muted,
+                            )
+                            Text(
+                                buildString {
+                                    append(if (active) "Activo" else "Inactivo")
+                                    val count = site["_count"]
+                                    if (count is Map<*, *>) {
+                                        @Suppress("UNCHECKED_CAST")
+                                        val c = count as Map<String, Any?>
+                                        append(" · ")
+                                        append("${str(c, "cameras")} cámaras · ")
+                                        append("${str(c, "doors")} puertas · ")
+                                        append("${str(c, "people")} personas")
+                                    }
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NxColors.Muted,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

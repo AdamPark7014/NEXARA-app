@@ -62,6 +62,10 @@ import { buildCrossPanelUrl, detectCurrentPanelId, isCrossPanelHref, resolveCros
 import { buildFreshLoginUrl } from "@/lib/tab-session";
 import { buildApiUrl } from "@/lib/api-base";
 import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
+import {
+  fetchMeNavigationAuthed,
+  type MeNavigation,
+} from "@/lib/me-navigation";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 import ShellConnectionStatus from "./ShellConnectionStatus";
@@ -127,6 +131,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [serverNav, setServerNav] = useState<MeNavigation | null>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -147,6 +152,20 @@ export default function AppShell({ panel, children }: AppShellProps) {
     void loadUnread();
     const id = window.setInterval(loadUnread, 45000);
     return () => window.clearInterval(id);
+  }, [user?.token]);
+
+  useEffect(() => {
+    if (!user?.token) {
+      setServerNav(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchMeNavigationAuthed(user.token).then((nav) => {
+      if (!cancelled) setServerNav(nav);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.token]);
 
   const loadNotifPreview = async () => {
@@ -290,9 +309,29 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
   const sidebarGroups = useMemo(() => {
     const groups = buildUserSidebar(panel, user);
-    if (panel !== "integra" || !integraCaps) return groups;
+    const pagePaths = (serverNav?.paths ?? []).filter((p) => !p.startsWith("/api/"));
+    const moduleKeys = serverNav?.moduleKeys ?? [];
+    const filteredByNav =
+      pagePaths.length === 0 && moduleKeys.length === 0
+        ? groups
+        : groups
+            .map((g) => ({
+              ...g,
+              items: g.items.filter((item) => {
+                if (moduleKeys.includes(item.id)) return true;
+                const full = `/${item.panel}${item.path === "/" ? "" : item.path.startsWith("/") ? item.path : `/${item.path}`}`;
+                return pagePaths.some((rule) => {
+                  const base = rule.replace(/\/\*\*$/, "").replace(/\/\*$/, "").replace(/\/$/, "");
+                  if (!base) return false;
+                  return full === base || full.startsWith(`${base}/`) || base.startsWith(full);
+                });
+              }),
+            }))
+            .filter((g) => g.items.length > 0);
+
+    if (panel !== "integra" || !integraCaps) return filteredByNav;
     const isClient = v2RoleKey === "cliente";
-    return groups
+    return filteredByNav
       .map((g) => ({
         ...g,
         items: g.items.filter((item) =>
@@ -303,7 +342,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
         ),
       }))
       .filter((g) => g.items.length > 0);
-  }, [panel, user, integraCaps, integraProvider, v2RoleKey]);
+  }, [panel, user, integraCaps, integraProvider, v2RoleKey, serverNav]);
 
   const allowedPanels = useMemo(
     () => getUserAllowedPanels(user),

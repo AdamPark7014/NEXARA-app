@@ -59,4 +59,13 @@ object ImageDataUrl {
 
     private fun readBytes(context: Context, uri: Uri): ByteArray? =
         runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+
+    /** JPEG comprimido listo para multipart (p. ej. salida/devolución vehículo). */
+    fun jpegBytesFromCaptured(context: Context, media: CapturedMedia, filename: String = "photo.jpg"): Pair<String, ByteArray>? {
+        val dataUrl = fromCaptured(context, media) ?: return null
+        val comma = dataUrl.indexOf(',')
+        if (comma < 0) return null
+        val bytes = Base64.decode(dataUrl.substring(comma + 1), Base64.NO_WRAP)
+        return filename to bytes
+    }
 }

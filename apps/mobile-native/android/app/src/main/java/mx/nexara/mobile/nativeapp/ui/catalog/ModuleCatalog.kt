@@ -52,7 +52,7 @@ object ModuleCatalog {
         mod("viatics", "Viáticos", "💼", "/operacion/viatics", ParityStatus.NATIVO),
         mod("my-viatics", "Mis viáticos", "💼", "/operacion/my-viatics", ParityStatus.CASCARON),
         mod("vehicles", "Vehículos", "🚗", "/operacion/vehicles", ParityStatus.CASCARON),
-        mod("my-vehicles", "Mis vehículos", "🚗", "/operacion/my-vehicles", ParityStatus.CASCARON),
+        mod("my-vehicles", "Mis vehículos", "🚗", "/operacion/my-vehicles", ParityStatus.NATIVO),
         mod("gps", "GPS", "🗺️", "/operacion/gps", ParityStatus.NATIVO),
         mod("tools", "Herramientas", "🧰", "/operacion/tools", ParityStatus.NATIVO),
         mod("clients", "Clientes", "🤝", "/console/clients", ParityStatus.NATIVO),
@@ -64,8 +64,8 @@ object ModuleCatalog {
         mod("my-lunch-breaks", "Mis comidas", "🥪", "/console/my-lunch-breaks", ParityStatus.NATIVO),
         mod("hr", "Recursos humanos", "👥", "/console/hr", ParityStatus.CASCARON),
         mod("employee-payments", "Pagos a empleados", "💵", "/console/employee-payments", ParityStatus.CASCARON),
-        mod("accounting", "Contabilidad", "📒", "/console/accounting", ParityStatus.CASCARON),
-        mod("banking", "Banca", "🏦", "/console/banking", ParityStatus.SOLO_LECTURA),
+        mod("accounting", "Contabilidad", "📒", "/console/accounting", ParityStatus.NATIVO),
+        mod("banking", "Banca", "🏦", "/console/banking", ParityStatus.NATIVO),
         mod("invoicing", "Facturación", "🧾", "/console/invoicing", ParityStatus.NATIVO),
         mod("expenses", "Gastos", "💸", "/console/expenses", ParityStatus.NATIVO),
         mod("fines", "Multas", "⚠️", "/console/fines", ParityStatus.CASCARON),
@@ -101,7 +101,7 @@ object ModuleCatalog {
         mod("my-preferences", "Mis preferencias", "⚙️", "/console/my-preferences", ParityStatus.SOLO_LECTURA),
         mod("offline-queue", "Cola offline", "☁️", "/console/offline-queue", ParityStatus.NATIVO),
         mod("settings", "Ajustes", "⚙️", "/console/settings", ParityStatus.NATIVO),
-        mod("companies", "Multi-empresa", "🏛️", "/erp/companies", ParityStatus.CASCARON),
+        mod("companies", "Multi-empresa", "🏛️", "/erp/companies", ParityStatus.NATIVO),
         mod("kb", "Knowledge Base", "📚", "/erp/kb", ParityStatus.SOLO_LECTURA),
         mod("exports", "Exportaciones", "📥", "/erp/exports", ParityStatus.NATIVO),
         mod("architecture", "Arquitectura", "🗺️", "/erp/architecture", ParityStatus.CASCARON),
@@ -137,8 +137,8 @@ object ModuleCatalog {
     /** Módulos del portal de contabilidad. */
     val contabilidad: List<ModuleEntry> = listOf(
         mod("dashboard", "Dashboard", "📊", "/contabilidad/dashboard", ParityStatus.SOLO_LECTURA),
-        mod("accounting", "Contabilidad", "📒", "/contabilidad/accounting", ParityStatus.CASCARON),
-        mod("banking", "Banca", "🏦", "/contabilidad/banking", ParityStatus.SOLO_LECTURA),
+        mod("accounting", "Contabilidad", "📒", "/contabilidad/accounting", ParityStatus.NATIVO),
+        mod("banking", "Banca", "🏦", "/contabilidad/banking", ParityStatus.NATIVO),
         mod("invoicing", "Facturación", "🧾", "/contabilidad/invoicing", ParityStatus.NATIVO),
         mod("expenses", "Gastos", "💸", "/contabilidad/expenses", ParityStatus.NATIVO),
         mod("employee-payments", "Pagos a empleados", "💵", "/contabilidad/employee-payments", ParityStatus.CASCARON),
@@ -176,6 +176,10 @@ object ModuleCatalog {
         ModuleEntry("integra-people", "Personas", "👤", "/integra/people", parityStatus = ParityStatus.NATIVO),
         ModuleEntry("integra-attendance", "Asistencia ACS", "🕒", "/integra/attendance", parityStatus = ParityStatus.NATIVO),
         ModuleEntry("integra-visitors", "Visitantes", "🪪", "/integra/visitors", parityStatus = ParityStatus.NATIVO),
+        ModuleEntry("integra-alarms", "Alarmas", "🚨", "/integra/alarms", parityStatus = ParityStatus.NATIVO),
+        ModuleEntry("integra-occupancy", "En sitio", "📍", "/integra/occupancy", parityStatus = ParityStatus.NATIVO),
+        ModuleEntry("integra-devices", "Equipos", "🖥️", "/integra/devices", parityStatus = ParityStatus.NATIVO),
+        ModuleEntry("integra-sites", "Sitios", "🏢", "/integra/settings", parityStatus = ParityStatus.SOLO_LECTURA),
     )
 
     /** Módulos LAB. */

@@ -2,6 +2,8 @@
  * Cliente del endpoint canónico de navegación RBAC.
  * Fuente: GET /api/me/navigation (url-matrix + roleKey).
  */
+import { buildApiUrl } from "@/lib/api-base";
+
 export type MeNavigation = {
   roleKey: string | null;
   orgRoleKey: string | null;
@@ -11,10 +13,12 @@ export type MeNavigation = {
 };
 
 export async function fetchMeNavigation(
-  fetcher: (path: string) => Promise<Response> = (path) => fetch(path, { credentials: "include" }),
+  fetcher?: () => Promise<Response>,
 ): Promise<MeNavigation | null> {
   try {
-    const res = await fetcher("/api/me/navigation");
+    const res = await (fetcher
+      ? fetcher()
+      : fetch(buildApiUrl("me/navigation"), { credentials: "include" }));
     if (!res.ok) return null;
     const data = (await res.json()) as MeNavigation;
     return {
@@ -27,6 +31,16 @@ export async function fetchMeNavigation(
   } catch {
     return null;
   }
+}
+
+export async function fetchMeNavigationAuthed(token: string): Promise<MeNavigation | null> {
+  return fetchMeNavigation(() =>
+    fetch(buildApiUrl("me/navigation"), {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+      cache: "no-store",
+    }),
+  );
 }
 
 /** Si moduleKeys viene del servidor, úsalo; si no, cae al filtro local. */

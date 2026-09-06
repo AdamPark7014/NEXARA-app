@@ -47,7 +47,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Viáticos (revisión) | `/operacion/viatics` | NATIVO · approveViatic | NATIVO |
 | Mis viáticos | `/operacion/my-viatics` | CASCARON · solo lista | CASCARON |
 | Vehículos | `/operacion/vehicles` | CASCARON · solo lista | CASCARON |
-| Mis vehículos | `/operacion/my-vehicles` | CASCARON | CASCARON |
+| Mis vehículos | `/operacion/my-vehicles` | NATIVO · solicitud + salida/devolución 9 fotos | NATIVO |
 | GPS | `/operacion/gps` | NATIVO · ConsoleGpsScreen | NATIVO |
 | Herramientas | `/operacion/tools` | NATIVO · hub + inventario/kit/renovaciones | NATIVO |
 | Clientes | `/console/clients` | NATIVO · CRUD | NATIVO |

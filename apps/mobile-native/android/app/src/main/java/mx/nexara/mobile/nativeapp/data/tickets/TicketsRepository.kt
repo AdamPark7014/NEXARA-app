@@ -9,6 +9,8 @@ import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.BranchPortalApi
 import mx.nexara.mobile.nativeapp.data.api.TicketsApi
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalTicketDto
+import mx.nexara.mobile.nativeapp.data.api.PortalTicketCommentBody
+import mx.nexara.mobile.nativeapp.data.api.PortalTicketStatusBody
 import mx.nexara.mobile.nativeapp.data.api.PendingFeedbackTicketDto
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalInventorySnapshotDto
 import mx.nexara.mobile.nativeapp.data.api.SyncInventoryInputDto
@@ -239,6 +241,20 @@ class TicketsRepository(context: Context) {
 
     suspend fun ticket(id: Long): ClientPortalTicketDto? =
         if (isBranchUser()) branchApi.ticket(id = id) else api.getTicket(id = id)
+
+    suspend fun postTicketComment(id: Long, body: String) {
+        if (isBranchUser()) {
+            throw IllegalStateException("Comentarios de OT no disponibles en portal sucursal aún")
+        }
+        api.postTicketComment(id, PortalTicketCommentBody(body = body.trim()))
+    }
+
+    suspend fun patchTicketStatus(id: Long, action: String, note: String? = null) {
+        if (isBranchUser()) {
+            throw IllegalStateException("Acciones de OT no disponibles en portal sucursal aún")
+        }
+        api.patchTicketStatus(id, PortalTicketStatusBody(action = action, note = note))
+    }
 
     suspend fun ticketReportPdfBytes(id: Long): ByteArray {
         if (isBranchUser()) {
