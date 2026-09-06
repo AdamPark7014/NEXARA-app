@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -936,6 +937,9 @@ fun RecruitingScreen() {
     var query by remember { mutableStateOf("") }
     var showRejected by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.CandidateDto?>(null) }
+    var showCreate by remember { mutableStateOf(false) }
+    var acting by remember { mutableStateOf(false) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
 
     suspend fun loadData(refresh: Boolean = false) {
         if (refresh) isRefreshing = true else loading = true
@@ -945,6 +949,56 @@ fun RecruitingScreen() {
     }
 
     LaunchedEffect(Unit) { loadData() }
+
+    fun moveCandidate(id: Long, stage: String) {
+        acting = true
+        actionMessage = null
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.moveCv(id, stage) }
+                actionMessage = "✅ Movido a ${STAGE_LABELS[stage] ?: stage}"
+                selected = null
+                loadData(refresh = true)
+            } catch (e: Exception) {
+                actionMessage = "❌ ${e.message ?: "No se pudo mover el candidato"}"
+            } finally {
+                acting = false
+            }
+        }
+    }
+
+    if (showCreate) {
+        RecruitingCreateForm(
+            saving = acting,
+            message = actionMessage,
+            onCancel = { showCreate = false; actionMessage = null },
+            onSubmit = { fullName, email, whatsapp, category, fileDataUrl ->
+                acting = true
+                actionMessage = null
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            repo.createCv(
+                                fullName = fullName,
+                                fileDataUrl = fileDataUrl,
+                                email = email,
+                                whatsapp = whatsapp,
+                                category = category,
+                            )
+                        }
+                        actionMessage = "✅ CV registrado"
+                        showCreate = false
+                        loadData(refresh = true)
+                    } catch (e: Exception) {
+                        actionMessage = "❌ ${e.message ?: "No se pudo registrar el CV"}"
+                    } finally {
+                        acting = false
+                    }
+                }
+            },
+        )
+        return
+    }
 
     val filtered = remember(candidates, query, showRejected) {
         candidates.filter { c ->
@@ -963,7 +1017,16 @@ fun RecruitingScreen() {
     }
 
     val sel = selected
-    if (sel != null) { CandidateDetail(sel, onBack = { selected = null }); return }
+    if (sel != null) {
+        CandidateDetail(
+            c = sel,
+            onBack = { selected = null },
+            acting = acting,
+            message = actionMessage,
+            onMove = { stage -> moveCandidate(sel.id, stage) },
+        )
+        return
+    }
 
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -1003,6 +1066,18 @@ fun RecruitingScreen() {
                     modifier = Modifier.weight(1f),
                 )
                 FilterChip(selected = showRejected, onClick = { showRejected = !showRejected }, label = { Text("Rechazados", style = MaterialTheme.typography.labelSmall) })
+            }
+            Button(
+                onClick = { showCreate = true; actionMessage = null },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            ) { Text("+ Registrar CV") }
+            actionMessage?.let { msg ->
+                Text(
+                    msg,
+                    color = if (msg.startsWith("✅")) NxColors.Success else NxColors.Danger,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                )
             }
 
             when {
@@ -1050,7 +1125,100 @@ private fun RecruKpiChip(label: String, value: String, color: Color = MaterialTh
 }
 
 @Composable
-private fun CandidateDetail(c: mx.nexara.mobile.nativeapp.data.api.CandidateDto, onBack: () -> Unit) {
+private fun RecruitingCreateForm(
+    saving: Boolean,
+    message: String?,
+    onCancel: () -> Unit,
+    onSubmit: (fullName: String, email: String, whatsapp: String, category: String, fileDataUrl: String) -> Unit,
+) {
+    val context = LocalContext.current
+    var fullName by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var whatsapp by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("") }
+    var fileDataUrl by remember { mutableStateOf<String?>(null) }
+    var localError by remember { mutableStateOf<String?>(null) }
+
+    Column(
+        Modifier.fillMaxSize().background(NxColors.Surface).verticalScroll(rememberScrollState()).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        OutlinedButton(onClick = onCancel, enabled = !saving) { Text("← Cancelar") }
+        Text("Registrar CV", fontWeight = FontWeight.Bold)
+        OutlinedTextField(
+            value = fullName,
+            onValueChange = { fullName = it },
+            label = { Text("Nombre completo *") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = whatsapp,
+            onValueChange = { whatsapp = it },
+            label = { Text("WhatsApp") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = category,
+            onValueChange = { category = it },
+            label = { Text("Categoría / puesto") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text("Archivo del CV (PDF o imagen) *", fontWeight = FontWeight.SemiBold)
+        mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar(
+            onPicked = { picked ->
+                fileDataUrl = picked.firstOrNull()?.let {
+                    mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl.fromCaptured(context, it)
+                }
+            },
+            allowCamera = true,
+            allowGallery = true,
+            allowDocuments = true,
+        )
+        if (fileDataUrl != null) {
+            Text("✓ Archivo listo", color = NxColors.Success, style = MaterialTheme.typography.bodySmall)
+        }
+        (localError ?: message)?.let { msg ->
+            Text(
+                msg,
+                color = if (msg.startsWith("✅")) NxColors.Success else NxColors.Danger,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Button(
+            onClick = {
+                localError = when {
+                    fullName.isBlank() -> "❌ Indica el nombre completo"
+                    fileDataUrl.isNullOrBlank() -> "❌ Adjunta el archivo del CV"
+                    else -> null
+                }
+                if (localError == null) {
+                    onSubmit(fullName.trim(), email.trim(), whatsapp.trim(), category.trim(), fileDataUrl!!)
+                }
+            },
+            enabled = !saving,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(if (saving) "Guardando…" else "Registrar") }
+    }
+}
+
+@Composable
+private fun CandidateDetail(
+    c: mx.nexara.mobile.nativeapp.data.api.CandidateDto,
+    onBack: () -> Unit,
+    acting: Boolean = false,
+    message: String? = null,
+    onMove: (String) -> Unit = {},
+) {
     val name     = c.displayName
     val email    = c.email
     val phone    = c.whatsapp
@@ -1096,6 +1264,27 @@ private fun CandidateDetail(c: mx.nexara.mobile.nativeapp.data.api.CandidateDto,
                         Text("Notas", fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
                         Text(notes, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Mover de etapa", fontWeight = FontWeight.SemiBold)
+                    STAGE_ORDER.filter { it != stage }.forEach { target ->
+                        OutlinedButton(
+                            onClick = { onMove(target) },
+                            enabled = !acting && c.id > 0,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(STAGE_LABELS[target] ?: target, color = stageColor(target)) }
+                    }
+                    message?.let { msg ->
+                        Text(
+                            msg,
+                            color = if (msg.startsWith("✅")) NxColors.Success else NxColors.Danger,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }

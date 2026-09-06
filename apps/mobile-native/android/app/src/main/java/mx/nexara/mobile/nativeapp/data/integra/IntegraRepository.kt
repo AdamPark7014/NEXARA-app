@@ -6,9 +6,12 @@ import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
-import mx.nexara.mobile.nativeapp.data.api.IntegraApi
+import mx.nexara.mobile.nativeapp.data.api.IntegraAddPersonRequest
 import mx.nexara.mobile.nativeapp.data.api.IntegraAlarmActionRequest
+import mx.nexara.mobile.nativeapp.data.api.IntegraApi
+import mx.nexara.mobile.nativeapp.data.api.IntegraFaceUploadRequest
 import mx.nexara.mobile.nativeapp.data.api.IntegraOpenDoorRequest
+import mx.nexara.mobile.nativeapp.data.api.IntegraUpdatePersonRequest
 import okhttp3.ResponseBody
 import java.lang.reflect.ParameterizedType
 import java.time.Instant
@@ -133,6 +136,53 @@ class IntegraRepository(context: Context) {
 
     suspend fun personDetail(personId: String): Map<String, Any?> =
         parseMap(api.getPerson(personId))
+
+    suspend fun addPerson(
+        personName: String,
+        gender: String? = null,
+        userType: String? = null,
+        autoCode: Boolean = true,
+    ): Map<String, Any?> = parseMap(
+        api.addPerson(
+            IntegraAddPersonRequest(
+                personName = personName.trim(),
+                gender = gender,
+                userType = userType,
+                autoCode = autoCode,
+                validEnable = true,
+            ),
+        ),
+    )
+
+    suspend fun updatePerson(
+        personId: String,
+        personName: String? = null,
+        gender: String? = null,
+        validEnable: Boolean? = null,
+    ): Map<String, Any?> = parseMap(
+        api.updatePerson(
+            personId = personId,
+            body = IntegraUpdatePersonRequest(
+                personName = personName?.trim()?.ifBlank { null },
+                gender = gender,
+                validEnable = validEnable,
+            ),
+        ),
+    )
+
+    suspend fun deletePerson(personId: String, force: Boolean = false): Map<String, Any?> =
+        parseMap(api.deletePerson(personId = personId, force = if (force) "1" else null))
+
+    suspend fun uploadPersonFace(personId: String, imageBase64: String): Map<String, Any?> {
+        val raw = imageBase64.trim().let { s ->
+            val idx = s.indexOf("base64,")
+            if (idx >= 0) s.substring(idx + "base64,".length) else s
+        }
+        return parseMap(api.uploadPersonFace(personId, IntegraFaceUploadRequest(imageBase64 = raw)))
+    }
+
+    suspend fun deletePersonFace(personId: String): Map<String, Any?> =
+        parseMap(api.deletePersonFace(personId))
 
     suspend fun attendance(days: Int = 7): List<Map<String, Any?>> {
         val end = Instant.now()

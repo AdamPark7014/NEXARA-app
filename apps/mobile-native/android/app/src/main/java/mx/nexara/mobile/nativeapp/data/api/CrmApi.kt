@@ -99,6 +99,24 @@ interface CrmApi {
     @GET("ventas/proyectos/{id}/resumen")
     suspend fun getProjectSummaryRaw(@Path("id") id: Long): okhttp3.ResponseBody
 
+    @PATCH("ventas/proyectos/{id}")
+    suspend fun updateProyectoRaw(
+        @Path("id") id: Long,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
+
+    @GET("ventas/proyectos/{id}/costos")
+    suspend fun getProyectoCostosRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @PATCH("ventas/proyectos/{id}/costos")
+    suspend fun updateProyectoCostosRaw(
+        @Path("id") id: Long,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
+
+    @POST("ventas/proyectos/{id}/close")
+    suspend fun closeProyectoRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
     @GET("catalog/products")
     suspend fun listProductsRaw(
         @Query("search") search: String? = null,

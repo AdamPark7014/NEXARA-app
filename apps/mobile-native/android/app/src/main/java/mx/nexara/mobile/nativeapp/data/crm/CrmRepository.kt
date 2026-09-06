@@ -212,6 +212,34 @@ class CrmRepository(private val context: Context) {
     suspend fun getProjectSummary(id: Long): Map<String, Any?> =
         parseObject(crmApi.getProjectSummaryRaw(id).string())
 
+    suspend fun updateProject(id: Long, fields: Map<String, Any?>): Map<String, Any?> =
+        parseObject(crmApi.updateProyectoRaw(id, fields).string())
+
+    suspend fun updateProjectStatus(id: Long, status: String): Map<String, Any?> =
+        updateProject(id, mapOf("status" to status))
+
+    suspend fun projectCosts(id: Long): Map<String, Any?> =
+        parseObject(crmApi.getProyectoCostosRaw(id).string())
+
+    /** PATCH ventas/proyectos/:id/costos — solo manda los campos capturados. */
+    suspend fun updateProjectCosts(
+        id: Long,
+        costProducts: Double? = null,
+        costViaticos: Double? = null,
+        costOperativo: Double? = null,
+    ): Map<String, Any?> {
+        val payload = buildMap<String, Any?> {
+            costProducts?.let { put("costProducts", it) }
+            costViaticos?.let { put("costViaticos", it) }
+            costOperativo?.let { put("costOperativo", it) }
+        }
+        if (payload.isEmpty()) throw IllegalArgumentException("Sin costos que actualizar")
+        return parseObject(crmApi.updateProyectoCostosRaw(id, payload).string())
+    }
+
+    suspend fun closeProject(id: Long): Map<String, Any?> =
+        parseObject(crmApi.closeProyectoRaw(id).string())
+
     suspend fun products(search: String? = null): List<Map<String, Any?>> =
         productDtos(search).map { it.toFlatMap() }
     suspend fun productDtos(search: String? = null): List<CrmProductDto> =

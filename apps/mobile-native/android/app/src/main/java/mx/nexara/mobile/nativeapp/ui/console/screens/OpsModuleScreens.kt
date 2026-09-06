@@ -111,6 +111,7 @@ data class ClientTicketsUiState(
     val statusFilter: String = "todos",
     val items: List<mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto> = emptyList(),
     val selected: mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto? = null,
+    val notesDraft: String = "",
     val acting: Boolean = false,
 )
 
@@ -128,7 +129,23 @@ class ClientTicketsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun select(item: mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto?) =
-        _state.update { it.copy(selected = item) }
+        _state.update { it.copy(selected = item, notesDraft = item?.notes.orEmpty(), message = null) }
+
+    fun setNotesDraft(v: String) = _state.update { it.copy(notesDraft = v) }
+
+    fun saveNotes(id: Long) {
+        val notes = _state.value.notesDraft
+        _state.update { it.copy(acting = true, message = null, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.patchClientTicketNotes(id, notes) }
+                _state.update { it.copy(acting = false, message = "Notas guardadas", selected = null) }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, error = e.message) }
+            }
+        }
+    }
 
     fun refresh(initial: Boolean = true) {
         _state.update {
@@ -205,6 +222,19 @@ fun ClientTicketsModuleScreen(vm: ClientTicketsViewModel = viewModel()) {
                         }
                     }
                 }
+                item {
+                    OutlinedTextField(
+                        value = s.notesDraft,
+                        onValueChange = vm::setNotesDraft,
+                        label = { Text("Notas internas") },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                item { ActionBtn("Guardar notas", s.acting) { vm.saveNotes(id) } }
+            }
+            if (!s.error.isNullOrBlank()) {
+                item { Text(s.error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
             item { TextButton(onClick = { vm.select(null) }) { Text("Volver") } }
         }

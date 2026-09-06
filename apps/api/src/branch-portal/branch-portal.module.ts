@@ -6,9 +6,10 @@ import { BranchPortalGuard } from './branch-portal.guard.js';
 import { InventoriesModule } from '../inventories/inventories.module.js';
 import { ActivitiesModule } from '../activities/activities.module.js';
 import { ServiceClientsModule } from '../service-clients/service-clients.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, InventoriesModule, ActivitiesModule, ServiceClientsModule],
+  imports: [PrismaModule, AuthModule, InventoriesModule, ActivitiesModule, ServiceClientsModule, NotificationsModule],
   controllers: [BranchPortalController],
   providers: [BranchPortalGuard],
 })

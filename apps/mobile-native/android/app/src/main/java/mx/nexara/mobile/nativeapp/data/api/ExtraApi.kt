@@ -8,6 +8,7 @@ import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.PartMap
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -921,6 +922,11 @@ interface ExtraApi {
         @Path("id") id: Long,
     ): DocumentDto
 
+    @PATCH("documents/{id}/archive")
+    suspend fun archiveDocument(
+        @Path("id") id: Long,
+    ): DocumentDto
+
     // Accounting journal entries
     @GET("accounting/journal-entries")
     suspend fun getJournalEntriesRaw(): okhttp3.ResponseBody
@@ -1042,6 +1048,20 @@ interface ExtraApi {
     @GET("cvs")
     suspend fun getCvsRaw(): okhttp3.ResponseBody
 
+    /** POST cvs — multipart con el archivo obligatorio en la parte `file`. */
+    @Multipart
+    @POST("cvs")
+    suspend fun createCv(
+        @PartMap fields: Map<String, @JvmSuppressWildcards okhttp3.RequestBody>,
+        @Part file: okhttp3.MultipartBody.Part,
+    ): okhttp3.ResponseBody
+
+    @PATCH("cvs/{id}/move")
+    suspend fun moveCv(
+        @Path("id") id: Long,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
+
     // Client ticket requests (para ventas "leads"/admin "client-tickets")
     @GET("client-ticket-requests")
     suspend fun getClientTicketRequestsRaw(): okhttp3.ResponseBody
@@ -1086,6 +1106,40 @@ interface ExtraApi {
 
     @GET("maintenance-contracts")
     suspend fun getMaintenanceContractsRaw(@Query("status") status: String? = null, @Query("clientId") clientId: String? = null): okhttp3.ResponseBody
+
+    @POST("maintenance-contracts")
+    suspend fun createMaintenanceContract(
+        @Body body: CreateMaintenanceContractRequest,
+    ): okhttp3.ResponseBody
+
+    @PATCH("maintenance-contracts/{id}")
+    suspend fun updateMaintenanceContract(
+        @Path("id") id: Long,
+        @Body body: UpdateMaintenanceContractRequest,
+    ): okhttp3.ResponseBody
+
+    @PATCH("maintenance-contracts/{id}/status")
+    suspend fun setMaintenanceContractStatus(
+        @Path("id") id: Long,
+        @Body body: MaintenanceContractStatusBody,
+    ): okhttp3.ResponseBody
+
+    @GET("maintenance-contracts/visits")
+    suspend fun getMaintenanceContractVisitsRaw(
+        @Query("contractId") contractId: Long? = null,
+        @Query("status") status: String? = null,
+    ): okhttp3.ResponseBody
+
+    @POST("maintenance-contracts/visits/{id}/generate-ot")
+    suspend fun generateMaintenanceVisitOt(
+        @Path("id") visitId: Long,
+        @Body body: GenerateMaintenanceOtBody = GenerateMaintenanceOtBody(),
+    ): okhttp3.ResponseBody
+
+    @POST("maintenance-contracts/visits/{id}/complete")
+    suspend fun completeMaintenanceVisit(
+        @Path("id") visitId: Long,
+    ): okhttp3.ResponseBody
 
     @GET("service-clients/{id}/branches")
     suspend fun getServiceClientBranchesRaw(@retrofit2.http.Path("id") id: String): okhttp3.ResponseBody

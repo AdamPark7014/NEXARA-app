@@ -157,7 +157,10 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
                 arguments = listOf(navArgument("personId") { type = NavType.StringType }),
             ) { backStack ->
                 val personId = backStack.arguments?.getString("personId").orEmpty()
-                IntegraPersonDetailScreen(personId = personId)
+                IntegraPersonDetailScreen(
+                    personId = personId,
+                    onDeleted = { nav.popBackStack() },
+                )
             }
             composable(Attendance) { IntegraAttendanceScreen() }
             composable(Visitors) { IntegraVisitorsScreen() }

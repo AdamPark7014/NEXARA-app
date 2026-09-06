@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, UseGuards, UploadedFiles, UseInterceptors, BadRequestException, Query } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Put, UseGuards, UploadedFiles, UseInterceptors, BadRequestException, Query } from '@nestjs/common';
 import { Param, ParseIntPipe, Res } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -9,6 +9,8 @@ import { InventoriesService } from '../inventories/inventories.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { isFinishedStatus, ACTIVITY_STATUS } from '../activities/activity-status.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Controller('branch-portal')
 @UseGuards(BranchPortalGuard)
@@ -18,6 +20,7 @@ export class BranchPortalController {
     private readonly inventoriesService: InventoriesService,
     private readonly activitiesService: ActivitiesService,
     private readonly serviceClientsService: ServiceClientsService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
   private async resolveClientCompanyId(clientId: number): Promise<number | null> {
@@ -26,6 +29,29 @@ export class BranchPortalController {
       select: { companyId: true },
     });
     return client?.companyId ?? null;
+  }
+
+  private async branchTicketScope(user: any): Promise<{ name?: string | null; branchNumber?: string | null; scope: any[] }> {
+    const branch = await this.prisma['serviceClientBranch'].findFirst({
+      where: { id: user.branchId, clientId: user.clientId },
+      select: { name: true, branchNumber: true },
+    });
+    const scope: any[] = [{ clientTicketRequest: { is: { branchId: user.branchId } } }];
+    if (branch?.branchNumber) scope.push({ branchNumber: branch.branchNumber });
+    if (branch?.name) scope.push({ branchName: branch.name });
+    return { name: branch?.name, branchNumber: branch?.branchNumber, scope };
+  }
+
+  private async findBranchTicket(user: any, id: number, select?: Record<string, boolean>) {
+    const { scope } = await this.branchTicketScope(user);
+    return this.prisma['activity'].findFirst({
+      where: {
+        id,
+        clientId: user.clientId,
+        OR: scope,
+      },
+      ...(select ? { select } : {}),
+    });
   }
 
   @Get('profile')
@@ -218,6 +244,149 @@ export class BranchPortalController {
       },
       include: { responsable: true, evidencias: true, serviceSheet: true, activityEvidence: true },
     });
+  }
+
+  /**
+   * Comentario de sucursal sobre una OT (Activity).
+   * Se appende a comentariosFeedback y notifica al responsable.
+   */
+  @Post('tickets/:id/comments')
+  async ticketComment(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { body?: string },
+  ) {
+    const text = String(body?.body || '').trim();
+    if (text.length < 2) throw new BadRequestException('Comentario demasiado corto');
+    if (text.length > 2000) throw new BadRequestException('Comentario demasiado largo');
+
+    const activity = await this.findBranchTicket(user, id, {
+      id: true,
+      anNumber: true,
+      titulo: true,
+      responsableId: true,
+      comentariosFeedback: true,
+      companyId: true,
+    });
+    if (!activity) throw new BadRequestException('Ticket no encontrado');
+
+    const stamp = new Date().toISOString();
+    const line = `[SUCURSAL ${stamp}] ${text}`;
+    const prev = activity.comentariosFeedback?.trim() || '';
+    const next = prev ? `${prev}\n${line}` : line;
+
+    const updated = await this.prisma['activity'].update({
+      where: { id },
+      data: { comentariosFeedback: next.slice(0, 8000) },
+      select: { id: true, comentariosFeedback: true },
+    });
+
+    void this.notificationHierarchy
+      .notifyPortalTicketComment({
+        activityId: activity.id,
+        anNumber: activity.anNumber,
+        message: text,
+        responsableId: activity.responsableId,
+        companyId: activity.companyId,
+      })
+      .catch(() => undefined);
+
+    return {
+      ok: true,
+      id: updated.id,
+      comentariosFeedback: updated.comentariosFeedback,
+      comment: { at: stamp, body: text, author: 'branch' },
+    };
+  }
+
+  /**
+   * Acciones seguras de sucursal sobre la OT.
+   * CONFIRM_RESOLVED | REQUEST_REOPEN | ACK
+   */
+  @Patch('tickets/:id/status')
+  async ticketBranchStatus(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { action?: string; note?: string },
+  ) {
+    const action = String(body?.action || '').toUpperCase();
+    if (!['CONFIRM_RESOLVED', 'REQUEST_REOPEN', 'ACK'].includes(action)) {
+      throw new BadRequestException('Acción inválida');
+    }
+
+    const activity = await this.findBranchTicket(user, id);
+    if (!activity) throw new BadRequestException('Ticket no encontrado');
+
+    const note = String(body?.note || '').trim();
+    const stamp = new Date().toISOString();
+
+    if (action === 'ACK') {
+      void this.notificationHierarchy
+        .notifyPortalTicketClientAction({
+          action: 'ACK',
+          activityId: activity.id,
+          anNumber: activity.anNumber,
+          title: activity.titulo,
+          note,
+          responsableId: activity.responsableId,
+          companyId: activity.companyId,
+        })
+        .catch(() => undefined);
+      return { ok: true, action, estatus: activity.estatus };
+    }
+
+    if (action === 'CONFIRM_RESOLVED') {
+      if (!isFinishedStatus(activity.estatus)) {
+        throw new BadRequestException('Solo puedes confirmar OT finalizadas');
+      }
+      const line = `[SUCURSAL ${stamp}] CONFIRMÓ resolución${note ? `: ${note}` : ''}`;
+      const prev = activity.comentariosFeedback?.trim() || '';
+      await this.prisma['activity'].update({
+        where: { id },
+        data: {
+          clientSurveyCompletedAt: activity.clientSurveyCompletedAt ?? new Date(),
+          comentariosFeedback: (prev ? `${prev}\n${line}` : line).slice(0, 8000),
+        },
+      });
+      void this.notificationHierarchy
+        .notifyPortalTicketClientAction({
+          action: 'CONFIRM_RESOLVED',
+          activityId: activity.id,
+          anNumber: activity.anNumber,
+          title: activity.titulo,
+          note,
+          responsableId: activity.responsableId,
+          companyId: activity.companyId,
+        })
+        .catch(() => undefined);
+      return { ok: true, action, estatus: activity.estatus };
+    }
+
+    if (!isFinishedStatus(activity.estatus)) {
+      throw new BadRequestException('Solo puedes reabrir OT finalizadas');
+    }
+    const line = `[SUCURSAL ${stamp}] SOLICITÓ reapertura${note ? `: ${note}` : ''}`;
+    const prev = activity.comentariosFeedback?.trim() || '';
+    const updated = await this.prisma['activity'].update({
+      where: { id },
+      data: {
+        estatus: ACTIVITY_STATUS.EN_PROCESO,
+        fechaFinalizacion: null,
+        comentariosFeedback: (prev ? `${prev}\n${line}` : line).slice(0, 8000),
+      },
+    });
+    void this.notificationHierarchy
+      .notifyPortalTicketClientAction({
+        action: 'REQUEST_REOPEN',
+        activityId: activity.id,
+        anNumber: activity.anNumber,
+        title: activity.titulo,
+        note,
+        responsableId: activity.responsableId,
+        companyId: activity.companyId,
+      })
+      .catch(() => undefined);
+    return { ok: true, action, estatus: updated.estatus };
   }
 
   @Get('tickets/:id/report')

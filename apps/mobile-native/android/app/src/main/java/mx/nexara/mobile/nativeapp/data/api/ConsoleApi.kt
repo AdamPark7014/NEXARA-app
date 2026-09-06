@@ -799,7 +799,43 @@ interface ConsoleApi {
     suspend fun deleteSetting(
         @Path("key") key: String,
     ): okhttp3.ResponseBody
+
+    // ── API keys de la empresa (console.admin / company.settings.manage) ────
+
+    @GET("company/api-keys")
+    suspend fun getCompanyApiKeysRaw(): okhttp3.ResponseBody
+
+    @retrofit2.http.POST("company/api-keys")
+    suspend fun createCompanyApiKey(
+        @retrofit2.http.Body body: CreateCompanyApiKeyBody,
+    ): okhttp3.ResponseBody
+
+    @retrofit2.http.DELETE("company/api-keys/{id}")
+    suspend fun revokeCompanyApiKey(
+        @Path("id") id: Long,
+    ): okhttp3.ResponseBody
+
+    // ── Webhooks outbound ──────────────────────────────────────────────────
+
+    @GET("webhooks")
+    suspend fun getWebhooksRaw(): okhttp3.ResponseBody
+
+    @GET("webhooks/dlq")
+    suspend fun getWebhooksDlqRaw(
+        @retrofit2.http.Query("limit") limit: Int = 50,
+    ): okhttp3.ResponseBody
+
+    @retrofit2.http.POST("webhooks/deliveries/{deliveryId}/replay")
+    suspend fun replayWebhookDelivery(
+        @Path("deliveryId") deliveryId: Long,
+    ): okhttp3.ResponseBody
 }
+
+data class CreateCompanyApiKeyBody(
+    val name: String,
+    val scopes: List<String>? = null,
+    val expiresAt: String? = null,
+)
 
 data class CreateOperationalProjectRequest(
     val title: String,

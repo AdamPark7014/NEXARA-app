@@ -22,7 +22,6 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.EmployeePaymentsRichScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ExpensesRichScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.FinesRichScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.InvoicesRichScreen
-import mx.nexara.mobile.nativeapp.ui.console.screens.WorkProjectsRichScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxListRow
@@ -138,7 +137,7 @@ fun ContabilidadNavHost(onExitToPanels: () -> Unit) {
                     "pagos"              -> EmployeePaymentsRichScreen()
                     "viaticos"           -> mx.nexara.mobile.nativeapp.ui.modules.MyViaticsScreen()
                     "multas"             -> FinesRichScreen()
-                    "work-projects"          -> WorkProjectsRichScreen()
+                    "work-projects"          -> ConsoleProjectsScreen()
                     "proyectos"              -> ConsoleProjectsScreen()
                     "horas"              -> mx.nexara.mobile.nativeapp.ui.modules.LunchBreaksModuleScreen()
                     "my-profile"         -> MyProfileScreen()

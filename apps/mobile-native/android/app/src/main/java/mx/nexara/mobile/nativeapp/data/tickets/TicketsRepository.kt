@@ -243,17 +243,21 @@ class TicketsRepository(context: Context) {
         if (isBranchUser()) branchApi.ticket(id = id) else api.getTicket(id = id)
 
     suspend fun postTicketComment(id: Long, body: String) {
+        val payload = PortalTicketCommentBody(body = body.trim())
         if (isBranchUser()) {
-            throw IllegalStateException("Comentarios de OT no disponibles en portal sucursal aún")
+            branchApi.postTicketComment(id, payload)
+        } else {
+            api.postTicketComment(id, payload)
         }
-        api.postTicketComment(id, PortalTicketCommentBody(body = body.trim()))
     }
 
     suspend fun patchTicketStatus(id: Long, action: String, note: String? = null) {
+        val payload = PortalTicketStatusBody(action = action, note = note)
         if (isBranchUser()) {
-            throw IllegalStateException("Acciones de OT no disponibles en portal sucursal aún")
+            branchApi.patchTicketStatus(id, payload)
+        } else {
+            api.patchTicketStatus(id, payload)
         }
-        api.patchTicketStatus(id, PortalTicketStatusBody(action = action, note = note))
     }
 
     suspend fun ticketReportPdfBytes(id: Long): ByteArray {

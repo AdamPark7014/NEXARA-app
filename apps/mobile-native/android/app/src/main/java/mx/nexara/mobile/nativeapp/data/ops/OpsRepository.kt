@@ -60,6 +60,10 @@ class OpsRepository(context: Context) {
         api.assignClientTicket(requestId, mapOf("activityId" to activityId))
     }
 
+    suspend fun patchClientTicketNotes(id: Long, notes: String) {
+        api.patchClientTicketNotes(id, mapOf("notes" to notes))
+    }
+
     suspend fun approvedTicketRequests() = clientTicketRequestDtos("APPROVED")
 
     suspend fun approveRequisition(id: Long) {

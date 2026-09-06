@@ -18,6 +18,7 @@ data class OpsClientTicketRequestDto(
     val address: String = "",
     val clientId: Long? = null,
     val clientName: String = "",
+    val notes: String = "",
     val createdAt: String = "",
     val dueAt: String = "",
 ) {
@@ -40,6 +41,7 @@ data class OpsClientTicketRequestDto(
         put("address", address)
         put("clientId", clientId)
         put("clientName", clientName)
+        put("notes", notes)
         put("createdAt", createdAt)
         put("dueAt", dueAt)
     }
@@ -65,6 +67,7 @@ data class OpsClientTicketRequestDto(
                     client?.get("name"), client?.get("nombre"),
                     row["clientName"], row["client"], row["name"],
                 ),
+                notes = ProcParse.str(row["notes"], row["notas"]),
                 createdAt = ProcParse.str(row["createdAt"], row["fecha"]),
                 dueAt = ProcParse.str(row["dueAt"], row["fechaVencimiento"]),
             )
