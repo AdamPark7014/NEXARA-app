@@ -181,8 +181,8 @@ if ($Seccion -in @('todo', 'video')) {
     Escribir-Hallazgo 'AVISO' 'No se pudo leer /api/streams de go2rtc'
   }
 
-  $camaras = @($nombres | Where-Object { $_ -like 'cam_*' -and $_ -notlike '*_a' })
-  $basura = @($nombres | Where-Object { $_ -like 'pb_*' -or $_ -like 'smoke_*' })
+  $camaras = @($nombres | Where-Object { $_ -like 'cam_*' -and $_ -notlike '*_a' -and $_ -notlike 'cam_pb_*' })
+  $basura = @($nombres | Where-Object { $_ -like 'pb_*' -or $_ -like 'smoke_*' -or $_ -like 'cam_pb_*' })
   Escribir-Hallazgo 'INFO' "$($nombres.Count) streams registrados · $($camaras.Count) camaras · $($basura.Count) restos de playback/prueba"
   if ($basura.Count -gt 5) {
     Escribir-Hallazgo 'AVISO' "Hay $($basura.Count) streams de playback sin borrar. Sus URLs con ?starttime= son lo que corrompe el YAML."
@@ -208,7 +208,15 @@ if ($Seccion -in @('todo', 'video')) {
     $enBase = [int]((Invoke-Sql 'SELECT count(*) FROM integra_cameras').Trim())
     if ($enBase -ne $camaras.Count) {
       Escribir-Hallazgo 'MAL' "Deriva: $enBase camaras en la base, $($camaras.Count) con stream en go2rtc."
-      Escribir-Hallazgo 'INFO' '  Las que faltan salen como hueco en el muro, sin explicacion.'
+      if ($camaras.Count -lt $enBase) {
+        Escribir-Hallazgo 'INFO' '  Las que faltan salen como hueco en el muro, sin explicacion.'
+      } else {
+        # La direccion contraria tambien pasa, y decia lo que no era: sobran
+        # streams en go2rtc. Suelen ser playback huerfanos llamados `cam_pb_*`,
+        # que caen en el cubo de camaras y falsean la cuenta.
+        Escribir-Hallazgo 'INFO' '  Sobran streams en go2rtc: restos que ya no existen en el espejo.'
+        Escribir-Hallazgo 'INFO' '  Mira si son `cam_pb_*`: playback viejos que la limpieza no borro.'
+      }
     } else {
       Escribir-Hallazgo 'OK' "Base y go2rtc coinciden en $enBase camaras"
     }

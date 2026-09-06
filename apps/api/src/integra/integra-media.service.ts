@@ -703,7 +703,13 @@ export class IntegraMediaService {
   private async dropStalePlaybackStreams(cameraIndexCode: string): Promise<void> {
     const internal = this.go2rtcInternal();
     if (!internal) return;
-    const prefix = `pb_${slugDeCamara(cameraIndexCode)}_`;
+    // OJO: el nombre real lo construye `publish()`, que antepone `cam_`. Los
+    // playback acaban llamándose `cam_pb_<camara>_<ts>`, no `pb_<camara>_<ts>`.
+    // Este prefijo estaba escrito a mano sin el `cam_` y por eso la limpieza
+    // NUNCA borró nada: en producción quedaron nueve streams huérfanos, y sus
+    // URLs con `?starttime=` son justo las que corrompieron el YAML de go2rtc.
+    // Se deriva del mismo constructor de nombres para que no vuelvan a divergir.
+    const prefix = `${nombreStreamMuro(`pb_${cameraIndexCode}`)}_`;
     try {
       const res = await fetch(`${internal}/api/streams`);
       if (!res.ok) return;

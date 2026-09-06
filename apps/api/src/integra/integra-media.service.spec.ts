@@ -508,6 +508,30 @@ describe('IntegraMediaService', () => {
     fetchMock.mockRestore();
   });
 
+  it('el prefijo de limpieza de playback casa con el nombre que publish() genera', () => {
+    // Este es el fallo que dejó nueve streams huérfanos en producción durante
+    // días. `publish()` antepone `cam_` a TODO, así que un playback acaba
+    // llamándose `cam_pb_<camara>_<ts>`. La limpieza buscaba `pb_<camara>_` y
+    // nunca casaba, así que no borraba nada — y sus URLs con `?starttime=` son
+    // las que corrompieron el YAML de go2rtc.
+    const camara = '192.168.9.163|101';
+    const nombreReal = nombreStreamMuro(`pb_${camara}_1788559750614`);
+    const prefijoLimpieza = `${nombreStreamMuro(`pb_${camara}`)}_`;
+
+    expect(nombreReal).toBe('cam_pb_192_168_9_163_101_1788559750614');
+    expect(nombreReal.startsWith(prefijoLimpieza)).toBe(true);
+
+    // Y el prefijo mal escrito, el de antes, NO casa. Si alguien lo vuelve a
+    // poner a mano, esta afirmación se lo dice.
+    expect(nombreReal.startsWith('pb_192_168_9_163_101_')).toBe(false);
+  });
+
+  it('la limpieza de una camara no toca los playback de otra', () => {
+    const prefijo163 = `${nombreStreamMuro('pb_192.168.9.163|101')}_`;
+    const otra = nombreStreamMuro('pb_192.168.9.171|102_1788559750614');
+    expect(otra.startsWith(prefijo163)).toBe(false);
+  });
+
   describe('streamsRegistrados', () => {
     it('devuelve los nombres que go2rtc tiene ahora mismo', async () => {
       const { svc } = await build(jest.fn(), null, 'http://go2rtc.test');
