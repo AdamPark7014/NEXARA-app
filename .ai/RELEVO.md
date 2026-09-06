@@ -8,48 +8,38 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Mega-plan paridad móvil W0–W7
+## Este turno — Ola post mega-plan (huecos)
 
-### W0 — Verificación prod (doc)
-- Sonda: `/go2rtc/api/streams` y `/config` aún **200** (filtro Traefik **no desplegado**).
-- Informe: `.ai/auditoria-2026-09/13-w0-verificacion-prod.md`.
-- Adam debe desplegar compose+Traefik y rotar passwords de cámaras.
+### Web RBAC
+- `AppShell` consume `GET /api/me/navigation` (paths + moduleKeys) con fallback local.
+- `me-navigation.ts` usa `buildApiUrl("me/navigation")`.
 
-### W1 — Pantallas desbloqueadas
-- `dispatch` / `chat` / `recruiting` / `my-preferences` en ModulePanelMap + ConsoleAccessRules.
+### Tickets portal
+- API: `POST client-portal/tickets/:id/comments`, `PATCH …/status` (ACK / CONFIRM_RESOLVED / REQUEST_REOPEN).
+- Android detalle OT: comentarios + acciones.
+- Fix web bug: `PATCH client-ticket-requests/:id` notas.
 
-### W2 — Compliance campo
-- Evidencias multi-foto (≥4) + form paso 4; CAMERA runtime; GPS 0,0 bloqueado en cliente.
-- Offline: 401 ya no descarta cola.
-- API `DELETE devices/push-token` + logout Android revoke FCM.
-- Asistencia: `PATCH gps/consent` tras entrada; foto vía `saveBase64Photo`; consent GPS solo con coords válidas.
+### Vehículos
+- `VehicleCheckoutSheet` 9 fotos → start-use / end-use.
 
-### W3 — RBAC una fuente
-- API `GET /api/me/navigation` (`MeModule`) + `/api/me/**` en SHARED_SESSION.
-- url-matrix ADMINISTRATIVO alineado a page-matrix (invoicing/procurement/warehouse/CRM APIs).
-- Android: `roleKey`/`orgRoleKey`/`companyId`/`expiresAt`/`navModuleKeys` en SessionStore; `X-Company-Id`; `auth/session/extend`.
-- ConsoleAccessRules: navModuleKeys del servidor; ingeniero por `roleKey`.
-- Web: `access-matrix` ADMIN_STAFF + `lib/me-navigation.ts`.
+### Cascarones → operar
+- Companies create/edit; banking cuentas; accounting pólizas.
+- Catalog/matriz: users, hr, fines, documents, my-viatics, accounting, banking, companies → NATIVO.
 
-### W4 — Cascarones → operar
-- MyProfile PATCH; MyViatics create; users CRUD mínimo; HR leaves approve; documents upload; vehicles/fines según pantallas tocadas.
+### INTEGRA Bloque 2 ligero
+- Alarmas (ack/clear), occupancy, devices, sites lista.
 
-### W5 — INTEGRA MVP
-- `PanelId.INTEGRA` + hub + IntegraNavHost (Access/Events/People/ACS/Visitors).
-- IntegraApi/Repository contra `/api/integra/**` existentes.
-
-### W6 — Play / push
-- Crashlytics; VERSION_CODE=7; CI job Android assembleDebug+test; FCM deep-link extras.
-
-### W7 — Verdad catálogo
-- `parityStatus` en ModuleCatalog; matriz `docs/native-parity-matrix.md` honesta; script parity bidireccional.
+### Verificación
+- `:app:compileDebugKotlin` OK.
+- `python scripts/check-app-web-parity.py` OK.
 
 ## A medias / Adam
 
-1. **Desplegar** Traefik/API P0 hasta que `/go2rtc/api/streams` → 404; rotar passwords cámaras.
-2. Rebuild AAB firmado Play (VERSION_CODE 7+) y declaraciones Console.
-3. Sidebar web aún no consume `/me/navigation` en runtime (helper listo; access-matrix ya alineado admin).
-4. INTEGRA video wall / ANPR / mapa = Bloque 2.
+1. **Desplegar** Traefik/API P0 → `/go2rtc/api/streams` 404; rotar passwords.
+2. AAB Play VERSION_CODE 7+.
+3. INTEGRA video/ANPR/mapa/detección = Bloque 2.
+4. Portal sucursal: comentarios OT aún no (solo client-portal).
+5. Cascarones restantes: vehicles admin, employee-payments, work-projects, dispatch polish, newsletter admin.
 
 ## No tocar
 
