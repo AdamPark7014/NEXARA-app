@@ -13,6 +13,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
 import kotlin.math.pow
@@ -65,14 +66,26 @@ object OfflineSyncCoordinator {
                     if (now - last < waitMs) continue
                 }
                 try {
-                    val expanded = NexaraOffline.mediaStore().expandMediaRefs(item.body)
-                    val body = expanded?.toRequestBody(item.contentType.toMediaType())
-                    val req = Request.Builder()
+                    val binMatch = Regex("^nexara-media-bin://([0-9a-fA-F\\-]{36})$")
+                        .matchEntire(item.body?.trim().orEmpty())
+                    val body = if (binMatch != null) {
+                        val bytes = NexaraOffline.mediaStore().loadBytes(binMatch.groupValues[1])
+                            ?: throw IOException("offline binary body missing")
+                        bytes.toRequestBody(item.contentType.toMediaType())
+                    } else {
+                        val expanded = NexaraOffline.mediaStore().expandMediaRefs(item.body)
+                        expanded?.toRequestBody(item.contentType.toMediaType())
+                    }
+                    val reqBuilder = Request.Builder()
                         .url(item.url)
                         .method(item.method, body)
                         .header("Authorization", "Bearer $bearerToken")
                         .header("Content-Type", item.contentType)
-                        .build()
+                    val idem = item.idempotencyKey
+                    if (!idem.isNullOrBlank()) {
+                        reqBuilder.header("Idempotency-Key", idem)
+                    }
+                    val req = reqBuilder.build()
                     client.newCall(req).execute().use { res ->
                         when {
                             res.isSuccessful -> {
@@ -166,14 +179,26 @@ object OfflineSyncCoordinator {
         bearerToken: String,
     ): Boolean {
         try {
-            val expanded = NexaraOffline.mediaStore().expandMediaRefs(item.body)
-            val body = expanded?.toRequestBody(item.contentType.toMediaType())
-            val req = Request.Builder()
+            val binMatch = Regex("^nexara-media-bin://([0-9a-fA-F\\-]{36})$")
+                .matchEntire(item.body?.trim().orEmpty())
+            val body = if (binMatch != null) {
+                val bytes = NexaraOffline.mediaStore().loadBytes(binMatch.groupValues[1])
+                    ?: throw IOException("offline binary body missing")
+                bytes.toRequestBody(item.contentType.toMediaType())
+            } else {
+                val expanded = NexaraOffline.mediaStore().expandMediaRefs(item.body)
+                expanded?.toRequestBody(item.contentType.toMediaType())
+            }
+            val reqBuilder = Request.Builder()
                 .url(item.url)
                 .method(item.method, body)
                 .header("Authorization", "Bearer $bearerToken")
                 .header("Content-Type", item.contentType)
-                .build()
+            val idem = item.idempotencyKey
+            if (!idem.isNullOrBlank()) {
+                reqBuilder.header("Idempotency-Key", idem)
+            }
+            val req = reqBuilder.build()
             client.newCall(req).execute().use { res ->
                 when {
                     res.isSuccessful -> {

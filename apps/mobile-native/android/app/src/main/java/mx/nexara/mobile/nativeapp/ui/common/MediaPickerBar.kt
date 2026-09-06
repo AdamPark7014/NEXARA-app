@@ -31,7 +31,9 @@ private fun freshCameraOutputUri(context: Context): Uri {
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, "NEXARA_$timestamp.jpg")
         put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/NEXARA")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/NEXARA")
+        }
     }
     return context.contentResolver.insert(
         MediaStore.Images.Media.EXTERNAL_CONTENT_URI,

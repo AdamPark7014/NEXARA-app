@@ -230,13 +230,19 @@ class ConsoleRepository(context: Context) {
 
     suspend fun attendanceCurrent() = api.getAttendanceCurrent()
 
-    suspend fun attendanceCheckIn(type: String, lat: Double? = null, lng: Double? = null) =
+    suspend fun attendanceCheckIn(
+        type: String,
+        lat: Double? = null,
+        lng: Double? = null,
+        photoBase64: String,
+    ) =
         api.postAttendance(
             mx.nexara.mobile.nativeapp.data.api.AttendanceRegisterRequest(
                 type = type,
                 timestamp = java.time.Instant.now().toString(),
                 latitude = lat,
                 longitude = lng,
+                photoBase64 = photoBase64,
             )
         )
 

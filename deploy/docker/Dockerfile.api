@@ -42,4 +42,6 @@ RUN test -d node_modules/@nestjs/terminus || test -d apps/api/node_modules/@nest
 RUN mkdir -p /app/uploads
 
 EXPOSE 3001
-CMD ["sh", "-c", "cd /app/apps/api && npx prisma migrate deploy && node /app/apps/api/dist/main.js"]
+# Migrations run via deploy/update.sh --with-migrate (or nexara.sh), not at every
+# container start — otherwise every restart serves 502 until prisma finishes.
+CMD ["node", "/app/apps/api/dist/main.js"]

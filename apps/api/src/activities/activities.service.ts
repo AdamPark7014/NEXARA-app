@@ -11,6 +11,9 @@ import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../
 import fs from 'fs/promises';
 import path from 'path';
 
+/** Cap list endpoints when the client omits limit (mobile dashboard was unbounded). */
+const DEFAULT_LIST_TAKE = 200;
+
 @Injectable()
 export class ActivitiesService {
   constructor(
@@ -132,7 +135,12 @@ export class ActivitiesService {
       ]);
       return buildPaginatedResponse(data, total, query);
     }
-    return this.prisma['activity'].findMany({ where, include });
+    return this.prisma['activity'].findMany({
+      where,
+      include,
+      orderBy: { fechaAsignacion: 'desc' },
+      take: DEFAULT_LIST_TAKE,
+    });
   }
 
   async findAllDetailed() {
@@ -234,6 +242,8 @@ export class ActivitiesService {
           },
         },
       },
+      orderBy: { fechaAsignacion: 'desc' },
+      take: DEFAULT_LIST_TAKE,
     });
   }
 
@@ -258,6 +268,8 @@ export class ActivitiesService {
           },
         },
       },
+      orderBy: { fechaAsignacion: 'desc' },
+      take: DEFAULT_LIST_TAKE,
     });
   }
 

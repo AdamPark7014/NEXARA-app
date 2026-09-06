@@ -16,6 +16,12 @@ services:
       - nexara-postgres-data:/var/lib/postgresql/data
     networks:
       - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
@@ -26,6 +32,12 @@ services:
       - nexara-redis-data:/data
     networks:
       - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   api:
     build:
@@ -33,10 +45,14 @@ services:
       dockerfile: deploy/docker/Dockerfile.api
     container_name: nexara-api
     restart: unless-stopped
+    mem_limit: ${API_MEM_LIMIT:-2560m}
     depends_on:
-      - db
-      - redis
-      - go2rtc
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      go2rtc:
+        condition: service_started
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -49,6 +65,11 @@ services:
       JOBS_RUN_WORKERS: ${JOBS_RUN_WORKERS:-1}
       # SaaS hard multi-tenant: set to 0 when all clients send X-Company-Id
       TENANT_ALLOW_PRIMARY_FALLBACK: ${TENANT_ALLOW_PRIMARY_FALLBACK:-1}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+      HTTP_REQUEST_TIMEOUT_MS: ${HTTP_REQUEST_TIMEOUT_MS:-120000}
+      HTTP_KEEPALIVE_TIMEOUT_MS: ${HTTP_KEEPALIVE_TIMEOUT_MS:-95000}
+      HTTP_HEADERS_TIMEOUT_MS: ${HTTP_HEADERS_TIMEOUT_MS:-96000}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       WEB_URL: ${WEB_URL}
@@ -136,6 +157,18 @@ services:
     networks:
       - internal
       - proxy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/api/health/live').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 45s
 
   # Optional dedicated BullMQ consumer: docker compose --profile worker up -d
   # Pair with JOBS_RUN_WORKERS=0 on api to avoid double-consuming.
@@ -147,9 +180,12 @@ services:
     container_name: nexara-worker
     restart: unless-stopped
     depends_on:
-      - db
-      - redis
-      - api
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
@@ -157,7 +193,7 @@ services:
       JOBS_RUN_WORKERS: "1"
       JWT_SECRET: ${JWT_SECRET}
       UPLOADS_ROOT: /app/uploads
-    command: ["sh", "-c", "cd /app/apps/api && node /app/apps/api/dist/worker.js"]
+    command: ["node", "/app/apps/api/dist/worker.js"]
     volumes:
       - ../uploads:/app/uploads
     networks:
@@ -208,6 +244,10 @@ services:
         NEXT_PUBLIC_STATE: ${WEB_NEXT_PUBLIC_STATE}
     container_name: nexara-web
     restart: unless-stopped
+    mem_limit: ${WEB_MEM_LIMIT:-1536m}
+    depends_on:
+      api:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${WEB_NEXT_PUBLIC_API_URL}

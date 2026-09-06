@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsNumber, IsISO8601 } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsISO8601 } from 'class-validator';
 
 export class CreateAttendanceDto {
   @IsEnum(['entrada', 'salida'], { message: 'type debe ser "entrada" o "salida"' })
@@ -8,9 +8,9 @@ export class CreateAttendanceDto {
   @IsISO8601({}, { message: 'timestamp debe ser una fecha ISO8601 válida' })
   timestamp?: string; // ISO8601 string instead of Date
 
-  @IsOptional()
   @IsString({ message: 'photoBase64 debe ser un string' })
-  photoBase64?: string; // Foto en base64 desde la cámara
+  @IsNotEmpty({ message: 'La foto es obligatoria para registrar asistencia' })
+  photoBase64!: string;
 
   @IsOptional()
   @IsNumber({}, { message: 'latitude debe ser un número' })

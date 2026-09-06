@@ -6,6 +6,7 @@ import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.UUID
 
 /**
@@ -22,7 +23,7 @@ class OfflineHttpInterceptor(
         val request = chain.request()
         val method = request.method.uppercase()
         val url = request.url.toString()
-        val authTag = request.header("Authorization")?.take(48) ?: "anon"
+        val authTag = stableAuthTag(request.header("Authorization"))
 
         if (!NetworkMonitor.isOnline.value) {
             if (method == "GET") {
@@ -72,18 +73,27 @@ class OfflineHttpInterceptor(
     }
 
     private fun enqueue(request: okhttp3.Request) {
+        val contentType = request.body?.contentType()?.toString() ?: "application/json"
+        val isMultipart = contentType.startsWith("multipart/", ignoreCase = true)
         val bodyStr = request.body?.let { b ->
             val buffer = okio.Buffer()
             b.writeTo(buffer)
-            buffer.readUtf8()
+            if (isMultipart) {
+                val id = media.saveBytes(buffer.readByteArray(), contentType)
+                    ?: return@let null
+                "nexara-media-bin://$id"
+            } else {
+                media.externalizeDataUrls(buffer.readUtf8())
+            }
         }
         queue.enqueue(
             QueuedMutation(
                 id = UUID.randomUUID().toString(),
                 method = request.method.uppercase(),
                 url = request.url.toString(),
-                body = media.externalizeDataUrls(bodyStr),
-                contentType = request.body?.contentType()?.toString() ?: "application/json",
+                body = bodyStr,
+                contentType = contentType,
+                idempotencyKey = UUID.randomUUID().toString(),
             ),
         )
     }
@@ -100,5 +110,12 @@ class OfflineHttpInterceptor(
 
     companion object {
         private val MUTATING = setOf("POST", "PUT", "PATCH", "DELETE")
+
+        /** Full-token hash — take(48) collided across users on the same device. */
+        fun stableAuthTag(authorization: String?): String {
+            if (authorization.isNullOrBlank()) return "anon"
+            val digest = MessageDigest.getInstance("SHA-256").digest(authorization.toByteArray())
+            return digest.joinToString("") { "%02x".format(it) }
+        }
     }
 }

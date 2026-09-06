@@ -183,12 +183,12 @@ Confirmar contenedores `nexara-api`, `nexara-web`, `nexara-go2rtc`.
 
 ## URGENTE · Credenciales de las cámaras expuestas a internet
 
-**Detectado y verificado el 2026-09-05.** Sin arreglar en el momento de escribir
-esto: el arreglo toca Traefik, que está en la lista de «no tocar» sin permiso.
+**Detectado y verificado el 2026-09-05.** Parche aplicado en
+`deploy/traefik/nexara.yml` (Wave 0 post-auditoría, Traefik autorizado por Adam):
+el router `integra-go2rtc` ya no usa `PathPrefix(/go2rtc)` abierto; enumera rutas
+del navegador. **Tras desplegar Traefik en prod, rotar passwords de cámaras.**
 
-`https://integra.nexara.com.mx/go2rtc/api/streams` responde **HTTP 200 desde
-internet, sin autenticación**, y su cuerpo trae **26 URLs RTSP con el usuario y
-la contraseña de las cámaras en claro**. `…/go2rtc/api/config` filtra otras 13.
+Antes:
 
 Comprobado con `curl` desde fuera de la red, sin credencial ninguna:
 

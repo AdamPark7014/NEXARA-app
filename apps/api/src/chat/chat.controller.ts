@@ -18,6 +18,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ChatService } from './chat.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
+import { RbacGuard } from '../common/rbac.guard.js';
 
 type MulterFile = {
   originalname: string;
@@ -27,7 +29,7 @@ type MulterFile = {
 };
 
 @Controller('chat')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
 export class ChatController {
   constructor(private readonly chat: ChatService) {}
 

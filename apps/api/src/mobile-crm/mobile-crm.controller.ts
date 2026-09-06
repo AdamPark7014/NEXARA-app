@@ -5,6 +5,8 @@ import { CrmActivitiesService } from '../crm-activities/crm-activities.service.j
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
+import { RbacGuard } from '../common/rbac.guard.js';
 import type { SalesLeadStatus } from '@prisma/client';
 
 /**
@@ -21,7 +23,7 @@ import type { SalesLeadStatus } from '@prisma/client';
 const LEADS_ABIERTOS: SalesLeadStatus[] = ['NEW', 'QUALIFIED', 'NURTURING'];
 
 @Controller('mobile/crm')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
 export class MobileCrmController {
   constructor(
     private readonly prisma: PrismaService,

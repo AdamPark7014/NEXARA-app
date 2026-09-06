@@ -93,6 +93,16 @@ export function workDayStart(instante: Date, tz = WORKDAY_TIMEZONE): Date {
   return new Date(t);
 }
 
+/** Instante de un reloj civil (hora:minuto) dentro del día laboral de `instante`. */
+export function workDayAtClock(
+  instante: Date,
+  hour: number,
+  minute = 0,
+  tz = WORKDAY_TIMEZONE,
+): Date {
+  return new Date(workDayStart(instante, tz).getTime() + (hour * 60 + minute) * 60_000);
+}
+
 /** Último milisegundo del día laboral que contiene a `instante`. */
 export function workDayEnd(instante: Date, tz = WORKDAY_TIMEZONE): Date {
   const inicioSiguiente = workDayStart(

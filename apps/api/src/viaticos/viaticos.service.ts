@@ -17,6 +17,9 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, resolveRequiredCompanyId, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
+/** Cap list endpoints when the client omits limit (mobile dashboard was unbounded). */
+const DEFAULT_LIST_TAKE = 200;
+
 export const VIATIC_CATEGORIES = [
   'COMBUSTIBLE',
   'CASETA',
@@ -345,6 +348,7 @@ export class ViaticosService {
       where,
       include,
       orderBy: { fechaSolicitud: 'desc' },
+      take: DEFAULT_LIST_TAKE,
     });
     return data.map(mapRow);
   }
