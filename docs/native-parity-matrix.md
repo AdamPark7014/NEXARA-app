@@ -45,7 +45,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Evidencias | `/operacion/evidences` | NATIVO · flujo 5 pasos + aprobar | NATIVO |
 | Mis evidencias | `/operacion/my-evidences` | NATIVO | NATIVO |
 | Viáticos (revisión) | `/operacion/viatics` | NATIVO · approveViatic | NATIVO |
-| Mis viáticos | `/operacion/my-viatics` | CASCARON · solo lista | CASCARON |
+| Mis viáticos | `/operacion/my-viatics` | NATIVO · create + estatus | NATIVO |
 | Vehículos | `/operacion/vehicles` | CASCARON · solo lista | CASCARON |
 | Mis vehículos | `/operacion/my-vehicles` | NATIVO · solicitud + salida/devolución 9 fotos | NATIVO |
 | GPS | `/operacion/gps` | NATIVO · ConsoleGpsScreen | NATIVO |
@@ -53,17 +53,17 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Clientes | `/console/clients` | NATIVO · CRUD | NATIVO |
 | Proyectos | `/operacion/projects` | NATIVO · patchProjectStatus | NATIVO |
 | Proyectos internos | `/operacion/work-projects` | CASCARON · WorkProjectsRichScreen | CASCARON |
-| Usuarios | `/console/users` | CASCARON · sin alta/edición | CASCARON |
+| Usuarios | `/console/users` | NATIVO · create/edit | NATIVO |
 | Asistencia | `/console/attendance` | NATIVO · check-in geo + foto | NATIVO |
 | Comidas (admin) | `/console/lunch-breaks` | NATIVO · KPIs + check-in/out | NATIVO |
 | Mis comidas | `/console/my-lunch-breaks` | NATIVO | NATIVO |
-| RRHH | `/console/hr` | CASCARON · sin aprobar vacaciones | CASCARON |
+| RRHH | `/console/hr` | NATIVO · aprobar ausencias | NATIVO |
 | Pagos empleados | `/console/employee-payments` | CASCARON | CASCARON |
-| Contabilidad | `/console/accounting` | CASCARON · sin pólizas | CASCARON |
-| Banca | `/console/banking` | SOLO_LECTURA · BankingRichScreen | SOLO_LECTURA |
+| Contabilidad | `/console/accounting` | NATIVO · pólizas create/post | NATIVO |
+| Banca | `/console/banking` | NATIVO · cuentas | NATIVO |
 | Facturación | `/console/invoicing` | NATIVO · pagos/match | NATIVO |
 | Gastos | `/console/expenses` | NATIVO · create/approve | NATIVO |
-| Multas | `/console/fines` | CASCARON | CASCARON |
+| Multas | `/console/fines` | NATIVO · approve/reject | NATIVO |
 | Cotizaciones ERP | `/console/cotizaciones` | SOLO_LECTURA | SOLO_LECTURA |
 | Gestión vendedores | `/console/gestion-vendedores` | SOLO_LECTURA · VentasSalesTeamScreen | SOLO_LECTURA |
 | Vista ejecutiva | `/erp/executive` | SOLO_LECTURA · ExecutiveScreen | SOLO_LECTURA |
@@ -80,7 +80,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Compras | `/console/procurement` | NATIVO · approve/reject req | NATIVO |
 | Mantenimiento | `/operacion/maintenance` | NATIVO · OT start/complete | NATIVO |
 | Hojas de servicio | `/operacion/service-sheets` | NATIVO · ServiceSheetsModuleScreen | NATIVO |
-| Documentos | `/console/documents` | CASCARON · CatalogRichScreen | CASCARON |
+| Documentos | `/console/documents` | NATIVO · upload | NATIVO |
 | CVs | `/console/cvs` | CASCARON | CASCARON |
 | Reclutamiento | `/ops/recruiting` | CASCARON · inalcanzable en sidebar | CASCARON |
 | Tickets clientes | `/operacion/client-tickets` | NATIVO · ClientTicketsModuleScreen | NATIVO |
@@ -96,7 +96,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Mis preferencias | `/console/my-preferences` | SOLO_LECTURA | SOLO_LECTURA |
 | Cola offline | `/console/offline-queue` | NATIVO · OfflineQueueScreen | NATIVO |
 | Ajustes | `/console/settings` | NATIVO · parcial (faltan api-keys/webhooks) | NATIVO |
-| Multi-empresa | `/erp/companies` | CASCARON | CASCARON |
+| Multi-empresa | `/erp/companies` | NATIVO · create/edit | NATIVO |
 | Knowledge Base | `/erp/kb` | SOLO_LECTURA | SOLO_LECTURA |
 | Exportaciones | `/erp/exports` | NATIVO · CSV + share | NATIVO |
 | Arquitectura | `/erp/architecture` | CASCARON · catálogo local | CASCARON |
@@ -137,8 +137,8 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Module | Web route (catalog) | Android | iOS |
 |---|---|---|---|
 | Dashboard | `/contabilidad/dashboard` | SOLO_LECTURA | SOLO_LECTURA |
-| Contabilidad | `/contabilidad/accounting` | CASCARON | CASCARON |
-| Banca | `/contabilidad/banking` | SOLO_LECTURA | SOLO_LECTURA |
+| Contabilidad | `/contabilidad/accounting` | NATIVO · pólizas | NATIVO |
+| Banca | `/contabilidad/banking` | NATIVO · cuentas | NATIVO |
 | Facturación | `/contabilidad/invoicing` | NATIVO | NATIVO |
 | Gastos | `/contabilidad/expenses` | NATIVO | NATIVO |
 | Pagos empleados | `/contabilidad/employee-payments` | CASCARON | CASCARON |
@@ -182,22 +182,24 @@ MVP operativo contra `/api/integra/**` (sin inventar ISAPI).
 
 | Module | Web route | Android | iOS |
 |---|---|---|---|
-| Inicio hub | `/integra` | NATIVO · IntegraNavHost | AUSENTE |
+| Inicio hub | `/integra/` | NATIVO · IntegraNavHost | AUSENTE |
 | Accesos | `/integra/access` | NATIVO · puertas + open | AUSENTE |
 | Eventos | `/integra/events` | NATIVO · lista | AUSENTE |
 | Personas | `/integra/people` | NATIVO · lista/detalle | AUSENTE |
 | Asistencia ACS | `/integra/attendance` | NATIVO · lista | AUSENTE |
 | Visitas | `/integra/visitors` | NATIVO · lista + registro | AUSENTE |
+| Alarmas | `/integra/alarms` | NATIVO · queue + ack/clear | AUSENTE |
+| En sitio | `/integra/access` | NATIVO · occupancy API (webPath→access) | AUSENTE |
+| Equipos | `/integra/access` | NATIVO · devices API (webPath→access) | AUSENTE |
+| Sitios | `/integra/settings` | SOLO_LECTURA · lista | AUSENTE |
 | Video 24h | `/integra/video` | AUSENTE · Bloque 2 | AUSENTE |
 | Detección | `/integra/detection` | AUSENTE · Bloque 2 | AUSENTE |
-| Alarmas | `/integra/alarms` | AUSENTE · Bloque 2 | AUSENTE |
 | ANPR | `/integra/anpr` | AUSENTE · Bloque 2 | AUSENTE |
 | Plano | `/integra/map` | AUSENTE · Bloque 2 | AUSENTE |
 | Vehículos ACS | `/integra/vehicles` | AUSENTE | AUSENTE |
-| Sitios | `/integra/settings` | AUSENTE | AUSENTE |
 | Auditoría | `/integra/audit` | AUSENTE | AUSENTE |
-| Notificaciones | `/integra/notifications-center` | AUSENTE · WIP | AUSENTE |
-| Mi perfil | `/integra/my-profile` | AUSENTE · WIP | AUSENTE |
+| Notificaciones | `/integra/notifications-center` | AUSENTE | AUSENTE |
+| Mi perfil | `/integra/my-profile` | AUSENTE | AUSENTE |
 
 ## Portal clientes (TicketsNavHost — fuera del catálogo ERP)
 
