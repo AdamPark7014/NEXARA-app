@@ -179,6 +179,44 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * Notificar que un ingeniero inició trabajo en campo (estatus → En Proceso).
+   * Supervisor ve quién arrancó qué OT.
+   */
+  async notifyActivityStarted(
+    actorId: number,
+    activityId: number,
+    activityTitle: string,
+    actorName: string,
+    responsableId?: number | null,
+  ) {
+    try {
+      const url = appUrls.opsActivity(activityId);
+      const supervisors = await this.getSupervisors(actorId);
+      const targets = new Set<number>();
+      for (const s of supervisors) targets.add(s.id);
+      if (responsableId && responsableId !== actorId) targets.add(responsableId);
+
+      for (const userId of targets) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_STARTED',
+          category: 'activities',
+          title: 'OT iniciada en campo',
+          message: `${actorName} inició "${activityTitle}"`,
+          triggerUserId: actorId,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: url,
+          priority: 'normal',
+          channel: 'ops',
+        });
+      }
+    } catch (error) {
+      this.logger.error(`Error notifying activity started:`, error);
+    }
+  }
+
+  /**
    * Notificar asignación de actividad
    * Usuario asignado -> Recibe notificación
    * Admin -> Notificación que se asignó una actividad
@@ -199,7 +237,7 @@ export class NotificationHierarchyService {
         message: `Se te ha asignado: "${activityTitle}". Revísala en tu plataforma.`,
         relatedEntityId: activityId,
         entityType: 'Activity',
-        relatedUrl: `/ops/activities/${activityId}`,
+        relatedUrl: appUrls.opsActivity(activityId),
         priority: 'high',
       });
 
@@ -214,7 +252,7 @@ export class NotificationHierarchyService {
           message: `${assignedByName} asignó "${activityTitle}" a un miembro del equipo`,
           relatedEntityId: activityId,
           entityType: 'Activity',
-          relatedUrl: `/ops/activities/${activityId}`,
+          relatedUrl: appUrls.opsActivity(activityId),
         });
       }
     } catch (error) {

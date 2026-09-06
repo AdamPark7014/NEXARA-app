@@ -832,6 +832,25 @@ const updatedActivity = await this.prisma['activity'].update({
           .notifyActivityMarkedFinished(actor.id, id, label, actorName, updatedActivity.responsableId)
           .catch(() => undefined);
       }
+      if (
+        /en\s*proceso|en_proceso|enproceso|en_progreso/i.test(nextStatus) &&
+        !/en\s*proceso|en_proceso|enproceso|en_progreso/i.test(prevStatus)
+      ) {
+        const label =
+          (updatedActivity.anNumber && String(updatedActivity.anNumber).trim()) ||
+          (updatedActivity.titulo && String(updatedActivity.titulo).trim()) ||
+          `Actividad ${id}`;
+        const actorName = String(actor.nombre || 'Usuario').trim() || 'Usuario';
+        void this.notificationHierarchy
+          .notifyActivityStarted(
+            actor.id,
+            id,
+            label,
+            actorName,
+            updatedActivity.responsableId,
+          )
+          .catch(() => undefined);
+      }
     }
 
     this.domainEvents.publishEntityLifecycle('updated', {

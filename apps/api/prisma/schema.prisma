@@ -2303,6 +2303,8 @@ enum NotificationType {
 
   // Actividad marcada como finalizada en campo
   ACTIVITY_COMPLETED
+  // Ingeniero inició OT en campo
+  ACTIVITY_STARTED
 
   // Compras / almacén / calidad (ERP)
   PURCHASE_REQUISITION_CREATED

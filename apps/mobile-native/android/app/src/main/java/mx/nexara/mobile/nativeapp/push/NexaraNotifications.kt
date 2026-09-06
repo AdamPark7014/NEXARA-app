@@ -20,9 +20,14 @@ object NexaraNotifications {
     const val CHANNEL_ALERTS = "nexara_alerts"
     const val CHANNEL_TICKETS = "nexara_tickets"
     const val CHANNEL_GPS = "nexara_gps"
+    const val CHANNEL_OPS = "nexara_ops"
+    const val CHANNEL_CHAT = "nexara_chat"
+    const val CHANNEL_APPROVALS = "nexara_approvals"
 
     /** Valores de `channel` en payload FCM que enrutan la notificación, no el chat. */
-    private val ROUTING_CHANNEL_KEYS = setOf("alerts", "tickets", "gps", "default")
+    private val ROUTING_CHANNEL_KEYS = setOf(
+        "alerts", "tickets", "gps", "default", "ops", "chat", "approvals",
+    )
 
     /** Extrae datos de deep link del payload FCM, sin mezclar canal de notificación con chat. */
     fun deepLinkDataFrom(data: Map<String, String>): Map<String, String> {
@@ -38,6 +43,9 @@ object NexaraNotifications {
         "alerts" -> CHANNEL_ALERTS
         "tickets" -> CHANNEL_TICKETS
         "gps" -> CHANNEL_GPS
+        "ops" -> CHANNEL_OPS
+        "chat" -> CHANNEL_CHAT
+        "approvals" -> CHANNEL_APPROVALS
         else -> CHANNEL_DEFAULT
     }
 
@@ -53,6 +61,12 @@ object NexaraNotifications {
                 .apply { description = "Tickets nuevos y actualizaciones" },
             NotificationChannel(CHANNEL_GPS, "Seguimiento", NotificationManager.IMPORTANCE_LOW)
                 .apply { description = "Estado de envío de ubicación en segundo plano" },
+            NotificationChannel(CHANNEL_OPS, "Operación", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Actividades, evidencias, viáticos y despacho" },
+            NotificationChannel(CHANNEL_CHAT, "Chat", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Menciones y mensajes del equipo" },
+            NotificationChannel(CHANNEL_APPROVALS, "Aprobaciones", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Flujos de aprobación y validaciones" },
         )
         channels.forEach { nm.createNotificationChannel(it) }
     }
@@ -67,29 +81,39 @@ object NexaraNotifications {
     ) {
         ensureChannels(context)
         val linkData = deepLinkDataFrom(data)
+        // ID estable: colapsa actualizaciones de la misma entidad/acción.
+        val stableId = data["nexara_notification_id"]?.toIntOrNull()
+            ?: data["tag"]?.hashCode()
+            ?: data["collapse_key"]?.hashCode()
+            ?: notificationId
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             linkData.forEach { (k, v) -> putExtra("nexara_$k", v) }
+            data["url"]?.takeIf { it.isNotBlank() }?.let { putExtra("nexara_url", it) }
         }
         val pending = PendingIntent.getActivity(
             context,
-            notificationId,
+            stableId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val high = data["priority"]?.equals("high", ignoreCase = true) == true ||
+            channel == CHANNEL_ALERTS || channel == CHANNEL_TICKETS || channel == CHANNEL_OPS
         val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title ?: "NEXARA")
             .setContentText(body ?: "")
             .setAutoCancel(true)
             .setContentIntent(pending)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(if (high) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+        data["tag"]?.takeIf { it.isNotBlank() }?.let { builder.setGroup(it) }
         if (!body.isNullOrBlank()) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
         }
         val nm = androidx.core.app.NotificationManagerCompat.from(context)
         try {
-            nm.notify(notificationId, builder.build())
+            nm.notify(stableId, builder.build())
         } catch (_: SecurityException) {
             // Sin permiso POST_NOTIFICATIONS en Android 13+ -> ignorar silenciosamente.
         }

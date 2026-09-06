@@ -13,6 +13,12 @@ export type PushPayload = {
   tag?: string;
   /** ID de fila Notification para dedupe / trazabilidad en cliente. */
   notificationId?: number;
+  /** Canal de routing Android (ops/tickets/alerts/…). */
+  channel?: string;
+  /** Tipo/evento de dominio (ACTIVITY_STARTED, …). */
+  event?: string;
+  /** Collapse key FCM — una acción/entidad = una tarjeta en bandeja. */
+  collapseKey?: string;
 };
 
 @Injectable()
@@ -61,8 +67,14 @@ export class PushDispatchService {
     const rows = await this.prisma.userPushEndpoint.findMany({ where: { userId } });
 
     const priority = payload.priority || 'normal';
-    const tag = payload.tag || (payload.notificationId ? `nexara-${payload.notificationId}` : `nexara-${userId}-${Date.now()}`);
+    const collapseKey =
+      payload.collapseKey ||
+      payload.tag ||
+      (payload.notificationId ? `nexara-${payload.notificationId}` : `nexara-${userId}-${Date.now()}`);
+    const tag = payload.tag || collapseKey;
     const nid = payload.notificationId != null ? String(payload.notificationId) : '';
+    const channel = payload.channel || 'default';
+    const event = payload.event || '';
 
     const data: Record<string, string> = {
       title: payload.title,
@@ -70,6 +82,9 @@ export class PushDispatchService {
       url: payload.relatedUrl || '',
       priority,
       tag,
+      channel,
+      event,
+      collapse_key: collapseKey,
       nexara_notification_id: nid,
     };
 
@@ -88,15 +103,25 @@ export class PushDispatchService {
               url: data.url,
               priority,
               tag,
+              channel,
+              event,
+              collapse_key: collapseKey,
               nexara_notification_id: nid,
             },
             android: {
               priority: priority === 'high' ? 'high' : 'normal',
+              collapseKey,
+              notification: {
+                tag,
+                channelId: channel === 'default' ? 'nexara_default' : `nexara_${channel}`,
+                priority: priority === 'high' ? 'high' : 'default',
+              },
             },
             apns: {
               payload: {
                 aps: {
                   sound: 'default',
+                  threadId: collapseKey,
                   ...(priority === 'high' ? { contentAvailable: true } : {}),
                 },
               },
