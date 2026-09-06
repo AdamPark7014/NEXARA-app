@@ -36,6 +36,8 @@ import androidx.compose.material3.MaterialTheme
 
 import androidx.compose.material3.OutlinedButton
 
+import androidx.compose.material3.OutlinedTextField
+
 import androidx.compose.material3.Text
 
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -113,6 +115,10 @@ data class TicketDetailUiState(
     val ticket: ClientPortalTicketDto? = null,
 
     val downloading: Boolean = false,
+
+    val saving: Boolean = false,
+
+    val commentDraft: String = "",
 
 )
 
@@ -233,6 +239,94 @@ class TicketDetailViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
 
                 _state.update { it.copy(downloading = false) }
+
+            }
+
+        }
+
+    }
+
+
+
+    fun setCommentDraft(text: String) {
+
+        _state.update { it.copy(commentDraft = text) }
+
+    }
+
+
+
+    fun postComment(ticketId: Long?) {
+
+        if (ticketId == null) return
+
+        val body = _state.value.commentDraft.trim()
+
+        if (body.isBlank()) return
+
+        _state.update { it.copy(saving = true, error = null) }
+
+        viewModelScope.launch {
+
+            try {
+
+                withContext(Dispatchers.IO) { repo.postTicketComment(ticketId, body) }
+
+                _state.update { it.copy(saving = false, commentDraft = "") }
+
+                load(ticketId, initial = false)
+
+            } catch (e: Exception) {
+
+                _state.update {
+
+                    it.copy(
+
+                        saving = false,
+
+                        error = e.toUserMessage("No se pudo enviar el comentario"),
+
+                    )
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+
+    fun patchStatus(ticketId: Long?, action: String, note: String? = null) {
+
+        if (ticketId == null) return
+
+        _state.update { it.copy(saving = true, error = null) }
+
+        viewModelScope.launch {
+
+            try {
+
+                withContext(Dispatchers.IO) { repo.patchTicketStatus(ticketId, action, note) }
+
+                _state.update { it.copy(saving = false) }
+
+                load(ticketId, initial = false)
+
+            } catch (e: Exception) {
+
+                _state.update {
+
+                    it.copy(
+
+                        saving = false,
+
+                        error = e.toUserMessage("No se pudo actualizar el ticket"),
+
+                    )
+
+                }
 
             }
 
@@ -544,11 +638,121 @@ fun TicketsTicketDetailScreen(
 
                         item {
 
+                            NxPanelShell(contentPadding = PaddingValues(14.dp)) {
+
+                                Text("Comentarios", fontWeight = FontWeight.SemiBold)
+
+                                val feedback = t.comentariosFeedback?.trim().orEmpty()
+
+                                if (feedback.isNotBlank()) {
+
+                                    feedback.lines().filter { it.isNotBlank() }.forEach { line ->
+
+                                        Text(line, style = MaterialTheme.typography.bodySmall)
+
+                                    }
+
+                                } else {
+
+                                    Text(
+
+                                        "Sin comentarios",
+
+                                        style = MaterialTheme.typography.bodySmall,
+
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+                                    )
+
+                                }
+
+                                Spacer(Modifier.height(8.dp))
+
+                                OutlinedTextField(
+
+                                    value = state.commentDraft,
+
+                                    onValueChange = { vm.setCommentDraft(it) },
+
+                                    label = { Text("Nuevo comentario") },
+
+                                    modifier = Modifier.fillMaxWidth(),
+
+                                    minLines = 2,
+
+                                    enabled = !state.saving,
+
+                                )
+
+                                Button(
+
+                                    onClick = { vm.postComment(ticketId) },
+
+                                    enabled = !state.saving && state.commentDraft.isNotBlank(),
+
+                                    modifier = Modifier.fillMaxWidth(),
+
+                                ) { Text(if (state.saving) "Enviando…" else "Enviar comentario") }
+
+                            }
+
+                        }
+
+
+
+                        item {
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
+                                if (!t.isOpen()) {
+
+                                    Button(
+
+                                        onClick = { vm.patchStatus(ticketId, "CONFIRM_RESOLVED") },
+
+                                        enabled = !state.saving,
+
+                                        modifier = Modifier.fillMaxWidth(),
+
+                                    ) { Text("Confirmar resolución") }
+
+                                    OutlinedButton(
+
+                                        onClick = { vm.patchStatus(ticketId, "REQUEST_REOPEN") },
+
+                                        enabled = !state.saving,
+
+                                        modifier = Modifier.fillMaxWidth(),
+
+                                    ) { Text("Solicitar reapertura") }
+
+                                } else {
+
+                                    OutlinedButton(
+
+                                        onClick = { vm.patchStatus(ticketId, "ACK") },
+
+                                        enabled = !state.saving,
+
+                                        modifier = Modifier.fillMaxWidth(),
+
+                                    ) { Text("Acusar recibo") }
+
+                                }
+
+                            }
+
+                        }
+
+
+
+                        item {
+
                             Button(
 
                                 onClick = { vm.downloadReport(ticketId) },
 
-                                enabled = !state.downloading,
+                                enabled = !state.downloading && !state.saving,
 
                                 modifier = Modifier.fillMaxWidth(),
 

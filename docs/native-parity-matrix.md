@@ -209,7 +209,7 @@ MVP operativo contra `/api/integra/**` (sin inventar ISAPI).
 | Inventarios sync | — | NATIVO | NATIVO |
 | Feedback | — | NATIVO | NATIVO |
 | Perfil | — | NATIVO · updateProfile | NATIVO |
-| Detalle ticket | — | CASCARON · sin comentar/cerrar | CASCARON |
+| Detalle ticket | — | NATIVO · comentarios + acciones estado | NATIVO |
 
 ## Cross-cutting
 
