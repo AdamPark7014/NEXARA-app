@@ -38,6 +38,9 @@ class NexaraNotificationsTest {
     @Test
     fun notificationChannelFrom_mapsRoutingKeys() {
         assertEquals(NexaraNotifications.CHANNEL_TICKETS, NexaraNotifications.notificationChannelFrom("tickets"))
+        assertEquals(NexaraNotifications.CHANNEL_OPS, NexaraNotifications.notificationChannelFrom("ops"))
+        assertEquals(NexaraNotifications.CHANNEL_CHAT, NexaraNotifications.notificationChannelFrom("chat"))
+        assertEquals(NexaraNotifications.CHANNEL_APPROVALS, NexaraNotifications.notificationChannelFrom("approvals"))
         assertEquals(NexaraNotifications.CHANNEL_DEFAULT, NexaraNotifications.notificationChannelFrom("9"))
     }
 }

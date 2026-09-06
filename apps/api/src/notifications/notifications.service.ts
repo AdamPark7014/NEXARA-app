@@ -6,6 +6,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { PushDispatchService } from '../devices/push-dispatch.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
+import { buildCollapseKey, channelForCategory } from './notification-push-meta.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -20,6 +21,14 @@ export interface INotificationPayload {
   relatedUrl?: string;
   priority?: 'high' | 'normal' | 'low';
   companyId?: number | null;
+  /** Canal Android (ops/tickets/…); si falta se deriva de category. */
+  channel?: string;
+  /** Collapse key FCM; si falta se deriva de type+entity+user. */
+  collapseKey?: string;
+  /** No notificar al actor (default true cuando hay triggerUserId). */
+  excludeActor?: boolean;
+  /** Ventana de dedupe en segundos (default 120). 0 = sin dedupe. */
+  dedupeSeconds?: number;
 }
 
 @Injectable()
@@ -281,10 +290,39 @@ export class NotificationsService {
   }
 
   /**
-   * Crear notificación individual con opciones completas
+   * Crear notificación individual con opciones completas.
+   * Push eficiente: canal + collapseKey; dedupe corto; no auto-notif al actor.
    */
   async createNotification(payload: INotificationPayload) {
     try {
+      if (
+        payload.excludeActor !== false &&
+        payload.triggerUserId != null &&
+        payload.triggerUserId === payload.userId
+      ) {
+        return null;
+      }
+
+      const dedupeSeconds = payload.dedupeSeconds === 0 ? 0 : payload.dedupeSeconds ?? 120;
+      if (dedupeSeconds > 0 && payload.relatedEntityId != null) {
+        const since = new Date(Date.now() - dedupeSeconds * 1000);
+        const dup = await this.prisma.notification.findFirst({
+          where: {
+            userId: payload.userId,
+            type: payload.type as NotificationType,
+            relatedEntityId: payload.relatedEntityId,
+            createdAt: { gte: since },
+          },
+          select: { id: true },
+        });
+        if (dup) {
+          this.logger.debug(
+            `Dedupe skip user=${payload.userId} type=${payload.type} entity=${payload.relatedEntityId}`,
+          );
+          return dup;
+        }
+      }
+
       const stampedCompanyId =
         payload.companyId ??
         getRequestCompanyId() ??
@@ -323,6 +361,16 @@ export class NotificationsService {
         });
       }
 
+      const channel = payload.channel || channelForCategory(payload.category);
+      const collapseKey =
+        payload.collapseKey ||
+        buildCollapseKey({
+          type: String(payload.type),
+          entityType: payload.entityType,
+          entityId: payload.relatedEntityId,
+          userId: payload.userId,
+        });
+
       void this.pushDispatch
         .sendToUser(payload.userId, {
           title: payload.title,
@@ -330,7 +378,10 @@ export class NotificationsService {
           relatedUrl: payload.relatedUrl,
           priority: payload.priority || 'normal',
           notificationId: notification.id,
-          tag: `nexara-${notification.id}`,
+          tag: collapseKey,
+          channel,
+          event: String(payload.type),
+          collapseKey,
         })
         .catch((err) => this.logger.warn(`Push dispatch: ${err instanceof Error ? err.message : err}`));
 
