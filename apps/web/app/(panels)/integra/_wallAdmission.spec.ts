@@ -17,15 +17,23 @@ import { WALL_CONNECT_CONCURRENCY, admitirMosaicos } from "./_wallAdmission";
 const celdas = (...ids: Array<string | null>) => ids.map((id) => (id ? { id } : null));
 
 describe("admisión del muro", () => {
-  it("deja arrancar solo a tres a la vez; el resto espera", () => {
-    const ids = admitirMosaicos(celdas("a", "b", "c", "d", "e"), {});
+  it("deja arrancar solo a las del tope; el resto espera", () => {
+    // El tope va explícito: lo que se prueba es la propiedad, no el número.
+    // Cuando el valor por defecto subió de 3 a 8, estas afirmaciones literales
+    // se cayeron sin que el comportamiento hubiera cambiado en nada.
+    const ids = admitirMosaicos(celdas("a", "b", "c", "d", "e"), {}, 3);
     expect([...ids]).toEqual(["a", "b", "c"]);
-    expect(ids.size).toBe(WALL_CONNECT_CONCURRENCY);
+    expect(ids.size).toBe(3);
+  });
+
+  it("por defecto usa WALL_CONNECT_CONCURRENCY", () => {
+    const muchas = Array.from({ length: WALL_CONNECT_CONCURRENCY + 4 }, (_, i) => `c${i}`);
+    expect(admitirMosaicos(celdas(...muchas), {}).size).toBe(WALL_CONNECT_CONCURRENCY);
   });
 
   it("en cuanto una se asienta, entra la siguiente de la cola", () => {
     const estado: Record<string, PlayerState> = { a: "live", b: "loading", c: "loading" };
-    const ids = admitirMosaicos(celdas("a", "b", "c", "d", "e"), estado);
+    const ids = admitirMosaicos(celdas("a", "b", "c", "d", "e"), estado, 3);
     // «a» sigue admitida —está viva— y además libera su turno para «d».
     expect([...ids]).toEqual(["a", "b", "c", "d"]);
   });
@@ -44,7 +52,7 @@ describe("admisión del muro", () => {
   });
 
   it("las celdas vacías de la rejilla no cuentan para nada", () => {
-    const ids = admitirMosaicos(celdas("a", null, "b", null, "c", "d"), {});
+    const ids = admitirMosaicos(celdas("a", null, "b", null, "c", "d"), {}, 3);
     expect([...ids]).toEqual(["a", "b", "c"]);
   });
 
@@ -58,7 +66,7 @@ describe("admisión del muro", () => {
       b: "offscreen",
       c: "offscreen",
     };
-    const ids = admitirMosaicos(celdas("a", "b", "c", "d", "e", "f", "g"), estado);
+    const ids = admitirMosaicos(celdas("a", "b", "c", "d", "e", "f", "g"), estado, 3);
     expect(ids.has("a")).toBe(false);
     expect([...ids]).toEqual(["d", "e", "f"]);
   });
@@ -75,7 +83,7 @@ describe("admisión del muro", () => {
 
   it("un mosaico invisible entre visibles no roba el turno de nadie", () => {
     const estado: Record<string, PlayerState> = { b: "offscreen" };
-    const ids = admitirMosaicos(celdas("a", "b", "c", "d", "e"), estado);
+    const ids = admitirMosaicos(celdas("a", "b", "c", "d", "e"), estado, 3);
     expect([...ids]).toEqual(["a", "c", "d"]);
   });
 

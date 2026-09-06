@@ -139,11 +139,14 @@ const LAYOUT_KEY = "nexara_integra_video_layout";
 const MODE_KEY = "nexara_integra_video_mode";
 const AUTOOPEN_KEY = "nexara_integra_video_autoopen";
 /**
- * Turno entre arranques dentro de una misma tanda. Ya no carga con todo el peso
- * — de eso se encarga el control de admisión de abajo — así que basta con
- * separar los handshakes unos cientos de ms.
+ * Turno entre arranques dentro de una misma tanda.
+ *
+ * Eran 250 ms cuando el tope de admisión era 3 y abrir costaba caro. Con ocho
+ * admitidos a la vez, 250 ms harían que el octavo empezara **1,75 s tarde** por
+ * nada: el control de admisión ya evita la avalancha, y esto solo tiene que
+ * impedir que ocho `new WebSocket` salgan en el mismo tick del navegador.
  */
-const STAGGER_MS = 250;
+const STAGGER_MS = 60;
 
 function colsFor(layout: LayoutN): number {
   if (layout === 1) return 1;
