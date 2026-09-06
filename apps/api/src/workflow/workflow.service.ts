@@ -8,6 +8,7 @@ import {
 } from '../common/tenant/tenant-scope.js';
 import { matchesAutoApproveCondition } from './workflow-auto-approve-condition.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import { appUrls } from '../common/app-urls.js';
 
 @Injectable()
 export class WorkflowService {
@@ -297,10 +298,14 @@ export class WorkflowService {
         userId: inst.startedById,
         type: 'WORKFLOW_REJECTED',
         category: 'workflow',
+        channel: 'approvals',
         title: '❌ Solicitud rechazada',
         message: `Tu solicitud "${inst.workflow.name}" para ${inst.entityType} #${inst.entityId} fue rechazada. ${comments ? `Motivo: ${comments}` : ''}`,
         entityType: inst.entityType,
         relatedEntityId: inst.entityId,
+        relatedUrl: appUrls.erpApprovals(inst.id),
+        triggerUserId: userId,
+        excludeActor: true,
       } as any).catch(() => null);
       this.domainEvents.publishEntityLifecycle('updated', {
         entityType: inst.entityType,
@@ -352,10 +357,14 @@ export class WorkflowService {
       userId: approval.instance.startedById,
       type: 'WORKFLOW_APPROVED',
       category: 'workflow',
+      channel: 'approvals',
       title: '✅ Solicitud aprobada',
       message: `Tu solicitud "${approval.instance.workflow.name}" para ${approval.instance.entityType} #${approval.instance.entityId} fue aprobada en todos los niveles.`,
       entityType: approval.instance.entityType,
       relatedEntityId: approval.instance.entityId,
+      relatedUrl: appUrls.erpApprovals(approval.instance.id),
+      triggerUserId: userId,
+      excludeActor: true,
     } as any).catch(() => null);
     return { decided: true, complete: true };
   }
@@ -507,10 +516,12 @@ export class WorkflowService {
       userId: approval.instance.startedById,
       type: 'WORKFLOW_APPROVED',
       category: 'workflow',
+      channel: 'approvals',
       title: '✅ Solicitud aprobada',
       message: `Tu solicitud "${approval.instance.workflow.name}" para ${approval.instance.entityType} #${approval.instance.entityId} fue aprobada en todos los niveles.`,
       entityType: approval.instance.entityType,
       relatedEntityId: approval.instance.entityId,
+      relatedUrl: appUrls.erpApprovals(approval.instance.id),
     } as any).catch(() => null);
 
     return { complete: true, cancelled: false };
@@ -549,11 +560,12 @@ export class WorkflowService {
         userId,
         type: 'WORKFLOW_PENDING',
         category: 'workflow',
+        channel: 'approvals',
         title: '🛡️ Aprobación pendiente',
         message: `Tienes una solicitud de aprobación: ${workflowName} — ${entityType} #${entityId}`,
         entityType,
         relatedEntityId: entityId,
-        relatedUrl: `/erp/approvals?highlight=${instanceId}`,
+        relatedUrl: appUrls.erpApprovals(instanceId),
       } as any);
     } catch {
       // silent

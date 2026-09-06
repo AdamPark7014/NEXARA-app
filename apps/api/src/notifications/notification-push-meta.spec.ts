@@ -12,6 +12,11 @@ describe('notification-push-meta', () => {
     expect(channelForCategory('integra-alarms')).toBe('tickets');
   });
 
+  it('enruta workflow/approvals a approvals', () => {
+    expect(channelForCategory('workflow')).toBe('approvals');
+    expect(channelForCategory('approvals')).toBe('approvals');
+  });
+
   it('collapse key es estable por evento+entidad+usuario', () => {
     const a = buildCollapseKey({
       type: 'ACTIVITY_STARTED',

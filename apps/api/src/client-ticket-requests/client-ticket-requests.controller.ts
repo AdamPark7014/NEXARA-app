@@ -6,6 +6,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { ClientTicketRequestsService } from './client-ticket-requests.service.js';
 import { ClientTicketRequestsQueryDto } from './dto/client-ticket-requests-query.dto.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
 
 @Controller('client-ticket-requests')
 @UseGuards(UrlAccessGuard, RbacGuard)
@@ -78,11 +79,12 @@ export class ClientTicketRequestsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { status?: string },
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: { id?: number },
   ) {
     if (!body.status) throw new BadRequestException('status requerido');
     const status = this.normalizeStatus(body.status);
     if (!status) throw new BadRequestException('status invalido');
-    return this.service.updateStatus(id, status, companyId);
+    return this.service.updateStatus(id, status, companyId, user?.id ?? null);
   }
 
   /** Notas internas (web ops/support/[id] llama PATCH :id con { notes }). */
