@@ -27,7 +27,7 @@ data class OfflineSyncStatus(
 
 object OfflineSyncCoordinator {
     private const val MAX_ATTEMPTS = 8
-    private val PERMANENT_CLIENT = setOf(400, 401, 403, 404, 409, 410, 422)
+    private val PERMANENT_CLIENT = setOf(400, 403, 404, 409, 410, 422)
 
     private val _syncStatus = MutableStateFlow(OfflineSyncStatus())
     val syncStatus: StateFlow<OfflineSyncStatus> = _syncStatus.asStateFlow()

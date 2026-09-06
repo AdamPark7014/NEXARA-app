@@ -16,6 +16,7 @@ object ModulePanelMap {
         "service-sheets", "client-tickets", "support", "noc", "support-sla",
         "service-clients",
         "cvs", "recruiting",
+        "dispatch", "chat",
     )
 
     private val ERP_KEYS = setOf(
@@ -33,6 +34,7 @@ object ModulePanelMap {
         "contact-messages", "news", "newsletter",
         "settings", "my-profile", "my-preferences", "offline-queue",
         "companies", "kb", "exports", "architecture", "calendar", "orgchart", "kpis-hr",
+        "chat",
     )
 
     /** null = sin filtro (todos los módulos console). */

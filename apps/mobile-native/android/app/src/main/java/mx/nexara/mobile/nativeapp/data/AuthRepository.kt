@@ -6,6 +6,8 @@ import mx.nexara.mobile.nativeapp.data.api.LoginRequest
 import mx.nexara.mobile.nativeapp.data.api.PortalLoginRequest
 import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
 import mx.nexara.mobile.nativeapp.data.realtime.RealtimeBus
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class AuthRepository(
     context: Context,
@@ -162,9 +164,23 @@ class AuthRepository(
     fun token(): String? = sessionStore.load()?.token
 
     fun logout() {
+        val bearer = sessionStore.load()?.token
         sessionStore.clear()
         RealtimeBus.stop()
         runCatching { NexaraOffline.apiCache().clear() }
+        if (!bearer.isNullOrBlank()) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                runCatching {
+                    val fcm = runCatching {
+                        com.google.firebase.messaging.FirebaseMessaging.getInstance().token.await()
+                    }.getOrNull()
+                    val api = ApiClient.authed { bearer }.create(
+                        mx.nexara.mobile.nativeapp.data.api.DevicesApi::class.java,
+                    )
+                    api.revokePushToken(fcm)
+                }
+            }
+        }
     }
 }
 
