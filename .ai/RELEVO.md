@@ -8,26 +8,21 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Push eficiente + paridad Wave A
+## Este turno — Notificaciones portal tickets / support / workflow
 
-### Push / notificaciones
-- FCM: `collapseKey`, `channel`, `event`, `entityType`, `relatedEntityId`, `category`.
-- `createNotification`: dedupe 120s + no auto-notif al actor.
-- Android canales: ops / chat / approvals + ID estable por tag.
-- `ACTIVITY_STARTED` (enum + migración) al pasar OT a En Proceso.
-- Portal cliente: comentarios/ACK/confirm/reopen → hierarchy → FCM (ya no prisma crudo).
-- Support request status change → notifica responsable OT.
-- Workflow approve/reject: `relatedUrl` + canal approvals.
+### Qué se cableó
+- Hierarchy: `notifyPortalTicketComment`, `notifyPortalTicketClientAction`, `notifySupportRequestCreated`, `notifySupportRequestStatusChanged`.
+- Helpers + armor: `portal-ticket-notify.ts` (+ `.spec.ts`); `appUrls.portalTicket`.
+- Client-portal: comment / ACK / CONFIRM_RESOLVED / REQUEST_REOPEN / `POST requests` → hierarchy (push + canal `tickets`).
+- Ops support status PATCH → notifica responsable OT vinculada (`opsSupport` URL).
+- Workflow approve/reject/pending: `relatedUrl` `erpApprovals` + canal `approvals`.
+- `ACTIVITY_STARTED` ya existía y sigue cableado en `activities.service` al pasar a En Proceso.
 
-### Paridad móvil
-- Vehicles admin + dispatch → **NATIVO** (approve/flotilla CRUD; board + bulk reassign).
-- Campo: Iniciar/Finalizar en lista; statuses web; GPS con `actividadId`.
-- EP / work-projects → **SOLO_LECTURA** (sin mutaciones aún).
+### Nota
+Portal cliente **no** tiene `User.id` (JWT portal) → no hay inbox FCM al cliente; solo staff.
 
 ### Verificación
-- `:app:compileDebugKotlin` OK.
-- `notification-push-meta` + `portal-ticket-notify` specs OK.
-- hierarchy: import limpio (sin `INotificationPayload` sin usar).
+- `portal-ticket-notify.spec` + `notification-push-meta.spec` OK.
 
 ## A medias / Adam
 
