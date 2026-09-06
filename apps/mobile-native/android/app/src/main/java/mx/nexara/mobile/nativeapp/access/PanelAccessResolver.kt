@@ -24,6 +24,9 @@ private val OPS_ROLE_KEYS = setOf(
 private val STUDIO_ROLE_KEYS = setOf(
     "ceo", "super_admin", "lider_diseno", "disenador",
 )
+private val LAB_ROLE_KEYS = setOf(
+    "ceo", "super_admin", "developer", "desarrollador",
+)
 private val INTEGRA_ROLE_KEYS = setOf(
     "ceo", "super_admin", "dir_operaciones", "coord_operaciones", "arquitecto",
     "ing_campo", "ing_soporte", "noc_lead", "noc_operator",

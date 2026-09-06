@@ -38,6 +38,7 @@ private object Routes {
     const val Crm = "crm"
     const val Studio = "studio"
     const val Lab = "lab"
+    const val Integra = "integra"
     const val Portal = "portal"
     const val Notifications = "notifications"
     // Legacy aliases (deep links / bookmarks)
@@ -84,6 +85,7 @@ fun NexaraApp() {
             PanelId.STUDIO -> Routes.Studio
             PanelId.LAB -> Routes.Lab
             PanelId.PORTAL -> Routes.Portal
+            PanelId.INTEGRA -> Routes.Integra
         }
         navController.navigate(route) { launchSingleTop = true }
     }
@@ -223,6 +225,12 @@ fun NexaraApp() {
         composable(Routes.Lab) {
             mx.nexara.mobile.nativeapp.ui.lab.LabNavHost(
                 onExitToPanels = { navController.navigate(Routes.Panels) { popUpTo(Routes.Lab) { inclusive = true } } },
+            )
+        }
+
+        composable(Routes.Integra) {
+            mx.nexara.mobile.nativeapp.ui.integra.IntegraNavHost(
+                onExitToPanels = { navController.navigate(Routes.Panels) { popUpTo(Routes.Integra) { inclusive = true } } },
             )
         }
 

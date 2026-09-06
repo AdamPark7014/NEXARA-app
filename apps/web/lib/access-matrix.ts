@@ -289,7 +289,7 @@ const ANY_INTERNAL: OrgRoleKey[] = [
 
 const ADMIN_TIER: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN];
 const ADMIN_PLUS: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST];
-const FINANCE_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.ACCOUNTANT];
+const FINANCE_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.ACCOUNTANT, R.ADMIN_STAFF];
 const HR_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST, R.ADMIN_STAFF];
 /** Personal que registra su propia asistencia/comida (legado org roles). */
 const SELF_ATTENDANCE_TEAM: OrgRoleKey[] = [
@@ -314,7 +314,7 @@ const OPS_LEADS: OrgRoleKey[] = [
 ];
 const NOC_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_OPS, R.NOC_LEAD, R.NOC_OPERATOR, R.SUPPORT_AGENT];
 const SUPPORT_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_OPS, R.SUPPORT_AGENT, R.MAINTENANCE_COORDINATOR];
-const WAREHOUSE_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.WAREHOUSE_MANAGER, R.PROCUREMENT_OFFICER];
+const WAREHOUSE_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.WAREHOUSE_MANAGER, R.PROCUREMENT_OFFICER, R.ADMIN_STAFF];
 const STUDIO_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_COMMERCIAL, R.DESIGNER];
 const FIELD_TEAM: OrgRoleKey[] = [R.FIELD_ENGINEER, R.SENIOR_ENGINEER];
 
@@ -417,7 +417,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   "viatics-admin": {
     id: "viatics-admin", panel: PANELS.ERP, path: "/finance/viatics",
     label: "Viáticos", description: "Comprobación y autorización de viáticos",
-    icon: "💸", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ACCOUNTANT, R.PROJECT_MANAGER],
+    icon: "💸", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ACCOUNTANT, R.PROJECT_MANAGER, R.ADMIN_STAFF],
     group: "Finanzas", visible: true,
   },
   "expenses-admin": {
@@ -481,7 +481,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   procurement: {
     id: "procurement", panel: PANELS.ERP, path: "/procurement",
     label: "Compras", description: "Requisiciones, OC y proveedores",
-    icon: "🛒", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.PROCUREMENT_OFFICER, R.WAREHOUSE_MANAGER],
+    icon: "🛒", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.PROCUREMENT_OFFICER, R.WAREHOUSE_MANAGER, R.ADMIN_STAFF],
     group: "Logística", visible: true,
   },
   documents: {
@@ -575,7 +575,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   "crm-clients": {
     id: "crm-clients", panel: PANELS.CRM, path: "/clients",
     label: "Clientes", description: "Cuentas y contactos",
-    icon: "🤝", allowedRoles: SALES_TEAM,
+    icon: "🤝", allowedRoles: [...SALES_TEAM, R.ADMIN_STAFF],
     group: "Catálogo y clientes", visible: true,
   },
   "crm-products": {
@@ -587,7 +587,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   "crm-quotes": {
     id: "crm-quotes", panel: PANELS.CRM, path: "/quotes",
     label: "Cotizaciones", description: "Documentos comerciales y firma digital",
-    icon: "📝", allowedRoles: [...SALES_TEAM, R.SENIOR_ENGINEER, R.DESIGNER],
+    icon: "📝", allowedRoles: [...SALES_TEAM, R.SENIOR_ENGINEER, R.DESIGNER, R.ADMIN_STAFF],
     group: "Catálogo y clientes", visible: true,
   },
   "crm-templates": {

@@ -6,6 +6,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 val keystorePropertiesFile = rootProject.file("key.properties")
@@ -168,10 +169,10 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
 
-    // Firebase Cloud Messaging (push externo)
+    // Firebase Cloud Messaging + Crashlytics (sin Analytics — evita permiso AD_ID en Play).
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-messaging-ktx")
-    // Analytics removed: unused and declares AD_ID (Play Console rejection risk).
+    implementation("com.google.firebase:firebase-crashlytics-ktx")
 
     // PDF renderer (in-app, sin depender de viewer externo)
     // El módulo android.graphics.pdf.PdfRenderer viene en el SDK, no requiere dep extra.

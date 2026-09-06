@@ -25,7 +25,10 @@ import java.io.File
 class ChatRepository(context: Context) {
     private val appContext = context.applicationContext
     private val api: ChatApi =
-        ApiClient.authed { AuthRepository(appContext).token() }.create(ChatApi::class.java)
+        ApiClient.authed(
+            tokenProvider = { AuthRepository(appContext).token() },
+            companyIdProvider = { AuthRepository(appContext).companyId() },
+        ).create(ChatApi::class.java)
 
     suspend fun channels(): List<ChatChannelDto> = api.listChannels()
 

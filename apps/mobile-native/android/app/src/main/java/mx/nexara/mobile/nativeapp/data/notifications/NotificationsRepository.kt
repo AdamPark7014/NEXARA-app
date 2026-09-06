@@ -7,7 +7,10 @@ import mx.nexara.mobile.nativeapp.data.api.NotificationsApi
 
 class NotificationsRepository(context: Context) {
     private val authRepo = AuthRepository(context)
-    private val api: NotificationsApi = ApiClient.authed { authRepo.token() }.create(NotificationsApi::class.java)
+    private val api: NotificationsApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(NotificationsApi::class.java)
 
     suspend fun list(limit: Int = 50, offset: Int = 0) = api.list(limit = limit, offset = offset)
 

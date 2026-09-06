@@ -20,13 +20,16 @@ import mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto
 import mx.nexara.mobile.nativeapp.data.api.KbArticleDto
 import mx.nexara.mobile.nativeapp.data.api.OrgNodeDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
+import mx.nexara.mobile.nativeapp.data.api.CreateDocumentRequest
 import mx.nexara.mobile.nativeapp.data.api.CreateExpenseRequest
 import mx.nexara.mobile.nativeapp.data.api.DocumentDto
 import mx.nexara.mobile.nativeapp.data.api.EmployeePaymentDto
 import mx.nexara.mobile.nativeapp.data.api.ExpenseApproveRequest
 import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
 import mx.nexara.mobile.nativeapp.data.api.ExtraApi
+import mx.nexara.mobile.nativeapp.data.api.FineApproveRequest
 import mx.nexara.mobile.nativeapp.data.api.FineDto
+import mx.nexara.mobile.nativeapp.data.api.HrLeaveRejectBody
 import mx.nexara.mobile.nativeapp.data.api.HrLeaveDto
 import mx.nexara.mobile.nativeapp.data.api.HrStaffDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
@@ -62,7 +65,10 @@ import java.lang.reflect.ParameterizedType
 
 class ExtraRepository(context: Context) {
     private val authRepo = AuthRepository(context)
-    private val api: ExtraApi = ApiClient.authed { authRepo.token() }.create(ExtraApi::class.java)
+    private val api: ExtraApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(ExtraApi::class.java)
 
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -145,6 +151,15 @@ class ExtraRepository(context: Context) {
             ),
         )
     suspend fun fines(): List<FineDto> = parseList(api.getFinesRaw())
+
+    suspend fun approveFine(id: Long, approve: Boolean, note: String? = null) =
+        api.approveFine(
+            id = id,
+            body = FineApproveRequest(
+                action = if (approve) "approve" else "reject",
+                note = note,
+            ),
+        )
     suspend fun employeePayments(): List<EmployeePaymentDto> = parseList(api.getEmployeePaymentsRaw())
     suspend fun cotizaciones(): List<CotizacionDto> = parseList(api.getCotizacionesRaw())
     suspend fun lunchBreaks(): List<LunchBreakDto> = parseList(api.getLunchBreaksRaw())
@@ -155,6 +170,24 @@ class ExtraRepository(context: Context) {
     suspend fun lunchCheckout(checkoutTime: String, photoDataUrl: String?): String =
         api.putLunchCheckout(LunchCheckoutRequest(checkoutTime = checkoutTime, checkoutPhotoUrl = photoDataUrl)).string()
     suspend fun documents(): List<DocumentDto> = parseList(api.getDocumentsRaw())
+
+    suspend fun createDocument(
+        title: String,
+        fileUrl: String,
+        mimeType: String? = null,
+        description: String? = null,
+        categoryId: Long? = null,
+    ) = api.createDocument(
+        CreateDocumentRequest(
+            title = title,
+            fileUrl = fileUrl,
+            mimeType = mimeType,
+            description = description,
+            categoryId = categoryId,
+        ),
+    )
+
+    suspend fun approveDocument(id: Long) = api.approveDocument(id)
     suspend fun journalEntries(): List<JournalEntryDto> = parseList(api.getJournalEntriesRaw())
     suspend fun invoices(): List<InvoiceDto> = parseList(api.getInvoicesRaw())
 
@@ -229,6 +262,14 @@ class ExtraRepository(context: Context) {
     suspend fun hrLeaves() = hrLeaveDtos().map { it.raw }
     suspend fun hrLeaveDtos(): List<HrLeaveDto> =
         loadGeneric { api.getHrLeavesRaw() }.map { HrLeaveDto.fromRaw(it) }
+
+    suspend fun approveHrLeave(id: Long) {
+        api.approveHrLeave(id)
+    }
+
+    suspend fun rejectHrLeave(id: Long, reason: String) {
+        api.rejectHrLeave(id, HrLeaveRejectBody(rejectionReason = reason))
+    }
     suspend fun hrReviews() = loadGeneric { api.getHrReviewsRaw() }
     suspend fun hrDashboardRaw(): String = api.getHrDashboardRaw().string()
     suspend fun warehouse(): List<Map<String, Any?>> =

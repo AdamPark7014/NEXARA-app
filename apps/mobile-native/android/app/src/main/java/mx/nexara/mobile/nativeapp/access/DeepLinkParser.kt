@@ -5,6 +5,7 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import mx.nexara.mobile.nativeapp.access.PanelId.CRM
 import mx.nexara.mobile.nativeapp.access.PanelId.ERP
+import mx.nexara.mobile.nativeapp.access.PanelId.INTEGRA
 import mx.nexara.mobile.nativeapp.access.PanelId.LAB
 import mx.nexara.mobile.nativeapp.access.PanelId.OPS
 import mx.nexara.mobile.nativeapp.access.PanelId.PORTAL
@@ -104,6 +105,18 @@ object DeepLinkParser {
         "chat" to "chat",
         "dispatch" to "dispatch",
         "tickets" to "tickets",
+        "access" to "integra-access",
+        "acceso" to "integra-access",
+        "puertas" to "integra-access",
+        "doors" to "integra-access",
+        "eventos" to "integra-events",
+        "personas" to "integra-people",
+        "visitantes" to "integra-visitors",
+        "integra-access" to "integra-access",
+        "integra-events" to "integra-events",
+        "integra-people" to "integra-people",
+        "integra-attendance" to "integra-attendance",
+        "integra-visitors" to "integra-visitors",
     )
 
     /** Rutas web tipo `/crm/opportunities/123` o URL absoluta con path y query. */
@@ -176,6 +189,7 @@ object DeepLinkParser {
             "crm", "ventas" -> CRM to segments.drop(1)
             "studio", "web" -> STUDIO to segments.drop(1)
             "lab" -> LAB to segments.drop(1)
+            "integra" -> INTEGRA to segments.drop(1)
             "portal", "tickets" -> PORTAL to segments.drop(1)
             else -> ERP to segments
         }

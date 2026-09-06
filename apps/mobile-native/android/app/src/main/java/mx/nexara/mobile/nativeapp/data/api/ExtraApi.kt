@@ -647,6 +647,23 @@ data class DocumentDto(
     val createdAt: String? = null,
 )
 
+data class CreateDocumentRequest(
+    val title: String,
+    val fileUrl: String,
+    val mimeType: String? = null,
+    val description: String? = null,
+    val categoryId: Long? = null,
+)
+
+data class FineApproveRequest(
+    val action: String,
+    val note: String? = null,
+)
+
+data class HrLeaveRejectBody(
+    val rejectionReason: String,
+)
+
 // ── Accounting journal entries ────────────────────────────────────────────
 data class JournalEntryDto(
     val id: Long,
@@ -755,6 +772,12 @@ interface ExtraApi {
     @GET("fines")
     suspend fun getFinesRaw(): okhttp3.ResponseBody
 
+    @PATCH("fines/{id}/approve")
+    suspend fun approveFine(
+        @Path("id") id: Long,
+        @Body body: FineApproveRequest,
+    ): okhttp3.ResponseBody
+
     // Employee payments
     @GET("employee-payments")
     suspend fun getEmployeePaymentsRaw(): okhttp3.ResponseBody
@@ -782,6 +805,16 @@ interface ExtraApi {
     // Documents
     @GET("documents")
     suspend fun getDocumentsRaw(): okhttp3.ResponseBody
+
+    @retrofit2.http.POST("documents")
+    suspend fun createDocument(
+        @retrofit2.http.Body body: CreateDocumentRequest,
+    ): DocumentDto
+
+    @PATCH("documents/{id}/approve")
+    suspend fun approveDocument(
+        @Path("id") id: Long,
+    ): DocumentDto
 
     // Accounting journal entries
     @GET("accounting/journal-entries")
@@ -816,6 +849,17 @@ interface ExtraApi {
     // HR
     @GET("hr/leaves")
     suspend fun getHrLeavesRaw(): okhttp3.ResponseBody
+
+    @PATCH("hr/leaves/{id}/approve")
+    suspend fun approveHrLeave(
+        @Path("id") id: Long,
+    ): okhttp3.ResponseBody
+
+    @PATCH("hr/leaves/{id}/reject")
+    suspend fun rejectHrLeave(
+        @Path("id") id: Long,
+        @Body body: HrLeaveRejectBody,
+    ): okhttp3.ResponseBody
 
     @GET("hr/reviews")
     suspend fun getHrReviewsRaw(): okhttp3.ResponseBody

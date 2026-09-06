@@ -13,7 +13,10 @@ import java.lang.reflect.ParameterizedType
 
 class OpsRepository(context: Context) {
     private val authRepo = AuthRepository(context)
-    private val api: OpsApi = ApiClient.authed { authRepo.token() }.create(OpsApi::class.java)
+    private val api: OpsApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(OpsApi::class.java)
     private val extra = ExtraRepository(context)
 
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()

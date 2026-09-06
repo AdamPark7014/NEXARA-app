@@ -44,6 +44,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.material3.OutlinedTextField
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.HrLeaveDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
@@ -62,6 +64,8 @@ data class HrLeavesUiState(
     val query: String = "",
     val typeFilter: String = "todos",
     val items: List<HrLeaveDto> = emptyList(),
+    val actingId: Long? = null,
+    val actionMessage: String? = null,
 )
 
 class HrLeavesViewModel(app: Application) : AndroidViewModel(app) {
@@ -103,6 +107,40 @@ class HrLeavesViewModel(app: Application) : AndroidViewModel(app) {
         }
         return list
     }
+
+    fun approve(id: Long) {
+        _state.update { it.copy(actingId = id, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.approveHrLeave(id) }
+                _state.update { it.copy(actingId = null, actionMessage = "✅ Permiso aprobado") }
+                refresh(initial = false)
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(actingId = null, actionMessage = "❌ ${e.toUserMessage("No se pudo aprobar")}")
+                }
+            }
+        }
+    }
+
+    fun reject(id: Long, reason: String) {
+        if (reason.isBlank()) {
+            _state.update { it.copy(actionMessage = "❌ Indica motivo de rechazo") }
+            return
+        }
+        _state.update { it.copy(actingId = id, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.rejectHrLeave(id, reason.trim()) }
+                _state.update { it.copy(actingId = null, actionMessage = "✅ Permiso rechazado") }
+                refresh(initial = false)
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(actingId = null, actionMessage = "❌ ${e.toUserMessage("No se pudo rechazar")}")
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,7 +155,21 @@ fun HrLeavesScreen(onBack: () -> Unit = {}, contentPadding: PaddingValues = Padd
 
     val sel = selected
     if (sel != null) {
-        LeaveDetail(sel, onBack = { selected = null })
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val canApprove = remember {
+            AuthRepository(context).loadSession()?.permissions?.any {
+                it.contains("hr.approve_leave") || it.contains("hr.manage") || it.contains("console.admin")
+            } == true
+        }
+        LeaveDetail(
+            row = sel,
+            canApprove = canApprove,
+            acting = state.actingId == sel.id,
+            actionMessage = state.actionMessage,
+            onApprove = { vm.approve(sel.id) },
+            onReject = { reason -> vm.reject(sel.id, reason) },
+            onBack = { selected = null },
+        )
         return
     }
 
@@ -192,7 +244,18 @@ private fun HrLeaveCard(row: HrLeaveDto, onClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun LeaveDetail(row: HrLeaveDto, onBack: () -> Unit) {
+private fun LeaveDetail(
+    row: HrLeaveDto,
+    canApprove: Boolean,
+    acting: Boolean,
+    actionMessage: String?,
+    onApprove: () -> Unit,
+    onReject: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    var rejectReason by remember { mutableStateOf("") }
+    val pending = row.status.equals("pendiente", true) || row.status.equals("pending", true)
+
     LazyColumn(
         Modifier.fillMaxSize().background(NxColors.Surface),
         contentPadding = PaddingValues(12.dp),
@@ -219,6 +282,39 @@ private fun LeaveDetail(row: HrLeaveDto, onBack: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     Text(row.notes, style = MaterialTheme.typography.bodyMedium)
                 }
+            }
+        }
+        if (canApprove && pending) {
+            item {
+                NxPanelShell {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Aprobación", fontWeight = FontWeight.SemiBold)
+                        OutlinedTextField(
+                            value = rejectReason,
+                            onValueChange = { rejectReason = it },
+                            label = { Text("Motivo rechazo (opcional para aprobar)") },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onApprove, enabled = !acting, modifier = Modifier.weight(1f)) {
+                                Text("Aprobar")
+                            }
+                            OutlinedButton(
+                                onClick = { onReject(rejectReason) },
+                                enabled = !acting,
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Rechazar") }
+                        }
+                    }
+                }
+            }
+        }
+        if (!actionMessage.isNullOrBlank()) {
+            item {
+                Text(
+                    actionMessage,
+                    color = if (actionMessage.startsWith("✅")) NxColors.Success else NxColors.Danger,
+                )
             }
         }
     }

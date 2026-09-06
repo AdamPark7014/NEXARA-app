@@ -47,8 +47,14 @@ data class StudioDashboardStats(
 class StudioRepository(context: Context) {
     private val authRepo = AuthRepository(context)
     private val appContext = context.applicationContext
-    private val api: StudioApi = ApiClient.authed { authRepo.token() }.create(StudioApi::class.java)
-    private val extraApi: ExtraApi = ApiClient.authed { authRepo.token() }.create(ExtraApi::class.java)
+    private val api: StudioApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(StudioApi::class.java)
+    private val extraApi: ExtraApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(ExtraApi::class.java)
 
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 

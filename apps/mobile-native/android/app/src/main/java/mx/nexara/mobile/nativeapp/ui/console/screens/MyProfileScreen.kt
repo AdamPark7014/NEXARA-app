@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +27,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import mx.nexara.mobile.nativeapp.R
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.data.api.UpdateUserProfileBody
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.security.AppLock
@@ -33,17 +47,135 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxAppMetaFooter
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
 /**
- * Pantalla nativa para "Mi perfil" usando la sesión guardada.
- * Refleja el mismo contenido básico que apps/mobile/app/(subdomains)/console/my-profile.
+ * Pantalla nativa para "Mi perfil" — sesión local + datos editables vía API.
  */
+data class MyProfileUiState(
+    val loading: Boolean = true,
+    val saving: Boolean = false,
+    val error: String? = null,
+    val saveMessage: String? = null,
+    val telefono: String = "",
+    val direccion: String = "",
+    val colonia: String = "",
+    val ciudad: String = "",
+    val estado: String = "",
+    val codigoPostal: String = "",
+    val curp: String = "",
+    val rfc: String = "",
+    val nss: String = "",
+    val contactoEmergenciaNombre: String = "",
+    val contactoEmergenciaTelefono: String = "",
+    val profileStatus: String? = null,
+)
+
+class MyProfileViewModel(app: android.app.Application) : AndroidViewModel(app) {
+    private val repo = ConsoleRepository(app.applicationContext)
+    private val _state = MutableStateFlow(MyProfileUiState())
+    val state: StateFlow<MyProfileUiState> = _state
+
+    init { load() }
+
+    fun setField(field: String, value: String) {
+        _state.update {
+            when (field) {
+                "telefono" -> it.copy(telefono = value)
+                "direccion" -> it.copy(direccion = value)
+                "colonia" -> it.copy(colonia = value)
+                "ciudad" -> it.copy(ciudad = value)
+                "estado" -> it.copy(estado = value)
+                "codigoPostal" -> it.copy(codigoPostal = value)
+                "curp" -> it.copy(curp = value)
+                "rfc" -> it.copy(rfc = value)
+                "nss" -> it.copy(nss = value)
+                "contactoEmergenciaNombre" -> it.copy(contactoEmergenciaNombre = value)
+                "contactoEmergenciaTelefono" -> it.copy(contactoEmergenciaTelefono = value)
+                else -> it
+            }
+        }
+    }
+
+    fun load() {
+        _state.update { it.copy(loading = true, error = null, saveMessage = null) }
+        viewModelScope.launch {
+            try {
+                val me = withContext(Dispatchers.IO) { repo.myProfile() }
+                val p = me.perfil
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        telefono = p?.telefono.orEmpty(),
+                        direccion = p?.direccion.orEmpty(),
+                        colonia = p?.colonia.orEmpty(),
+                        ciudad = p?.ciudad.orEmpty(),
+                        estado = p?.estado.orEmpty(),
+                        codigoPostal = p?.codigoPostal.orEmpty(),
+                        curp = p?.curp.orEmpty(),
+                        rfc = p?.rfc.orEmpty(),
+                        nss = p?.nss.orEmpty(),
+                        contactoEmergenciaNombre = p?.contactoEmergenciaNombre.orEmpty(),
+                        contactoEmergenciaTelefono = p?.contactoEmergenciaTelefono.orEmpty(),
+                        profileStatus = p?.estatus,
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(loading = false, error = e.toUserMessage("No se pudo cargar el perfil"))
+                }
+            }
+        }
+    }
+
+    fun save() {
+        val s = _state.value
+        _state.update { it.copy(saving = true, saveMessage = null, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.updateMyProfile(
+                        UpdateUserProfileBody(
+                            telefono = s.telefono.trim().ifBlank { null },
+                            direccion = s.direccion.trim().ifBlank { null },
+                            colonia = s.colonia.trim().ifBlank { null },
+                            ciudad = s.ciudad.trim().ifBlank { null },
+                            estado = s.estado.trim().ifBlank { null },
+                            codigoPostal = s.codigoPostal.trim().ifBlank { null },
+                            curp = s.curp.trim().ifBlank { null },
+                            rfc = s.rfc.trim().ifBlank { null },
+                            nss = s.nss.trim().ifBlank { null },
+                            contactoEmergenciaNombre = s.contactoEmergenciaNombre.trim().ifBlank { null },
+                            contactoEmergenciaTelefono = s.contactoEmergenciaTelefono.trim().ifBlank { null },
+                        ),
+                    )
+                }
+                _state.update { it.copy(saving = false, saveMessage = "Perfil guardado") }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        saving = false,
+                        saveMessage = e.toUserMessage("No se pudo guardar"),
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun MyProfileScreen(
     contentPadding: PaddingValues = PaddingValues(20.dp),
     onOpenOfflineQueue: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val repo = remember(context) { AuthRepository(context) }
-    val user = repo.loadSession()
+    val authRepo = remember(context) { AuthRepository(context) }
+    val user = authRepo.loadSession()
+    val vm: MyProfileViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                MyProfileViewModel(context.applicationContext as android.app.Application) as T
+        },
+    )
+    val profileState by vm.state.collectAsState()
     val isSuperAdmin = user?.isSuperAdmin == true
     var appLockEnabled by remember { mutableStateOf(AppLock.isEnabled(context)) }
     val lockAvailable = remember(context) { AppLock.canAuthenticate(context) }
@@ -130,7 +262,64 @@ fun MyProfileScreen(
             }
         }
 
-        // ── Info fields ───────────────────────────────────────────────────
+        // ── Info fields (API) ─────────────────────────────────────────────
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(1.dp),
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Datos personales", fontWeight = FontWeight.SemiBold, color = Slate)
+                    if (profileState.loading) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    } else {
+                        profileState.error?.let { err ->
+                            Text(err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = { vm.load() }) { Text("Reintentar") }
+                        }
+                        ProfileField("Teléfono", profileState.telefono) { vm.setField("telefono", it) }
+                        ProfileField("Dirección", profileState.direccion) { vm.setField("direccion", it) }
+                        ProfileField("Colonia", profileState.colonia) { vm.setField("colonia", it) }
+                        ProfileField("Ciudad", profileState.ciudad) { vm.setField("ciudad", it) }
+                        ProfileField("Estado", profileState.estado) { vm.setField("estado", it) }
+                        ProfileField("C.P.", profileState.codigoPostal) { vm.setField("codigoPostal", it) }
+                        ProfileField("CURP", profileState.curp) { vm.setField("curp", it) }
+                        ProfileField("RFC", profileState.rfc) { vm.setField("rfc", it) }
+                        ProfileField("NSS", profileState.nss) { vm.setField("nss", it) }
+                        ProfileField("Contacto emergencia", profileState.contactoEmergenciaNombre) {
+                            vm.setField("contactoEmergenciaNombre", it)
+                        }
+                        ProfileField("Tel. emergencia", profileState.contactoEmergenciaTelefono) {
+                            vm.setField("contactoEmergenciaTelefono", it)
+                        }
+                        profileState.profileStatus?.takeIf { it.isNotBlank() }?.let { st ->
+                            ProfileInfoRow("Estatus perfil", st, Teal, Sub)
+                        }
+                        if (!profileState.saveMessage.isNullOrBlank()) {
+                            Text(
+                                profileState.saveMessage!!,
+                                color = if (profileState.saveMessage!!.contains("guardado", true)) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Button(
+                            onClick = { vm.save() },
+                            enabled = !profileState.saving && !profileState.loading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (profileState.saving) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text("Guardar perfil")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -253,4 +442,15 @@ private fun ProfileInfoRow(label: String, value: String, teal: Color, sub: Color
         Text(label, style = MaterialTheme.typography.bodySmall, color = sub)
         Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color(0xFF0F172A))
     }
+}
+
+@Composable
+private fun ProfileField(label: String, value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = label != "Dirección",
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

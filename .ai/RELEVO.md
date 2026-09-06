@@ -8,45 +8,48 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Plan arreglo P0 post-auditoría (olas 0–3)
+## Este turno — Mega-plan paridad móvil W0–W7
 
-Adam autorizó Traefik. Se implementó el plan priorizado completo.
+### W0 — Verificación prod (doc)
+- Sonda: `/go2rtc/api/streams` y `/config` aún **200** (filtro Traefik **no desplegado**).
+- Informe: `.ai/auditoria-2026-09/13-w0-verificacion-prod.md`.
+- Adam debe desplegar compose+Traefik y rotar passwords de cámaras.
 
-### Wave 0 — 502 / infra
-- Timeouts Node: request 120s, keepAlive 95s, headers ≥96s (`main.ts`).
-- Migraciones fuera del CMD API; healthchecks compose + Traefik healthCheck.
-- Traefik: filtro go2rtc por path (ya no filtra RTSP con password); aliases rotos
-  retirados del redirect HTTP permanente; `/api`+socket en aliases vivos.
-- Env `CORS_ORIGIN` / `MAX_FILE_SIZE` inyectados; `X-Company-Id` en CORS.
-- Tope `take: 200` activities/viatics; dashboard Android degradación suave.
-- URL evidencias → `WebPanelUrl` / core (no `consola`).
+### W1 — Pantallas desbloqueadas
+- `dispatch` / `chat` / `recruiting` / `my-preferences` en ModulePanelMap + ConsoleAccessRules.
 
-### Wave 1 — seguridad
-- Evidencias approve/reject: reviewer JWT + `EVIDENCES_REVIEW`.
-- Metrics: no público; chat/mobile-crm con StaffOnly+Rbac.
-- Offline: Idempotency-Key, cache por hash de token, multipart binario, clear on logout.
-- Compresión JPEG `ImageDataUrl`. IP rate-limit desde `req.ip`.
+### W2 — Compliance campo
+- Evidencias multi-foto (≥4) + form paso 4; CAMERA runtime; GPS 0,0 bloqueado en cliente.
+- Offline: 401 ya no descarta cola.
+- API `DELETE devices/push-token` + logout Android revoke FCM.
+- Asistencia: `PATCH gps/consent` tras entrada; foto vía `saveBase64Photo`; consent GPS solo con coords válidas.
 
-### Wave 2 — RBAC
-- `roleKey` sync en create/update desde `Role.orgRoleKey`.
-- page-matrix + section-views: administrativo, vendedor, arquitecto, ing_soporte.
-- PanelAccessResolver: claves v2 + tokens (rh ya no queda en cero paneles).
+### W3 — RBAC una fuente
+- API `GET /api/me/navigation` (`MeModule`) + `/api/me/**` en SHARED_SESSION.
+- url-matrix ADMINISTRATIVO alineado a page-matrix (invoicing/procurement/warehouse/CRM APIs).
+- Android: `roleKey`/`orgRoleKey`/`companyId`/`expiresAt`/`navModuleKeys` en SessionStore; `X-Company-Id`; `auth/session/extend`.
+- ConsoleAccessRules: navModuleKeys del servidor; ingeniero por `roleKey`.
+- Web: `access-matrix` ADMIN_STAFF + `lib/me-navigation.ts`.
 
-### Wave 3 — compliance / Play / docs
-- Asistencia foto obligatoria; lunch TZ México; GPS 0,0 rechazado.
-- Play: VERSION_CODE=6, sin Analytics/AD_ID, SessionStore fallback, cámara API&lt;29.
-- Informes 07/09 escritos; 11 completado con fichas de proceso.
+### W4 — Cascarones → operar
+- MyProfile PATCH; MyViatics create; users CRUD mínimo; HR leaves approve; documents upload; vehicles/fines según pantallas tocadas.
 
-### Auditoría
-Salvada en `be7f0a53` + docs nuevos bajo `.ai/auditoria-2026-09/`.
+### W5 — INTEGRA MVP
+- `PanelId.INTEGRA` + hub + IntegraNavHost (Access/Events/People/ACS/Visitors).
+- IntegraApi/Repository contra `/api/integra/**` existentes.
 
-## A medias / verificar en prod
+### W6 — Play / push
+- Crashlytics; VERSION_CODE=7; CI job Android assembleDebug+test; FCM deep-link extras.
 
-1. **Desplegar** compose + Traefik dinámico; confirmar curl a `/go2rtc/api/streams` → 404.
-2. **Rotar passwords de cámaras** después del filtro Traefik.
-3. go2rtc.yaml servidor / cámara 601 (turnos INTEGRA previos).
-4. `DELETE devices/push-token` aún ausente en API.
-5. Unificar matrices RBAC a largo plazo (`GET /me/navigation`).
+### W7 — Verdad catálogo
+- `parityStatus` en ModuleCatalog; matriz `docs/native-parity-matrix.md` honesta; script parity bidireccional.
+
+## A medias / Adam
+
+1. **Desplegar** Traefik/API P0 hasta que `/go2rtc/api/streams` → 404; rotar passwords cámaras.
+2. Rebuild AAB firmado Play (VERSION_CODE 7+) y declaraciones Console.
+3. Sidebar web aún no consume `/me/navigation` en runtime (helper listo; access-matrix ya alineado admin).
+4. INTEGRA video wall / ANPR / mapa = Bloque 2.
 
 ## No tocar
 

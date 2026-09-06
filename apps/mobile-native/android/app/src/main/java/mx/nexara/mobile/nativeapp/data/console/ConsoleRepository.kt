@@ -364,6 +364,98 @@ class ConsoleRepository(context: Context) {
 
     suspend fun vehicleInventoryFetch() = api.getVehicleInventory()
 
+    suspend fun createVehicleRequest(
+        activityId: Long,
+        vehicleId: Long? = null,
+        nombreVehiculo: String? = null,
+        placasVehiculo: String? = null,
+        motivoUso: String? = null,
+        fechaInicioSolicitada: String? = null,
+        fechaFinSolicitada: String? = null,
+    ) = api.createVehicleRequest(
+        mx.nexara.mobile.nativeapp.data.api.CreateVehicleRequest(
+            actividadId = activityId,
+            vehicleId = vehicleId,
+            nombreVehiculo = nombreVehiculo,
+            placasVehiculo = placasVehiculo,
+            motivoUso = motivoUso,
+            fechaInicioSolicitada = fechaInicioSolicitada,
+            fechaFinSolicitada = fechaFinSolicitada,
+        ),
+    )
+
+    suspend fun requestVehicleRenewal(id: Long, startIso: String?, endIso: String?) =
+        api.requestVehicleRenewal(
+            id = id,
+            body = mx.nexara.mobile.nativeapp.data.api.VehicleRenewalRequest(
+                renovacionSolicitadaInicio = startIso,
+                renovacionSolicitadaFin = endIso,
+            ),
+        )
+
+    suspend fun startVehicleUse(
+        id: Long,
+        odometroKm: Double,
+        combustiblePct: Double,
+        photoParts: List<Pair<String, ByteArray>>,
+    ) {
+        fun part(field: String, index: Int): MultipartBody.Part {
+            val (filename, bytes) = photoParts[index]
+            val body = bytes.toRequestBody("image/jpeg".toMediaType())
+            return MultipartBody.Part.createFormData(field, filename, body)
+        }
+        api.startVehicleUse(
+            id = id,
+            odometroKm = odometroKm.toString().toRequestBody(textMedia),
+            combustiblePct = combustiblePct.toString().toRequestBody(textMedia),
+            interna0 = part("interna-0", 0),
+            interna1 = part("interna-1", 1),
+            interna2 = part("interna-2", 2),
+            interna3 = part("interna-3", 3),
+            externa0 = part("externa-0", 4),
+            externa1 = part("externa-1", 5),
+            externa2 = part("externa-2", 6),
+            externa3 = part("externa-3", 7),
+            odometro = part("odometro", 8),
+        )
+    }
+
+    suspend fun endVehicleUse(
+        id: Long,
+        odometroKm: Double,
+        combustiblePct: Double,
+        photoParts: List<Pair<String, ByteArray>>,
+    ) {
+        fun part(field: String, index: Int): MultipartBody.Part {
+            val (filename, bytes) = photoParts[index]
+            val body = bytes.toRequestBody("image/jpeg".toMediaType())
+            return MultipartBody.Part.createFormData(field, filename, body)
+        }
+        api.endVehicleUse(
+            id = id,
+            odometroKm = odometroKm.toString().toRequestBody(textMedia),
+            combustiblePct = combustiblePct.toString().toRequestBody(textMedia),
+            interna0 = part("interna-0", 0),
+            interna1 = part("interna-1", 1),
+            interna2 = part("interna-2", 2),
+            interna3 = part("interna-3", 3),
+            externa0 = part("externa-0", 4),
+            externa1 = part("externa-1", 5),
+            externa2 = part("externa-2", 6),
+            externa3 = part("externa-3", 7),
+            odometro = part("odometro", 8),
+        )
+    }
+
+    suspend fun userRoles() = api.getUserRoles()
+
+    suspend fun userDepartments() = api.getUserDepartments()
+
+    suspend fun createUser(body: mx.nexara.mobile.nativeapp.data.api.CreateUserBody) = api.createUser(body)
+
+    suspend fun updateUser(id: Long, body: mx.nexara.mobile.nativeapp.data.api.UpdateUserBody) =
+        api.updateUser(id = id, body = body)
+
     suspend fun gpsMe() = api.getGpsMe()
 
     suspend fun gpsTeam() = api.getGpsTeam()

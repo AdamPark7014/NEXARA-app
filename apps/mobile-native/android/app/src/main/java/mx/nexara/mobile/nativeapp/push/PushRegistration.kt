@@ -24,7 +24,10 @@ object PushRegistration {
                 val token = auth.token()
                 if (token.isNullOrBlank()) return@runCatching
                 val fcmToken = FirebaseMessaging.getInstance().token.await()
-                val api = ApiClient.authed { auth.token() }.create(DevicesApi::class.java)
+                val api = ApiClient.authed(
+                    tokenProvider = { auth.token() },
+                    companyIdProvider = { auth.companyId() },
+                ).create(DevicesApi::class.java)
                 api.registerPushToken(RegisterFcmTokenRequest(fcmToken, "android"))
                 Log.d("PushRegistration", "Token FCM registrado: ${fcmToken.takeLast(8)}")
             }.onFailure { Log.w("PushRegistration", "Error: ${it.message}") }

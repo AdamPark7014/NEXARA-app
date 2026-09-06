@@ -21,6 +21,26 @@ object NexaraNotifications {
     const val CHANNEL_TICKETS = "nexara_tickets"
     const val CHANNEL_GPS = "nexara_gps"
 
+    /** Valores de `channel` en payload FCM que enrutan la notificación, no el chat. */
+    private val ROUTING_CHANNEL_KEYS = setOf("alerts", "tickets", "gps", "default")
+
+    /** Extrae datos de deep link del payload FCM, sin mezclar canal de notificación con chat. */
+    fun deepLinkDataFrom(data: Map<String, String>): Map<String, String> {
+        if (data.isEmpty()) return emptyMap()
+        val out = data.filterValues { it.isNotBlank() }.toMutableMap()
+        out["channel"]?.let { routing ->
+            if (routing.lowercase() in ROUTING_CHANNEL_KEYS) out.remove("channel")
+        }
+        return out
+    }
+
+    fun notificationChannelFrom(routingKey: String?): String = when (routingKey?.lowercase()) {
+        "alerts" -> CHANNEL_ALERTS
+        "tickets" -> CHANNEL_TICKETS
+        "gps" -> CHANNEL_GPS
+        else -> CHANNEL_DEFAULT
+    }
+
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
@@ -46,9 +66,10 @@ object NexaraNotifications {
         notificationId: Int = System.currentTimeMillis().toInt(),
     ) {
         ensureChannels(context)
+        val linkData = deepLinkDataFrom(data)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data.forEach { (k, v) -> putExtra("nexara_$k", v) }
+            linkData.forEach { (k, v) -> putExtra("nexara_$k", v) }
         }
         val pending = PendingIntent.getActivity(
             context,
