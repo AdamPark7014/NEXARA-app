@@ -512,13 +512,14 @@ class ConsoleRepository(context: Context) {
     suspend fun gpsTrajectory(date: String? = null, userId: Long? = null) =
         api.getGpsTrajectory(date = date, userId = userId)
 
-    suspend fun gpsPost(lat: Double, lng: Double, speedKmh: Double?) =
+    suspend fun gpsPost(lat: Double, lng: Double, speedKmh: Double?, activityId: Long? = null) =
         api.postGpsLocation(
             mx.nexara.mobile.nativeapp.data.api.PostGpsLocationRequest(
                 latitud = lat,
                 longitud = lng,
                 velocidadKmh = speedKmh,
                 ultimaActualizacion = java.time.Instant.now().toString(),
+                actividadId = activityId,
             )
         )
 

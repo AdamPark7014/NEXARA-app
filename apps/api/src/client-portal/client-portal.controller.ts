@@ -18,9 +18,6 @@ import { Request } from 'express';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { isFinishedStatus, statusVariants, ACTIVITY_STATUS } from '../activities/activity-status.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
-import type { PortalTicketClientAction } from '../notifications/portal-ticket-notify.js';
-import { NotificationsService } from '../notifications/notifications.service.js';
-import { appUrls } from '../common/app-urls.js';
 
 const ensureBranchUploadsDir = () => {
   const segments = __dirname.split(path.sep);
@@ -62,7 +59,7 @@ export class ClientPortalController {
     private readonly inventoriesService: InventoriesService,
     private readonly accountingService: AccountingService,
     private readonly cotizacionesService: CotizacionesService,
-    private readonly notifications: NotificationsService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
   private normalizeBoolean(value: unknown) {
@@ -606,7 +603,7 @@ export class ClientPortalController {
     });
     if (!primaryCompany) throw new BadRequestException('No hay empresa configurada');
 
-    return this.prisma['clientTicketRequest'].create({
+    const created = await this.prisma['clientTicketRequest'].create({
       data: {
         clientId: user.clientId,
         branchId: branchData?.id || null,
@@ -626,6 +623,22 @@ export class ClientPortalController {
         companyId: primaryCompany.id,
       },
     });
+
+    const client = await this.prisma.serviceClient.findUnique({
+      where: { id: user.clientId },
+      select: { name: true },
+    });
+    void this.notificationHierarchy
+      .notifySupportRequestCreated({
+        requestId: created.id,
+        description,
+        clientName: client?.name,
+        companyId: primaryCompany.id,
+        urgency,
+      })
+      .catch(() => undefined);
+
+    return created;
   }
 
   @Get('projects')
@@ -770,23 +783,15 @@ export class ClientPortalController {
       select: { id: true, comentariosFeedback: true },
     });
 
-    if (activity.responsableId) {
-      void this.notifications
-        .createNotification({
-          userId: activity.responsableId,
-          type: 'ACTIVITY_ASSIGNED',
-          category: 'tickets',
-          title: `Cliente comentó OT ${activity.anNumber}`,
-          message: text.slice(0, 280),
-          relatedEntityId: activity.id,
-          entityType: 'activity',
-          relatedUrl: appUrls.opsActivity(activity.id),
-          companyId: activity.companyId,
-          channel: 'tickets',
-          priority: 'high',
-        })
-        .catch(() => undefined);
-    }
+    void this.notificationHierarchy
+      .notifyPortalTicketComment({
+        activityId: activity.id,
+        anNumber: activity.anNumber,
+        message: text,
+        responsableId: activity.responsableId,
+        companyId: activity.companyId,
+      })
+      .catch(() => undefined);
 
     return {
       ok: true,
@@ -821,19 +826,20 @@ export class ClientPortalController {
 
     if (action === 'ACK') {
       if (activity.responsableId) {
+        const meta = portalTicketActionNotifyMeta('ACK', activity.id, activity.anNumber, activity.titulo, note);
         void this.notifications
           .createNotification({
             userId: activity.responsableId,
-            type: 'ACTIVITY_ASSIGNED',
-            category: 'tickets',
-            title: `Cliente acusó recibo · OT ${activity.anNumber}`,
-            message: note || activity.titulo,
+            type: meta.type,
+            category: meta.category,
+            title: meta.title,
+            message: meta.message,
             relatedEntityId: activity.id,
-            entityType: 'activity',
-            relatedUrl: appUrls.opsActivity(activity.id),
+            entityType: meta.entityType,
+            relatedUrl: meta.relatedUrl,
             companyId: activity.companyId,
-            channel: 'tickets',
-            priority: 'high',
+            channel: meta.channel,
+            priority: meta.priority,
           })
           .catch(() => undefined);
       }
@@ -854,19 +860,26 @@ export class ClientPortalController {
         },
       });
       if (activity.responsableId) {
+        const meta = portalTicketActionNotifyMeta(
+          'CONFIRM_RESOLVED',
+          activity.id,
+          activity.anNumber,
+          activity.titulo,
+          note,
+        );
         void this.notifications
           .createNotification({
             userId: activity.responsableId,
-            type: 'ACTIVITY_APPROVED',
-            category: 'tickets',
-            title: `Cliente confirmó resolución · OT ${activity.anNumber}`,
-            message: note || activity.titulo,
+            type: meta.type,
+            category: meta.category,
+            title: meta.title,
+            message: meta.message,
             relatedEntityId: activity.id,
-            entityType: 'activity',
-            relatedUrl: appUrls.opsActivity(activity.id),
+            entityType: meta.entityType,
+            relatedUrl: meta.relatedUrl,
             companyId: activity.companyId,
-            channel: 'tickets',
-            priority: 'normal',
+            channel: meta.channel,
+            priority: meta.priority,
           })
           .catch(() => undefined);
       }
@@ -888,19 +901,26 @@ export class ClientPortalController {
       },
     });
     if (activity.responsableId) {
+      const meta = portalTicketActionNotifyMeta(
+        'REQUEST_REOPEN',
+        activity.id,
+        activity.anNumber,
+        activity.titulo,
+        note,
+      );
       void this.notifications
         .createNotification({
           userId: activity.responsableId,
-          type: 'ACTIVITY_REJECTED',
-          category: 'tickets',
-          title: `Cliente pidió reabrir OT ${activity.anNumber}`,
-          message: note || activity.titulo,
+          type: meta.type,
+          category: meta.category,
+          title: meta.title,
+          message: meta.message,
           relatedEntityId: activity.id,
-          entityType: 'activity',
-          relatedUrl: appUrls.opsActivity(activity.id),
+          entityType: meta.entityType,
+          relatedUrl: meta.relatedUrl,
           companyId: activity.companyId,
-          channel: 'tickets',
-          priority: 'high',
+          channel: meta.channel,
+          priority: meta.priority,
         })
         .catch(() => undefined);
     }
