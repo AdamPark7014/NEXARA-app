@@ -37,6 +37,32 @@ export class AttendanceService {
     }
   }
 
+  /**
+   * Coordenadas reales, o `null` si el teléfono no tenía ubicación.
+   *
+   * La app publicada manda `0.0, 0.0` cuando el usuario niega el permiso de
+   * ubicación, y `Number.isFinite(0)` es `true`: el cero pasaba el filtro y se
+   * guardaba como si fuera un punto medido. Son coordenadas en el golfo de
+   * Guinea, a 9.000 km de Puebla, y quedan en la misma columna que las buenas.
+   *
+   * Aquí NO se rechaza la petición: la versión de la app que la gente ya tiene
+   * instalada seguiría mandando el cero y dejaría a medio equipo sin poder
+   * fichar. Se acepta el registro y se guarda la ubicación como ausente, que es
+   * lo que de verdad hubo. El rechazo duro se puede activar cuando la v2 esté
+   * desplegada (ver `.ai/auditoria-2026-09/14-integridad-datos-remediacion.md`).
+   */
+  private realCoords(
+    latitude?: number | null,
+    longitude?: number | null,
+  ): { latitude: number; longitude: number } | null {
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    // El (0,0) exacto no es una lectura de GPS, es el valor por defecto.
+    if (latitude === 0 && longitude === 0) return null;
+    if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+    return { latitude, longitude };
+  }
+
   private isSuperAdminEmail(email?: string | null) {
     if (!email) return false;
     const normalized = email.toLowerCase();
@@ -467,6 +493,16 @@ export class AttendanceService {
     const today = this.getDateOnly(now);
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
     const deviceInfo = detectDeviceFromUserAgent(userAgent, req?.headers);
+    // Una sola lectura de las coordenadas para todo el registro: lo que se
+    // guarda, lo que decide si hay GPS y lo que alimenta el rastreo salen de
+    // aquí. Antes cada uno filtraba a su manera y `entryLatitude` acababa con
+    // el (0,0) que los otros dos ya habían descartado.
+    const coords = this.realCoords(dto.latitude, dto.longitude);
+    if (!coords && (dto.latitude !== undefined || dto.longitude !== undefined)) {
+      this.logger.warn(
+        `Asistencia sin ubicación real (userId=${userId}, recibido lat=${dto.latitude} lng=${dto.longitude}); se guarda sin coordenadas`,
+      );
+    }
 
     const isEntry = dto.type === 'entrada';
 
@@ -493,8 +529,8 @@ export class AttendanceService {
           workDate: today,
           deviceInfo,
           photoUrl: this.persistAttendancePhoto(dto.photoBase64),
-          entryLatitude: dto.latitude ?? null,
-          entryLongitude: dto.longitude ?? null,
+          entryLatitude: coords?.latitude ?? null,
+          entryLongitude: coords?.longitude ?? null,
           companyId: tenantId,
         },
         include: { user: true },
@@ -516,23 +552,24 @@ export class AttendanceService {
         },
       });
 
-      const hasGps =
-        typeof dto.latitude === 'number' &&
-        typeof dto.longitude === 'number' &&
-        Number.isFinite(dto.latitude) &&
-        Number.isFinite(dto.longitude) &&
-        !(dto.latitude === 0 && dto.longitude === 0);
-
-      if (hasGps) {
-        await this.prisma.user.update({
-          where: { id: userId },
-          data: { locationConsent: true },
-        });
+      // Fichar NO es consentir el rastreo.
+      //
+      // Aquí se escribía `locationConsent: true` por el mero hecho de que la
+      // petición trajera coordenadas. Nadie otorgaba nada: la base afirmaba un
+      // consentimiento que el usuario nunca dio, y con él su posición pasaba a
+      // ser visible en el mapa del equipo el resto de la jornada. El
+      // consentimiento sólo se escribe desde `PATCH /gps/consent`, que cuelga
+      // del interruptor de la pantalla de GPS.
+      //
+      // El punto de esta entrada sí se guarda: es el sitio desde el que fichó,
+      // y para eso pidió el permiso. Lo que no se guarda es una autorización
+      // permanente que no dio.
+      if (coords) {
         await this.prisma['locationTracking'].create({
           data: {
             usuarioId: userId,
-            latitud: dto.latitude!,
-            longitud: dto.longitude!,
+            latitud: coords.latitude,
+            longitud: coords.longitude,
             velocidadKmh: null,
             estaActivo: true,
             ultimaActualizacion: now,
@@ -607,8 +644,8 @@ export class AttendanceService {
         timestamp: now,
         deviceInfo,
         photoUrl: this.persistAttendancePhoto(dto.photoBase64),
-        exitLatitude: dto.latitude || null,
-        exitLongitude: dto.longitude || null,
+        exitLatitude: coords?.latitude ?? null,
+        exitLongitude: coords?.longitude ?? null,
         companyId: tenantId,
       },
       include: { user: true },
@@ -625,6 +662,10 @@ export class AttendanceService {
       },
     });
 
+    // El `false` de la salida sí se queda. Revocar no es fabricar: apagar el
+    // rastreo al cerrar la jornada es el comportamiento conservador, y deja al
+    // usuario donde estaría si nunca hubiera consentido. Lo que se quitó, en la
+    // entrada, era el `true` que nadie había otorgado.
     await this.prisma.user.update({
       where: { id: userId },
       data: { locationConsent: false },

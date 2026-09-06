@@ -1,29 +1,67 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { CreateGpsDto } from './dto/create-gps.dto.js';
-import { parseWorkDate, workDayBounds, workDayStart } from '../common/time/workday.js';
+import { parseWorkDate, workDateColumn, workDayBounds } from '../common/time/workday.js';
 
 @Injectable()
 export class GpsService {
+  private readonly logger = new Logger(GpsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
-  /** "Hoy" en hora de la empresa, no la del servidor. */
+  /**
+   * "Hoy" para comparar contra `AttendanceDay.date`, que es `@db.Date`.
+   *
+   * Antes devolvía `workDayStart`, o sea las 06:00 UTC. Una columna `date` de
+   * Postgres se compara contra medianoche, así que `date = <06:00>` no casaba
+   * nunca: el mapa del equipo salía vacío y `GET /gps/me` decía que no había
+   * consentimiento aunque lo hubiera. El día se construye igual que lo escribe
+   * `AttendanceService`.
+   */
   private getTodayDateOnly() {
-    return workDayStart(new Date());
+    return workDateColumn(new Date());
+  }
+
+  /**
+   * Punto real, o `null`. Mismo criterio que en asistencia: el (0,0) exacto es
+   * el valor por defecto de un teléfono sin permiso de ubicación, no una
+   * lectura. `Number.isFinite(0)` lo dejaba pasar y se guardaba como si fuera
+   * un punto medido en el golfo de Guinea.
+   */
+  private realPoint(lat?: number | null, lng?: number | null) {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (lat === 0 && lng === 0) return null;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    return { lat, lng };
   }
 
   async create(createGpsDto: CreateGpsDto, companyId?: number | null) {
     if (createGpsDto.usuarioId === undefined) {
       throw new Error('usuarioId requerido');
     }
+
+    // No se lanza excepción: la app instalada en los teléfonos podría mandar
+    // un (0,0) y dejaría al técnico con un error rojo en pantalla por un ping
+    // que ni siquiera pidió. Se descarta el punto y se dice que se descartó.
+    // El 400 duro se puede activar cuando la v2 esté desplegada; ver
+    // `.ai/auditoria-2026-09/14-integridad-datos-remediacion.md`.
+    const punto = this.realPoint(createGpsDto.latitud, createGpsDto.longitud);
+    if (!punto) {
+      this.logger.warn(
+        `Ping GPS descartado (usuarioId=${createGpsDto.usuarioId}, lat=${createGpsDto.latitud}, lng=${createGpsDto.longitud}): no es una ubicación real`,
+      );
+      return { skipped: true as const, reason: 'coordenadas no válidas (0,0 o fuera de rango)' };
+    }
+
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     const data: Prisma.LocationTrackingUncheckedCreateInput = {
       usuarioId: createGpsDto.usuarioId,
-      latitud: createGpsDto.latitud,
-      longitud: createGpsDto.longitud,
+      latitud: punto.lat,
+      longitud: punto.lng,
       velocidadKmh: createGpsDto.velocidadKmh ?? null,
       estaActivo: createGpsDto.estaActivo ?? true,
       ultimaActualizacion: createGpsDto.ultimaActualizacion,

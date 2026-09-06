@@ -20,8 +20,11 @@ export class LunchBreaksController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
+    // Las cadenas viajan sin convertir: el servicio las interpreta como días
+    // de México. `new Date('2026-09-06')` aquí era medianoche UTC, y el rango
+    // salía corrido seis horas.
+    const start = startDate || undefined;
+    const end = endDate || undefined;
     if (user.isSuperAdmin || user.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE)) {
       return this.lunchBreaksService.getAllLunchBreaks(start, end, companyId);
     }
@@ -67,8 +70,8 @@ export class LunchBreaksController {
   ) {
     return this.lunchBreaksService.getUserLunchBreaks(
       user.id,
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
+      startDate || undefined,
+      endDate || undefined,
       companyId,
     );
   }
@@ -84,8 +87,8 @@ export class LunchBreaksController {
   ) {
     // Admins ven usuarios normales, SuperAdmin ve todo
     return this.lunchBreaksService.getAllLunchBreaks(
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
+      startDate || undefined,
+      endDate || undefined,
       companyId,
     );
   }

@@ -46,7 +46,9 @@ function build(over: Record<string, any> = {}) {
   return { service, prisma };
 }
 
-const entrada = { type: 'entrada' as const };
+// La foto es obligatoria y se comprueba antes que nada: sin ella `register`
+// corta ahí y estas pruebas nunca llegaban a lo que quieren fijar.
+const entrada = { type: 'entrada' as const, photoBase64: 'data:image/jpeg;base64,AAAA' };
 
 describe('entrada duplicada', () => {
   it('la comprobación previa sigue dando el mensaje claro', async () => {
