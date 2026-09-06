@@ -268,13 +268,17 @@ class ConsoleRepository(context: Context) {
         activityId: Long,
         reviewerId: Long,
         notes: String,
-        rejectedStep: String = "EVIDENCE_PHOTOS",
+        rejectedSteps: List<String>? = null,
+        rejectedStep: String? = null,
+        resetFullFlow: Boolean = false,
     ) = api.rejectEvidence(
         activityId = activityId,
         body = mx.nexara.mobile.nativeapp.data.api.EvidenceRejectRequest(
             reviewerId = reviewerId,
-            rejectedStep = rejectedStep,
             notes = notes,
+            rejectedSteps = if (resetFullFlow) null else rejectedSteps,
+            rejectedStep = if (resetFullFlow || !rejectedSteps.isNullOrEmpty()) null else rejectedStep,
+            resetFullFlow = if (resetFullFlow) true else null,
         ),
     )
 
@@ -350,6 +354,8 @@ class ConsoleRepository(context: Context) {
             vehicleId = vehicleId,
         ),
     )
+
+    suspend fun markViaticPagado(id: Long) = api.markViaticPagado(id)
 
     suspend fun approveViatic(id: Long, approve: Boolean, note: String? = null) =
         api.approveViatic(

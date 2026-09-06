@@ -214,6 +214,24 @@ class ConsoleViaticsViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    fun markPagado(id: Long) {
+        _state.update { it.copy(actingId = id, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.markViaticPagado(id) }
+                _state.update { it.copy(actingId = null, actionMessage = "✅ Marcado como pagado") }
+                refresh()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        actingId = null,
+                        actionMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo marcar pagado"}",
+                    )
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -559,6 +577,17 @@ fun ConsoleViaticsScreen(
                             }
                         }
                     }
+                }
+            }
+            val approvedUnpaid = status.equals("aprobado", true) || status.equals("aprobada", true)
+            if (canApprove && approvedUnpaid) {
+                item {
+                    Button(
+                        onClick = { vm.markPagado(v.id); selected = null },
+                        enabled = state.actingId == null,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                    ) { Text(if (state.actingId == v.id) "Marcando…" else "Marcar pagado") }
                 }
             }
             if (!state.actionMessage.isNullOrBlank()) {

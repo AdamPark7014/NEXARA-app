@@ -25,7 +25,6 @@ import mx.nexara.mobile.nativeapp.data.api.KbArticleDto
 import mx.nexara.mobile.nativeapp.data.api.OrgNodeDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.api.CreateDocumentRequest
-import mx.nexara.mobile.nativeapp.data.api.CreateEmployeePaymentRequest
 import mx.nexara.mobile.nativeapp.data.api.CreateExpenseRequest
 import mx.nexara.mobile.nativeapp.data.api.DocumentDto
 import mx.nexara.mobile.nativeapp.data.api.EmployeePaymentDto
@@ -50,6 +49,8 @@ import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
 import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
 import mx.nexara.mobile.nativeapp.data.api.CandidateDto
 import mx.nexara.mobile.nativeapp.data.api.UpdateEmployeePaymentRequest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import mx.nexara.mobile.nativeapp.data.api.CatalogProductDto
 import mx.nexara.mobile.nativeapp.data.api.PortfolioProjectDto
 import mx.nexara.mobile.nativeapp.data.api.ServiceSheetListDto
@@ -182,18 +183,20 @@ class ExtraRepository(context: Context) {
         concepto: String?,
         note: String?,
         totalMinutes: Int? = null,
-    ) = api.createEmployeePayment(
-        CreateEmployeePaymentRequest(
-            userId = userId,
-            periodFrom = periodFrom,
-            periodTo = periodTo,
-            amount = amount,
-            concepto = concepto,
-            note = note,
-            totalMinutes = totalMinutes,
-            status = "Borrador",
-        ),
-    )
+    ): EmployeePaymentDto {
+        fun plain(v: String) = v.toRequestBody("text/plain".toMediaType())
+        val fields = linkedMapOf(
+            "userId" to plain(userId.toString()),
+            "periodFrom" to plain(periodFrom),
+            "periodTo" to plain(periodTo),
+            "amount" to plain(amount.toString()),
+            "status" to plain("Borrador"),
+        )
+        if (!concepto.isNullOrBlank()) fields["concepto"] = plain(concepto)
+        if (!note.isNullOrBlank()) fields["note"] = plain(note)
+        if (totalMinutes != null) fields["totalMinutes"] = plain(totalMinutes.toString())
+        return api.createEmployeePayment(fields)
+    }
 
     suspend fun markEmployeePaymentPagado(id: Long) = api.markEmployeePaymentPagado(id)
 
