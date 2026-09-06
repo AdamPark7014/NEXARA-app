@@ -117,6 +117,18 @@ object DeepLinkParser {
         "integra-people" to "integra-people",
         "integra-attendance" to "integra-attendance",
         "integra-visitors" to "integra-visitors",
+        "alarms" to "integra-alarms",
+        "alarmas" to "integra-alarms",
+        "occupancy" to "integra-occupancy",
+        "en-sitio" to "integra-occupancy",
+        "devices" to "integra-devices",
+        "equipos" to "integra-devices",
+        "sites" to "integra-sites",
+        "sitios" to "integra-sites",
+        "integra-alarms" to "integra-alarms",
+        "integra-occupancy" to "integra-occupancy",
+        "integra-devices" to "integra-devices",
+        "integra-sites" to "integra-sites",
     )
 
     /** Rutas web tipo `/crm/opportunities/123` o URL absoluta con path y query. */

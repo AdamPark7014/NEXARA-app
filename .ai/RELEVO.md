@@ -28,6 +28,7 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ### INTEGRA Bloque 2 ligero
 - Alarmas (ack/clear), occupancy, devices, sites lista.
+- `ModulePanelMap` + deep links para claves nuevas.
 
 ### Verificación
 - `:app:compileDebugKotlin` OK.
