@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NotificationsService, INotificationPayload } from './notifications.service';
+import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { appUrls } from '../common/app-urls.js';
