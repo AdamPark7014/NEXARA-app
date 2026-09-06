@@ -167,6 +167,16 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         photoBase64 = photoBase64,
                     )
                 }
+                val hasGps =
+                    coords != null &&
+                        coords.lat.isFinite() &&
+                        coords.lng.isFinite() &&
+                        !(coords.lat == 0.0 && coords.lng == 0.0)
+                if (type == "entrada" && hasGps) {
+                    runCatching {
+                        withContext(Dispatchers.IO) { repo.gpsUpdateConsent(enabled = true) }
+                    }
+                }
                 val base = res.message ?: if (type == "entrada") "✅ Entrada registrada" else "✅ Salida registrada"
                 val geoHint = when {
                     coords == null -> " (sin GPS — activa ubicación)"

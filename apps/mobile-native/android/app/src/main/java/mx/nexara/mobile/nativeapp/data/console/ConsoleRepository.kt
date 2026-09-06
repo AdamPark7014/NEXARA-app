@@ -10,7 +10,10 @@ import mx.nexara.mobile.nativeapp.data.api.ConsoleApi
 
 class ConsoleRepository(context: Context) {
     private val authRepo = AuthRepository(context)
-    private val api: ConsoleApi = ApiClient.authed { authRepo.token() }.create(ConsoleApi::class.java)
+    private val api: ConsoleApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(ConsoleApi::class.java)
     private val textMedia = "text/plain".toMediaType()
 
     suspend fun dashboardFetch(): DashboardPayload = DashboardPayload(

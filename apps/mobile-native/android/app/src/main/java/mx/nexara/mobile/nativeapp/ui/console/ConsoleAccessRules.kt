@@ -50,11 +50,32 @@ private fun SessionUser.isPlatformAdmin(): Boolean {
 /** Rol «Administrativo» — operación día a día (espejo page-matrix web). */
 fun SessionUser.isAdministrativoRole(): Boolean {
     if (isSuperAdmin || isPlatformAdmin()) return false
+    val key = roleKey?.lowercase()
+    if (key == "administrativo") return true
+    if (key == "coord_admin" || key == "dir_admin") return false
     val r = role.lowercase()
     if (r == "coord_admin" || r == "dir_admin") return false
     if (r.contains("coord") && r.contains("admin")) return false
     if (r.contains("director") && r.contains("admin")) return false
     return r == "administrativo" || r.contains("administrativ")
+}
+
+private fun SessionUser.effectiveRoleKey(): String? =
+    roleKey?.lowercase()?.takeIf { it.isNotBlank() }
+
+private fun SessionUser.isIngenieroRole(): Boolean {
+    val key = effectiveRoleKey()
+    if (key == "ing_campo" || key == "ing_soporte") return true
+    if (key != null) return false
+    return role.lowercase().contains("ingenier")
+}
+
+private fun SessionUser.isVendedorRole(): Boolean {
+    val key = effectiveRoleKey()
+    if (key == "vendedor" || key == "coord_ventas") return true
+    if (key != null) return false
+    val r = role.lowercase()
+    return r.contains("vendedor") || r.contains("ventas")
 }
 
 /** Módulos ERP permitidos para personal administrativo (Mónica / admin_staff). */
@@ -95,15 +116,21 @@ fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
     if (module.superAdminOnly && !user.isSuperAdmin) return false
     if (module.permissions.isNotEmpty() && !user.hasAnyPermission(*module.permissions.toTypedArray())) return false
 
+    // Fuente de verdad del servidor (GET /me/navigation) cuando está disponible.
+    val navKeys = user.navModuleKeys
+    if (!navKeys.isNullOrEmpty() && !user.isSuperAdmin) {
+        return module.key in navKeys
+    }
+
     val path = normalizedConsolePath(module)
     val roleLower = user.role.lowercase()
 
     val isPlatformAdmin = user.isPlatformAdmin()
     val isAdmin = !user.isSuperAdmin && isPlatformAdmin
-    val isIngeniero = !user.isSuperAdmin && !isAdmin && roleLower.contains("ingenier")
+    val isIngeniero = !user.isSuperAdmin && !isAdmin && user.isIngenieroRole()
     val isAdministrativo = user.isAdministrativoRole()
     val isVendedor = !user.isSuperAdmin && !isAdmin && !isIngeniero && !isAdministrativo &&
-        (roleLower.contains("vendedor") || roleLower.contains("ventas"))
+        user.isVendedorRole()
 
     if (user.isSuperAdmin) {
         if (path.startsWith("/my-")) return false
@@ -119,7 +146,6 @@ fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
     }
 
     if (isIngeniero) {
-        // Campo: lo que la API ya permite a ing_campo / ing_soporte (no solo /my-*).
         val baseAllowed = setOf(
             "/dashboard", "/cotizaciones", "/cvs", "/ventas", "/attendance",
             "/activities", "/evidences", "/viatics", "/vehicles", "/gps", "/tools",

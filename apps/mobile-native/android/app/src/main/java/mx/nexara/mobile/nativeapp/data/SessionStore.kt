@@ -19,6 +19,12 @@ data class SessionUser(
     val clientId: Long? = null,
     val branchId: Long? = null,
     val avatarUrl: String? = null,
+    val roleKey: String? = null,
+    val orgRoleKey: String? = null,
+    val companyId: Long? = null,
+    val expiresAt: String? = null,
+    /** Claves de módulo permitidas desde GET /me/navigation (null = usar reglas locales). */
+    val navModuleKeys: List<String>? = null,
 )
 
 data class QuickProfile(
@@ -44,6 +50,11 @@ class SessionStore(context: Context) {
         val isBranchUser = prefs.getBoolean("is_branch_user", false)
         val clientId = prefs.getLong("client_id", 0L).takeIf { it > 0L }
         val branchId = prefs.getLong("branch_id", 0L).takeIf { it > 0L }
+        val companyId = prefs.getLong("company_id", 0L).takeIf { it > 0L }
+        val navKeys = prefs.getString("nav_module_keys_csv", null)
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
         return SessionUser(
             id = id,
             nombre = nombre,
@@ -58,6 +69,11 @@ class SessionStore(context: Context) {
             clientId = clientId,
             branchId = branchId,
             avatarUrl = prefs.getString("avatar_url", null),
+            roleKey = prefs.getString("role_key", null),
+            orgRoleKey = prefs.getString("org_role_key", null),
+            companyId = companyId,
+            expiresAt = prefs.getString("expires_at", null),
+            navModuleKeys = navKeys,
         )
     }
 
@@ -76,6 +92,11 @@ class SessionStore(context: Context) {
             .putLong("client_id", user.clientId ?: 0L)
             .putLong("branch_id", user.branchId ?: 0L)
             .putString("avatar_url", user.avatarUrl)
+            .putString("role_key", user.roleKey)
+            .putString("org_role_key", user.orgRoleKey)
+            .putLong("company_id", user.companyId ?: 0L)
+            .putString("expires_at", user.expiresAt)
+            .putString("nav_module_keys_csv", user.navModuleKeys?.joinToString(","))
             .apply()
 
         saveQuickProfile(user)
@@ -139,6 +160,12 @@ class SessionStore(context: Context) {
             .remove("is_branch_user")
             .remove("client_id")
             .remove("branch_id")
+            .remove("avatar_url")
+            .remove("role_key")
+            .remove("org_role_key")
+            .remove("company_id")
+            .remove("expires_at")
+            .remove("nav_module_keys_csv")
             .apply()
     }
 

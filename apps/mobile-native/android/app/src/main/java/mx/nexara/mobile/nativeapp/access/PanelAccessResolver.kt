@@ -24,7 +24,10 @@ private val OPS_ROLE_KEYS = setOf(
 private val STUDIO_ROLE_KEYS = setOf(
     "ceo", "super_admin", "lider_diseno", "disenador",
 )
-private val LAB_ROLE_KEYS = setOf("ceo", "super_admin", "developer")
+private val INTEGRA_ROLE_KEYS = setOf(
+    "ceo", "super_admin", "dir_operaciones", "coord_operaciones", "arquitecto",
+    "ing_campo", "ing_soporte", "noc_lead", "noc_operator",
+)
 
 private fun normalizePerms(perms: List<String>): Set<String> =
     perms.map { it.trim().lowercase().replace('_', '.').replace('-', '.') }.toSet()
@@ -70,10 +73,13 @@ object PanelAccessResolver {
         }
 
         val perms = user.normalizedPerms()
-        val tokens = roleTokens(user.role)
+        val tokens = buildSet {
+            addAll(roleTokens(user.role))
+            user.roleKey?.let { addAll(roleTokens(it)) }
+        }
 
         if (user.isSuperAdmin) {
-            return listOf(PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB)
+            return listOf(PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA)
         }
 
         val erp = hasAny(
@@ -117,12 +123,19 @@ object PanelAccessResolver {
             || tokens.any { it in LAB_ROLE_KEYS }
             || tokens.any { t -> t.contains("developer") || t.contains("desarroll") }
 
+        val integra = tokens.any { it in INTEGRA_ROLE_KEYS }
+            || tokens.any { t ->
+                t.contains("integra") || t.contains("operac") || t.contains("ingenier")
+                    || t.contains("campo") || t.contains("soporte") || t.contains("noc")
+            }
+
         return buildList {
             if (erp) add(PanelId.ERP)
             if (crm) add(PanelId.CRM)
             if (ops) add(PanelId.OPS)
             if (studio) add(PanelId.STUDIO)
             if (lab) add(PanelId.LAB)
+            if (integra) add(PanelId.INTEGRA)
         }.distinct()
     }
 
@@ -133,6 +146,7 @@ object PanelAccessResolver {
         PanelId.STUDIO -> "studio"
         PanelId.LAB -> "lab"
         PanelId.PORTAL -> "portal"
+        PanelId.INTEGRA -> "integra"
     }
 
     fun routeForSinglePanelUser(user: SessionUser?): String? {

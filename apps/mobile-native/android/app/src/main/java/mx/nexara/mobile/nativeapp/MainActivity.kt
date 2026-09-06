@@ -70,6 +70,10 @@ class MainActivity : FragmentActivity() {
                     val authRepo = remember { AuthRepository(this@MainActivity) }
                     val activity = this@MainActivity
 
+                    LaunchedEffect(Unit) {
+                        runCatching { authRepo.maybeExtendSession() }
+                    }
+
                     LaunchedEffect(locked, unlockAttempt) {
                         if (!locked) return@LaunchedEffect
                         isUnlocking = true
