@@ -2,36 +2,6 @@ package mx.nexara.mobile.nativeapp.access
 
 import mx.nexara.mobile.nativeapp.data.SessionUser
 
-private val CLIENT_OR_BRANCH_PERMISSION_PREFIXES = listOf(
-    "client-portal.",
-    "branch-portal.",
-    "client-auth.",
-    "branch-auth.",
-    "client-tickets.",
-)
-
-private val ERP_ROLE_KEYS = setOf(
-    "ceo", "super_admin", "dir_admin", "coord_admin", "administrativo",
-    "rh", "contabilidad", "dir_operaciones",
-)
-private val CRM_ROLE_KEYS = setOf(
-    "ceo", "super_admin", "coord_ventas", "vendedor", "dir_admin",
-)
-private val OPS_ROLE_KEYS = setOf(
-    "ceo", "super_admin", "dir_operaciones", "coord_operaciones", "arquitecto",
-    "ing_campo", "ing_soporte", "noc_lead", "noc_operator",
-)
-private val STUDIO_ROLE_KEYS = setOf(
-    "ceo", "super_admin", "lider_diseno", "disenador",
-)
-private val LAB_ROLE_KEYS = setOf(
-    "ceo", "super_admin", "developer", "desarrollador",
-)
-private val INTEGRA_ROLE_KEYS = setOf(
-    "ceo", "super_admin", "dir_operaciones", "coord_operaciones", "arquitecto",
-    "ing_campo", "ing_soporte", "noc_lead", "noc_operator",
-)
-
 private fun normalizePerms(perms: List<String>): Set<String> =
     perms.map { it.trim().lowercase().replace('_', '.').replace('-', '.') }.toSet()
 
@@ -42,66 +12,85 @@ private fun hasAny(perms: Set<String>, required: List<String>, isSuperAdmin: Boo
     return required.any { perms.contains(it) }
 }
 
-private fun isClientOrBranchAccount(role: String, permissions: List<String>): Boolean {
-    val byRole = Regex("(cliente|client|sucursal|branch)", RegexOption.IGNORE_CASE).containsMatchIn(role)
-    val byPerm = permissions.any { p ->
-        val n = p.trim().lowercase()
-        CLIENT_OR_BRANCH_PERMISSION_PREFIXES.any { n.startsWith(it) }
-    }
-    return byRole || byPerm
-}
-
-/** Prefer snake_case roleKey-like tokens; also keep display-name substrings as fallback. */
-private fun roleTokens(role: String): Set<String> {
-    val raw = role.trim().lowercase()
-    if (raw.isBlank()) return emptySet()
-    val snake = raw.replace(Regex("[\\s\\-]+"), "_")
-    return buildSet {
-        add(raw)
-        add(snake)
-        raw.split(Regex("[\\s_\\-/,]+")).filter { it.length >= 2 }.forEach { add(it) }
-    }
-}
-
-private fun panelFromNavKey(key: String): PanelId? = when (key.trim().lowercase()) {
-    "erp" -> PanelId.ERP
-    "crm" -> PanelId.CRM
+/**
+ * Claves de panel de `GET /me/navigation` (`me.service.ts · PANEL_PREFIXES`)
+ * más los alias legacy que aún viven en deep links y bookmarks.
+ */
+private fun panelFromNavKey(key: String): PanelId? = when (val k = key.trim().lowercase()) {
+    "erp", "core" -> PanelId.ERP
+    "crm", "sales" -> PanelId.CRM
     "ops" -> PanelId.OPS
     "studio" -> PanelId.STUDIO
     "lab" -> PanelId.LAB
     "integra" -> PanelId.INTEGRA
     "portal" -> PanelId.PORTAL
-    else -> null
+    // `console`, `ventas`, `operacion`, `web`, `tickets` — rutas legacy.
+    else -> PanelId.fromKey(k)
 }
 
+/** Panel mínimo de un usuario interno autenticado — nunca una pantalla muerta. */
+private val BASE_INTERNAL_PANEL = PanelId.ERP
+
+private val ALL_INTERNAL_PANELS = listOf(
+    PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA,
+)
+
 /**
- * Resuelve paneles accesibles — alineado con apps/web/lib/access-matrix.ts + panel-routing legacy.
- * Preferencia: `navPanels` de GET /me/navigation; fallback a heurística local.
+ * Resuelve paneles accesibles — alineado con `apps/api/src/common/rbac/roles.v2.ts`
+ * y `apps/web/lib/access-matrix.ts`.
+ *
+ * Orden de decisión (el primero que da resultado, manda):
+ *   1. Cuenta externa (cliente / sucursal) → solo PORTAL.
+ *   2. Super admin → todos los paneles internos.
+ *   3. `navPanels` de `GET /me/navigation` — la API es la fuente de verdad.
+ *   4. Rol canónico (`RolePanelMatrix`) — respaldo sin conexión, por igualdad
+ *      exacta de clave, nunca por subcadena del nombre visible del rol.
+ *   5. Permisos efectivos de la sesión.
+ *   6. Panel base: un usuario interno autenticado siempre entra a algún lado.
  */
 object PanelAccessResolver {
     fun accessiblePanels(user: SessionUser?): List<PanelId> {
         if (user == null) return emptyList()
 
-        if (user.isClient || user.isBranchUser || isClientOrBranchAccount(user.role, user.permissions)) {
+        val canonicalRole = RolePanelMatrix.canonicalRoleKey(
+            roleKey = user.roleKey,
+            orgRoleKey = user.orgRoleKey,
+            roleDisplayName = user.role,
+        )
+
+        // 1. Externos: los marca el servidor (`portal/login`) o el rol canónico.
+        if (user.isClient || user.isBranchUser || RolePanelMatrix.isExternalRole(canonicalRole)) {
             return listOf(PanelId.PORTAL)
         }
 
-        if (user.isSuperAdmin) {
-            return listOf(PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA)
-        }
+        // 2. Bypass total.
+        if (user.isSuperAdmin) return ALL_INTERNAL_PANELS
 
-        // Integración: paneles del servidor cuando vienen poblados.
+        // 3. La API manda cuando responde.
         val fromNav = user.navPanels
             ?.mapNotNull { panelFromNavKey(it) }
+            ?.filter { it != PanelId.PORTAL }
             ?.distinct()
             .orEmpty()
         if (fromNav.isNotEmpty()) return fromNav
 
+        // 4. Rol canónico — respaldo determinista sin conexión.
+        val fromRole = RolePanelMatrix.panelsForRole(canonicalRole).filter { it != PanelId.PORTAL }
+        if (fromRole.isNotEmpty()) return fromRole
+
+        // 5. Permisos efectivos.
+        val fromPerms = panelsFromPermissions(user)
+        if (fromPerms.isNotEmpty()) return fromPerms
+
+        // 6. Nunca cero paneles con sesión válida.
+        return listOf(BASE_INTERNAL_PANEL)
+    }
+
+    /** Último recurso antes del panel base: qué abre la lista de permisos. */
+    private fun panelsFromPermissions(user: SessionUser): List<PanelId> {
         val perms = user.normalizedPerms()
-        val tokens = buildSet {
-            addAll(roleTokens(user.role))
-            user.roleKey?.let { addAll(roleTokens(it)) }
-        }
+        if (perms.isEmpty()) return emptyList()
+        val superAdmin = user.isSuperAdmin
 
         val erp = hasAny(
             perms,
@@ -109,46 +98,30 @@ object PanelAccessResolver {
                 "console.access", "console.admin", "users.manage",
                 "contabilidad.view", "contabilidad.manage",
                 "attendance.view", "attendance.manage",
-                "console_access", "console_admin",
+                "hr.view", "hr.manage", "cvs.manage",
             ),
-            user.isSuperAdmin,
-        ) || tokens.any { it in ERP_ROLE_KEYS }
-            || tokens.any { t ->
-                t.contains("admin") || t.contains("rh") || t.contains("people")
-                    || t.contains("contab") || t.contains("administrativ")
-                    || t.contains("recurso") || t.contains("humano")
-            }
-
+            superAdmin,
+        )
         val crm = hasAny(
             perms,
             listOf("panel.ventas", "sales.view", "sales.manage", "sales.reports.view"),
-            user.isSuperAdmin,
-        ) || tokens.any { it in CRM_ROLE_KEYS }
-            || tokens.any { t -> t.contains("vendedor") || t.contains("ventas") || t.contains("sales") }
-
+            superAdmin,
+        )
         val ops = hasAny(
             perms,
-            listOf("console.access", "console.admin", "gps.view", "gps.manage", "activities.view"),
-            user.isSuperAdmin,
-        ) || tokens.any { it in OPS_ROLE_KEYS }
-            || tokens.any { t ->
-                t.contains("ingenier") || t.contains("soporte") || t.contains("campo")
-                    || t.contains("operac") || t.contains("noc") || t.contains("arquitect")
-            }
-
-        val studio = hasAny(perms, listOf("panel.web", "studio.access"), user.isSuperAdmin)
-            || tokens.any { it in STUDIO_ROLE_KEYS }
-            || tokens.any { t -> t.contains("diseño") || t.contains("diseno") || t.contains("studio") }
-
-        val lab = user.isSuperAdmin
-            || tokens.any { it in LAB_ROLE_KEYS }
-            || tokens.any { t -> t.contains("developer") || t.contains("desarroll") }
-
-        val integra = tokens.any { it in INTEGRA_ROLE_KEYS }
-            || tokens.any { t ->
-                t.contains("integra") || t.contains("operac") || t.contains("ingenier")
-                    || t.contains("campo") || t.contains("soporte") || t.contains("noc")
-            }
+            listOf(
+                "gps.view", "gps.manage", "activities.view", "activities.manage",
+                "evidences.view", "dispatch.manage",
+            ),
+            superAdmin,
+        )
+        val studio = hasAny(
+            perms,
+            listOf("panel.web", "studio.content.view", "studio.content.manage"),
+            superAdmin,
+        )
+        val lab = hasAny(perms, listOf("lab.access", "lab.ai.live"), superAdmin)
+        val integra = superAdmin || perms.any { it.startsWith("integra.") }
 
         return buildList {
             if (erp) add(PanelId.ERP)
