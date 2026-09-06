@@ -131,6 +131,7 @@ class AppUrlsParityTest {
         PanelId.CRM -> ModuleCatalog.ventas.map { it.key }.toSet()
         PanelId.STUDIO -> ModuleCatalog.studio.map { it.key }.toSet()
         PanelId.LAB -> ModuleCatalog.lab.map { it.key }.toSet()
+        PanelId.INTEGRA -> ModuleCatalog.integra.map { it.key }.toSet()
         PanelId.ERP, PanelId.OPS -> {
             val console = ModuleCatalog.console.map { it.key }.toSet()
             ModulePanelMap.consoleKeysFor(panel)?.intersect(console) ?: console

@@ -389,6 +389,23 @@ interface ConsoleApi {
     @GET("users")
     suspend fun getUsers(): List<VisibleUserDto>
 
+    @GET("users/roles")
+    suspend fun getUserRoles(): List<UserRolePickerDto>
+
+    @GET("users/departments")
+    suspend fun getUserDepartments(): List<UserDepartmentPickerDto>
+
+    @retrofit2.http.POST("users")
+    suspend fun createUser(
+        @retrofit2.http.Body body: CreateUserBody,
+    ): UserAdminDto
+
+    @PATCH("users/{id}")
+    suspend fun updateUser(
+        @Path("id") id: Long,
+        @retrofit2.http.Body body: UpdateUserBody,
+    ): UserAdminDto
+
     @GET("attendance/hierarchy/range")
     suspend fun getAttendanceHierarchyRange(
         @Query("from") from: String,
@@ -504,6 +521,51 @@ interface ConsoleApi {
 
     @GET("vehicles/inventory")
     suspend fun getVehicleInventory(): List<VehicleAssetDto>
+
+    @retrofit2.http.POST("vehicles")
+    suspend fun createVehicleRequest(
+        @retrofit2.http.Body body: CreateVehicleRequest,
+    ): VehicleControlDto
+
+    @retrofit2.http.POST("vehicles/{id}/renewal")
+    suspend fun requestVehicleRenewal(
+        @Path("id") id: Long,
+        @retrofit2.http.Body body: VehicleRenewalRequest,
+    ): VehicleControlDto
+
+    @Multipart
+    @retrofit2.http.POST("vehicles/{id}/start-use")
+    suspend fun startVehicleUse(
+        @Path("id") id: Long,
+        @Part("odometroKm") odometroKm: RequestBody,
+        @Part("combustiblePct") combustiblePct: RequestBody,
+        @Part("interna-0") interna0: MultipartBody.Part,
+        @Part("interna-1") interna1: MultipartBody.Part,
+        @Part("interna-2") interna2: MultipartBody.Part,
+        @Part("interna-3") interna3: MultipartBody.Part,
+        @Part("externa-0") externa0: MultipartBody.Part,
+        @Part("externa-1") externa1: MultipartBody.Part,
+        @Part("externa-2") externa2: MultipartBody.Part,
+        @Part("externa-3") externa3: MultipartBody.Part,
+        @Part odometro: MultipartBody.Part,
+    ): VehicleControlDto
+
+    @Multipart
+    @retrofit2.http.POST("vehicles/{id}/end-use")
+    suspend fun endVehicleUse(
+        @Path("id") id: Long,
+        @Part("odometroKm") odometroKm: RequestBody,
+        @Part("combustiblePct") combustiblePct: RequestBody,
+        @Part("interna-0") interna0: MultipartBody.Part,
+        @Part("interna-1") interna1: MultipartBody.Part,
+        @Part("interna-2") interna2: MultipartBody.Part,
+        @Part("interna-3") interna3: MultipartBody.Part,
+        @Part("externa-0") externa0: MultipartBody.Part,
+        @Part("externa-1") externa1: MultipartBody.Part,
+        @Part("externa-2") externa2: MultipartBody.Part,
+        @Part("externa-3") externa3: MultipartBody.Part,
+        @Part odometro: MultipartBody.Part,
+    ): VehicleControlDto
 
     // ── GPS ─────────────────────────────────────────────────────────────────
 
@@ -1019,6 +1081,59 @@ data class VehicleAssetDto(
     val placas: String? = null,
     val estatus: String? = null,
     val activo: Boolean? = null,
+)
+
+data class CreateVehicleRequest(
+    val actividadId: Long,
+    val vehicleId: Long? = null,
+    val nombreVehiculo: String? = null,
+    val placasVehiculo: String? = null,
+    val motivoUso: String? = null,
+    val fechaInicioSolicitada: String? = null,
+    val fechaFinSolicitada: String? = null,
+)
+
+data class VehicleRenewalRequest(
+    val renovacionSolicitadaInicio: String? = null,
+    val renovacionSolicitadaFin: String? = null,
+)
+
+data class UserRolePickerDto(
+    val id: Long,
+    val nombre: String,
+)
+
+data class UserDepartmentPickerDto(
+    val id: Long,
+    val nombre: String,
+)
+
+data class CreateUserBody(
+    val nombre: String,
+    val email: String,
+    val password: String,
+    val roleId: Long,
+    val departmentId: Long,
+    val employeeNumber: String? = null,
+    val managerId: Long? = null,
+)
+
+data class UpdateUserBody(
+    val nombre: String? = null,
+    val email: String? = null,
+    val password: String? = null,
+    val roleId: Long? = null,
+    val departmentId: Long? = null,
+    val employeeNumber: String? = null,
+    val managerId: Long? = null,
+    val isActive: Boolean? = null,
+)
+
+data class UserAdminDto(
+    val id: Long,
+    val nombre: String,
+    val email: String? = null,
+    val isActive: Boolean? = null,
 )
 
 data class GpsUserDto(

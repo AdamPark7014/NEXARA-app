@@ -1,159 +1,222 @@
-# Native parity matrix (apps/mobile → apps/mobile-native)
+# Native parity matrix (apps/web → apps/mobile-native)
 
-Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Next/Capacitor) y quedarnos con:
+Checklist de **paridad honesta** entre el panel web (`apps/web`) y la app nativa Android (+ referencia iOS).
+Fuente de verdad del catálogo: `ModuleCatalog.kt` (`parityStatus` + `nativeImplemented` derivado).
 
-- `apps/api` (backend)
-- `apps/web` (panel web)
-- `apps/mobile-native` (apps nativas Android+iOS)
+**Verificación:** `python scripts/check-app-web-parity.py` (falla si la matriz y el catálogo divergen).
 
-## Reglas / definiciones
-- **Parity**: misma capacidad funcional (aunque el UI sea diferente), con las mismas reglas de acceso (RBAC/jerarquía).
-- **Paneles web (v2)**: ERP, CRM, OPS, STUDIO, LAB + Portal clientes — ver `apps/web/lib/access-matrix.ts`.
-- **Android v2 hub**: `PanelAccessResolver` + `PanelId` (commit 2026-06) reemplaza nombres legacy console/ventas/web.
-- **Portal**: cuentas cliente/sucursal (tickets/inventarios/solicitudes).
-- **Realtime**: Socket.IO (`apps/api/src/realtime/realtime.gateway.ts`) para invalidar/refrescar.
-- **Offline**: cache GET + cola de mutaciones con replay (equivalente a `apps/mobile/lib/install-offline-fetch.ts` + `offline-queue.ts`).
+## Leyenda (columna Android / iOS)
 
-## Panel hub / Auth (core)
-| Feature | Mobile web (`apps/mobile`) | Android native | iOS native |
+| Estado | Significado |
+|---|---|
+| **NATIVO** | Pantalla Compose con CRUD/ops reales contra la API. `nativeImplemented=true`. |
+| **SOLO_LECTURA** | Pantalla nativa de consulta; la web tampoco exige mutaciones (KPIs, logs, catálogos). |
+| **CASCARON** | Pantalla existe pero lista/detalle sin operar; la web sí permite crear/editar/aprobar. |
+| **AUSENTE** | Sin pantalla nativa (Placeholder o sin entrada de catálogo). |
+| **WEBVIEW** | Embebido WebView — **0 casos** hoy (escape = navegador externo sin sesión). |
+
+Resumen catálogo Android (111+ entradas): estados honestos NATIVO / SOLO_LECTURA / CASCARON.
+Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (NATIVO); video/ANPR/mapa = AUSENTE (Bloque 2).
+
+## Reglas
+
+- **Parity**: misma capacidad funcional con las mismas reglas RBAC (ver `apps/web/lib/access-matrix.ts`).
+- **Paneles v2**: ERP, CRM, OPS, STUDIO, LAB, INTEGRA + Portal clientes.
+- **Android hub**: `PanelAccessResolver` + `PanelId` + `ModuleCatalog`.
+- **Offline / realtime**: Socket.IO + cola offline en `ApiClient` / `OfflineSyncCoordinator`.
+
+## Core / Auth
+
+| Feature | Web route | Android | iOS |
 |---|---|---|---|
-| Login | `app/(auth)/login` | ✅ `ui/screens/LoginScreen.kt` | ✅ `LoginView` |
-| Panel hub (/paneles) + access rules | `lib/panel-routing.ts` / `access-matrix.ts` | ✅ `PanelAccessResolver` (ERP/CRM/OPS/STUDIO/LAB) | ✅ `Access/PanelAccessResolver.swift` |
-| Session store (token, perms) | `UserContext` (session/localStorage) | ✅ `EncryptedSharedPreferences` (`data/SessionStore.kt`) | ✅ `Session/SessionStore.swift` (Keychain) |
-| Saved accounts | `lib/saved-accounts.ts` | ✅ `QuickProfile` en login | ✅ `QuickProfileStore` + login |
-| Deep links to screens | (URL routing) | ✅ `nexara://` — ERP/CRM/Studio/Portal/LAB | ✅ `nexara://` — todos los paneles |
+| Login | `/login` | NATIVO · LoginScreen | NATIVO · LoginView |
+| Panel hub | `/paneles` | NATIVO · PanelAccessResolver | NATIVO · PanelAccessResolver |
+| Session store | — | NATIVO · SessionStore | NATIVO · SessionStore |
+| Saved accounts | — | NATIVO · QuickProfile | NATIVO · QuickProfileStore |
+| Deep links | `nexara://` | NATIVO · DeepLinkParser | NATIVO · DeepLinkParser |
 
-## Panel: Console
-| Screen / capability | Mobile route | Android native | iOS native |
-|---|---|---|---|
-| Dashboard | `/console/dashboard` | ✅ `ConsoleDashboardScreen` | ✅ `ConsoleDashboardView` |
-| Tabs inferiores por rol (admin vs campo) | sidebar web | ✅ `ConsoleNavHost` dinámico | ✅ `ConsoleTabView` dinámico + RBAC |
-| Rol **Administrativo** (solo ERP, módulos limitados) | `page-matrix` administrativo | ✅ RBAC + tabs Inicio/Asistencia/Más + atajos dashboard | ✅ idem |
-| Activities (admin) | `/console/activities` | ✅ | ✅ `ActivitiesView` |
-| My activities | `/console/my-activities` | ✅ | ✅ `ActivitiesView` |
-| Evidences (admin/user) | `/console/evidences`, `/console/my-evidences` | ✅ workflow completo | ✅ `EvidencesView` (flujo 5 pasos) |
-| Viatics | `/console/viatics` | ✅ | ✅ `ViaticsView` |
-| My viatics | `/console/my-viatics` | ✅ | ✅ scope personal |
-| Vehicles | `/console/vehicles` | ✅ | ✅ `VehiclesView` |
-| GPS | `/console/gps` | ✅ | ✅ `GpsMapView` |
-| Tools hub + inventory + my-kit + renewals + kits-users | `/console/tools/*` | ✅ | ✅ `ToolsHubView` (aprobar/rechazar renovaciones) |
-| Clients | `/console/clients` | ✅ CRUD + logo | ✅ `ServiceClientsView` CRUD + logo |
-| Projects | `/console/projects` | ✅ | ✅ `ProjectsView` + estado |
-| Users | `/console/users` | ✅ | ✅ `UsersView` |
-| Attendance | `/console/attendance` | ✅ check-in/out | ✅ entrada/salida |
-| HR leaves | `/console/hr` | ✅ `HrLeavesScreen` | ✅ `HrLeavesView` |
-| Lunch breaks | `/console/lunch-breaks` | ✅ `LunchBreaksModuleScreen` (KPIs + tarjetas) | ✅ `LunchBreaksAdminView` |
-| My lunch breaks | `/console/my-lunch-breaks` | ✅ | ✅ `MyLunchBreaksView` |
-| Finance (expenses/invoices/banking) | varios | ✅ | ✅ vistas dedicadas |
-| Settings (console.admin) | `/console/settings` | ✅ | ✅ `ConsoleSettingsView` |
+## Panel ERP (ModuleCatalog.console — claves ERP)
 
-## Panel: OPS (operaciones)
-| Screen / capability | Mobile route | Android native | iOS native |
+| Module | Web route (catalog) | Android | iOS |
 |---|---|---|---|
-| Tickets de clientes (bandeja + KPIs + cambio estado) | `/ops/support` | ✅ `ClientTicketsModuleScreen` | ✅ `ClientTicketsModuleView` |
-| Compras (requisiciones + órdenes + aprobar/rechazar) | `/erp/procurement` | ✅ `ProcurementModuleScreen` | ✅ `ProcurementModuleView` |
-| Bodega + almacén (hub sin duplicar) | `/console/warehouse`, `/console/stock` | ✅ `WarehouseHubScreen` | ✅ `WarehouseHubView` |
-| Hojas de servicio | `/operacion/service-sheets` | ✅ `ServiceSheetsModuleScreen` | ✅ `ServiceSheetsModuleView` |
-| Mantenimiento / Activos | varios | ✅ `MaintenanceModuleScreen` (hub + iniciar/completar OT) | ✅ `MaintenanceView` |
-| Gestión vendedores (desde ERP) | `/console/gestion-vendedores` | ✅ `VentasSalesTeamScreen` | ✅ `CrmSalesTeamView` |
+| Inicio | `/console/dashboard` | NATIVO · ConsoleDashboardScreen | NATIVO |
+| Actividades | `/operacion/activities` | NATIVO · ConsoleActivitiesScreen | NATIVO |
+| Mis actividades | `/operacion/my-activities` | NATIVO | NATIVO |
+| Evidencias | `/operacion/evidences` | NATIVO · flujo 5 pasos + aprobar | NATIVO |
+| Mis evidencias | `/operacion/my-evidences` | NATIVO | NATIVO |
+| Viáticos (revisión) | `/operacion/viatics` | NATIVO · approveViatic | NATIVO |
+| Mis viáticos | `/operacion/my-viatics` | CASCARON · solo lista | CASCARON |
+| Vehículos | `/operacion/vehicles` | CASCARON · solo lista | CASCARON |
+| Mis vehículos | `/operacion/my-vehicles` | CASCARON | CASCARON |
+| GPS | `/operacion/gps` | NATIVO · ConsoleGpsScreen | NATIVO |
+| Herramientas | `/operacion/tools` | NATIVO · hub + inventario/kit/renovaciones | NATIVO |
+| Clientes | `/console/clients` | NATIVO · CRUD | NATIVO |
+| Proyectos | `/operacion/projects` | NATIVO · patchProjectStatus | NATIVO |
+| Proyectos internos | `/operacion/work-projects` | CASCARON · WorkProjectsRichScreen | CASCARON |
+| Usuarios | `/console/users` | CASCARON · sin alta/edición | CASCARON |
+| Asistencia | `/console/attendance` | NATIVO · check-in geo + foto | NATIVO |
+| Comidas (admin) | `/console/lunch-breaks` | NATIVO · KPIs + check-in/out | NATIVO |
+| Mis comidas | `/console/my-lunch-breaks` | NATIVO | NATIVO |
+| RRHH | `/console/hr` | CASCARON · sin aprobar vacaciones | CASCARON |
+| Pagos empleados | `/console/employee-payments` | CASCARON | CASCARON |
+| Contabilidad | `/console/accounting` | CASCARON · sin pólizas | CASCARON |
+| Banca | `/console/banking` | SOLO_LECTURA · BankingRichScreen | SOLO_LECTURA |
+| Facturación | `/console/invoicing` | NATIVO · pagos/match | NATIVO |
+| Gastos | `/console/expenses` | NATIVO · create/approve | NATIVO |
+| Multas | `/console/fines` | CASCARON | CASCARON |
+| Cotizaciones ERP | `/console/cotizaciones` | SOLO_LECTURA | SOLO_LECTURA |
+| Gestión vendedores | `/console/gestion-vendedores` | SOLO_LECTURA · VentasSalesTeamScreen | SOLO_LECTURA |
+| Vista ejecutiva | `/erp/executive` | SOLO_LECTURA · ExecutiveScreen | SOLO_LECTURA |
+| Despacho OT | `/ops/dispatch` | CASCARON · pantalla OK, menú oculto | CASCARON |
+| Aprobaciones | `/erp/approvals` | NATIVO · workflowDecide | NATIVO |
+| Notificaciones | `/erp/notifications-center` | NATIVO · NotificationsScreen | NATIVO |
+| Chat | `/erp/chat` | NATIVO · ChatScreen (a veces oculto en menú) | NATIVO |
+| BI | `/erp/analytics/bi` | SOLO_LECTURA · ErpBiScreen | SOLO_LECTURA |
+| Analítica | `/console/analytics` | SOLO_LECTURA · ErpBiScreen | SOLO_LECTURA |
+| Auditoría | `/console/audit` | SOLO_LECTURA · AuditModuleScreen | SOLO_LECTURA |
+| Activos | `/operacion/assets` | NATIVO · MaintenanceModuleScreen | NATIVO |
+| Almacén | `/console/stock` | NATIVO · WarehouseHubScreen | NATIVO |
+| Bodega | `/console/warehouse` | NATIVO | NATIVO |
+| Compras | `/console/procurement` | NATIVO · approve/reject req | NATIVO |
+| Mantenimiento | `/operacion/maintenance` | NATIVO · OT start/complete | NATIVO |
+| Hojas de servicio | `/operacion/service-sheets` | NATIVO · ServiceSheetsModuleScreen | NATIVO |
+| Documentos | `/console/documents` | CASCARON · CatalogRichScreen | CASCARON |
+| CVs | `/console/cvs` | CASCARON | CASCARON |
+| Reclutamiento | `/ops/recruiting` | CASCARON · inalcanzable en sidebar | CASCARON |
+| Tickets clientes | `/operacion/client-tickets` | NATIVO · ClientTicketsModuleScreen | NATIVO |
+| Clientes servicio | `/ops/service-clients` | NATIVO · ConsoleClientsScreen | NATIVO |
+| Bandeja soporte | `/ops/support` | NATIVO | NATIVO |
+| NOC | `/ops/noc` | SOLO_LECTURA · sin reconocer alarma | SOLO_LECTURA |
+| SLA | `/ops/support/sla` | SOLO_LECTURA | SOLO_LECTURA |
+| Contratos mant. | `/ops/maintenance/contracts` | CASCARON | CASCARON |
+| Mensajes contacto | `/console/contact-messages` | SOLO_LECTURA | SOLO_LECTURA |
+| Noticias ERP | `/console/news` | CASCARON · lista sin CRUD | CASCARON |
+| Newsletter ERP | `/console/newsletter` | CASCARON | CASCARON |
+| Mi perfil | `/console/my-profile` | CASCARON · sin updateProfile | CASCARON |
+| Mis preferencias | `/console/my-preferences` | SOLO_LECTURA | SOLO_LECTURA |
+| Cola offline | `/console/offline-queue` | NATIVO · OfflineQueueScreen | NATIVO |
+| Ajustes | `/console/settings` | NATIVO · parcial (faltan api-keys/webhooks) | NATIVO |
+| Multi-empresa | `/erp/companies` | CASCARON | CASCARON |
+| Knowledge Base | `/erp/kb` | SOLO_LECTURA | SOLO_LECTURA |
+| Exportaciones | `/erp/exports` | NATIVO · CSV + share | NATIVO |
+| Arquitectura | `/erp/architecture` | CASCARON · catálogo local | CASCARON |
+| Calendario | `/erp/calendar` | SOLO_LECTURA | SOLO_LECTURA |
+| Organigrama | `/erp/hr/orgchart` | SOLO_LECTURA | SOLO_LECTURA |
+| KPIs personas | `/erp/hr/kpis` | SOLO_LECTURA | SOLO_LECTURA |
+| Reuniones | `/erp/reuniones` | AUSENTE | AUSENTE |
+| Accesos oficinas | `/erp/facilities/access` | AUSENTE | AUSENTE |
 
-## Panel: Tickets (Portal cliente/sucursal)
-| Capability | Mobile route | Android native | iOS native |
-|---|---|---|---|
-| Portal home | `/tickets` | ✅ `TicketsPortalScreen` | ✅ `PortalHomeView` |
-| Profile view/update | tab Perfil | ✅ | ✅ `PortalProfileView` |
-| Branches list/create/edit + logo upload | tab Sucursales | ✅ | ✅ CRUD + logo (`PortalBranchEditView`) |
-| Requests list/create | tab Nuevo/Solicitudes | ✅ | ✅ + crear solicitud |
-| Tickets list/detail | tab Tickets | ✅ | ✅ + PDF reporte |
-| Ticket report PDF | ticket modal/descarga | ✅ | ✅ |
-| Close request | (acción) | ✅ | ✅ |
-| Feedback pending + submit | (feedback modal) | ✅ | ✅ formulario completo |
-| Inventories (list/detail/sync/upload/report) | tab Inventarios | ✅ | ✅ sync + decide + PDF |
-| Portal report PDF | `/client-portal/report` | ✅ | ✅ |
-| Realtime refresh (`entity:updated`) | Socket.IO | ✅ | ✅ `RealtimeBus` |
-| Offline queue/cache | Offline layer | ✅ | ✅ cache GET + cola mutaciones |
+## Panel CRM (ModuleCatalog.ventas)
 
-## Panel: Ventas / CRM
-| Screen / capability | Mobile route | Android native | iOS native |
+| Module | Web route (catalog) | Android | iOS |
 |---|---|---|---|
-| Dashboard | `/ventas/dashboard` | ✅ | ✅ `CrmDashboardView` |
-| Leads | `/ventas/leads` | ✅ | ✅ `CrmLeadsView` |
-| Oportunidades | `/ventas/oportunidades` | ✅ `VentasOportunidadesScreen` + FAB crear | ✅ `CrmOpportunitiesView` + FAB crear |
-| Clientes | `/ventas/clientes` | ✅ `VentasClientesScreen` | ✅ `CrmCommercialClientsView` |
-| Cotizaciones (view/pdf) | `/ventas/cotizaciones` | ✅ | ✅ KPI + filtros |
-| Cotizador inteligente (Smart Quote) | `/ventas/cotizaciones/nueva` | ✅ `SmartQuoteBuilderScreen` | ✅ |
-| Productos | `/crm/products` | ✅ `VentasProductsScreen` | ✅ `CrmProductsView` |
-| Proyectos | `/ventas/proyectos` | ✅ `VentasProyectosScreen` | ✅ `CrmProjectsView` |
-| Pipeline | `/crm/pipeline` | ✅ `VentasPipelineScreen` | ✅ `CrmPipelineView` |
-| Agenda | `/crm/agenda` | ✅ `VentasAgendaScreen` | ✅ `CrmAgendaView` |
-| Licitaciones | `/crm/tenders` | ✅ `VentasTendersScreen` | ✅ `CrmTendersView` |
-| Metas comerciales | `/crm/targets` | ✅ `VentasTargetsScreen` | ✅ `CrmTargetsView` |
-| Oportunidades (detalle: notas, adjuntos, cotizaciones, historial, CRUD, PDF) | `/crm/opportunities` | ✅ `VentasOpportunityDetailScreen` | ✅ `CrmOpportunityDetailView` |
-| Plantillas cotización PDF | `/crm/templates` | ✅ `VentasTemplatesScreen` (`ventas/order-templates`) | ✅ `CrmTemplatesView` |
-| Clientes de servicio (OPS) | `/ops/service-clients` | ✅ `ConsoleClientsScreen` vía `service-clients` | ✅ `ServiceClientsView` |
-| Reportes + crecimiento + comparativa | `/ventas/reportes`, `/ventas/crecimiento`, `/ventas/equipo-comparativa` | ✅ `CrmReportsScreen` (KPIs `ventas/reportes/metricas` + vendedores) | ✅ `CrmReportsView` |
-| Notificaciones ventas | `/ventas/notificaciones` | ✅ `NotificationsScreen` | ✅ `NotificationsCenterView` |
-| Dashboard CRM (métricas mes) | `/ventas` inicio | ✅ `VentasDashboardScreen` + pipeline API | ✅ `CrmDashboardView` + pipeline API |
-| Menú «Más» sin duplicar tabs | sidebar web | ✅ `consoleSidebarGroupsForMore` / `ventasSidebarGroups` | ✅ `ConsoleAccessRules` (mismo filtro) |
-| ERP BI / analítica | `/erp/analytics/bi`, `/console/analytics` | ✅ `ErpBiScreen` (KPIs + margen + ingenieros + ROI) | ✅ `ErpBiView` |
-| Vista ejecutiva | `/erp/executive` | ✅ `ExecutiveScreen` (`executive/c-level`) | ✅ `ExecutiveView` |
-| Aprobaciones | `/erp/approvals` | ✅ `ApprovalsScreen` (workflow my-pending) | ✅ `ApprovalsView` |
-| Centro notificaciones ERP | `/erp/notifications-center` | ✅ `NotificationsScreen` (hub global) | ✅ `NotificationsCenterView` |
-| NOC monitoreo | `/ops/noc` | ✅ `NocModuleScreen` | ✅ `NocView` |
-| SLA soporte | `/ops/support/sla` | ✅ `SlaModuleScreen` | ✅ `SlaView` |
-| Contratos mantenimiento | `/ops/maintenance/contracts` | ✅ `MaintenanceContractsScreen` | ✅ `MaintenanceContractsView` |
-| Bandeja soporte | `/ops/support` | ✅ `ClientTicketsModuleScreen` | ✅ `ClientTicketsModuleView` |
-| Multi-empresa | `/erp/companies` | ✅ `CompaniesScreen` | ✅ `CompaniesView` |
-| Knowledge Base | `/erp/kb` | ✅ `KbScreen` | ✅ `KbView` |
-| Exportaciones CSV | `/erp/exports` | ✅ `ExportsScreen` (share intent) | ✅ `ExportsView` (share sheet) |
-| Arquitectura ERP | `/erp/architecture` | ✅ `ArchitectureScreen` (catálogo local) | ✅ `ArchitectureView` |
-| Calendario personal | `/erp/calendar` | ✅ `ErpCalendarScreen` | ✅ `ErpCalendarView` |
-| Organigrama | `/erp/hr/orgchart` | ✅ `OrgchartScreen` | ✅ `OrgchartView` |
-| KPIs de personas | `/erp/hr/kpis` | ✅ `HrKpisScreen` | ✅ `HrKpisView` |
+| Dashboard | `/ventas/dashboard` | SOLO_LECTURA · VentasDashboardScreen | SOLO_LECTURA |
+| Leads | `/ventas/leads` | NATIVO · CRUD | NATIVO |
+| Oportunidades | `/ventas/oportunidades` | NATIVO · FAB + detalle | NATIVO |
+| Cotizaciones | `/ventas/cotizaciones` | NATIVO | NATIVO |
+| Cotizador inteligente | `/ventas/cotizaciones/nueva` | NATIVO · SmartQuoteBuilderScreen | NATIVO |
+| Productos | `/ventas/productos` | SOLO_LECTURA | SOLO_LECTURA |
+| Clientes | `/ventas/clientes` | NATIVO · CRUD | NATIVO |
+| Proyectos | `/ventas/proyectos` | CASCARON · sin costos/orden | CASCARON |
+| Pipeline | `/crm/pipeline` | NATIVO · updateStage | NATIVO |
+| Agenda | `/crm/agenda` | NATIVO | NATIVO |
+| Licitaciones | `/crm/tenders` | SOLO_LECTURA | SOLO_LECTURA |
+| Metas | `/crm/targets` | SOLO_LECTURA | SOLO_LECTURA |
+| Plantillas | `/ventas/plantillas` | NATIVO | NATIVO |
+| Gestión vendedores | `/ventas/gestion-vendedores` | SOLO_LECTURA | SOLO_LECTURA |
+| Comparativa equipo | `/ventas/equipo-comparativa` | SOLO_LECTURA · CrmReportsScreen | SOLO_LECTURA |
+| Crecimiento | `/ventas/crecimiento` | SOLO_LECTURA | SOLO_LECTURA |
+| Reportes | `/ventas/reportes` | SOLO_LECTURA | SOLO_LECTURA |
+| Notificaciones | `/ventas/notificaciones` | NATIVO | NATIVO |
+| Chat | `/erp/chat` | NATIVO | NATIVO |
+| Mi perfil | `/ventas/my-profile` | CASCARON | CASCARON |
+| Equipo CRM | `/crm/team` | AUSENTE (expuesto como gestion-vendedores) | AUSENTE |
 
-## Panel: Contabilidad
-| Screen / capability | Mobile route | Android native | iOS native |
-|---|---|---|---|
-| Hub TabView (Inicio · Facturas · Gastos · Más) | `/contabilidad/*` | ✅ `ContabilidadNavHost` (desde ERP Más + deep link) | ✅ `ContabilidadTabView` (desde ERP Más) |
-| Dashboard | `/contabilidad/dashboard` | ✅ | ✅ `ContabilidadDashboardView` |
-| Facturación / Gastos / Banca | varios | ✅ `InvoicesRichScreen` / `ExpensesRichScreen` / `BankingRichScreen` | ✅ `InvoicesView` / `ExpensesView` / `BankingView` |
-| Pagos empleados · Multas · Asientos | varios | ✅ `FinanceRichScreens` | ✅ `EmployeePaymentsView` / `FinesView` / `AccountingView` |
+## Panel Contabilidad (ModuleCatalog.contabilidad)
 
-## Panel: STUDIO (web)
-| Screen / capability | Mobile route | Android native | iOS native |
+| Module | Web route (catalog) | Android | iOS |
 |---|---|---|---|
-| Dashboard KPIs | `/studio/dashboard` | ✅ `StudioDashboardScreen` | ✅ `StudioDashboardView` |
-| Hero carousel CRUD | `/studio/hero` | ✅ upload/reorder | ✅ CRUD + reorder |
-| Casos de éxito | `/studio/cases` | ✅ CRUD + publicar | ✅ CRUD + publicar |
-| Noticias | `/studio/news` | ✅ CRUD | ✅ CRUD |
-| Contactos / Leads | `/studio/contacts`, `/studio/leads` | ✅ workflow | ✅ detalle + estado |
-| Redes sociales | `/studio/social` | ✅ CRUD | ✅ CRUD + publicar |
-| Newsletter | `/studio/newsletter` | ✅ | ✅ búsqueda |
-| Secciones sitio | `/studio/pages` | ✅ JSON editor | ✅ JSON editor |
+| Dashboard | `/contabilidad/dashboard` | SOLO_LECTURA | SOLO_LECTURA |
+| Contabilidad | `/contabilidad/accounting` | CASCARON | CASCARON |
+| Banca | `/contabilidad/banking` | SOLO_LECTURA | SOLO_LECTURA |
+| Facturación | `/contabilidad/invoicing` | NATIVO | NATIVO |
+| Gastos | `/contabilidad/expenses` | NATIVO | NATIVO |
+| Pagos empleados | `/contabilidad/employee-payments` | CASCARON | CASCARON |
+| Viáticos | `/contabilidad/viaticos` | CASCARON · MyViaticsScreen RO | CASCARON |
+| Pagos | `/contabilidad/pagos` | CASCARON | CASCARON |
+| Horas | `/contabilidad/horas` | SOLO_LECTURA | SOLO_LECTURA |
+| Proyectos | `/contabilidad/proyectos` | NATIVO · ConsoleProjectsScreen | NATIVO |
+| Proyectos internos | `/contabilidad/work-projects` | CASCARON | CASCARON |
+| Multas | `/contabilidad/multas` | CASCARON | CASCARON |
+| Chat | `/erp/chat` | NATIVO | NATIVO |
 
-## Panel: Web (legacy → STUDIO)
-| Screen / capability | Mobile route | Android native | iOS native |
-|---|---|---|---|
-| Dashboard | `/web/dashboard` | ✅ vía panel STUDIO | ✅ vía panel STUDIO |
-| Clientes | `/web/clientes` | ✅ `ServiceClientsView` / Studio | ✅ `ServiceClientsView` |
-| Proyectos | `/web/proyectos` | ✅ módulos CRM/Console | ✅ `ModuleRouter` |
-| Contactos | `/web/contactos` | ✅ Studio contacts | ✅ Studio contacts |
-| Noticias | `/web/noticias` | ✅ `NewsModuleScreen` | ✅ listas nativas |
+## Panel STUDIO (ModuleCatalog.studio)
 
-## Panel: LAB
-| Screen / capability | Mobile route | Android native | iOS native |
+| Module | Web route (catalog) | Android | iOS |
 |---|---|---|---|
-| Lab home + KPIs API | `/lab` | ✅ `LabNavHost` home | ✅ `LabTabView` home |
-| API Health | `/lab/health` | ✅ `LabHealthScreen` | ✅ `LabHealthView` |
-| Feature flags | `/lab/flags` | ✅ `LabFlagsScreen` | ✅ `LabFlagsView` |
-| AI Sandbox | `/lab/ai` | ✅ `LabAiScreen` | ✅ `LabAiSandboxView` |
+| Dashboard | `/studio/dashboard` | SOLO_LECTURA | SOLO_LECTURA |
+| Hero | `/studio/hero` | NATIVO · CRUD + reorder | NATIVO |
+| Secciones | `/studio/pages` | NATIVO · JSON editor | NATIVO |
+| Casos | `/studio/cases` | NATIVO · CRUD + publicar | NATIVO |
+| Noticias | `/studio/news` | NATIVO | NATIVO |
+| Redes | `/studio/social` | NATIVO | NATIVO |
+| Newsletter | `/studio/newsletter` | CASCARON · sin mutaciones | CASCARON |
+| Contactos | `/studio/contacts` | NATIVO | NATIVO |
+| Leads sitio | `/studio/leads` | NATIVO | NATIVO |
+| Chat | `/erp/chat` | NATIVO | NATIVO |
+
+## Panel LAB (ModuleCatalog.lab)
+
+| Module | Web route (catalog) | Android | iOS |
+|---|---|---|---|
+| Home | `/lab` | SOLO_LECTURA · LabHomeScreen | SOLO_LECTURA |
+| API Health | `/lab/health` | SOLO_LECTURA | SOLO_LECTURA |
+| Feature flags | `/lab/flags` | NATIVO · setFlag | NATIVO |
+| AI Sandbox | `/lab/ai` | NATIVO · runAi | NATIVO |
+| Chat | `/lab/chat` | NATIVO | NATIVO |
+
+## Panel INTEGRA — MVP nativo + Bloque 2
+
+`PanelId.INTEGRA` + `IntegraNavHost` + `ModuleCatalog.integra` en Android.
+MVP operativo contra `/api/integra/**` (sin inventar ISAPI).
+
+| Module | Web route | Android | iOS |
+|---|---|---|---|
+| Inicio hub | `/integra` | NATIVO · IntegraNavHost | AUSENTE |
+| Accesos | `/integra/access` | NATIVO · puertas + open | AUSENTE |
+| Eventos | `/integra/events` | NATIVO · lista | AUSENTE |
+| Personas | `/integra/people` | NATIVO · lista/detalle | AUSENTE |
+| Asistencia ACS | `/integra/attendance` | NATIVO · lista | AUSENTE |
+| Visitas | `/integra/visitors` | NATIVO · lista + registro | AUSENTE |
+| Video 24h | `/integra/video` | AUSENTE · Bloque 2 | AUSENTE |
+| Detección | `/integra/detection` | AUSENTE · Bloque 2 | AUSENTE |
+| Alarmas | `/integra/alarms` | AUSENTE · Bloque 2 | AUSENTE |
+| ANPR | `/integra/anpr` | AUSENTE · Bloque 2 | AUSENTE |
+| Plano | `/integra/map` | AUSENTE · Bloque 2 | AUSENTE |
+| Vehículos ACS | `/integra/vehicles` | AUSENTE | AUSENTE |
+| Sitios | `/integra/settings` | AUSENTE | AUSENTE |
+| Auditoría | `/integra/audit` | AUSENTE | AUSENTE |
+| Notificaciones | `/integra/notifications-center` | AUSENTE · WIP | AUSENTE |
+| Mi perfil | `/integra/my-profile` | AUSENTE · WIP | AUSENTE |
+
+## Portal clientes (TicketsNavHost — fuera del catálogo ERP)
+
+| Capability | Web route | Android | iOS |
+|---|---|---|---|
+| Portal home | `/tickets` | NATIVO | NATIVO |
+| Sucursales CRUD | `/tickets/*` | NATIVO | NATIVO |
+| Solicitudes | — | NATIVO | NATIVO |
+| Inventarios sync | — | NATIVO | NATIVO |
+| Feedback | — | NATIVO | NATIVO |
+| Perfil | — | NATIVO · updateProfile | NATIVO |
+| Detalle ticket | — | CASCARON · sin comentar/cerrar | CASCARON |
 
 ## Cross-cutting
-| Feature | Mobile web | Android native | iOS native |
-|---|---|---|---|
-| Notifications inbox + badge | `apps/api/src/notifications` | ✅ `NotificationsScreen` + badge hub | ✅ `NotificationsCenterView` + badge |
-| Socket.IO realtime | `apps/api/src/realtime` | ✅ `RealtimeBus` | ✅ `RealtimeBus` |
-| Offline GET cache | `install-offline-fetch.ts` | ✅ integrado en `ApiClient` | ✅ `OfflineApiCache` |
-| Offline mutation queue + replay | `offline-queue.ts` | ✅ `OfflineSyncCoordinator` | ✅ `OfflineSyncCoordinator` |
-| Camera/gallery uploads | evidences/ventas opp | ✅ `MediaPickerBar` + cámara/galería en evidencias | ✅ `MediaPickerBar` + `CameraCaptureView` |
-| Push notifications (FCM/APNs) | devices/push-token | ✅ FCM + deep link al tocar | ✅ APNs + `PushManager` |
+
+| Feature | Android | iOS |
+|---|---|---|
+| Socket.IO realtime | NATIVO · RealtimeBus | NATIVO |
+| Offline GET cache | NATIVO | NATIVO |
+| Offline mutation queue | NATIVO | NATIVO |
+| Push (FCM/APNs) | NATIVO | WIP · aps dev |
+| Camera / uploads | NATIVO · MediaPickerBar | NATIVO |

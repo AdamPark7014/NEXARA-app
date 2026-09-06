@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -220,28 +222,160 @@ fun AuditRichScreen() = CatalogRichScreen(
     },
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DocumentsRichScreen() = CatalogRichScreen(
-    title = "Documentos",
-    subtitle = "Biblioteca de archivos",
-    kpis = emptyList(),
-    placeholder = "Buscar documento…",
-    load = { it.documents() },
-    keyOf = { "doc-${it.id}" },
-    titleOf = { it.title.orEmpty().ifBlank { "Documento" } },
-    subtitleOf = { it.type.orEmpty() },
-    metaOf = { it.createdAt.orEmpty() },
-    matches = { row, q ->
-        (row.title ?: "").lowercase().contains(q) || (row.type ?: "").lowercase().contains(q)
-    },
-    detailPairs = { d: DocumentDto ->
-        listOf(
-            "Título" to (d.title ?: ""),
-            "Tipo" to (d.type ?: ""),
-            "Fecha" to (d.createdAt ?: ""),
+fun DocumentsRichScreen() {
+    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as Application
+    val repo = remember { ExtraRepository(app) }
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    var items by remember { mutableStateOf<List<DocumentDto>>(emptyList()) }
+    var selected by remember { mutableStateOf<DocumentDto?>(null) }
+    var showUpload by remember { mutableStateOf(false) }
+    var titleInput by remember { mutableStateOf("") }
+    var fileDataUrl by remember { mutableStateOf<String?>(null) }
+    var uploading by remember { mutableStateOf(false) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    fun reload(initial: Boolean = true) {
+        scope.launch {
+            loading = initial && items.isEmpty()
+            isRefreshing = !initial
+            error = null
+            try {
+                items = withContext(Dispatchers.IO) { repo.documents() }
+            } catch (e: Exception) {
+                error = e.message ?: "No se pudieron cargar documentos"
+            } finally {
+                loading = false
+                isRefreshing = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { reload(initial = true) }
+
+    if (showUpload) {
+        Column(Modifier.fillMaxSize().background(NxColors.Surface).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(onClick = { showUpload = false; actionMessage = null }) { Text("← Cancelar") }
+            Text("Subir documento", fontWeight = FontWeight.Bold)
+            NxPanelShell {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = titleInput,
+                        onValueChange = { titleInput = it },
+                        label = { Text("Título") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text("Archivo (PDF o imagen)", fontWeight = FontWeight.SemiBold)
+                    mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar(
+                        onPicked = { picked ->
+                            fileDataUrl = picked.firstOrNull()?.let {
+                                mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl.fromCaptured(context, it)
+                            }
+                        },
+                        allowCamera = true,
+                        allowGallery = true,
+                        allowDocuments = true,
+                    )
+                    if (fileDataUrl != null) {
+                        Text("✓ Archivo listo", color = NxColors.Success, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            actionMessage?.let { Text(it, color = if (it.startsWith("✅")) NxColors.Success else NxColors.Danger) }
+            Button(
+                onClick = {
+                    if (titleInput.isBlank()) {
+                        actionMessage = "❌ Indica título"
+                        return@Button
+                    }
+                    if (fileDataUrl.isNullOrBlank()) {
+                        actionMessage = "❌ Adjunta archivo"
+                        return@Button
+                    }
+                    uploading = true
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                repo.createDocument(
+                                    title = titleInput.trim(),
+                                    fileUrl = fileDataUrl!!,
+                                    mimeType = if (fileDataUrl!!.contains("pdf")) "application/pdf" else "image/jpeg",
+                                )
+                            }
+                            actionMessage = "✅ Documento subido"
+                            showUpload = false
+                            titleInput = ""; fileDataUrl = null
+                            reload(initial = false)
+                        } catch (e: Exception) {
+                            actionMessage = "❌ ${e.message ?: "No se pudo subir"}"
+                        } finally {
+                            uploading = false
+                        }
+                    }
+                },
+                enabled = !uploading,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (uploading) "Subiendo…" else "Subir") }
+        }
+        return
+    }
+
+    val sel = selected
+    if (sel != null) {
+        CatalogItemDetail(
+            pairs = listOf(
+                "Título" to (sel.title ?: ""),
+                "Tipo" to (sel.type ?: ""),
+                "URL" to (sel.fileUrl ?: ""),
+                "Fecha" to (sel.createdAt ?: ""),
+            ),
+            onBack = { selected = null },
         )
-    },
-)
+        return
+    }
+
+    val filtered = items.filter { row ->
+        if (query.isBlank()) return@filter true
+        val q = query.lowercase()
+        (row.title ?: "").lowercase().contains(q) || (row.type ?: "").lowercase().contains(q)
+    }
+
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { reload(initial = false) }, modifier = Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
+            NxSectionHeader(title = "Documentos", subtitle = "Biblioteca de archivos")
+            NxSearchField(value = query, onValueChange = { query = it }, placeholder = "Buscar documento…")
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = { showUpload = true; actionMessage = null }, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                Text("+ Subir documento")
+            }
+            Spacer(Modifier.height(8.dp))
+            when {
+                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { NxLoadingBlock("Cargando…") }
+                error != null -> NxErrorBlock(error!!) { reload() }
+                filtered.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    NxEmptyState("Sin documentos", "No hay archivos en la biblioteca.")
+                }
+                else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(filtered.take(80), key = { it.id }) { doc ->
+                        NxPanelShell(onClick = { selected = doc }) {
+                            Text(doc.title ?: "Documento", fontWeight = FontWeight.SemiBold)
+                            Text(doc.type ?: "", style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                            doc.createdAt?.take(10)?.let {
+                                Text(it, style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun NewsRichScreen() = CatalogRichScreen(

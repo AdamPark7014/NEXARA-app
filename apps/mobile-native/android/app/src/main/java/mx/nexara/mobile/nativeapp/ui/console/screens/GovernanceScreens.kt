@@ -35,6 +35,7 @@ import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleEntry
+import mx.nexara.mobile.nativeapp.ui.catalog.ParityStatus
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
@@ -355,7 +356,7 @@ fun ArchitectureScreen() {
         Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { NxSectionHeader("Arquitectura del ERP", "5 paneles · módulos nativos implementados") }
+        item { NxSectionHeader("Arquitectura del ERP", "Estado real · ver native-parity-matrix.md") }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = selected == "all", onClick = { selected = "all" }, label = { Text("Todos") })
@@ -368,14 +369,29 @@ fun ArchitectureScreen() {
         toShow.forEach { panel ->
             item {
                 Text("${panel.icon} ${panel.title}", fontWeight = FontWeight.Bold, color = panel.accent)
-                Text("${panel.modules.count { it.nativeImplemented }} módulos nativos", style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
+                Text(
+                    "${panel.modules.count { it.parityStatus == ParityStatus.NATIVO }} nativos · " +
+                        "${panel.modules.count { it.parityStatus == ParityStatus.SOLO_LECTURA }} lectura · " +
+                        "${panel.modules.count { it.parityStatus == ParityStatus.CASCARON }} cascarón",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF64748B),
+                )
             }
             items(panel.modules, key = { "${panel.id}-${it.key}" }) { m ->
                 GovCard(
                     title = "${m.icon} ${m.label}",
                     subtitle = m.webPath,
-                    trailing = if (m.nativeImplemented) "✓" else "—",
-                    accent = if (m.nativeImplemented) panel.accent else Color(0xFF94A3B8),
+                    trailing = when (m.parityStatus) {
+                        ParityStatus.NATIVO -> "✓"
+                        ParityStatus.SOLO_LECTURA -> "RO"
+                        ParityStatus.CASCARON -> "○"
+                        else -> "—"
+                    },
+                    accent = when (m.parityStatus) {
+                        ParityStatus.NATIVO -> panel.accent
+                        ParityStatus.SOLO_LECTURA -> panel.accent.copy(alpha = 0.65f)
+                        else -> Color(0xFF94A3B8)
+                    },
                 )
             }
         }

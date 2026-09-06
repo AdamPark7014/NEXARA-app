@@ -5,8 +5,14 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 class NexaraApplication : Application(), ImageLoaderFactory {
+    override fun onCreate() {
+        super.onCreate()
+        FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
+    }
+
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .memoryCache {

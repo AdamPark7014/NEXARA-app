@@ -37,10 +37,24 @@ object ModulePanelMap {
         "chat",
     )
 
+    private val INTEGRA_KEYS = setOf(
+        "integra-home",
+        "integra-access",
+        "integra-events",
+        "integra-people",
+        "integra-attendance",
+        "integra-visitors",
+    )
+
     /** null = sin filtro (todos los módulos console). */
     fun consoleKeysFor(panel: PanelId): Set<String>? = when (panel) {
         PanelId.OPS -> OPS_KEYS
         PanelId.ERP -> ERP_KEYS
+        else -> null
+    }
+
+    fun integraKeysFor(panel: PanelId): Set<String>? = when (panel) {
+        PanelId.INTEGRA -> INTEGRA_KEYS
         else -> null
     }
 }

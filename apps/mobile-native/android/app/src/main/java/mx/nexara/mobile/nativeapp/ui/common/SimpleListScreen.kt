@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.common
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -52,6 +53,7 @@ fun SimpleListScreen(
     onRetry: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
     header: (@Composable () -> Unit)? = null,
+    onRowClick: ((String) -> Unit)? = null,
 ) {
     val baseRows = rows ?: emptyList()
     var query by remember { mutableStateOf("") }
@@ -132,7 +134,7 @@ fun SimpleListScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(filteredRows, key = { it.id }) { row ->
-                        SimpleRowCard(row)
+                        SimpleRowCard(row, onClick = onRowClick?.let { { it(row.id) } })
                     }
                     item { Spacer(Modifier.height(24.dp)) }
                 }
@@ -142,9 +144,11 @@ fun SimpleListScreen(
 }
 
 @Composable
-private fun SimpleRowCard(row: SimpleRow) {
+private fun SimpleRowCard(row: SimpleRow, onClick: (() -> Unit)? = null) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(1.dp),
     ) {

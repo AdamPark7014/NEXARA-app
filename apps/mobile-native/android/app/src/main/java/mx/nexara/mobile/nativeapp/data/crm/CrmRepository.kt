@@ -37,8 +37,14 @@ import java.lang.reflect.ParameterizedType
 class CrmRepository(private val context: Context) {
     private val appContext = context.applicationContext
     private val authRepo = AuthRepository(appContext)
-    private val crmApi: CrmApi = ApiClient.authed { authRepo.token() }.create(CrmApi::class.java)
-    private val extraApi: ExtraApi = ApiClient.authed { authRepo.token() }.create(ExtraApi::class.java)
+    private val crmApi: CrmApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(CrmApi::class.java)
+    private val extraApi: ExtraApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(ExtraApi::class.java)
 
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 

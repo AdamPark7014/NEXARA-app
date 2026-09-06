@@ -165,14 +165,29 @@ class MainActivity : FragmentActivity() {
 
     private fun pushDataFromIntent(intent: Intent): Map<String, String> {
         val extras = intent.extras ?: return emptyMap()
-        return extras.keySet()
-            .asSequence()
-            .filter { it.startsWith("nexara_") }
-            .mapNotNull { key ->
-                val value = extras.getString(key)?.trim().orEmpty()
-                if (value.isBlank()) null else key.removePrefix("nexara_") to value
+        val deepLinkKeys = setOf(
+            "entityType",
+            "relatedEntityId",
+            "entityId",
+            "relatedUrl",
+            "url",
+            "category",
+            "channelId",
+            "channel",
+            "notificationId",
+            "nexara_notification_id",
+        )
+        val result = linkedMapOf<String, String>()
+        for (key in deepLinkKeys) {
+            extras.getString(key)?.trim()?.takeIf { it.isNotEmpty() }?.let { result[key] = it }
+        }
+        for (key in extras.keySet()) {
+            if (!key.startsWith("nexara_")) continue
+            extras.getString(key)?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                result[key.removePrefix("nexara_")] = it
             }
-            .toMap()
+        }
+        return NexaraNotifications.deepLinkDataFrom(result)
     }
 
     private fun askNotificationPermissionIfNeeded() {
@@ -195,7 +210,10 @@ class MainActivity : FragmentActivity() {
                 runCatching {
                     val auth = AuthRepository(applicationContext)
                     if (auth.token().isNullOrBlank()) return@runCatching
-                    val api = ApiClient.authed { auth.token() }.create(DevicesApi::class.java)
+                    val api = ApiClient.authed(
+                        tokenProvider = { auth.token() },
+                        companyIdProvider = { auth.companyId() },
+                    ).create(DevicesApi::class.java)
                     api.registerPushToken(RegisterFcmTokenRequest(token, "android"))
                 }.onFailure { Log.w("MainActivity", "registerPushToken: ${it.message}") }
             }

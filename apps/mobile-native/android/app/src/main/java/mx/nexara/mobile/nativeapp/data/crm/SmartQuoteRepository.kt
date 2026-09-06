@@ -21,7 +21,10 @@ import mx.nexara.mobile.nativeapp.data.api.SupplierStatsResponseDto
 
 class SmartQuoteRepository(context: Context) {
     private val api: SmartQuoteApi =
-        ApiClient.authed { AuthRepository(context).token() }.create(SmartQuoteApi::class.java)
+        ApiClient.authed(
+            tokenProvider = { AuthRepository(context).token() },
+            companyIdProvider = { AuthRepository(context).companyId() },
+        ).create(SmartQuoteApi::class.java)
 
     suspend fun search(
         query: String,

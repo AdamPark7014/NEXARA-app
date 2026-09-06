@@ -9,7 +9,10 @@ import mx.nexara.mobile.nativeapp.data.api.SetFlagRequest
 
 class LabRepository(context: Context) {
     private val authRepo = AuthRepository(context)
-    private val api: LabApi = ApiClient.authed { authRepo.token() }.create(LabApi::class.java)
+    private val api: LabApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(LabApi::class.java)
     private val healthApi = ApiClient.healthApi { authRepo.token() }
 
     suspend fun basicHealth() = healthApi.health()

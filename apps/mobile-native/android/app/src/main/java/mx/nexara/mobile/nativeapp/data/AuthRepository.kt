@@ -234,7 +234,7 @@ class AuthRepository(
                     val fcm = runCatching {
                         com.google.firebase.messaging.FirebaseMessaging.getInstance().token.await()
                     }.getOrNull()
-                    val api = ApiClient.authed { bearer }.create(
+                    val api = ApiClient.authed(tokenProvider = { bearer }).create(
                         mx.nexara.mobile.nativeapp.data.api.DevicesApi::class.java,
                     )
                     api.revokePushToken(fcm)

@@ -18,8 +18,14 @@ import mx.nexara.mobile.nativeapp.data.api.UploadUrlsResponse
 
 class TicketsRepository(context: Context) {
     private val authRepo = AuthRepository(context)
-    private val api: TicketsApi = ApiClient.authed { authRepo.token() }.create(TicketsApi::class.java)
-    private val branchApi: BranchPortalApi = ApiClient.authed { authRepo.token() }.create(BranchPortalApi::class.java)
+    private val api: TicketsApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(TicketsApi::class.java)
+    private val branchApi: BranchPortalApi = ApiClient.authed(
+        tokenProvider = { authRepo.token() },
+        companyIdProvider = { authRepo.companyId() },
+    ).create(BranchPortalApi::class.java)
     private val textMedia = "text/plain".toMediaType()
 
     private fun isBranchUser(): Boolean = authRepo.loadSession()?.isBranchUser == true

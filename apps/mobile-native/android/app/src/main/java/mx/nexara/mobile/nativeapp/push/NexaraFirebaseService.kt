@@ -22,27 +22,25 @@ class NexaraFirebaseService : FirebaseMessagingService() {
         val ctx = applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
-                val api = ApiClient.authed { AuthRepository(ctx).token() }.create(DevicesApi::class.java)
+                val api = ApiClient.authed(
+                    tokenProvider = { AuthRepository(ctx).token() },
+                    companyIdProvider = { AuthRepository(ctx).companyId() },
+                ).create(DevicesApi::class.java)
                 api.registerPushToken(RegisterFcmTokenRequest(token = token, platform = "android"))
             }.onFailure { Log.w(TAG, "No se pudo registrar token FCM: ${it.message}") }
         }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        val title = message.notification?.title ?: message.data["title"]
-        val body = message.notification?.body ?: message.data["body"]
-        val channel = when (message.data["channel"]) {
-            "alerts" -> NexaraNotifications.CHANNEL_ALERTS
-            "tickets" -> NexaraNotifications.CHANNEL_TICKETS
-            "gps" -> NexaraNotifications.CHANNEL_GPS
-            else -> NexaraNotifications.CHANNEL_DEFAULT
-        }
+        val data = message.data
+        val title = message.notification?.title ?: data["title"]
+        val body = message.notification?.body ?: data["body"]
         NexaraNotifications.show(
             context = applicationContext,
             title = title,
             body = body,
-            channel = channel,
-            data = message.data,
+            channel = NexaraNotifications.notificationChannelFrom(data["channel"]),
+            data = data,
         )
     }
 

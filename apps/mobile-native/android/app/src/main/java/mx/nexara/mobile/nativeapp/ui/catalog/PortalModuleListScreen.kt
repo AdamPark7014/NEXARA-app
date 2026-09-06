@@ -28,6 +28,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 
+/** Etiqueta corta para UI a partir de [ParityStatus]. */
+fun parityStatusLabel(status: String): String = when (status) {
+    ParityStatus.NATIVO -> "nativo"
+    ParityStatus.SOLO_LECTURA -> "solo lectura"
+    ParityStatus.CASCARON -> "cascarón"
+    ParityStatus.AUSENTE -> "ausente"
+    ParityStatus.WEBVIEW -> "webview"
+    else -> status.lowercase()
+}
+
 /**
  * Shell reutilizable: muestra una lista de módulos (apps/mobile-like) y deja
  * que el caller navegue a la pantalla por módulo.
@@ -77,7 +87,7 @@ fun PortalModuleListScreen(
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                m.webPath + if (m.nativeImplemented) "  ·  nativo" else "  ·  pendiente",
+                                "${m.webPath}  ·  ${parityStatusLabel(m.parityStatus)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

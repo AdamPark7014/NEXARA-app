@@ -765,6 +765,8 @@ data class FinesRichUiState(
     val isRefreshing: Boolean = false,
     val query: String = "",
     val items: List<FineDto> = emptyList(),
+    val actingId: Long? = null,
+    val actionMessage: String? = null,
 )
 
 class FinesRichViewModel(app: Application) : AndroidViewModel(app) {
@@ -798,16 +800,55 @@ class FinesRichViewModel(app: Application) : AndroidViewModel(app) {
     fun pendingTotal() = _state.value.items
         .filter { !it.displayStatus().equals("pagado", true) && !it.displayStatus().equals("pagada", true) }
         .sumOf { it.displayAmount() }
+
+    fun decide(id: Long, approve: Boolean, note: String?) {
+        if (!approve && note.isNullOrBlank()) {
+            _state.update { it.copy(actionMessage = "❌ Indica motivo de rechazo") }
+            return
+        }
+        _state.update { it.copy(actingId = id, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.approveFine(id, approve, note) }
+                _state.update {
+                    it.copy(
+                        actingId = null,
+                        actionMessage = if (approve) "✅ Multa aprobada" else "✅ Multa rechazada",
+                    )
+                }
+                refresh()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        actingId = null,
+                        actionMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo actualizar"}",
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
 fun FinesRichScreen(vm: FinesRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
     var selected by remember { mutableStateOf<FineDto?>(null) }
+    var rejectNote by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val canApprove = remember {
+        AuthRepository(context).loadSession()?.let { u ->
+            u.isSuperAdmin || u.permissions.any {
+                it.contains("console.admin") || it.contains("activities.manage")
+            }
+        } == true
+    }
 
     val sel = selected
     if (sel != null) {
-        FinanceDetailScaffold(onBack = { selected = null }) {
+        val pendingApproval = sel.displayApproval().equals("pendiente", true) ||
+            sel.displayApproval().equals("pending", true) ||
+            sel.displayApproval() == "—"
+        FinanceDetailScaffold(onBack = { selected = null; rejectNote = "" }) {
             item {
                 NxPanelShell(contentPadding = PaddingValues(16.dp)) {
                     Column(
@@ -854,6 +895,38 @@ fun FinesRichScreen(vm: FinesRichViewModel = viewModel()) {
             }
             if (sel.referenciaId != null) {
                 item { FinanceRow("Referencia", "#${sel.referenciaId}") }
+            }
+            if (canApprove && pendingApproval) {
+                item {
+                    OutlinedTextField(
+                        value = rejectNote,
+                        onValueChange = { rejectNote = it },
+                        label = { Text("Motivo rechazo") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { vm.decide(sel.id, true, null); selected = null },
+                            enabled = s.actingId != sel.id,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Aprobar") }
+                        OutlinedButton(
+                            onClick = { vm.decide(sel.id, false, rejectNote); selected = null },
+                            enabled = s.actingId != sel.id,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Rechazar") }
+                    }
+                }
+            }
+            if (!s.actionMessage.isNullOrBlank()) {
+                item {
+                    Text(
+                        s.actionMessage!!,
+                        color = if (s.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                    )
+                }
             }
         }
         return
