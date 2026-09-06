@@ -41,6 +41,49 @@ class ConsoleActivitiesViewModel(app: Application) : AndroidViewModel(app) {
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
     fun setStatusFilter(v: String) = _state.update { it.copy(statusFilter = v) }
 
+    /**
+     * Campo: Iniciar → En Proceso (+ GPS con actividadId) / Finalizar → Finalizada.
+     * Vocabulario alineado con API/web (no EN_CURSO/COMPLETADA).
+     */
+    fun executeMine(
+        id: Long,
+        start: Boolean,
+        isAdmin: Boolean = false,
+        isSuperAdmin: Boolean = false,
+        currentUserId: Long? = null,
+        lat: Double? = null,
+        lng: Double? = null,
+    ) {
+        viewModelScope.launch {
+            try {
+                val now = java.time.Instant.now().toString()
+                withContext(Dispatchers.IO) {
+                    if (start) {
+                        repo.executeActivity(id = id, estatus = "En Proceso", fechaInicio = now)
+                        if (lat != null && lng != null) {
+                            runCatching { repo.gpsPost(lat, lng, speedKmh = null, activityId = id) }
+                        }
+                    } else {
+                        repo.executeActivity(id = id, estatus = "Finalizada", fechaFinalizacion = now)
+                    }
+                }
+                loadAll(
+                    initial = false,
+                    isAdmin = isAdmin,
+                    isSuperAdmin = isSuperAdmin,
+                    currentUserId = currentUserId,
+                )
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        error = e.message?.takeIf { m -> m.isNotBlank() }
+                            ?: if (start) "No se pudo iniciar la OT" else "No se pudo finalizar la OT",
+                    )
+                }
+            }
+        }
+    }
+
     fun loadAll(
         initial: Boolean = true,
         isAdmin: Boolean = false,

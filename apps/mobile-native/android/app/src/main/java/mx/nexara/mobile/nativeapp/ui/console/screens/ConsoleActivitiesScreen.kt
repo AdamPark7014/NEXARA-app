@@ -241,7 +241,29 @@ fun ConsoleActivitiesScreen(
                 }
             } else {
                 items(myFiltered.take(100), key = { it.id }) { a ->
-                    ActivityCard(a, showResponsable = false, onClick = { selectedActivity = a })
+                    ActivityCard(
+                        a,
+                        showResponsable = false,
+                        onClick = { selectedActivity = a },
+                        onStart = {
+                            vm.executeMine(
+                                id = a.id,
+                                start = true,
+                                isAdmin = isAdmin,
+                                isSuperAdmin = isSuperAdmin,
+                                currentUserId = user?.id,
+                            )
+                        },
+                        onFinish = {
+                            vm.executeMine(
+                                id = a.id,
+                                start = false,
+                                isAdmin = isAdmin,
+                                isSuperAdmin = isSuperAdmin,
+                                currentUserId = user?.id,
+                            )
+                        },
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -285,8 +307,24 @@ private fun ActivitySectionHeader(label: String, count: Int, icon: String) {
 }
 
 @Composable
-private fun ActivityCard(a: ActivityDto, showResponsable: Boolean = true, onClick: (() -> Unit)? = null) {
+private fun ActivityCard(
+    a: ActivityDto,
+    showResponsable: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onStart: (() -> Unit)? = null,
+    onFinish: (() -> Unit)? = null,
+) {
     val statusTone = activStatusTone(a.estatus)
+    val status = a.estatus.lowercase()
+    val canStart = onStart != null &&
+        !status.contains("proceso") &&
+        !status.contains("finaliz") &&
+        !status.contains("complet") &&
+        !status.contains("cancel")
+    val canFinish = onFinish != null &&
+        (status.contains("proceso") || status.contains("validar") || status.contains("curso")) &&
+        !status.contains("finaliz") &&
+        !status.contains("complet")
     NxPanelShell(onClick = onClick) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -324,6 +362,26 @@ private fun ActivityCard(a: ActivityDto, showResponsable: Boolean = true, onClic
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF94A3B8),
                 )
+            }
+            if (canStart || canFinish) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (canStart) {
+                        Button(
+                            onClick = { onStart?.invoke() },
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Iniciar") }
+                    }
+                    if (canFinish) {
+                        OutlinedButton(
+                            onClick = { onFinish?.invoke() },
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Finalizar") }
+                    }
+                }
             }
         }
     }

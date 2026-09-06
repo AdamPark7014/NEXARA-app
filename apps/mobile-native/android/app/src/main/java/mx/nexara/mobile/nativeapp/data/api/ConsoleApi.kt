@@ -1199,6 +1199,7 @@ data class PostGpsLocationRequest(
     val velocidadKmh: Double? = null,
     val estaActivo: Boolean = true,
     val ultimaActualizacion: String,
+    val actividadId: Long? = null,
 )
 
 data class GpsConsentRequest(
