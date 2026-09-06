@@ -116,4 +116,17 @@ export class ClientTicketRequestsService {
       data: { status },
     });
   }
+
+  async updateNotes(id: number, notes: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const request = await this.prisma.clientTicketRequest.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(request, tenantId, 'Solicitud');
+    return this.prisma.clientTicketRequest.update({
+      where: { id },
+      data: { notes: notes.trim().slice(0, 4000) },
+      include: { client: true, branch: true, activity: true },
+    });
+  }
 }

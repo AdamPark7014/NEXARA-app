@@ -13,9 +13,13 @@ import mx.nexara.mobile.nativeapp.data.api.BiClientRoiDto
 import mx.nexara.mobile.nativeapp.data.api.BiEngineerRowDto
 import mx.nexara.mobile.nativeapp.data.api.BiMarginRowDto
 import mx.nexara.mobile.nativeapp.data.api.CalendarEventDto
+import mx.nexara.mobile.nativeapp.data.api.ChartAccountDto
 import mx.nexara.mobile.nativeapp.data.api.ComputedKpiDto
 import mx.nexara.mobile.nativeapp.data.api.CompanyDto
 import mx.nexara.mobile.nativeapp.data.api.ContactMessageDto
+import mx.nexara.mobile.nativeapp.data.api.CreateBankAccountRequest
+import mx.nexara.mobile.nativeapp.data.api.CreateCompanyRequest
+import mx.nexara.mobile.nativeapp.data.api.CreateJournalEntryRequest
 import mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto
 import mx.nexara.mobile.nativeapp.data.api.KbArticleDto
 import mx.nexara.mobile.nativeapp.data.api.OrgNodeDto
@@ -36,6 +40,7 @@ import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceMatchWaiveRequest
 import mx.nexara.mobile.nativeapp.data.api.InvoicePaymentRequest
 import mx.nexara.mobile.nativeapp.data.api.JournalEntryDto
+import mx.nexara.mobile.nativeapp.data.api.JournalEntryLineRequest
 import mx.nexara.mobile.nativeapp.data.api.LunchBreakDto
 import mx.nexara.mobile.nativeapp.data.api.LunchCheckinRequest
 import mx.nexara.mobile.nativeapp.data.api.LunchCheckoutRequest
@@ -48,7 +53,9 @@ import mx.nexara.mobile.nativeapp.data.api.PortfolioProjectDto
 import mx.nexara.mobile.nativeapp.data.api.ServiceSheetListDto
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 import mx.nexara.mobile.nativeapp.data.api.StockMovementDto
+import mx.nexara.mobile.nativeapp.data.api.SetCompanyActiveRequest
 import mx.nexara.mobile.nativeapp.data.api.StockMovementRequest
+import mx.nexara.mobile.nativeapp.data.api.UpdateCompanyRequest
 import mx.nexara.mobile.nativeapp.data.api.GoodsReceiptDto
 import mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto
 import mx.nexara.mobile.nativeapp.data.api.PurchaseOrderDto
@@ -189,6 +196,44 @@ class ExtraRepository(context: Context) {
 
     suspend fun approveDocument(id: Long) = api.approveDocument(id)
     suspend fun journalEntries(): List<JournalEntryDto> = parseList(api.getJournalEntriesRaw())
+    suspend fun chartAccounts(): List<ChartAccountDto> = parseList(api.getChartAccountsRaw())
+
+    suspend fun createJournalEntry(
+        date: String,
+        description: String,
+        debitAccountId: Long,
+        creditAccountId: Long,
+        amount: Double,
+        reference: String? = null,
+    ) {
+        api.createJournalEntry(
+            CreateJournalEntryRequest(
+                date = date,
+                description = description,
+                reference = reference,
+                lines = listOf(
+                    JournalEntryLineRequest(
+                        debitAccountId = debitAccountId,
+                        creditAccountId = creditAccountId,
+                        description = description,
+                        debit = amount,
+                        credit = 0.0,
+                    ),
+                    JournalEntryLineRequest(
+                        debitAccountId = creditAccountId,
+                        creditAccountId = debitAccountId,
+                        description = description,
+                        debit = 0.0,
+                        credit = amount,
+                    ),
+                ),
+            ),
+        ).string()
+    }
+
+    suspend fun postJournalEntry(id: Long) {
+        api.postJournalEntry(id).string()
+    }
     suspend fun invoices(): List<InvoiceDto> = parseList(api.getInvoicesRaw())
 
     suspend fun invoiceDetail(id: Long): Map<String, Any?> {
@@ -230,6 +275,24 @@ class ExtraRepository(context: Context) {
     }
 
     suspend fun bankAccounts(): List<BankAccountDto> = parseList(api.getBankAccountsRaw())
+
+    suspend fun createBankAccount(
+        name: String,
+        bankName: String,
+        accountNumber: String,
+        currency: String = "MXN",
+        clabe: String? = null,
+    ) {
+        api.createBankAccount(
+            CreateBankAccountRequest(
+                name = name,
+                bankName = bankName,
+                accountNumber = accountNumber,
+                currency = currency,
+                clabe = clabe,
+            ),
+        ).string()
+    }
 
     // ── Generic endpoints (Map<String, Any?>) for screens that only list raw
     // records. Mantiene paridad visual sin forzar DTOs específicos.
@@ -419,6 +482,52 @@ class ExtraRepository(context: Context) {
     suspend fun companies() = companyDtos().map { it.raw }
     suspend fun companyDtos(): List<CompanyDto> =
         loadGeneric { api.getCompaniesRaw() }.map { CompanyDto.fromRaw(it) }
+
+    suspend fun createCompany(
+        legalName: String,
+        tradeName: String? = null,
+        rfc: String? = null,
+        fiscalRegime: String? = null,
+        contactEmail: String? = null,
+        contactPhone: String? = null,
+    ) {
+        api.createCompany(
+            CreateCompanyRequest(
+                legalName = legalName,
+                tradeName = tradeName,
+                rfc = rfc,
+                fiscalRegime = fiscalRegime,
+                contactEmail = contactEmail,
+                contactPhone = contactPhone,
+            ),
+        ).string()
+    }
+
+    suspend fun updateCompany(
+        id: Long,
+        legalName: String? = null,
+        tradeName: String? = null,
+        rfc: String? = null,
+        fiscalRegime: String? = null,
+        contactEmail: String? = null,
+        contactPhone: String? = null,
+    ) {
+        api.updateCompany(
+            id,
+            UpdateCompanyRequest(
+                legalName = legalName,
+                tradeName = tradeName,
+                rfc = rfc,
+                fiscalRegime = fiscalRegime,
+                contactEmail = contactEmail,
+                contactPhone = contactPhone,
+            ),
+        ).string()
+    }
+
+    suspend fun setCompanyActive(id: Long, isActive: Boolean) {
+        api.setCompanyActive(id, SetCompanyActiveRequest(isActive)).string()
+    }
     suspend fun kbArticles(q: String? = null) = kbArticleDtos(q).map { it.raw }
     suspend fun kbArticleDtos(q: String? = null): List<KbArticleDto> =
         loadGeneric { api.getKbArticlesRaw(q) }.map { KbArticleDto.fromRaw(it) }

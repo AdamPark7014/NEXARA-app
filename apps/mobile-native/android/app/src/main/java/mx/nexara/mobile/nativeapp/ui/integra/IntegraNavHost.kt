@@ -44,6 +44,10 @@ private const val People = "integra/people"
 private const val PersonDetail = "integra/people/{personId}"
 private const val Attendance = "integra/attendance"
 private const val Visitors = "integra/visitors"
+private const val Alarms = "integra/alarms"
+private const val Occupancy = "integra/occupancy"
+private const val Devices = "integra/devices"
+private const val Sites = "integra/sites"
 
 private fun integraRouteForKey(key: String): String = when (key.lowercase()) {
     "integra-access", "access", "acceso", "puertas", "doors" -> Access
@@ -51,6 +55,10 @@ private fun integraRouteForKey(key: String): String = when (key.lowercase()) {
     "integra-people", "people", "personas" -> People
     "integra-attendance", "attendance", "asistencia" -> Attendance
     "integra-visitors", "visitors", "visitantes" -> Visitors
+    "integra-alarms", "alarms", "alarmas" -> Alarms
+    "integra-occupancy", "occupancy", "en-sitio", "presencia" -> Occupancy
+    "integra-devices", "devices", "equipos" -> Devices
+    "integra-sites", "sites", "sitios", "integra-settings", "settings" -> Sites
     else -> Home
 }
 
@@ -82,6 +90,10 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
         currentRoute?.startsWith("integra/people/") == true -> "Detalle de persona"
         currentRoute == Attendance -> "Asistencia ACS"
         currentRoute == Visitors -> "Visitantes"
+        currentRoute == Alarms -> "Alarmas SOC"
+        currentRoute == Occupancy -> "En sitio ahora"
+        currentRoute == Devices -> "Equipos"
+        currentRoute == Sites -> "Sitios Integra"
         else -> "NEXARA INTEGRA"
     }
 
@@ -103,6 +115,10 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
                     onOpenPeople = { nav.navigate(People) { launchSingleTop = true } },
                     onOpenAttendance = { nav.navigate(Attendance) { launchSingleTop = true } },
                     onOpenVisitors = { nav.navigate(Visitors) { launchSingleTop = true } },
+                    onOpenAlarms = { nav.navigate(Alarms) { launchSingleTop = true } },
+                    onOpenOccupancy = { nav.navigate(Occupancy) { launchSingleTop = true } },
+                    onOpenDevices = { nav.navigate(Devices) { launchSingleTop = true } },
+                    onOpenSites = { nav.navigate(Sites) { launchSingleTop = true } },
                 )
             }
             composable(Access) { IntegraAccessScreen() }
@@ -123,6 +139,10 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
             }
             composable(Attendance) { IntegraAttendanceScreen() }
             composable(Visitors) { IntegraVisitorsScreen() }
+            composable(Alarms) { IntegraAlarmsScreen() }
+            composable(Occupancy) { IntegraOccupancyScreen() }
+            composable(Devices) { IntegraDevicesScreen() }
+            composable(Sites) { IntegraSitesScreen() }
         }
     }
 }
@@ -134,6 +154,10 @@ private fun IntegraHomeScreen(
     onOpenPeople: () -> Unit,
     onOpenAttendance: () -> Unit,
     onOpenVisitors: () -> Unit,
+    onOpenAlarms: () -> Unit,
+    onOpenOccupancy: () -> Unit,
+    onOpenDevices: () -> Unit,
+    onOpenSites: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -150,7 +174,7 @@ private fun IntegraHomeScreen(
                     color = NxColors.Slate,
                 )
                 Text(
-                    "Puertas, eventos, personas, asistencia y visitantes",
+                    "Puertas, eventos, personas, asistencia, visitantes y operación SOC",
                     style = MaterialTheme.typography.bodySmall,
                     color = NxColors.Muted,
                 )
@@ -202,6 +226,60 @@ private fun IntegraHomeScreen(
                     bg = Color(0xFF059669),
                     onClick = onOpenVisitors,
                 )
+            }
+        }
+        item {
+            Column {
+                Text(
+                    "Operación",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = NxColors.Slate,
+                )
+                Text(
+                    "Alarmas, presencia, equipos y sitios",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxColors.Muted,
+                )
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IntegraQuickCard(
+                        modifier = Modifier.weight(1f),
+                        icon = "🚨",
+                        title = "Alarmas",
+                        subtitle = "Cola SOC",
+                        bg = Color(0xFFDC2626),
+                        onClick = onOpenAlarms,
+                    )
+                    IntegraQuickCard(
+                        modifier = Modifier.weight(1f),
+                        icon = "📍",
+                        title = "En sitio",
+                        subtitle = "Ocupación hoy",
+                        bg = Color(0xFF0891B2),
+                        onClick = onOpenOccupancy,
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IntegraQuickCard(
+                        modifier = Modifier.weight(1f),
+                        icon = "🖥️",
+                        title = "Equipos",
+                        subtitle = "Inventario ACS",
+                        bg = Color(0xFF4B5563),
+                        onClick = onOpenDevices,
+                    )
+                    IntegraQuickCard(
+                        modifier = Modifier.weight(1f),
+                        icon = "🏢",
+                        title = "Sitios",
+                        subtitle = "Lista de sitios",
+                        bg = Color(0xFF9333EA),
+                        onClick = onOpenSites,
+                    )
+                }
             }
         }
         item { Spacer(Modifier.height(24.dp)) }

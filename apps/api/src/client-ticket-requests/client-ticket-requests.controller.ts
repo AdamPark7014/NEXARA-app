@@ -84,4 +84,26 @@ export class ClientTicketRequestsController {
     if (!status) throw new BadRequestException('status invalido');
     return this.service.updateStatus(id, status, companyId);
   }
+
+  /** Notas internas (web ops/support/[id] llama PATCH :id con { notes }). */
+  @Patch(':id')
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.SUPPORT_MANAGE,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+    ],
+  })
+  updateNotes(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { notes?: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    if (body.notes === undefined || body.notes === null) {
+      throw new BadRequestException('notes requerido');
+    }
+    return this.service.updateNotes(id, String(body.notes), companyId);
+  }
 }

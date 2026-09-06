@@ -11,7 +11,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,8 +37,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.access.ModulePanelMap
-import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.data.api.CompanyDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
+import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleEntry
 import mx.nexara.mobile.nativeapp.ui.catalog.ParityStatus
@@ -54,13 +61,20 @@ data class CompaniesState(
     val loading: Boolean = true,
     val isRefreshing: Boolean = false,
     val error: String? = null,
-    val items: List<mx.nexara.mobile.nativeapp.data.api.CompanyDto> = emptyList(),
+    val items: List<CompanyDto> = emptyList(),
+    val selected: CompanyDto? = null,
+    val showCreate: Boolean = false,
+    val saving: Boolean = false,
+    val actionMessage: String? = null,
 )
 
 class CompaniesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
     private val _state = MutableStateFlow(CompaniesState())
     val state: StateFlow<CompaniesState> = _state
+
+    fun setShowCreate(show: Boolean) = _state.update { it.copy(showCreate = show, actionMessage = null) }
+    fun selectCompany(c: CompanyDto?) = _state.update { it.copy(selected = c, actionMessage = null) }
 
     fun load(refresh: Boolean = false) {
         _state.update { it.copy(loading = !refresh && it.items.isEmpty(), isRefreshing = refresh, error = null) }
@@ -73,6 +87,91 @@ class CompaniesViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    fun createCompany(
+        legalName: String,
+        tradeName: String,
+        rfc: String,
+        fiscalRegime: String,
+        contactEmail: String,
+        contactPhone: String,
+        onDone: () -> Unit,
+    ) {
+        if (legalName.isBlank()) {
+            _state.update { it.copy(actionMessage = "❌ Razón social obligatoria") }
+            return
+        }
+        _state.update { it.copy(saving = true, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.createCompany(
+                        legalName = legalName.trim(),
+                        tradeName = tradeName.trim().ifBlank { null },
+                        rfc = rfc.trim().ifBlank { null },
+                        fiscalRegime = fiscalRegime.trim().ifBlank { null },
+                        contactEmail = contactEmail.trim().ifBlank { null },
+                        contactPhone = contactPhone.trim().ifBlank { null },
+                    )
+                }
+                _state.update { it.copy(saving = false, showCreate = false, actionMessage = "✅ Empresa creada") }
+                load(refresh = true)
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(saving = false, actionMessage = "❌ ${e.toUserMessage("No se pudo crear")}") }
+            }
+        }
+    }
+
+    fun updateCompany(
+        id: Long,
+        legalName: String,
+        tradeName: String,
+        rfc: String,
+        fiscalRegime: String,
+        contactEmail: String,
+        contactPhone: String,
+        onDone: () -> Unit,
+    ) {
+        if (legalName.isBlank()) {
+            _state.update { it.copy(actionMessage = "❌ Razón social obligatoria") }
+            return
+        }
+        _state.update { it.copy(saving = true, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.updateCompany(
+                        id = id,
+                        legalName = legalName.trim(),
+                        tradeName = tradeName.trim().ifBlank { null },
+                        rfc = rfc.trim().ifBlank { null },
+                        fiscalRegime = fiscalRegime.trim().ifBlank { null },
+                        contactEmail = contactEmail.trim().ifBlank { null },
+                        contactPhone = contactPhone.trim().ifBlank { null },
+                    )
+                }
+                _state.update { it.copy(saving = false, actionMessage = "✅ Empresa actualizada") }
+                load(refresh = true)
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(saving = false, actionMessage = "❌ ${e.toUserMessage("No se pudo actualizar")}") }
+            }
+        }
+    }
+
+    fun toggleActive(id: Long, isActive: Boolean) {
+        _state.update { it.copy(saving = true, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.setCompanyActive(id, isActive) }
+                _state.update { it.copy(saving = false, actionMessage = if (isActive) "✅ Empresa activada" else "✅ Empresa desactivada") }
+                load(refresh = true)
+            } catch (e: Exception) {
+                _state.update { it.copy(saving = false, actionMessage = "❌ ${e.toUserMessage("No se pudo cambiar estatus")}") }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,6 +180,104 @@ fun CompaniesScreen() {
     val vm: CompaniesViewModel = viewModel()
     val state by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.load() }
+
+    var legalName by remember { mutableStateOf("") }
+    var tradeName by remember { mutableStateOf("") }
+    var rfc by remember { mutableStateOf("") }
+    var fiscalRegime by remember { mutableStateOf("") }
+    var contactEmail by remember { mutableStateOf("") }
+    var contactPhone by remember { mutableStateOf("") }
+
+    val selected = state.selected
+    if (selected != null && !state.showCreate) {
+        LaunchedEffect(selected.id) {
+            legalName = selected.legalName
+            tradeName = selected.tradeName
+            rfc = selected.rfc
+            fiscalRegime = selected.fiscalRegime
+            contactEmail = selected.email
+            contactPhone = selected.phone
+        }
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { OutlinedButton(onClick = { vm.selectCompany(null) }) { Text("← Volver") } }
+            item { NxSectionHeader(selected.displayName, "Editar razón social") }
+            item { OutlinedTextField(legalName, { legalName = it }, label = { Text("Razón social *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(tradeName, { tradeName = it }, label = { Text("Nombre comercial") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(rfc, { rfc = it }, label = { Text("RFC") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(fiscalRegime, { fiscalRegime = it }, label = { Text("Régimen fiscal") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(contactEmail, { contactEmail = it }, label = { Text("Correo") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(contactPhone, { contactPhone = it }, label = { Text("Teléfono") }, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Activa")
+                    Switch(
+                        checked = selected.isActive,
+                        onCheckedChange = { vm.toggleActive(selected.id, it) },
+                        enabled = !state.saving,
+                    )
+                }
+            }
+            item {
+                Button(
+                    onClick = {
+                        vm.updateCompany(selected.id, legalName, tradeName, rfc, fiscalRegime, contactEmail, contactPhone) {
+                            vm.selectCompany(null)
+                        }
+                    },
+                    enabled = !state.saving,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (state.saving) "Guardando…" else "Guardar cambios") }
+            }
+            if (!state.actionMessage.isNullOrBlank()) {
+                item {
+                    Text(
+                        state.actionMessage!!,
+                        color = if (state.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    if (state.showCreate) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { OutlinedButton(onClick = { vm.setShowCreate(false) }) { Text("← Cancelar") } }
+            item { NxSectionHeader("Nueva empresa", "Alta de razón social") }
+            item { OutlinedTextField(legalName, { legalName = it }, label = { Text("Razón social *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(tradeName, { tradeName = it }, label = { Text("Nombre comercial") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(rfc, { rfc = it }, label = { Text("RFC") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(fiscalRegime, { fiscalRegime = it }, label = { Text("Régimen fiscal") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(contactEmail, { contactEmail = it }, label = { Text("Correo") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(contactPhone, { contactPhone = it }, label = { Text("Teléfono") }, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Button(
+                    onClick = {
+                        vm.createCompany(legalName, tradeName, rfc, fiscalRegime, contactEmail, contactPhone) {
+                            legalName = ""; tradeName = ""; rfc = ""; fiscalRegime = ""; contactEmail = ""; contactPhone = ""
+                        }
+                    },
+                    enabled = !state.saving,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (state.saving) "Creando…" else "Crear empresa") }
+            }
+            if (!state.actionMessage.isNullOrBlank()) {
+                item {
+                    Text(
+                        state.actionMessage!!,
+                        color = if (state.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+        return
+    }
 
     PullToRefreshBox(
         isRefreshing = state.isRefreshing,
@@ -92,6 +289,11 @@ fun CompaniesScreen() {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item { NxSectionHeader("Multi-empresa", "Razones sociales y sucursales") }
+            item {
+                Button(onClick = { vm.setShowCreate(true) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("+ Nueva empresa")
+                }
+            }
             when {
                 state.loading -> item { NxLoadingBlock("Cargando empresas…") }
                 state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
@@ -109,6 +311,15 @@ fun CompaniesScreen() {
                         subtitle = listOfNotNull(c.rfc.takeIf { it.isNotBlank() }, c.fiscalRegime.takeIf { it.isNotBlank() }).joinToString(" · "),
                         trailing = c.trailingLabel,
                         accent = if (c.isPrimary) Color(0xFF059669) else Color(0xFF64748B),
+                        modifier = Modifier.clickable { vm.selectCompany(c) },
+                    )
+                }
+            }
+            if (!state.actionMessage.isNullOrBlank()) {
+                item {
+                    Text(
+                        state.actionMessage!!,
+                        color = if (state.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
                     )
                 }
             }

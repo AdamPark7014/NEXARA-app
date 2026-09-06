@@ -9,6 +9,7 @@ import retrofit2.http.Body
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.POST
+import retrofit2.http.PATCH
 import retrofit2.http.Query
 
 data class ClientBranchDto(
@@ -107,6 +108,7 @@ data class ClientPortalTicketDto(
     val evidencias: Any? = null,
     val serviceSheet: Any? = null,
     val activityEvidence: Any? = null,
+    val comentariosFeedback: String? = null,
 ) {
     fun displayPriority(): String = prioridad ?: urgency ?: "—"
 
@@ -136,6 +138,15 @@ data class CreateFeedbackBody(
     val wasFriendly: Boolean? = null,
     val wasSolved: Boolean? = null,
     val comments: String? = null,
+)
+
+data class PortalTicketCommentBody(
+    val body: String,
+)
+
+data class PortalTicketStatusBody(
+    val action: String,
+    val note: String? = null,
 )
 
 data class RequestDecisionBody(
@@ -373,6 +384,18 @@ interface TicketsApi {
     @GET("client-portal/tickets/{id}/report")
     suspend fun getTicketReportPdf(
         @Path("id") id: Long,
+    ): okhttp3.ResponseBody
+
+    @POST("client-portal/tickets/{id}/comments")
+    suspend fun postTicketComment(
+        @Path("id") id: Long,
+        @Body body: PortalTicketCommentBody,
+    ): okhttp3.ResponseBody
+
+    @PATCH("client-portal/tickets/{id}/status")
+    suspend fun patchTicketStatus(
+        @Path("id") id: Long,
+        @Body body: PortalTicketStatusBody,
     ): okhttp3.ResponseBody
 
     @GET("client-portal/services-summary")

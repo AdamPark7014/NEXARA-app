@@ -49,11 +49,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.BankAccountDto
+import mx.nexara.mobile.nativeapp.data.api.ChartAccountDto
 import mx.nexara.mobile.nativeapp.data.api.EmployeePaymentDto
 import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
 import mx.nexara.mobile.nativeapp.data.api.FineDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
 import mx.nexara.mobile.nativeapp.data.api.JournalEntryDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
@@ -64,6 +66,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 import mx.nexara.mobile.nativeapp.ui.console.util.financeStatusTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.fg
+import java.time.LocalDate
 import java.util.Locale
 
 private fun fmtMoney(v: Double?): String {
@@ -666,6 +669,9 @@ data class BankingRichUiState(
     val isRefreshing: Boolean = false,
     val query: String = "",
     val items: List<BankAccountDto> = emptyList(),
+    val showCreate: Boolean = false,
+    val saving: Boolean = false,
+    val actionMessage: String? = null,
 )
 
 class BankingRichViewModel(app: Application) : AndroidViewModel(app) {
@@ -674,12 +680,36 @@ class BankingRichViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<BankingRichUiState> = _state
     init { refresh() }
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
+    fun setShowCreate(show: Boolean) = _state.update { it.copy(showCreate = show, actionMessage = null) }
     fun refresh() {
         val hasData = _state.value.items.isNotEmpty()
         _state.update { it.copy(loading = !hasData, isRefreshing = hasData) }
         viewModelScope.launch {
-            val list = withContext(Dispatchers.IO) { repo.bankAccounts() }
-            _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
+            try {
+                val list = withContext(Dispatchers.IO) { repo.bankAccounts() }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, isRefreshing = false, actionMessage = "❌ ${e.toUserMessage("No se pudieron cargar cuentas")}") }
+            }
+        }
+    }
+    fun createAccount(name: String, bankName: String, accountNumber: String, currency: String, onDone: () -> Unit) {
+        if (name.isBlank() || bankName.isBlank() || accountNumber.isBlank()) {
+            _state.update { it.copy(actionMessage = "❌ Nombre, banco y número son obligatorios") }
+            return
+        }
+        _state.update { it.copy(saving = true, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.createBankAccount(name.trim(), bankName.trim(), accountNumber.trim(), currency.ifBlank { "MXN" })
+                }
+                _state.update { it.copy(saving = false, showCreate = false, actionMessage = "✅ Cuenta creada") }
+                refresh()
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(saving = false, actionMessage = "❌ ${e.toUserMessage("No se pudo crear cuenta")}") }
+            }
         }
     }
     fun filtered(): List<BankAccountDto> {
@@ -696,6 +726,41 @@ class BankingRichViewModel(app: Application) : AndroidViewModel(app) {
 fun BankingRichScreen(vm: BankingRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
     var selected by remember { mutableStateOf<BankAccountDto?>(null) }
+    var name by remember { mutableStateOf("") }
+    var bankName by remember { mutableStateOf("") }
+    var accountNumber by remember { mutableStateOf("") }
+    var currency by remember { mutableStateOf("MXN") }
+
+    if (s.showCreate) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { OutlinedButton(onClick = { vm.setShowCreate(false) }) { Text("← Cancelar") } }
+            item { Text("Nueva cuenta bancaria", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item { OutlinedTextField(name, { name = it }, label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(bankName, { bankName = it }, label = { Text("Banco *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(accountNumber, { accountNumber = it }, label = { Text("Número de cuenta *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(currency, { currency = it }, label = { Text("Moneda") }, modifier = Modifier.fillMaxWidth()) }
+            item {
+                Button(
+                    onClick = { vm.createAccount(name, bankName, accountNumber, currency) { name = ""; bankName = ""; accountNumber = ""; currency = "MXN" } },
+                    enabled = !s.saving,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (s.saving) "Creando…" else "Crear cuenta") }
+            }
+            if (!s.actionMessage.isNullOrBlank()) {
+                item {
+                    Text(
+                        s.actionMessage!!,
+                        color = if (s.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+        return
+    }
+
     val sel = selected
     if (sel != null) {
         FinanceDetailScaffold(onBack = { selected = null }) {
@@ -737,7 +802,23 @@ fun BankingRichScreen(vm: BankingRichViewModel = viewModel()) {
         isEmpty = vm.filtered().isEmpty(),
         emptyTitle = "Sin cuentas bancarias",
         emptySubtitle = "No hay cuentas bancarias registradas en el sistema.",
+        emptyActionLabel = "Nueva cuenta",
+        onEmptyAction = { vm.setShowCreate(true) },
     ) {
+        item {
+            Button(onClick = { vm.setShowCreate(true) }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Text("+ Nueva cuenta")
+            }
+        }
+        if (!s.actionMessage.isNullOrBlank()) {
+            item {
+                Text(
+                    s.actionMessage!!,
+                    color = if (s.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+        }
         items(vm.filtered().take(40), key = { it.id }) { acc ->
             NxPanelShell(onClick = { selected = acc }) {
                 Text(acc.name ?: "Cuenta", fontWeight = FontWeight.Bold)
@@ -1130,6 +1211,11 @@ data class AccountingRichUiState(
     val isRefreshing: Boolean = false,
     val query: String = "",
     val items: List<JournalEntryDto> = emptyList(),
+    val accounts: List<ChartAccountDto> = emptyList(),
+    val showCreate: Boolean = false,
+    val saving: Boolean = false,
+    val actingId: Long? = null,
+    val actionMessage: String? = null,
 )
 
 class AccountingRichViewModel(app: Application) : AndroidViewModel(app) {
@@ -1138,12 +1224,65 @@ class AccountingRichViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<AccountingRichUiState> = _state
     init { refresh() }
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
+    fun setShowCreate(show: Boolean) = _state.update { it.copy(showCreate = show, actionMessage = null) }
     fun refresh() {
         val hasData = _state.value.items.isNotEmpty()
         _state.update { it.copy(loading = !hasData, isRefreshing = hasData) }
         viewModelScope.launch {
-            val list = withContext(Dispatchers.IO) { repo.journalEntries() }
-            _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
+            try {
+                val list = withContext(Dispatchers.IO) { repo.journalEntries() }
+                val accounts = withContext(Dispatchers.IO) { runCatching { repo.chartAccounts() }.getOrDefault(emptyList()) }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = list, accounts = accounts) }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, isRefreshing = false, actionMessage = "❌ ${e.toUserMessage("No se pudieron cargar asientos")}") }
+            }
+        }
+    }
+    fun createEntry(
+        date: String,
+        description: String,
+        debitAccountId: Long,
+        creditAccountId: Long,
+        amount: Double,
+        reference: String?,
+        onDone: () -> Unit,
+    ) {
+        if (description.isBlank()) {
+            _state.update { it.copy(actionMessage = "❌ Descripción obligatoria") }
+            return
+        }
+        if (amount <= 0) {
+            _state.update { it.copy(actionMessage = "❌ Importe debe ser mayor a cero") }
+            return
+        }
+        if (debitAccountId <= 0L || creditAccountId <= 0L) {
+            _state.update { it.copy(actionMessage = "❌ IDs de cuenta debe/haber obligatorios") }
+            return
+        }
+        _state.update { it.copy(saving = true, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.createJournalEntry(date, description.trim(), debitAccountId, creditAccountId, amount, reference?.trim()?.ifBlank { null })
+                }
+                _state.update { it.copy(saving = false, showCreate = false, actionMessage = "✅ Asiento creado") }
+                refresh()
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(saving = false, actionMessage = "❌ ${e.toUserMessage("No se pudo crear asiento")}") }
+            }
+        }
+    }
+    fun postEntry(id: Long) {
+        _state.update { it.copy(actingId = id, actionMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.postJournalEntry(id) }
+                _state.update { it.copy(actingId = null, actionMessage = "✅ Asiento contabilizado") }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(actingId = null, actionMessage = "❌ ${e.toUserMessage("No se pudo contabilizar")}") }
+            }
         }
     }
     fun filtered(): List<JournalEntryDto> {
@@ -1159,6 +1298,67 @@ class AccountingRichViewModel(app: Application) : AndroidViewModel(app) {
 fun AccountingRichScreen(vm: AccountingRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
     var selected by remember { mutableStateOf<JournalEntryDto?>(null) }
+    var description by remember { mutableStateOf("") }
+    var entryDate by remember { mutableStateOf(LocalDate.now().toString()) }
+    var debitAccountId by remember { mutableStateOf("") }
+    var creditAccountId by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var reference by remember { mutableStateOf("") }
+
+    if (s.showCreate) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { OutlinedButton(onClick = { vm.setShowCreate(false) }) { Text("← Cancelar") } }
+            item { Text("Nuevo asiento", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item { OutlinedTextField(description, { description = it }, label = { Text("Descripción *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(entryDate, { entryDate = it }, label = { Text("Fecha (AAAA-MM-DD)") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(debitAccountId, { debitAccountId = it }, label = { Text("Cuenta debe (ID) *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(creditAccountId, { creditAccountId = it }, label = { Text("Cuenta haber (ID) *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(amount, { amount = it }, label = { Text("Importe *") }, modifier = Modifier.fillMaxWidth()) }
+            item { OutlinedTextField(reference, { reference = it }, label = { Text("Referencia") }, modifier = Modifier.fillMaxWidth()) }
+            if (s.accounts.isNotEmpty()) {
+                item { Text("Catálogo (referencia)", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelMedium) }
+                items(s.accounts.take(12), key = { it.id }) { acc ->
+                    Text(acc.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item {
+                Button(
+                    onClick = {
+                        vm.createEntry(
+                            entryDate.trim().ifBlank { LocalDate.now().toString() },
+                            description,
+                            debitAccountId.trim().toLongOrNull() ?: 0L,
+                            creditAccountId.trim().toLongOrNull() ?: 0L,
+                            amount.trim().replace(",", ".").toDoubleOrNull() ?: 0.0,
+                            reference,
+                        ) {
+                            description = ""
+                            entryDate = LocalDate.now().toString()
+                            debitAccountId = ""
+                            creditAccountId = ""
+                            amount = ""
+                            reference = ""
+                        }
+                    },
+                    enabled = !s.saving,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (s.saving) "Creando…" else "Crear asiento") }
+            }
+            if (!s.actionMessage.isNullOrBlank()) {
+                item {
+                    Text(
+                        s.actionMessage!!,
+                        color = if (s.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+        return
+    }
+
     val sel = selected
     if (sel != null) {
         FinanceDetailScaffold(onBack = { selected = null }) {
@@ -1172,6 +1372,23 @@ fun AccountingRichScreen(vm: AccountingRichViewModel = viewModel()) {
             item { FinanceRow("Fecha", sel.entryDate?.take(10)) }
             item { FinanceRow("Referencia", sel.reference) }
             item { FinanceRow("Estatus", sel.status, statusTone = financeStatusTone(sel.status)) }
+            if (sel.status.equals("DRAFT", true)) {
+                item {
+                    Button(
+                        onClick = { vm.postEntry(sel.id); selected = null },
+                        enabled = s.actingId != sel.id,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(if (s.actingId == sel.id) "Contabilizando…" else "Contabilizar asiento") }
+                }
+            }
+            if (!s.actionMessage.isNullOrBlank()) {
+                item {
+                    Text(
+                        s.actionMessage!!,
+                        color = if (s.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
         }
         return
     }
@@ -1190,7 +1407,23 @@ fun AccountingRichScreen(vm: AccountingRichViewModel = viewModel()) {
         isEmpty = vm.filtered().isEmpty(),
         emptyTitle = "Sin asientos contables",
         emptySubtitle = "No hay asientos registrados con los filtros actuales.",
+        emptyActionLabel = "Nuevo asiento",
+        onEmptyAction = { vm.setShowCreate(true) },
     ) {
+        item {
+            Button(onClick = { vm.setShowCreate(true) }, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Text("+ Nuevo asiento")
+            }
+        }
+        if (!s.actionMessage.isNullOrBlank()) {
+            item {
+                Text(
+                    s.actionMessage!!,
+                    color = if (s.actionMessage!!.startsWith("✅")) Color(0xFF059669) else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+        }
         items(vm.filtered().take(80), key = { it.id }) { e ->
             NxPanelShell(onClick = { selected = e }) {
                 Text(e.description ?: "Asiento", fontWeight = FontWeight.Bold)

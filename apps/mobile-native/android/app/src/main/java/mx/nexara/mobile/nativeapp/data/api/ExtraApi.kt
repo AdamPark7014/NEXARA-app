@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import com.squareup.moshi.Json
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
@@ -670,10 +671,33 @@ data class JournalEntryDto(
     val description: String? = null,
     val totalDebit: Double? = null,
     val totalCredit: Double? = null,
-    val entryDate: String? = null,
+    @Json(name = "date") val entryDate: String? = null,
     val reference: String? = null,
     val status: String? = null,
 )
+
+data class JournalEntryLineRequest(
+    val debitAccountId: Long,
+    val creditAccountId: Long? = null,
+    val debit: Double,
+    val credit: Double,
+    val description: String? = null,
+)
+
+data class CreateJournalEntryRequest(
+    val date: String,
+    val description: String,
+    val reference: String? = null,
+    val lines: List<JournalEntryLineRequest>,
+)
+
+data class ChartAccountDto(
+    val id: Long,
+    val code: String? = null,
+    val name: String? = null,
+) {
+    val label: String get() = listOfNotNull(code, name).joinToString(" · ").ifBlank { "#$id" }
+}
 
 data class InvoiceDto(
     val id: Long,
@@ -702,10 +726,40 @@ data class InvoiceMatchWaiveRequest(
 data class BankAccountDto(
     val id: Long,
     val name: String? = null,
-    val bank: String? = null,
+    @Json(name = "bankName") val bank: String? = null,
     val accountNumber: String? = null,
-    val balance: Double? = null,
+    @Json(name = "currentBalance") val balance: Double? = null,
     val currency: String? = null,
+)
+
+data class CreateBankAccountRequest(
+    val name: String,
+    val bankName: String,
+    val accountNumber: String,
+    val currency: String? = "MXN",
+    val clabe: String? = null,
+)
+
+data class CreateCompanyRequest(
+    val legalName: String,
+    val tradeName: String? = null,
+    val rfc: String? = null,
+    val fiscalRegime: String? = null,
+    val contactEmail: String? = null,
+    val contactPhone: String? = null,
+)
+
+data class UpdateCompanyRequest(
+    val legalName: String? = null,
+    val tradeName: String? = null,
+    val rfc: String? = null,
+    val fiscalRegime: String? = null,
+    val contactEmail: String? = null,
+    val contactPhone: String? = null,
+)
+
+data class SetCompanyActiveRequest(
+    val isActive: Boolean,
 )
 
 /**
@@ -820,6 +874,15 @@ interface ExtraApi {
     @GET("accounting/journal-entries")
     suspend fun getJournalEntriesRaw(): okhttp3.ResponseBody
 
+    @POST("accounting/journal-entries")
+    suspend fun createJournalEntry(@Body body: CreateJournalEntryRequest): okhttp3.ResponseBody
+
+    @PATCH("accounting/journal-entries/{id}/post")
+    suspend fun postJournalEntry(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("accounting/accounts")
+    suspend fun getChartAccountsRaw(@Query("isActive") isActive: String? = "true"): okhttp3.ResponseBody
+
     // Invoices
     @GET("accounting/invoices")
     suspend fun getInvoicesRaw(): okhttp3.ResponseBody
@@ -845,6 +908,9 @@ interface ExtraApi {
     // Banking accounts
     @GET("accounting/banking/accounts")
     suspend fun getBankAccountsRaw(): okhttp3.ResponseBody
+
+    @POST("accounting/banking/accounts")
+    suspend fun createBankAccount(@Body body: CreateBankAccountRequest): okhttp3.ResponseBody
 
     // HR
     @GET("hr/leaves")
@@ -976,6 +1042,15 @@ interface ExtraApi {
     // Gobierno corporativo
     @GET("company/list")
     suspend fun getCompaniesRaw(): okhttp3.ResponseBody
+
+    @POST("company")
+    suspend fun createCompany(@Body body: CreateCompanyRequest): okhttp3.ResponseBody
+
+    @PATCH("company/{id}")
+    suspend fun updateCompany(@Path("id") id: Long, @Body body: UpdateCompanyRequest): okhttp3.ResponseBody
+
+    @PATCH("company/{id}/active")
+    suspend fun setCompanyActive(@Path("id") id: Long, @Body body: SetCompanyActiveRequest): okhttp3.ResponseBody
 
     @GET("kb/articles")
     suspend fun getKbArticlesRaw(@Query("q") q: String? = null): okhttp3.ResponseBody

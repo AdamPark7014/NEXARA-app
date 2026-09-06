@@ -7,6 +7,7 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.IntegraApi
+import mx.nexara.mobile.nativeapp.data.api.IntegraAlarmActionRequest
 import mx.nexara.mobile.nativeapp.data.api.IntegraOpenDoorRequest
 import okhttp3.ResponseBody
 import java.lang.reflect.ParameterizedType
@@ -31,6 +32,52 @@ class IntegraRepository(context: Context) {
             Any::class.java,
         )
         return moshi.adapter<Map<String, Any?>>(mapType).fromJson(raw) ?: emptyMap()
+    }
+
+    private fun parseFlexibleList(body: ResponseBody): List<Map<String, Any?>> {
+        val raw = body.string().trim()
+        if (raw.isEmpty()) return emptyList()
+        if (raw.startsWith("[")) {
+            val listType = Types.newParameterizedType(
+                List::class.java,
+                Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java),
+            )
+            return moshi.adapter<List<Map<String, Any?>>>(listType).fromJson(raw) ?: emptyList()
+        }
+        return parseItemsFromMap(raw)
+    }
+
+    private fun parseItemsFromMap(raw: String): List<Map<String, Any?>> {
+        val mapType: ParameterizedType = Types.newParameterizedType(
+            Map::class.java,
+            String::class.java,
+            Any::class.java,
+        )
+        val root = moshi.adapter<Map<String, Any?>>(mapType).fromJson(raw) ?: emptyMap()
+        val direct = root["items"]
+        if (direct is List<*>) {
+            @Suppress("UNCHECKED_CAST")
+            return direct.filterIsInstance<Map<String, Any?>>()
+        }
+        for (key in listOf("list", "data", "results", "rows")) {
+            val nested = root[key]
+            when (nested) {
+                is List<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    return nested.filterIsInstance<Map<String, Any?>>()
+                }
+                is Map<*, *> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val map = nested as Map<String, Any?>
+                    val inner = map["list"] ?: map["items"]
+                    if (inner is List<*>) {
+                        @Suppress("UNCHECKED_CAST")
+                        return inner.filterIsInstance<Map<String, Any?>>()
+                    }
+                }
+            }
+        }
+        return emptyList()
     }
 
     private fun parseItems(body: ResponseBody): List<Map<String, Any?>> {
@@ -118,4 +165,37 @@ class IntegraRepository(context: Context) {
 
     suspend fun recurringVisitors(): List<Map<String, Any?>> =
         parseItems(api.listRecurringVisitors())
+
+    data class AlarmQueueResult(
+        val items: List<Map<String, Any?>>,
+        val openCount: Int,
+    )
+
+    suspend fun alarmQueue(hours: Int = 24): AlarmQueueResult {
+        val root = parseMap(api.alarmQueue(hours = hours))
+        val items = (root["items"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+        val openCount = (root["openCount"] as? Number)?.toInt() ?: 0
+        return AlarmQueueResult(items = items, openCount = openCount)
+    }
+
+    suspend fun ackAlarm(alarmId: String, note: String? = null) {
+        api.ackAlarm(alarmId, IntegraAlarmActionRequest(note = note?.trim()?.ifBlank { null }))
+    }
+
+    suspend fun clearAlarm(alarmId: String, note: String? = null) {
+        api.clearAlarm(alarmId, IntegraAlarmActionRequest(note = note?.trim()?.ifBlank { null }))
+    }
+
+    suspend fun occupancy(): Pair<List<Map<String, Any?>>, Int> {
+        val root = parseMap(api.occupancy())
+        val items = (root["items"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+        val total = (root["total"] as? Number)?.toInt() ?: items.size
+        return items to total
+    }
+
+    suspend fun devices(): List<Map<String, Any?>> =
+        parseItems(api.listDevices())
+
+    suspend fun sites(): List<Map<String, Any?>> =
+        parseFlexibleList(api.listSites())
 }

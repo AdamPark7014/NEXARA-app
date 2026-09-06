@@ -734,6 +734,153 @@ export class ClientPortalController {
     });
   }
 
+  /**
+   * Comentario del cliente sobre una OT (Activity).
+   * Se appende a comentariosFeedback y notifica al responsable — sin tabla nueva.
+   */
+  @Post('tickets/:id/comments')
+  async ticketComment(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { body?: string },
+  ) {
+    const text = String(body?.body || '').trim();
+    if (text.length < 2) throw new BadRequestException('Comentario demasiado corto');
+    if (text.length > 2000) throw new BadRequestException('Comentario demasiado largo');
+
+    const activity = await this.prisma['activity'].findFirst({
+      where: { id, clientId: user.clientId },
+      select: { id: true, anNumber: true, titulo: true, responsableId: true, comentariosFeedback: true, companyId: true },
+    });
+    if (!activity) throw new BadRequestException('Ticket no encontrado');
+
+    const stamp = new Date().toISOString();
+    const line = `[CLIENTE ${stamp}] ${text}`;
+    const prev = activity.comentariosFeedback?.trim() || '';
+    const next = prev ? `${prev}\n${line}` : line;
+
+    const updated = await this.prisma['activity'].update({
+      where: { id },
+      data: { comentariosFeedback: next.slice(0, 8000) },
+      select: { id: true, comentariosFeedback: true },
+    });
+
+    try {
+      await this.prisma.notification.create({
+        data: {
+          userId: activity.responsableId,
+          type: 'ACTIVITY_ASSIGNED',
+          category: 'tickets',
+          title: `Cliente comentó OT ${activity.anNumber}`,
+          message: text.slice(0, 280),
+          relatedEntityId: activity.id,
+          entityType: 'activity',
+          relatedUrl: `/ops/activities/${activity.id}`,
+          companyId: activity.companyId,
+        },
+      });
+    } catch {
+      /* no bloquear el comentario si la notif falla */
+    }
+
+    return {
+      ok: true,
+      id: updated.id,
+      comentariosFeedback: updated.comentariosFeedback,
+      comment: { at: stamp, body: text, author: 'client' },
+    };
+  }
+
+  /**
+   * Acciones seguras del cliente sobre la OT (no sustituye el workflow interno).
+   * CONFIRM_RESOLVED | REQUEST_REOPEN | ACK
+   */
+  @Patch('tickets/:id/status')
+  async ticketClientStatus(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { action?: string; note?: string },
+  ) {
+    const action = String(body?.action || '').toUpperCase();
+    if (!['CONFIRM_RESOLVED', 'REQUEST_REOPEN', 'ACK'].includes(action)) {
+      throw new BadRequestException('Acción inválida');
+    }
+
+    const activity = await this.prisma['activity'].findFirst({
+      where: { id, clientId: user.clientId },
+    });
+    if (!activity) throw new BadRequestException('Ticket no encontrado');
+
+    const note = String(body?.note || '').trim();
+    const stamp = new Date().toISOString();
+
+    if (action === 'ACK') {
+      try {
+        await this.prisma.notification.create({
+          data: {
+            userId: activity.responsableId,
+            type: 'ACTIVITY_ASSIGNED',
+            category: 'tickets',
+            title: `Cliente acusó recibo · OT ${activity.anNumber}`,
+            message: note || activity.titulo,
+            relatedEntityId: activity.id,
+            entityType: 'activity',
+            relatedUrl: `/ops/activities/${activity.id}`,
+            companyId: activity.companyId,
+          },
+        });
+      } catch { /* ignore */ }
+      return { ok: true, action, estatus: activity.estatus };
+    }
+
+    if (action === 'CONFIRM_RESOLVED') {
+      if (!isFinishedStatus(activity.estatus)) {
+        throw new BadRequestException('Solo puedes confirmar OT finalizadas');
+      }
+      const line = `[CLIENTE ${stamp}] CONFIRMÓ resolución${note ? `: ${note}` : ''}`;
+      const prev = activity.comentariosFeedback?.trim() || '';
+      await this.prisma['activity'].update({
+        where: { id },
+        data: {
+          clientSurveyCompletedAt: activity.clientSurveyCompletedAt ?? new Date(),
+          comentariosFeedback: (prev ? `${prev}\n${line}` : line).slice(0, 8000),
+        },
+      });
+      return { ok: true, action, estatus: activity.estatus };
+    }
+
+    // REQUEST_REOPEN
+    if (!isFinishedStatus(activity.estatus)) {
+      throw new BadRequestException('Solo puedes reabrir OT finalizadas');
+    }
+    const line = `[CLIENTE ${stamp}] SOLICITÓ reapertura${note ? `: ${note}` : ''}`;
+    const prev = activity.comentariosFeedback?.trim() || '';
+    const updated = await this.prisma['activity'].update({
+      where: { id },
+      data: {
+        estatus: ACTIVITY_STATUS.EN_PROCESO,
+        fechaFinalizacion: null,
+        comentariosFeedback: (prev ? `${prev}\n${line}` : line).slice(0, 8000),
+      },
+    });
+    try {
+      await this.prisma.notification.create({
+        data: {
+          userId: activity.responsableId,
+          type: 'ACTIVITY_REJECTED',
+          category: 'tickets',
+          title: `Cliente pidió reabrir OT ${activity.anNumber}`,
+          message: note || activity.titulo,
+          relatedEntityId: activity.id,
+          entityType: 'activity',
+          relatedUrl: `/ops/activities/${activity.id}`,
+          companyId: activity.companyId,
+        },
+      });
+    } catch { /* ignore */ }
+    return { ok: true, action, estatus: updated.estatus };
+  }
+
   @Get('tickets/:id/report')
   async ticketReport(
     @CurrentUser() user: any,
