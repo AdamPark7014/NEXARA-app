@@ -851,3 +851,191 @@ pensados para esto; no están en CI.
     `PAGE_MATRIX` y el filtro de sidebar, con `common.self` y `common.org`
     concedidas por defecto a todo rol interno — lo que sube la mediana de 22 a
     ~45 módulos y hace que un módulo nuevo aparezca solo donde le corresponde.
+
+---
+
+# Remediación 2026-09-06 (post-Cursor)
+
+Turno de remediación posterior al de Cursor que introdujo `GET /me/navigation`.
+**Todo lo de arriba se reverificó contra el disco antes de tocar nada**; donde el
+informe y el código no coincidían, gana el código y así se anota.
+
+## 1. Qué del informe ya no era cierto
+
+Cursor arregló tres de los cuatro «casos que más duelen» del §6:
+
+| Caso del §6 | Estado real al empezar este turno |
+|---|---|
+| `administrativo` no puede abrir `/erp/invoicing` | **Parcial.** `page-matrix.ts` ya tenía `/erp/invoicing`, pero **sin comodín**: abría el listado y ninguna factura (`/erp/invoicing/:id` bloqueado). |
+| `ing_soporte` no tiene `/ops/noc` | **Corregido.** `/ops/noc` y `/ops/noc/**` presentes; NOC, bandeja y SLA visibles. |
+| `vendedor` no ve «Oportunidades» | **Corregido.** `section-views.ts` ya incluye `SALES_REP` en `crm-opportunities`. |
+| `arquitecto` no puede abrir `/erp/approvals` | **Parcial.** `/erp/approvals` presente, pero **los 18 módulos de INTEGRA seguían invisibles**, ahora por la capa nueva. |
+
+Y una corrección al propio informe: **el glob `/crm/quotes/**` no estaba mal
+escrito.** `compilePattern()` traduce `/**` a `(/.*)?`, así que `/crm/quotes/**`
+sí cubre `/crm/quotes`. Los globs rotos eran los **contrarios** — paths desnudos
+sobre rutas que sí tienen detalle dinámico (`/erp/invoicing`, `/erp/warehouse`,
+`/erp/procurement`, `/crm/quotes`, `/crm/tenders`): el módulo aparecía en el
+menú, el listado abría y el primer clic en una fila daba en muro.
+
+## 2. El mapa real de decisión: tres filtros en cascada
+
+El menú se decide en tres capas que se **intersectan**, así que el resultado es
+siempre la más restrictiva:
+
+| # | Capa | Archivo | Qué niega |
+|---|---|---|---|
+| 1 | `PAGE_MATRIX` | `apps/web/lib/rbac/page-matrix.ts:38` | Whitelist de páginas. Deniega por defecto. |
+| 2 | `shouldShowModuleInSidebar` | `apps/web/lib/section-views.ts:200` | Qué se pinta en el menú, por conjuntos de rol. |
+| 3 | `URL_MATRIX` → `/me/navigation` | `apps/api/src/common/rbac/url-matrix.ts:92` | Clip del servidor sobre lo ya filtrado (`AppShell.tsx:311-322`). |
+
+`user-access.ts:111-112` (`if (v2) return true`) **no era la causa**: salta
+`module.allowedRoles` y por tanto amplía, no reduce. Confirmado midiendo.
+
+**La capa 3 era el agujero nuevo y el más grave**, porque `deriveModuleKeysFromPaths`
+deriva los módulos de los *paths* de `url-matrix`, y `url-matrix` era más estrecha
+que `PAGE_MATRIX` en 9 de los 17 roles.
+
+### El caso extremo: el super admin veía 1 módulo
+
+`filterModulesByNavigation` (`me-navigation.ts:75`) reducía cada regla a su base
+con `rule.replace(/\/\*\*$/, "")`. Para `/**` —la única regla del `super_admin`—
+eso da cadena vacía, y la línea siguiente (`if (!base) return false`) negaba
+**todo**. Sobrevivía solo `my-profile`, que venía de la semilla de
+`deriveModuleKeysFromPaths`. El comodín que significa «acceso total» significaba
+«acceso a nada».
+
+Se sumaba un segundo fallo independiente: los conjuntos de rol de
+`section-views.ts` (`ERP_EXECUTIVE`, `ERP_ADMIN`, `FINANCE_ROLES`,
+`WAREHOUSE_ROLES`, `SALES_MANAGERS`) **no incluían `SUPER_ADMIN`**, y le negaban
+otros 37 módulos en la capa 2.
+
+Adam no lo notó porque «el usuario de más alto rango» es el dueño de la
+plataforma (`gerencia@`), que `resolveV2RoleKey` resuelve a **`ceo`**, no a
+`super_admin` — y `ceo` estaba sano (95 módulos).
+
+## 3. Antes / después, módulos visibles sobre 103
+
+Medido ejecutando las tres capas reales, no simulándolas.
+
+| Rol | Antes | Después | Δ |
+|---|---:|---:|---:|
+| `super_admin` | **1** | **95** | +94 |
+| `ceo` | 95 | 95 | 0 |
+| `dir_operaciones` | 52 | 63 | +11 |
+| `dir_admin` | 36 | 49 | +13 |
+| `arquitecto` | 24 | 47 | +23 |
+| `coord_operaciones` | 42 | 46 | +4 |
+| `coord_admin` | 29 | 38 | +9 |
+| `ing_soporte` | 33 | 36 | +3 |
+| `coord_ventas` | 22 | 29 | +7 |
+| `administrativo` | 19 | 23 | +4 |
+| `contabilidad` | 16 | 20 | +4 |
+| `lider_diseno` | 15 | 20 | +5 |
+| `disenador` | 16 | 19 | +3 |
+| `rh` | 15 | 18 | +3 |
+| `vendedor` | 16 | 17 | +1 |
+| `ing_campo` | 13 | 15 | +2 |
+| `cliente` | 12 | 12 | 0 |
+
+**Mediana: 19 → 29.** Y, lo más importante: **`denyL3 = 0` en los 17 roles** —
+ninguna concesión de la web la recorta ya el servidor.
+
+## 4. Criterio usado para ampliar
+
+No se repartió permiso a bulto. Cada módulo añadido cumple **una** de estas dos
+reglas, ambas auditables:
+
+1. **`section-views.ts` ya nombraba explícitamente al rol** para ese módulo y
+   `PAGE_MATRIX` lo contradecía. La intención ya estaba escrita en el código; lo
+   que faltaba era dejar entrar. (No cuenta el `default:` del `switch`, donde la
+   capa 2 no tiene opinión — por eso no se tocó ningún `*-chat`, `facilities-access`
+   ni `integra-*` de roles que no tienen ese panel.)
+2. **Función documentada en `docs/AREAS-VS-SISTEMA.md`** para ese puesto.
+
+### Cambios por archivo
+
+**`apps/web/lib/me-navigation.ts`** — el comodín raíz (`/**`, `/*`, `/`) se trata
+como acceso total en vez de colapsar a base vacía.
+
+**`apps/web/lib/section-views.ts`**
+- `SUPER_ADMIN` entra en `ERP_EXECUTIVE`, `ERP_ADMIN`, `FINANCE_ROLES`,
+  `WAREHOUSE_ROLES` y `SALES_MANAGERS`. Los pares personales de OPS siguen
+  ocultos vía `EXECUTIVE`.
+- `arquitecto` y `dir_operaciones` ven `crm-quotes` y `crm-projects`: `url-matrix`
+  ya les daba scope `approve` sobre cotizaciones y `PAGE_MATRIX` la ruta, pero el
+  menú se las escondía.
+- `dir_operaciones` ve además `crm-dashboard`, `crm-pipeline`, `crm-tenders` y
+  `crm-reports` — todas rutas que `PAGE_MATRIX` ya le concedía.
+
+**`apps/web/lib/rbac/page-matrix.ts`**
+
+| Rol | Añadido | Por qué |
+|---|---|---|
+| `arquitecto` | `documents`, `kb`, `hr/orgchart` | «Diseño y planeación de proyectos» (§4). `url-matrix` ya se los daba. |
+| `dir_operaciones` | `kb`, `hr/orgchart`, `news`, asistencia propia, globs de `warehouse`/`procurement` | Un director también ficha; el detalle de almacén estaba roto. |
+| `dir_admin` | CRM completo (`leads`, `opportunities`, `clients`, `products`, `projects`, `pipeline`, `agenda`), glob de `tenders` | Es `SALES_MANAGER` en la capa 2; «Seguimiento a clientes» (§2). |
+| `coord_admin` | `hr`, `hr/fines`, `hr/kpis`, `hr/orgchart`, `kb`, `crm/agenda`, globs de `invoicing`/`procurement` | Es `HR_MANAGER` en la capa 2. |
+| `administrativo` | globs de `invoicing`/`warehouse`/`procurement`, `crm/leads`, `crm/pipeline`, `crm/agenda`, `ops/vehicles` | Facturación y Compras con Mayorista son sus funciones #1 y #5 (§2); `resolveOpsPairNav` ya le da vista de flotilla. |
+| `coord_operaciones` | `approvals`, `documents`, `kb`, `hr/orgchart`, glob de `crm/quotes` | Aprueba viáticos y cierres de OT (§3). |
+| `ing_soporte` | `crm/quotes` + glob | La capa 2 ya lo nombraba en `crm-quotes`: cotiza refacciones. |
+| `coord_ventas` | `calendar`, `approvals`, `kb`, `documents`, `hr/orgchart`, `studio/contacts`, `studio/leads` | No tenía ni su propio calendario; los leads del sitio son de ventas. |
+| `rh` | `approvals`, `kb`, `finance/viatics`, glob de `documents` | Autoriza permisos e incidencias; `resolveViaticsSidebarHome` ya lo mandaba a viáticos ERP. |
+| `contabilidad` | `approvals`, `kb`, globs de `invoicing` y `crm/quotes`, asistencia propia | Autoriza gastos; el detalle de factura y de cotización es su trabajo diario. |
+
+**`apps/api/src/common/rbac/url-matrix.ts`** — se alineó la tercera capa con las
+otras dos para los 9 roles donde recortaba: INTEGRA para `arquitecto`; CRM y
+reportes de campo para `dir_admin` y `coord_admin`; `calendar` y `documents` para
+`ing_campo`, `ing_soporte`, `vendedor` y el equipo de diseño; `chat`, catálogo y
+plantillas para `lider_diseno`/`disenador`; y las páginas nuevas de los demás.
+Solo se añadieron **rutas de página** y lecturas `GET` acotadas — ninguna
+ampliación de escritura sobre endpoints existentes.
+
+## 5. Red de seguridad
+
+`apps/web/lib/rbac/role-modules.spec.ts` — 49 pruebas, vitest, al estilo de
+`page-matrix.spec.ts`:
+
+- El **conjunto exacto** de módulos visibles de cada uno de los 17 roles. Si un
+  cambio mueve un módulo, este archivo se mueve en el mismo commit.
+- **Coherencia de las tres capas**: importa `URL_MATRIX` y
+  `deriveModuleKeysFromPaths` de verdad desde `apps/api` y exige que nada de lo
+  que la web concede lo recorte `/me/navigation`. Es la prueba que impide que el
+  déficit vuelva por la puerta de atrás.
+- El comodín raíz devuelve el catálogo entero; una navegación vacía nunca recorta.
+- **Listado ⇒ detalle**: ningún rol puede abrir una lista y quedarse fuera de la
+  ficha.
+- Un caso por puesto, nombrando la función del organigrama que lo justifica.
+- **Confinamiento**: ningún rol operativo entra en `users`, `accounting`,
+  `banking`, `settings` ni facturación fiscal.
+
+Verificado por mutación: revertir el arreglo del comodín raíz rompe 4 pruebas.
+
+## 6. Propuesto y NO aplicado
+
+Todo esto lo pide la capa 2 (`section-views.ts` ya nombra al rol) pero toca
+facturación fiscal, contabilidad, nómina o alta de usuarios. **Requiere el visto
+bueno de Adam**, así que queda escrito y sin aplicar:
+
+| Rol | Módulos que la capa 2 ya le concede y `PAGE_MATRIX` sigue negando | Por qué no se aplicó |
+|---|---|---|
+| `administrativo` | `accounting`, `banking`, `employee-payments` | Contabilidad y nómina para un rol administrativo de tier 45. |
+| `rh` | `accounting`, `invoicing`, `banking` | Facturación fiscal para RH. |
+| `dir_operaciones` | `users`, `settings`, `audit`, `accounting`, `invoicing`, `banking` | Alta de usuarios y contabilidad para el director de operaciones. |
+| `coord_admin` | `settings`, `architecture`, `audit` | Configuración y auditoría del sistema. |
+| `ing_campo` | `kb` | Lo bloquea `tier >= 50` en la capa 2 y él es tier 40. Un técnico de instalación con manuales a mano parece razonable, pero es cambiar la política de tier, no un permiso suelto. |
+
+Otros dos hallazgos anotados, sin tocar:
+
+1. **`listAllowedUrls()` no incluye `SHARED_SESSION_URL_RULES`** y
+   `checkUrlAccess()` sí (`url-matrix.ts:731`). Hoy es inocuo —esas reglas son
+   todas `/api/`— pero `/me/navigation` devuelve una vista incompleta de lo que
+   el usuario realmente puede tocar.
+2. **La propuesta estructural del §12 sigue en pie.** Esta remediación alinea las
+   tres listas; no las sustituye. Mientras sean tres, cada módulo nuevo hay que
+   darlo de alta tres veces y el déficit vuelve a crecer solo.
+
+## 7. Estado
+
+`npm run typecheck:web` ✅ · `npm run typecheck:api` ✅ ·
+`npm run test:web` ✅ 608/608 (37 archivos) · `npm run test:api` ✅ 911/911 (110 suites).

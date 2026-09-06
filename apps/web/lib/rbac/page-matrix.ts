@@ -57,6 +57,13 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/reuniones',
     '/erp/calendar',
     '/erp/approvals',
+    // Diseña y planea proyectos: expedientes y base de conocimiento técnica.
+    // `url-matrix` ya se las concedía; era esta capa la que las negaba.
+    '/erp/documents',
+    '/erp/documents/**',
+    '/erp/kb',
+    '/erp/kb/**',
+    '/erp/hr/orgchart',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/crm/quotes/**',
@@ -78,10 +85,15 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/calendar',
     '/erp/documents',
     '/erp/finance/**',
-    '/erp/procurement',
-    '/erp/warehouse',
+    // Con el path desnudo se abría la lista pero no el detalle (`/erp/warehouse/5`).
+    '/erp/procurement/**',
+    '/erp/warehouse/**',
     '/erp/analytics/**',
     '/erp/exports',
+    '/erp/kb',
+    '/erp/kb/**',
+    '/erp/hr/orgchart',
+    '/erp/news',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/ops/**',
@@ -93,6 +105,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/reports',
     '/erp/facilities/**',
     '/integra/**',
+    // Un director también ficha su propia entrada.
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── DIR. ADMIN — finanzas, RH, gobierno + lectura OPS para facturación ──
@@ -104,7 +118,16 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/team',
     '/crm/targets',
     '/crm/templates',
-    '/crm/tenders',
+    '/crm/tenders/**',
+    // Dirección Administrativa lleva el seguimiento a clientes (organigrama):
+    // `section-views` ya la cuenta como SALES_MANAGERS, esta capa la frenaba.
+    '/crm/leads/**',
+    '/crm/opportunities/**',
+    '/crm/clients/**',
+    '/crm/products/**',
+    '/crm/projects/**',
+    '/crm/pipeline',
+    '/crm/agenda',
     // Acceso de lectura a OPS: reportes de campo → facturación y seguimiento cliente
     '/ops/activities',
     '/ops/activities/**',
@@ -124,13 +147,23 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/documents',
     '/erp/accounting',
     '/erp/banking',
-    '/erp/invoicing',
+    // El detalle de una factura vive en `/erp/invoicing/:id`: sin el comodín se
+    // abría el listado y no se podía entrar a ninguna.
+    '/erp/invoicing/**',
     '/erp/finance/**',
-    '/erp/procurement',
+    '/erp/procurement/**',
     '/erp/warehouse',
     '/erp/warehouse/**',
     '/erp/users',
     '/erp/exports',
+    // Coordinación Administrativa es HR_MANAGER en `section-views`: plantilla,
+    // incidencias y KPIs de personas ya se le muestran, faltaba dejarla entrar.
+    '/erp/hr',
+    '/erp/hr/fines',
+    '/erp/hr/kpis',
+    '/erp/hr/orgchart',
+    '/erp/kb',
+    '/erp/kb/**',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/erp/news',
@@ -143,6 +176,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/products/**',
     '/crm/projects/**',
     '/crm/pipeline',
+    '/crm/agenda',
     '/ops/tools',
     '/ops/tools/**',
     // Acceso de lectura a OPS: reportes de campo → facturación y seguimiento cliente
@@ -165,11 +199,22 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/documents',
     '/erp/finance/viatics',
     '/erp/finance/expenses',
-    '/erp/invoicing',
-    '/erp/procurement',
-    '/erp/warehouse',
+    // Facturación es su función #1 en el organigrama (`docs/AREAS-VS-SISTEMA.md`
+    // §2). El path desnudo dejaba abrir el listado pero ninguna factura.
+    '/erp/invoicing/**',
+    // "Compras con Mayorista" y almacén, también función propia del área.
+    '/erp/procurement/**',
+    '/erp/warehouse/**',
     '/crm/quotes/**',
     '/crm/clients/**',
+    // Seguimiento a clientes: `section-views` ya nombra a ADMINISTRATIVO en
+    // crm-leads / crm-pipeline / crm-agenda; faltaba la whitelist de páginas.
+    '/crm/leads/**',
+    '/crm/pipeline',
+    '/crm/agenda',
+    // Flotilla: `resolveOpsPairNav(vehicles)` le devuelve vista de equipo.
+    '/ops/vehicles',
+    '/ops/vehicles/**',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/erp/news',
@@ -183,9 +228,18 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/chat',
     '/erp/reuniones',
     '/erp/calendar',
+    // Planifica servicios y da seguimiento a proyectos: aprueba viáticos y OT,
+    // y necesita expedientes y procedimientos. `section-views` ya lo asume.
+    '/erp/approvals',
+    '/erp/documents',
+    '/erp/documents/**',
+    '/erp/kb',
+    '/erp/kb/**',
+    '/erp/hr/orgchart',
     '/erp/notifications-center',
     '/erp/my-profile',
-    '/crm/quotes',
+    // Sin comodín no podía abrir una cotización concreta, solo el listado.
+    '/crm/quotes/**',
     '/integra/**',
     ...SELF_ATTENDANCE_PATHS,
   ],
@@ -229,6 +283,10 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/kb/**',
     '/erp/documents',
     '/erp/documents/**',
+    // Soporte cotiza refacciones y renovaciones: `section-views` ya lo nombra
+    // explícitamente en `crm-quotes`.
+    '/crm/quotes',
+    '/crm/quotes/**',
     '/integra/**',
     ...SELF_ATTENDANCE_PATHS,
   ],
@@ -240,6 +298,19 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
+    // Faltaba hasta su propio calendario, que `section-views` da a todo el
+    // personal interno. Aprobaciones y KB corresponden a su nivel (tier 70).
+    '/erp/calendar',
+    '/erp/approvals',
+    '/erp/kb',
+    '/erp/kb/**',
+    '/erp/documents',
+    '/erp/documents/**',
+    '/erp/hr/orgchart',
+    // Los leads y contactos que entran por el sitio son materia de ventas:
+    // `studio-contacts` / `studio-leads` ya listan a SALES_MANAGERS.
+    '/studio/contacts',
+    '/studio/leads',
     '/erp/notifications-center',
     '/erp/my-profile',
     ...SELF_ATTENDANCE_PATHS,
@@ -293,8 +364,16 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/reuniones',
     '/erp/hr/**',
     '/erp/finance/employee-payments',
+    // Viáticos: `resolveViaticsSidebarHome` manda a RH al home de finanzas ERP,
+    // así que el módulo se le pintaba y la ruta se le negaba.
+    '/erp/finance/viatics',
+    // Autoriza permisos, vacaciones e incidencias del personal.
+    '/erp/approvals',
+    '/erp/kb',
+    '/erp/kb/**',
     '/erp/calendar',
     '/erp/documents',
+    '/erp/documents/**',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/ops/recruiting',
@@ -308,15 +387,24 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/reuniones',
     '/erp/accounting',
     '/erp/banking',
-    '/erp/invoicing',
+    // El detalle de la factura es su trabajo diario; el path desnudo lo impedía.
+    '/erp/invoicing/**',
     '/erp/finance/**',
     '/erp/exports',
+    // Autoriza gastos y comprobaciones (tier 60, ya contemplado en section-views).
+    '/erp/approvals',
+    '/erp/kb',
+    '/erp/kb/**',
     '/erp/calendar',
     '/erp/documents',
+    '/erp/documents/**',
     '/erp/notifications-center',
     '/erp/my-profile',
+    // Referencia para facturar: hacía falta poder abrir la cotización, no solo verla listada.
     '/crm/quotes',
+    '/crm/quotes/**',
     '/crm/projects/**',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── CLIENTE EXTERNO — portal + Integra (solo módulos de su company) ──
