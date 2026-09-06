@@ -49,4 +49,18 @@ export class DevicesService {
     });
     return { ok: true as const };
   }
+
+  async removeFcmToken(userId: number, token?: string) {
+    if (token) {
+      await this.prisma.userPushEndpoint.deleteMany({
+        where: { userId, fcmToken: token },
+      });
+    } else {
+      await this.prisma.userPushEndpoint.deleteMany({
+        where: { userId, fcmToken: { not: null } },
+      });
+    }
+    this.logger.log(`FCM token(s) revoked for user ${userId}`);
+    return { ok: true as const };
+  }
 }

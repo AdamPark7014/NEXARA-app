@@ -15,6 +15,7 @@ import {
   workDayStart,
 } from '../common/time/workday.js';
 import { Prisma } from '@prisma/client';
+import { saveBase64Photo } from '../common/file-upload.util';
 
 @Injectable()
 export class AttendanceService {
@@ -25,6 +26,16 @@ export class AttendanceService {
     private readonly realtimeGateway: RealtimeGateway,
     private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
+
+  private persistAttendancePhoto(photoBase64?: string | null): string | null {
+    if (!photoBase64 || !photoBase64.trim()) return null;
+    try {
+      return saveBase64Photo(photoBase64, __dirname, 'attendance');
+    } catch (err) {
+      this.logger.warn(`No se pudo persistir foto de asistencia: ${(err as Error).message}`);
+      return null;
+    }
+  }
 
   private isSuperAdminEmail(email?: string | null) {
     if (!email) return false;
@@ -481,9 +492,9 @@ export class AttendanceService {
           timestamp: now,
           workDate: today,
           deviceInfo,
-          photoUrl: dto.photoBase64 || null,
-          entryLatitude: dto.latitude || null,
-          entryLongitude: dto.longitude || null,
+          photoUrl: this.persistAttendancePhoto(dto.photoBase64),
+          entryLatitude: dto.latitude ?? null,
+          entryLongitude: dto.longitude ?? null,
           companyId: tenantId,
         },
         include: { user: true },
@@ -505,17 +516,23 @@ export class AttendanceService {
         },
       });
 
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { locationConsent: true },
-      });
+      const hasGps =
+        typeof dto.latitude === 'number' &&
+        typeof dto.longitude === 'number' &&
+        Number.isFinite(dto.latitude) &&
+        Number.isFinite(dto.longitude) &&
+        !(dto.latitude === 0 && dto.longitude === 0);
 
-      if (typeof dto.latitude === 'number' && typeof dto.longitude === 'number') {
+      if (hasGps) {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { locationConsent: true },
+        });
         await this.prisma['locationTracking'].create({
           data: {
             usuarioId: userId,
-            latitud: dto.latitude,
-            longitud: dto.longitude,
+            latitud: dto.latitude!,
+            longitud: dto.longitude!,
             velocidadKmh: null,
             estaActivo: true,
             ultimaActualizacion: now,
@@ -589,7 +606,7 @@ export class AttendanceService {
         type: dto.type,
         timestamp: now,
         deviceInfo,
-        photoUrl: dto.photoBase64 || null,
+        photoUrl: this.persistAttendancePhoto(dto.photoBase64),
         exitLatitude: dto.latitude || null,
         exitLongitude: dto.longitude || null,
         companyId: tenantId,

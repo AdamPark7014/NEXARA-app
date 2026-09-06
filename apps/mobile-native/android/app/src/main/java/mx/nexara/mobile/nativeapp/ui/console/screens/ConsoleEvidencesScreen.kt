@@ -267,7 +267,12 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun completeServiceSheetData(activityId: Long) {
+    fun completeServiceSheetData(
+        activityId: Long,
+        technicianName: String,
+        workSummary: String,
+        notes: String? = null,
+    ) {
         setUploading("serviceData")
         setUploadMessage(null)
         viewModelScope.launch {
@@ -278,7 +283,10 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                         data = mapOf(
                             "source" to "mobile-native",
                             "completedAt" to java.time.Instant.now().toString(),
-                            "notes" to "Plantilla completada desde app nativa"
+                            "technicianName" to technicianName,
+                            "serviceDate" to java.time.LocalDate.now().toString(),
+                            "workSummary" to workSummary,
+                            "notes" to (notes ?: ""),
                         )
                     )
                 }
@@ -304,6 +312,10 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 } else null
                 val useLat = coords?.lat ?: lat
                 val useLng = coords?.lng ?: lng
+                if (!useLat.isFinite() || !useLng.isFinite() || (useLat == 0.0 && useLng == 0.0)) {
+                    setUploadMessage("GPS obligatorio para la foto de salida. Activa ubicación e inténtalo de nuevo.")
+                    return@launch
+                }
                 val updated = withContext(Dispatchers.IO) {
                     repo.evidenceExitPhoto(
                         activityId = activityId,
@@ -506,8 +518,13 @@ fun ConsoleEvidencesScreen(
     }
     var pickEntryPhoto by remember { mutableStateOf(false) }
     var pickEvidencePhotos by remember { mutableStateOf(false) }
+    var evidenceDraftUrls by remember { mutableStateOf<List<String>>(emptyList()) }
     var pickPdf by remember { mutableStateOf(false) }
     var pickExitPhoto by remember { mutableStateOf(false) }
+    var showServiceSheetForm by remember { mutableStateOf(false) }
+    var sheetTechName by remember { mutableStateOf(user?.nombre.orEmpty()) }
+    var sheetWorkSummary by remember { mutableStateOf("") }
+    var sheetNotes by remember { mutableStateOf("") }
 
     fun mediaToDataUrl(media: CapturedMedia): String? =
         mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl.fromCaptured(context, media)
@@ -688,9 +705,11 @@ fun ConsoleEvidencesScreen(
                                 onClick = {
                                     vm.clearUploadMessage()
                                     pickEvidencePhotos = true
+                                    evidenceDraftUrls = emptyList()
                                     pickEntryPhoto = false
                                     pickPdf = false
                                     pickExitPhoto = false
+                                    showServiceSheetForm = false
                                 },
                                 enabled = state.uploadingStep == null && currentStep == "EVIDENCE_PHOTOS",
                                 modifier = Modifier.fillMaxWidth(),
@@ -698,17 +717,45 @@ fun ConsoleEvidencesScreen(
                                 Text("2) Subir fotos de evidencia (4+)")
                             }
                             if (pickEvidencePhotos && currentStep == "EVIDENCE_PHOTOS") {
+                                Text(
+                                    "Seleccionadas: ${evidenceDraftUrls.size}/4 (mínimo)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = EvSub,
+                                )
+                                Spacer(Modifier.height(6.dp))
                                 MediaPickerBar(
                                     onPicked = { picked ->
                                         val dataUrls = picked.mapNotNull { mediaToDataUrl(it) }
                                         if (dataUrls.isEmpty()) return@MediaPickerBar
-                                        vm.submitEvidencePhotos(selectedActivity.id, dataUrls)
-                                        pickEvidencePhotos = false
+                                        evidenceDraftUrls = (evidenceDraftUrls + dataUrls).distinct().take(12)
                                     },
                                     allowCamera = true,
-                                    allowGallery = false,
+                                    allowGallery = true,
                                     allowDocuments = false,
                                 )
+                                Spacer(Modifier.height(6.dp))
+                                Button(
+                                    onClick = {
+                                        if (evidenceDraftUrls.size < 4) {
+                                            vm.clearUploadMessage()
+                                            return@Button
+                                        }
+                                        vm.submitEvidencePhotos(selectedActivity.id, evidenceDraftUrls)
+                                        pickEvidencePhotos = false
+                                        evidenceDraftUrls = emptyList()
+                                    },
+                                    enabled = evidenceDraftUrls.size >= 4 && state.uploadingStep == null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text("Enviar ${evidenceDraftUrls.size} fotos")
+                                }
+                                if (evidenceDraftUrls.size in 1..3) {
+                                    Text(
+                                        "Faltan ${4 - evidenceDraftUrls.size} foto(s). Usa cámara o galería.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = EvRed,
+                                    )
+                                }
                             }
 
                             OutlinedButton(
@@ -718,6 +765,7 @@ fun ConsoleEvidencesScreen(
                                     pickEntryPhoto = false
                                     pickEvidencePhotos = false
                                     pickExitPhoto = false
+                                    showServiceSheetForm = false
                                 },
                                 enabled = state.uploadingStep == null && currentStep == "SERVICE_SHEET_PDF",
                                 modifier = Modifier.fillMaxWidth(),
@@ -740,11 +788,60 @@ fun ConsoleEvidencesScreen(
                             }
 
                             OutlinedButton(
-                                onClick = { vm.completeServiceSheetData(selectedActivity.id) },
+                                onClick = {
+                                    showServiceSheetForm = true
+                                    pickEntryPhoto = false
+                                    pickEvidencePhotos = false
+                                    pickPdf = false
+                                    pickExitPhoto = false
+                                },
                                 enabled = state.uploadingStep == null && currentStep == "SERVICE_SHEET_DATA",
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text("4) Completar plantilla interna")
+                            }
+                            if (showServiceSheetForm && currentStep == "SERVICE_SHEET_DATA") {
+                                OutlinedTextField(
+                                    value = sheetTechName,
+                                    onValueChange = { sheetTechName = it },
+                                    label = { Text("Técnico") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = sheetWorkSummary,
+                                    onValueChange = { sheetWorkSummary = it },
+                                    label = { Text("Resumen del trabajo") },
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 88.dp),
+                                    minLines = 3,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = sheetNotes,
+                                    onValueChange = { sheetNotes = it },
+                                    label = { Text("Notas (opcional)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        if (sheetTechName.isBlank() || sheetWorkSummary.isBlank()) return@Button
+                                        vm.completeServiceSheetData(
+                                            selectedActivity.id,
+                                            technicianName = sheetTechName.trim(),
+                                            workSummary = sheetWorkSummary.trim(),
+                                            notes = sheetNotes.trim().ifBlank { null },
+                                        )
+                                        showServiceSheetForm = false
+                                    },
+                                    enabled = sheetTechName.isNotBlank() && sheetWorkSummary.isNotBlank() &&
+                                        state.uploadingStep == null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text("Guardar plantilla")
+                                }
                             }
 
                             OutlinedButton(
@@ -754,6 +851,7 @@ fun ConsoleEvidencesScreen(
                                     pickEntryPhoto = false
                                     pickEvidencePhotos = false
                                     pickPdf = false
+                                    showServiceSheetForm = false
                                 },
                                 enabled = state.uploadingStep == null && currentStep == "EXIT_PHOTO",
                                 modifier = Modifier.fillMaxWidth(),

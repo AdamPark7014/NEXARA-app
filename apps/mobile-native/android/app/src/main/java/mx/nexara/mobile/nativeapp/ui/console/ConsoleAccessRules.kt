@@ -66,6 +66,11 @@ val ADMINISTRATIVO_ERP_MODULE_KEYS: Set<String> = setOf(
     "documents",
     "viatics",
     "expenses",
+    "invoicing",
+    "procurement",
+    "warehouse",
+    "clients",
+    "cotizaciones",
     "notifications-center",
     "my-profile",
     "my-preferences",
@@ -73,6 +78,7 @@ val ADMINISTRATIVO_ERP_MODULE_KEYS: Set<String> = setOf(
     "attendance",
     "my-lunch-breaks",
     "lunch-breaks",
+    "chat",
 )
 
 private fun normalizedConsolePath(module: ModuleEntry): String {
@@ -113,7 +119,13 @@ fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
     }
 
     if (isIngeniero) {
-        val baseAllowed = setOf("/dashboard", "/cotizaciones", "/cvs", "/ventas", "/attendance")
+        // Campo: lo que la API ya permite a ing_campo / ing_soporte (no solo /my-*).
+        val baseAllowed = setOf(
+            "/dashboard", "/cotizaciones", "/cvs", "/ventas", "/attendance",
+            "/activities", "/evidences", "/viatics", "/vehicles", "/gps", "/tools",
+            "/lunch-breaks", "/chat", "/dispatch", "/support", "/noc",
+            "/service-sheets", "/client-tickets",
+        )
         if (!path.startsWith("/my-") && path !in baseAllowed) return false
         if (path == "/cotizaciones" && !user.canAccessCotizaciones()) return false
         if (path == "/cvs" && !user.canAccessCvs()) return false
@@ -161,18 +173,18 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
             .filter { allowedKeys == null || it.key in allowedKeys }
 
     val groups = listOf(
-        ConsoleSidebarGroup("profile", "Cuenta personal", pick("my-profile", "calendar")),
+        ConsoleSidebarGroup("profile", "Cuenta personal", pick("my-profile", "my-preferences", "calendar")),
         ConsoleSidebarGroup(
             "employee", "Mi espacio de trabajo",
-            pick("dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks"),
+            pick("dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks", "chat"),
         ),
         ConsoleSidebarGroup(
             "operations", "Supervisión operativa",
-            pick("activities", "evidences", "viatics", "vehicles", "gps", "service-clients", "maintenance", "assets", "service-sheets"),
+            pick("activities", "evidences", "viatics", "vehicles", "gps", "service-clients", "maintenance", "assets", "service-sheets", "dispatch"),
         ),
         ConsoleSidebarGroup(
             "people", "RRHH y control de personal",
-            pick("attendance", "lunch-breaks", "fines", "cvs", "users", "hr", "orgchart", "kpis-hr"),
+            pick("attendance", "lunch-breaks", "fines", "cvs", "recruiting", "users", "hr", "orgchart", "kpis-hr"),
         ),
         ConsoleSidebarGroup(
             "commercial", "Clientes y comercial",
@@ -196,7 +208,7 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ),
         ConsoleSidebarGroup(
             "ops-monitoring", "Monitoreo y soporte",
-            pick("noc", "client-tickets", "support", "support-sla", "maintenance-contracts"),
+            pick("noc", "client-tickets", "support", "support-sla", "maintenance-contracts", "dispatch", "recruiting"),
         ),
     )
 
@@ -211,11 +223,12 @@ private fun administrativoSidebarGroups(user: SessionUser): List<ConsoleSidebarG
     return listOf(
         ConsoleSidebarGroup("board", "Tablero", pick("dashboard", "approvals")),
         ConsoleSidebarGroup("governance", "Gobierno", pick("companies")),
-        ConsoleSidebarGroup("finance", "Finanzas", pick("viatics", "expenses")),
+        ConsoleSidebarGroup("finance", "Finanzas", pick("viatics", "expenses", "invoicing", "procurement")),
+        ConsoleSidebarGroup("commercial", "Comercial", pick("clients", "cotizaciones")),
         ConsoleSidebarGroup("people", "Personas", pick("attendance", "my-lunch-breaks")),
-        ConsoleSidebarGroup("logistics", "Logística", pick("documents")),
-        ConsoleSidebarGroup("audit", "Auditoría", pick("notifications-center")),
-        ConsoleSidebarGroup("account", "Mi cuenta", pick("my-profile", "calendar", "news")),
+        ConsoleSidebarGroup("logistics", "Logística", pick("documents", "warehouse")),
+        ConsoleSidebarGroup("audit", "Auditoría", pick("notifications-center", "chat")),
+        ConsoleSidebarGroup("account", "Mi cuenta", pick("my-profile", "my-preferences", "calendar", "news")),
     ).filter { it.modules.isNotEmpty() }
 }
 

@@ -1,7 +1,9 @@
 package mx.nexara.mobile.nativeapp.ui.common
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -20,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -55,12 +58,31 @@ fun MediaPickerBar(
 ) {
     val context = LocalContext.current
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var hasCam by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED,
+        )
+    }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success: Boolean ->
         val uri = pendingCameraUri
         if (success && uri != null) onPicked(listOf(CapturedMedia(uri, "image/jpeg")))
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        hasCam = granted
+        if (granted) {
+            val uri = freshCameraOutputUri(context)
+            if (uri != Uri.EMPTY) {
+                pendingCameraUri = uri
+                cameraLauncher.launch(uri)
+            }
+        }
     }
 
     val photoPicker = rememberLauncherForActivityResult(
@@ -81,20 +103,24 @@ fun MediaPickerBar(
         if (results.isNotEmpty()) onPicked(results)
     }
 
+    fun launchCamera() {
+        if (!hasCam) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+            return
+        }
+        val uri = freshCameraOutputUri(context)
+        if (uri != Uri.EMPTY) {
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        }
+    }
+
     Row(
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (allowCamera) {
-            OutlinedButton(
-                onClick = {
-                    val uri = freshCameraOutputUri(context)
-                    if (uri != Uri.EMPTY) {
-                        pendingCameraUri = uri
-                        cameraLauncher.launch(uri)
-                    }
-                },
-            ) { Text("📷 Cámara") }
+            OutlinedButton(onClick = { launchCamera() }) { Text("Cámara") }
         }
 
         if (allowGallery) {
@@ -106,7 +132,7 @@ fun MediaPickerBar(
                         )
                     )
                 },
-            ) { Text("🖼 Galería") }
+            ) { Text("Galería") }
         }
 
         if (allowDocuments) {
@@ -123,7 +149,7 @@ fun MediaPickerBar(
                         )
                     )
                 },
-            ) { Text("📎 Archivo") }
+            ) { Text("Archivo") }
         }
     }
 }

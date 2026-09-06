@@ -23,5 +23,5 @@ interface DevicesApi {
     suspend fun registerPushToken(@Body body: RegisterFcmTokenRequest): RegisterFcmTokenResponse
 
     @DELETE("devices/push-token")
-    suspend fun revokePushToken(@Query("token") token: String): RegisterFcmTokenResponse
+    suspend fun revokePushToken(@Query("token") token: String? = null): RegisterFcmTokenResponse
 }

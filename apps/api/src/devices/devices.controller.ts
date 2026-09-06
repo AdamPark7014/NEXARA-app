@@ -32,4 +32,13 @@ export class DevicesController {
     if (!user?.id || !endpoint) return { ok: false };
     return this.devices.removeWebPush(Number(user.id), endpoint);
   }
+
+  /** Revoca token FCM de la APK (logout / cambio de dispositivo). */
+  @Delete('push-token')
+  async removePushToken(@CurrentUser() user: any, @Query('token') token?: string) {
+    if (user?.isClient || user?.isBranchUser || !user?.id) {
+      return { ok: false, reason: 'forbidden' };
+    }
+    return this.devices.removeFcmToken(Number(user.id), token?.trim() || undefined);
+  }
 }
