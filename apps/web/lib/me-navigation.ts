@@ -66,6 +66,13 @@ export function filterModulesByNavigation<T extends { id: string; panel?: string
   const pagePaths = (navigation.paths ?? []).filter((p) => !p.startsWith("/api/"));
   if ((!ids || ids.length === 0) && pagePaths.length === 0) return modules;
 
+  // Comodín raíz = acceso total (super_admin). Sin esto, `/**` se reducía a
+  // base vacía más abajo y el filtro dejaba al super admin con los 2-3 módulos
+  // que `deriveModuleKeysFromPaths` siembra por defecto.
+  if (pagePaths.some((rule) => rule === "/**" || rule === "/*" || rule === "/")) {
+    return modules;
+  }
+
   const idSet = new Set(ids ?? []);
   return modules.filter((m) => {
     if (idSet.has(m.id)) return true;

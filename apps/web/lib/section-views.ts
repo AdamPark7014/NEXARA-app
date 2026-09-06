@@ -32,13 +32,17 @@ const OPS_MANAGERS = new Set<RoleKey>([
 const FIELD = new Set<RoleKey>([ROLES.ING_CAMPO]);
 const SUPPORT = new Set<RoleKey>([ROLES.ING_SOPORTE]);
 const HR_MANAGERS = new Set<RoleKey>([ROLES.RH, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN]);
-const SALES_MANAGERS = new Set<RoleKey>([ROLES.CEO, ROLES.COORD_VENTAS, ROLES.DIR_ADMIN]);
+const SALES_MANAGERS = new Set<RoleKey>([ROLES.SUPER_ADMIN, ROLES.CEO, ROLES.COORD_VENTAS, ROLES.DIR_ADMIN]);
 const SALES_REP = new Set<RoleKey>([ROLES.VENDEDOR]);
-const ERP_EXECUTIVE = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES]);
-const ERP_ADMIN = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
-const FINANCE_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.CONTABILIDAD, ROLES.DIR_OPERACIONES]);
+// `SUPER_ADMIN` entra en los conjuntos de mando porque estos deciden qué se ve
+// en el sidebar, no solo qué puesto ocupa cada quien: sin él, el super admin
+// perdía ejecutivo, gobierno, finanzas, almacén y CRM completos (37 módulos).
+// Los pares personales de OPS (`ops-my-*`) siguen ocultos vía `EXECUTIVE`.
+const ERP_EXECUTIVE = new Set<RoleKey>([ROLES.SUPER_ADMIN, ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES]);
+const ERP_ADMIN = new Set<RoleKey>([ROLES.SUPER_ADMIN, ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
+const FINANCE_ROLES = new Set<RoleKey>([ROLES.SUPER_ADMIN, ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.CONTABILIDAD, ROLES.DIR_OPERACIONES]);
 const HR_ONLY = new Set<RoleKey>([ROLES.RH]);
-const WAREHOUSE_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
+const WAREHOUSE_ROLES = new Set<RoleKey>([ROLES.SUPER_ADMIN, ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
 const DESIGN_TEAM = new Set<RoleKey>([ROLES.LIDER_DISENO, ROLES.DISENADOR]);
 
 function isOpsManager(role: RoleKey): boolean {
@@ -294,8 +298,11 @@ export function shouldShowModuleInSidebar(
     // CRM — gerente vs vendedor vs diseño
     case 'crm-sales-team':
     case 'crm-targets':
-    case 'crm-tenders':
       return SALES_MANAGERS.has(v2);
+    case 'crm-tenders':
+      // Una licitación se gana con el alcance técnico: Operaciones la trabaja
+      // con Ventas, y `PAGE_MATRIX` ya se la concede.
+      return SALES_MANAGERS.has(v2) || v2 === ROLES.DIR_OPERACIONES;
     case 'crm-templates':
       return SALES_MANAGERS.has(v2) || v2 === ROLES.LIDER_DISENO;
     case 'crm-quotes':
@@ -305,6 +312,10 @@ export function shouldShowModuleInSidebar(
         || SALES_REP.has(v2)
         || v2 === ROLES.ING_SOPORTE
         || v2 === ROLES.COORD_OPERACIONES
+        // Arquitecto y Dir. Operaciones aprueban la cotización técnicamente
+        // (`url-matrix` les da scope `approve`); ocultarla era incoherente.
+        || v2 === ROLES.ARQUITECTO
+        || v2 === ROLES.DIR_OPERACIONES
         || v2 === ROLES.CONTABILIDAD
         || v2 === ROLES.COORD_ADMIN
         || v2 === ROLES.ADMINISTRATIVO
@@ -312,6 +323,14 @@ export function shouldShowModuleInSidebar(
     case 'crm-products':
       return DESIGN_TEAM.has(v2) || SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-pipeline':
+      // Dir. Operaciones dimensiona la carga de campo desde el embudo.
+      return (
+        SALES_MANAGERS.has(v2)
+        || SALES_REP.has(v2)
+        || v2 === ROLES.COORD_ADMIN
+        || v2 === ROLES.ADMINISTRATIVO
+        || v2 === ROLES.DIR_OPERACIONES
+      );
     case 'crm-agenda':
     case 'crm-clients':
     case 'crm-leads':
@@ -319,15 +338,19 @@ export function shouldShowModuleInSidebar(
     case 'crm-opportunities':
       return EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-dashboard':
-      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
+      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN || v2 === ROLES.DIR_OPERACIONES;
     case 'crm-reports':
-      return SALES_MANAGERS.has(v2) || v2 === ROLES.DIR_ADMIN;
+      return SALES_MANAGERS.has(v2) || v2 === ROLES.DIR_ADMIN || v2 === ROLES.DIR_OPERACIONES;
     case 'crm-projects':
       return (
         SALES_MANAGERS.has(v2)
         || SALES_REP.has(v2)
         || v2 === ROLES.COORD_ADMIN
         || v2 === ROLES.CONTABILIDAD
+        // Quien ejecuta el proyecto vendido: Arquitecto lo diseña y planea,
+        // Dir. Operaciones lo entrega. Ambos ya tenían la ruta en PAGE_MATRIX.
+        || v2 === ROLES.ARQUITECTO
+        || v2 === ROLES.DIR_OPERACIONES
       );
     case 'approvals':
       return (
