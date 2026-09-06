@@ -765,18 +765,35 @@ export class IntegraSyncService {
         });
 
         // La terminal lleva cámara: es la que mira a quien pasa por la puerta.
-        // Entra al inventario de video para poder verla desde la consola —
-        // sigue siendo un equipo ACS, así que no se le deriva sub-stream: no
-        // tiene. Se guarda su id de stream tal cual y si trae audio.
+        // Entra al inventario de video para poder verla desde la consola.
+        //
+        // Aquí había escrito «la terminal solo publica el 101», y era falso.
+        // Medido el 2026-09-06 contra las cuatro DS-K1T de Oficinas: su canal
+        // 102 responde 200 con H.264 1280×720 a 25 fps. Servirlas del principal
+        // les costaba el doble de latencia para la misma resolución, así que se
+        // guarda también el secundario cuando el equipo lo declara.
         const videoCh = info.videoChannels.find((c) => c.enabled) || info.videoChannels[0];
+        const subCh = videoCh
+          ? info.videoChannels.find(
+              (c) =>
+                c.streamIndex === 2 &&
+                c.enabled !== false &&
+                // Mismo canal físico: 101 y 102 son perfiles del mismo, 201 no.
+                Math.floor(Number(c.id) / 100) === Math.floor(Number(videoCh.id) / 100),
+            )
+          : undefined;
         if (videoCh) {
           const cameraIndexCode = `${ip}|${videoCh.id}`;
           camerasSeen.add(cameraIndexCode);
           cameraCount++;
           await upsertCamera(cameraIndexCode, `${name} (puerta)`, info.reachable, {
             channelId: videoCh.id,
-            // Id exacto: la terminal solo publica el 101.
-            streamId: videoCh.id,
+            // Perfil a pedir. Si el equipo declara un secundario del mismo
+            // canal se usa ese: misma resolución, la mitad de latencia. Si no,
+            // el principal, que es lo único que hay.
+            streamId: subCh?.id ?? videoCh.id,
+            /** Se guarda aparte para que el camino de alta calidad sepa a dónde ir. */
+            mainStreamId: videoCh.id,
             channelNumber: videoCh.channelNumber,
             codec: videoCh.codec,
             width: videoCh.width,

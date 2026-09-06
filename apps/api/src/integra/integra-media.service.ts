@@ -307,8 +307,10 @@ export class IntegraMediaService {
 
     const raw = (camera.raw ?? {}) as {
       channelId?: string;
-      /** Id exacto a pedir. Lo ponen los equipos con un solo stream. */
+      /** Perfil a pedir para el muro. Lo ponen los equipos ACS. */
       streamId?: string;
+      /** Principal del mismo canal, cuando `streamId` ya es el secundario. */
+      mainStreamId?: string;
       hasAudio?: boolean;
       /** Códec del canal PRINCIPAL, tal como lo guardó el sync. */
       codec?: string | null;
@@ -340,16 +342,23 @@ export class IntegraMediaService {
       // Una terminal de acceso publica un único stream: pedirle el «sub» da 404.
       // El resto son cámaras sueltas, que numeran desde 101 aunque en el NVR
       // sean el canal 7.
-      // La terminal de acceso publica un solo perfil: pedirle otro da 404, así
-      // que su `streamId` explícito manda por encima de la calidad pedida.
-      const streamId = raw.streamId ?? (efectiva === 'main' ? MAIN_STREAM_ID : SUB_STREAM_ID);
+      // `streamId` explícito es el perfil que el sync eligió para el muro en un
+      // equipo ACS. Antes mandaba siempre, porque se creía que esas terminales
+      // publicaban un único stream; medido, publican dos. Así que ahora, si se
+      // pide alta calidad y el sync guardó cuál es el principal, se respeta.
+      const streamId =
+        efectiva === 'main'
+          ? raw.mainStreamId ?? raw.streamId ?? MAIN_STREAM_ID
+          : raw.streamId ?? SUB_STREAM_ID;
       return {
         rtsp: direct.rtspUrl(streamId),
         redacted: direct.rtspUrlRedacted(streamId),
-        // Con `streamId` explícito no hay un segundo perfil que transcodificar.
-        principal: raw.streamId
-          ? null
-          : {
+        // Solo hay algo que transcodificar si existe un principal DISTINTO del
+        // que ya se está sirviendo.
+        principal:
+          raw.streamId && !raw.mainStreamId
+            ? null
+            : {
               rtsp: direct.rtspUrl(MAIN_STREAM_ID),
               redacted: direct.rtspUrlRedacted(MAIN_STREAM_ID),
             },
