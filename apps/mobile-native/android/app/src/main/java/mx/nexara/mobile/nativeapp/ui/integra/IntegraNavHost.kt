@@ -52,6 +52,9 @@ import mx.nexara.mobile.nativeapp.ui.integra.governance.IntegraAuditScreen
 import mx.nexara.mobile.nativeapp.ui.integra.governance.IntegraGovernanceRoutes
 import mx.nexara.mobile.nativeapp.ui.integra.governance.IntegraMyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.integra.governance.IntegraNotificationsCenterScreen
+import mx.nexara.mobile.nativeapp.ui.integra.map.IntegraDashboardScreen
+import mx.nexara.mobile.nativeapp.ui.integra.map.IntegraMapRoutes
+import mx.nexara.mobile.nativeapp.ui.integra.map.IntegraMapScreen
 import mx.nexara.mobile.nativeapp.ui.integra.schedules.IntegraEspaciosScreen
 import mx.nexara.mobile.nativeapp.ui.integra.schedules.IntegraSchedulesScreen
 import mx.nexara.mobile.nativeapp.ui.integra.schedules.SchedulesRoutes
@@ -113,6 +116,8 @@ internal fun integraRouteForKey(key: String): String {
         "integra-video", "video", "camaras", "cámaras", "muro" -> IntegraVideoRoutes.WALL
         "integra-schedules", "schedules", "horarios" -> SchedulesRoutes.SCHEDULES
         "integra-espacios", "espacios", "spaces" -> SchedulesRoutes.ESPACIOS
+        "integra-map", "map", "plano", "mapa" -> IntegraMapRoutes.MAP
+        "integra-dashboard", "dashboard", "panorama", "tablero" -> IntegraMapRoutes.DASHBOARD
         else -> Home
     }
 }
@@ -169,6 +174,7 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
     val topBarTitle = IntegraVehiclesRoutes.tituloDe(currentRoute)
         ?: SchedulesRoutes.titleForRoute(currentRoute)
         ?: IntegraGovernanceRoutes.tituloDeRuta(currentRoute)
+        ?: IntegraMapRoutes.titleForRoute(currentRoute)
         ?: videoTitleForRoute(currentRoute)
         ?: detectionTitleForRoute(currentRoute)
         ?: when {
@@ -336,6 +342,25 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
                 )
             }
 
+            // ── Plano y panorama ──────────────────────────────────────────
+            // Los dos saltan a otros módulos por CLAVE, con el mismo resolutor
+            // que el hub: así un enlace desde el plano a «alarmas» no necesita
+            // conocer la ruta.
+            composable(IntegraMapRoutes.MAP) {
+                IntegraMapScreen(
+                    onOpenKey = { key ->
+                        nav.navigate(integraRouteForKey(key)) { launchSingleTop = true }
+                    },
+                )
+            }
+            composable(IntegraMapRoutes.DASHBOARD) {
+                IntegraDashboardScreen(
+                    onOpenKey = { key ->
+                        nav.navigate(integraRouteForKey(key)) { launchSingleTop = true }
+                    },
+                )
+            }
+
             // ── Gobierno ──────────────────────────────────────────────────
             composable(IntegraGovernanceRoutes.AUDIT) { IntegraAuditScreen() }
             composable(IntegraGovernanceRoutes.NOTIFICATIONS) {
@@ -388,8 +413,10 @@ private fun IntegraHomeScreen(
     ).filter { show(it.key) }
 
     val opsCards = listOf(
+        hubCard("integra-dashboard", "📊", "Panorama", "Cómo está todo ahora", Color(0xFF1E40AF), onOpenKey),
         hubCard("integra-alarms", "🚨", "Alarmas", "Cola SOC", Color(0xFFDC2626), onOpenKey),
         hubCard("integra-occupancy", "📍", "En sitio", "Ocupación hoy", Color(0xFF0891B2), onOpenKey),
+        hubCard("integra-map", "🗺️", "Plano", "Puertas y cámaras situadas", Color(0xFF475569), onOpenKey),
         hubCard("integra-video", "🎥", "Cámaras", "Vista previa y PTZ", Color(0xFF0F766E), onOpenKey),
         hubCard("integra-vehicles", "🚙", "Vehículos", "Placas registradas", Color(0xFF15803D), onOpenKey),
         hubCard("integra-anpr", "🔎", "ANPR", "Lecturas de placa", Color(0xFF166534), onOpenKey),
@@ -411,6 +438,10 @@ private fun IntegraHomeScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        // Estado vivo arriba del todo: conectado, puertas en línea, alarmas
+        // abiertas y gente en sitio. Sin esto el hub era una rejilla muda que
+        // no decía nada hasta entrar en un módulo.
+        item { IntegraHomeSummary() }
         if (accessCards.isNotEmpty()) {
             item {
                 Column {

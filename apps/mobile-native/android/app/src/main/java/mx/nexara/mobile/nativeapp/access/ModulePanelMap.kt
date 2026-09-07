@@ -22,6 +22,9 @@ object ModulePanelMap {
     private val ERP_KEYS = setOf(
         "dashboard",
         "executive", "approvals", "notifications-center", "bi",
+        // Sin esta clave el módulo de Reuniones no aparece, por muy escrito
+        // que esté: es el mismo motivo por el que `chat` estuvo invisible.
+        "reuniones",
         "attendance", "lunch-breaks", "my-lunch-breaks",
         "hr", "fines", "users", "employee-payments",
         "accounting", "banking", "invoicing", "expenses",
@@ -66,6 +69,8 @@ object ModulePanelMap {
         "integra-audit",
         "integra-notifications",
         "integra-my-profile",
+        "integra-map",
+        "integra-dashboard",
     )
 
     /** null = sin filtro (todos los módulos console). */

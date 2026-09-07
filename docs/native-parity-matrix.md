@@ -15,8 +15,19 @@ Fuente de verdad del catálogo: `ModuleCatalog.kt` (`parityStatus` + `nativeImpl
 | **AUSENTE** | Sin pantalla nativa (Placeholder o sin entrada de catálogo). |
 | **WEBVIEW** | Embebido WebView — **0 casos** hoy (escape = navegador externo sin sesión). |
 
-Resumen catálogo Android (111+ entradas): estados honestos NATIVO / SOLO_LECTURA / CASCARON.
-Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (NATIVO); video/ANPR/mapa = AUSENTE (Bloque 2).
+Resumen catálogo Android (128 entradas): estados honestos NATIVO / SOLO_LECTURA / CASCARON.
+
+**Panel INTEGRA: 21 módulos cableados** (2026-09-07). Video, ANPR, vehículos,
+horarios, espacios, detección, bitácora, avisos, mi perfil, ajustes, plano y
+panorama dejaron de ser «Bloque 2». Dos recortes dichos y no disimulados: las
+**cámaras no son transmisión en vivo** (rejilla con vista previa, PTZ y
+captura; el muro MSE/WebSocket se queda en la web) y los **polígonos de
+detección y los pines del plano se ven pero no se editan**.
+
+> Este documento **ha mentido antes**: llegó a tener 68 ✅ sin una sola
+> advertencia, de los que 13 eran módulos de solo lectura y 3 inalcanzables.
+> Por eso ahora `check-app-web-parity.py` compara en los dos sentidos y falla
+> si la matriz y el catálogo divergen. No edites una fila sin ejecutarlo.
 
 ## Reglas
 
@@ -74,12 +85,12 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | BI | `/erp/analytics/bi` | SOLO_LECTURA · ErpBiScreen | SOLO_LECTURA |
 | Analítica | `/console/analytics` | SOLO_LECTURA · ErpBiScreen | SOLO_LECTURA |
 | Auditoría | `/console/audit` | SOLO_LECTURA · AuditModuleScreen | SOLO_LECTURA |
-| Activos | `/operacion/assets` | NATIVO · MaintenanceModuleScreen | NATIVO |
+| Activos | `/operacion/assets` | SOLO_LECTURA · las escrituras del fichero son de la pestaña Órdenes, o sea de `maintenance` | SOLO_LECTURA |
 | Almacén | `/console/stock` | NATIVO · WarehouseHubScreen | NATIVO |
 | Bodega | `/console/warehouse` | NATIVO | NATIVO |
 | Compras | `/console/procurement` | NATIVO · approve/reject req | NATIVO |
 | Mantenimiento | `/operacion/maintenance` | NATIVO · OT start/complete | NATIVO |
-| Hojas de servicio | `/operacion/service-sheets` | NATIVO · ServiceSheetsModuleScreen | NATIVO |
+| Hojas de servicio | `/operacion/service-sheets` | SOLO_LECTURA · **no existe ningún endpoint de escritura de hojas de servicio** en el cliente | SOLO_LECTURA |
 | Documentos | `/console/documents` | NATIVO · upload | NATIVO |
 | CVs | `/console/cvs` | NATIVO · create + move stage | NATIVO |
 | Reclutamiento | `/ops/recruiting` | NATIVO · RecruitingScreen | NATIVO |
@@ -90,7 +101,7 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | SLA | `/ops/support/sla` | SOLO_LECTURA | SOLO_LECTURA |
 | Contratos mant. | `/ops/maintenance/contracts` | NATIVO · create/status/OT | NATIVO |
 | Mensajes contacto | `/console/contact-messages` | SOLO_LECTURA | SOLO_LECTURA |
-| Noticias ERP | `/console/news` | CASCARON · lista sin CRUD | CASCARON |
+| Noticias ERP | `/console/news` | SOLO_LECTURA · lista real, sin alta | SOLO_LECTURA |
 | Newsletter ERP | `/console/newsletter` | SOLO_LECTURA | SOLO_LECTURA |
 | Mi perfil | `/console/my-profile` | NATIVO · MyProfileScreen | NATIVO |
 | Mis preferencias | `/console/my-preferences` | SOLO_LECTURA | SOLO_LECTURA |
@@ -98,12 +109,12 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Ajustes | `/console/settings` | NATIVO · parcial (faltan api-keys/webhooks) | NATIVO |
 | Multi-empresa | `/erp/companies` | NATIVO · create/edit | NATIVO |
 | Knowledge Base | `/erp/kb` | SOLO_LECTURA | SOLO_LECTURA |
-| Exportaciones | `/erp/exports` | NATIVO · CSV + share | NATIVO |
-| Arquitectura | `/erp/architecture` | CASCARON · catálogo local | CASCARON |
+| Exportaciones | `/erp/exports` | SOLO_LECTURA · es un `@GET`: descarga, no administra | SOLO_LECTURA |
+| Arquitectura | `/erp/architecture` | SOLO_LECTURA · catálogo local, no llama a la API | SOLO_LECTURA |
 | Calendario | `/erp/calendar` | SOLO_LECTURA | SOLO_LECTURA |
 | Organigrama | `/erp/hr/orgchart` | SOLO_LECTURA | SOLO_LECTURA |
 | KPIs personas | `/erp/hr/kpis` | SOLO_LECTURA | SOLO_LECTURA |
-| Reuniones | `/erp/reuniones` | AUSENTE | AUSENTE |
+| Reuniones | `/erp/reuniones` | NATIVO · 4 pestañas, convocar con agenda, pasar lista mandando la lista completa, acuerdos con dueño y fecha, cierre con minuta | AUSENTE |
 | Accesos oficinas | `/erp/facilities/access` | AUSENTE | AUSENTE |
 
 ## Panel CRM (ModuleCatalog.ventas)
@@ -142,8 +153,8 @@ Panel INTEGRA MVP móvil: **Access, Events, People, ACS Attendance, Visitors** (
 | Facturación | `/contabilidad/invoicing` | NATIVO | NATIVO |
 | Gastos | `/contabilidad/expenses` | NATIVO | NATIVO |
 | Pagos empleados | `/contabilidad/employee-payments` | NATIVO · CRUD + pagado | NATIVO |
-| Viáticos | `/contabilidad/viaticos` | CASCARON · MyViaticsScreen RO | CASCARON |
-| Pagos | `/contabilidad/pagos` | CASCARON | CASCARON |
+| Viáticos | `/contabilidad/viaticos` | NATIVO · abría «Mis viáticos» filtrado por el propio usuario, así que el contador veía una pantalla vacía; ahora abre la de revisión | CASCARON |
+| Pagos | `/contabilidad/pagos` | NATIVO | CASCARON |
 | Horas | `/contabilidad/horas` | SOLO_LECTURA | SOLO_LECTURA |
 | Proyectos | `/contabilidad/proyectos` | NATIVO · ConsoleProjectsScreen | NATIVO |
 | Proyectos internos | `/contabilidad/work-projects` | NATIVO · ConsoleProjectsScreen | NATIVO |
@@ -201,7 +212,8 @@ MVP operativo contra `/api/integra/**` (sin inventar ISAPI).
 | Auditoría | `/integra/audit` | NATIVO · filtros, paginación real, `ipAddress`/`userAgent`/`previousData` visibles | AUSENTE |
 | Notificaciones | `/integra/notifications-center` | NATIVO · centro con triaje | AUSENTE |
 | Mi perfil | `/integra/my-profile` | NATIVO · credenciales y qué abre cada una | AUSENTE |
-| Plano | `/integra/map` | AUSENTE · sin agente asignado todavía | AUSENTE |
+| Plano | `/integra/map` | SOLO_LECTURA · zoom, ficha del pin con estado vivo, cobertura y pines huérfanos. **No se sitúan ni se borran pines**: el servidor hace `upsert` por equipo y uno mal puesto pisa el bueno | AUSENTE |
+| Panorama | `/integra/dashboard` | SOLO_LECTURA · enlace, puertas y cámaras con su resto «sin reportar», alarmas de 24 h, gente en sitio | AUSENTE |
 
 ## Portal clientes (TicketsNavHost — fuera del catálogo ERP)
 
