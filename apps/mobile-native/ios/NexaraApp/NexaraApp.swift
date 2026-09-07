@@ -92,8 +92,7 @@ struct RootView: View {
                 case .lab:
                     LabTabView(onExit: { app.route = .panels })
                 case .integra:
-                    // Catálogo + PlaceholderView hasta que otro agente cablee pantallas INTEGRA.
-                    PanelModuleNavView(panel: panel, onExit: { app.route = .panels })
+                    IntegraRootView(onExit: { app.route = .panels })
                 }
             }
             }
