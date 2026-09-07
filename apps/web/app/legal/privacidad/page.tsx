@@ -77,6 +77,62 @@ export default function PrivacidadPage() {
       </section>
 
       <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Datos que recaba la aplicación móvil NEXARA</h2>
+        <p className={styles.p}>
+          La aplicación móvil NEXARA es una herramienta de uso profesional. No tiene registro
+          público: las cuentas las da de alta el administrador de cada organización. Además de
+          los datos de la cuenta (nombre y correo electrónico), la aplicación puede recabar lo
+          siguiente:
+        </p>
+        <ul className={styles.list}>
+          <li>
+            <strong>Ubicación precisa y aproximada.</strong> Es <strong>opcional</strong>. Se
+            solicita en el momento de usarla, únicamente para registrar asistencia y para las
+            funciones de trabajo en campo. Si se rechaza el permiso, la aplicación sigue
+            funcionando y el registro se guarda sin ubicación. La aplicación{" "}
+            <strong>no rastrea la ubicación en segundo plano</strong>.
+          </li>
+          <li>
+            <strong>Fotografías y archivos.</strong> Es <strong>opcional</strong>. Solo se
+            capturan o adjuntan cuando la persona usuaria lo hace de forma expresa, como
+            evidencia de un trabajo, una asistencia o un documento de la organización.
+          </li>
+          <li>
+            <strong>Identificador del dispositivo.</strong> Necesario para enviar notificaciones
+            push al teléfono correcto y para identificar la sesión.
+          </li>
+          <li>
+            <strong>Registros de fallos y datos de diagnóstico.</strong> Cuando la aplicación
+            falla se envía un informe técnico (estado de la aplicación, modelo de dispositivo y
+            versión del sistema) con el único fin de corregir el error.
+          </li>
+          <li>
+            <strong>Actividad operativa dentro de la aplicación.</strong> Registros de
+            asistencia, comidas, actividades, evidencias y demás operaciones que la persona
+            usuaria realiza como parte de su trabajo. Estos datos se guardan en el sistema de la
+            organización que contrató el servicio.
+          </li>
+        </ul>
+        <p className={styles.p}>
+          La aplicación <strong>no contiene publicidad</strong>, no utiliza identificadores
+          publicitarios y <strong>no vende ni cede datos personales a terceros</strong> con fines
+          comerciales o publicitarios. Los servicios de Google que utilizamos para el envío de
+          notificaciones y el reporte de fallos actúan como encargados del tratamiento por cuenta
+          nuestra, no como destinatarios independientes.
+        </p>
+        <p className={styles.p}>
+          Toda la comunicación entre la aplicación y nuestros servidores viaja{" "}
+          <strong>cifrada</strong>. La persona usuaria puede solicitar la eliminación de su cuenta
+          y de sus datos en{" "}
+          <a className={styles.link} href="/legal/eliminar-cuenta">
+            nexara.com.mx/legal/eliminar-cuenta
+          </a>
+          , sin perjuicio de los periodos de conservación que exija la ley o el contrato con la
+          organización correspondiente.
+        </p>
+      </section>
+
+      <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Finalidades del tratamiento</h2>
         <p className={styles.p}>
           Los datos personales serán utilizados para las siguientes finalidades primarias:

@@ -87,7 +87,7 @@ SHA-256 : 28:34:99:79:FC:8F:82:33:78:72:22:C0:1F:F1:CB:43:FE:48:D9:66:29:E6:58:D
 > distribución (Play Console → Configuración → Integridad de la app) a la restricción de la API key
 > de Maps y a Firebase, o el mapa saldrá en blanco en la versión de Play aunque funcione en local.
 
-Estado actual del build: `versionCode = 5`, `versionName = 1.0.0`, `targetSdk = 36`, `minSdk = 24`.
+Estado actual del build: `versionCode = 7`, `versionName = 1.0.1`, `targetSdk = 36`, `minSdk = 24`.
 Cumple el requisito vigente de target API. En cada actualización futura hay que **subir el
 `versionCode`** en `apps/mobile-native/android/gradle.properties` — Play rechaza un
 `versionCode` repetido, y tampoco se puede reutilizar el de un bundle ya subido aunque esa
