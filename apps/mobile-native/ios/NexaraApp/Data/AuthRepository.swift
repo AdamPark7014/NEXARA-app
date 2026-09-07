@@ -21,6 +21,8 @@ final class AuthRepository {
         let email: String?
         let role: String?
         let rol: String?
+        let roleKey: String?
+        let orgRoleKey: String?
         let department: String?
         let departamento: String?
         let permissions: [String]?
@@ -60,7 +62,10 @@ final class AuthRepository {
             isClient: u?.isClient ?? false,
             isBranchUser: u?.isBranchUser ?? false,
             clientId: u?.clientId,
-            branchId: u?.branchId
+            branchId: u?.branchId,
+            roleKey: u?.roleKey,
+            orgRoleKey: u?.orgRoleKey,
+            navPanels: nil
         )
         SessionStore.shared.save(user)
         QuickProfileStore.remember(user)

@@ -15,6 +15,11 @@ struct SessionUser: Codable, Equatable {
     var isBranchUser: Bool
     var clientId: String?
     var branchId: String?
+    /// Clave canónica del backend (`mapSessionUser`); prioriza sobre `role`.
+    var roleKey: String? = nil
+    var orgRoleKey: String? = nil
+    /// Paneles de `GET /me/navigation` cuando la sesión los trae.
+    var navPanels: [String]? = nil
 }
 
 /// Almacén seguro de sesión basado en Keychain.

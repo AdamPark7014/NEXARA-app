@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Paneles consolidados — espejo de apps/web/lib/access-matrix.ts (PANELS).
 enum PanelId: String, CaseIterable, Identifiable {
-    case erp, crm, ops, studio, lab, portal
+    case erp, crm, ops, studio, lab, portal, integra
 
     var id: String { rawValue }
 
@@ -16,6 +16,7 @@ enum PanelId: String, CaseIterable, Identifiable {
         case .studio: return "NEXARA STUDIO"
         case .lab: return "NEXARA LAB"
         case .portal: return "Portal clientes"
+        case .integra: return "NEXARA INTEGRA"
         }
     }
 
@@ -27,6 +28,7 @@ enum PanelId: String, CaseIterable, Identifiable {
         case .studio: return "Marca, sitio público y casos"
         case .lab: return "Sandbox técnico y API health"
         case .portal: return "Tickets, sucursales e inventarios"
+        case .integra: return "Acceso, eventos, personas y visitantes"
         }
     }
 
@@ -38,6 +40,7 @@ enum PanelId: String, CaseIterable, Identifiable {
         case .studio: return "paintpalette"
         case .lab: return "flask"
         case .portal: return "ticket"
+        case .integra: return "lock.shield"
         }
     }
 
@@ -49,6 +52,7 @@ enum PanelId: String, CaseIterable, Identifiable {
         case .studio: return Color(red: 0.66, green: 0.33, blue: 0.97)
         case .lab: return Color(red: 0.39, green: 0.45, blue: 0.55)
         case .portal: return Color(red: 0.05, green: 0.58, blue: 0.53)
+        case .integra: return Color(red: 0.15, green: 0.39, blue: 0.92)
         }
     }
 
@@ -60,6 +64,7 @@ enum PanelId: String, CaseIterable, Identifiable {
         case "web": return .studio
         case "tickets": return .portal
         case "lab": return .lab
+        case "integra": return .integra
         default: return PanelId(rawValue: legacy) ?? .erp
         }
     }
@@ -67,7 +72,7 @@ enum PanelId: String, CaseIterable, Identifiable {
 
 /// Puente para ModuleRouter (catálogo legacy console/ventas/web/tickets).
 enum ModuleRoutingPortal {
-    case console, ventas, web, studio, tickets, contabilidad, lab
+    case console, ventas, web, studio, tickets, contabilidad, lab, integra
 }
 
 extension PanelId {
@@ -78,6 +83,7 @@ extension PanelId {
         case .studio: return .studio
         case .portal: return .tickets
         case .lab: return .lab
+        case .integra: return .integra
         }
     }
 }
