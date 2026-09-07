@@ -94,6 +94,5 @@ final class IntegraGovernanceRepository {
         )
     }
 
-    // TODO: push-notification preferences for INTEGRA — no verified mobile endpoint
-    // beyond shared `notifications` (see NotificationsRepository). Do not invent paths.
+    /// INTEGRA has no dedicated inbox API — reuse shared ERP `NotificationsRepository`.
 }

@@ -1141,6 +1141,9 @@ private struct AuditRow: View {
 struct DocumentsView: View {
     @StateObject private var vm = DocumentsVM()
     @State private var selected: DocumentItem?
+    @State private var acting = false
+    @State private var actionMessage: String?
+
     var body: some View {
         Group {
             if let s = selected { docDetail(s) } else { docList }
@@ -1160,7 +1163,7 @@ struct DocumentsView: View {
             else if vm.filtered.isEmpty { Spacer(); Text("Sin documentos").foregroundColor(.secondary); Spacer() }
             else {
                 List(vm.filtered.prefix(60)) { item in
-                    Button { selected = item } label: { DocumentRow(item: item) }
+                    Button { selected = item; actionMessage = nil } label: { DocumentRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
                         .listRowSeparator(.hidden)
@@ -1177,7 +1180,7 @@ struct DocumentsView: View {
         let size     = StockParse.str(d.raw["size"], d.raw["fileSize"])
         let author   = StockParse.str(d.raw["authorName"], d.raw["uploadedBy"], d.raw["createdBy"])
         List {
-            Section { Button("← Documentos") { selected = nil } }
+            Section { Button("← Documentos") { selected = nil; actionMessage = nil } }
             Section("Documento") {
                 oRow("Nombre",     name)
                 oRow("Categoría",  category)
@@ -1192,8 +1195,43 @@ struct DocumentsView: View {
                     }
                 }
             }
+            if d.id > 0 {
+                Section("Acciones") {
+                    Button(acting ? "…" : "Aprobar") {
+                        Task { await actDocument(id: d.id, label: "Documento aprobado") {
+                            try await ExtraRepository.shared.approveDocument(id: d.id)
+                        }}
+                    }
+                    .disabled(acting)
+                    Button(acting ? "…" : "Archivar") {
+                        Task { await actDocument(id: d.id, label: "Documento archivado") {
+                            try await ExtraRepository.shared.archiveDocument(id: d.id)
+                        }}
+                    }
+                    .disabled(acting)
+                }
+            }
+            if let actionMessage {
+                Section {
+                    Text(actionMessage)
+                        .foregroundColor(actionMessage.hasPrefix("✅") ? .green : .red)
+                }
+            }
         }
         .listStyle(.insetGrouped)
+    }
+
+    private func actDocument(id: Int64, label: String, _ block: () async throws -> Void) async {
+        acting = true; actionMessage = nil
+        defer { acting = false }
+        do {
+            try await block()
+            actionMessage = "✅ \(label)"
+            selected = nil
+            vm.load()
+        } catch {
+            actionMessage = "❌ \(error.toUserMessage())"
+        }
     }
 }
 

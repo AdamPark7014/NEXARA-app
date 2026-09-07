@@ -29,6 +29,12 @@ struct IntegraAttendanceView: View {
             Section("Rango") {
                 DatePicker("Desde", selection: $vm.from, displayedComponents: .date)
                 DatePicker("Hasta", selection: $vm.to, displayedComponents: .date)
+                NxAlertBanner(alert: NxAlert(
+                    id: "no-exit",
+                    title: "Deducido de accesos concedidos.",
+                    subtitle: "Este control de acceso no emite señal de salida, así que la jornada no se cierra sola.",
+                    tone: .info
+                ))
             }
 
             Section {
@@ -137,7 +143,7 @@ final class IntegraAttendanceVM: ObservableObject {
             loading = false
         } catch {
             loading = false
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage(fallback: "No se pudo cargar la asistencia")
         }
     }
 }

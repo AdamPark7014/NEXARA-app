@@ -25,8 +25,18 @@ struct IntegraCameraDetailView: View {
     @State private var actionError: String?
     @State private var rtsp: String?
     @State private var hls: String?
+    @State private var fallos: Int = 0
+    @State private var pacingTask: Task<Void, Never>?
+    @State private var paused = false
+    @Environment(\.scenePhase) private var scenePhase
 
     private var showsPtz: Bool { camera?.isPtz == true }
+
+    private var resolvedFrameURL: URL? {
+        guard motivo.isEmpty,
+              let s = Go2rtcFrame.frameUrl(hls: hls, nonce: nonce) else { return nil }
+        return URL(string: s)
+    }
 
     var body: some View {
         Group {
@@ -70,27 +80,35 @@ struct IntegraCameraDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await refreshFrame() }
+        .onChange(of: scenePhase) { _, phase in
+            paused = phase != .active
+            if phase == .active { schedulePace(immediate: true) }
+            else { pacingTask?.cancel() }
+        }
+        .onDisappear { pacingTask?.cancel() }
     }
 
     private var previewBox: some View {
         ZStack(alignment: .topLeading) {
             Color(red: 0.06, green: 0.09, blue: 0.16)
                 .aspectRatio(16 / 9, contentMode: .fit)
-            if let frameURL, motivo.isEmpty {
-                AsyncImage(url: frameURL) { phase in
+            if let resolvedFrameURL {
+                AsyncImage(url: resolvedFrameURL) { phase in
                     switch phase {
                     case .success(let img):
                         img.resizable().scaledToFit()
-                            .onAppear { hasImage = true }
+                            .onAppear { onFrameOk() }
                     case .failure:
                         Text(motivo.isEmpty ? "Sin respuesta del equipo. Reintentando." : motivo)
                             .font(.caption)
                             .foregroundStyle(Color(white: 0.9))
                             .padding()
+                            .onAppear { onFrameFail() }
                     default:
                         ProgressView().tint(.white)
                     }
                 }
+                .id(nonce)
             } else {
                 Text(motivo.isEmpty ? "Sin imagen." : motivo)
                     .font(.caption)
@@ -254,11 +272,14 @@ struct IntegraCameraDetailView: View {
             hls = slot.hls
             rtsp = slot.rtsp
             motivo = motivoSinImagen(slot)
-            frameURL = IntegraVideoDataStub.frameURL(hls: hls, nonce: nonce)
+            frameURL = resolvedFrameURL
             if cam?.isPtz == true {
                 await loadPresets()
             } else {
                 presetsLoaded = true
+            }
+            if motivo.isEmpty {
+                schedulePace(immediate: true)
             }
         } catch {
             errorText = error.localizedDescription
@@ -273,8 +294,42 @@ struct IntegraCameraDetailView: View {
 
     private func refreshFrame() async {
         nonce += 1
-        frameURL = IntegraVideoDataStub.frameURL(hls: hls, nonce: nonce)
+        frameURL = resolvedFrameURL
         message = "Preview actualizado"
+    }
+
+    private func schedulePace(immediate: Bool) {
+        pacingTask?.cancel()
+        guard !paused, motivo.isEmpty || fallos > 0, hls != nil else { return }
+        let failures = fallos
+        pacingTask = Task {
+            if !immediate {
+                let ms = FramePacing.nextDelayMs(consecutiveFailures: failures)
+                try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
+            }
+            guard !Task.isCancelled, !paused else { return }
+            await MainActor.run {
+                nonce += 1
+                frameURL = resolvedFrameURL
+            }
+        }
+    }
+
+    private func onFrameOk() {
+        hasImage = true
+        fallos = 0
+        if motivo.lowercased().contains("sin respuesta") { motivo = "" }
+        schedulePace(immediate: false)
+    }
+
+    private func onFrameFail() {
+        fallos += 1
+        hasImage = false
+        if fallos >= 3 {
+            let sec = FramePacing.nextDelayMs(consecutiveFailures: fallos) / 1000
+            motivo = "Sin respuesta del equipo. Reintentando cada \(sec) s."
+        }
+        schedulePace(immediate: false)
     }
 
     private func capture() async {

@@ -184,7 +184,7 @@ struct ClientTicketsModuleView: View {
             selected = nil
             await reload()
         } catch {
-            message = "Error: \(error.localizedDescription)"
+            message = "Error: \(error.toUserMessage())"
         }
     }
 }

@@ -54,7 +54,7 @@ struct ModuleRouter {
         case (.console, "projects"):
             ProjectsView()
         case (.console, "work-projects"), (.contabilidad, "work-projects"):
-            WorkProjectsView()
+            ProjectsView()
         case (.console, "users"):
             UsersView()
         case (.console, "attendance"):

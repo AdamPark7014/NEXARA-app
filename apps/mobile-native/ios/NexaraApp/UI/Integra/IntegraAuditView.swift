@@ -11,70 +11,6 @@ struct IntegraAuditEntry: Identifiable, Hashable {
     var previousValue: String?
 }
 
-enum IntegraGovernanceDataStub {
-    static func audit(day: Date) async throws -> [IntegraAuditEntry] {
-        let cal = Calendar.current
-        let start = cal.startOfDay(for: day)
-        let end = cal.date(byAdding: .day, value: 1, to: start) ?? start
-        let iso = ISO8601DateFormatter()
-        var consulta = IntegraGovernanceRepository.ConsultaBitacora()
-        consulta.fromIso = iso.string(from: start)
-        consulta.toIso = iso.string(from: end)
-        consulta.limit = 100
-        let page = try await IntegraGovernanceRepository.shared.audit(consulta)
-        return page.items.enumerated().map { i, m in
-            IntegraAuditEntry(
-                id: m.integraStr("id") ?? "\(i)",
-                when: m.integraStr("createdAt", "timestamp", "at") ?? "",
-                actor: m.integraStr("actor", "user", "userName") ?? "—",
-                action: m.integraStr("action", "type", "event") ?? "acción",
-                target: m.integraStr("target", "resource"),
-                ip: m.integraStr("ip", "ipAddress"),
-                userAgent: m.integraStr("userAgent"),
-                previousValue: m.integraStr("previousValue", "before")
-            )
-        }
-    }
-
-    static func notifications() async throws -> [IntegraNotificationRow] {
-        // Shared ERP inbox not yet ported — empty list is honest, not fake rows.
-        []
-    }
-
-    static func pushEventStats() async throws -> (openAlarms: Int?, eventsToday: Int?) {
-        let stats = try await IntegraGovernanceRepository.shared.pushEventStats()
-        let open = try? await IntegraRepository.shared.alarmQueue(hours: 24).openCount
-        return (open, stats.integraInt("today", "count", "eventsToday"))
-    }
-
-    static func identityMe() async throws -> IntegraIdentitySnapshot {
-        let me = try await IntegraGovernanceRepository.shared.identityMe()
-        let acs = IntegraJSON.asMap(me["acsPerson"])
-        return IntegraIdentitySnapshot(
-            displayName: me.integraStr("name", "displayName"),
-            email: me.integraStr("email"),
-            acsPersonId: acs?.integraStr("personId", "id"),
-            acsSiteId: acs?.integraInt("siteId")
-        )
-    }
-
-    static func myCredentials(personId: String?) async throws -> [IntegraCredentialRow] {
-        guard let personId, !personId.isEmpty else { return [] }
-        let detail = try await IntegraGovernanceRepository.shared.personDetail(personId: personId)
-        var out: [IntegraCredentialRow] = []
-        if let face = detail.integraInt("faceCount"), face > 0 {
-            out.append(.init(id: "face", kind: "Rostro", label: "\(face) face(s)", status: "En espejo"))
-        }
-        if let fp = detail.integraInt("fingerprintCount"), fp > 0 {
-            out.append(.init(id: "fp", kind: "Huella", label: "\(fp) FP", status: "En espejo"))
-        }
-        if let card = detail.integraInt("cardCount"), card > 0 {
-            out.append(.init(id: "card", kind: "Tarjeta", label: "\(card) card(s)", status: "En espejo"))
-        }
-        return out
-    }
-}
-
 struct IntegraNotificationRow: Identifiable, Hashable {
     let id: String
     var title: String
@@ -197,7 +133,30 @@ struct IntegraAuditView: View {
         isLoading = true
         errorText = nil
         defer { isLoading = false }
-        do { entries = try await IntegraGovernanceDataStub.audit(day: day) }
-        catch { errorText = error.localizedDescription }
+        do {
+            let cal = Calendar.current
+            let start = cal.startOfDay(for: day)
+            let end = cal.date(byAdding: .day, value: 1, to: start) ?? start
+            let iso = ISO8601DateFormatter()
+            var consulta = IntegraGovernanceRepository.ConsultaBitacora()
+            consulta.fromIso = iso.string(from: start)
+            consulta.toIso = iso.string(from: end)
+            consulta.limit = 100
+            let page = try await IntegraGovernanceRepository.shared.audit(consulta)
+            entries = page.items.enumerated().map { i, m in
+                IntegraAuditEntry(
+                    id: m.integraStr("id") ?? "\(i)",
+                    when: m.integraStr("createdAt", "timestamp", "at") ?? "",
+                    actor: m.integraStr("actor", "user", "userName") ?? "—",
+                    action: m.integraStr("action", "type", "event") ?? "acción",
+                    target: m.integraStr("target", "resource"),
+                    ip: m.integraStr("ip", "ipAddress"),
+                    userAgent: m.integraStr("userAgent"),
+                    previousValue: m.integraStr("previousValue", "before")
+                )
+            }
+        } catch {
+            errorText = error.localizedDescription
+        }
     }
 }

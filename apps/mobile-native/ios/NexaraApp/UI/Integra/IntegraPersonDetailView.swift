@@ -97,6 +97,20 @@ struct IntegraPersonDetailView: View {
                 LabeledContent("Código", value: IntegraDict.str(person, "code", "personCode").nilIfEmpty ?? "—")
                 LabeledContent("Tipo", value: IntegraDict.str(person, "userType").nilIfEmpty ?? "—")
                 LabeledContent("Género", value: IntegraDict.str(person, "gender").nilIfEmpty ?? "—")
+                let validity = IntegraValidity.describe(person)
+                HStack {
+                    Text("Vigencia")
+                    Spacer()
+                    NxStatusChip(text: validity.label, tone: validity.tone)
+                }
+                LabeledContent(
+                    "Desde",
+                    value: IntegraDict.str(person, "validFrom").nilIfEmpty ?? "—"
+                )
+                LabeledContent(
+                    "Hasta",
+                    value: IntegraDict.str(person, "validTo").nilIfEmpty ?? "—"
+                )
             }
 
             Section {
@@ -139,6 +153,12 @@ struct IntegraPersonDetailView: View {
                 .disabled(vm.acting)
                 Toggle("Vigencia activa", isOn: $vm.editValidEnable)
                     .disabled(vm.acting)
+                TextField("Válido desde (YYYY-MM-DD)", text: $vm.editValidFrom)
+                    .disabled(vm.acting)
+                    .textInputAutocapitalization(.never)
+                TextField("Válido hasta (YYYY-MM-DD)", text: $vm.editValidTo)
+                    .disabled(vm.acting)
+                    .textInputAutocapitalization(.never)
                 Button {
                     Task { await vm.save() }
                 } label: {
@@ -182,6 +202,8 @@ final class IntegraPersonDetailVM: ObservableObject {
     @Published var editUserType = ""
     @Published var editGender = ""
     @Published var editValidEnable = true
+    @Published var editValidFrom = ""
+    @Published var editValidTo = ""
     /// Checkbox explícito — nunca se envía force=true sin marcar esto.
     @Published var forceDelete = false
 
@@ -206,10 +228,12 @@ final class IntegraPersonDetailVM: ObservableObject {
             editUserType = IntegraDict.str(data, "userType")
             editGender = IntegraDict.str(data, "gender")
             editValidEnable = IntegraDict.bool(data, "validEnable") != false
+            editValidFrom = String(IntegraDict.str(data, "validFrom").prefix(10))
+            editValidTo = String(IntegraDict.str(data, "validTo").prefix(10))
             loading = false
         } catch {
             loading = false
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage(fallback: "No se pudo cargar la persona")
         }
     }
 
@@ -223,13 +247,15 @@ final class IntegraPersonDetailVM: ObservableObject {
                 personName: editName,
                 gender: editGender.nilIfEmpty,
                 userType: editUserType.nilIfEmpty,
+                validFrom: editValidFrom.nilIfEmpty,
+                validTo: editValidTo.nilIfEmpty,
                 validEnable: editValidEnable
             )
-            message = "Ficha actualizada"
+            message = "Ficha guardada en los terminales"
             messageIsError = false
             await refresh()
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage(fallback: "No se pudo guardar la ficha")
             messageIsError = true
         }
     }
@@ -251,7 +277,7 @@ final class IntegraPersonDetailVM: ObservableObject {
             messageIsError = false
             await refresh()
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage(fallback: "No se pudo enrolar el rostro")
             messageIsError = true
         }
     }
@@ -266,7 +292,7 @@ final class IntegraPersonDetailVM: ObservableObject {
             messageIsError = false
             await refresh()
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage(fallback: "No se pudo quitar el rostro")
             messageIsError = true
         }
     }
@@ -279,7 +305,7 @@ final class IntegraPersonDetailVM: ObservableObject {
             _ = try await repo.deletePerson(personId: personId, force: forceDelete)
             return true
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage(fallback: "No se pudo eliminar la persona")
             messageIsError = true
             return false
         }

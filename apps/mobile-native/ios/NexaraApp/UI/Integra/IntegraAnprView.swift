@@ -13,54 +13,6 @@ struct IntegraAnprRecord: Identifiable, Hashable {
     var vehiclePicUri: String?
 }
 
-enum IntegraAnprDataStub {
-    static func query(
-        plate: String,
-        owner: String,
-        cameraId: String
-    ) async throws -> (records: [IntegraAnprRecord], total: Int?, unavailable: Bool, message: String?) {
-        let now = Date()
-        let start = now.addingTimeInterval(-24 * 3600)
-        let fmt = ISO8601DateFormatter()
-        let q = IntegraVehiclesRepository.AnprQuery(
-            pageNo: 1,
-            pageSize: 50,
-            startTime: fmt.string(from: start),
-            endTime: fmt.string(from: now),
-            cameraIndexCode: cameraId.isEmpty ? nil : cameraId,
-            plateNo: plate.isEmpty ? nil : plate,
-            ownerName: owner.isEmpty ? nil : owner
-        )
-        do {
-            let page = try await IntegraVehiclesRepository.shared.anpr(q)
-            let records = page.registros.enumerated().map { i, m -> IntegraAnprRecord in
-                IntegraAnprRecord(
-                    id: m.integraStr("id", "crossRecordSyscode") ?? "\(i)",
-                    plate: m.integraStr("plateNo", "plate") ?? "—",
-                    crossTime: m.integraStr("crossTime", "passTime"),
-                    direction: m.integraStr("direction", "vehicleDirection"),
-                    cameraName: m.integraStr("cameraName"),
-                    owner: m.integraStr("ownerName"),
-                    vehicleType: m.integraStr("vehicleType"),
-                    vehicleColor: m.integraStr("vehicleColor"),
-                    vehiclePicUri: m.integraStr("vehiclePicUri")
-                )
-            }
-            return (records, page.total, false, nil)
-        } catch {
-            let d = IntegraVehiclesRepository.diagnosticar(error, fallback: "No se pudo consultar ANPR")
-            if d.noDisponible {
-                return ([], nil, true, d.mensaje)
-            }
-            throw error
-        }
-    }
-
-    static func cameras() async throws -> [(id: String, name: String)] {
-        try await IntegraVehiclesRepository.shared.camaras().map { ($0.id, $0.name) }
-    }
-}
-
 /// Cruces ANPR. No inventa lecturas; en sitios sin Artemis muestra no-disponible.
 struct IntegraAnprView: View {
     @State private var records: [IntegraAnprRecord] = []
@@ -73,7 +25,7 @@ struct IntegraAnprView: View {
     @State private var plate = ""
     @State private var owner = ""
     @State private var cameraId = ""
-    @State private var cameras: [(id: String, name: String)] = []
+    @State private var cameras: [IntegraVehiclesRepository.CamaraOpcion] = []
 
     var body: some View {
         Group {
@@ -152,7 +104,7 @@ struct IntegraAnprView: View {
         }
         .navigationTitle(IntegraVehiclesRoutes.titleAnpr)
         .task {
-            cameras = (try? await IntegraAnprDataStub.cameras()) ?? []
+            cameras = (try? await IntegraVehiclesRepository.shared.camaras()) ?? []
             await search()
         }
         .refreshable { await search() }
@@ -173,21 +125,44 @@ struct IntegraAnprView: View {
             isLoading = false
             searching = false
         }
+        let now = Date()
+        let start = now.addingTimeInterval(-24 * 3600)
+        let fmt = ISO8601DateFormatter()
+        let q = IntegraVehiclesRepository.AnprQuery(
+            pageNo: 1,
+            pageSize: 50,
+            startTime: fmt.string(from: start),
+            endTime: fmt.string(from: now),
+            cameraIndexCode: cameraId.isEmpty ? nil : cameraId,
+            plateNo: plate.isEmpty ? nil : plate,
+            ownerName: owner.isEmpty ? nil : owner
+        )
         do {
-            let result = try await IntegraAnprDataStub.query(
-                plate: plate, owner: owner, cameraId: cameraId
-            )
-            if result.unavailable {
+            let page = try await IntegraVehiclesRepository.shared.anpr(q)
+            records = page.registros.enumerated().map { i, m in
+                IntegraAnprRecord(
+                    id: m.integraStr("id", "crossRecordSyscode") ?? "\(i)",
+                    plate: m.integraStr("plateNo", "plate") ?? "—",
+                    crossTime: m.integraStr("crossTime", "passTime"),
+                    direction: m.integraStr("direction", "vehicleDirection"),
+                    cameraName: m.integraStr("cameraName"),
+                    owner: m.integraStr("ownerName"),
+                    vehicleType: m.integraStr("vehicleType"),
+                    vehicleColor: m.integraStr("vehicleColor"),
+                    vehiclePicUri: m.integraStr("vehiclePicUri")
+                )
+            }
+            total = page.total
+        } catch {
+            let d = IntegraVehiclesRepository.diagnosticar(error, fallback: "No se pudo consultar ANPR")
+            if d.noDisponible {
                 unavailable = true
-                unavailableMessage = result.message
+                unavailableMessage = d.mensaje
                 records = []
                 total = nil
             } else {
-                records = result.records
-                total = result.total
+                errorText = d.mensaje
             }
-        } catch {
-            errorText = error.localizedDescription
         }
     }
 }

@@ -71,6 +71,11 @@ final class ExtraRepository {
         )
     }
 
+    func markExpensePagado(id: Int64) async throws {
+        struct Empty: Encodable {}
+        _ = try await ApiClient.shared.patchJSON("expenses/\(id)/pagado", body: Empty())
+    }
+
     func fines() async -> [[String: Any]] { await fineItems().map(\.raw) }
     func fineItems() async -> [FineItem] { await load("fines").map { FineItem(raw: $0) } }
     func employeePayments() async -> [[String: Any]] { await employeePaymentItems().map(\.raw) }
@@ -83,6 +88,16 @@ final class ExtraRepository {
     func lunchBreakItems() async -> [LunchBreak] { await load("lunch-breaks").map { LunchBreak(raw: $0) } }
     func documents() async -> [[String: Any]] { await documentItems().map(\.raw) }
     func documentItems() async -> [DocumentItem] { await load("documents").map { DocumentItem(raw: $0) } }
+
+    func approveDocument(id: Int64) async throws {
+        struct Empty: Encodable {}
+        _ = try await ApiClient.shared.patchJSON("documents/\(id)/approve", body: Empty())
+    }
+
+    func archiveDocument(id: Int64) async throws {
+        struct Empty: Encodable {}
+        _ = try await ApiClient.shared.patchJSON("documents/\(id)/archive", body: Empty())
+    }
     func journalEntries() async -> [[String: Any]] { await journalEntryItems().map(\.raw) }
     func journalEntryItems() async -> [JournalEntryItem] {
         await load("accounting/journal-entries").map { JournalEntryItem(raw: $0) }
@@ -265,6 +280,17 @@ final class ExtraRepository {
     }
     func cvs() async -> [[String: Any]] { await candidateItems().map(\.raw) }
     func candidateItems() async -> [CandidateItem] { await load("cvs").map { CandidateItem(raw: $0) } }
+
+    func moveCv(id: Int64, stage: String, sortOrder: Int? = nil) async throws {
+        struct Body: Encodable {
+            let stage: String
+            let sortOrder: Int?
+        }
+        _ = try await ApiClient.shared.patchJSON(
+            "cvs/\(id)/move",
+            body: Body(stage: stage, sortOrder: sortOrder)
+        )
+    }
     func clientTicketRequests() async -> [[String: Any]] { await load("client-ticket-requests") }
     func projects() async -> [[String: Any]] { await portfolioProjects().map(\.raw) }
     func portfolioProjects() async -> [PortfolioProject] {

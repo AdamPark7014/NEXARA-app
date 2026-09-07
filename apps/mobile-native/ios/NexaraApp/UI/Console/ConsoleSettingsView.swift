@@ -81,6 +81,74 @@ struct ConsoleSettingsView: View {
                     OfflineQueueView()
                 }
             }
+            Section("API keys de la empresa") {
+                if let err = vm.apiKeysError {
+                    Text(err).font(.footnote).foregroundColor(.red)
+                }
+                if let token = vm.createdApiKeyToken {
+                    Text("Token (solo se muestra ahora): \(token)")
+                        .font(.caption)
+                        .foregroundColor(.teal)
+                    Button("Ocultar token") { vm.createdApiKeyToken = nil }
+                }
+                if vm.apiKeys.isEmpty && vm.apiKeysError == nil {
+                    Text("Sin API keys activas").font(.footnote).foregroundColor(.secondary)
+                }
+                ForEach(vm.apiKeys) { key in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(key.name).font(.subheadline.bold())
+                            if !key.meta.isEmpty {
+                                Text(key.meta).font(.caption2).foregroundColor(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Button("Revocar", role: .destructive) {
+                            Task { await vm.revokeApiKey(id: key.id) }
+                        }
+                        .font(.caption)
+                        .disabled(vm.integrationsBusy)
+                    }
+                }
+                TextField("Nombre de la nueva API key", text: $vm.newApiKeyName)
+                Button("+ Crear API key") { Task { await vm.createApiKey() } }
+                    .disabled(vm.integrationsBusy || vm.newApiKeyName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            Section("Webhooks outbound") {
+                if let err = vm.webhooksError {
+                    Text(err).font(.footnote).foregroundColor(.red)
+                }
+                if vm.webhooks.isEmpty && vm.webhooksError == nil {
+                    Text("Sin webhooks configurados").font(.footnote).foregroundColor(.secondary)
+                }
+                ForEach(vm.webhooks) { hook in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(hook.name).font(.subheadline.bold())
+                        if !hook.url.isEmpty {
+                            Text(hook.url).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                        }
+                    }
+                }
+                if !vm.webhookDlq.isEmpty {
+                    Text("Entregas fallidas (\(vm.webhookDlq.count))")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.red)
+                    ForEach(vm.webhookDlq.prefix(20)) { row in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(row.eventType).font(.caption)
+                                if !row.lastError.isEmpty {
+                                    Text(row.lastError).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                                }
+                            }
+                            Spacer()
+                            Button("Reenviar") { Task { await vm.replayDelivery(id: row.id) } }
+                                .font(.caption)
+                                .disabled(vm.integrationsBusy)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -99,6 +167,24 @@ private struct SettingRow: Identifiable {
     var id: String { key }
 }
 
+private struct ApiKeyRow: Identifiable {
+    let id: Int64
+    let name: String
+    let meta: String
+}
+
+private struct WebhookRow: Identifiable {
+    let id: String
+    let name: String
+    let url: String
+}
+
+private struct WebhookDlqRow: Identifiable {
+    let id: Int64
+    let eventType: String
+    let lastError: String
+}
+
 @MainActor
 final class ConsoleSettingsVM: ObservableObject {
     @Published var isLoading = true
@@ -110,6 +196,15 @@ final class ConsoleSettingsVM: ObservableObject {
     @Published var newValue = ""
     @Published var message: String?
     @Published var messageIsError = false
+
+    @Published var apiKeys: [ApiKeyRow] = []
+    @Published var apiKeysError: String?
+    @Published var newApiKeyName = ""
+    @Published var createdApiKeyToken: String?
+    @Published var webhooks: [WebhookRow] = []
+    @Published var webhooksError: String?
+    @Published var webhookDlq: [WebhookDlqRow] = []
+    @Published var integrationsBusy = false
 
     var categories: [String] {
         let order = ["general", "empresa", "fiscal", "notificaciones", "seguridad"]
@@ -152,8 +247,65 @@ final class ConsoleSettingsVM: ObservableObject {
                 return (k, ConsoleHelpers.mapStr(m, "value"))
             })
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
             messageIsError = true
+        }
+        await loadIntegrations()
+    }
+
+    func loadIntegrations() async {
+        do {
+            let list = try await ConsoleRepository.shared.companyApiKeys()
+            apiKeys = list.compactMap { m in
+                guard let id = StockParse.int64(m["id"]) else { return nil }
+                let name = ConsoleHelpers.mapStr(m, "name")
+                let prefix = ConsoleHelpers.mapStr(m, "prefix")
+                let scopes: String = {
+                    if let arr = m["scopes"] as? [Any] {
+                        return arr.compactMap { $0 as? String }.filter { !$0.isEmpty }.joined(separator: ", ")
+                    }
+                    return ConsoleHelpers.mapStr(m, "scopes")
+                }()
+                let meta = [prefix, scopes].filter { !$0.isEmpty }.joined(separator: " · ")
+                return ApiKeyRow(id: id, name: name.isEmpty ? "API key #\(id)" : name, meta: meta)
+            }
+            apiKeysError = nil
+        } catch {
+            apiKeys = []
+            apiKeysError = error.toUserMessage("No se pudieron cargar API keys")
+        }
+
+        do {
+            let list = try await ConsoleRepository.shared.webhooks()
+            webhooks = list.enumerated().map { idx, m in
+                let name = ConsoleHelpers.mapStr(m, "name")
+                let url = ConsoleHelpers.mapStr(m, "url")
+                let id = ConsoleHelpers.mapStr(m, "id")
+                return WebhookRow(
+                    id: id.isEmpty ? "hook-\(idx)" : id,
+                    name: name.isEmpty ? "Webhook" : name,
+                    url: url
+                )
+            }
+            webhooksError = nil
+        } catch {
+            webhooks = []
+            webhooksError = error.toUserMessage("No se pudieron cargar webhooks")
+        }
+
+        do {
+            let list = try await ConsoleRepository.shared.webhooksDlq()
+            webhookDlq = list.compactMap { m in
+                guard let id = StockParse.int64(m["id"]) else { return nil }
+                let e = ConsoleHelpers.mapStr(m, "eventType", "event")
+                return WebhookDlqRow(
+                    id: id,
+                    eventType: e.isEmpty ? "Entrega #\(id)" : e,
+                    lastError: ConsoleHelpers.mapStr(m, "lastError", "error")
+                )
+            }
+        } catch {
+            webhookDlq = []
         }
     }
 
@@ -166,7 +318,7 @@ final class ConsoleSettingsVM: ObservableObject {
             )
             message = "Guardado"; messageIsError = false
             await load()
-        } catch { message = error.localizedDescription; messageIsError = true }
+        } catch { message = error.toUserMessage(); messageIsError = true }
     }
 
     func delete(key: String) async {
@@ -174,7 +326,7 @@ final class ConsoleSettingsVM: ObservableObject {
             try await ConsoleRepository.shared.settingsDelete(key: key)
             message = "Eliminado"; messageIsError = false
             await load()
-        } catch { message = error.localizedDescription; messageIsError = true }
+        } catch { message = error.toUserMessage(); messageIsError = true }
     }
 
     func create() async {
@@ -188,7 +340,50 @@ final class ConsoleSettingsVM: ObservableObject {
             newKey = ""; newLabel = ""; newValue = ""
             message = "Ajuste creado"; messageIsError = false
             await load()
-        } catch { message = error.localizedDescription; messageIsError = true }
+        } catch { message = error.toUserMessage(); messageIsError = true }
+    }
+
+    func createApiKey() async {
+        let name = newApiKeyName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        integrationsBusy = true
+        defer { integrationsBusy = false }
+        do {
+            let created = try await ConsoleRepository.shared.createCompanyApiKey(name: name)
+            createdApiKeyToken = ConsoleHelpers.mapStr(created, "token", "apiKey", "key")
+            newApiKeyName = ""
+            message = "API key creada"; messageIsError = false
+            await loadIntegrations()
+        } catch {
+            message = error.toUserMessage("No se pudo crear la API key")
+            messageIsError = true
+        }
+    }
+
+    func revokeApiKey(id: Int64) async {
+        integrationsBusy = true
+        defer { integrationsBusy = false }
+        do {
+            try await ConsoleRepository.shared.revokeCompanyApiKey(id: id)
+            message = "API key revocada"; messageIsError = false
+            await loadIntegrations()
+        } catch {
+            message = error.toUserMessage("No se pudo revocar")
+            messageIsError = true
+        }
+    }
+
+    func replayDelivery(id: Int64) async {
+        integrationsBusy = true
+        defer { integrationsBusy = false }
+        do {
+            try await ConsoleRepository.shared.replayWebhookDelivery(deliveryId: id)
+            message = "Entrega reenviada"; messageIsError = false
+            await loadIntegrations()
+        } catch {
+            message = error.toUserMessage("No se pudo reenviar")
+            messageIsError = true
+        }
     }
 }
 

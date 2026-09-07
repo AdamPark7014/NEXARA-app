@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Sitios INTEGRA (lista de consulta). Alta/baja profunda vive en ajustes cuando
-/// el agente de datos cablee sync; aquí se listan sitios y se orienta al hub.
+/// Sitios INTEGRA — lista real + selección de alcance (`IntegraSiteScope`).
+/// Paridad operativa con la barra de sitios Android / ajustes de consulta.
 struct IntegraSitesView: View {
     @StateObject private var vm = IntegraSitesVM()
     var onOpenSettingsHint: (() -> Void)? = nil
@@ -27,9 +27,26 @@ struct IntegraSitesView: View {
     private var listBody: some View {
         List {
             Section {
-                Text("Sitios vinculados al control de acceso. La sincronización y el alta/baja completa se cablean con la capa de datos.")
+                Text("Sitio activo: \(vm.selectedLabel)")
+                    .font(.subheadline.weight(.semibold))
+                if let sync = vm.syncLabel {
+                    Text("Última reconciliación: \(sync)")
+                        .font(.caption)
+                        .foregroundColor(vm.syncStale ? .orange : .secondary)
+                } else if !vm.loading {
+                    Text("Sin fecha de reconciliación del espejo.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Text("Al elegir un sitio, el resto de pantallas INTEGRA consulta ese alcance.")
                     .font(.footnote)
                     .foregroundColor(.secondary)
+            }
+
+            if let message = vm.message {
+                Section {
+                    NxAlertBanner(alert: NxAlert(id: "msg", title: message, tone: .success))
+                }
             }
 
             Section {
@@ -43,6 +60,20 @@ struct IntegraSitesView: View {
                     .foregroundColor(.secondary)
             }
 
+            Section {
+                Button {
+                    vm.select(nil)
+                } label: {
+                    HStack {
+                        Text("Predeterminado del servidor")
+                        Spacer()
+                        if vm.selectedId == nil {
+                            Image(systemName: "checkmark.circle.fill").foregroundColor(.teal)
+                        }
+                    }
+                }
+            }
+
             if vm.filtered.isEmpty {
                 Section {
                     NxEmptyState(
@@ -52,7 +83,9 @@ struct IntegraSitesView: View {
                 }
             } else {
                 ForEach(vm.filtered) { site in
-                    siteRow(site)
+                    Button { vm.select(Int(site.id)) } label: {
+                        siteRow(site)
+                    }
                 }
             }
 
@@ -71,13 +104,17 @@ struct IntegraSitesView: View {
         let region = IntegraDict.str(site.raw, "region", "regionName", "location")
         let active = IntegraDict.bool(site.raw, "active", "enabled", "isDefault")
         let isDefault = IntegraDict.bool(site.raw, "isDefault", "default") == true
+        let selected = vm.selectedId.map { String($0) } == site.id
 
         return HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(name).font(.subheadline.weight(.semibold))
+                    Text(name).font(.subheadline.weight(.semibold)).foregroundColor(.primary)
                     if isDefault {
                         NxStatusChip(text: "Predeterminado", tone: .brand)
+                    }
+                    if selected {
+                        NxStatusChip(text: "Activo ahora", tone: .info)
                     }
                 }
                 if !region.isEmpty {
@@ -86,7 +123,9 @@ struct IntegraSitesView: View {
                 Text("ID \(site.id)").font(.caption2).foregroundColor(.secondary)
             }
             Spacer()
-            if let active {
+            if selected {
+                Image(systemName: "checkmark.circle.fill").foregroundColor(.teal)
+            } else if let active {
                 NxStatusChip(
                     text: active ? "Activo" : "Inactivo",
                     tone: active ? .success : .neutral
@@ -103,8 +142,20 @@ final class IntegraSitesVM: ObservableObject {
     @Published var query = ""
     @Published var loading = true
     @Published var error: String?
+    @Published var message: String?
+    @Published var selectedId: Int? = IntegraSiteScope.current
+    @Published var syncLabel: String?
+    @Published var syncStale = false
 
     private let repo = IntegraRepository.shared
+
+    var selectedLabel: String {
+        guard let id = selectedId else { return "Predeterminado del servidor" }
+        if let hit = items.first(where: { $0.id == String(id) }) {
+            return IntegraDict.str(hit.raw, "name", "label", "siteName").nilIfEmpty ?? "Sitio \(id)"
+        }
+        return "Sitio \(id)"
+    }
 
     var filtered: [IntegraRow] {
         items.filter {
@@ -115,19 +166,46 @@ final class IntegraSitesVM: ObservableObject {
         }
     }
 
+    func select(_ siteId: Int?) {
+        let value = siteId.flatMap { $0 > 0 ? $0 : nil }
+        repo.selectSite(value)
+        selectedId = IntegraSiteScope.current
+        message = value == nil
+            ? "Usando el sitio predeterminado del servidor"
+            : "Sitio \(selectedLabel) seleccionado"
+        Task { await loadSync() }
+    }
+
     func refresh(initial: Bool = true) async {
         if initial && items.isEmpty { loading = true }
         error = nil
+        selectedId = IntegraSiteScope.current
         do {
             let rows = try await repo.sites()
             items = rows.enumerated().map { idx, raw in
                 let id = IntegraDict.str(raw, "id", "siteId").nilIfEmpty ?? "site-\(idx)"
                 return IntegraRow(id: id, raw: raw)
             }
+            await loadSync()
             loading = false
         } catch {
             loading = false
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage(fallback: "No se pudieron cargar los sitios")
+        }
+    }
+
+    private func loadSync() async {
+        let syncMap = (try? await repo.lastSync()) ?? [:]
+        let dash = (try? await repo.dashboard()) ?? [:]
+        let raw = IntegraDict.str(dash, "lastSync", "lastSyncAt").nilIfEmpty
+            ?? IntegraDict.str(syncMap, "lastSync", "lastSyncAt", "at").nilIfEmpty
+        if let ms = IntegraCoreFormat.parseMs(raw) {
+            let age = IntegraCoreFormat.syncAge(lastSyncMs: ms)
+            syncLabel = age.label
+            syncStale = age.stale
+        } else {
+            syncLabel = nil
+            syncStale = false
         }
     }
 }

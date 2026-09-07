@@ -1,9 +1,5 @@
 import SwiftUI
 
-// MARK: - Local models / stub data layer
-// Wire to Data/Integra/Video/IntegraVideoRepository when that agent lands.
-// Do NOT invent MSE/live streaming here — JPEG frames only.
-
 struct IntegraCameraRow: Identifiable, Hashable {
     let id: String
     var name: String
@@ -27,41 +23,21 @@ struct IntegraVideoCell: Identifiable {
     var camera: IntegraCameraRow
     var phase: IntegraVideoCellPhase
     var motivo: String
-    var frameURL: URL?
-}
+    var hls: String?
+    var nonce: Int64
+    var fallos: Int
 
-/// Calls `IntegraVideoRepository` (Data/Integra/Video). Maps to UI rows.
-enum IntegraVideoDataStub {
-    static func loadCameras(siteId: Int?) async throws -> [IntegraCameraRow] {
-        let cams = try await IntegraVideoRepository.shared.cameras(siteId: siteId)
-        let ids = cams.map(\.id)
-        let slots = (try? await IntegraVideoRepository.shared.openStreams(cameraIds: ids, siteId: siteId)) ?? [:]
-        return cams.map { cam in
-            let slot = slots[cam.id]
-            return IntegraCameraRow(
-                id: cam.id,
-                name: cam.name,
-                region: cam.region,
-                model: cam.model,
-                sourceIp: cam.sourceIp,
-                isPtz: cam.isPtz,
-                hlsPath: slot?.hls
-            )
-        }
-    }
-
-    static func frameURL(hls: String?, nonce: Int64) -> URL? {
-        guard let s = Go2rtcFrame.frameUrl(hls: hls, nonce: nonce) else { return nil }
+    var frameURL: URL? {
+        guard phase != .sinImagen,
+              let s = Go2rtcFrame.frameUrl(hls: hls, nonce: nonce) else { return nil }
         return URL(string: s)
     }
 }
 
-// MARK: - Video wall
-
 /// Rejilla de cámaras INTEGRA.
 ///
 /// **Qué es y qué no.** Esto NO es video en vivo. Son fotogramas JPEG
-/// pedidos de uno en uno. Las insignias NUNCA dicen «EN VIVO» ni «LIVE».
+/// pedidos de uno en uno con `FramePacing`. Las insignias NUNCA dicen «EN VIVO» ni «LIVE».
 struct IntegraVideoWallView: View {
     var onOpenCamera: (String) -> Void = { _ in }
 
@@ -69,7 +45,9 @@ struct IntegraVideoWallView: View {
     @State private var query = ""
     @State private var isLoading = true
     @State private var errorText: String?
-    @State private var siteId: Int?
+    @State private var siteId: Int? = IntegraSiteScope.current
+    @State private var pacingTasks: [String: Task<Void, Never>] = [:]
+    @State private var paused = false
     @Environment(\.scenePhase) private var scenePhase
 
     private var visible: [IntegraVideoCell] {
@@ -127,9 +105,16 @@ struct IntegraVideoWallView: View {
         .task { await reload() }
         .refreshable { await reload() }
         .onChange(of: scenePhase) { _, phase in
-            // Pause polling when backgrounded — no silent JPEG flood.
-            _ = phase
+            paused = phase != .active
+            if phase == .active {
+                for cell in cells where cell.phase != .sinImagen {
+                    scheduleNext(cameraId: cell.id, immediate: true)
+                }
+            } else {
+                stopAllPacing()
+            }
         }
+        .onDisappear { stopAllPacing() }
     }
 
     private var honestyBanner: some View {
@@ -164,15 +149,18 @@ struct IntegraVideoWallView: View {
                         switch phase {
                         case .success(let img):
                             img.resizable().scaledToFill()
+                                .onAppear { frameArrived(cell.id) }
                         case .failure:
                             Text(cell.motivo.isEmpty ? "Sin imagen." : cell.motivo)
                                 .font(.caption2)
                                 .foregroundStyle(Color(white: 0.9))
                                 .padding(8)
+                                .onAppear { frameFailed(cell.id) }
                         default:
                             ProgressView().tint(.white)
                         }
                     }
+                    .id("\(cell.id)-\(cell.nonce)")
                     .clipped()
                 } else if cell.phase == .sinImagen || cell.phase == .fallando {
                     Text(cell.motivo.isEmpty ? "Sin imagen." : cell.motivo)
@@ -219,7 +207,6 @@ struct IntegraVideoWallView: View {
             .padding(.vertical, 2)
             .background(bg)
             .clipShape(RoundedRectangle(cornerRadius: 4))
-            // Guard against accidental LIVE copy in future edits:
             .accessibilityLabel(phase.rawValue)
     }
 
@@ -230,24 +217,88 @@ struct IntegraVideoWallView: View {
     }
 
     private func reload() async {
+        stopAllPacing()
         isLoading = true
         errorText = nil
         defer { isLoading = false }
         do {
-            let cams = try await IntegraVideoDataStub.loadCameras(siteId: siteId)
+            siteId = IntegraSiteScope.current
+            let cams = try await IntegraVideoRepository.shared.cameras(siteId: siteId)
+            let ids = cams.map(\.id)
+            let slots = (try? await IntegraVideoRepository.shared.openStreams(cameraIds: ids, siteId: siteId)) ?? [:]
             cells = cams.map { cam in
-                let motivo = cam.hlsPath == nil
-                    ? "Sin ruta de imagen en el espejo."
-                    : ""
+                let slot = slots[cam.id]
+                let hls = slot?.hls
+                let sin = hls == nil || !(slot?.ok ?? true)
+                let motivo = sin ? (motivoSinImagen(slot).isEmpty ? "Sin ruta de imagen en el espejo." : motivoSinImagen(slot)) : ""
                 return IntegraVideoCell(
-                    camera: cam,
-                    phase: cam.hlsPath == nil ? .sinImagen : .enCola,
+                    camera: IntegraCameraRow(
+                        id: cam.id,
+                        name: cam.name,
+                        region: cam.region,
+                        model: cam.model,
+                        sourceIp: cam.sourceIp,
+                        isPtz: cam.isPtz,
+                        hlsPath: hls
+                    ),
+                    phase: sin ? .sinImagen : .enCola,
                     motivo: motivo,
-                    frameURL: IntegraVideoDataStub.frameURL(hls: cam.hlsPath, nonce: 1)
+                    hls: hls,
+                    nonce: 0,
+                    fallos: 0
                 )
+            }
+            for cell in cells where cell.phase != .sinImagen {
+                scheduleNext(cameraId: cell.id, immediate: true)
             }
         } catch {
             errorText = error.localizedDescription
         }
+    }
+
+    private func scheduleNext(cameraId: String, immediate: Bool) {
+        pacingTasks[cameraId]?.cancel()
+        guard !paused else { return }
+        guard let cell = cells.first(where: { $0.id == cameraId }), cell.phase != .sinImagen else { return }
+        let fallos = cell.fallos
+        pacingTasks[cameraId] = Task {
+            if !immediate {
+                let ms = FramePacing.nextDelayMs(consecutiveFailures: fallos)
+                try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
+            }
+            guard !Task.isCancelled, !paused else { return }
+            await MainActor.run {
+                guard let idx = cells.firstIndex(where: { $0.id == cameraId }) else { return }
+                cells[idx].nonce += 1
+                if cells[idx].phase != .conImagen {
+                    cells[idx].phase = .pidiendo
+                }
+            }
+        }
+    }
+
+    private func frameArrived(_ cameraId: String) {
+        guard let idx = cells.firstIndex(where: { $0.id == cameraId }) else { return }
+        cells[idx].phase = .conImagen
+        cells[idx].fallos = 0
+        cells[idx].motivo = ""
+        if !paused { scheduleNext(cameraId: cameraId, immediate: false) }
+    }
+
+    private func frameFailed(_ cameraId: String) {
+        guard let idx = cells.firstIndex(where: { $0.id == cameraId }) else { return }
+        let fallos = cells[idx].fallos + 1
+        cells[idx].fallos = fallos
+        cells[idx].phase = .fallando
+        if fallos >= 3 {
+            let sec = FramePacing.nextDelayMs(consecutiveFailures: fallos) / 1000
+            cells[idx].motivo = "Sin respuesta del equipo. Reintentando cada \(sec) s."
+        }
+        if !paused { scheduleNext(cameraId: cameraId, immediate: false) }
+    }
+
+    private func stopAllPacing() {
+        for t in pacingTasks.values { t.cancel() }
+        pacingTasks.removeAll()
     }
 }

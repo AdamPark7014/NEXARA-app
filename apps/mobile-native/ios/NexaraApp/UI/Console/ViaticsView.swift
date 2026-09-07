@@ -56,7 +56,7 @@ final class ViaticsVM: ObservableObject {
                 let fallback = await ExtraRepository.shared.viaticItems()
                 items = fallback
                 if fallback.isEmpty {
-                    loadError = error.localizedDescription
+                    loadError = error.toUserMessage()
                 }
             }
             isLoading = false
@@ -170,7 +170,7 @@ struct ViaticsView: View {
             amountText = ""; motivo = ""; ticketDataUrl = nil
             vm.load(personalOnly: personalOnly)
         } catch {
-            actionMessage = "❌ \(error.localizedDescription)"
+            actionMessage = "❌ \(error.toUserMessage())"
         }
     }
 
@@ -260,6 +260,7 @@ struct ViaticsView: View {
         let status = v.displayStatus
         let color = viatStatusColor(status)
         let pending = status.lowercased() == "pendiente"
+        let approvedUnpaid = status.lowercased() == "aprobado" || status.lowercased() == "aprobada"
 
         List {
             Section {
@@ -304,6 +305,15 @@ struct ViaticsView: View {
                 }
             }
 
+            if canApprove && approvedUnpaid, v.id > 0 {
+                Section("Pago") {
+                    Button(acting ? "Marcando…" : "Marcar pagado") {
+                        Task { await markPagado(id: v.id) }
+                    }
+                    .disabled(acting)
+                }
+            }
+
             if let actionMessage {
                 Section {
                     Text(actionMessage)
@@ -332,7 +342,20 @@ struct ViaticsView: View {
             rejectNote = ""
             vm.load(personalOnly: personalOnly)
         } catch {
-            actionMessage = "❌ \(error.localizedDescription)"
+            actionMessage = "❌ \(error.toUserMessage())"
+        }
+    }
+
+    private func markPagado(id: Int64) async {
+        acting = true; actionMessage = nil
+        defer { acting = false }
+        do {
+            try await ConsoleRepository.shared.markViaticPagado(id: id)
+            actionMessage = "✅ Marcado como pagado"
+            selected = nil
+            vm.load(personalOnly: personalOnly)
+        } catch {
+            actionMessage = "❌ \(error.toUserMessage("No se pudo marcar pagado"))"
         }
     }
 

@@ -17,64 +17,15 @@ struct IntegraCapabilityRow: Identifiable, Hashable {
     var supported: Bool
 }
 
-enum IntegraDetectionDataStub {
-    static func cameras() async throws -> [IntegraDetectionCamera] {
-        let cams = try await IntegraDetectionRepository.shared.cameras()
-        return cams.map {
-            IntegraDetectionCamera(
-                id: $0.id,
-                name: $0.name,
-                region: $0.region,
-                profileEnabled: false,
-                sensitivity: nil,
-                polygonPoints: []
-            )
-        }
-    }
+private func confidenceIndex(_ key: String, options: [String]) -> Double {
+    guard let i = options.firstIndex(of: key) else { return Double(options.count / 2) }
+    return Double(i)
+}
 
-    static func capabilities() async throws -> [IntegraCapabilityRow] {
-        let rows = try await IntegraDetectionRepository.shared.siteCapabilities()
-        return rows.map { row in
-            let fd = row.capabilities.flags.first { $0.key.lowercased().contains("field") }
-            let state = fd?.state ?? .unverified
-            let label: String = {
-                switch state {
-                case .supported: return "Soportado"
-                case .unsupported: return "No"
-                case .unverified: return "Sin sondear"
-                }
-            }()
-            return IntegraCapabilityRow(
-                id: row.cameraId,
-                label: row.cameraId,
-                stateLabel: label,
-                supported: state == .supported
-            )
-        }
-    }
-
-    static func saveProfile(cameraId: String, enabled: Bool, sensitivity: Double, confidence: Double) async throws {
-        let conf: String = {
-            switch confidence {
-            case ..<25: return "low"
-            case ..<50: return "mediumLow"
-            case ..<75: return "mediumHigh"
-            default: return "high"
-            }
-        }()
-        let draft = DetectionDraft(
-            enabled: enabled,
-            sensitivity: Int(sensitivity),
-            alarmConfidence: conf,
-            detectionTarget: "human",
-            window: defaultDetectionWindow
-        )
-        _ = try await IntegraDetectionRepository.shared.saveProfile(cameraId: cameraId, draft: draft)
-    }
-
-    static func applyToDevice(cameraId: String) async throws {
-        _ = try await IntegraDetectionRepository.shared.apply(cameraId: cameraId)
-    }
+private func confidenceKey(_ index: Double, options: [String]) -> String {
+    guard !options.isEmpty else { return "mediumHigh" }
+    let i = Int(index.rounded()).clamped(to: 0...(options.count - 1))
+    return options[i]
 }
 
 // MARK: - Cameras list
@@ -145,8 +96,26 @@ struct IntegraDetectionCamerasView: View {
         isLoading = true
         errorText = nil
         defer { isLoading = false }
-        do { items = try await IntegraDetectionDataStub.cameras() }
-        catch { errorText = error.localizedDescription }
+        do {
+            let cams = try await IntegraDetectionRepository.shared.cameras()
+            var rows: [IntegraDetectionCamera] = []
+            for cam in cams {
+                let profile = try? await IntegraDetectionRepository.shared.profile(cameraId: cam.id)
+                rows.append(
+                    IntegraDetectionCamera(
+                        id: cam.id,
+                        name: cam.name,
+                        region: cam.region,
+                        profileEnabled: profile?.enabled ?? false,
+                        sensitivity: profile?.sensitivity,
+                        polygonPoints: profile?.regionPolygons.first ?? []
+                    )
+                )
+            }
+            items = rows
+        } catch {
+            errorText = error.localizedDescription
+        }
     }
 }
 
@@ -155,10 +124,19 @@ struct IntegraDetectionCamerasView: View {
 struct IntegraDetectionTuningView: View {
     let cameraId: String
 
-    @State private var camera: IntegraDetectionCamera?
+    @State private var profile: DetectionProfile?
     @State private var enabled = false
     @State private var sensitivity: Double = 50
-    @State private var confidence: Double = 50
+    @State private var confidenceIdx: Double = 2
+    @State private var target = "human"
+    @State private var windowStart = "00:00"
+    @State private var windowEnd = "23:59"
+    @State private var windowDays: Set<Int> = [0, 1, 2, 3, 4, 5, 6]
+    @State private var polygonPoints: [CGPoint] = []
+    @State private var confidenceOptions: [String] = DetectionDefaults.confidenceOrder
+    @State private var targetOptions: [String] = DetectionDefaults.targetOrder
+    @State private var sensMin: Double = 0
+    @State private var sensMax: Double = 100
     @State private var isLoading = true
     @State private var saving = false
     @State private var applying = false
@@ -166,12 +144,14 @@ struct IntegraDetectionTuningView: View {
     @State private var errorText: String?
     @State private var confirmApply = false
 
+    private let dayLabels = ["D", "L", "M", "X", "J", "V", "S"]
+
     var body: some View {
         Group {
             if isLoading {
                 ProgressView("Sintonizando…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let errorText, camera == nil {
+            } else if let errorText, profile == nil {
                 Text(errorText).foregroundStyle(.secondary).padding()
             } else {
                 Form {
@@ -179,11 +159,36 @@ struct IntegraDetectionTuningView: View {
                         Toggle("Perfil activo", isOn: $enabled)
                         VStack(alignment: .leading) {
                             Text("Sensibilidad \(Int(sensitivity))")
-                            Slider(value: $sensitivity, in: 0...100, step: 1)
+                            Slider(value: $sensitivity, in: sensMin...sensMax, step: 1)
                         }
                         VStack(alignment: .leading) {
-                            Text("Confianza \(Int(confidence))")
-                            Slider(value: $confidence, in: 0...100, step: 1)
+                            let key = confidenceKey(confidenceIdx, options: confidenceOptions)
+                            Text("Confianza: \(key)")
+                            Slider(
+                                value: $confidenceIdx,
+                                in: 0...Double(max(confidenceOptions.count - 1, 0)),
+                                step: 1
+                            )
+                            .disabled(confidenceOptions.count <= 1)
+                        }
+                        Picker("Objetivo", selection: $target) {
+                            ForEach(targetOptions, id: \.self) { Text(targetLabel($0)).tag($0) }
+                        }
+                    }
+                    Section("Horario de detección (sitio)") {
+                        TextField("Inicio HH:MM", text: $windowStart)
+                            .textInputAutocapitalization(.never)
+                        TextField("Fin HH:MM", text: $windowEnd)
+                            .textInputAutocapitalization(.never)
+                        HStack {
+                            ForEach(0..<7, id: \.self) { d in
+                                Button(dayLabels[d]) {
+                                    if windowDays.contains(d) { windowDays.remove(d) }
+                                    else { windowDays.insert(d) }
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(windowDays.contains(d) ? .teal : .gray)
+                            }
                         }
                     }
                     Section("Zona (solo lectura)") {
@@ -194,12 +199,15 @@ struct IntegraDetectionTuningView: View {
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        DetectionRegionPreview(points: camera?.polygonPoints ?? [])
+                        DetectionRegionPreview(points: polygonPoints)
                             .frame(height: 160)
                             .allowsHitTesting(false)
                     }
                     if let message {
                         Section { Text(message).foregroundStyle(NxTone.success.fg) }
+                    }
+                    if let errorText {
+                        Section { Text(errorText).foregroundStyle(NxTone.danger.fg) }
                     }
                     Section {
                         Button(saving ? "Guardando…" : "Guardar en base") {
@@ -216,7 +224,7 @@ struct IntegraDetectionTuningView: View {
                 }
             }
         }
-        .navigationTitle(camera?.name ?? "Sintonizar cámara")
+        .navigationTitle(profile?.cameraName ?? "Sintonizar cámara")
         .task { await load() }
         .confirmationDialog(
             "¿Aplicar perfil al equipo?",
@@ -232,14 +240,38 @@ struct IntegraDetectionTuningView: View {
         }
     }
 
+    private func targetLabel(_ t: String) -> String {
+        switch t {
+        case "human": return "Persona"
+        case "vehicle": return "Vehículo"
+        case "human,vehicle": return "Persona y vehículo"
+        default: return t
+        }
+    }
+
     private func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let cams = try await IntegraDetectionDataStub.cameras()
-            camera = cams.first { $0.id == cameraId }
-            enabled = camera?.profileEnabled ?? false
-            sensitivity = Double(camera?.sensitivity ?? 50)
+            let p = try await IntegraDetectionRepository.shared.profile(cameraId: cameraId)
+            profile = p
+            enabled = p.enabled
+            sensitivity = Double(p.sensitivity)
+            sensMin = Double(p.limits.sensitivityMin)
+            sensMax = Double(p.limits.sensitivityMax)
+            confidenceOptions = p.limits.alarmConfidences.isEmpty
+                ? DetectionDefaults.confidenceOrder
+                : p.limits.alarmConfidences
+            targetOptions = p.limits.detectionTargets.isEmpty
+                ? DetectionDefaults.targetOrder
+                : p.limits.detectionTargets
+            confidenceIdx = confidenceIndex(p.alarmConfidence, options: confidenceOptions)
+            target = p.detectionTarget
+            let w = p.window ?? defaultDetectionWindow
+            windowStart = w.start
+            windowEnd = w.end
+            windowDays = Set(w.days)
+            polygonPoints = p.regionPolygons.first ?? []
         } catch {
             errorText = error.localizedDescription
         }
@@ -248,12 +280,25 @@ struct IntegraDetectionTuningView: View {
     private func save() async {
         saving = true
         defer { saving = false }
-        do {
-            try await IntegraDetectionDataStub.saveProfile(
-                cameraId: cameraId, enabled: enabled,
-                sensitivity: sensitivity, confidence: confidence
+        let draft = DetectionDraft(
+            enabled: enabled,
+            sensitivity: Int(sensitivity),
+            alarmConfidence: confidenceKey(confidenceIdx, options: confidenceOptions),
+            detectionTarget: target,
+            window: DetectionWindow(
+                start: windowStart,
+                end: windowEnd,
+                days: windowDays.sorted()
             )
+        )
+        do {
+            let saved = try await IntegraDetectionRepository.shared.saveProfile(
+                cameraId: cameraId,
+                draft: draft
+            )
+            profile = saved
             message = "Guardado en base (aún no aplicado al equipo)."
+            errorText = nil
         } catch {
             errorText = error.localizedDescription
         }
@@ -263,8 +308,11 @@ struct IntegraDetectionTuningView: View {
         applying = true
         defer { applying = false }
         do {
-            try await IntegraDetectionDataStub.applyToDevice(cameraId: cameraId)
-            message = "Perfil aplicado al equipo."
+            let outcome = try await IntegraDetectionRepository.shared.apply(cameraId: cameraId)
+            message = outcome.note.isEmpty
+                ? (outcome.applied ? "Perfil aplicado al equipo." : "El servidor no confirmó la aplicación.")
+                : outcome.note
+            errorText = nil
         } catch {
             errorText = error.localizedDescription
         }
@@ -301,7 +349,7 @@ struct DetectionRegionPreview: View {
                         .fill(Color.teal.opacity(0.2))
                     )
                 } else {
-                    Text("Sin polígono de zona")
+                    Text("Sin polígono de zona (fotograma completo)")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.7))
                 }
@@ -326,6 +374,8 @@ struct IntegraDetectionCapabilitiesView: View {
     @State private var rows: [IntegraCapabilityRow] = []
     @State private var isLoading = true
     @State private var errorText: String?
+    @State private var probing = false
+    @State private var probeNote: String?
 
     var body: some View {
         Group {
@@ -340,14 +390,25 @@ struct IntegraDetectionCapabilitiesView: View {
                     subtitle: "El sondeo no devolvió filas para este parque."
                 )
             } else {
-                List(rows) { row in
-                    HStack {
-                        Text(row.label)
-                        Spacer()
-                        NxStatusChip(
-                            text: row.stateLabel,
-                            tone: row.supported ? .success : .neutral
-                        )
+                List {
+                    if let probeNote {
+                        Section { Text(probeNote).font(.caption).foregroundStyle(.secondary) }
+                    }
+                    Section {
+                        Button(probing ? "Sondeando sitio…" : "Sondear parque completo") {
+                            Task { await probeSite() }
+                        }
+                        .disabled(probing)
+                    }
+                    ForEach(rows) { row in
+                        HStack {
+                            Text(row.label)
+                            Spacer()
+                            NxStatusChip(
+                                text: row.stateLabel,
+                                tone: row.supported ? .success : .neutral
+                            )
+                        }
                     }
                 }
             }
@@ -360,7 +421,47 @@ struct IntegraDetectionCapabilitiesView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        do { rows = try await IntegraDetectionDataStub.capabilities() }
-        catch { errorText = error.localizedDescription }
+        do {
+            let caps = try await IntegraDetectionRepository.shared.siteCapabilities()
+            rows = caps.map { row in
+                let fd = row.capabilities.flags.first {
+                    $0.key.lowercased().contains("field") || $0.key == "fieldDetection"
+                }
+                let state = fd?.state ?? .unverified
+                let label: String = {
+                    switch state {
+                    case .supported: return "Soportado"
+                    case .unsupported: return "No"
+                    case .unverified: return "Sin sondear"
+                    }
+                }()
+                return IntegraCapabilityRow(
+                    id: row.cameraId,
+                    label: row.cameraId,
+                    stateLabel: label,
+                    supported: state == .supported
+                )
+            }
+        } catch {
+            errorText = error.localizedDescription
+        }
+    }
+
+    private func probeSite() async {
+        probing = true
+        defer { probing = false }
+        do {
+            let outcome = try await IntegraDetectionRepository.shared.probeSite()
+            probeNote = "Sondeo: \(outcome.ok)/\(outcome.total) OK"
+            await reload()
+        } catch {
+            errorText = error.localizedDescription
+        }
+    }
+}
+
+private extension Int {
+    func clamped(to range: ClosedRange<Int>) -> Int {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }

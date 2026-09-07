@@ -20,6 +20,16 @@ struct EvidencesView: View {
     @State private var rejectNotes = ""
     @State private var reviewingId: Int64?
     @State private var reviewMessage: String?
+    @State private var resetFullFlow = false
+    @State private var rejectedSteps: Set<String> = []
+
+    private let rejectStepOptions: [(String, String)] = [
+        ("ENTRY_PHOTO", "Paso 1: Foto de Entrada"),
+        ("EVIDENCE_PHOTOS", "Paso 2: Fotos de Evidencia"),
+        ("SERVICE_SHEET_PDF", "Paso 3: PDF Hoja de Servicio"),
+        ("SERVICE_SHEET_DATA", "Paso 4: Plantilla Interna"),
+        ("EXIT_PHOTO", "Paso 5: Foto de Salida"),
+    ]
 
     private var statuses: [String] {
         var s = Set(rows.map(\.status).filter { !$0.isEmpty })
@@ -184,15 +194,40 @@ struct EvidencesView: View {
             .disabled(reviewMode)
 
             if canReview {
-                TextField("Motivo de rechazo (requerido para rechazar)", text: $rejectNotes, axis: .vertical)
-                    .lineLimit(2...4)
-                    .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Rechazo: pasos a corregir").font(.caption).bold()
+                    Toggle("Rehacer todo desde cero", isOn: Binding(
+                        get: { resetFullFlow },
+                        set: { newValue in
+                            resetFullFlow = newValue
+                            if newValue { rejectedSteps = [] }
+                        }
+                    ))
+                    .font(.footnote)
                     .disabled(acting == true)
-                NxDecisionActions(
-                    acting: acting == true,
-                    onApprove: { Task { await approve(row.activityId) } },
-                    onReject: { Task { await reject(row.activityId) } }
-                )
+                    if !resetFullFlow {
+                        ForEach(rejectStepOptions, id: \.0) { value, label in
+                            Toggle(label, isOn: Binding(
+                                get: { rejectedSteps.contains(value) },
+                                set: { on in
+                                    if on { rejectedSteps.insert(value) }
+                                    else { rejectedSteps.remove(value) }
+                                }
+                            ))
+                            .font(.caption)
+                            .disabled(acting == true)
+                        }
+                    }
+                    TextField("Motivo de rechazo (requerido para rechazar)", text: $rejectNotes, axis: .vertical)
+                        .lineLimit(2...4)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(acting == true)
+                    NxDecisionActions(
+                        acting: acting == true,
+                        onApprove: { Task { await approve(row.activityId) } },
+                        onReject: { Task { await reject(row.activityId) } }
+                    )
+                }
             }
         }
         .padding(12)
@@ -215,9 +250,11 @@ struct EvidencesView: View {
             )
             reviewMessage = "✅ Evidencia aprobada"
             rejectNotes = ""
+            resetFullFlow = false
+            rejectedSteps = []
             await reload()
         } catch {
-            reviewMessage = "❌ \(error.localizedDescription)"
+            reviewMessage = "❌ \(error.toUserMessage())"
         }
     }
 
@@ -225,6 +262,10 @@ struct EvidencesView: View {
         let notes = rejectNotes.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !notes.isEmpty else {
             reviewMessage = "❌ Indica el motivo del rechazo"
+            return
+        }
+        guard resetFullFlow || !rejectedSteps.isEmpty else {
+            reviewMessage = "❌ Elige pasos a corregir o «Rehacer todo»"
             return
         }
         guard let reviewerId = Int64(SessionStore.shared.currentUser?.id ?? "") else {
@@ -238,13 +279,19 @@ struct EvidencesView: View {
             try await ConsoleRepository.shared.rejectEvidence(
                 activityId: activityId,
                 reviewerId: reviewerId,
-                notes: notes
+                notes: notes,
+                rejectedSteps: resetFullFlow ? nil : Array(rejectedSteps),
+                resetFullFlow: resetFullFlow
             )
-            reviewMessage = "✅ Evidencia rechazada — el técnico debe corregir"
+            reviewMessage = resetFullFlow
+                ? "✅ Flujo completo a rehacer"
+                : "✅ Evidencia rechazada — el técnico debe corregir"
             rejectNotes = ""
+            resetFullFlow = false
+            rejectedSteps = []
             await reload()
         } catch {
-            reviewMessage = "❌ \(error.localizedDescription)"
+            reviewMessage = "❌ \(error.toUserMessage())"
         }
     }
 
@@ -317,14 +364,14 @@ struct EvidencesView: View {
                 rows = try await hist
                 myActivities = (try? await acts) ?? []
             }
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = error.toUserMessage() }
     }
 
     private func openActivity(_ id: Int64) async {
         selectedActivityId = id
         uploadMessage = nil
         do { evidence = try await ConsoleRepository.shared.evidenceDetailItem(activityId: id) }
-        catch { uploadMessage = "❌ \(error.localizedDescription)" }
+        catch { uploadMessage = "❌ \(error.toUserMessage())" }
     }
 
     private func submitStep(_ key: String, activityId: Int64, media: [CapturedMedia]) async {
@@ -367,13 +414,13 @@ struct EvidencesView: View {
             }
             evidence = try await ConsoleRepository.shared.evidenceDetailItem(activityId: activityId)
             await reload()
-        } catch { uploadMessage = "❌ \(error.localizedDescription)" }
+        } catch { uploadMessage = "❌ \(error.toUserMessage())" }
     }
 
     private func downloadReport(_ activityId: Int64) async {
         do {
             reportData = try await ConsoleRepository.shared.ticketReportPdf(activityId: activityId)
-        } catch { uploadMessage = "❌ No se pudo descargar el PDF" }
+        } catch { uploadMessage = "❌ \(error.toUserMessage("No se pudo descargar el PDF"))" }
     }
 }
 
