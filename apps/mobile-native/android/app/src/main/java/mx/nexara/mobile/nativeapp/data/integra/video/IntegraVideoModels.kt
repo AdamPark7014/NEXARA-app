@@ -93,11 +93,19 @@ data class IntegraCamera(
      * Misma regla que el muro web (`onlineish`): el espejo guarda el estado tal
      * como lo dio el equipo y hay sitios que no lo reportan. Un estado ausente
      * NO es una cámara caída — tratarlo como caída escondería cámaras que sí ven.
+     *
+     * Moshi entrega enteros JSON como Double; `Map.str` los deja en `"1.0"`.
+     * En JS `String(1)` es `"1"`; aquí hay que normalizar el número.
      */
     val online: Boolean
-        get() = when (status?.trim()?.lowercase()) {
-            null, "", "1", "online" -> true
-            else -> false
+        get() {
+            val s = status?.trim()?.lowercase().orEmpty()
+            when (s) {
+                "", "1", "online" -> return true
+                "0", "offline" -> return false
+            }
+            s.toDoubleOrNull()?.let { return it.toInt() == 1 }
+            return false
         }
 
     companion object {
