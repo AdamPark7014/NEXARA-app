@@ -36,14 +36,21 @@ puede hacer por ti.
 
 ### 1. Alta en el Apple Developer Program — 99 USD/año
 
-<https://developer.apple.com/programs/enroll/>
+**Hecho el 2026-09-07, por la vía de organización.** Enrollment ID
+`49J96Q3WQ3`, entidad «New Engineering Expertise And Resource Advancement»,
+D-U-N-S 951814054. **En verificación.**
 
-Como persona física es inmediato. Como empresa piden el número **D-U-N-S** y
-tarda de días a semanas; si hay prisa, empieza como persona física y transfiere
-la app después.
+Ojo con el orden, porque no es el de la vía de persona física: Apple primero
+verifica que el solicitante tiene autoridad para firmar contratos por la
+entidad —correo, y a veces una llamada— y **solo después** manda el enlace para
+completar el alta, que es donde se paga. Hasta ese correo no hay nada que hacer
+en el portal, porque el portal aún no existe para esta cuenta.
 
-Al terminar, apunta el **Team ID**: 10 caracteres, esquina superior derecha de
-<https://developer.apple.com/account>.
+Si pasan diez días hábiles sin noticias, reclamar en
+<https://developer.apple.com/contact/> con el Enrollment ID.
+
+Cuando esté activa, apunta el **Team ID**: 10 caracteres, esquina superior
+derecha de <https://developer.apple.com/account>.
 
 ### 2. Clave de la API de App Store Connect
 
@@ -80,12 +87,23 @@ guion te diga. Luego:
 La clave privada se queda en `C:\dev\secrets\nexara-ios` y no entra nunca al
 repositorio.
 
-### 4. Registrar la app en App Store Connect
+### 4. Registrar el identificador y dar de alta la app
 
-<https://appstoreconnect.apple.com/apps> → **+** → Nueva app.
+Van en este orden: el formulario de app nueva solo ofrece identificadores que ya
+existan, así que primero el identificador.
+
+**a) El identificador** —
+<https://developer.apple.com/account/resources/identifiers/add/bundleId>
+
+- Tipo: **App IDs** → **App**
+- Bundle ID: **Explicit**, `mx.nexara.mobile.NexaraApp`
+- Capacidades: marcar **Push Notifications**. Sin esto la firma falla luego con
+  «Provisioning profile doesn't include aps-environment».
+
+**b) La app** — <https://appstoreconnect.apple.com/apps> → **+** → Nueva app.
 
 - Plataforma: iOS
-- Identificador de paquete: `mx.nexara.mobile.NexaraApp`
+- Identificador de paquete: el que acabas de crear
 - SKU: `nexara-mobile`
 
 ### 5. Cargar los secretos
@@ -104,7 +122,7 @@ la carpeta de secretos.
 Desde la pestaña **Actions** del repositorio, flujo *iOS · TestFlight*, o bien:
 
 ```powershell
-gh workflow run "iOS - TestFlight" --repo AdamPark7014/NEXARA-app -f version=1.0.0 -f subir=true
+gh workflow run ios-testflight.yml --repo AdamPark7014/NEXARA-app -f version=1.0.0 -f subir=true
 ```
 
 La primera vez conviene lanzarlo con `subir=false`: compila y firma pero no

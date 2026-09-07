@@ -118,6 +118,6 @@ foreach ($n in $secretos.Keys) {
 
 Write-Host ""
 Write-Host "Hecho. Lanza la construccion con:" -ForegroundColor Green
-Write-Host "  gh workflow run 'iOS - TestFlight' --repo $Repo -f version=1.0.0 -f subir=true" -ForegroundColor White
+Write-Host "  gh workflow run ios-testflight.yml --repo $Repo -f version=1.0.0 -f subir=true" -ForegroundColor White
 Write-Host "o desde la pestana Actions del repositorio."
 Write-Host ""
