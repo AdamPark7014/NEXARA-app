@@ -13,7 +13,7 @@ package mx.nexara.mobile.nativeapp.ui.integra.schedules
  * composable(SchedulesRoutes.SCHEDULES) { IntegraSchedulesScreen() }
  * composable(SchedulesRoutes.ESPACIOS) {
  *     IntegraEspaciosScreen(
- *         onOpenSchedulesForDoor = { doorId ->
+ *         onOpenSchedules = { doorId ->
  *             nav.navigate(SchedulesRoutes.schedulesForDoor(doorId)) { launchSingleTop = true }
  *         },
  *     )

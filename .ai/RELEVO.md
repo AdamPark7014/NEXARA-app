@@ -1,6 +1,6 @@
 # RELEVO
 
-- **Último turno:** claude-code
+- **Último turno:** cursor
 - **Fecha:** 2026-09-06
 - **Rama:** mejora/calidad-y-web
 
@@ -8,148 +8,108 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Auditoría de 12 áreas y remediación de lo que quedó vivo
+## Este turno — Rescate del ejército paralelo INTEGRA + compilación verde
 
-Adam reportó cuatro cosas: (1) en la web, loguearte en un subdominio no te
-deja ahí; (2) todos los roles salvo el más alto ven muy pocos módulos; (3) en
-la app móvil un usuario veía «error 502» y ni cargaba su dashboard; (4) la
-asistencia en el móvil es un clic cuando en la web es un proceso con foto.
+Siete agentes construyeron en paralelo paquetes nuevos (`ui/integra/{video,vehicles,schedules,detection,governance}` + data). El límite de sesión dejó WIP a medias. Cursor rescató, cerró huecos de compilación y dejó los contratos de cableado listos para Adam.
 
-Se barrieron 12 áreas con agentes en paralelo. **Los 12 informes están en
-`.ai/auditoria-2026-09/`** y son la referencia detallada de todo lo de abajo.
+### Commits de este hilo
 
-**Aviso metodológico para quien entre:** los informes 01-13 se escribieron
-ANTES del turno de remediación de cursor (`181cc218` y anteriores). Varias
-de sus conclusiones ya no se sostienen. La sección «Remediación 2026-09-06
-(post-Cursor)» al final de los informes 02 y 06, y los informes 10 y 14
-completos, sí reflejan el estado actual.
+1. **`6eed0292`** — Rescate WIP del ejército (26 paths: data+UI de los 5 paquetes nuevos + paridad fuera de INTEGRA).
+2. **`46e4f2d5`** — Fixes de compilación: `DetectionContract` (`const val`), Access unificado en `IntegraAccessScreen.kt`, `IntegraEspaciosScreen` + `IntegraMyProfileScreen`, `IntegraScreens` alineado al repo (`pushEvents`, attendance Instant, `RecurringResult`/`OccupancyResult`).
+3. **Este cierre** — `online` de cámaras acepta Double Moshi (`1.0`); comentario `SchedulesRoutes` ↔ `onOpenSchedules`; RELEVO con contratos.
 
-### Lo que se cerró (5 commits)
+### Verificado
 
-1. **`e2f0e9f8` — El árbol no compilaba, y el login te expulsaba.**
-   `activity-evidence.service.ts` pedía `isSuperAdmin` en un `select` de
-   Prisma; ese campo no es columna de `User`, se calcula en el JWT. El otro
-   error del typecheck (`notes` en `ClientTicketRequest`) era un cliente de
-   Prisma rancio, no un bug: el campo existe y tiene migración.
-   `PanelLogin` sólo respetaba el subdominio si era `integra` o `lab`,
-   cableado en cuatro sitios; ahora usa `detectCurrentPanelId()`, que ya
-   mapeaba los 15.
+- `:app:compileDebugKotlin` OK
+- Tests INTEGRA data: **125** (detection 31, vehicles 57, video 37) — 0 fallos
+- **No se tocó** `IntegraNavHost.kt` ni `ModuleCatalog.kt` ni `ModulePanelMap.kt` (regla del ejército)
 
-2. **`ea4b64c7` — Android dejaba de adivinar el rol por su nombre.**
-   `PanelAccessResolver` decidía con `contains("rh")`, `contains("ingenier")`
-   sobre el nombre VISIBLE del rol. Nuevo `access/RolePanelMatrix.kt` por
-   igualdad exacta. `accessiblePanels()` es una cadena explícita que nunca
-   devuelve cero paneles. Y el bug que tapaba los módulos ya recuperados:
-   `normalizedConsolePath` sólo pelaba `/console` y `/operacion`, así que
-   `chat` (`/erp/chat`) y `dispatch` (`/ops/dispatch`) eran invisibles pese a
-   estar en el menú y en el mapa.
+---
 
-3. **`9777594d` — El AAB llevaba 6 días caducado.** Bundle del 31-08 contra
-   fuente del 06-09, con `versionCode 5` y sin ninguna ola de paridad. El
-   smoke lo aprobaba porque sólo miraba que el fichero existiera. Reglas de
-   ProGuard por forma de nombre (antes funcionaban por casualidad),
-   preflight que aborta `bundleRelease` si falta firma/VERSION_CODE/clave de
-   Maps, y `data_extraction_rules.xml` — `allowBackup=false` no corta la
-   transferencia D2D en Android 12+.
+## INTEGRA móvil — estado real (corrige el 0 % del turno claude-code)
 
-4. **`a8ccc72a` — La comida estaba 6 h corrida y el retraso inflado en 1 h.**
-   `setHours` en contenedor UTC, en tres sitios (servicio, cron, y los dos
-   `@Cron` sin `timeZone`). El retraso se medía contra las 15:00 cuando la
-   condición es rebasar las 16:00. Además: coordenadas `0,0` que se
-   guardaban pese al guard, `locationConsent = true` incondicional desde dos
-   fuentes, fichajes del móvil registrados como «Escritorio · PC», y
-   `gps.service.ts::getTodayDateOnly` comparando 06:00 UTC contra una
-   columna `@db.Date` — igualdad SIEMPRE falsa, `GET /gps/team` llevaba
-   devolviendo lista vacía en silencio.
+**No está al 0 %.** Ya hay 10 módulos vivos cableados en NavHost + ~9 paquetes nuevos sin cablear.
 
-5. **`049c868d` — El super admin veía 1 módulo de 103.** Mediana por rol
-   19 → 29. La causa no era `user-access.ts:111` (ese amplía, no reduce):
-   eran tres capas que se intersectan y la tercera (`url-matrix` vía
-   `/me/navigation`) era más estrecha que `PAGE_MATRIX` en 9 de 17 roles.
-   `denyL3 = 0` en los 17. Los globs rotos no eran `/crm/quotes/**` sino los
-   paths desnudos, que abrían el listado y bloqueaban la ficha.
+### Los 10 vivos (NavHost + catálogo)
 
-**Estado verificado:** typecheck web+api limpio · **911 pruebas de API** ·
-**608 de web** · `:app:compileDebugKotlin` OK · 93 pruebas de Android ·
-`check-app-web-parity.py` OK. Redes nuevas donde no había ninguna: 49
-pruebas en `role-modules.spec.ts` (importa `URL_MATRIX` de verdad desde
-`apps/api`), 39 sobre `PanelAccessResolver`/`ConsoleAccessRules`, 13 sobre la
-ventana de comida con guarda de regresión que falla si reaparece `setHours`.
+| Clave | Ruta | Profundidad honesta |
+|---|---|---|
+| `integra-home` | `integra/home` | Hub de tarjetas |
+| `integra-access` | `integra/access` | **NATIVO** — listado, live/mirror, control puerta con motivo (`IntegraAccessScreen`) |
+| `integra-events` | `integra/events` | Lectura push events |
+| `integra-people` | `integra/people` + detalle | **NATIVO** — CRUD, cara upload/delete |
+| `integra-attendance` | `integra/attendance` | Lectura por rango Instant |
+| `integra-visitors` | `integra/visitors` | Lectura + registro recurrente |
+| `integra-alarms` | `integra/alarms` | Lectura + ack selección |
+| `integra-occupancy` | `integra/occupancy` | Lectura `OccupancyResult` |
+| `integra-devices` | `integra/devices` | Lectura equipos |
+| `integra-sites` | `integra/sites` | Catálogo dice SOLO_LECTURA; el paquete detection trae Settings NATIVO sin cablear |
 
-## A medias / decisiones de Adam
+`PanelId.INTEGRA` ya existe. Arquitectura limpia (rutas / VM / repo). No hace falta cimientos.
 
-1. **P0 SIN DESPLEGAR — lo primero.** `https://integra.nexara.com.mx/go2rtc/api/streams`
-   responde **200 desde fuera**, con las credenciales RTSP de las cámaras en
-   claro. El parche está en la rama (`deploy/traefik/nexara.yml`), Traefik de
-   producción no lo ha cargado. Orden obligatorio: desplegar → confirmar 404
-   → **entonces** rotar contraseñas. Checklist en
-   `.ai/auditoria-2026-09/13-w0-verificacion-prod.md`.
-2. **Recompilar el AAB.** Y confirmar en Play Console el `versionCode` real:
-   el 7 del repo es una suposición y Play no reutiliza un código ya subido.
-3. **Data Safety desactualizado.** Analytics salió, Crashlytics entró:
-   «Interacciones en la app» → No, añadir «Registros de fallos» y
-   «Diagnósticos», «ID de publicidad» → No. Borrador en
-   `docs/PLAY-STORE-CHECKLIST.md`.
-4. **Datos históricos falsos — sólo Adam decide.** Las notas de retraso de
-   comida se escribieron infladas en 60 min y con la ventana 6 h corrida;
-   hay coordenadas `0,0` y consentimientos que nadie otorgó. Consultas SQL
-   de SOLO LECTURA para dimensionarlo en
-   `.ai/auditoria-2026-09/14-integridad-datos-remediacion.md`. Límite
-   honesto: los consentimientos falsos **no se pueden distinguir con
-   certeza** de los reales porque nunca hubo bitácora de ese cambio.
-5. **Ampliaciones de acceso propuestas y NO aplicadas** porque tocan
-   facturación fiscal, contabilidad, nómina o alta de usuarios. Lista
-   completa en `.ai/auditoria-2026-09/02-rbac-web-modulos-por-rol.md`.
-6. **Efecto visible al desplegar:** quien nunca haya tocado el interruptor de
-   GPS dejará de aparecer en el mapa del equipo. Es correcto; conviene
-   avisarlo antes.
+### Paquetes nuevos listos — Adam cablea (NO tocar NavHost/Catalog desde agentes)
 
-## Abierto, con dueño claro para el siguiente turno
+#### 1. Video — `IntegraVideoRoutes`
 
-- **INTEGRA en el móvil = 0 %.** 18 módulos en web, cero pantallas en
-  Android; la palabra «integra» aparece una vez en los 202 ficheros Kotlin.
-  Es el hueco más grande de la v2. Ahí dentro está la asistencia por control
-  de acceso, que es nómina. Ver informe 05.
-- **`DELETE devices/push-token`** declarado en Android y ausente en la API.
-- **Android no manda `X-Company-Id`** — multi-empresa frágil.
-- **MFA rompe el login**: la API responde `401 MFA_REQUIRED` y Android lo
-  traduce a «Correo o contraseña incorrectos»; no hay pantalla de código.
-- **Sin refresh de sesión**: existe `POST auth/session/extend` en la API y
-  cero llamadas desde Kotlin. A las 4 h se pierde el trabajo en curso.
-- **`?_nxt=` es un portón abierto.** `middleware.ts:294` deja pasar sin
-  sesión con que el parámetro EXISTA, y `UserContext.tsx:404` confía en un
-  base64 SIN FIRMA para fijar la identidad. Los datos siguen protegidos por
-  la cookie HttpOnly, así que no es robo de cuenta, pero hay que firmarlo o
-  cambiarlo por un intercambio contra la API.
-- **`ing_soporte`, `arquitecto` y 4 hallazgos de Kotlin de Play** (insets
-  edge-to-edge con `targetSdk 36`, cámara en API 24-28, fallback sin cifrar
-  de `SessionStore`, `android/base/manifest/` versionado como basura de
-  build). Detalle en el informe 10.
-- **Tres «fuentes únicas de verdad»** (`access-matrix`, `page-matrix`,
-  `url-matrix`) que no se importan entre sí. `role-modules.spec.ts` ya las
-  ata con pruebas, pero la unificación real sigue pendiente.
+| | |
+|---|---|
+| Rutas | `integra/video`, `integra/video/{cameraId}` |
+| Clave | `integra-video` |
+| Pantallas | `IntegraVideoWallScreen`, `IntegraCameraDetailScreen` |
+| Honestidad | Rejilla + preview autorregulada, PTZ presets, captura. **Sin badge «EN VIVO»**. No MSE/go2rtc WebSocket en móvil. |
 
-## Corregido de la auditoría (no perseguir fantasmas)
+#### 2. Vehículos / ANPR — `IntegraVehiclesRoutes` + `integraVehiclesGraph()`
 
-- `me.service.ts` **NO** lee el rol crudo: `mapSessionUser:692` resuelve con
-  `resolveEffectiveRoleKey`. `/me/navigation` sí gobierna para usuarios
-  antiguos.
-- `chat`, `dispatch` y `recruiting` **ya no son huérfanos** — cursor los
-  recuperó; lo que faltaba era el filtro de path que los tapaba.
-- **No hay ni un WebView** en la app Android. El problema de sesión web no
-  contamina al móvil: son dos problemas separados.
-- Crashlytics **ya está integrado**. La v2 no sale a ciegas.
-- `docs/native-parity-matrix.md` **miente**: 68 ✅ sin advertencias, 13 de
-  ellos son módulos de sólo lectura y 3 inalcanzables; no tiene sección de
-  INTEGRA y compara contra `apps/mobile`, una app ya borrada del repo.
-- `apps/api/tsconfig.json:17` tiene `incremental: true` sin
-  `tsBuildInfoFile`: **el typecheck local puede dar errores fantasma** en
-  líneas que no existen. Borra el `.tsbuildinfo` antes de creerte nada.
+| | |
+|---|---|
+| Rutas | `integra/vehicles`, `integra/anpr` |
+| Claves | `integra-vehicles`, `integra-anpr` |
+| Cableado | Una línea: `integraVehiclesGraph()` dentro del NavHost; `routeParaClave` / `tituloDe` |
+
+#### 3. Horarios / Espacios — `SchedulesRoutes`
+
+| | |
+|---|---|
+| Rutas | `integra/schedules`, `integra/espacios`, `integra/schedules/door/{doorId}` |
+| Claves | `integra-schedules`, `integra-espacios` |
+| Callback | `IntegraEspaciosScreen(onOpenSchedules = { … })` — **no** `onOpenSchedulesForDoor` |
+| Door id | Codificar `|` con `schedulesForDoor()` / `decodeRouteArg` |
+
+#### 4. Detección / Ajustes — `IntegraDetectionRoutes`
+
+| | |
+|---|---|
+| Rutas | `integra/detection`, `…/camera/{id}`, `…/capabilities`, `integra/settings`, `…/new`, `…/site/{siteId}` |
+| Claves | `integra-detection` (nueva), `integra-sites` (subir catálogo a NATIVO) |
+| Honestidad | Polígonos de zona = **solo lectura** en móvil; resto escribe |
+
+#### 5. Gobierno — `IntegraGovernanceRoutes`
+
+| | |
+|---|---|
+| Rutas | `integra/audit`, `integra/notifications-center`, `integra/my-profile` |
+| Claves | `integra-audit`, `integra-notifications`, `integra-my-profile` |
+| Helpers | `rutaDeClave`, `tituloDeRuta` |
+
+### Checklist cableado Adam (cuando lo haga)
+
+1. `ModulePanelMap.INTEGRA_KEYS` — añadir las claves nuevas de arriba.
+2. `ModuleCatalog.integra` — entradas + `parityStatus` honesto (sites → NATIVO si cablea Settings).
+3. `IntegraNavHost` — composables + `integraRouteForKey` + títulos top bar.
+4. Deep links opcionales en `DeepLinkParser`.
+
+---
+
+## A medias / decisiones de Adam (heredado + vivo)
+
+1. **P0 SIN DESPLEGAR** — go2rtc streams expuestos con RTSP en claro. Traefik en rama; prod no cargó. Rotar passwords **después** del 404.
+2. **Recompilar AAB** + confirmar `versionCode` en Play.
+3. **Data Safety** desactualizado (Crashlytics vs Analytics).
+4. **Datos históricos falsos** (comida/GPS) — sólo Adam decide limpia.
+5. **Cablear NavHost/Catalog** de los 5 paquetes (este turno no lo tocó a propósito).
+6. **Mapa + dashboard INTEGRA** — aún sin agente; lanzar cuando haya capacidad.
+7. MFA móvil, refresh sesión, `X-Company-Id`, `DELETE push-token`, `?_nxt=` — siguen abiertos del informe 10/auditoría.
 
 ## No tocar
 
-Puente NAS. Traefik y credenciales sin permiso de Adam. Face ID óptico
-inventado. Provider ISAPI. No inventar ANPR/FieldDetection en la PTZ .179.
-No hls.js por CDN — la CSP no lo lleva y ya está en `package.json`.
-iOS está fuera del alcance de la v2: 131 ficheros Swift reales, pero sin
-`.xcodeproj` (XcodeGen, requiere Mac), nunca compilado ni firmado.
+Puente NAS. Traefik/credenciales sin permiso. Face ID óptico inventado. Provider ISAPI. No inventar ANPR/FieldDetection en PTZ .179. No hls.js CDN. No fingir «EN VIVO» en preview. iOS fuera de v2.
