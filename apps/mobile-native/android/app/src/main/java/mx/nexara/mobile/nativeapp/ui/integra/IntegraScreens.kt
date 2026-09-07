@@ -102,198 +102,8 @@ private fun nestedPerson(root: Map<String, Any?>): Map<String, Any?> {
     }
 }
 
-// ── Access (doors) ────────────────────────────────────────────────────────────
 
-data class IntegraAccessUiState(
-    val loading: Boolean = true,
-    val isRefreshing: Boolean = false,
-    val error: String? = null,
-    val message: String? = null,
-    val items: List<Map<String, Any?>> = emptyList(),
-    val selected: Map<String, Any?>? = null,
-    val reason: String = "",
-    val acting: Boolean = false,
-)
-
-class IntegraAccessViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = IntegraRepository(app.applicationContext)
-    private val _state = MutableStateFlow(IntegraAccessUiState())
-    val state: StateFlow<IntegraAccessUiState> = _state
-
-    init { refresh() }
-
-    fun setReason(v: String) = _state.update { it.copy(reason = v, message = null) }
-    fun select(item: Map<String, Any?>?) = _state.update { it.copy(selected = item, message = null) }
-
-    fun refresh(initial: Boolean = true) {
-        _state.update {
-            it.copy(
-                loading = initial && it.items.isEmpty(),
-                isRefreshing = !initial,
-                error = null,
-            )
-        }
-        viewModelScope.launch {
-            try {
-                val list = withContext(Dispatchers.IO) { repo.doors() }
-                _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        loading = false,
-                        isRefreshing = false,
-                        error = e.toUserMessage("No se pudieron cargar las puertas"),
-                    )
-                }
-            }
-        }
-    }
-
-    fun openSelected() {
-        val door = _state.value.selected ?: return
-        val id = str(door, "id", "doorIndexCode", "doorId")
-        val reason = _state.value.reason.trim()
-        if (id.isBlank()) {
-            _state.update { it.copy(error = "Puerta sin identificador") }
-            return
-        }
-        if (reason.length < 3) {
-            _state.update { it.copy(error = "Indica un motivo de al menos 3 caracteres") }
-            return
-        }
-        _state.update { it.copy(acting = true, error = null, message = null) }
-        viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) { repo.openDoor(id, reason) }
-                _state.update {
-                    it.copy(
-                        acting = false,
-                        message = "Puerta abierta: ${str(door, "name", "doorName")}",
-                        selected = null,
-                        reason = "",
-                    )
-                }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        acting = false,
-                        error = e.toUserMessage("No se pudo abrir la puerta"),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun IntegraAccessScreen(vm: IntegraAccessViewModel = viewModel()) {
-    val s by vm.state.collectAsState()
-    val selected = s.selected
-
-    if (selected != null) {
-        LazyColumn(
-            Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            item {
-                Text(
-                    str(selected, "name", "doorName"),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-            }
-            item { IntegraDetailLine("Ubicación", str(selected, "location", "regionName")) }
-            item {
-                val online = bool(selected, "online") ?: true
-                IntegraDetailLine("Estado", if (online) "En línea" else "Fuera de línea")
-            }
-            item { IntegraDetailLine("Estado puerta", str(selected, "status", "doorState")) }
-            item {
-                OutlinedTextField(
-                    value = s.reason,
-                    onValueChange = vm::setReason,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Motivo de apertura") },
-                    minLines = 2,
-                )
-            }
-            item {
-                Button(
-                    onClick = vm::openSelected,
-                    enabled = !s.acting,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (s.acting) "Abriendo…" else "Abrir puerta")
-                }
-            }
-            item {
-                OutlinedButton(onClick = { vm.select(null) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Cancelar")
-                }
-            }
-            s.message?.let { msg ->
-                item { Text(msg, color = NxColors.Success) }
-            }
-            s.error?.let { err ->
-                item { Text(err, color = NxColors.Danger) }
-            }
-        }
-        return
-    }
-
-    PullToRefreshBox(
-        isRefreshing = s.isRefreshing,
-        onRefresh = { vm.refresh(initial = false) },
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        when {
-            s.loading -> NxLoadingBlock("Cargando puertas…")
-            s.error != null && s.items.isEmpty() -> NxErrorBlock(s.error!!) { vm.refresh() }
-            s.items.isEmpty() -> NxEmptyState("Sin puertas", "No hay puertas configuradas en Integra.")
-            else -> LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                s.message?.let { msg ->
-                    item { Text(msg, color = NxColors.Success, modifier = Modifier.padding(bottom = 4.dp)) }
-                }
-                s.error?.let { err ->
-                    item { Text(err, color = NxColors.Danger, modifier = Modifier.padding(bottom = 4.dp)) }
-                }
-                items(s.items, key = { str(it, "id", "doorIndexCode") }) { door ->
-                    val online = bool(door, "online") ?: true
-                    Card(
-                        onClick = { vm.select(door) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = NxColors.Card),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    str(door, "name", "doorName"),
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    str(door, "location", "regionName"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = NxColors.Muted,
-                                )
-                            }
-                            NxStatusChip(
-                                if (online) "En línea" else "Offline",
-                                if (online) NxTone.Success else NxTone.Neutral,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+// Acceso (puertas): ver IntegraAccessScreen.kt (profundización).
 
 // ── Events ────────────────────────────────────────────────────────────────────
 
@@ -320,7 +130,7 @@ class IntegraEventsViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             try {
-                val list = withContext(Dispatchers.IO) { repo.events() }
+                val list = withContext(Dispatchers.IO) { repo.pushEvents().items }
                 _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
                 _state.update {
@@ -841,7 +651,9 @@ class IntegraAttendanceViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             try {
-                val list = withContext(Dispatchers.IO) { repo.attendance(_state.value.days) }
+                val end = Instant.now()
+                val start = end.minus(_state.value.days.toLong(), ChronoUnit.DAYS)
+                val list = withContext(Dispatchers.IO) { repo.attendance(from = start, to = end) }
                 _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
                 _state.update {
@@ -957,7 +769,7 @@ class IntegraVisitorsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val appts = withContext(Dispatchers.IO) { repo.visitorAppointments() }
-                val rec = runCatching { withContext(Dispatchers.IO) { repo.recurringVisitors() } }
+                val rec = runCatching { withContext(Dispatchers.IO) { repo.recurringVisitors().items } }
                     .getOrDefault(emptyList())
                 _state.update {
                     it.copy(
@@ -1480,8 +1292,15 @@ class IntegraOccupancyViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             try {
-                val (items, total) = withContext(Dispatchers.IO) { repo.occupancy() }
-                _state.update { it.copy(loading = false, isRefreshing = false, items = items, total = total) }
+                val result = withContext(Dispatchers.IO) { repo.occupancy() }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        items = result.items,
+                        total = result.total,
+                    )
+                }
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
