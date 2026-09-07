@@ -144,6 +144,7 @@ enum ModuleCatalog {
         ModuleEntry("proyectos", "Proyectos", "🧩", "/contabilidad/proyectos"),
         ModuleEntry("work-projects", "Proyectos internos", "🧱", "/contabilidad/work-projects"),
         ModuleEntry("multas", "Multas", "⚠️", "/contabilidad/multas"),
+        ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat"),
     ]
 
     static let studio: [ModuleEntry] = [
@@ -156,6 +157,7 @@ enum ModuleCatalog {
         ModuleEntry("newsletter", "Newsletter", "📬", "/studio/newsletter"),
         ModuleEntry("contacts", "Contactos", "✉️", "/studio/contacts"),
         ModuleEntry("leads", "Leads", "✨", "/studio/leads"),
+        ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat"),
     ]
 
     static let web: [ModuleEntry] = studio

@@ -234,6 +234,9 @@ struct ModuleRouter {
             LabAiSandboxView()
         case (.lab, "dashboard"), (.lab, "lab-home"):
             LabTabView(onExit: {})
+        // ── INTEGRA: un solo host con NavigationStack interno
+        case (.integra, let key):
+            IntegraRootView(initialKey: key == "integra-home" || key == "home" ? nil : key)
         default:
             PlaceholderView(title: key)
         }
