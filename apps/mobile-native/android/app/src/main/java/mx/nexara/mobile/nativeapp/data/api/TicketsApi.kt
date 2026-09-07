@@ -117,6 +117,21 @@ data class ClientPortalTicketDto(
         return !s.contains("finaliz") && !s.contains("cerrad") && !s.contains("complet") && !s.contains("cancel")
     }
 
+    /**
+     * Finalizada de verdad, que no es lo mismo que «no abierta».
+     *
+     * El API sólo acepta confirmar la resolución o pedir reapertura cuando el
+     * estatus es exactamente **FINALIZADA** (`activity-status.ts::isFinishedStatus`,
+     * que descarta `Cancelada` explícitamente). Gatear los botones con
+     * `!isOpen()` los enseñaba también en tickets cancelados: el cliente
+     * pulsaba, el servidor devolvía 400 y no pasaba nada.
+     */
+    fun isFinished(): Boolean {
+        val s = (estatus ?: "").lowercase()
+        if (s.contains("cancel")) return false
+        return s.contains("finaliz") || s.contains("complet")
+    }
+
     fun isHighPriority(): Boolean {
         val p = displayPriority().lowercase()
         return p.contains("alta") || p.contains("high") || p.contains("urgent") || p == "high"

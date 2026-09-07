@@ -690,6 +690,20 @@ data class HrLeaveRejectBody(
     val rejectionReason: String,
 )
 
+/**
+ * Alta de solicitud de permiso (`POST hr/leaves`).
+ *
+ * El API calcula `days` a partir del rango, así que el móvil no lo manda: si
+ * lo mandara y no coincidiera con el cálculo del servidor, el saldo de
+ * vacaciones quedaría mintiendo. Ver `hr.service.ts::createLeave`.
+ */
+data class CreateHrLeaveBody(
+    val type: String,
+    val startDate: String,
+    val endDate: String,
+    val reason: String? = null,
+)
+
 // ── Accounting journal entries ────────────────────────────────────────────
 data class JournalEntryDto(
     val id: Long,
@@ -983,6 +997,16 @@ interface ExtraApi {
         @Path("id") id: Long,
         @Body body: HrLeaveRejectBody,
     ): okhttp3.ResponseBody
+
+    @POST("hr/leaves")
+    suspend fun createHrLeave(@Body body: CreateHrLeaveBody): okhttp3.ResponseBody
+
+    /** Cancelar la solicitud propia mientras siga pendiente. */
+    @PATCH("hr/leaves/{id}/cancel")
+    suspend fun cancelHrLeave(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("hr/leaves/balance/{userId}")
+    suspend fun getHrLeaveBalanceRaw(@Path("userId") userId: Long): okhttp3.ResponseBody
 
     @GET("hr/reviews")
     suspend fun getHrReviewsRaw(): okhttp3.ResponseBody
