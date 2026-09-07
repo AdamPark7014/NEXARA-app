@@ -75,7 +75,7 @@ final class ExpensesVM: ObservableObject {
             load()
             return true
         } catch {
-            message = "❌ \(error.localizedDescription)"
+            message = "❌ \(error.toUserMessage())"
             return false
         }
     }
@@ -93,7 +93,21 @@ final class ExpensesVM: ObservableObject {
             load()
             return true
         } catch {
-            message = "❌ \(error.localizedDescription)"
+            message = "❌ \(error.toUserMessage())"
+            return false
+        }
+    }
+
+    func markPagado(id: Int64) async -> Bool {
+        acting = true; message = nil
+        defer { acting = false }
+        do {
+            try await ExtraRepository.shared.markExpensePagado(id: id)
+            message = "✅ Marcado como pagado"
+            load()
+            return true
+        } catch {
+            message = "❌ \(error.toUserMessage("No se pudo marcar pagado"))"
             return false
         }
     }
@@ -299,6 +313,22 @@ struct ExpensesView: View {
                     Button(vm.acting ? "…" : "Rechazar", role: .destructive) {
                         Task {
                             if await vm.decide(id: exp.id, approve: false, note: rejectNote) {
+                                selected = nil
+                            }
+                        }
+                    }
+                    .disabled(vm.acting)
+                }
+            }
+            let approvedUnpaid = exp.status.lowercased().contains("aprobado") || exp.status.lowercased().contains("aprobada")
+            if vm.canManage && approvedUnpaid && !exp.status.lowercased().contains("pagad"), exp.id > 0 {
+                Section("Pago") {
+                    if let msg = vm.message {
+                        Text(msg).foregroundColor(msg.hasPrefix("✅") ? .green : .red)
+                    }
+                    Button(vm.acting ? "Marcando…" : "Marcar pagado") {
+                        Task {
+                            if await vm.markPagado(id: exp.id) {
                                 selected = nil
                             }
                         }

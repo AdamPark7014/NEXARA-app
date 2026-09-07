@@ -1,7 +1,9 @@
 import SwiftUI
+import UIKit
 
 struct IntegraMapPin: Identifiable, Hashable {
     let id: String
+    var entityId: String
     var label: String
     var kind: Kind
     var x: CGFloat
@@ -12,58 +14,13 @@ struct IntegraMapPin: Identifiable, Hashable {
     enum Kind: String { case door, camera, other }
 }
 
-struct IntegraFloorPlan: Identifiable, Hashable {
+struct IntegraFloorPlan: Identifiable {
     let id: String
     var name: String
-    var imageURL: URL?
+    var image: UIImage?
     var pins: [IntegraMapPin]
     var coveredEntityIds: Set<String>
     var orphanPins: Int
-}
-
-enum IntegraMapDataStub {
-    static func plans(siteId: Int?) async throws -> [IntegraFloorPlan] {
-        _ = siteId
-        let snap = try await IntegraMapRepository.shared.snapshot()
-        let entityIds = Set(snap.doors.map(\.id) + snap.cameras.map(\.id))
-        let byId = Dictionary(uniqueKeysWithValues: (snap.doors + snap.cameras).map { ($0.id, $0) })
-        return snap.floorplans.map { fp in
-            let pins: [IntegraMapPin] = fp.pins.map { p in
-                let orphan = !entityIds.contains(p.entityId)
-                let ent = byId[p.entityId]
-                let kind: IntegraMapPin.Kind = {
-                    switch p.kind {
-                    case .door: return .door
-                    case .camera: return .camera
-                    case .other: return .other
-                    }
-                }()
-                return IntegraMapPin(
-                    id: "\(p.id)",
-                    label: p.displayName,
-                    kind: kind,
-                    x: CGFloat(p.xPct) / 100,
-                    y: CGFloat(p.yPct) / 100,
-                    orphan: orphan,
-                    statusLabel: ent.map { e in
-                        if let online = e.online {
-                            return online ? "En línea" : "Fuera de línea"
-                        }
-                        return e.doorState ?? "Sin estado"
-                    }
-                )
-            }
-            let orphans = pins.filter(\.orphan).count
-            return IntegraFloorPlan(
-                id: "\(fp.id)",
-                name: fp.name,
-                imageURL: nil, // imageData is inline; decode in a follow-up if needed
-                pins: pins,
-                coveredEntityIds: Set(pins.filter { !$0.orphan }.map(\.id)),
-                orphanPins: orphans
-            )
-        }
-    }
 }
 
 enum IntegraMapRoutes {
@@ -90,6 +47,29 @@ enum IntegraMapRoutes {
 
     static func route(forModuleKey key: String) -> String? {
         routeByKey[key.lowercased()]
+    }
+}
+
+private enum FloorplanImageDecode {
+    static func image(from imageData: String?) -> UIImage? {
+        guard let raw = imageData?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+        if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
+            return nil // remote URLs are not fetched here — honesty: embedded only
+        }
+        let b64: String
+        if let range = raw.range(of: ";base64,") {
+            b64 = String(raw[range.upperBound...])
+        } else if raw.hasPrefix("data:") {
+            return nil
+        } else {
+            b64 = raw
+        }
+        guard let data = Data(base64Encoded: b64, options: [.ignoreUnknownCharacters]) else {
+            return nil
+        }
+        return UIImage(data: data)
     }
 }
 
@@ -201,10 +181,7 @@ struct IntegraMapView: View {
     private var coverageRow: some View {
         if let plan {
             HStack {
-                NxStatusChip(
-                    text: "\(plan.pins.count) pines",
-                    tone: .info
-                )
+                NxStatusChip(text: "\(plan.pins.count) pines", tone: .info)
                 NxStatusChip(
                     text: "\(plan.orphanPins) huérfanos",
                     tone: plan.orphanPins > 0 ? .warning : .success
@@ -221,16 +198,13 @@ struct IntegraMapView: View {
         GeometryReader { geo in
             ZStack {
                 Color(.secondarySystemBackground)
-                if let url = plan?.imageURL {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let img) = phase {
-                            img.resizable().scaledToFit()
-                        } else {
-                            Text("Sin imagen de plano").foregroundStyle(.secondary)
-                        }
-                    }
+                if let image = plan?.image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
                 } else {
-                    Text("Plano sin imagen").foregroundStyle(.secondary)
+                    Text("Plano sin imagen incrustada")
+                        .foregroundStyle(.secondary)
                 }
                 ForEach(visiblePins) { pin in
                     Circle()
@@ -242,7 +216,6 @@ struct IntegraMapView: View {
                             y: pin.y * geo.size.height
                         )
                         .onTapGesture {
-                            // Tap opens card only — never delete/move.
                             selectedPin = pin
                         }
                         .accessibilityLabel(pin.label)
@@ -256,7 +229,6 @@ struct IntegraMapView: View {
                     DragGesture().onChanged { offset = $0.translation }
                 )
             )
-            // No long-press / drag-to-reposition handlers on purpose.
         }
         .aspectRatio(4 / 3, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -313,7 +285,46 @@ struct IntegraMapView: View {
         errorText = nil
         defer { isLoading = false }
         do {
-            plans = try await IntegraMapDataStub.plans(siteId: nil)
+            let snap = try await IntegraMapRepository.shared.snapshot()
+            let entityIds = Set(snap.doors.map(\.id) + snap.cameras.map(\.id))
+            let byId = Dictionary(uniqueKeysWithValues: (snap.doors + snap.cameras).map { ($0.id, $0) })
+            plans = snap.floorplans.map { fp in
+                let pins: [IntegraMapPin] = fp.pins.map { p in
+                    let orphan = !entityIds.contains(p.entityId)
+                    let ent = byId[p.entityId]
+                    let kind: IntegraMapPin.Kind = {
+                        switch p.kind {
+                        case .door: return .door
+                        case .camera: return .camera
+                        case .other: return .other
+                        }
+                    }()
+                    return IntegraMapPin(
+                        id: "\(p.id)",
+                        entityId: p.entityId,
+                        label: p.displayName,
+                        kind: kind,
+                        x: CGFloat(p.xPct) / 100,
+                        y: CGFloat(p.yPct) / 100,
+                        orphan: orphan,
+                        statusLabel: ent.map { e in
+                            if let online = e.online {
+                                return online ? "En línea" : "Fuera de línea"
+                            }
+                            return e.doorState ?? "Sin estado"
+                        }
+                    )
+                }
+                let covered = Set(pins.filter { !$0.orphan }.map(\.entityId))
+                return IntegraFloorPlan(
+                    id: "\(fp.id)",
+                    name: fp.name,
+                    image: FloorplanImageDecode.image(from: fp.imageData),
+                    pins: pins,
+                    coveredEntityIds: covered,
+                    orphanPins: pins.filter(\.orphan).count
+                )
+            }
             selectedPlanId = plans.first?.id
         } catch {
             errorText = error.localizedDescription

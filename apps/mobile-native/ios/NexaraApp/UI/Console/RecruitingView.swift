@@ -38,6 +38,8 @@ struct RecruitingView: View {
     @State private var query = ""
     @State private var showRejected = false
     @State private var selected: CandidateItem?
+    @State private var acting = false
+    @State private var actionMessage: String?
 
     private var filtered: [CandidateItem] {
         candidates.filter { c in
@@ -84,7 +86,7 @@ struct RecruitingView: View {
     private func candidateDetail(_ c: CandidateItem) -> some View {
         let color = stageColor(c.stageKey)
         List {
-            Section { Button("← Candidatos") { selected = nil } }
+            Section { Button("← Candidatos") { selected = nil; actionMessage = nil } }
             Section {
                 HStack {
                     ZStack {
@@ -111,8 +113,40 @@ struct RecruitingView: View {
             if !c.notes.isEmpty {
                 Section("Notas") { Text(c.notes).font(.subheadline) }
             }
+            if c.id > 0 {
+                Section("Mover de etapa") {
+                    ForEach(STAGE_ORDER.filter { $0 != c.stageKey }, id: \.self) { target in
+                        Button {
+                            Task { await moveCandidate(id: c.id, stage: target) }
+                        } label: {
+                            Text(STAGE_LABEL[target] ?? target)
+                                .foregroundColor(stageColor(target))
+                        }
+                        .disabled(acting)
+                    }
+                    if acting { ProgressView() }
+                    if let actionMessage {
+                        Text(actionMessage)
+                            .font(.footnote)
+                            .foregroundColor(actionMessage.hasPrefix("✅") ? .green : .red)
+                    }
+                }
+            }
         }
         .listStyle(.insetGrouped)
+    }
+
+    private func moveCandidate(id: Int64, stage: String) async {
+        acting = true; actionMessage = nil
+        defer { acting = false }
+        do {
+            try await ExtraRepository.shared.moveCv(id: id, stage: stage)
+            actionMessage = "✅ Movido a \(STAGE_LABEL[stage] ?? stage)"
+            selected = nil
+            await load()
+        } catch {
+            actionMessage = "❌ \(error.toUserMessage("No se pudo mover el candidato"))"
+        }
     }
 
     @ViewBuilder private func labeled(_ k: String, _ v: String) -> some View {

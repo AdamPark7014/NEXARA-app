@@ -154,12 +154,28 @@ final class ConsoleRepository {
         activityId: Int64,
         reviewerId: Int64,
         notes: String,
-        rejectedStep: String = "EVIDENCE_PHOTOS"
+        rejectedSteps: [String]? = nil,
+        rejectedStep: String? = nil,
+        resetFullFlow: Bool = false
     ) async throws {
-        struct Body: Encodable { let reviewerId: Int64; let notes: String; let rejectedStep: String }
+        struct Body: Encodable {
+            let reviewerId: Int64
+            let notes: String
+            let rejectedSteps: [String]?
+            let rejectedStep: String?
+            let resetFullFlow: Bool?
+        }
+        let multi = rejectedSteps?.filter { !$0.isEmpty }
+        let hasMulti = !(multi?.isEmpty ?? true)
         _ = try await api.postJSON(
             "activity-evidence/\(activityId)/reject",
-            body: Body(reviewerId: reviewerId, notes: notes, rejectedStep: rejectedStep)
+            body: Body(
+                reviewerId: reviewerId,
+                notes: notes,
+                rejectedSteps: resetFullFlow ? nil : multi,
+                rejectedStep: (resetFullFlow || hasMulti) ? nil : (rejectedStep ?? "EVIDENCE_PHOTOS"),
+                resetFullFlow: resetFullFlow ? true : nil
+            )
         )
     }
 
@@ -395,6 +411,11 @@ final class ConsoleRepository {
         )
     }
 
+    func markViaticPagado(id: Int64) async throws {
+        struct Empty: Encodable {}
+        _ = try await api.patchJSON("viatics/\(id)/pagado", body: Empty())
+    }
+
     func gpsPost(lat: Double, lng: Double, speedKmh: Double? = nil) async throws {
         struct Body: Encodable {
             let latitud: Double
@@ -426,5 +447,39 @@ final class ConsoleRepository {
 
     func settingsDelete(key: String) async throws {
         try await api.delete("settings/\(key)")
+    }
+
+    // MARK: Company API keys & webhooks (console.admin)
+
+    func companyApiKeys() async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("company/api-keys"))
+    }
+
+    func createCompanyApiKey(name: String, scopes: [String]? = nil) async throws -> [String: Any] {
+        struct Body: Encodable {
+            let name: String
+            let scopes: [String]?
+        }
+        return ConsoleHelpers.decodeMap(try await api.postJSON(
+            "company/api-keys",
+            body: Body(name: name, scopes: scopes)
+        ))
+    }
+
+    func revokeCompanyApiKey(id: Int64) async throws {
+        try await api.delete("company/api-keys/\(id)")
+    }
+
+    func webhooks() async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("webhooks"))
+    }
+
+    func webhooksDlq(limit: Int = 50) async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("webhooks/dlq", query: ["limit": "\(limit)"]))
+    }
+
+    func replayWebhookDelivery(deliveryId: Int64) async throws {
+        struct Empty: Encodable {}
+        _ = try await api.postJSON("webhooks/deliveries/\(deliveryId)/replay", body: Empty())
     }
 }

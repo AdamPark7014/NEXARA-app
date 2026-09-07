@@ -1,79 +1,30 @@
 import SwiftUI
 
-// Stub models until Data/Integra/Vehicles/ lands.
-struct IntegraVehiculoRow: Identifiable, Hashable {
-    let id: String
-    var placa: String
-    var ownerLabel: String?
-    var personId: String?
-}
-
-enum IntegraVehiclesDataStub {
-    static func list() async throws -> [IntegraVehiculoRow] {
-        let inv = try await IntegraVehiclesRepository.shared.vehiculos()
-        return inv.items.map {
-            IntegraVehiculoRow(
-                id: $0.id,
-                placa: $0.plate,
-                ownerLabel: $0.personName,
-                personId: $0.personId
-            )
-        }
-    }
-
-    static func upsert(placa: String, personId: String?) async throws {
-        let v = PlacaLogic.validarPlaca(placa)
-        guard v.valida else { throw NSError(domain: "placa", code: 1, userInfo: [NSLocalizedDescriptionKey: v.error ?? "Placa inválida"]) }
-        _ = try await IntegraVehiclesRepository.shared.altaVehiculo(
-            placaNormalizada: v.normalizada,
-            personId: personId
-        )
-    }
-
-    static func delete(id: String) async throws {
-        _ = try await IntegraVehiclesRepository.shared.borrarVehiculo(vehicleId: id)
-    }
-}
-
 /// Inventario de placas. Protege el upsert silencioso del servidor detectando duplicados en UI.
 struct IntegraVehiclesView: View {
-    @State private var items: [IntegraVehiculoRow] = []
+    @State private var items: [IntegraVehiculo] = []
+    @State private var personas: [IntegraPersonaResumen] = []
     @State private var query = ""
     @State private var isLoading = true
     @State private var errorText: String?
     @State private var showForm = false
+    @State private var editingId: String?
     @State private var placa = ""
+    @State private var personId = ""
     @State private var message: String?
-    @State private var filterOwner: OwnerFilter = .todos
+    @State private var formError: String?
+    @State private var filterOwner: FiltroDueno = .todas
 
-    enum OwnerFilter: String, CaseIterable {
-        case todos = "Todos"
-        case conDueno = "Con dueño"
-        case sinDueno = "Sin dueño"
+    private var filtered: [IntegraVehiculo] {
+        PlacaLogic.filtrarVehiculos(items, filtros: FiltrosVehiculos(q: query, dueno: filterOwner))
     }
 
-    private var filtered: [IntegraVehiculoRow] {
-        var list = items
-        switch filterOwner {
-        case .todos: break
-        case .conDueno: list = list.filter { ($0.personId ?? "").isEmpty == false }
-        case .sinDueno: list = list.filter { ($0.personId ?? "").isEmpty }
-        }
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return list }
-        return list.filter {
-            $0.placa.lowercased().contains(q)
-                || ($0.ownerLabel ?? "").lowercased().contains(q)
-        }
+    private var validacion: ValidacionPlaca {
+        PlacaLogic.validarPlaca(placa)
     }
 
-    private var placaNorm: String {
-        placa.uppercased().filter { $0.isLetter || $0.isNumber }
-    }
-
-    private var duplicate: IntegraVehiculoRow? {
-        guard placaNorm.count >= 3 else { return nil }
-        return items.first { $0.placa.uppercased().filter { $0.isLetter || $0.isNumber } == placaNorm }
+    private var duplicate: IntegraVehiculo? {
+        PlacaLogic.placaDuplicada(placa, vehiculos: items, exceptoId: editingId)
     }
 
     var body: some View {
@@ -93,7 +44,14 @@ struct IntegraVehiclesView: View {
         .navigationTitle(IntegraVehiclesRoutes.titleVehicles)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { showForm = true; placa = ""; message = nil } label: {
+                Button {
+                    editingId = nil
+                    placa = ""
+                    personId = ""
+                    formError = nil
+                    message = nil
+                    showForm = true
+                } label: {
                     Image(systemName: "plus")
                 }
             }
@@ -117,9 +75,17 @@ struct IntegraVehiclesView: View {
             Section {
                 TextField("Buscar placa o dueño…", text: $query)
                 Picker("Dueño", selection: $filterOwner) {
-                    ForEach(OwnerFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    Text("Todos").tag(FiltroDueno.todas)
+                    Text("Con dueño").tag(FiltroDueno.con)
+                    Text("Sin dueño").tag(FiltroDueno.sin)
                 }
                 .pickerStyle(.segmented)
+                let sin = PlacaLogic.contarSinDueno(items)
+                if sin > 0 {
+                    Text("\(sin) sin dueño")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             if let message {
                 Section { Text(message).foregroundStyle(NxTone.success.fg) }
@@ -135,19 +101,27 @@ struct IntegraVehiclesView: View {
                 }
             } else {
                 Section("\(filtered.count) placas") {
-                    ForEach(filtered) { v in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(v.placa).font(.headline.monospaced())
-                            Text(v.ownerLabel ?? "Sin dueño")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    ForEach(filtered, id: \.id) { v in
+                        Button {
+                            editingId = v.id
+                            placa = v.plate
+                            personId = v.personId ?? ""
+                            formError = nil
+                            showForm = true
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(v.plate).font(.headline.monospaced())
+                                Text(ownerLabel(v))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .onDelete { idx in
                         let doomed = idx.map { filtered[$0] }
                         Task {
                             for v in doomed {
-                                try? await IntegraVehiclesDataStub.delete(id: v.id)
+                                _ = try? await IntegraVehiclesRepository.shared.borrarVehiculo(vehicleId: v.id)
                             }
                             await reload()
                         }
@@ -163,37 +137,80 @@ struct IntegraVehiclesView: View {
                 TextField("Placa", text: $placa)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
+                Picker("Dueño", selection: $personId) {
+                    Text("Sin dueño").tag("")
+                    ForEach(personas, id: \.id) { p in
+                        Text(PlacaLogic.etiquetaPersona(p)).tag(p.id)
+                    }
+                }
                 if let duplicate {
-                    Text("Ya existe «\(duplicate.placa)». Guardar la pisaría (upsert silencioso).")
+                    Text(PlacaLogic.avisoDuplicado(duplicate))
                         .font(.caption)
                         .foregroundStyle(NxTone.danger.fg)
-                } else if placaNorm.count < 3 && !placa.isEmpty {
-                    Text("La placa normalizada debe tener al menos 3 caracteres.")
+                } else if !validacion.valida, !placa.isEmpty {
+                    Text(validacion.error ?? "Placa inválida")
                         .font(.caption)
                         .foregroundStyle(NxTone.warning.fg)
+                } else if let aviso = validacion.aviso {
+                    Text(aviso).font(.caption).foregroundStyle(NxTone.warning.fg)
+                }
+                if let formError {
+                    Text(formError).font(.caption).foregroundStyle(NxTone.danger.fg)
                 }
             }
-            .navigationTitle("Alta de placa")
+            .navigationTitle(editingId == nil ? "Alta de placa" : "Editar placa")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { showForm = false }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") {
-                        Task {
-                            do {
-                                try await IntegraVehiclesDataStub.upsert(placa: placa, personId: nil)
-                                showForm = false
-                                message = "Placa guardada"
-                                await reload()
-                            } catch {
-                                message = error.localizedDescription
-                            }
-                        }
-                    }
-                    .disabled(duplicate != nil || placaNorm.count < 3)
+                    Button("Guardar") { Task { await save() } }
+                        .disabled(duplicate != nil || !validacion.valida)
                 }
             }
+        }
+    }
+
+    private func ownerLabel(_ v: IntegraVehiculo) -> String {
+        switch PlacaLogic.resolverDueno(v, personas: personas) {
+        case .conocido(_, let nombre, _): return nombre
+        case .ausente(_, let nombre): return nombre ?? "Dueño ausente del padrón"
+        case .sinDueno: return "Sin dueño"
+        }
+    }
+
+    private func save() async {
+        formError = nil
+        let v = PlacaLogic.validarPlaca(placa)
+        guard v.valida else {
+            formError = v.error
+            return
+        }
+        if let duplicate {
+            formError = PlacaLogic.avisoDuplicado(duplicate)
+            return
+        }
+        let pid = personId.isEmpty ? nil : personId
+        do {
+            if let editingId {
+                _ = try await IntegraVehiclesRepository.shared.editarVehiculo(
+                    vehicleId: editingId,
+                    placaNormalizada: v.normalizada,
+                    personId: pid
+                )
+                message = "Placa actualizada"
+            } else {
+                _ = try await IntegraVehiclesRepository.shared.altaVehiculo(
+                    placaNormalizada: v.normalizada,
+                    personId: pid
+                )
+                message = "Placa guardada"
+            }
+            showForm = false
+            await reload()
+        } catch {
+            let d = IntegraVehiclesRepository.diagnosticar(error, fallback: "No se pudo guardar")
+            formError = d.mensaje
         }
     }
 
@@ -202,9 +219,13 @@ struct IntegraVehiclesView: View {
         errorText = nil
         defer { isLoading = false }
         do {
-            items = try await IntegraVehiclesDataStub.list()
+            async let inv = IntegraVehiclesRepository.shared.vehiculos()
+            async let people = IntegraVehiclesRepository.shared.personas()
+            items = try await inv.items
+            personas = (try? await people) ?? []
         } catch {
-            errorText = error.localizedDescription
+            let d = IntegraVehiclesRepository.diagnosticar(error, fallback: "No se pudieron cargar vehículos")
+            errorText = d.mensaje
         }
     }
 }

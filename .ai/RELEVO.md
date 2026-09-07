@@ -8,66 +8,40 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — iOS al nivel Android (5 agentes) + cuenta demo en prod
+## Este turno — Segunda ola de profundidad iOS (paridad real, no solo catálogo)
 
-### A) Cuenta revisor App Store / Play — LISTA EN PRODUCCIÓN
+Adam: el catálogo ya emparejaba claves; el hueco era **LOC/operabilidad**
+(~7.8k → **~10.2k** líneas INTEGRA iOS vs ~25k Android; app completa ~42k vs ~94k).
 
-- Seeder `seed-play-reviewer` corrido en `nexara-api` (Hetzner).
-- Login verificado `POST https://api.nexara.com.mx/api/auth/login` → 200.
-- Usuario: `play.review@nexara.com.mx` · nombre «Revisor App Store / Google Play»
-- Tenant: `nexara-demo` (id=2), MFA off, rol ceo del demo.
-- Credenciales: `C:\dev\secrets\nexara-store\reviewer-credentials.txt` (NO en git).
-- Doc: `docs/STORE-REVIEWER-ACCOUNT.md`.
+Tres agentes en paralelo + cableado settings:
 
-### B) Paridad iOS — ejército de 5 agentes + cableado
-
-Commits: `57df20f5` (rescate WIP agentes) + este cierre.
-
-| Agente | Entregable |
+| Agente | Qué profundizó |
 |---|---|
-| Fundación | `PanelId.integra`, `ParityStatus`, `RolePanelMatrix`, `PanelAccessResolver` sin contains, `ModulePanelMap` 21 keys, catálogo con 21 INTEGRA + honestidad, `ApiErrors.toUserMessage` |
-| Data | `Data/Integra/*` (8 repos) |
-| Core UI | Home…Sites + `IntegraRootView` |
-| Advanced UI | video (sin EN VIVO), vehicles/ANPR, schedules, detection RO polígonos, governance, map/dashboard RO |
-| Orphans | `MeetingsRepository` + `MeetingsView` (lista completa de asistentes), router reuniones/chat/smart-quote |
+| Core INTEGRA | Home summary vivo, Access live/mirror+página, Events cursor, People/Alarms/Visitors profundidad |
+| Advanced INTEGRA | Video FramePacing, Vehicles/ANPR, Schedules/Espacios, Detection, Settings create/delete/sync, Gov, Map/Dashboard — **cero DataStub** |
+| Consola no-INTEGRA | Evidencias multi-reject, viáticos/gastos «Marcar pagado», documentos approve, recruiting moveCv, settings api-keys |
 
-Cableado parent: `NexaraApp` monta `IntegraRootView`; `ModuleRouter` caso `.integra`.
+Parent: `IntegraSettingsRepository.swift` (POST/PATCH/DELETE `integra/sites` + sync).
 
-### Conteos disco (aprox.)
+### Verificado
 
-- `UI/Integra/`: 32 Swift
-- `Data/Integra/`: 8 Swift
-- Catálogo iOS ahora incluye integra + chat/reuniones/smart-quote
+- Diff ~+3545/−870 en 37 archivos iOS
+- Catálogo console/ventas/contabilidad/studio/integra: **mismas claves** que Android
+- Honestidad intacta: sin EN VIVO, mapa RO, polígonos RO
 
-### Honestidad (igual Android)
+### Aún falta (honesto)
 
-- Video = preview/PTZ/captura, **sin «EN VIVO»**
-- Detección: polígonos solo lectura
-- Mapa: sin escritura de pines
-- Catálogo: map/dashboard `soloLectura`
+1. **xcodebuild nunca corrido** — primera CI fallará.
+2. INTEGRA iOS ~40 % LOC de Android — más pulido fino (agrupación alarmas, PTZ edge cases, fanout ACS UI).
+3. MFA / refresh sesión / X-Company-Id en iOS (también abiertos en Android).
+4. Apple enrollment + TestFlight pipeline (Adam).
 
-### Lo que NO está verificado
+## Heredado vivo
 
-**Ningún `xcodebuild`.** Primera compilación CI con `subir=false` va a fallar; ciclo de arreglos previsto.
-
-## Cuando Apple active la membresía (Enrollment `49J96Q3WQ3`)
-
-Orden (runbook `apps/mobile-native/ios/PUBLICAR-SIN-MAC.md`):
-
-1. Completar pago cuando llegue el correo.
-2. Portal: Team ID, App ID `mx.nexara.mobile.NexaraApp` + Push, subir `.csr` → `.cer`, API key ASC `.p8`, alta app.
-3. `crear-certificado.ps1 -Paso p12` + `subir-secretos.ps1` (tras `gh auth login`).
-4. `gh workflow run ios-testflight.yml --repo AdamPark7014/NEXARA-app -f version=1.0.0 -f subir=false`
-5. Arreglar Swift hasta verde → `subir=true` → TestFlight.
-6. Fase 5 tienda: capturas + demo account (`play.review@…`) + decidir App Store público vs Custom Apps ABM.
-
-## A medias / Adam
-
-0. Esperar correo Apple + pago (vía org, D-U-N-S ya ok).
-1. `gh auth login`.
-2. P0 go2rtc Traefik prod.
-3. Primero `xcodebuild` CI.
+- Demo store: `play.review@nexara.com.mx` en prod; creds en `C:\dev\secrets\nexara-store\`.
+- Enrollment Apple `49J96Q3WQ3` — esperar correo/pago.
+- P0 go2rtc Traefik prod.
 
 ## No tocar
 
-Puente NAS. Credenciales Apple/tarjeta. No fingir EN VIVO. No meter password del revisor en el git.
+Puente NAS. Credenciales Apple. No fingir EN VIVO. Password revisor fuera del git.

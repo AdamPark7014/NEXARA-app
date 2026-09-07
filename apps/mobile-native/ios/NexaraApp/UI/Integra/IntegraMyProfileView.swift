@@ -80,10 +80,32 @@ struct IntegraMyProfileView: View {
         personError = nil
         defer { isLoading = false }
         do {
-            let me = try await IntegraGovernanceDataStub.identityMe()
-            identity = me
+            let me = try await IntegraGovernanceRepository.shared.identityMe()
+            let acs = IntegraJSON.asMap(me["acsPerson"])
+            let snap = IntegraIdentitySnapshot(
+                displayName: me.integraStr("name", "displayName"),
+                email: me.integraStr("email"),
+                acsPersonId: acs?.integraStr("personId", "id"),
+                acsSiteId: acs?.integraInt("siteId")
+            )
+            identity = snap
+            guard let personId = snap.acsPersonId, !personId.isEmpty else {
+                credentials = []
+                return
+            }
             do {
-                credentials = try await IntegraGovernanceDataStub.myCredentials(personId: me.acsPersonId)
+                let detail = try await IntegraGovernanceRepository.shared.personDetail(personId: personId)
+                var out: [IntegraCredentialRow] = []
+                if let face = detail.integraInt("faceCount"), face > 0 {
+                    out.append(.init(id: "face", kind: "Rostro", label: "\(face) face(s)", status: "En espejo"))
+                }
+                if let fp = detail.integraInt("fingerprintCount"), fp > 0 {
+                    out.append(.init(id: "fp", kind: "Huella", label: "\(fp) FP", status: "En espejo"))
+                }
+                if let card = detail.integraInt("cardCount"), card > 0 {
+                    out.append(.init(id: "card", kind: "Tarjeta", label: "\(card) card(s)", status: "En espejo"))
+                }
+                credentials = out
             } catch {
                 personError = error.localizedDescription
                 credentials = []

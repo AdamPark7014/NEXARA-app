@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Centro de notificaciones INTEGRA-specific.
-/// Web redirects `/integra/notifications-center` → ERP inbox; here we keep
-/// integra pulse (open alarms / push stats) plus a shared-style inbox stub.
+/// Centro de notificaciones INTEGRA.
+/// Bandeja = ERP `NotificationsRepository` (no hay inbox INTEGRA propio).
+/// Pulso = alarmas abiertas + push stats del sitio.
 struct IntegraNotificationsCenterView: View {
     var onOpenAlarms: (() -> Void)? = nil
 
@@ -17,6 +17,7 @@ struct IntegraNotificationsCenterView: View {
     @State private var eventsToday: Int?
     @State private var isLoading = true
     @State private var errorText: String?
+    @State private var inboxHonestEmpty = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +30,7 @@ struct IntegraNotificationsCenterView: View {
             if isLoading {
                 ProgressView("Cargando…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let errorText, items.isEmpty && tab == .inbox {
+            } else if let errorText, items.isEmpty && tab == .inbox && !inboxHonestEmpty {
                 Text(errorText).foregroundStyle(.secondary).padding()
             } else {
                 switch tab {
@@ -53,7 +54,12 @@ struct IntegraNotificationsCenterView: View {
                 .foregroundStyle(.secondary)
             }
             if items.isEmpty {
-                NxEmptyState(title: "Sin notificaciones", subtitle: "La bandeja está vacía.")
+                NxEmptyState(
+                    title: "Sin notificaciones",
+                    subtitle: inboxHonestEmpty
+                        ? "La bandeja ERP está vacía (o no hay API de inbox)."
+                        : "La bandeja está vacía."
+                )
             } else {
                 ForEach(items) { n in
                     VStack(alignment: .leading, spacing: 4) {
@@ -106,14 +112,45 @@ struct IntegraNotificationsCenterView: View {
     private func reload() async {
         isLoading = true
         errorText = nil
+        inboxHonestEmpty = false
         defer { isLoading = false }
+
         do {
-            items = try await IntegraGovernanceDataStub.notifications()
-            let stats = try await IntegraGovernanceDataStub.pushEventStats()
-            openAlarms = stats.openAlarms
-            eventsToday = stats.eventsToday
+            let rows = try await NotificationsRepository.shared.list(limit: 50)
+            items = rows.enumerated().map { i, m in
+                let id: String = {
+                    if let n = m["id"] as? Int { return String(n) }
+                    if let n = m["id"] as? Int64 { return String(n) }
+                    if let s = m["id"] as? String { return s }
+                    return "\(i)"
+                }()
+                IntegraNotificationRow(
+                    id: id,
+                    title: (m["title"] as? String)
+                        ?? (m["subject"] as? String)
+                        ?? "Notificación",
+                    body: (m["body"] as? String) ?? (m["message"] as? String),
+                    createdAt: (m["createdAt"] as? String) ?? (m["at"] as? String),
+                    read: (m["read"] as? Bool) ?? (m["isRead"] as? Bool) ?? true
+                )
+            }
+            if items.isEmpty { inboxHonestEmpty = true }
         } catch {
-            errorText = error.localizedDescription
+            // Honest empty when shared inbox API absent — do not invent rows.
+            items = []
+            inboxHonestEmpty = true
+            errorText = nil
+        }
+
+        if let stats = try? await IntegraGovernanceRepository.shared.pushEventStats() {
+            eventsToday = stats.integraInt("today", "count", "eventsToday")
+        } else {
+            eventsToday = nil
+        }
+        if let q = try? await IntegraRepository.shared.alarmQueue(hours: 24) {
+            openAlarms = q.openCount
+        } else {
+            openAlarms = nil
         }
     }
 }

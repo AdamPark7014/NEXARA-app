@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 // MARK: - Detection contract (subset ported from Android DetectionContract.kt)
 
@@ -70,6 +71,8 @@ struct DetectionProfile {
     let detectionTarget: String
     /// `nil` = full frame. Mobile does not edit polygons.
     let regions: [[String: Any]]?
+    /// Normalized 0…1 vertices per polygon (read-only UI).
+    let regionPolygons: [[CGPoint]]
     let timeThresholdSec: Int
     let eventTypes: [String]
     let window: DetectionWindow?
@@ -148,6 +151,7 @@ enum DetectionParsing {
             alarmConfidence: confidence,
             detectionTarget: target,
             regions: IntegraJSON.asMapList(eff["regions"]),
+            regionPolygons: readRegionPolygons(eff["regions"]),
             timeThresholdSec: eff.integraInt("timeThresholdSec") ?? 0,
             eventTypes: stringList(eff["eventTypes"]),
             window: readWindow(stored?["schedule"]),
@@ -156,6 +160,36 @@ enum DetectionParsing {
             capabilities: parseCapabilities(raw["capabilities"], cameraId: cameraId),
             limits: limits
         )
+    }
+
+    /// Android `readRegions`: list of polygons, each a list of `{x,y}` in 0…1.
+    static func readRegionPolygons(_ v: Any?) -> [[CGPoint]] {
+        guard let list = v as? [Any] else { return [] }
+        var out: [[CGPoint]] = []
+        for raw in list {
+            let pts: [CGPoint]
+            if let arr = raw as? [Any] {
+                pts = arr.compactMap { item -> CGPoint? in
+                    guard let m = IntegraJSON.asMap(item),
+                          let x = m.integraDouble("x"),
+                          let y = m.integraDouble("y") else { return nil }
+                    return CGPoint(x: min(1, max(0, x)), y: min(1, max(0, y)))
+                }
+            } else if let m = IntegraJSON.asMap(raw),
+                      let nested = IntegraJSON.asMapList(m["points"]) {
+                pts = nested.compactMap { p in
+                    guard let x = p.integraDouble("x"), let y = p.integraDouble("y") else { return nil }
+                    return CGPoint(x: min(1, max(0, x)), y: min(1, max(0, y)))
+                }
+            } else {
+                pts = []
+            }
+            if pts.count >= DetectionDefaults.minRegionPoints {
+                out.append(Array(pts.prefix(DetectionDefaults.maxRegionPoints)))
+            }
+            if out.count >= DetectionDefaults.maxRegions { break }
+        }
+        return out
     }
 
     /// Omits `regions` on purpose — phone does not draw polygons; server keeps zones.

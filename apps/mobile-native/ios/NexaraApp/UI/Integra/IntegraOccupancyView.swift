@@ -1,6 +1,8 @@
 import SwiftUI
 
 /// Ocupación deducida del día (no conteo óptico). Paridad `IntegraOccupancyScreen`.
+private let integraOccupancyPage = 40
+
 struct IntegraOccupancyView: View {
     @StateObject private var vm = IntegraOccupancyVM()
 
@@ -23,7 +25,10 @@ struct IntegraOccupancyView: View {
     }
 
     private var listBody: some View {
-        List {
+        let matching = vm.filtered
+        let shown = Array(matching.prefix(vm.limit))
+
+        return List {
             Section {
                 NxKpiGrid(items: [
                     NxKpi(label: "En sitio", value: "\(vm.total)", tone: .brand),
@@ -40,7 +45,7 @@ struct IntegraOccupancyView: View {
                         tone: .info
                     ))
                 } else {
-                    Text("Ocupación deducida por accesos del día, no por sensores ópticos.")
+                    Text("Ocupación deducida por accesos del día, no por sensores ópticos. Este ACS no emite salida.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -51,10 +56,14 @@ struct IntegraOccupancyView: View {
                     Image(systemName: "magnifyingglass").foregroundColor(.secondary)
                     TextField("Persona o zona", text: $vm.query)
                         .autocorrectionDisabled()
+                        .onChange(of: vm.query) { _, _ in vm.limit = integraOccupancyPage }
                 }
+                Text("Mostrando \(shown.count) de \(matching.count)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
-            if vm.filtered.isEmpty {
+            if shown.isEmpty {
                 Section {
                     NxEmptyState(
                         title: "Nadie en sitio",
@@ -62,8 +71,13 @@ struct IntegraOccupancyView: View {
                     )
                 }
             } else {
-                ForEach(vm.filtered) { row in
+                ForEach(shown) { row in
                     occupancyRow(row)
+                }
+                if matching.count > vm.limit {
+                    Section {
+                        Button("Ver más") { vm.limit += integraOccupancyPage }
+                    }
                 }
             }
         }
@@ -94,6 +108,7 @@ final class IntegraOccupancyVM: ObservableObject {
     @Published var day = ""
     @Published var note = ""
     @Published var query = ""
+    @Published var limit = integraOccupancyPage
     @Published var loading = true
     @Published var error: String?
 
@@ -123,7 +138,7 @@ final class IntegraOccupancyVM: ObservableObject {
             loading = false
         } catch {
             loading = false
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage(fallback: "No se pudo cargar la ocupación")
         }
     }
 }

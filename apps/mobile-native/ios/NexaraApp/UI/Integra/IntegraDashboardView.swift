@@ -21,79 +21,8 @@ struct IntegraPanoramaAlarm: Identifiable, Hashable {
     var when: String?
 }
 
-enum IntegraDashboardDataStub {
-    static func snapshot(siteId: Int?) async throws -> IntegraPanoramaSnapshot {
-        _ = siteId
-        var failed: [String] = []
-        var linkConnected: Bool?
-        var linkLabel = "Enlace"
-        var doorsOnline: Int?
-        var doorsTotal: Int?
-        var camerasOnline: Int?
-        var camerasTotal: Int?
-        var openAlarms: Int?
-        var occupancy: Int?
-        var eventsToday: Int?
-        var topAlarms: [IntegraPanoramaAlarm] = []
-
-        if let dash = try? await IntegraRepository.shared.dashboard() {
-            linkConnected = dash.integraBool("connected", "online")
-            linkLabel = dash.integraStr("provider", "label") ?? "Enlace del sitio"
-            doorsOnline = dash.integraInt("doorsOnline")
-            doorsTotal = dash.integraInt("doorsTotal")
-            camerasOnline = dash.integraInt("camerasOnline")
-            camerasTotal = dash.integraInt("camerasTotal")
-        } else {
-            failed.append("dashboard")
-        }
-
-        if let q = try? await IntegraRepository.shared.alarmQueue(hours: 24) {
-            openAlarms = q.openCount
-            topAlarms = q.items.prefix(5).enumerated().map { i, m in
-                IntegraPanoramaAlarm(
-                    id: m.integraStr("id") ?? "\(i)",
-                    title: m.integraStr("title", "name") ?? "Alarma",
-                    subtitle: m.integraStr("personName", "deviceName"),
-                    when: m.integraStr("timestamp", "occurredAt")
-                )
-            }
-        } else {
-            failed.append("alarms")
-        }
-
-        if let occ = try? await IntegraRepository.shared.occupancy() {
-            occupancy = occ.total
-        } else {
-            failed.append("occupancy")
-        }
-
-        if let stats = try? await IntegraRepository.shared.pushEventStats() {
-            eventsToday = stats.integraInt("today", "count", "eventsToday")
-        } else {
-            failed.append("stats")
-        }
-
-        if (try? await IntegraVideoRepository.shared.cameras()) == nil {
-            failed.append("cameras")
-        }
-
-        return IntegraPanoramaSnapshot(
-            linkConnected: linkConnected,
-            linkLabel: linkLabel,
-            doorsOnline: doorsOnline,
-            doorsTotal: doorsTotal,
-            camerasOnline: camerasOnline,
-            camerasTotal: camerasTotal,
-            openAlarms: openAlarms,
-            occupancy: occupancy,
-            eventsToday: eventsToday,
-            topAlarms: topAlarms,
-            failedParts: failed
-        )
-    }
-}
-
 /// Panorama — resumen de estado. Solo lectura; navega con onOpenKey.
+/// Nunca inventa ceros: un hueco se muestra como «—» / bloque fallido.
 struct IntegraDashboardView: View {
     var onOpenKey: ((String) -> Void)? = nil
 
@@ -193,6 +122,12 @@ struct IntegraDashboardView: View {
                 hint: snap.occupancy == nil ? "Sin occupancy" : nil,
                 tone: .brand
             ),
+            NxKpi(
+                label: "Eventos hoy",
+                value: snap.eventsToday.map(String.init) ?? "—",
+                hint: snap.eventsToday == nil ? "Sin stats" : nil,
+                tone: .brand
+            ),
         ])
     }
 
@@ -258,11 +193,89 @@ struct IntegraDashboardView: View {
         isLoading = true
         errorText = nil
         defer { isLoading = false }
-        do {
-            snap = try await IntegraDashboardDataStub.snapshot(siteId: nil)
-        } catch {
-            errorText = error.localizedDescription
-            snap = nil
+
+        var failed: [String] = []
+        var linkConnected: Bool?
+        var linkLabel = "Enlace"
+        var doorsOnline: Int?
+        var doorsTotal: Int?
+        var camerasOnline: Int?
+        var camerasTotal: Int?
+        var openAlarms: Int?
+        var occupancy: Int?
+        var eventsToday: Int?
+        var topAlarms: [IntegraPanoramaAlarm] = []
+
+        if let dash = try? await IntegraRepository.shared.dashboard() {
+            linkConnected = dash.integraBool("connected", "online")
+            linkLabel = dash.integraStr("provider", "label") ?? "Enlace del sitio"
+            doorsOnline = dash.integraInt("doorsOnline")
+            doorsTotal = dash.integraInt("doorsTotal")
+            camerasOnline = dash.integraInt("camerasOnline")
+            camerasTotal = dash.integraInt("camerasTotal")
+        } else {
+            failed.append("dashboard")
         }
+
+        // Prefer map snapshot counts when dashboard omitted inventory (never invent 0).
+        if doorsOnline == nil || camerasOnline == nil,
+           let map = try? await IntegraMapRepository.shared.snapshot() {
+            if doorsTotal == nil {
+                doorsTotal = map.doors.count
+                let known = map.doors.compactMap(\.online)
+                if known.count == map.doors.count {
+                    doorsOnline = known.filter { $0 }.count
+                }
+            }
+            if camerasTotal == nil {
+                camerasTotal = map.cameras.count
+                let known = map.cameras.compactMap(\.online)
+                if known.count == map.cameras.count {
+                    camerasOnline = known.filter { $0 }.count
+                }
+            }
+        }
+
+        if let q = try? await IntegraRepository.shared.alarmQueue(hours: 24) {
+            openAlarms = q.openCount
+            topAlarms = q.items.prefix(5).enumerated().map { i, m in
+                IntegraPanoramaAlarm(
+                    id: m.integraStr("id") ?? "\(i)",
+                    title: m.integraStr("title", "name") ?? "Alarma",
+                    subtitle: m.integraStr("personName", "deviceName"),
+                    when: m.integraStr("timestamp", "occurredAt")
+                )
+            }
+        } else {
+            failed.append("alarms")
+        }
+
+        if let occ = try? await IntegraRepository.shared.occupancy() {
+            occupancy = occ.total
+        } else {
+            failed.append("occupancy")
+        }
+
+        if let stats = try? await IntegraRepository.shared.pushEventStats() {
+            eventsToday = stats.integraInt("today", "count", "eventsToday")
+        } else if let stats = try? await IntegraGovernanceRepository.shared.pushEventStats() {
+            eventsToday = stats.integraInt("today", "count", "eventsToday")
+        } else {
+            failed.append("stats")
+        }
+
+        snap = IntegraPanoramaSnapshot(
+            linkConnected: linkConnected,
+            linkLabel: linkLabel,
+            doorsOnline: doorsOnline,
+            doorsTotal: doorsTotal,
+            camerasOnline: camerasOnline,
+            camerasTotal: camerasTotal,
+            openAlarms: openAlarms,
+            occupancy: occupancy,
+            eventsToday: eventsToday,
+            topAlarms: topAlarms,
+            failedParts: failed
+        )
     }
 }

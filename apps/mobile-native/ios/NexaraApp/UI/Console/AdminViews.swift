@@ -122,7 +122,7 @@ struct ProjectsView: View {
             message = "Estado actualizado"
             selected = nil
             await reload()
-        } catch { message = error.localizedDescription }
+        } catch { message = error.toUserMessage() }
     }
 }
 

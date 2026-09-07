@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// Hub INTEGRA — tarjetas por módulo. Paridad Android `IntegraHomeScreen`.
+/// Hub INTEGRA — tarjetas por módulo + cabecera viva. Paridad Android `IntegraHomeScreen` / `IntegraHomeSummary`.
 struct IntegraHomeView: View {
     var onOpenKey: (String) -> Void
     var onExit: (() -> Void)? = nil
     var allowedKeys: Set<String>? = nil
+
+    @StateObject private var summary = IntegraHomeSummaryVM()
 
     private struct HubCard: Identifiable {
         let key: String
@@ -60,6 +62,8 @@ struct IntegraHomeView: View {
                         .foregroundColor(.secondary)
                 }
 
+                IntegraHomeSummaryBlock(vm: summary)
+
                 if !accessCards.isEmpty {
                     section("Control de accesos", "Puertas, eventos, personas, asistencia y visitantes", cards: accessCards)
                 }
@@ -75,6 +79,8 @@ struct IntegraHomeView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("INTEGRA")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await summary.refresh() }
+        .refreshable { await summary.refresh() }
         .toolbar {
             if let onExit {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -118,5 +124,186 @@ struct IntegraHomeView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Cabecera viva (paridad IntegraHomeSummary)
+
+private struct IntegraHomeSummaryBlock: View {
+    @ObservedObject var vm: IntegraHomeSummaryVM
+
+    var body: some View {
+        let caidas = max(0, vm.doors - vm.doorsOnline)
+        VStack(alignment: .leading, spacing: 10) {
+            if vm.loading && vm.connected == nil {
+                ProgressView("Consultando panorama…")
+                    .frame(maxWidth: .infinity)
+            }
+
+            if vm.connected == false {
+                NxAlertBanner(alert: NxAlert(
+                    id: "offline",
+                    title: vm.host.isEmpty
+                        ? "Sin enlace con el sitio."
+                        : "Sin enlace con el sitio (\(vm.host)).",
+                    subtitle: "Lo de abajo es el último espejo sincronizado, no el estado de ahora.",
+                    tone: .danger
+                ))
+            } else if vm.connected == nil && !vm.loading {
+                NxAlertBanner(alert: NxAlert(
+                    id: "dash-fail",
+                    title: "No se pudo consultar el estado del sitio.",
+                    subtitle: "Los módulos siguen abriéndose, pero sus datos pueden estar desfasados.",
+                    tone: .warning
+                ))
+            }
+
+            NxKpiGrid(items: [
+                NxKpi(
+                    label: "Puertas en línea",
+                    value: vm.doors > 0 ? "\(vm.doorsOnline)/\(vm.doors)" : "—",
+                    hint: caidas > 0 ? "\(caidas) sin conexión" : nil,
+                    tone: caidas > 0 ? .danger : .success
+                ),
+                NxKpi(
+                    label: "Alarmas pendientes",
+                    value: "\(vm.alarmasAbiertas)",
+                    hint: vm.alarmasAbiertas > 0 ? "Requieren decisión" : "Cola limpia",
+                    tone: vm.alarmasAbiertas > 0 ? .danger : .success
+                ),
+                NxKpi(label: "En sitio ahora", value: "\(vm.enSitio)", tone: .info),
+                NxKpi(
+                    label: "Denegados hoy",
+                    value: "\(vm.denegados)",
+                    tone: vm.denegados > 0 ? .warning : .neutral
+                ),
+            ])
+
+            Text(
+                "\(vm.cameras) cámaras · \(vm.people) personas · \(vm.devices) equipos"
+                    + (vm.syncLabel.map { " · espejo \($0)" } ?? "")
+            )
+            .font(.caption2)
+            .foregroundColor(.secondary)
+
+            if !vm.loading, vm.syncLabel == nil {
+                NxAlertBanner(alert: NxAlert(
+                    id: "no-sync",
+                    title: "El espejo no tiene fecha de última reconciliación.",
+                    subtitle: "No se sabe de cuándo son estos números; sincroniza desde la consola web.",
+                    tone: .warning
+                ))
+            } else if let sync = vm.syncLabel, vm.syncStale {
+                NxAlertBanner(alert: NxAlert(
+                    id: "stale",
+                    title: "El espejo lleva \(sync.replacingOccurrences(of: "hace ", with: "")) sin reconciliarse.",
+                    subtitle: "Puertas, personas y equipos pueden no coincidir con lo instalado.",
+                    tone: .warning
+                ))
+            }
+        }
+    }
+}
+
+@MainActor
+final class IntegraHomeSummaryVM: ObservableObject {
+    @Published var loading = true
+    @Published var connected: Bool?
+    @Published var host = ""
+    @Published var doors = 0
+    @Published var doorsOnline = 0
+    @Published var cameras = 0
+    @Published var people = 0
+    @Published var devices = 0
+    @Published var enSitio = 0
+    @Published var denegados = 0
+    @Published var alarmasAbiertas = 0
+    @Published var syncLabel: String?
+    @Published var syncStale = false
+
+    private let repo = IntegraRepository.shared
+
+    func refresh() async {
+        loading = true
+        let dash = (try? await repo.dashboard()) ?? [:]
+        let stats = (try? await repo.pushEventStats()) ?? [:]
+        let alarms = try? await repo.alarmQueue()
+        let syncMap = (try? await repo.lastSync()) ?? [:]
+
+        connected = IntegraDict.bool(dash, "connected")
+        host = IntegraDict.str(dash, "host")
+        doors = IntegraDict.int(dash, "doors")
+        doorsOnline = IntegraDict.int(dash, "doorsOnline")
+        cameras = IntegraDict.int(dash, "cameras")
+        people = IntegraDict.int(dash, "people")
+        devices = IntegraDict.int(dash, "devices")
+        if stats["enSitio"] != nil {
+            enSitio = IntegraDict.int(stats, "enSitio")
+        } else {
+            enSitio = IntegraDict.int(stats, "onSite")
+        }
+        if stats["denegados"] != nil {
+            denegados = IntegraDict.int(stats, "denegados")
+        } else {
+            denegados = IntegraDict.int(stats, "denied")
+        }
+        alarmasAbiertas = alarms?.openCount ?? 0
+
+        let raw = IntegraDict.str(dash, "lastSync", "lastSyncAt").nilIfEmpty
+            ?? IntegraDict.str(syncMap, "lastSync", "lastSyncAt", "at").nilIfEmpty
+        if let ms = IntegraCoreFormat.parseMs(raw) {
+            let age = IntegraCoreFormat.syncAge(lastSyncMs: ms)
+            syncLabel = age.label
+            syncStale = age.stale
+        } else {
+            syncLabel = nil
+            syncStale = false
+        }
+        loading = false
+    }
+}
+
+/// Formato / edad de espejo compartido por pantallas core (paridad Android IntegraFormat / syncAge).
+enum IntegraCoreFormat {
+    static let syncStaleMs: TimeInterval = 60 * 60
+
+    struct SyncAge {
+        let label: String
+        let stale: Bool
+    }
+
+    static func parseMs(_ raw: String?) -> TimeInterval? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = iso.date(from: raw) { return d.timeIntervalSince1970 }
+        iso.formatOptions = [.withInternetDateTime]
+        if let d = iso.date(from: raw) { return d.timeIntervalSince1970 }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        if let d = f.date(from: String(raw.prefix(19))) { return d.timeIntervalSince1970 }
+        return nil
+    }
+
+    static func syncAge(lastSyncMs: TimeInterval, now: Date = Date()) -> SyncAge {
+        let edad = now.timeIntervalSince1970 - lastSyncMs
+        if edad < 0 { return SyncAge(label: "recién", stale: false) }
+        let minutos = Int(edad / 60)
+        let label: String
+        switch minutos {
+        case ..<1: label = "hace menos de 1 min"
+        case ..<60: label = "hace \(minutos) min"
+        case ..<(60 * 24): label = "hace \(minutos / 60) h"
+        default: label = "hace \(minutos / (60 * 24)) d"
+        }
+        return SyncAge(label: label, stale: edad > syncStaleMs)
+    }
+
+    static func dateOnly(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
     }
 }
