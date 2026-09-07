@@ -332,6 +332,50 @@ fun IntegraConfirmDialog(
 }
 
 /**
+ * Selector de una opción entre muchas.
+ *
+ * Con dos regiones o cuatro tipos, una fila de chips va bien; con ciento veinte
+ * puertas, no cabe. Esto es el equivalente móvil del `<select>` de la web: dice
+ * qué hay elegido sin desplegar nada, y sólo abre la lista al tocarlo.
+ */
+@Composable
+fun IntegraPicker(
+    label: String,
+    options: List<Pair<String, String>>,
+    selected: String,
+    emptyLabel: String,
+    onSelect: (String) -> Unit,
+    enabled: Boolean = true,
+) {
+    var open by remember { mutableStateOf(false) }
+    val actual = options.firstOrNull { it.first == selected }?.second ?: emptyLabel
+    Column(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+        Box {
+            OutlinedButton(
+                onClick = { open = true },
+                enabled = enabled && options.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (options.isEmpty()) "Sin opciones" else actual)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                DropdownMenuItem(
+                    text = { Text(emptyLabel) },
+                    onClick = { open = false; onSelect("") },
+                )
+                options.forEach { (valor, etiqueta) ->
+                    DropdownMenuItem(
+                        text = { Text(etiqueta) },
+                        onClick = { open = false; onSelect(valor) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * Pie de lista: cuántas se ven de cuántas hay y cómo pedir más.
  *
  * Cortar una lista en silencio es mentir sobre el inventario. Si hay más, se
