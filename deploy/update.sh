@@ -195,5 +195,26 @@ if [[ "$AUTO_PRUNE_ON_HIGH_DISK" == true ]]; then
   fi
 fi
 
+# --- ARTA/guest Traefik safety (do not remove) ---
+# El servidor es COMPARTIDO: además de NEXARA aloja ARTA, School, Ágora,
+# Family y otros. La configuración real de Traefik NO es la de este repo, vive
+# en /opt/traefik/config, y `deploy/traefik/nexara.yml` solo se copia allí a
+# través de estos scripts, que refrescan lo de NEXARA y **re-afirman todas las
+# rutas de invitados sin borrarlas**.
+#
+# Sin este bloque, un despliegue de NEXARA puede dejar sin rutas a las apps de
+# otros clientes. Vivía sin versionar en el servidor —solo en su copia de
+# trabajo— y un `git pull` que tocara este fichero lo habría borrado sin que
+# nadie se enterara hasta que un cliente ajeno se cayera. Por eso está aquí.
+#
+# Detalle en /opt/traefik/README.md del servidor.
+if [[ -x /opt/traefik/sync-nexara-routes.sh ]]; then
+  bash /opt/traefik/sync-nexara-routes.sh || true
+fi
+if [[ -x /opt/traefik/ensure-guest-routes.sh ]]; then
+  bash /opt/traefik/ensure-guest-routes.sh || true
+fi
+# --- end Traefik safety ---
+
 echo "Done. Service status:"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
