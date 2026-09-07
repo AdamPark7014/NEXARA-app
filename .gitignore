@@ -88,6 +88,23 @@ apps/mobile-native/ios/**/*.xcworkspace/xcuserdata/
 apps/mobile-native/ios/Pods/
 apps/mobile-native/ios/**/*.ipa
 apps/mobile-native/ios/**/GoogleService-Info.plist
+# `NexaraApp.xcodeproj` lo genera XcodeGen desde project.yml dentro del runner.
+# Versionarlo significaria mantener dos definiciones del mismo proyecto y que
+# una de las dos empiece a mentir.
+apps/mobile-native/ios/NexaraApp.xcodeproj/
+apps/mobile-native/ios/.spm-cache/
+
+# Material de firma de iOS. ESTE REPOSITORIO ES PUBLICO: una clave privada o un
+# .p8 subidos aqui quedan expuestos en el acto y, aunque se borren despues,
+# siguen en el historial y en las copias que ya haya clonado cualquiera.
+# El sitio de estos ficheros es C:\dev\secrets\nexara-ios, fuera del arbol.
+*.p12
+*.p8
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+AuthKey_*
 
 # secretos: hojas de credenciales
 *credenciales*.xlsx

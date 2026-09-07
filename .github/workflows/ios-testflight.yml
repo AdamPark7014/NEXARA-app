@@ -1,0 +1,264 @@
+name: iOS · TestFlight
+
+# Construye, firma y sube la app iOS a TestFlight sin que nadie toque una Mac.
+# La Mac existe —es el runner de GitHub— pero se alquila por minutos y en un
+# repositorio público no cuesta nada.
+#
+# ┌─ POR QUÉ SOLO `workflow_dispatch` ────────────────────────────────────────┐
+# │ Este repositorio es PÚBLICO. Un disparador `pull_request` dejaría que     │
+# │ cualquiera abriera un PR desde una bifurcación con un paso que imprime    │
+# │ el certificado de distribución. Con `workflow_dispatch` el flujo solo lo  │
+# │ lanza quien tiene permiso de escritura, desde la pestaña Actions.         │
+# │ NO añadir `push:` ni `pull_request:` aquí.                                │
+# └───────────────────────────────────────────────────────────────────────────┘
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión visible en la tienda (CFBundleShortVersionString), ej. 1.0.0'
+        required: true
+        default: '1.0.0'
+      build:
+        description: 'Número de construcción. Vacío = número de ejecución. Apple EXIGE que suba en cada envío.'
+        required: false
+        default: ''
+      subir:
+        description: 'Subir a TestFlight. Desmárcalo para solo compilar y firmar.'
+        type: boolean
+        required: true
+        default: true
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: Compilar, firmar y subir
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      IOS_DIR: apps/mobile-native/ios
+      BUNDLE_ID: mx.nexara.mobile.NexaraApp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Un secreto que falta se manifiesta mucho más tarde como un error de
+      # firma ilegible ("No signing certificate found"). Esto lo dice de frente
+      # y en el primer medio minuto.
+      - name: Comprobar que están los seis secretos
+        env:
+          P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          P12_PASS: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          TEAM: ${{ secrets.IOS_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          faltan=""
+          [ -n "$P12" ]      || faltan="$faltan IOS_DIST_CERT_P12"
+          [ -n "$P12_PASS" ] || faltan="$faltan IOS_DIST_CERT_PASSWORD"
+          [ -n "$TEAM" ]     || faltan="$faltan IOS_TEAM_ID"
+          [ -n "$KEY_ID" ]   || faltan="$faltan ASC_KEY_ID"
+          [ -n "$ISSUER" ]   || faltan="$faltan ASC_ISSUER_ID"
+          [ -n "$KEY" ]      || faltan="$faltan ASC_PRIVATE_KEY"
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan secretos:$faltan"
+            echo "Créalos con: apps/mobile-native/ios/scripts/subir-secretos.ps1"
+            exit 1
+          fi
+          echo "Los seis secretos están presentes."
+
+      - name: Versión de Xcode del runner
+        run: xcodebuild -version && swift --version
+
+      - name: Instalar XcodeGen
+        run: brew install xcodegen
+
+      # Resolver SocketIO desde cero cuesta ~1 min por construcción. Cachearlo
+      # es la diferencia entre gastar minutos de runner en compilar o en clonar.
+      - name: Caché de paquetes Swift
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.IOS_DIR }}/.spm-cache
+          key: spm-${{ runner.os }}-${{ hashFiles('apps/mobile-native/ios/project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Generar NexaraApp.xcodeproj
+        working-directory: ${{ env.IOS_DIR }}
+        run: |
+          xcodegen generate
+          echo "--- esquemas compartidos generados ---"
+          ls -1 NexaraApp.xcodeproj/xcshareddata/xcschemes/
+
+      # El llavero temporal muere con el runner. `set-key-partition-list` es
+      # imprescindible: sin él `codesign` se queda esperando una autorización
+      # gráfica que en un runner sin sesión nunca llega, y el trabajo agota el
+      # tiempo sin decir por qué.
+      - name: Importar el certificado de distribución
+        env:
+          P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          LLAVERO="$RUNNER_TEMP/firma.keychain-db"
+          CLAVE="$(uuidgen)"
+          echo "LLAVERO=$LLAVERO" >> "$GITHUB_ENV"
+
+          security create-keychain -p "$CLAVE" "$LLAVERO"
+          security set-keychain-settings -lut 21600 "$LLAVERO"
+          security unlock-keychain -p "$CLAVE" "$LLAVERO"
+
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" \
+            -k "$LLAVERO" -P "$P12_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          rm -f "$RUNNER_TEMP/dist.p12"
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$CLAVE" "$LLAVERO" >/dev/null
+          security list-keychains -d user -s "$LLAVERO" login.keychain-db
+
+          echo "--- identidades de firma disponibles ---"
+          security find-identity -v -p codesigning "$LLAVERO"
+
+      # `xcodebuild` y `altool` buscan la clave .p8 en esta ruta por convención.
+      - name: Colocar la clave de App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          RUTA="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "$ASC_PRIVATE_KEY" | base64 --decode > "$RUTA"
+          chmod 600 "$RUTA"
+          echo "ASC_KEY_PATH=$RUTA" >> "$GITHUB_ENV"
+          head -1 "$RUTA" | grep -q "BEGIN PRIVATE KEY" \
+            || { echo "::error::ASC_PRIVATE_KEY no es un .p8 válido en base64"; exit 1; }
+
+      - name: Fijar número de construcción
+        run: |
+          BUILD="${{ inputs.build }}"
+          [ -n "$BUILD" ] || BUILD="${{ github.run_number }}"
+          echo "BUILD_NUMBER=$BUILD" >> "$GITHUB_ENV"
+          echo "Versión ${{ inputs.version }} · construcción $BUILD"
+
+      # `-allowProvisioningUpdates` con la clave de App Store Connect hace que
+      # Xcode registre el identificador, active la capacidad de notificaciones
+      # y descargue el perfil de aprovisionamiento él solo. Es lo que sustituye
+      # a los clics en "Signing & Capabilities".
+      - name: Archivar (Release)
+        working-directory: ${{ env.IOS_DIR }}
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project NexaraApp.xcodeproj \
+            -scheme NexaraApp \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/NexaraApp.xcarchive" \
+            -clonedSourcePackagesDirPath .spm-cache \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            MARKETING_VERSION="${{ inputs.version }}" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            CODE_SIGN_STYLE=Automatic
+
+      - name: Exportar el .ipa
+        working-directory: ${{ env.IOS_DIR }}
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          # Se genera aquí y no se versiona: lleva el identificador de equipo.
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>${TEAM_ID}</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>destination</key>
+              <string>export</string>
+          </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/NexaraApp.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+          IPA="$(ls "$RUNNER_TEMP/export"/*.ipa | head -1)"
+          echo "IPA=$IPA" >> "$GITHUB_ENV"
+          ls -lh "$IPA"
+
+      # Validar antes de subir. Detecta casi todos los rechazos (icono con
+      # alfa, permisos sin descripción, entitlements que el perfil no cubre)
+      # sin consumir un número de construcción en App Store Connect.
+      - name: Validar contra App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcrun altool --validate-app \
+            --type ios \
+            --file "$IPA" \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Subir a TestFlight
+        if: ${{ inputs.subir }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA" \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+          echo "Subido. El procesado en App Store Connect tarda de 5 a 30 min."
+
+      - name: Guardar el .ipa como artefacto
+        if: always() && env.IPA != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexaraApp-${{ inputs.version }}-${{ env.BUILD_NUMBER }}
+          path: ${{ env.IPA }}
+          retention-days: 14
+
+      # El llavero vive en RUNNER_TEMP y se destruye con la máquina, pero
+      # borrarlo explícitamente evita que quede en un volcado si el trabajo se
+      # cancela a medias.
+      - name: Limpiar material de firma
+        if: always()
+        run: |
+          security delete-keychain "$LLAVERO" 2>/dev/null || true
+          rm -rf "$HOME/.appstoreconnect/private_keys" || true
