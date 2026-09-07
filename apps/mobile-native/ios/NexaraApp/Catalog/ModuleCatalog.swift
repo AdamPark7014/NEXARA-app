@@ -148,13 +148,13 @@ enum ModuleCatalog {
     ]
 
     static let studio: [ModuleEntry] = [
-        ModuleEntry("dashboard", "Dashboard", "📊", "/studio/dashboard"),
+        ModuleEntry("dashboard", "Dashboard", "📊", "/studio/dashboard", parityStatus: .soloLectura),
         ModuleEntry("hero", "Carrusel inicio", "🖼️", "/studio/hero"),
         ModuleEntry("pages", "Secciones del sitio", "🌐", "/studio/pages"),
         ModuleEntry("cases", "Casos de éxito", "🏆", "/studio/cases"),
         ModuleEntry("news", "Noticias", "📰", "/studio/news"),
         ModuleEntry("social", "Redes sociales", "📱", "/studio/social"),
-        ModuleEntry("newsletter", "Newsletter", "📬", "/studio/newsletter"),
+        ModuleEntry("newsletter", "Newsletter", "📬", "/studio/newsletter", parityStatus: .soloLectura),
         ModuleEntry("contacts", "Contactos", "✉️", "/studio/contacts"),
         ModuleEntry("leads", "Leads", "✨", "/studio/leads"),
         ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat"),
