@@ -51,7 +51,21 @@ object ModulePanelMap {
         "integra-alarms",
         "integra-occupancy",
         "integra-devices",
+        // `integra-sites` abre la pantalla de Ajustes, no la lista de solo lectura.
         "integra-sites",
+        // Paquetes cableados el 2026-09-07. Sin la clave aquí,
+        // `allowedIntegraKeys()` las descarta y la tarjeta no se pinta nunca,
+        // aunque la ruta exista y la pantalla esté escrita — que es justo como
+        // `chat` y `dispatch` estuvieron invisibles meses.
+        "integra-video",
+        "integra-vehicles",
+        "integra-anpr",
+        "integra-schedules",
+        "integra-espacios",
+        "integra-detection",
+        "integra-audit",
+        "integra-notifications",
+        "integra-my-profile",
     )
 
     /** null = sin filtro (todos los módulos console). */
