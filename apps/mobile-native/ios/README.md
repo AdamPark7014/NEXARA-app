@@ -21,24 +21,30 @@ ios/
 │       └── MyProfileView.swift
 ├── Resources/
 │   ├── Info.plist
-│   └── Assets.xcassets/     # (crear desde Xcode al generar)
+│   ├── Assets.xcassets/     # AppIcon 1024x1024 sin canal alfa
+│   ├── NexaraApp.Debug.entitlements    # aps-environment: development
+│   └── NexaraApp.Release.entitlements  # aps-environment: production
+└── scripts/                 # firma y secretos, desde Windows
 ```
 
 ## Generar el proyecto Xcode
 
-Requiere [XcodeGen](https://github.com/yonaskolb/XcodeGen):
+`NexaraApp.xcodeproj` **no se versiona**: `project.yml` es la única definición y
+el proyecto se genera con [XcodeGen](https://github.com/yonaskolb/XcodeGen). En
+el runner de macOS eso ya pasa solo. A mano, si algún día hay una Mac delante:
 
 ```bash
-brew install xcodegen
-cd apps/mobile-native/ios
-xcodegen generate
-open NexaraApp.xcodeproj
+brew install xcodegen && xcodegen generate && open NexaraApp.xcodeproj
 ```
 
 ## Distribución
 
-La app iOS **no se sirve desde el VPS**: se distribuye por TestFlight / App Store Connect.
-Ver `apps/mobile-native/README.md` para pipeline.
+La app iOS **no se sirve desde el VPS**: se distribuye por TestFlight / App Store
+Connect, y se construye **sin Mac** en un runner de GitHub Actions.
+
+**Léete [`PUBLICAR-SIN-MAC.md`](PUBLICAR-SIN-MAC.md)** — es el runbook completo:
+qué cuesta, qué tiene que hacer Adam una sola vez, cómo se lanza y qué mirar
+cuando falle.
 
 ## Paridad con Android
 

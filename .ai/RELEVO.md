@@ -8,7 +8,66 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — INTEGRA homologado y paridad cerrada
+## Este turno — iOS pasa a ser publicable sin Mac
+
+`MAC_BUILD_PLAYBOOK.md` daba por hecho una Mac física y una sesión de clics en
+Xcode. Este turno lo sustituye por un flujo de GitHub Actions que compila, firma
+y sube a TestFlight sin que nadie se siente delante de una Mac. **Coste real: los
+99 USD/año del Apple Developer Program y nada más** — el runner `macos-15` no
+consume cuota en repositorios públicos, y este lo es.
+
+Runbook completo en `apps/mobile-native/ios/PUBLICAR-SIN-MAC.md`.
+
+### Dos defectos latentes corregidos de paso
+
+Ninguno se había disparado nunca porque **XcodeGen jamás llegó a ejecutarse**:
+
+- **`project.yml` se habría comido `Info.plist`.** El bloque `info:` no añade
+  claves: *regenera* la plist con las que se listen y borra el resto. Se habría
+  llevado las siete cadenas de permisos —ubicación, cámara, fotos, micrófono,
+  seguimiento— y Apple rechaza cualquier binario que use esas API sin su
+  descripción. Ahora es `INFOPLIST_FILE` apuntando a la plist escrita a mano.
+- **Un solo fichero de entitlements con `aps-environment: development`.** APNs
+  distingue los dos entornos y el token de uno no vale en el otro: TestFlight
+  habría dado notificaciones mudas. Ahora hay dos ficheros, uno por
+  configuración, y Release usa `production`.
+
+Además: XcodeGen no crea esquemas compartidos por su cuenta y `xcodebuild
+-scheme` solo ve los compartidos — sin el bloque `schemes:` la construcción
+fallaba con "scheme not found" aun con el proyecto bien generado.
+
+### Firebase fuera, y con motivo
+
+El playbook mandaba añadir `firebase-ios-sdk` a mano. **No hay ni un `import
+Firebase` en los 134 ficheros Swift**: `PushManager` manda el token APNs crudo a
+`POST devices/push-token` con `platform: "ios"`. Añadirlo costaba varios minutos
+de compilación por construcción sin cambiar nada.
+
+### El disparador es manual a propósito — no añadir `push:`
+
+El repositorio es **público**. Un disparador `pull_request` dejaría que
+cualquiera abriese un PR desde una bifurcación con un paso que imprime el
+certificado de distribución. `ios-testflight.yml` solo se lanza a mano, y así
+debe quedarse.
+
+### Verificado desde Windows
+
+Los tres YAML analizan. El `ExportOptions.plist` que genera el heredoc es un
+plist válido. El camino de OpenSSL está probado de punta a punta simulando a
+Apple con un certificado autofirmado: CSR, DER→PEM, `.p12` y las verificaciones
+de contraseña correcta e incorrecta.
+
+**Lo que NO está verificado: que los 134 ficheros Swift compilen.** Nunca ha
+pasado un `xcodebuild` por encima. Es probable que la primera construcción falle
+con errores de compilación; para eso está `subir=false`.
+
+### Sobre el `.p12`: ni AES-256 ni `-legacy`
+
+Por omisión OpenSSL 3 cifra con AES-256 y `security import` de macOS ha fallado
+con eso. `-legacy` produce RC2 de 40 bits: débil, y releerlo exige cargar otra
+vez el proveedor legacy. Se usa `PBE-SHA1-3DES`, medido y probado.
+
+## Turno anterior — INTEGRA homologado y paridad cerrada
 
 Cursor rescató en dos commits WIP el trabajo de los siete agentes que
 murieron a media escritura y dejó los contratos de cableado listos. Este
@@ -105,6 +164,13 @@ Si alguien los ve y piensa que falta trabajo, es deliberado:
 
 ## A medias / decisiones de Adam
 
+0. **iOS: cinco trámites que solo puede hacer Adam.** Alta en el Apple
+   Developer Program (99 USD/año), clave de la API de App Store Connect,
+   certificado de distribución (guion de Windows, no hace falta Mac), alta de la
+   app en App Store Connect y carga de los seis secretos. Paso a paso en
+   `apps/mobile-native/ios/PUBLICAR-SIN-MAC.md`. Hasta que eso exista, el flujo
+   falla en el primer paso y lo dice claro.
+
 1. **P0 SIN DESPLEGAR — sigue siendo lo primero.**
    `https://integra.nexara.com.mx/go2rtc/api/streams` responde **200 desde
    fuera** con las credenciales RTSP de las cámaras en claro. El parche está
@@ -127,6 +193,18 @@ Si alguien los ve y piensa que falta trabajo, es deliberado:
    `.ai/auditoria-2026-09/02-rbac-web-modulos-por-rol.md`.
 6. **Al desplegar**: quien nunca haya tocado el interruptor de GPS dejará de
    aparecer en el mapa del equipo. Es correcto; conviene avisarlo antes.
+
+## Aviso de concurrencia — 2026-09-07 12:48
+
+Al arrancar este turno, `relevo estado` daba la punta en `fbb17971`; minutos
+después habían entrado cinco commits más, el último a las 12:38. **Había otro
+agente trabajando esta misma rama en paralelo**, contra la regla de un agente a
+la vez. Este turno se limitó a `apps/mobile-native/ios/`, `.github/workflows/` y
+`.gitignore` para no cruzarse; no se tocó Android, deploy ni web.
+
+Además, `RELEVO.md` pedía «recompilar el AAB, el de disco es versionCode 5»
+cuando `fbb17971` ya decía haberlo compilado con versionCode 7: el disco
+contradecía al relevo. **Sin resolver — lo decide Adam.**
 
 ## Abierto, con dueño claro
 
