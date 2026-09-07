@@ -25,7 +25,36 @@ en el repo.
 
 ---
 
-## 1. Cuenta de desarrollador — organización **[TÚ]**
+> ## ✅ Estado real de la consola — verificado el 07-09-2026
+>
+> Las secciones 1, 2 y 3 **ya están hechas**. Confirmado en Play Console:
+>
+> | | |
+> |---|---|
+> | Cuenta | Organización — *New Engineering Expertise And Resource Advancement* |
+> | App | **NEXARA** · `mx.nexara.mobile.nativeapp` |
+> | Estado | **Producción** |
+> | Última actualización | **31 ago 2026** (v1) |
+> | Usuarios con la app | **0** |
+>
+> **`versionCode` seguro:** la v1 se publicó el 31-08 y el AAB que se compiló
+> ese día llevaba `versionCode 5`. Por tanto **7 está libre**. Aun así,
+> confírmalo en *NEXARA → Versiones → Panel de versiones* antes de subir:
+> Play no reutiliza un número ya subido ni aunque descartaras ese bundle.
+>
+> **Cero usuarios** significa que puedes subir directo a Producción sin
+> romperle la app a nadie. La única razón para pasar antes por Prueba interna
+> es cazar un fallo del build minificado sin gastar una revisión.
+>
+> **Pendiente que aparece en tu consola:** el aviso de *Verificación de
+> desarrolladores de Android*. Léelo y resuélvelo desde el botón que trae;
+> es un requisito de cuenta, no de esta versión, pero conviene no dejarlo.
+>
+> Empieza por la **sección 4**.
+
+---
+
+## 1. Cuenta de desarrollador — organización **[TÚ]** ✅ HECHO
 
 1. https://play.google.com/console/signup → tipo de cuenta **Organización**.
 2. Cuota única de **25 USD** (tarjeta; no es suscripción).
@@ -39,7 +68,7 @@ después del 13-nov-2023. Con cuenta de organización puedes ir directo a produc
 
 ---
 
-## 2. Crear la app en Play Console **[TÚ]**
+## 2. Crear la app en Play Console **[TÚ]** ✅ HECHO
 
 - Nombre: `NEXARA` · Idioma predeterminado: **Español (Latinoamérica)**
 - Tipo: **App** · Gratuita (no se puede cambiar a de pago después)
@@ -47,7 +76,7 @@ después del 13-nov-2023. Con cuenta de organización puedes ir directo a produc
 
 ---
 
-## 3. Firma de la app
+## 3. Firma de la app ✅ HECHO
 
 Ya está resuelto localmente:
 

@@ -1,7 +1,11 @@
 param(
   [switch]$SkipAabCheck,
   [switch]$SkipCompile,
-  [switch]$SkipTests
+  [switch]$SkipTests,
+  # Compila desde cero. AVISO: `clean` borra `build/` entero, así que se lleva
+  # por delante el AAB de release que el paso 1 acaba de validar. Úsalo solo
+  # cuando sospeches de un árbol sucio, y recompila el bundle después.
+  [switch]$CleanBuild
 )
 
 # ============================================================================
@@ -111,9 +115,24 @@ else {
 Push-Location $androidDir
 try {
   # --- 2) Compile ---
+  # OJO: aquí había un `gradlew clean`. El paso 1 comprueba que el AAB de
+  # release existe y es más nuevo que el código… y `clean` borra `build/`
+  # entero, AAB incluido. Es decir: verificar el bundle lo destruía, y al
+  # terminar el smoke te quedabas sin nada que subir. Ocurrió de verdad el
+  # 07-09-2026 con el bundle de la v2 recién firmado.
+  #
+  # `assembleDebug` no necesita partir de cero: Gradle recompila lo que
+  # cambió. Si de verdad hace falta un árbol limpio, pásalo a propósito con
+  # -CleanBuild, que además avisa de que se lleva el AAB por delante.
   if (-not $SkipCompile) {
-    Write-Step "2/3 Compilar (clean assembleDebug)"
-    & $gradlew clean assembleDebug --no-daemon
+    if ($CleanBuild) {
+      Write-Step "2/3 Compilar (clean assembleDebug) — BORRA el AAB de release"
+      & $gradlew clean assembleDebug --no-daemon
+    }
+    else {
+      Write-Step "2/3 Compilar (assembleDebug, conserva el AAB de release)"
+      & $gradlew assembleDebug --no-daemon
+    }
     if ($LASTEXITCODE -ne 0) {
       Fail "assembleDebug falló (exit $LASTEXITCODE)"
     }
