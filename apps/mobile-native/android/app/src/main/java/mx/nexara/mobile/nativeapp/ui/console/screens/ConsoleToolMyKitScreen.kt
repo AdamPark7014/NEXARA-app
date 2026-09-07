@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ToolKitAssignmentDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
@@ -62,7 +63,7 @@ class ConsoleToolMyKitViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.myToolKit() }
                 _state.update { it.copy(isLoading = false, items = list, error = null) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message ?: "No se pudo cargar mi kit") }
+                _state.update { it.copy(isLoading = false, error = e.toUserMessage("No se pudo cargar mi kit")) }
             }
         }
     }
@@ -80,7 +81,7 @@ class ConsoleToolMyKitViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(reportText = "", reportingId = null) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(reportingId = null, error = e.message ?: "No se pudo reportar") }
+                _state.update { it.copy(reportingId = null, error = e.toUserMessage("No se pudo reportar")) }
             }
         }
     }

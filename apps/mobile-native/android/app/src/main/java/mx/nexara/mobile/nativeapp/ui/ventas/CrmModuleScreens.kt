@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.data.api.CrmOpportunityDto
@@ -157,7 +158,7 @@ class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.opportunityDtos() }
                 _state.update { it.copy(isLoading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -173,7 +174,7 @@ class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 if (id != null) onCreated(id)
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }
@@ -185,7 +186,7 @@ class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }
@@ -197,7 +198,7 @@ class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }
@@ -406,7 +407,7 @@ class CrmClientesViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.clientDtos() }
                 _state.update { it.copy(isLoading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -515,7 +516,7 @@ class CrmProductsViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.productDtos(q) }
                 _state.update { it.copy(isLoading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -706,7 +707,7 @@ class CrmProyectosViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.projectDtos() }
                 _state.update { it.copy(isLoading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -805,7 +806,7 @@ private fun CrmProjectDetailScreen(
                 actionMsg = "✅ $okLabel"
                 onChanged()
             } catch (e: Exception) {
-                actionMsg = "❌ ${e.message ?: "No se pudo completar la operación"}"
+                actionMsg = "❌ ${e.toUserMessage("No se pudo completar la operación")}"
             } finally {
                 acting = false
             }

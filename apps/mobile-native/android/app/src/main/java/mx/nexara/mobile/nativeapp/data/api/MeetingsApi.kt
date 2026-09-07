@@ -4,6 +4,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -43,6 +44,19 @@ interface MeetingsApi {
     /** Cierra la junta y guarda la minuta. */
     @POST("reuniones/{id}/cerrar")
     suspend fun closeMeeting(@Path("id") id: Long, @Body body: CloseMeetingBody): okhttp3.ResponseBody
+
+    /**
+     * Pasa lista. Reemplaza la lista completa de asistentes.
+     *
+     * El servidor sustituye, no fusiona (`setAttendance`): hay que mandar
+     * **todos** los convocados en cada llamada o los que falten quedan fuera
+     * del acta.
+     */
+    @PUT("reuniones/{id}/asistencia")
+    suspend fun setAttendance(
+        @Path("id") id: Long,
+        @Body body: MeetingAttendanceBody,
+    ): okhttp3.ResponseBody
 
     @POST("reuniones/{id}/acuerdos")
     suspend fun addAgreement(@Path("id") id: Long, @Body body: CreateAgreementBody): okhttp3.ResponseBody
@@ -111,6 +125,10 @@ data class UpdateAgreementBody(
 
 data class UpdateMyAgreementBody(val estado: String)
 
+data class MeetingAttendeeMark(val userId: Long, val asistio: Boolean = true)
+
+data class MeetingAttendanceBody(val asistentes: List<MeetingAttendeeMark>)
+
 // ── Catálogo del dominio ──────────────────────────────────────────────────
 
 /**
@@ -162,6 +180,49 @@ object MeetingCatalog {
         "CUMPLIDO" to "Cumplido",
         "CANCELADO" to "Cancelado",
     )
+
+    /**
+     * Puntos de agenda sugeridos por tipo (espejo de `MEETING_AGENDA`).
+     *
+     * No es decorado. La junta del viernes que no pregunta explícitamente por
+     * lecciones aprendidas acaba siendo un repaso de pendientes: por eso el
+     * punto viene escrito de fábrica y el móvil lo propone igual que la web.
+     * El servidor rellena la agenda si va vacía, así que esto es lo que la
+     * persona ve **antes** de convocar, no una segunda verdad.
+     */
+    val AGENDA: Map<String, List<String>> = mapOf(
+        "DIARIA" to listOf(
+            "Prioridades del día",
+            "Servicios programados",
+            "Materiales y herramienta requeridos",
+            "Bloqueos e incidencias abiertas",
+        ),
+        "PLANEACION_SEMANAL" to listOf(
+            "Metas de la semana",
+            "Asignación de actividades por técnico",
+            "Compras y materiales a gestionar",
+            "Riesgos previstos",
+        ),
+        "REVISION_AVANCES" to listOf(
+            "Avance contra el plan del lunes",
+            "Actividades en riesgo de SLA",
+            "Ajustes de asignación",
+        ),
+        "CIERRE_SEMANAL" to listOf(
+            "Resultados de la semana",
+            "Problemas encontrados",
+            "Lecciones aprendidas",
+            "Acuerdos para la semana entrante",
+        ),
+        "EXTRAORDINARIA" to listOf("Motivo de la convocatoria", "Acuerdos"),
+    )
+
+    /** Agenda sugerida ya formateada como líneas, lista para el campo de texto. */
+    fun suggestedAgenda(tipo: String): String =
+        AGENDA[tipo.trim().uppercase()].orEmpty().joinToString("\n") { "• $it" }
+
+    /** Título por defecto del ritmo — el mismo que pondría el servidor. */
+    fun defaultTitle(tipo: String): String = typeLabel(tipo)
 
     /** Estados en los que el acuerdo todavía espera algo de alguien. */
     val OPEN_AGREEMENT_STATUSES: Set<String> = setOf("PENDIENTE", "EN_PROCESO")
@@ -304,29 +365,56 @@ data class MeetingAgreementDto(
     }
 }
 
+/**
+ * Una persona convocada al acta.
+ *
+ * Lleva `userId` a propósito. La versión anterior aplanaba la lista a cadenas
+ * («Ana ✓») y con eso se podía dibujar la asistencia pero no **pasar lista**:
+ * `PUT reuniones/{id}/asistencia` reemplaza la lista completa y necesita los
+ * ids de todos los convocados, no sus nombres.
+ */
+data class MeetingAttendeeDto(
+    val userId: Long = 0L,
+    val nombre: String = "",
+    val asistio: Boolean = false,
+) {
+    val rowKey: String get() = "att-$userId"
+    val displayName: String get() = nombre.ifBlank { "Usuario $userId" }
+
+    companion object {
+        fun fromRaw(row: Map<String, Any?>): MeetingAttendeeDto {
+            @Suppress("UNCHECKED_CAST")
+            val user = row["user"] as? Map<String, Any?>
+            return MeetingAttendeeDto(
+                userId = ProcParse.lng(row["userId"], user?.get("id")) ?: 0L,
+                nombre = ProcParse.str(user?.get("nombre"), user?.get("email")),
+                asistio = row["asistio"] == true,
+            )
+        }
+    }
+}
+
 /** Detalle completo de una reunión: cabecera + acuerdos + asistentes. */
 data class MeetingDetailDto(
     val meeting: MeetingDto = MeetingDto(),
     val acuerdos: List<MeetingAgreementDto> = emptyList(),
-    val asistentes: List<String> = emptyList(),
+    val asistentes: List<MeetingAttendeeDto> = emptyList(),
 ) {
+    /** «3 de 7 asistieron» — lo primero que se pregunta al abrir un acta vieja. */
+    val attendanceLabel: String
+        get() = if (asistentes.isEmpty()) "Sin convocados" else
+            "${asistentes.count { it.asistio }} de ${asistentes.size} asistieron"
+
     companion object {
         fun fromRaw(row: Map<String, Any?>): MeetingDetailDto {
-            @Suppress("UNCHECKED_CAST")
             val acuerdosRaw = (row["acuerdos"] as? List<*>).orEmpty().filterIsInstance<Map<String, Any?>>()
-            @Suppress("UNCHECKED_CAST")
             val asistentesRaw = (row["asistentes"] as? List<*>).orEmpty().filterIsInstance<Map<String, Any?>>()
             return MeetingDetailDto(
                 meeting = MeetingDto.fromRaw(row),
                 acuerdos = acuerdosRaw.map { MeetingAgreementDto.fromRaw(it) },
-                asistentes = asistentesRaw.mapNotNull { a ->
-                    @Suppress("UNCHECKED_CAST")
-                    val user = a["user"] as? Map<String, Any?>
-                    val nombre = ProcParse.str(user?.get("nombre"), user?.get("email"))
-                    if (nombre.isBlank()) null else {
-                        if (a["asistio"] == true) "$nombre ✓" else nombre
-                    }
-                },
+                // Una fila sin id de usuario no se puede volver a mandar en el
+                // acta; se descarta en vez de viajar como userId=0.
+                asistentes = asistentesRaw.map { MeetingAttendeeDto.fromRaw(it) }.filter { it.userId > 0L },
             )
         }
     }

@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.HeroSlideDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -99,7 +100,7 @@ class StudioHeroViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.heroSlides() }
                 _state.update { it.copy(loading = false, refreshing = false, slides = list.sortedBy { s -> s.position ?: 0 }) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, refreshing = false, error = e.message ?: "Error al cargar carrusel") }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.toUserMessage("Error al cargar carrusel")) }
             }
         }
     }
@@ -158,7 +159,7 @@ class StudioHeroViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(saving = false, showEditor = false, message = "Guardado") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo guardar") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo guardar")) }
             }
         }
     }
@@ -169,7 +170,7 @@ class StudioHeroViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.deleteHeroSlide(id) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }
@@ -188,7 +189,7 @@ class StudioHeroViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.reorderHeroSlides(list.map { it.id }) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }

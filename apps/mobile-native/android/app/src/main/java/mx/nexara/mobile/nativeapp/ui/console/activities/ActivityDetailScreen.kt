@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceDetailDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
@@ -92,7 +93,7 @@ fun ActivityDetailScreen(
                 editing = false
                 snackbarHostState.showSnackbar("Actividad actualizada")
             } catch (e: Exception) {
-                saveError = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo guardar"
+                saveError = e.toUserMessage("No se pudo guardar")
             } finally {
                 saving = false
             }

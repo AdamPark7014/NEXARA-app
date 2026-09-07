@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -77,7 +78,7 @@ class StudioNewsletterViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.newsletter(q) }
                 _state.update { it.copy(loading = false, refreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, refreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -184,7 +185,7 @@ class StudioPagesViewModel(app: Application) : AndroidViewModel(app) {
                 val sections = withContext(Dispatchers.IO) { repo.pageSections() }
                 _state.update { it.copy(loading = false, refreshing = false, sections = sections) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, refreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -197,7 +198,7 @@ class StudioPagesViewModel(app: Application) : AndroidViewModel(app) {
                 val json = moshi.adapter(Any::class.java).toJson(row.content ?: emptyMap<String, Any>())
                 _state.update { it.copy(loading = false, jsonDraft = json) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -215,7 +216,7 @@ class StudioPagesViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.upsertPageContent(section, parsed) }
                 _state.update { it.copy(saving = false) }
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "JSON inválido") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("JSON inválido")) }
             }
         }
     }

@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
@@ -78,7 +79,7 @@ class CrmReportsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(loading = false, isRefreshing = false, metrics = metrics, vendors = vendors) }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(loading = false, isRefreshing = false, error = e.message ?: "Error al cargar reportes")
+                    it.copy(loading = false, isRefreshing = false, error = e.toUserMessage("Error al cargar reportes"))
                 }
             }
         }

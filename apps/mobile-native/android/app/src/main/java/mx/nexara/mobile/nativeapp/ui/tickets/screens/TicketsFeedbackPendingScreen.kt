@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.PendingFeedbackTicketDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
@@ -98,7 +99,7 @@ class TicketsFeedbackPendingViewModel(app: Application) : AndroidViewModel(app) 
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cargar feedback pendiente",
+                        error = e.toUserMessage("No se pudo cargar feedback pendiente"),
                     )
                 }
             }
@@ -131,7 +132,7 @@ class TicketsFeedbackPendingViewModel(app: Application) : AndroidViewModel(app) 
                 _state.update {
                     it.copy(
                         saving = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo enviar feedback",
+                        error = e.toUserMessage("No se pudo enviar feedback"),
                     )
                 }
             }

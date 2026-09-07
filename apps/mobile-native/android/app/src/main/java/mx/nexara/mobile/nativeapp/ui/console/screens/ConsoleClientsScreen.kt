@@ -54,6 +54,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ActivityDetailedDto
 import mx.nexara.mobile.nativeapp.data.api.InventorySnapshotDto
 import mx.nexara.mobile.nativeapp.data.api.ServiceClientDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
@@ -239,7 +240,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
                 val clients = withContext(Dispatchers.IO) { repo.serviceClients() }
                 _state.update { it.copy(isLoading = false, clients = clients, error = null) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message ?: "No se pudo cargar clientes") }
+                _state.update { it.copy(isLoading = false, error = e.toUserMessage("No se pudo cargar clientes")) }
             }
         }
     }
@@ -265,7 +266,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message ?: "No se pudo cargar tickets") }
+                _state.update { it.copy(isLoading = false, error = e.toUserMessage("No se pudo cargar tickets")) }
             }
         }
     }
@@ -352,7 +353,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 refreshAll()
             } catch (e: Exception) {
-                _state.update { it.copy(createSubmitting = false, createMessage = e.message ?: "No se pudo crear el cliente") }
+                _state.update { it.copy(createSubmitting = false, createMessage = e.toUserMessage("No se pudo crear el cliente")) }
             }
         }
     }
@@ -390,7 +391,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(editSubmitting = false, editMessage = "Cliente actualizado", editingId = null, editLogoUri = null) }
                 refreshAll()
             } catch (e: Exception) {
-                _state.update { it.copy(editSubmitting = false, editMessage = e.message ?: "No se pudo actualizar el cliente") }
+                _state.update { it.copy(editSubmitting = false, editMessage = e.toUserMessage("No se pudo actualizar el cliente")) }
             }
         }
     }
@@ -405,7 +406,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
                 openPdfFile(context, file)
                 _state.update { it.copy(submitting = false) }
             } catch (e: Exception) {
-                _state.update { it.copy(submitting = false, error = e.message ?: "No se pudo descargar PDF") }
+                _state.update { it.copy(submitting = false, error = e.toUserMessage("No se pudo descargar PDF")) }
             }
         }
     }
@@ -420,7 +421,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
                 openPdfFile(context, file)
                 _state.update { it.copy(submitting = false) }
             } catch (e: Exception) {
-                _state.update { it.copy(submitting = false, error = e.message ?: "No se pudo descargar reporte") }
+                _state.update { it.copy(submitting = false, error = e.toUserMessage("No se pudo descargar reporte")) }
             }
         }
     }
@@ -435,7 +436,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
                 openPdfFile(context, file)
                 _state.update { it.copy(submitting = false) }
             } catch (e: Exception) {
-                _state.update { it.copy(submitting = false, error = e.message ?: "No se pudo descargar inventario") }
+                _state.update { it.copy(submitting = false, error = e.toUserMessage("No se pudo descargar inventario")) }
             }
         }
     }
@@ -449,7 +450,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(submitting = false) }
                 refreshTicketsData()
             } catch (e: Exception) {
-                _state.update { it.copy(submitting = false, error = e.message ?: "No se pudo actualizar estatus") }
+                _state.update { it.copy(submitting = false, error = e.toUserMessage("No se pudo actualizar estatus")) }
             }
         }
     }

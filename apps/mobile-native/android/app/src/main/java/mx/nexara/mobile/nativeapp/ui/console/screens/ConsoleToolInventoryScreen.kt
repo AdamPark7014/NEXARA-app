@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ToolInventoryItemDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
@@ -68,7 +69,7 @@ class ConsoleToolInventoryViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _state.update { it.copy(isLoading = false, items = list, error = null) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message ?: "No se pudo cargar inventario") }
+                _state.update { it.copy(isLoading = false, error = e.toUserMessage("No se pudo cargar inventario")) }
             }
         }
     }

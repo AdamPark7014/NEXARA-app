@@ -201,7 +201,7 @@ class ConsoleUsersViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { msg -> msg.isNotBlank() } ?: "No se pudieron cargar usuarios",
+                        error = e.toUserMessage("No se pudieron cargar usuarios"),
                     )
                 }
             }

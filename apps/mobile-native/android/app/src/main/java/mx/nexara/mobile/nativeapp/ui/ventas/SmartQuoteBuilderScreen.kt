@@ -47,6 +47,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.ui.common.NxAsyncImage
 import mx.nexara.mobile.nativeapp.data.api.CommercialRuleDto
 import mx.nexara.mobile.nativeapp.data.api.LogisticsZoneDto
@@ -179,7 +180,7 @@ class SmartQuoteViewModel(app: Application) : AndroidViewModel(app) {
             val list = repo.search(s.query, s.targetMargin, s.optimizeMode, s.selectedBrand, s.selectedCategory)
             _state.update { it.copy(loading = false, results = list) }
         } catch (e: Exception) {
-            _state.update { it.copy(loading = false, error = e.message ?: "Error de búsqueda") }
+            _state.update { it.copy(loading = false, error = e.toUserMessage("Error de búsqueda")) }
         }
     }
 
@@ -287,7 +288,7 @@ class SmartQuoteViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 scheduleMarginChecks()
             } catch (e: Exception) {
-                _state.update { it.copy(configureLoading = false, error = e.message ?: "No se pudo configurar") }
+                _state.update { it.copy(configureLoading = false, error = e.toUserMessage("No se pudo configurar")) }
             }
         }
     }
@@ -348,7 +349,7 @@ class SmartQuoteViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 scheduleMarginChecks()
             } catch (e: Exception) {
-                _state.update { it.copy(copilotLoading = false, error = e.message ?: "Copilot no disponible") }
+                _state.update { it.copy(copilotLoading = false, error = e.toUserMessage("Copilot no disponible")) }
             }
         }
     }
@@ -397,7 +398,7 @@ class SmartQuoteViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(laborLoading = false, cart = it.cart + laborLines) }
                 scheduleMarginChecks()
             } catch (e: Exception) {
-                _state.update { it.copy(laborLoading = false, error = e.message ?: "No se pudo sugerir MO") }
+                _state.update { it.copy(laborLoading = false, error = e.toUserMessage("No se pudo sugerir MO")) }
             }
         }
     }
@@ -461,7 +462,7 @@ class SmartQuoteViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(saving = false, savedQuoteId = id) }
                 onDone(id)
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo guardar") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo guardar")) }
             }
         }
     }

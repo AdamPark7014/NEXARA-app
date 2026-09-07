@@ -32,6 +32,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceDetailDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceRowDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
@@ -144,7 +145,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         reviewingActivityId = null,
-                        reviewMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo aprobar"}",
+                        reviewMessage = "❌ ${e.toUserMessage("No se pudo aprobar")}",
                     )
                 }
             }
@@ -195,7 +196,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         reviewingActivityId = null,
-                        reviewMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo rechazar"}",
+                        reviewMessage = "❌ ${e.toUserMessage("No se pudo rechazar")}",
                     )
                 }
             }
@@ -235,7 +236,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 val geo = if (useLat != 0.0 || useLng != 0.0) " · GPS ok" else " · sin GPS"
                 setUploadMessage("Entrada guardada$geo. Sigue con fotos de evidencia.")
             } catch (e: Exception) {
-                setUploadMessage(e.message?.takeIf { it.isNotBlank() } ?: "No se pudo guardar la foto de entrada")
+                setUploadMessage(e.toUserMessage("No se pudo guardar la foto de entrada"))
             } finally {
                 setUploading(null)
             }
@@ -253,7 +254,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(selectedEvidence = updated) }
                 setUploadMessage("Evidencias guardadas. Sube la hoja PDF.")
             } catch (e: Exception) {
-                setUploadMessage(e.message?.takeIf { it.isNotBlank() } ?: "No se pudieron guardar las evidencias")
+                setUploadMessage(e.toUserMessage("No se pudieron guardar las evidencias"))
             } finally {
                 setUploading(null)
             }
@@ -271,7 +272,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(selectedEvidence = updated) }
                 setUploadMessage("PDF guardado. Completa la plantilla interna.")
             } catch (e: Exception) {
-                setUploadMessage(e.message?.takeIf { it.isNotBlank() } ?: "No se pudo guardar el PDF")
+                setUploadMessage(e.toUserMessage("No se pudo guardar el PDF"))
             } finally {
                 setUploading(null)
             }
@@ -304,7 +305,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(selectedEvidence = updated) }
                 setUploadMessage("Plantilla completada. Sube foto de salida.")
             } catch (e: Exception) {
-                setUploadMessage(e.message?.takeIf { it.isNotBlank() } ?: "No se pudo completar la plantilla")
+                setUploadMessage(e.toUserMessage("No se pudo completar la plantilla"))
             } finally {
                 setUploading(null)
             }
@@ -339,7 +340,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 val geo = if (useLat != 0.0 || useLng != 0.0) " · GPS ok" else " · sin GPS"
                 setUploadMessage("Flujo completado$geo. Evidencia enviada para revisión.")
             } catch (e: Exception) {
-                setUploadMessage(e.message?.takeIf { it.isNotBlank() } ?: "No se pudo guardar la foto de salida")
+                setUploadMessage(e.toUserMessage("No se pudo guardar la foto de salida"))
             } finally {
                 setUploading(null)
             }
@@ -355,7 +356,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 onBytes(bytes)
             } catch (e: Exception) {
                 _state.update { it.copy(downloadingReport = false) }
-                onError(e.message ?: "Error al descargar")
+                onError(e.toUserMessage("Error al descargar"))
             }
         }
     }
@@ -412,7 +413,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar evidencias",
+                        error = e.toUserMessage("No se pudieron cargar evidencias"),
                     )
                 }
             }

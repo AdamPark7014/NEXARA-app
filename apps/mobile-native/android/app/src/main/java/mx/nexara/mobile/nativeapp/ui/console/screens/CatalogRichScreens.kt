@@ -39,6 +39,7 @@ import mx.nexara.mobile.nativeapp.data.api.AuditEntryDto
 import mx.nexara.mobile.nativeapp.data.api.ContactMessageDto
 import mx.nexara.mobile.nativeapp.data.api.DocumentDto
 import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -106,7 +107,7 @@ private fun <T> CatalogRichScreen(
             try {
                 items = withContext(Dispatchers.IO) { load(repo) }
             } catch (e: Exception) {
-                error = e.message ?: "No se pudieron cargar los registros"
+                error = e.toUserMessage("No se pudieron cargar los registros")
             } finally {
                 loading = false
                 isRefreshing = false
@@ -244,7 +245,7 @@ fun DocumentsRichScreen() {
             try {
                 items = withContext(Dispatchers.IO) { repo.documents() }
             } catch (e: Exception) {
-                error = e.message ?: "No se pudieron cargar documentos"
+                error = e.toUserMessage("No se pudieron cargar documentos")
             } finally {
                 loading = false
                 isRefreshing = false
@@ -308,7 +309,7 @@ fun DocumentsRichScreen() {
                             titleInput = ""; fileDataUrl = null
                             reload(initial = false)
                         } catch (e: Exception) {
-                            actionMessage = "❌ ${e.message ?: "No se pudo subir"}"
+                            actionMessage = "❌ ${e.toUserMessage("No se pudo subir")}"
                         } finally {
                             uploading = false
                         }
@@ -333,7 +334,7 @@ fun DocumentsRichScreen() {
                     selected = null
                     reload(initial = false)
                 } catch (e: Exception) {
-                    actionMessage = "❌ ${e.message ?: "No se pudo completar la acción"}"
+                    actionMessage = "❌ ${e.toUserMessage("No se pudo completar la acción")}"
                 } finally {
                     uploading = false
                 }

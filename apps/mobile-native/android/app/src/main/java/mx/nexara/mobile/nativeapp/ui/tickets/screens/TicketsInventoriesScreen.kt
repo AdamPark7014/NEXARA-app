@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalInventorySnapshotDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
@@ -71,7 +72,7 @@ class TicketsInventoriesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar inventarios",
+                        error = e.toUserMessage("No se pudieron cargar inventarios"),
                     )
                 }
             }
@@ -93,7 +94,7 @@ class TicketsInventoriesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         downloading = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo descargar el reporte",
+                        error = e.toUserMessage("No se pudo descargar el reporte"),
                     )
                 }
             }

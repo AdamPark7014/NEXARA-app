@@ -526,6 +526,10 @@ fun ConsoleNavHost(
                         )
                     } }
                     "approvals" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ApprovalsScreen() } }
+                    // Ritmo operativo (`/erp/reuniones`). El módulo no existía
+                    // en el móvil: la junta de las 10:00 y los acuerdos que
+                    // salen de ella sólo se veían desde la web.
+                    "reuniones" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MeetingsScreen() } }
                     "notifications-center" -> { {
                         mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen(
                             onBack = { navController.popBackStack() },
@@ -603,6 +607,7 @@ fun ConsoleNavHost(
                         "viatics", "vehicles", "gps", "tools", "clients", "projects", "users",
                         "attendance", "settings", "offline-queue", "offline", "my-profile",
                         "news","contact-messages","newsletter","audit","analytics","bi","executive","dispatch","approvals",
+                        "reuniones",
                         "notifications-center","chat","noc","support-sla","support","maintenance-contracts",
                         "companies","kb","exports","architecture","calendar","orgchart","kpis-hr",
                         "expenses",

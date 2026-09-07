@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.SocialPostDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.studio.StudioDashboardStats
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
@@ -72,7 +73,7 @@ class StudioDashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val stats = withContext(Dispatchers.IO) { repo.dashboardStats() }
                 _state.update { it.copy(loading = false, stats = stats) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Error al cargar dashboard") }
+                _state.update { it.copy(loading = false, error = e.toUserMessage("Error al cargar dashboard")) }
             }
         }
     }

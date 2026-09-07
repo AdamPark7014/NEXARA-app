@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ServiceSheetListDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.ops.OpsRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
@@ -142,7 +143,7 @@ class ClientTicketsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "Notas guardadas", selected = null) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, error = e.message) }
+                _state.update { it.copy(acting = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -161,7 +162,7 @@ class ClientTicketsViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.clientTicketRequestDtos(st) }
                 _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -174,7 +175,7 @@ class ClientTicketsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "Estado actualizado", selected = null) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, error = e.message) }
+                _state.update { it.copy(acting = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -361,7 +362,7 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(loading = false, isRefreshing = false, requisitions = reqs, orders = orders, goodsReceipts = gr)
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -384,7 +385,7 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "Actualizado", selected = null, rejectReason = "") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, error = e.message) }
+                _state.update { it.copy(acting = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -571,7 +572,7 @@ fun ServiceSheetsModuleScreen() {
             try {
                 items = withContext(Dispatchers.IO) { repo.serviceSheetDtos() }
             } catch (e: Exception) {
-                error = e.message ?: "No se pudieron cargar hojas de servicio"
+                error = e.toUserMessage("No se pudieron cargar hojas de servicio")
             } finally {
                 loading = false
                 isRefreshing = false
@@ -736,7 +737,7 @@ class MaintenanceViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -756,7 +757,7 @@ class MaintenanceViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }

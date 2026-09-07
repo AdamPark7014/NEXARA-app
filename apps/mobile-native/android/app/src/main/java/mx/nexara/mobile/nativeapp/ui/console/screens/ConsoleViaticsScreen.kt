@@ -58,6 +58,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ViaticDto
 import mx.nexara.mobile.nativeapp.data.api.VisibleUserDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
@@ -114,7 +115,7 @@ class ConsoleViaticsViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message ?: "No se pudieron cargar viáticos",
+                        error = e.toUserMessage("No se pudieron cargar viáticos"),
                     )
                 }
             }
@@ -147,7 +148,7 @@ class ConsoleViaticsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         creating = false,
-                        actionMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo crear"}",
+                        actionMessage = "❌ ${e.toUserMessage("No se pudo crear")}",
                     )
                 }
             }
@@ -181,7 +182,7 @@ class ConsoleViaticsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         creating = false,
-                        actionMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo asignar"}",
+                        actionMessage = "❌ ${e.toUserMessage("No se pudo asignar")}",
                     )
                 }
             }
@@ -208,7 +209,7 @@ class ConsoleViaticsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         actingId = null,
-                        actionMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo actualizar"}",
+                        actionMessage = "❌ ${e.toUserMessage("No se pudo actualizar")}",
                     )
                 }
             }
@@ -226,7 +227,7 @@ class ConsoleViaticsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         actingId = null,
-                        actionMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo marcar pagado"}",
+                        actionMessage = "❌ ${e.toUserMessage("No se pudo marcar pagado")}",
                     )
                 }
             }

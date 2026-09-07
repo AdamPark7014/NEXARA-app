@@ -33,6 +33,7 @@ import mx.nexara.mobile.nativeapp.data.api.CrmOppNoteDto
 import mx.nexara.mobile.nativeapp.data.api.CrmOppQuoteDto
 import mx.nexara.mobile.nativeapp.data.api.CrmOpportunityDetailDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
@@ -82,7 +83,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 val detail = withContext(Dispatchers.IO) { repo.opportunityDetail(oppId) }
                 _state.update { it.copy(isLoading = false, detail = detail) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -114,7 +115,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 _state.update { it.copy(updatingStage = false, showStageDialog = false) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(updatingStage = false, actionError = e.message) }
+                _state.update { it.copy(updatingStage = false, actionError = e.toUserMessage()) }
             }
         }
     }
@@ -126,7 +127,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 val acts = withContext(Dispatchers.IO) { repo.crmActivitiesForOpportunity(oppId) }
                 _state.update { it.copy(loadingActivities = false, activities = acts) }
             } catch (e: Exception) {
-                _state.update { it.copy(loadingActivities = false, actionError = e.message) }
+                _state.update { it.copy(loadingActivities = false, actionError = e.toUserMessage()) }
             }
         }
     }
@@ -139,7 +140,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 loadActivities()
                 _state.update { it.copy(completingActivity = false) }
             } catch (e: Exception) {
-                _state.update { it.copy(completingActivity = false, actionError = e.message) }
+                _state.update { it.copy(completingActivity = false, actionError = e.toUserMessage()) }
             }
         }
     }
@@ -154,7 +155,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 _state.update { it.copy(savingNote = false, noteText = "") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(savingNote = false, actionError = e.message) }
+                _state.update { it.copy(savingNote = false, actionError = e.toUserMessage()) }
             }
         }
     }
@@ -168,7 +169,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 _state.update { it.copy(uploading = false) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(uploading = false, actionError = e.message) }
+                _state.update { it.copy(uploading = false, actionError = e.toUserMessage()) }
             }
         }
     }
@@ -194,7 +195,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 _state.update { it.copy(savingForm = false, showEditForm = false) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(savingForm = false, actionError = e.message) }
+                _state.update { it.copy(savingForm = false, actionError = e.toUserMessage()) }
             }
         }
     }
@@ -205,7 +206,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 withContext(Dispatchers.IO) { repo.deleteOpportunity(oppId) }
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(actionError = e.message) }
+                _state.update { it.copy(actionError = e.toUserMessage()) }
             }
         }
     }
@@ -219,7 +220,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
                 file.writeBytes(bytes)
                 _state.update { it.copy(pdfFile = file, pdfTitle = title) }
             } catch (e: Exception) {
-                _state.update { it.copy(actionError = e.message) }
+                _state.update { it.copy(actionError = e.toUserMessage()) }
             }
         }
     }

@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ToolInventorySearchOptionDto
 import mx.nexara.mobile.nativeapp.data.api.ToolKitUserRowDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
@@ -81,7 +82,7 @@ class ConsoleToolsKitsUsersViewModel(app: Application) : AndroidViewModel(app) {
                 val rows = withContext(Dispatchers.IO) { repo.toolKitsUsers() }
                 _state.update { it.copy(isLoading = false, rows = rows, error = null) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message ?: "No se pudo cargar kits") }
+                _state.update { it.copy(isLoading = false, error = e.toUserMessage("No se pudo cargar kits")) }
             }
         }
     }
@@ -117,7 +118,7 @@ class ConsoleToolsKitsUsersViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(submitting = false, inventoryOptions = emptyList(), selectedInventory = null, inventoryQuery = "") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(submitting = false, error = e.message ?: "No se pudo asignar") }
+                _state.update { it.copy(submitting = false, error = e.toUserMessage("No se pudo asignar")) }
             }
         }
     }
@@ -156,7 +157,7 @@ class ConsoleToolsKitsUsersViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(submitting = false, resolvingEventId = null) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(submitting = false, error = e.message ?: "No se pudo resolver") }
+                _state.update { it.copy(submitting = false, error = e.toUserMessage("No se pudo resolver")) }
             }
         }
     }

@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.KbPublicArticleDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
@@ -129,7 +130,7 @@ class PortalHelpViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     isLoading = false,
                     isRefreshing = false,
-                    error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar los artículos",
+                    error = e.toUserMessage("No se pudieron cargar los artículos"),
                 )
             }
         }

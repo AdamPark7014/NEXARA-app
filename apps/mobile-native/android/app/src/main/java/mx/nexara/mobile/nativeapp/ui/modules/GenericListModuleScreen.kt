@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.common.SimpleListScreen
 import mx.nexara.mobile.nativeapp.ui.common.SimpleRow
@@ -223,7 +224,7 @@ fun <T> TypedModuleListScreen(
         try {
             fetchItems()
         } catch (e: Exception) {
-            error = e.message ?: "Error al cargar"
+            error = e.toUserMessage("Error al cargar")
         } finally {
             loading = false
         }
@@ -286,7 +287,7 @@ fun <T> TypedModuleListScreen(
                     try {
                         fetchItems()
                     } catch (e: Exception) {
-                        error = e.message ?: "Error al cargar"
+                        error = e.toUserMessage("Error al cargar")
                     } finally {
                         refreshing = false
                         loading = false
@@ -307,7 +308,7 @@ fun <T> TypedModuleListScreen(
                                 try {
                                     fetchItems()
                                 } catch (e: Exception) {
-                                    error = e.message
+                                    error = e.toUserMessage()
                                 } finally {
                                     loading = false
                                 }

@@ -50,6 +50,7 @@ import mx.nexara.mobile.nativeapp.data.api.CaseStudyDto
 import mx.nexara.mobile.nativeapp.data.api.CreateCaseStudyBody
 import mx.nexara.mobile.nativeapp.data.api.UpdateCaseStudyBody
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -95,7 +96,7 @@ class StudioCasesViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.caseStudies() }
                 _state.update { it.copy(loading = false, refreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, refreshing = false, error = e.message ?: "Error") }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.toUserMessage("Error")) }
             }
         }
     }
@@ -173,7 +174,7 @@ class StudioCasesViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.toggleCasePublicado(id) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }
@@ -184,7 +185,7 @@ class StudioCasesViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.deleteCaseStudy(id) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }

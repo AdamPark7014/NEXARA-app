@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.CreateSocialPostBody
 import mx.nexara.mobile.nativeapp.data.api.SocialPostDto
 import mx.nexara.mobile.nativeapp.data.api.UpdateSocialPostBody
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -86,7 +87,7 @@ class StudioSocialViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.socialPosts() }
                 _state.update { it.copy(loading = false, refreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, refreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -159,7 +160,7 @@ class StudioSocialViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.setSocialEstado(id, "Publicado") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }
@@ -170,7 +171,7 @@ class StudioSocialViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.deleteSocialPost(id) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }

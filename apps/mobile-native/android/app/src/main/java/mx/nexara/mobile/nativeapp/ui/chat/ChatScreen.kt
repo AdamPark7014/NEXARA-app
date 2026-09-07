@@ -110,6 +110,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.access.DeepLinkParser
 import mx.nexara.mobile.nativeapp.data.SessionStore
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.data.api.ChatChannelDto
 import mx.nexara.mobile.nativeapp.data.api.ChatColleagueDto
@@ -586,7 +587,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                         s.copy(loading = false, channels = sortChannels(list, s.favoriteChannelIds))
                     }
                 }
-                .onFailure { e -> _state.update { it.copy(loading = false, error = e.message) } }
+                .onFailure { e -> _state.update { it.copy(loading = false, error = e.toUserMessage()) } }
         }
     }
 
@@ -605,7 +606,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                         )
                     }
                 }
-                .onFailure { e -> _state.update { it.copy(refreshing = false, error = e.message) } }
+                .onFailure { e -> _state.update { it.copy(refreshing = false, error = e.toUserMessage()) } }
         }
     }
 
@@ -674,7 +675,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 selectChannel(ch)
             }.onFailure { e ->
                 _state.update {
-                    it.copy(channelActionLoading = false, channelActionError = e.message ?: "No se pudo crear el canal")
+                    it.copy(channelActionLoading = false, channelActionError = e.toUserMessage("No se pudo crear el canal"))
                 }
             }
         }
@@ -703,7 +704,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update {
                         it.copy(
                             channelActionLoading = false,
-                            channelActionError = e.message ?: "No se pudo abrir el mensaje directo",
+                            channelActionError = e.toUserMessage("No se pudo abrir el mensaje directo"),
                         )
                     }
                 }
@@ -729,7 +730,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update {
                         it.copy(
                             channelActionLoading = false,
-                            channelActionError = e.message ?: "No se pudo invitar al miembro",
+                            channelActionError = e.toUserMessage("No se pudo invitar al miembro"),
                         )
                     }
                 }
@@ -755,7 +756,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update {
                         it.copy(
                             channelActionLoading = false,
-                            channelActionError = e.message ?: "No se pudo actualizar el tema",
+                            channelActionError = e.toUserMessage("No se pudo actualizar el tema"),
                         )
                     }
                 }
@@ -786,7 +787,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update {
                         it.copy(
                             channelActionLoading = false,
-                            channelActionError = e.message ?: "No se pudo editar el mensaje",
+                            channelActionError = e.toUserMessage("No se pudo editar el mensaje"),
                         )
                     }
                 }
@@ -891,7 +892,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             }.onFailure { e ->
-                _state.update { it.copy(refreshingMessages = false, messagesError = e.message) }
+                _state.update { it.copy(refreshingMessages = false, messagesError = e.toUserMessage()) }
             }
         }
     }
@@ -940,7 +941,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update { it.copy(threadLoading = false, threadReplies = replies) }
                 }
                 .onFailure { e ->
-                    _state.update { it.copy(threadLoading = false, threadError = e.message) }
+                    _state.update { it.copy(threadLoading = false, threadError = e.toUserMessage()) }
                 }
         }
     }
@@ -1044,7 +1045,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     refreshMessages(ch.id)
                 }
-                .onFailure { e -> _state.update { it.copy(sending = false, messagesError = e.message) } }
+                .onFailure { e -> _state.update { it.copy(sending = false, messagesError = e.toUserMessage()) } }
         }
     }
 
@@ -1084,7 +1085,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 refreshMessages(ch.id)
             }.onFailure { e ->
-                _state.update { it.copy(uploading = false, messagesError = e.message) }
+                _state.update { it.copy(uploading = false, messagesError = e.toUserMessage()) }
             }
         }
     }
