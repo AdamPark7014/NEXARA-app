@@ -54,6 +54,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.GpsLocationDto
 import mx.nexara.mobile.nativeapp.data.api.VisibleUserDto
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.MapPin
 import mx.nexara.mobile.nativeapp.ui.common.NexaraMap
@@ -141,7 +142,7 @@ class ConsoleGpsViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message ?: "No se pudo cargar GPS",
+                        error = e.toUserMessage("No se pudo cargar GPS"),
                     )
                 }
             }
@@ -173,7 +174,7 @@ class ConsoleGpsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         loadingTrajectory = false,
-                        error = e.message ?: "No se pudo cargar el trayecto",
+                        error = e.toUserMessage("No se pudo cargar el trayecto"),
                     )
                 }
             }
@@ -196,7 +197,7 @@ class ConsoleGpsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         consentToggling = false,
-                        error = e.message ?: "No se pudo actualizar el consentimiento GPS",
+                        error = e.toUserMessage("No se pudo actualizar el consentimiento GPS"),
                     )
                 }
             }
@@ -210,7 +211,7 @@ class ConsoleGpsViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.gpsPost(lat, lng, speedKmh) }
                 refresh(isOwnerView = false)
             } catch (e: Exception) {
-                _state.update { it.copy(posting = false, error = e.message ?: "No se pudo enviar ubicación") }
+                _state.update { it.copy(posting = false, error = e.toUserMessage("No se pudo enviar ubicación")) }
             } finally {
                 _state.update { it.copy(posting = false) }
             }

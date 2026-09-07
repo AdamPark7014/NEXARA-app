@@ -72,6 +72,7 @@ import kotlinx.coroutines.withContext
 
 import mx.nexara.mobile.nativeapp.data.api.ClientBranchDto
 
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
@@ -160,7 +161,7 @@ class TicketsBranchesViewModel(app: Application) : AndroidViewModel(app) {
 
                         isRefreshing = false,
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar sucursales",
+                        error = e.toUserMessage("No se pudieron cargar sucursales"),
 
                     )
 

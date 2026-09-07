@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ContactMessageDto
 import mx.nexara.mobile.nativeapp.data.api.UpdateContactMessageBody
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -73,7 +74,7 @@ class StudioContactsViewModel(
                 val list = withContext(Dispatchers.IO) { repo.contactMessages(limit = 100) }
                 _state.update { it.copy(loading = false, refreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, refreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -103,7 +104,7 @@ class StudioContactsViewModel(
                 _state.update { it.copy(saving = false, selected = null) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message) }
+                _state.update { it.copy(saving = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -116,7 +117,7 @@ class StudioContactsViewModel(
                 _state.update { it.copy(selected = null) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }

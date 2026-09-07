@@ -348,7 +348,7 @@ class KbViewModel(app: Application) : AndroidViewModel(app) {
                 val articles = withContext(Dispatchers.IO) { repo.kbArticleDtos(q) }
                 _state.update { it.copy(loading = false, isRefreshing = false, articles = articles) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -477,7 +477,7 @@ class ExportsViewModel(app: Application) : AndroidViewModel(app) {
                 shareFile(context, file)
                 _state.update { it.copy(downloading = null, message = "✅ Exportación lista para compartir") }
             } catch (e: Exception) {
-                _state.update { it.copy(downloading = null, error = e.message ?: "Error al exportar") }
+                _state.update { it.copy(downloading = null, error = e.toUserMessage("Error al exportar")) }
             }
         }
     }
@@ -633,7 +633,7 @@ class ErpCalendarViewModel(app: Application) : AndroidViewModel(app) {
                 val events = withContext(Dispatchers.IO) { repo.calendarEventDtos(from, to) }
                 _state.update { it.copy(loading = false, isRefreshing = false, events = events) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -713,7 +713,7 @@ fun OrgchartScreen() {
         try {
             roots = withContext(Dispatchers.IO) { ExtraRepository(context).orgNodeDtos() }
         } catch (e: Exception) {
-            error = e.message
+            error = e.toUserMessage()
         }
         loading = false
         isRefreshing = false
@@ -799,7 +799,7 @@ class HrKpisViewModel(app: Application) : AndroidViewModel(app) {
                 val engineers = withContext(Dispatchers.IO) { repo.biEngineerRowDtos(15) }
                 _state.update { it.copy(loading = false, isRefreshing = false, staff = allStaff, engineers = engineers) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -960,7 +960,7 @@ fun RecruitingScreen() {
                 selected = null
                 loadData(refresh = true)
             } catch (e: Exception) {
-                actionMessage = "❌ ${e.message ?: "No se pudo mover el candidato"}"
+                actionMessage = "❌ ${e.toUserMessage("No se pudo mover el candidato")}"
             } finally {
                 acting = false
             }
@@ -990,7 +990,7 @@ fun RecruitingScreen() {
                         showCreate = false
                         loadData(refresh = true)
                     } catch (e: Exception) {
-                        actionMessage = "❌ ${e.message ?: "No se pudo registrar el CV"}"
+                        actionMessage = "❌ ${e.toUserMessage("No se pudo registrar el CV")}"
                     } finally {
                         acting = false
                     }

@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalTicketDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
@@ -119,7 +120,7 @@ class TicketsTicketsViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar tickets",
+                        error = e.toUserMessage("No se pudieron cargar tickets"),
                     )
                 }
             }

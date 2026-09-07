@@ -45,6 +45,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.BuildConfig
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalTicketDto
 import mx.nexara.mobile.nativeapp.data.api.ClientTicketRequestDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.tickets.PortalProfile
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
@@ -125,7 +126,7 @@ class TicketsPortalViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cargar el portal",
+                        error = e.toUserMessage("No se pudo cargar el portal"),
                     )
                 }
             }
@@ -149,7 +150,7 @@ class TicketsPortalViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         downloadingPortalReport = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo descargar el reporte",
+                        error = e.toUserMessage("No se pudo descargar el reporte"),
                     )
                 }
             }

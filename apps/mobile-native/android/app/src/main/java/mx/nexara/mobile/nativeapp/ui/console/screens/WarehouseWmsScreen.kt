@@ -53,6 +53,7 @@ import mx.nexara.mobile.nativeapp.data.api.CatalogProductDto
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 import mx.nexara.mobile.nativeapp.data.api.StockMovementDto
 import mx.nexara.mobile.nativeapp.data.api.WarehouseDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.common.BarcodeScannerScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
@@ -576,7 +577,7 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                                 resetForm()
                                 reload()
                             } catch (e: Exception) {
-                                message = "❌ ${e.message?.takeIf { it.isNotBlank() } ?: "No se pudo registrar"}"
+                                message = "❌ ${e.toUserMessage("No se pudo registrar")}"
                             } finally {
                                 acting = false
                             }

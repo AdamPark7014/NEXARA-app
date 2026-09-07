@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.SystemSettingDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -161,7 +162,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         integrationsBusy = false,
-                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo crear la API key",
+                        message = e.toUserMessage("No se pudo crear la API key"),
                         messageIsError = true,
                     )
                 }
@@ -182,7 +183,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         integrationsBusy = false,
-                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo revocar",
+                        message = e.toUserMessage("No se pudo revocar"),
                         messageIsError = true,
                     )
                 }
@@ -203,7 +204,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         integrationsBusy = false,
-                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo reenviar",
+                        message = e.toUserMessage("No se pudo reenviar"),
                         messageIsError = true,
                     )
                 }
@@ -243,7 +244,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             } catch (e: Exception) {
-                val msg = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar ajustes"
+                val msg = e.toUserMessage("No se pudieron cargar ajustes")
                 val forbidden = msg.contains("403", ignoreCase = true) ||
                     (e is HttpException && e.code() == 403)
                 _state.update {
@@ -283,7 +284,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         saving = false,
-                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "Error al guardar",
+                        message = e.toUserMessage("Error al guardar"),
                         messageIsError = true,
                     )
                 }
@@ -318,7 +319,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         saving = false,
-                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "Error al crear",
+                        message = e.toUserMessage("Error al crear"),
                         messageIsError = true,
                     )
                 }
@@ -344,7 +345,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         saving = false,
-                        message = e.message?.takeIf { m -> m.isNotBlank() } ?: "Error al eliminar",
+                        message = e.toUserMessage("Error al eliminar"),
                         messageIsError = true,
                     )
                 }

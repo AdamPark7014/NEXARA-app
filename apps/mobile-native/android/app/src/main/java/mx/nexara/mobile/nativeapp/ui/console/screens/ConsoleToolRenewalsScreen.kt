@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ToolRenewalDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
@@ -57,7 +58,7 @@ class ConsoleToolRenewalsViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.toolRenewalsPending() }
                 _state.update { it.copy(isLoading = false, rows = list, error = null) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message ?: "No se pudieron cargar renovaciones") }
+                _state.update { it.copy(isLoading = false, error = e.toUserMessage("No se pudieron cargar renovaciones")) }
             }
         }
     }
@@ -70,7 +71,7 @@ class ConsoleToolRenewalsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(actingId = null, rejectionReason = "") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(actingId = null, error = e.message ?: "No se pudo aprobar") }
+                _state.update { it.copy(actingId = null, error = e.toUserMessage("No se pudo aprobar")) }
             }
         }
     }
@@ -88,7 +89,7 @@ class ConsoleToolRenewalsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(actingId = null, rejectionReason = "") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(actingId = null, error = e.message ?: "No se pudo rechazar") }
+                _state.update { it.copy(actingId = null, error = e.toUserMessage("No se pudo rechazar")) }
             }
         }
     }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 
@@ -76,8 +77,9 @@ class ConsoleActivitiesViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
-                        error = e.message?.takeIf { m -> m.isNotBlank() }
-                            ?: if (start) "No se pudo iniciar la OT" else "No se pudo finalizar la OT",
+                        error = e.toUserMessage(
+                            if (start) "No se pudo iniciar la OT" else "No se pudo finalizar la OT",
+                        ),
                     )
                 }
             }
@@ -128,7 +130,7 @@ class ConsoleActivitiesViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar actividades",
+                        error = e.toUserMessage("No se pudieron cargar actividades"),
                     )
                 }
             }

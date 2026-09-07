@@ -75,7 +75,7 @@ class ErpBiViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(loading = false, isRefreshing = false, dashboard = dash, computedKpis = kpis, margin = margin, engineers = engineers, clientsRoi = clients)
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message ?: "Error al cargar BI") }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage("Error al cargar BI")) }
             }
         }
     }
@@ -231,7 +231,7 @@ class ExecutiveViewModel(app: Application) : AndroidViewModel(app) {
                 val data = withContext(Dispatchers.IO) { repo.executiveCLevelDto() }
                 _state.update { it.copy(loading = false, isRefreshing = false, data = data) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -408,7 +408,7 @@ class ApprovalsViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 load()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = null, error = e.message) }
+                _state.update { it.copy(acting = null, error = e.toUserMessage()) }
             }
         }
     }
@@ -561,7 +561,7 @@ class NocViewModel(app: Application) : AndroidViewModel(app) {
                 val devices = withContext(Dispatchers.IO) { repo.nocDeviceDtos() }
                 _state.update { it.copy(loading = false, isRefreshing = false, summary = summary, alerts = alerts, devices = devices) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -668,7 +668,7 @@ class SlaViewModel(app: Application) : AndroidViewModel(app) {
                 val stats = withContext(Dispatchers.IO) { repo.slaStatsDto() }
                 _state.update { it.copy(loading = false, isRefreshing = false, stats = stats) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -765,7 +765,7 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
                 val items = withContext(Dispatchers.IO) { repo.maintenanceContractDtos() }
                 _state.update { it.copy(loading = false, isRefreshing = false, items = items) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -801,7 +801,7 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
                 load(refresh = true)
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -814,7 +814,7 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "✅ Estado → $status") }
                 load(refresh = true)
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -827,7 +827,7 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "✅ OT generada") }
                 loadVisits(contractId)
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -840,7 +840,7 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "✅ Visita completada") }
                 loadVisits(contractId)
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }

@@ -112,7 +112,7 @@ class ExpensesRichViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -131,7 +131,7 @@ class ExpensesRichViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -144,7 +144,7 @@ class ExpensesRichViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "✅ Marcado como pagado") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -416,7 +416,7 @@ class InvoicesRichViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -432,7 +432,7 @@ class InvoicesRichViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "✅ 3-way match: $status", detail = result) }
                 loadDetail(id)
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -930,7 +930,7 @@ class FinesRichViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         actingId = null,
-                        actionMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo actualizar"}",
+                        actionMessage = "❌ ${e.toUserMessage("No se pudo actualizar")}",
                     )
                 }
             }
@@ -1106,7 +1106,7 @@ class EmployeePaymentsRichViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(loading = false, isRefreshing = false, message = "❌ ${e.message ?: "Error al cargar"}")
+                    it.copy(loading = false, isRefreshing = false, message = "❌ ${e.toUserMessage("Error al cargar")}")
                 }
             }
         }
@@ -1135,7 +1135,7 @@ class EmployeePaymentsRichViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -1149,7 +1149,7 @@ class EmployeePaymentsRichViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -1162,7 +1162,7 @@ class EmployeePaymentsRichViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(acting = false, message = "✅ Marcado como pagado") }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -1176,7 +1176,7 @@ class EmployeePaymentsRichViewModel(app: Application) : AndroidViewModel(app) {
                 refresh()
                 onDone()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(acting = false, message = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }

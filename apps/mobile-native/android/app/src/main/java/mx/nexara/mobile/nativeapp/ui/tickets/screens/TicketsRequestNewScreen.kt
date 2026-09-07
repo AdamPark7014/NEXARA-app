@@ -104,6 +104,7 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 
 import mx.nexara.mobile.nativeapp.data.api.ClientBranchDto
 
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
@@ -228,7 +229,7 @@ class TicketsRequestNewViewModel(app: Application) : AndroidViewModel(app) {
 
                         isRefreshing = false,
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar sucursales",
+                        error = e.toUserMessage("No se pudieron cargar sucursales"),
 
                     )
 
@@ -304,7 +305,7 @@ class TicketsRequestNewViewModel(app: Application) : AndroidViewModel(app) {
 
                         saving = false,
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo crear la solicitud",
+                        error = e.toUserMessage("No se pudo crear la solicitud"),
 
                     )
 

@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.OrderTemplateDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -75,7 +76,7 @@ class VentasTemplatesViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.orderTemplateDtos() }
                 _state.update { it.copy(isLoading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -134,7 +135,7 @@ class VentasTemplatesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(saving = false, showForm = false) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, actionError = e.message) }
+                _state.update { it.copy(saving = false, actionError = e.toUserMessage()) }
             }
         }
     }
@@ -145,7 +146,7 @@ class VentasTemplatesViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.setOrderTemplateDefault(id) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(actionError = e.message) }
+                _state.update { it.copy(actionError = e.toUserMessage()) }
             }
         }
     }
@@ -156,7 +157,7 @@ class VentasTemplatesViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.deleteOrderTemplate(id) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(actionError = e.message) }
+                _state.update { it.copy(actionError = e.toUserMessage()) }
             }
         }
     }

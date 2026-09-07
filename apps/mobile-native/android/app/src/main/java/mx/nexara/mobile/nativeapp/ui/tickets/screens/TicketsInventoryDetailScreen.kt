@@ -90,6 +90,7 @@ import mx.nexara.mobile.nativeapp.data.api.ClientPortalInventoryItemDto
 
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalInventorySnapshotDto
 
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
@@ -222,7 +223,7 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
                         isRefreshing = false,
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cargar inventario",
+                        error = e.toUserMessage("No se pudo cargar inventario"),
 
                     )
 
@@ -278,7 +279,7 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
                         downloading = false,
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo descargar PDF",
+                        error = e.toUserMessage("No se pudo descargar PDF"),
 
                     )
 
@@ -314,7 +315,7 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
                         saving = false,
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo actualizar",
+                        error = e.toUserMessage("No se pudo actualizar"),
 
                     )
 
@@ -360,7 +361,7 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
                         saving = false,
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo subir media",
+                        error = e.toUserMessage("No se pudo subir media"),
 
                     )
 
@@ -430,7 +431,7 @@ class TicketsInventoryDetailViewModel(app: Application) : AndroidViewModel(app) 
 
                         saving = false,
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo sincronizar",
+                        error = e.toUserMessage("No se pudo sincronizar"),
 
                     )
 

@@ -37,6 +37,7 @@ import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.api.CrmActivityDto
 import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
 import mx.nexara.mobile.nativeapp.data.api.CrmOpportunityDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
@@ -129,7 +130,7 @@ class VentasDashboardViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         loading = false,
                         isRefreshing = false,
-                        error = e.message ?: "Error al cargar CRM",
+                        error = e.toUserMessage("Error al cargar CRM"),
                     )
                 }
             }

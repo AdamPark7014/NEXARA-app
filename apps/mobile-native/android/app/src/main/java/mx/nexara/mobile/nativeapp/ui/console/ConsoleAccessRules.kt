@@ -91,6 +91,8 @@ val ADMINISTRATIVO_ERP_MODULE_KEYS: Set<String> = setOf(
     "clients",
     "cotizaciones",
     "notifications-center",
+    // `MEETINGS_STAFF_URL_RULES` también cubre a ADMINISTRATIVO.
+    "reuniones",
     "my-profile",
     "my-preferences",
     "news",
@@ -191,6 +193,10 @@ fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
             "/service-sheets", "/client-tickets",
             "/support/sla", "/maintenance", "/maintenance/contracts", "/assets",
             "/service-clients", "/kb", "/notifications-center",
+            // `MEETINGS_STAFF_URL_RULES` da lectura de reuniones a ING_CAMPO e
+            // ING_SOPORTE, y escritura sobre sus propios acuerdos. Es justo la
+            // gente que tiene acuerdos asignados y está en campo.
+            "/reuniones",
         )
         if (!path.startsWith("/my-") && path !in baseAllowed) return false
         if (path == "/cotizaciones" && !user.canAccessCotizaciones()) return false
@@ -209,6 +215,8 @@ fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
         val baseAllowed = setOf(
             "/dashboard", "/ventas", "/cotizaciones", "/cvs", "/attendance",
             "/chat", "/notifications-center", "/clients",
+            // VENDEDOR lleva MEETINGS_STAFF_URL_RULES en url-matrix.
+            "/reuniones",
         )
         if (!path.startsWith("/my-") && path !in baseAllowed) return false
         if (path == "/cotizaciones" && !user.canAccessCotizaciones()) return false
@@ -251,7 +259,10 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ConsoleSidebarGroup("profile", "Cuenta personal", pick("my-profile", "my-preferences", "calendar")),
         ConsoleSidebarGroup(
             "employee", "Mi espacio de trabajo",
-            pick("dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks", "chat"),
+            // «Reuniones» entra aquí y no en gobierno porque la pantalla de
+            // entrada es «Mis acuerdos»: lo que me toca a mí, no el archivo de
+            // juntas.
+            pick("dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks", "reuniones", "chat"),
         ),
         ConsoleSidebarGroup(
             "operations", "Supervisión operativa",
@@ -296,7 +307,7 @@ private fun administrativoSidebarGroups(user: SessionUser): List<ConsoleSidebarG
     fun pick(vararg keys: String): List<ModuleEntry> =
         keys.mapNotNull { byKey[it] }.filter { canAccessConsoleModule(user, it) }
     return listOf(
-        ConsoleSidebarGroup("board", "Tablero", pick("dashboard", "approvals")),
+        ConsoleSidebarGroup("board", "Tablero", pick("dashboard", "approvals", "reuniones")),
         ConsoleSidebarGroup("governance", "Gobierno", pick("companies")),
         ConsoleSidebarGroup("finance", "Finanzas", pick("viatics", "expenses", "invoicing", "procurement")),
         ConsoleSidebarGroup("commercial", "Comercial", pick("clients", "cotizaciones")),

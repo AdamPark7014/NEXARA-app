@@ -135,11 +135,25 @@ fun ContabilidadNavHost(onExitToPanels: () -> Unit) {
                     "banking"            -> BankingRichScreen()
                     "employee-payments",
                     "pagos"              -> EmployeePaymentsRichScreen()
-                    "viaticos"           -> mx.nexara.mobile.nativeapp.ui.modules.MyViaticsScreen()
+                    // Contabilidad revisa los viáticos del equipo, no los
+                    // suyos. Esta clave abría `MyViaticsScreen`, que filtra por
+                    // `usuarioId == miId` (`ConsoleExtraScreens.kt`): el
+                    // contador entraba a «Viáticos» y veía únicamente los que
+                    // él mismo había pedido — normalmente ninguno, o sea una
+                    // pantalla vacía sin explicación. `ConsoleViaticsScreen`
+                    // es la de revisión: cadena de aprobación por monto,
+                    // comprobante y marcado de pagado.
+                    "viaticos"           -> mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleViaticsScreen()
                     "multas"             -> FinesRichScreen()
                     "work-projects"          -> ConsoleProjectsScreen()
                     "proyectos"              -> ConsoleProjectsScreen()
-                    "horas"              -> mx.nexara.mobile.nativeapp.ui.modules.LunchBreaksModuleScreen()
+                    // «Horas» abría la pantalla de **Comidas**
+                    // (`LunchBreaksModuleScreen`): otro módulo entero, con
+                    // otros datos. `ConsoleAttendanceScreen` es la que tiene
+                    // horas: jornadas del equipo, total de horas del período y
+                    // exportación «Usuario,Horas,Días registrados», que es lo
+                    // que contabilidad necesita para nómina.
+                    "horas"              -> mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen()
                     "my-profile"         -> MyProfileScreen()
                     "chat"               -> mx.nexara.mobile.nativeapp.ui.chat.ChatScreen(onBack = { nav.popBackStack() })
                     else -> {

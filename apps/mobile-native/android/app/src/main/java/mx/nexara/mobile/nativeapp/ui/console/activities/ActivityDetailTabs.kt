@@ -27,6 +27,7 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceDetailDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityIncidentDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityRecommendationDto
 import mx.nexara.mobile.nativeapp.data.api.ViaticDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
@@ -452,7 +453,7 @@ fun ActivityViaticsTab(
                                 formMode = null
                                 reloadViatics()
                             } catch (e: Exception) {
-                                createError = e.message ?: "No se pudo guardar"
+                                createError = e.toUserMessage("No se pudo guardar")
                             } finally {
                                 creating = false
                             }
@@ -687,7 +688,7 @@ fun ActivityIssuesTab(activityId: Long, canManage: Boolean) {
                                         showIncidentForm = false
                                         reload()
                                     } catch (e: Exception) {
-                                        actionError = e.message ?: "No se pudo registrar"
+                                        actionError = e.toUserMessage("No se pudo registrar")
                                     } finally {
                                         savingIncident = false
                                     }
@@ -782,7 +783,7 @@ fun ActivityIssuesTab(activityId: Long, canManage: Boolean) {
                                             }
                                             reload()
                                         } catch (e: Exception) {
-                                            actionError = e.message ?: "No se pudo actualizar"
+                                            actionError = e.toUserMessage("No se pudo actualizar")
                                         }
                                     }
                                 },
@@ -871,7 +872,7 @@ fun ActivityIssuesTab(activityId: Long, canManage: Boolean) {
                                         showRecForm = false
                                         reload()
                                     } catch (e: Exception) {
-                                        actionError = e.message ?: "No se pudo registrar"
+                                        actionError = e.toUserMessage("No se pudo registrar")
                                     } finally {
                                         savingRec = false
                                     }
@@ -925,7 +926,7 @@ fun ActivityIssuesTab(activityId: Long, canManage: Boolean) {
                                                 }
                                                 reload()
                                             } catch (e: Exception) {
-                                                actionError = e.message ?: "No se pudo actualizar"
+                                                actionError = e.toUserMessage("No se pudo actualizar")
                                             }
                                         }
                                     },

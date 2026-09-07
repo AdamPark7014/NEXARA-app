@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ClientTicketRequestDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
@@ -87,7 +88,7 @@ class TicketsRequestsViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar solicitudes",
+                        error = e.toUserMessage("No se pudieron cargar solicitudes"),
                     )
                 }
             }
@@ -107,7 +108,7 @@ class TicketsRequestsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         saving = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cerrar la solicitud",
+                        error = e.toUserMessage("No se pudo cerrar la solicitud"),
                     )
                 }
             }
@@ -126,7 +127,7 @@ class TicketsRequestsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         saving = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo actualizar la solicitud",
+                        error = e.toUserMessage("No se pudo actualizar la solicitud"),
                     )
                 }
             }

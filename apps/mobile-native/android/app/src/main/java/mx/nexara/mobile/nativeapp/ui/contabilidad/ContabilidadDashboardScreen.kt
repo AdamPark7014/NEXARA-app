@@ -29,6 +29,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.BankAccountDto
 import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
@@ -82,7 +83,7 @@ class ContabilidadDashboardViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         loading = false,
                         isRefreshing = false,
-                        error = e.message ?: "Error al cargar contabilidad",
+                        error = e.toUserMessage("Error al cargar contabilidad"),
                     )
                 }
             }

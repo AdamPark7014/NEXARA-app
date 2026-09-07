@@ -46,6 +46,7 @@ import mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest
 import mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.VisibleUserDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.ops.OpsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
@@ -111,7 +112,7 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         loading = false,
-                        error = e.message ?: "No se pudo cargar el formulario",
+                        error = e.toUserMessage("No se pudo cargar el formulario"),
                     )
                 }
             }
@@ -213,7 +214,7 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         saving = false,
-                        error = e.message ?: "No se pudo guardar la OT",
+                        error = e.toUserMessage("No se pudo guardar la OT"),
                     )
                 }
             }

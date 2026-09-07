@@ -242,7 +242,7 @@ class TicketDetailViewModel(app: Application) : AndroidViewModel(app) {
 
                     it.copy(
 
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo descargar el PDF",
+                        error = e.toUserMessage("No se pudo descargar el PDF"),
 
                     )
 

@@ -38,6 +38,7 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.AttendanceCurrentDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
@@ -115,7 +116,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cargar asistencia",
+                        error = e.toUserMessage("No se pudo cargar asistencia"),
                     )
                 }
             }
@@ -145,7 +146,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                 shareCsv(context, file)
                 _state.update { it.copy(exportMessage = "✅ CSV listo para compartir") }
             } catch (e: Exception) {
-                _state.update { it.copy(exportMessage = "❌ ${e.message ?: "No se pudo exportar"}") }
+                _state.update { it.copy(exportMessage = "❌ ${e.toUserMessage("No se pudo exportar")}") }
             }
         }
     }
@@ -188,7 +189,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         checkInLoading = false,
-                        checkInMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "Error al registrar"}",
+                        checkInMessage = "❌ ${e.toUserMessage("Error al registrar")}",
                     )
                 }
             }

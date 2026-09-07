@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ToolRequestDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
@@ -61,7 +62,7 @@ class ConsoleToolsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(isLoading = false, my = my, all = all, error = null) }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(isLoading = false, error = e.message ?: "No se pudieron cargar herramientas")
+                    it.copy(isLoading = false, error = e.toUserMessage("No se pudieron cargar herramientas"))
                 }
             }
         }

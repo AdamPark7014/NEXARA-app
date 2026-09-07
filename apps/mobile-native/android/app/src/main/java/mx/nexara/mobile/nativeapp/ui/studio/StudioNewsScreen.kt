@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.CreateNewsBody
 import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
 import mx.nexara.mobile.nativeapp.data.api.UpdateNewsBody
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -84,7 +85,7 @@ class StudioNewsViewModel(app: Application) : AndroidViewModel(app) {
                 val list = withContext(Dispatchers.IO) { repo.news() }
                 _state.update { it.copy(loading = false, refreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, refreshing = false, error = e.message) }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.toUserMessage()) }
             }
         }
     }
@@ -151,7 +152,7 @@ class StudioNewsViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.deleteNews(id) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+                _state.update { it.copy(error = e.toUserMessage()) }
             }
         }
     }

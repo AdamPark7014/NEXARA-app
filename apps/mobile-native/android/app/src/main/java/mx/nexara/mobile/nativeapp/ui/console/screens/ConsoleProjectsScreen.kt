@@ -51,6 +51,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.ServiceClientDto
 import mx.nexara.mobile.nativeapp.data.api.VisibleUserDto
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
@@ -124,7 +125,7 @@ class ConsoleProjectsViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(isLoading = false, isRefreshing = false, error = e.message ?: "No se pudo cargar proyectos")
+                    it.copy(isLoading = false, isRefreshing = false, error = e.toUserMessage("No se pudo cargar proyectos"))
                 }
             }
         }
@@ -169,7 +170,7 @@ class ConsoleProjectsViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo crear el proyecto.") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo crear el proyecto.")) }
             }
         }
     }
@@ -183,7 +184,7 @@ class ConsoleProjectsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(saving = false) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo actualizar estatus") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo actualizar estatus")) }
             }
         }
     }
@@ -197,7 +198,7 @@ class ConsoleProjectsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(saving = false, selectedEngineerByProject = it.selectedEngineerByProject + (projectId to null)) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo asignar ingeniero") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo asignar ingeniero")) }
             }
         }
     }
@@ -210,7 +211,7 @@ class ConsoleProjectsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(saving = false) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo quitar ingeniero") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo quitar ingeniero")) }
             }
         }
     }

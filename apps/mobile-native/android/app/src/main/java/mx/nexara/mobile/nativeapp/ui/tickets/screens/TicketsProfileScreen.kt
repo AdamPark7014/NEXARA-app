@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.tickets.PortalProfile
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
@@ -106,7 +107,7 @@ class TicketsProfileViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         isLoading = false,
                         isRefreshing = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cargar el perfil",
+                        error = e.toUserMessage("No se pudo cargar el perfil"),
                     )
                 }
             }
@@ -158,7 +159,7 @@ class TicketsProfileViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         saving = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo guardar",
+                        error = e.toUserMessage("No se pudo guardar"),
                     )
                 }
             }

@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.data.api.LunchBreakDto
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
@@ -301,7 +302,7 @@ fun CotizacionesModuleScreen() {
         try {
             items = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repo.cotizaciones() }
         } catch (e: Exception) {
-            error = e.message ?: "Error al cargar cotizaciones"
+            error = e.toUserMessage("Error al cargar cotizaciones")
         } finally {
             loading = false
         }
@@ -481,7 +482,7 @@ class LunchBreaksAdminViewModel(app: Application) : AndroidViewModel(app) {
                 val items = withContext(Dispatchers.IO) { repo.usersLunchBreaks() }
                 _state.update { it.copy(loading = false, items = items) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Error al cargar") }
+                _state.update { it.copy(loading = false, error = e.toUserMessage("Error al cargar")) }
             }
         }
     }
@@ -645,7 +646,7 @@ class MyLunchBreaksViewModel(app: Application) : AndroidViewModel(app) {
                 else all.filter { it.userId == userId || it.user?.id == userId }
                 _state.update { it.copy(loading = false, breaks = filtered) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Error al cargar") }
+                _state.update { it.copy(loading = false, error = e.toUserMessage("Error al cargar")) }
             }
         }
     }
@@ -665,7 +666,7 @@ class MyLunchBreaksViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(actionLoading = false, actionMessage = "✅ Entrada a comida registrada$geo") }
                 load(userId)
             } catch (e: Exception) {
-                _state.update { it.copy(actionLoading = false, actionMessage = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(actionLoading = false, actionMessage = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
@@ -685,7 +686,7 @@ class MyLunchBreaksViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(actionLoading = false, actionMessage = "✅ Salida de comida registrada$geo") }
                 load(userId)
             } catch (e: Exception) {
-                _state.update { it.copy(actionLoading = false, actionMessage = "❌ ${e.message ?: "Error"}") }
+                _state.update { it.copy(actionLoading = false, actionMessage = "❌ ${e.toUserMessage("Error")}") }
             }
         }
     }
