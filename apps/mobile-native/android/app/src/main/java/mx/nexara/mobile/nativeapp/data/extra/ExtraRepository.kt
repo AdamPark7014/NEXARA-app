@@ -33,6 +33,8 @@ import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
 import mx.nexara.mobile.nativeapp.data.api.ExtraApi
 import mx.nexara.mobile.nativeapp.data.api.FineApproveRequest
 import mx.nexara.mobile.nativeapp.data.api.FineDto
+import mx.nexara.mobile.nativeapp.data.api.CreateHrLeaveBody
+import mx.nexara.mobile.nativeapp.data.api.HrLeaveBalanceDto
 import mx.nexara.mobile.nativeapp.data.api.HrLeaveRejectBody
 import mx.nexara.mobile.nativeapp.data.api.HrLeaveDto
 import mx.nexara.mobile.nativeapp.data.api.HrStaffDto
@@ -385,6 +387,35 @@ class ExtraRepository(context: Context) {
 
     suspend fun rejectHrLeave(id: Long, reason: String) {
         api.rejectHrLeave(id, HrLeaveRejectBody(rejectionReason = reason))
+    }
+
+    /**
+     * Alta de solicitud de permiso.
+     *
+     * Las fechas van en AAAA-MM-DD. El API rechaza el rango invertido, pero se
+     * valida también aquí para no gastar un viaje de red en un error evitable.
+     */
+    suspend fun createHrLeave(type: String, startDate: String, endDate: String, reason: String?) {
+        api.createHrLeave(
+            CreateHrLeaveBody(
+                type = type,
+                startDate = startDate,
+                endDate = endDate,
+                reason = reason?.trim()?.takeIf { it.isNotBlank() },
+            ),
+        )
+    }
+
+    suspend fun cancelHrLeave(id: Long) {
+        api.cancelHrLeave(id)
+    }
+
+    suspend fun hrLeaveBalance(userId: Long): HrLeaveBalanceDto {
+        val raw = api.getHrLeaveBalanceRaw(userId).string().trim()
+        if (raw.isEmpty() || !raw.startsWith("{")) return HrLeaveBalanceDto()
+        val mapType = Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
+        val row = moshi.adapter<Map<String, Any?>>(mapType).fromJson(raw) ?: return HrLeaveBalanceDto()
+        return HrLeaveBalanceDto.fromRaw(row)
     }
     suspend fun hrReviews() = loadGeneric { api.getHrReviewsRaw() }
     suspend fun hrDashboardRaw(): String = api.getHrDashboardRaw().string()

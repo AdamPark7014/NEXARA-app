@@ -76,7 +76,19 @@ import kotlinx.coroutines.launch
 
 import kotlinx.coroutines.withContext
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
+import androidx.compose.ui.draw.clip
+
+import androidx.compose.ui.platform.LocalContext
+
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalTicketDto
+
+import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
+
+import mx.nexara.mobile.nativeapp.ui.common.NxAsyncImage
+
+import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 
@@ -376,6 +388,8 @@ fun TicketsTicketDetailScreen(
 
     val state by vm.state.collectAsState()
 
+    val ticketCtx = LocalContext.current
+
 
 
     LaunchedEffect(ticketId) {
@@ -608,25 +622,102 @@ fun TicketsTicketDetailScreen(
 
                             item { Text("Evidencias (${evidencias.size})", fontWeight = FontWeight.SemiBold) }
 
-                            items(evidencias.take(8), key = { it.hashCode() }) { ev ->
+                            items(evidencias.take(20), key = { it.hashCode() }) { ev ->
+
+                                // La web enseña la foto; aquí sólo se leía el texto,
+                                // así que el cliente no podía VER la evidencia de su
+                                // propio servicio — que es para lo que sirve.
+
+                                val fileUrl = toAbsoluteAssetUrl(
+
+                                    ticketMapStr(ev, "archivoUrl", "fileUrl", "url", "path").takeIf { it.isNotBlank() }
+
+                                )
+
+                                val lower = fileUrl.lowercase()
+
+                                val isPdf = lower.endsWith(".pdf")
+
+                                val isImage = fileUrl.isNotBlank() && !isPdf
 
                                 NxPanelShell(contentPadding = PaddingValues(12.dp)) {
 
                                     Text(
 
-                                        ticketMapStr(ev, "description", "descripcion", "name", "tipo").ifBlank { "Evidencia" },
+                                        ticketMapStr(ev, "tipoEvidencia", "description", "descripcion", "name", "tipo")
+                                            .ifBlank { "Evidencia" },
 
                                         fontWeight = FontWeight.Medium,
 
                                     )
 
-                                    val whenAt = ticketMapStr(ev, "createdAt", "fecha", "uploadedAt")
+                                    val comentarios = ticketMapStr(ev, "comentarios", "description", "descripcion")
+
+                                    if (comentarios.isNotBlank()) {
+
+                                        Text(comentarios, style = MaterialTheme.typography.bodySmall)
+
+                                    }
+
+                                    val whenAt = ticketMapStr(ev, "subidoEn", "createdAt", "fecha", "uploadedAt")
 
                                     if (whenAt.isNotBlank()) {
 
                                         Text(whenAt.take(16), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                                     }
+
+                                    if (isImage) {
+
+                                        Spacer(Modifier.height(8.dp))
+
+                                        NxAsyncImage(
+
+                                            model = fileUrl,
+
+                                            contentDescription = "Evidencia del servicio",
+
+                                            modifier = Modifier
+
+                                                .fillMaxWidth()
+
+                                                .height(180.dp)
+
+                                                .clip(RoundedCornerShape(8.dp)),
+
+                                        )
+
+                                    } else if (isPdf) {
+
+                                        Spacer(Modifier.height(8.dp))
+
+                                        OutlinedButton(
+
+                                            onClick = { openExternalUrl(ticketCtx, fileUrl) },
+
+                                            modifier = Modifier.fillMaxWidth(),
+
+                                        ) { Text("Abrir PDF") }
+
+                                    }
+
+                                }
+
+                            }
+
+                            if (evidencias.size > 20) {
+
+                                item {
+
+                                    Text(
+
+                                        "Se muestran 20 de ${evidencias.size} evidencias.",
+
+                                        style = MaterialTheme.typography.labelSmall,
+
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+                                    )
 
                                 }
 
@@ -704,7 +795,11 @@ fun TicketsTicketDetailScreen(
 
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
-                                if (!t.isOpen()) {
+                                // `isFinished()`, no `!isOpen()`: el API sólo acepta
+                                // estas dos acciones sobre una OT FINALIZADA. Una
+                                // cancelada enseñaba los botones y devolvía 400.
+
+                                if (t.isFinished()) {
 
                                     Button(
 
@@ -725,6 +820,23 @@ fun TicketsTicketDetailScreen(
                                         modifier = Modifier.fillMaxWidth(),
 
                                     ) { Text("Solicitar reapertura") }
+
+                                } else if (!t.isOpen()) {
+
+                                    // Cancelada o cerrada: no hay nada que confirmar
+                                    // ni que reabrir, y decirlo evita que el cliente
+                                    // busque un botón que no existe.
+
+                                    Text(
+
+                                        "Este ticket está ${t.estatus.orEmpty().lowercase().ifBlank { "cerrado" }}. " +
+                                            "Si necesitas retomarlo, levanta una nueva solicitud.",
+
+                                        style = MaterialTheme.typography.bodySmall,
+
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+                                    )
 
                                 } else {
 
