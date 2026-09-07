@@ -308,6 +308,20 @@ http:
       loadBalancer:
         healthCheck:
           path: /
+          # `hostname` es OBLIGATORIO aquí, no un adorno.
+          #
+          # El middleware de Next.js valida la cabecera Host contra una lista
+          # blanca (`buildDefaultAllowedHostPatterns` en apps/web/middleware.ts).
+          # La sonda de Traefik viaja con `Host: nexara-web:3000`, que no está en
+          # esa lista, así que el web responde **400** y Traefik lo marca como
+          # caído. Resultado: 503 en TODOS los subdominios aunque el contenedor
+          # esté perfectamente sano.
+          #
+          # Pasó en producción el 07-09-2026, al desplegar estos healthChecks:
+          # core, sales, ops e integra cayeron a la vez. Verificado en el
+          # servidor: con `Host: nexara-web:3000` → 400; con un host de la lista
+          # → 200.
+          hostname: core.nexara.com.mx
           interval: 15s
           timeout: 5s
         servers:
