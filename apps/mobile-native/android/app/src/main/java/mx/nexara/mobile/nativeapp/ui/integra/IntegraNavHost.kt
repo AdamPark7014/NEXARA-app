@@ -41,6 +41,25 @@ import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxModuleScaffold
+import mx.nexara.mobile.nativeapp.ui.integra.detection.IntegraDetectionCamerasScreen
+import mx.nexara.mobile.nativeapp.ui.integra.detection.IntegraDetectionCapabilitiesScreen
+import mx.nexara.mobile.nativeapp.ui.integra.detection.IntegraDetectionRoutes
+import mx.nexara.mobile.nativeapp.ui.integra.detection.IntegraDetectionTuningScreen
+import mx.nexara.mobile.nativeapp.ui.integra.detection.IntegraNewSiteScreen
+import mx.nexara.mobile.nativeapp.ui.integra.detection.IntegraSettingsScreen
+import mx.nexara.mobile.nativeapp.ui.integra.detection.IntegraSiteDetailScreen
+import mx.nexara.mobile.nativeapp.ui.integra.governance.IntegraAuditScreen
+import mx.nexara.mobile.nativeapp.ui.integra.governance.IntegraGovernanceRoutes
+import mx.nexara.mobile.nativeapp.ui.integra.governance.IntegraMyProfileScreen
+import mx.nexara.mobile.nativeapp.ui.integra.governance.IntegraNotificationsCenterScreen
+import mx.nexara.mobile.nativeapp.ui.integra.schedules.IntegraEspaciosScreen
+import mx.nexara.mobile.nativeapp.ui.integra.schedules.IntegraSchedulesScreen
+import mx.nexara.mobile.nativeapp.ui.integra.schedules.SchedulesRoutes
+import mx.nexara.mobile.nativeapp.ui.integra.vehicles.IntegraVehiclesRoutes
+import mx.nexara.mobile.nativeapp.ui.integra.vehicles.integraVehiclesGraph
+import mx.nexara.mobile.nativeapp.ui.integra.video.IntegraCameraDetailScreen
+import mx.nexara.mobile.nativeapp.ui.integra.video.IntegraVideoRoutes
+import mx.nexara.mobile.nativeapp.ui.integra.video.IntegraVideoWallScreen
 
 /** Claves INTEGRA visibles: catálogo ∩ navModuleKeys (soft si nav no trae integra-*). */
 private fun allowedIntegraKeys(user: SessionUser?): Set<String> {
@@ -65,22 +84,64 @@ private const val Visitors = "integra/visitors"
 private const val Alarms = "integra/alarms"
 private const val Occupancy = "integra/occupancy"
 private const val Devices = "integra/devices"
-private const val Sites = "integra/sites"
 
-private fun integraRouteForKey(key: String): String = when (key.lowercase()) {
-    "integra-access", "access", "acceso", "puertas", "doors" -> Access
-    "integra-events", "events", "eventos" -> Events
-    "integra-people", "people", "personas" -> People
-    "integra-attendance", "attendance", "asistencia" -> Attendance
-    "integra-visitors", "visitors", "visitantes" -> Visitors
-    "integra-alarms", "alarms", "alarmas" -> Alarms
-    "integra-occupancy", "occupancy", "en-sitio", "presencia" -> Occupancy
-    "integra-devices", "devices", "equipos" -> Devices
-    "integra-sites", "sites", "sitios", "integra-settings", "settings" -> Sites
-    else -> Home
+/**
+ * Ruta de una clave de módulo o de un enlace profundo.
+ *
+ * Los cinco paquetes nuevos (video, vehículos, horarios, detección, gobierno)
+ * traen su propio resolutor y se consultan ANTES que la tabla local: cada uno
+ * conoce sus alias y así añadir un módulo no obliga a editar este `when`. El
+ * que devuelve `null` cede el turno al siguiente.
+ *
+ * `integra-sites` cae en el resolutor de detección, que lo manda a la pantalla
+ * de Ajustes —alta, etiqueta, activación, módulos por sitio, sincronización y
+ * baja—, superconjunto de la lista de solo lectura que había antes.
+ */
+internal fun integraRouteForKey(key: String): String {
+    IntegraVehiclesRoutes.routeParaClave(key)?.let { return it }
+    IntegraGovernanceRoutes.rutaDeClave(key)?.let { return it }
+    IntegraDetectionRoutes.ROUTE_BY_KEY[key.lowercase()]?.let { return it }
+    return when (key.lowercase()) {
+        "integra-access", "access", "acceso", "puertas", "doors" -> Access
+        "integra-events", "events", "eventos" -> Events
+        "integra-people", "people", "personas" -> People
+        "integra-attendance", "attendance", "asistencia" -> Attendance
+        "integra-visitors", "visitors", "visitantes" -> Visitors
+        "integra-alarms", "alarms", "alarmas" -> Alarms
+        "integra-occupancy", "occupancy", "en-sitio", "presencia" -> Occupancy
+        "integra-devices", "devices", "equipos" -> Devices
+        "integra-video", "video", "camaras", "cámaras", "muro" -> IntegraVideoRoutes.WALL
+        "integra-schedules", "schedules", "horarios" -> SchedulesRoutes.SCHEDULES
+        "integra-espacios", "espacios", "spaces" -> SchedulesRoutes.ESPACIOS
+        else -> Home
+    }
 }
 
 private fun personDetailRoute(personId: String) = "integra/people/$personId"
+
+/**
+ * Títulos de video y detección.
+ *
+ * Estos dos paquetes dejaron sus títulos en la documentación del contrato en vez
+ * de en una función, así que se traducen aquí. Se compara contra el PATRÓN de
+ * ruta (`…/{cameraId}`), que es lo que devuelve la pila de navegación, no contra
+ * la ruta ya resuelta.
+ */
+private fun videoTitleForRoute(route: String?): String? = when (route) {
+    IntegraVideoRoutes.WALL -> IntegraVideoRoutes.TITLE_WALL
+    IntegraVideoRoutes.CAMERA_DETAIL -> IntegraVideoRoutes.TITLE_DETAIL
+    else -> null
+}
+
+private fun detectionTitleForRoute(route: String?): String? = when (route) {
+    IntegraDetectionRoutes.DETECTION -> "Detección"
+    IntegraDetectionRoutes.CAMERA -> "Sintonizar cámara"
+    IntegraDetectionRoutes.CAPABILITIES -> "Capacidades del parque"
+    IntegraDetectionRoutes.SETTINGS -> "Ajustes INTEGRA"
+    IntegraDetectionRoutes.SETTINGS_NEW -> "Nuevo sitio"
+    IntegraDetectionRoutes.SETTINGS_SITE -> "Sitio"
+    else -> null
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,20 +164,25 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
     }
 
     val showBack = currentRoute != Home
-    val topBarTitle = when {
-        currentRoute == Home -> "NEXARA INTEGRA"
-        currentRoute == Access -> "Control de acceso"
-        currentRoute == Events -> "Eventos ACS"
-        currentRoute == People -> "Personas"
-        currentRoute?.startsWith("integra/people/") == true -> "Detalle de persona"
-        currentRoute == Attendance -> "Asistencia ACS"
-        currentRoute == Visitors -> "Visitantes"
-        currentRoute == Alarms -> "Alarmas SOC"
-        currentRoute == Occupancy -> "En sitio ahora"
-        currentRoute == Devices -> "Equipos"
-        currentRoute == Sites -> "Sitios Integra"
-        else -> "NEXARA INTEGRA"
-    }
+    // Cada paquete nuevo sabe titular sus propias rutas; el `when` local solo
+    // cubre las diez pantallas que viven en este módulo.
+    val topBarTitle = IntegraVehiclesRoutes.tituloDe(currentRoute)
+        ?: SchedulesRoutes.titleForRoute(currentRoute)
+        ?: IntegraGovernanceRoutes.tituloDeRuta(currentRoute)
+        ?: videoTitleForRoute(currentRoute)
+        ?: detectionTitleForRoute(currentRoute)
+        ?: when {
+            currentRoute == Access -> "Control de acceso"
+            currentRoute == Events -> "Eventos ACS"
+            currentRoute == People -> "Personas"
+            currentRoute.startsWith("integra/people/") -> "Detalle de persona"
+            currentRoute == Attendance -> "Asistencia ACS"
+            currentRoute == Visitors -> "Visitantes"
+            currentRoute == Alarms -> "Alarmas SOC"
+            currentRoute == Occupancy -> "En sitio ahora"
+            currentRoute == Devices -> "Equipos"
+            else -> "NEXARA INTEGRA"
+        }
 
     NxModuleScaffold(
         title = topBarTitle,
@@ -132,15 +198,9 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
             composable(Home) {
                 IntegraHomeScreen(
                     allowedKeys = allowedKeys,
-                    onOpenAccess = { nav.navigate(Access) { launchSingleTop = true } },
-                    onOpenEvents = { nav.navigate(Events) { launchSingleTop = true } },
-                    onOpenPeople = { nav.navigate(People) { launchSingleTop = true } },
-                    onOpenAttendance = { nav.navigate(Attendance) { launchSingleTop = true } },
-                    onOpenVisitors = { nav.navigate(Visitors) { launchSingleTop = true } },
-                    onOpenAlarms = { nav.navigate(Alarms) { launchSingleTop = true } },
-                    onOpenOccupancy = { nav.navigate(Occupancy) { launchSingleTop = true } },
-                    onOpenDevices = { nav.navigate(Devices) { launchSingleTop = true } },
-                    onOpenSites = { nav.navigate(Sites) { launchSingleTop = true } },
+                    onOpenKey = { key ->
+                        nav.navigate(integraRouteForKey(key)) { launchSingleTop = true }
+                    },
                 )
             }
             composable(Access) { IntegraAccessScreen() }
@@ -167,7 +227,121 @@ fun IntegraNavHost(onExitToPanels: () -> Unit) {
             composable(Alarms) { IntegraAlarmsScreen() }
             composable(Occupancy) { IntegraOccupancyScreen() }
             composable(Devices) { IntegraDevicesScreen() }
-            composable(Sites) { IntegraSitesScreen() }
+
+            // ── Video ─────────────────────────────────────────────────────
+            composable(IntegraVideoRoutes.WALL) {
+                IntegraVideoWallScreen(
+                    onOpenCamera = { id ->
+                        nav.navigate(IntegraVideoRoutes.cameraDetail(id)) { launchSingleTop = true }
+                    },
+                )
+            }
+            composable(
+                route = IntegraVideoRoutes.CAMERA_DETAIL,
+                arguments = listOf(
+                    navArgument(IntegraVideoRoutes.ARG_CAMERA_ID) { type = NavType.StringType },
+                ),
+            ) { entry ->
+                IntegraCameraDetailScreen(
+                    cameraId = entry.arguments
+                        ?.getString(IntegraVideoRoutes.ARG_CAMERA_ID).orEmpty(),
+                )
+            }
+
+            // ── Vehículos y ANPR ──────────────────────────────────────────
+            integraVehiclesGraph()
+
+            // ── Horarios y espacios ───────────────────────────────────────
+            composable(SchedulesRoutes.SCHEDULES) { IntegraSchedulesScreen() }
+            composable(SchedulesRoutes.ESPACIOS) {
+                IntegraEspaciosScreen(
+                    onOpenSchedules = { doorId ->
+                        nav.navigate(SchedulesRoutes.schedulesForDoor(doorId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            composable(
+                route = SchedulesRoutes.SCHEDULES_FOR_DOOR,
+                arguments = listOf(
+                    navArgument(SchedulesRoutes.ARG_DOOR_ID) { type = NavType.StringType },
+                ),
+            ) { entry ->
+                // El id de puerta es «10.0.0.5|1»: viaja codificado en la ruta.
+                IntegraSchedulesScreen(
+                    initialDoorId = SchedulesRoutes.decodeRouteArg(
+                        entry.arguments?.getString(SchedulesRoutes.ARG_DOOR_ID),
+                    ),
+                )
+            }
+
+            // ── Detección ─────────────────────────────────────────────────
+            composable(IntegraDetectionRoutes.DETECTION) {
+                IntegraDetectionCamerasScreen(
+                    onOpenCamera = { id ->
+                        nav.navigate(IntegraDetectionRoutes.cameraRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenCapabilities = {
+                        nav.navigate(IntegraDetectionRoutes.CAPABILITIES) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            composable(IntegraDetectionRoutes.CAPABILITIES) {
+                IntegraDetectionCapabilitiesScreen()
+            }
+            composable(
+                route = IntegraDetectionRoutes.CAMERA,
+                arguments = listOf(
+                    navArgument(IntegraDetectionRoutes.ARG_CAMERA_ID) { type = NavType.StringType },
+                ),
+            ) { entry ->
+                IntegraDetectionTuningScreen(
+                    cameraId = entry.arguments
+                        ?.getString(IntegraDetectionRoutes.ARG_CAMERA_ID).orEmpty(),
+                )
+            }
+
+            // ── Ajustes (sustituye la lista de sitios de solo lectura) ─────
+            composable(IntegraDetectionRoutes.SETTINGS) {
+                IntegraSettingsScreen(
+                    onOpenSite = { id ->
+                        nav.navigate(IntegraDetectionRoutes.siteRoute(id)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onOpenNewSite = {
+                        nav.navigate(IntegraDetectionRoutes.SETTINGS_NEW) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            composable(IntegraDetectionRoutes.SETTINGS_NEW) {
+                IntegraNewSiteScreen(onCreated = { nav.popBackStack() })
+            }
+            composable(
+                route = IntegraDetectionRoutes.SETTINGS_SITE,
+                arguments = listOf(
+                    navArgument(IntegraDetectionRoutes.ARG_SITE_ID) { type = NavType.IntType },
+                ),
+            ) { entry ->
+                IntegraSiteDetailScreen(
+                    siteId = entry.arguments?.getInt(IntegraDetectionRoutes.ARG_SITE_ID) ?: 0,
+                    onDeleted = { nav.popBackStack() },
+                )
+            }
+
+            // ── Gobierno ──────────────────────────────────────────────────
+            composable(IntegraGovernanceRoutes.AUDIT) { IntegraAuditScreen() }
+            composable(IntegraGovernanceRoutes.NOTIFICATIONS) {
+                IntegraNotificationsCenterScreen()
+            }
+            composable(IntegraGovernanceRoutes.MY_PROFILE) { IntegraMyProfileScreen() }
         }
     }
 }
@@ -181,34 +355,53 @@ private data class IntegraHubCard(
     val onClick: () -> Unit,
 )
 
+/**
+ * Tarjeta del hub. Se construye por CLAVE de módulo y la navegación se resuelve
+ * con `integraRouteForKey`, no con un callback por módulo: con 18 módulos, un
+ * parámetro por cada uno hacía la firma inmanejable y era el motivo por el que
+ * añadir una pantalla obligaba a tocar cuatro sitios.
+ */
+private fun hubCard(
+    key: String,
+    icon: String,
+    title: String,
+    subtitle: String,
+    bg: Color,
+    onOpenKey: (String) -> Unit,
+) = IntegraHubCard(key, icon, title, subtitle, bg) { onOpenKey(key) }
+
 @Composable
 private fun IntegraHomeScreen(
     allowedKeys: Set<String>,
-    onOpenAccess: () -> Unit,
-    onOpenEvents: () -> Unit,
-    onOpenPeople: () -> Unit,
-    onOpenAttendance: () -> Unit,
-    onOpenVisitors: () -> Unit,
-    onOpenAlarms: () -> Unit,
-    onOpenOccupancy: () -> Unit,
-    onOpenDevices: () -> Unit,
-    onOpenSites: () -> Unit,
+    onOpenKey: (String) -> Unit,
 ) {
     fun show(key: String) = key in allowedKeys
 
     val accessCards = listOf(
-        IntegraHubCard("integra-access", "🚪", "Acceso", "Puertas y apertura", Color(0xFF2563EB), onOpenAccess),
-        IntegraHubCard("integra-events", "📋", "Eventos", "Bitácora ACS", Color(0xFF0D9488), onOpenEvents),
-        IntegraHubCard("integra-people", "👤", "Personas", "Directorio ACS", Color(0xFF7C3AED), onOpenPeople),
-        IntegraHubCard("integra-attendance", "🕒", "Asistencia", "Entradas / salidas", Color(0xFFF97316), onOpenAttendance),
-        IntegraHubCard("integra-visitors", "🪪", "Visitantes", "Citas y registro", Color(0xFF059669), onOpenVisitors),
+        hubCard("integra-access", "🚪", "Acceso", "Puertas y apertura", Color(0xFF2563EB), onOpenKey),
+        hubCard("integra-events", "📋", "Eventos", "Bitácora ACS", Color(0xFF0D9488), onOpenKey),
+        hubCard("integra-people", "👤", "Personas", "Directorio ACS", Color(0xFF7C3AED), onOpenKey),
+        hubCard("integra-attendance", "🕒", "Asistencia", "Entradas / salidas", Color(0xFFF97316), onOpenKey),
+        hubCard("integra-visitors", "🪪", "Visitantes", "Citas y registro", Color(0xFF059669), onOpenKey),
+        hubCard("integra-schedules", "🗓️", "Horarios", "Vigencia por puerta", Color(0xFF1D4ED8), onOpenKey),
+        hubCard("integra-espacios", "🏛️", "Espacios", "Política y reservas", Color(0xFF6D28D9), onOpenKey),
     ).filter { show(it.key) }
 
     val opsCards = listOf(
-        IntegraHubCard("integra-alarms", "🚨", "Alarmas", "Cola SOC", Color(0xFFDC2626), onOpenAlarms),
-        IntegraHubCard("integra-occupancy", "📍", "En sitio", "Ocupación hoy", Color(0xFF0891B2), onOpenOccupancy),
-        IntegraHubCard("integra-devices", "🖥️", "Equipos", "Inventario ACS", Color(0xFF4B5563), onOpenDevices),
-        IntegraHubCard("integra-sites", "🏢", "Sitios", "Lista de sitios", Color(0xFF9333EA), onOpenSites),
+        hubCard("integra-alarms", "🚨", "Alarmas", "Cola SOC", Color(0xFFDC2626), onOpenKey),
+        hubCard("integra-occupancy", "📍", "En sitio", "Ocupación hoy", Color(0xFF0891B2), onOpenKey),
+        hubCard("integra-video", "🎥", "Cámaras", "Vista previa y PTZ", Color(0xFF0F766E), onOpenKey),
+        hubCard("integra-vehicles", "🚙", "Vehículos", "Placas registradas", Color(0xFF15803D), onOpenKey),
+        hubCard("integra-anpr", "🔎", "ANPR", "Lecturas de placa", Color(0xFF166534), onOpenKey),
+        hubCard("integra-devices", "🖥️", "Equipos", "Inventario ACS", Color(0xFF4B5563), onOpenKey),
+    ).filter { show(it.key) }
+
+    val governCards = listOf(
+        hubCard("integra-detection", "🎯", "Detección", "Perfiles por cámara", Color(0xFFB45309), onOpenKey),
+        hubCard("integra-audit", "🧾", "Bitácora", "Quién hizo qué", Color(0xFF334155), onOpenKey),
+        hubCard("integra-notifications", "🔔", "Avisos", "Centro de notificaciones", Color(0xFFC2410C), onOpenKey),
+        hubCard("integra-my-profile", "🆔", "Mi perfil", "Mis credenciales", Color(0xFF7E22CE), onOpenKey),
+        hubCard("integra-sites", "⚙️", "Ajustes", "Sitios y sincronización", Color(0xFF9333EA), onOpenKey),
     ).filter { show(it.key) }
 
     LazyColumn(
@@ -244,13 +437,30 @@ private fun IntegraHomeScreen(
                         color = NxColors.Slate,
                     )
                     Text(
-                        "Alarmas, presencia, equipos y sitios",
+                        "Alarmas, presencia, cámaras, vehículos y equipos",
                         style = MaterialTheme.typography.bodySmall,
                         color = NxColors.Muted,
                     )
                 }
             }
             item { IntegraCardGrid(cards = opsCards) }
+        }
+        if (governCards.isNotEmpty()) {
+            item {
+                Column {
+                    Text(
+                        "Configuración y gobierno",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = NxColors.Slate,
+                    )
+                    Text(
+                        "Detección, bitácora, avisos, perfil y ajustes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Muted,
+                    )
+                }
+            }
+            item { IntegraCardGrid(cards = governCards) }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }

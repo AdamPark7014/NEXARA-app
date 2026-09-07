@@ -191,15 +191,17 @@ MVP operativo contra `/api/integra/**` (sin inventar ISAPI).
 | Alarmas | `/integra/alarms` | NATIVO · queue + ack/clear | AUSENTE |
 | En sitio | `/integra/access` | NATIVO · occupancy API (webPath→access) | AUSENTE |
 | Equipos | `/integra/access` | NATIVO · devices API (webPath→access) | AUSENTE |
-| Sitios | `/integra/settings` | SOLO_LECTURA · lista | AUSENTE |
-| Video 24h | `/integra/video` | AUSENTE · Bloque 2 | AUSENTE |
-| Detección | `/integra/detection` | AUSENTE · Bloque 2 | AUSENTE |
-| ANPR | `/integra/anpr` | AUSENTE · Bloque 2 | AUSENTE |
-| Plano | `/integra/map` | AUSENTE · Bloque 2 | AUSENTE |
-| Vehículos ACS | `/integra/vehicles` | AUSENTE | AUSENTE |
-| Auditoría | `/integra/audit` | AUSENTE | AUSENTE |
-| Notificaciones | `/integra/notifications-center` | AUSENTE | AUSENTE |
-| Mi perfil | `/integra/my-profile` | AUSENTE | AUSENTE |
+| Ajustes / Sitios | `/integra/settings` | NATIVO · alta, etiqueta, activación, módulos por sitio, sync y baja | AUSENTE |
+| Cámaras | `/integra/video` | NATIVO · rejilla con vista previa autorregulada, PTZ con presets, captura. **No es transmisión en vivo**: el muro MSE/WebSocket se queda en la web y la pantalla no pone «EN VIVO» | AUSENTE |
+| Detección | `/integra/detection` | NATIVO · sensibilidad, confianza, objetivo, horario, guardar, aplicar al equipo y sondeo de capacidades. **Los polígonos de zona se ven pero no se editan** | AUSENTE |
+| ANPR | `/integra/anpr` | NATIVO · lecturas de placa | AUSENTE |
+| Vehículos ACS | `/integra/vehicles` | NATIVO · alta/edición/baja con aviso de placa duplicada | AUSENTE |
+| Horarios | `/integra/schedules` | NATIVO · vigencia, plantilla por puerta, presets y reparto por terminal | AUSENTE |
+| Espacios | `/integra/espacios` | NATIVO · política por espacio, reservas y cancelación | AUSENTE |
+| Auditoría | `/integra/audit` | NATIVO · filtros, paginación real, `ipAddress`/`userAgent`/`previousData` visibles | AUSENTE |
+| Notificaciones | `/integra/notifications-center` | NATIVO · centro con triaje | AUSENTE |
+| Mi perfil | `/integra/my-profile` | NATIVO · credenciales y qué abre cada una | AUSENTE |
+| Plano | `/integra/map` | AUSENTE · sin agente asignado todavía | AUSENTE |
 
 ## Portal clientes (TicketsNavHost — fuera del catálogo ERP)
 

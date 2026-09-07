@@ -180,7 +180,31 @@ object ModuleCatalog {
         // Sin página web dedicada aún: "Abrir en web" → access/settings cercanos.
         mod("integra-occupancy", "En sitio", "📍", "/integra/access", ParityStatus.NATIVO),
         mod("integra-devices", "Equipos", "🖥️", "/integra/access", ParityStatus.NATIVO),
-        mod("integra-sites", "Sitios", "🏢", "/integra/settings", ParityStatus.SOLO_LECTURA),
+        // Sube de SOLO_LECTURA: la pantalla de Ajustes da de alta, etiqueta,
+        // activa, marca predeterminado, configura módulos por sitio, sincroniza
+        // y da de baja. La baja exige teclear el nombre del sitio.
+        mod("integra-sites", "Ajustes", "⚙️", "/integra/settings", ParityStatus.NATIVO),
+
+        // ── Cableados el 2026-09-07 ──────────────────────────────────────
+        // Estado de paridad HONESTO: `NATIVO` solo donde la pantalla escribe
+        // de verdad contra la API. Donde hay recorte, se dice cuál.
+
+        // Rejilla con vista previa autorregulada, PTZ con presets y captura.
+        // NO es transmisión en vivo: el muro con MSE sobre WebSocket se queda
+        // en la consola web. La pantalla no miente con una etiqueta «EN VIVO».
+        mod("integra-video", "Cámaras", "🎥", "/integra/video", ParityStatus.NATIVO),
+        mod("integra-vehicles", "Vehículos", "🚙", "/integra/vehicles", ParityStatus.NATIVO),
+        mod("integra-anpr", "ANPR", "🔎", "/integra/anpr", ParityStatus.NATIVO),
+        mod("integra-schedules", "Horarios", "🗓️", "/integra/schedules", ParityStatus.NATIVO),
+        mod("integra-espacios", "Espacios", "🏛️", "/integra/espacios", ParityStatus.NATIVO),
+        // Sensibilidad, confianza, objetivo, horario, guardar y aplicar al
+        // equipo se hacen desde el teléfono. Los polígonos de zona SE VEN pero
+        // NO se editan: dibujar con el dedo un polígono de detección daba peor
+        // resultado que no ofrecerlo. El recorte está dicho en pantalla.
+        mod("integra-detection", "Detección", "🎯", "/integra/detection", ParityStatus.NATIVO),
+        mod("integra-audit", "Bitácora", "🧾", "/integra/audit", ParityStatus.NATIVO),
+        mod("integra-notifications", "Avisos", "🔔", "/integra/notifications-center", ParityStatus.NATIVO),
+        mod("integra-my-profile", "Mi perfil", "🆔", "/integra/my-profile", ParityStatus.NATIVO),
     )
 
     /** Módulos LAB. */
