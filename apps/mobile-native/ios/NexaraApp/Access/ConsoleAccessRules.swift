@@ -79,12 +79,17 @@ enum ConsoleAccessRules {
         "news", "attendance", "my-lunch-breaks", "lunch-breaks",
     ]
 
+    /// Prefijos de panel a quitar para comparar contra listas por rol.
+    /// Sin `/erp` y `/ops`, `chat` (`/erp/chat`) y `reuniones` (`/erp/reuniones`)
+    /// nunca casan con la allowlist del ingeniero/vendedor.
+    private static let panelPathPrefixes = ["/operacion", "/console", "/ops", "/erp", "/crm"]
+
     private static func normalizedConsolePath(_ module: ModuleEntry) -> String {
-        if module.webPath.hasPrefix("/operacion") {
-            return String(module.webPath.dropFirst("/operacion".count))
-        }
-        if module.webPath.hasPrefix("/console") {
-            return String(module.webPath.dropFirst("/console".count))
+        for prefix in panelPathPrefixes {
+            let withSlash = prefix + "/"
+            if module.webPath.hasPrefix(withSlash) {
+                return String(module.webPath.dropFirst(prefix.count))
+            }
         }
         return module.webPath
     }
@@ -119,7 +124,16 @@ enum ConsoleAccessRules {
         }
 
         if isIngeniero {
-            let baseAllowed: Set<String> = ["/dashboard", "/cotizaciones", "/cvs", "/ventas", "/attendance"]
+            // Unión ING_CAMPO ∪ ING_SOPORTE + MEETINGS_STAFF_URL_RULES (Android).
+            let baseAllowed: Set<String> = [
+                "/dashboard", "/cotizaciones", "/cvs", "/ventas", "/attendance",
+                "/activities", "/evidences", "/viatics", "/vehicles", "/gps", "/tools",
+                "/lunch-breaks", "/chat", "/dispatch", "/support", "/noc",
+                "/service-sheets", "/client-tickets",
+                "/support/sla", "/maintenance", "/maintenance/contracts", "/assets",
+                "/service-clients", "/kb", "/notifications-center",
+                "/reuniones",
+            ]
             if !path.hasPrefix("/my-") && !baseAllowed.contains(path) { return false }
             if path == "/cotizaciones" && !canAccessCotizaciones(user) { return false }
             if path == "/cvs" && !canAccessCvs(user) { return false }
@@ -132,7 +146,11 @@ enum ConsoleAccessRules {
         }
 
         if isVendedor {
-            let baseAllowed: Set<String> = ["/dashboard", "/ventas", "/cotizaciones", "/cvs", "/attendance"]
+            let baseAllowed: Set<String> = [
+                "/dashboard", "/ventas", "/cotizaciones", "/cvs", "/attendance",
+                "/chat", "/notifications-center", "/clients",
+                "/reuniones",
+            ]
             if !path.hasPrefix("/my-") && !baseAllowed.contains(path) { return false }
             if path == "/cotizaciones" && !canAccessCotizaciones(user) { return false }
             if path == "/cvs" && !canAccessCvs(user) { return false }
@@ -253,16 +271,17 @@ enum ConsoleAccessRules {
         }
 
         let groups: [ConsoleSidebarGroup] = [
-            ConsoleSidebarGroup(id: "profile", title: "Cuenta personal", modules: pick(["my-profile", "offline-queue", "calendar"])),
+            ConsoleSidebarGroup(id: "profile", title: "Cuenta personal", modules: pick(["my-profile", "my-preferences", "offline-queue", "calendar"])),
             ConsoleSidebarGroup(id: "employee", title: "Mi espacio de trabajo", modules: pick([
                 "dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks",
+                "reuniones", "chat",
             ])),
             ConsoleSidebarGroup(id: "operations", title: "Supervisión operativa", modules: pick([
                 "activities", "evidences", "viatics", "vehicles", "gps", "service-clients",
-                "maintenance", "assets", "service-sheets",
+                "maintenance", "assets", "service-sheets", "dispatch",
             ])),
             ConsoleSidebarGroup(id: "people", title: "RRHH y control de personal", modules: pick([
-                "attendance", "lunch-breaks", "fines", "cvs", "users", "hr", "orgchart", "kpis-hr",
+                "attendance", "lunch-breaks", "fines", "cvs", "recruiting", "users", "hr", "orgchart", "kpis-hr",
             ])),
             ConsoleSidebarGroup(id: "commercial", title: "Clientes y comercial", modules: pick([
                 "clients", "projects", "cotizaciones", "gestion-vendedores", "contact-messages",
@@ -293,7 +312,7 @@ enum ConsoleAccessRules {
             keys.compactMap { byKey[$0] }.filter { canAccessConsoleModule(user: user, module: $0) }
         }
         return [
-            ConsoleSidebarGroup(id: "board", title: "Tablero", modules: pick(["dashboard", "approvals"])),
+            ConsoleSidebarGroup(id: "board", title: "Tablero", modules: pick(["dashboard", "approvals", "reuniones"])),
             ConsoleSidebarGroup(id: "governance", title: "Gobierno", modules: pick(["companies"])),
             ConsoleSidebarGroup(id: "finance", title: "Finanzas", modules: pick(["viatics", "expenses"])),
             ConsoleSidebarGroup(id: "people", title: "Personas", modules: pick(["attendance", "my-lunch-breaks"])),
@@ -314,13 +333,13 @@ enum ConsoleAccessRules {
         }
         return [
             ConsoleSidebarGroup(id: "pipeline", title: "Pipeline y catálogo", modules: pick([
-                "oportunidades", "pipeline", "agenda", "plantillas",
+                "oportunidades", "pipeline", "agenda", "plantillas", "smart-quote",
                 "clientes", "productos", "proyectos", "licitaciones",
             ])),
             ConsoleSidebarGroup(id: "team", title: "Equipo y métricas", modules: pick([
                 "gestion-vendedores", "metas", "reportes", "crecimiento", "equipo-comparativa",
             ])),
-            ConsoleSidebarGroup(id: "account", title: "Mi cuenta", modules: pick(["my-profile", "notificaciones"])),
+            ConsoleSidebarGroup(id: "account", title: "Mi cuenta", modules: pick(["my-profile", "notificaciones", "chat"])),
         ].filter { !$0.modules.isEmpty }
     }
 }

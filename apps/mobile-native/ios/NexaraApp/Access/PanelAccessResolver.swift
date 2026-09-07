@@ -1,15 +1,18 @@
 import Foundation
 
-/// Resuelve paneles accesibles — alineado con apps/web/lib/access-matrix.ts.
+/// Resuelve paneles accesibles — alineado con `roles.v2.ts` y Android `PanelAccessResolver`.
+///
+/// Orden: externos → super admin → navPanels de sesión → RolePanelMatrix → permisos → ERP base.
 enum PanelAccessResolver {
-    private static let clientPrefixes = [
-        "client-portal.", "branch-portal.", "client-auth.", "branch-auth.", "client-tickets.",
-    ]
+    private static let allInternalPanels: [PanelId] = [.erp, .crm, .ops, .studio, .lab, .integra]
+    private static let baseInternalPanel: PanelId = .erp
 
     private static func normalizePerms(_ perms: [String]) -> Set<String> {
-        Set(perms.map { $0.trimmingCharacters(in: .whitespaces).lowercased()
-            .replacingOccurrences(of: "_", with: ".")
-            .replacingOccurrences(of: "-", with: ".") })
+        Set(perms.map {
+            $0.trimmingCharacters(in: .whitespaces).lowercased()
+                .replacingOccurrences(of: "_", with: ".")
+                .replacingOccurrences(of: "-", with: ".")
+        })
     }
 
     private static func hasAny(_ perms: Set<String>, _ required: [String], superAdmin: Bool) -> Bool {
@@ -17,52 +20,81 @@ enum PanelAccessResolver {
         return required.contains { perms.contains($0) }
     }
 
-    private static func isClientOrBranch(role: String, permissions: [String]) -> Bool {
-        let roleMatch = role.range(of: "(cliente|client|sucursal|branch)", options: .regularExpression) != nil
-        let permMatch = permissions.contains { p in
-            let n = p.trimmingCharacters(in: .whitespaces).lowercased()
-            return clientPrefixes.contains { n.hasPrefix($0) }
+    private static func panelFromNavKey(_ key: String) -> PanelId? {
+        switch key.trimmingCharacters(in: .whitespaces).lowercased() {
+        case "erp", "core": return .erp
+        case "crm", "sales": return .crm
+        case "ops": return .ops
+        case "studio": return .studio
+        case "lab": return .lab
+        case "integra": return .integra
+        case "portal": return .portal
+        default: return PanelId.fromLegacy(key)
         }
-        return roleMatch || permMatch
     }
 
     static func accessiblePanels(user: SessionUser?) -> [PanelId] {
         guard let user else { return [] }
 
-        if user.isClient || user.isBranchUser || isClientOrBranch(role: user.role ?? "", permissions: user.permissions) {
+        let canonicalRole = RolePanelMatrix.canonicalRoleKey(
+            roleKey: user.roleKey,
+            orgRoleKey: user.orgRoleKey,
+            roleDisplayName: user.role
+        )
+
+        // 1. Externos
+        if user.isClient || user.isBranchUser || RolePanelMatrix.isExternalRole(canonicalRole) {
             return [.portal]
         }
 
-        let perms = normalizePerms(user.permissions)
-        let role = (user.role ?? "").lowercased()
-
+        // 2. Super admin
         if user.isSuperAdmin {
-            return [.erp, .crm, .ops, .studio, .lab]
+            return allInternalPanels
         }
+
+        // 3. API navigation panels
+        if let nav = user.navPanels, !nav.isEmpty {
+            let fromNav = nav.compactMap { panelFromNavKey($0) }.filter { $0 != .portal }
+            var seen = Set<PanelId>()
+            let unique = fromNav.filter { seen.insert($0).inserted }
+            if !unique.isEmpty { return unique }
+        }
+
+        // 4. RolePanelMatrix — igualdad exacta, nunca contains("rh")
+        let fromRole = RolePanelMatrix.panelsForRole(canonicalRole).filter { $0 != .portal }
+        if !fromRole.isEmpty { return fromRole }
+
+        // 5. Permisos efectivos
+        let fromPerms = panelsFromPermissions(user)
+        if !fromPerms.isEmpty { return fromPerms }
+
+        // 6. Nunca cero paneles con sesión interna válida
+        return [baseInternalPanel]
+    }
+
+    private static func panelsFromPermissions(_ user: SessionUser) -> [PanelId] {
+        let perms = normalizePerms(user.permissions)
+        if perms.isEmpty { return [] }
+        let superAdmin = user.isSuperAdmin
 
         let erp = hasAny(perms, [
             "console.access", "console.admin", "users.manage",
             "contabilidad.view", "contabilidad.manage",
             "attendance.view", "attendance.manage",
-            "console_access", "console_admin",
-        ], superAdmin: user.isSuperAdmin)
-            || role.contains("admin") || role.contains("rh") || role.contains("contab")
-
+            "hr.view", "hr.manage", "cvs.manage",
+        ], superAdmin: superAdmin)
         let crm = hasAny(perms, [
             "panel.ventas", "sales.view", "sales.manage", "sales.reports.view",
-        ], superAdmin: user.isSuperAdmin)
-            || role.contains("vendedor") || role.contains("ventas")
-
+        ], superAdmin: superAdmin)
         let ops = hasAny(perms, [
-            "console.access", "console.admin", "gps.view", "gps.manage", "activities.view",
-        ], superAdmin: user.isSuperAdmin)
-            || role.contains("ingenier") || role.contains("soporte") || role.contains("campo")
-            || role.contains("operac") || role.contains("noc")
-
-        let studio = hasAny(perms, ["panel.web", "studio.access"], superAdmin: user.isSuperAdmin)
-            || role.contains("diseño") || role.contains("diseno") || role.contains("studio")
-
-        let lab = user.isSuperAdmin || role.contains("developer") || role.contains("desarroll")
+            "gps.view", "gps.manage", "activities.view", "activities.manage",
+            "evidences.view", "dispatch.manage",
+        ], superAdmin: superAdmin)
+        let studio = hasAny(perms, [
+            "panel.web", "studio.content.view", "studio.content.manage",
+        ], superAdmin: superAdmin)
+        let lab = hasAny(perms, ["lab.access", "lab.ai.live"], superAdmin: superAdmin)
+        let integra = superAdmin || perms.contains { $0.hasPrefix("integra.") }
 
         var out: [PanelId] = []
         if erp { out.append(.erp) }
@@ -70,6 +102,7 @@ enum PanelAccessResolver {
         if ops { out.append(.ops) }
         if studio { out.append(.studio) }
         if lab { out.append(.lab) }
+        if integra { out.append(.integra) }
         return out
     }
 

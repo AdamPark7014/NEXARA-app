@@ -17,11 +17,14 @@ struct ModuleRouter {
         case (.console, "activities"),
              (.console, "my-activities"):
             ActivitiesView()
-        case (.console, "chat"), (.ventas, "chat"), (.lab, "chat"):
+        case (.console, "chat"), (.ventas, "chat"), (.contabilidad, "chat"),
+             (.lab, "chat"), (.studio, "chat"), (.web, "chat"):
             ChatView(
                 initialChannelId: channelId > 0 ? channelId : nil,
                 initialMessageId: messageId > 0 ? messageId : nil
             )
+        case (.console, "reuniones"), (.console, "meetings"):
+            MeetingsView()
         case (.console, "dispatch"):
             DispatchBoardView()
         case (.console, "evidences"):

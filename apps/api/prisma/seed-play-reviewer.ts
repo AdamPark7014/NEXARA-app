@@ -196,12 +196,13 @@ async function seedReviewer() {
 
   console.log(`\n   ${ok ? '✅' : '❌'} Verificación de login: ${ok ? 'OK' : 'FALLA'}`);
   console.log('\n──────────────────────────────────────────────────────────────');
-  console.log(' Pegar en Play Console → Contenido de la app → Acceso a la app');
+  console.log(' Pegar en Play Console / App Store Connect → credenciales demo');
   console.log('──────────────────────────────────────────────────────────────');
   console.log(` Nombre de las credenciales : Cuenta de demostración NEXARA`);
   console.log(` Usuario                    : ${REVIEWER_EMAIL}`);
   console.log(` Contraseña                 : ${password}`);
   console.log('──────────────────────────────────────────────────────────────');
+  console.log(' Tenant: nexara-demo (NO es la empresa primaria). MFA off.');
   console.log(' Guarda la contraseña ahora: sólo se muestra en esta corrida.');
   console.log(' Si se pierde, vuelve a correr el seed para generar otra.\n');
 }

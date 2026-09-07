@@ -10,12 +10,7 @@ enum ApiError: Error, LocalizedError {
     case decoding(Error)
 
     var errorDescription: String? {
-        switch self {
-        case .invalidURL: return "URL inválida"
-        case .http(let code, let msg): return "HTTP \(code)\(msg.map { ": \($0)" } ?? "")"
-        case .transport(let e): return e.localizedDescription
-        case .decoding(let e): return "Decodificación: \(e.localizedDescription)"
-        }
+        toUserMessage()
     }
 }
 

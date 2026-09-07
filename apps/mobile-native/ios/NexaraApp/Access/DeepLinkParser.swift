@@ -29,6 +29,9 @@ enum DeepLinkParser {
         "soporte": "client-tickets", "support": "client-tickets", "client-tickets": "client-tickets",
         "executive": "executive", "approvals": "approvals", "bi": "bi", "analytics": "analytics",
         "dispatch": "dispatch",
+        "chat": "chat",
+        "reuniones": "reuniones", "meetings": "reuniones",
+        "smart-quote": "smart-quote", "cotizar": "smart-quote", "nueva-cotizacion": "smart-quote",
         "noc": "noc", "sla": "support-sla", "support-sla": "support-sla",
         "maintenance-contracts": "maintenance-contracts", "contratos": "maintenance-contracts",
         "companies": "companies", "kb": "kb", "exports": "exports",
@@ -78,6 +81,9 @@ enum DeepLinkParser {
             moduleParts = Array(segments.dropFirst())
         case "portal", "tickets":
             panel = .portal
+            moduleParts = Array(segments.dropFirst())
+        case "integra":
+            panel = .integra
             moduleParts = Array(segments.dropFirst())
         default:
             panel = .erp
