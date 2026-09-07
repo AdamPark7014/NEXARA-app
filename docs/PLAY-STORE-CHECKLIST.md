@@ -99,9 +99,22 @@ npm run mobile:android:play-aab
 
 Salida: `apps/mobile-native/android/app/build/outputs/bundle/release/app-release.aab`
 
-**Build verificado (17/08/2026):** 28.77 MB, `jar verified`, firmado con la llave de subida
-`CN=NEXARA, OU=Mobile, O=NEXARA, L=Puebla, ST=Puebla, C=MX`, vigente hasta 2053 (Play exige que el
-certificado dure al menos hasta el 22/10/2033 — cumple).
+**Build de la v2 — verificado el 07/09/2026:**
+
+| | |
+|---|---|
+| Archivo | `apps/mobile-native/android/app/build/outputs/bundle/release/app-release.aab` |
+| Tamaño | **27.18 MB** |
+| `versionCode` / `versionName` | **7** / **1.0.1** |
+| Firma | **`jar verified`** (jarsigner) |
+| Mapping de R8 | `apps/mobile-native/play-releases/mapping-v7-1.0.1.txt` (144.9 MB, fuera de git) |
+
+Firmado con la llave de subida `CN=NEXARA, OU=Mobile, O=NEXARA, L=Puebla, ST=Puebla, C=MX`,
+vigente hasta 2053 (Play exige que el certificado dure al menos hasta el 22/10/2033 — cumple).
+
+> **No ejecutes `mobile-smoke-checklist.ps1` con `-CleanBuild` después de compilar el bundle:**
+> `clean` borra `build/` entero y se lleva el AAB. Sin ese flag ya no pasa (arreglado el
+> 07-09-2026, después de que ocurriera con este mismo bundle).
 
 Huellas del certificado de subida — las necesitas para restringir la API key de Google Maps y para
 registrar la app en Firebase:
