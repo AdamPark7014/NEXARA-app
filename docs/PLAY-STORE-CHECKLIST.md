@@ -25,6 +25,46 @@ en el repo.
 
 ---
 
+> ## 🚀 v2 ENVIADA A REVISIÓN — 07-09-2026, 12:26
+>
+> `versionCode 7` / `versionName 1.0.1` subido a **Producción** y en revisión.
+> En cola fueron: la versión de producción, el cuestionario de Seguridad de
+> los datos, y la declaración de ID de publicidad (ya aplicada).
+>
+> ### El error que bloqueó el envío — pasará otra vez si no se lee esto
+>
+> Al pulsar «Siguiente» en Revisar y confirmar, Play **se negó a guardar**:
+>
+> > *«Tu declaración de ID de publicidad en Play Console indica que tu
+> > aplicación usa un ID de publicidad. Un archivo de manifiesto de uno de tus
+> > artefactos activos no incluye el permiso
+> > `com.google.android.gms.permission.AD_ID`.»*
+>
+> **Causa:** al salir Firebase Analytics del build desaparecieron `AD_ID` y
+> `ACCESS_ADSERVICES_*` del manifiesto fusionado, pero la declaración de la v1
+> seguía diciendo que la app usa ID de publicidad. Play compara **declaración
+> contra manifiesto** y bloquea.
+>
+> **Arreglo:** *Contenido de la aplicación → ID de publicidad* → «¿Tu
+> aplicación usa un ID de publicidad?» de **Sí a No**. El error desaparece.
+>
+> **Regla general:** cada vez que entre o salga un SDK de Google del build,
+> revisa esta declaración ANTES de subir el bundle. No basta con el
+> cuestionario de Seguridad de los datos: son dos declaraciones distintas.
+>
+> ### Advertencia que no bloquea
+>
+> «Este App Bundle contiene código nativo, pero no has subido símbolos de
+> depuración.» Es una recomendación. Sin esos símbolos, un fallo en código
+> nativo llega a Crashlytics ilegible. Se puede subir después.
+>
+> ### Comprobado en el envío
+>
+> Dispositivos compatibles **12.475 teléfonos / 6.685 tablets, 0 perdidos**.
+> El bundle viejo `5 (1.0.0)` NO se incluyó.
+
+---
+
 > ## ✅ Estado real de la consola — verificado el 07-09-2026
 >
 > Las secciones 1, 2 y 3 **ya están hechas**. Confirmado en Play Console:
