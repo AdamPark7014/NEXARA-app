@@ -324,6 +324,17 @@ object DeepLinkParser {
         "my-profile" to "integra-my-profile",
         "mi-perfil" to "integra-my-profile",
         "integra-my-profile" to "integra-my-profile",
+        "map" to "integra-map",
+        "plano" to "integra-map",
+        "mapa" to "integra-map",
+        "floorplans" to "integra-map",
+        "integra-map" to "integra-map",
+        // En la web `/integra/dashboard` redirige a `/integra`, así que ese
+        // enlace viejo circula: aquí aterriza en el panorama nativo.
+        "dashboard" to "integra-dashboard",
+        "panorama" to "integra-dashboard",
+        "tablero" to "integra-dashboard",
+        "integra-dashboard" to "integra-dashboard",
     )
 
     private fun resolveEntityId(

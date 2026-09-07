@@ -76,15 +76,18 @@ object ModuleCatalog {
         mod("approvals", "Aprobaciones", "🛡️", "/erp/approvals", ParityStatus.NATIVO),
         mod("notifications-center", "Notificaciones", "🔔", "/erp/notifications-center", ParityStatus.NATIVO),
         mod("chat", "Chat", "💬", "/erp/chat", ParityStatus.NATIVO),
+        // `MeetingsApi.kt` llevaba escrito sin que lo referenciara nadie, ni
+        // siquiera el cliente HTTP. Con el módulo montado encima, pasa a NATIVO.
+        mod("reuniones", "Reuniones", "📅", "/erp/reuniones", ParityStatus.NATIVO),
         mod("bi", "Business Intelligence", "📈", "/erp/analytics/bi", ParityStatus.SOLO_LECTURA),
         mod("analytics", "Analítica", "📈", "/console/analytics", ParityStatus.SOLO_LECTURA),
         mod("audit", "Auditoría", "🔍", "/console/audit", ParityStatus.SOLO_LECTURA),
-        mod("assets", "Activos", "📦", "/operacion/assets", ParityStatus.NATIVO),
+        mod("assets", "Activos", "📦", "/operacion/assets", ParityStatus.SOLO_LECTURA),
         mod("stock", "Almacén", "📦", "/console/stock", ParityStatus.NATIVO),
         mod("warehouse", "Bodega", "🏭", "/console/warehouse", ParityStatus.NATIVO),
         mod("procurement", "Compras", "🛒", "/console/procurement", ParityStatus.NATIVO),
         mod("maintenance", "Mantenimiento", "🔧", "/operacion/maintenance", ParityStatus.NATIVO),
-        mod("service-sheets", "Hojas de servicio", "📄", "/operacion/service-sheets", ParityStatus.NATIVO),
+        mod("service-sheets", "Hojas de servicio", "📄", "/operacion/service-sheets", ParityStatus.SOLO_LECTURA),
         mod("documents", "Documentos", "📁", "/console/documents", ParityStatus.NATIVO),
         mod("cvs", "CVs", "📑", "/console/cvs", ParityStatus.NATIVO),
         mod("recruiting", "Reclutamiento", "🔍", "/ops/recruiting", ParityStatus.NATIVO),
@@ -95,7 +98,7 @@ object ModuleCatalog {
         mod("support-sla", "SLA y tiempos", "⏱️", "/ops/support/sla", ParityStatus.SOLO_LECTURA),
         mod("maintenance-contracts", "Contratos de servicio", "📑", "/ops/maintenance/contracts", ParityStatus.NATIVO),
         mod("contact-messages", "Mensajes de contacto", "✉️", "/console/contact-messages", ParityStatus.SOLO_LECTURA),
-        mod("news", "Noticias", "📰", "/console/news", ParityStatus.CASCARON),
+        mod("news", "Noticias", "📰", "/console/news", ParityStatus.SOLO_LECTURA),
         mod("newsletter", "Newsletter", "📮", "/console/newsletter", ParityStatus.SOLO_LECTURA),
         mod("my-profile", "Mi perfil", "👤", "/console/my-profile", ParityStatus.NATIVO),
         mod("my-preferences", "Mis preferencias", "⚙️", "/console/my-preferences", ParityStatus.SOLO_LECTURA),
@@ -103,8 +106,8 @@ object ModuleCatalog {
         mod("settings", "Ajustes", "⚙️", "/console/settings", ParityStatus.NATIVO),
         mod("companies", "Multi-empresa", "🏛️", "/erp/companies", ParityStatus.NATIVO),
         mod("kb", "Knowledge Base", "📚", "/erp/kb", ParityStatus.SOLO_LECTURA),
-        mod("exports", "Exportaciones", "📥", "/erp/exports", ParityStatus.NATIVO),
-        mod("architecture", "Arquitectura", "🗺️", "/erp/architecture", ParityStatus.CASCARON),
+        mod("exports", "Exportaciones", "📥", "/erp/exports", ParityStatus.SOLO_LECTURA),
+        mod("architecture", "Arquitectura", "🗺️", "/erp/architecture", ParityStatus.SOLO_LECTURA),
         mod("calendar", "Mi calendario", "📅", "/erp/calendar", ParityStatus.SOLO_LECTURA),
         mod("orgchart", "Organigrama", "🌳", "/erp/hr/orgchart", ParityStatus.SOLO_LECTURA),
         mod("kpis-hr", "KPIs de personas", "📊", "/erp/hr/kpis", ParityStatus.SOLO_LECTURA),
@@ -142,8 +145,8 @@ object ModuleCatalog {
         mod("invoicing", "Facturación", "🧾", "/contabilidad/invoicing", ParityStatus.NATIVO),
         mod("expenses", "Gastos", "💸", "/contabilidad/expenses", ParityStatus.NATIVO),
         mod("employee-payments", "Pagos a empleados", "💵", "/contabilidad/employee-payments", ParityStatus.NATIVO),
-        mod("viaticos", "Viáticos", "💼", "/contabilidad/viaticos", ParityStatus.CASCARON),
-        mod("pagos", "Pagos", "💳", "/contabilidad/pagos", ParityStatus.CASCARON),
+        mod("viaticos", "Viáticos", "💼", "/contabilidad/viaticos", ParityStatus.NATIVO),
+        mod("pagos", "Pagos", "💳", "/contabilidad/pagos", ParityStatus.NATIVO),
         mod("horas", "Horas", "⏱️", "/contabilidad/horas", ParityStatus.SOLO_LECTURA),
         mod("proyectos", "Proyectos", "🧩", "/contabilidad/proyectos", ParityStatus.NATIVO),
         mod("work-projects", "Proyectos internos", "🧱", "/contabilidad/work-projects", ParityStatus.NATIVO),
@@ -205,6 +208,14 @@ object ModuleCatalog {
         mod("integra-audit", "Bitácora", "🧾", "/integra/audit", ParityStatus.NATIVO),
         mod("integra-notifications", "Avisos", "🔔", "/integra/notifications-center", ParityStatus.NATIVO),
         mod("integra-my-profile", "Mi perfil", "🆔", "/integra/my-profile", ParityStatus.NATIVO),
+        // Plano: se ve y se consulta, NO se sitúan ni se borran pines. El
+        // servidor hace `upsert` por equipo, así que un pin mal puesto con el
+        // dedo sobre una planta al 40 % pisa el bueno. En la web, tocar un pin
+        // lo borraba sin preguntar; aquí no hay gesto que borre porque no hay
+        // nada que borrar.
+        mod("integra-map", "Plano", "🗺️", "/integra/map", ParityStatus.SOLO_LECTURA),
+        // Panorama: solo consulta y salta a otros módulos.
+        mod("integra-dashboard", "Panorama", "📊", "/integra/dashboard", ParityStatus.SOLO_LECTURA),
     )
 
     /** Módulos LAB. */

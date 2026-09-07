@@ -105,6 +105,8 @@ class IntegraWiringTest {
             "integra-my-profile" to "integra/my-profile",
             // Sube de la lista de solo lectura a la pantalla de Ajustes.
             "integra-sites" to "integra/settings",
+            "integra-map" to "integra/map",
+            "integra-dashboard" to "integra/dashboard",
         )
 
         esperado.forEach { (clave, ruta) ->
