@@ -7,6 +7,11 @@ package mx.nexara.mobile.nativeapp.ui.integra.governance
  * inventarse las cadenas: aquí están las rutas, las claves de módulo y los
  * títulos de la barra superior, en un solo sitio y compiladas. Las pantallas se
  * registran desde `IntegraNavHost` (que este turno no toca).
+ *
+ * Pantallas listas:
+ *   · [IntegraAuditScreen]
+ *   · [IntegraNotificationsCenterScreen]
+ *   · [IntegraMyProfileScreen]
  */
 object IntegraGovernanceRoutes {
 

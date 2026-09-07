@@ -30,16 +30,16 @@ package mx.nexara.mobile.nativeapp.data.integra.detection
 /** Sensibilidad por defecto. **50**, no 100: es el valor del ejemplo del
  *  fabricante (Apéndice A.49). El 100 que se escribía a ciegas en las dieciséis
  *  cámaras es la causa directa de los falsos positivos. */
-const DEFAULT_SENSITIVITY = 50
+const val DEFAULT_SENSITIVITY = 50
 
 /** Polígonos simultáneos que admite el equipo (verificado en DS-2CD2123G2). */
-const MAX_REGIONS = 4
+const val MAX_REGIONS = 4
 
 /** Un polígono necesita tres vértices para encerrar algo (lo exige el servidor). */
-const MIN_REGION_POINTS = 3
+const val MIN_REGION_POINTS = 3
 
 /** Tope de vértices por polígono. */
-const MAX_REGION_POINTS = 10
+const val MAX_REGION_POINTS = 10
 
 val CONFIDENCE_ORDER: List<String> = listOf("low", "mediumLow", "mediumHigh", "high")
 
