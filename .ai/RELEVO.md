@@ -164,12 +164,22 @@ Si alguien los ve y piensa que falta trabajo, es deliberado:
 
 ## A medias / decisiones de Adam
 
-0. **iOS: cinco trámites que solo puede hacer Adam.** Alta en el Apple
-   Developer Program (99 USD/año), clave de la API de App Store Connect,
-   certificado de distribución (guion de Windows, no hace falta Mac), alta de la
-   app en App Store Connect y carga de los seis secretos. Paso a paso en
-   `apps/mobile-native/ios/PUBLICAR-SIN-MAC.md`. Hasta que eso exista, el flujo
-   falla en el primer paso y lo dice claro.
+0. **iOS: BLOQUEADO esperando a Apple, no por trabajo pendiente.** El alta se
+   envió el 2026-09-07 por la vía de **organización** (Enrollment ID
+   `49J96Q3WQ3`, entidad «New Engineering Expertise And Resource Advancement»,
+   D-U-N-S 951814054). Esa vía verifica **antes** de cobrar: Apple manda correo
+   —y a veces llama— para confirmar autoridad de firma, y solo entonces da el
+   enlace de pago. **Todavía no se ha pagado y el portal aún no existe para esta
+   cuenta.**
+
+   La clave privada y el `.csr` ya están hechos y verificados en
+   `C:\dev\secrets
+exara-ios\` (fuera del repo, que es público). Cuando la
+   membresía esté activa quedan cuatro trámites de portal y dos guiones: paso a
+   paso en `apps/mobile-native/ios/PUBLICAR-SIN-MAC.md`.
+
+   Pendiente de Adam y ajeno a Apple: `gh auth login` — GitHub CLI no tiene
+   sesión, y sin ella `subir-secretos.ps1` no puede cargar nada.
 
 1. **P0 SIN DESPLEGAR — sigue siendo lo primero.**
    `https://integra.nexara.com.mx/go2rtc/api/streams` responde **200 desde
