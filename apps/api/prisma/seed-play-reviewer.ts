@@ -25,7 +25,7 @@ const prisma = new PrismaClient();
 const REVIEWER_EMAIL = (process.env.PLAY_REVIEWER_EMAIL || 'play.review@nexara.com.mx')
   .trim()
   .toLowerCase();
-const REVIEWER_NAME = 'Revisor Google Play';
+const REVIEWER_NAME = 'Revisor App Store / Google Play';
 const DEMO_COMPANY_SLUG = 'nexara-demo';
 const DEMO_COMPANY_LEGAL_NAME = 'NEXARA Demo (revisión de tiendas)';
 const DEMO_DEPARTMENT = 'Demostración';
