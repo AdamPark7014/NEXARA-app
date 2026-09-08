@@ -11,6 +11,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,12 +39,16 @@ import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Reply
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -55,6 +61,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,6 +98,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
@@ -112,10 +120,12 @@ import mx.nexara.mobile.nativeapp.access.DeepLinkParser
 import mx.nexara.mobile.nativeapp.data.SessionStore
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
+import mx.nexara.mobile.nativeapp.data.api.ChatChannelDetailDto
 import mx.nexara.mobile.nativeapp.data.api.ChatChannelDto
 import mx.nexara.mobile.nativeapp.data.api.ChatColleagueDto
 import mx.nexara.mobile.nativeapp.data.api.ChatMentionDto
 import mx.nexara.mobile.nativeapp.data.api.ChatReactionDto
+import mx.nexara.mobile.nativeapp.data.api.ChatSearchHitDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.common.NxAsyncImage
 import mx.nexara.mobile.nativeapp.data.api.ChatMessageDto
@@ -362,7 +372,38 @@ data class ChatUiState(
     val colleaguesLoading: Boolean = false,
     val channelActionLoading: Boolean = false,
     val channelActionError: String? = null,
-)
+    // ── Ficha, silencio y búsqueda (traído de la web, 2026-09-08) ───────────
+    /** Ficha del canal abierto; null mientras no se haya podido leer. */
+    val channelDetail: ChatChannelDetailDto? = null,
+    val showSearch: Boolean = false,
+    val searchQuery: String = "",
+    val searchResults: List<ChatSearchHitDto> = emptyList(),
+    val searchLoading: Boolean = false,
+    val searchError: String? = null,
+    /** true = la búsqueda se limita al canal abierto. */
+    val searchInChannel: Boolean = false,
+) {
+    /** Silenciado según la ficha; si aún no llegó, se asume que no. */
+    val isMuted: Boolean get() = channelDetail?.muted == true
+
+    /**
+     * Salir sólo tiene sentido en canales de equipo. El servidor rechaza los DM
+     * y los canales `general`/`anuncios`; replicarlo aquí evita ofrecer un
+     * botón que sólo sabe fallar.
+     */
+    val canLeaveChannel: Boolean
+        get() {
+            val ch = selectedChannel ?: return false
+            if (ch.kind.uppercase() == "DIRECT") return false
+            val slug = (channelDetail?.slug ?: ch.slug).orEmpty()
+            if (slug == "general" || slug == "anuncios") return false
+            return channelDetail?.supervised != true
+        }
+
+    /** Silenciar exige membresía real: ni supervisado ni solo lectura. */
+    val canMuteChannel: Boolean
+        get() = channelDetail != null && !channelDetail.supervised && !channelDetail.readOnly
+}
 
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ChatRepository(app.applicationContext)
@@ -824,9 +865,14 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 threadError = null,
                 replyTo = null,
                 typingUsers = emptyMap(),
+                channelDetail = null,
+                showSearch = false,
+                searchResults = emptyList(),
+                searchError = null,
             )
         }
         refreshMessages(ch.id, markRead = true)
+        loadChannelDetail(ch.id)
     }
 
     fun pollNewMessages(channelId: Long? = _state.value.selectedChannel?.id) {
@@ -912,6 +958,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 threadError = null,
                 replyTo = null,
                 typingUsers = emptyMap(),
+                channelDetail = null,
+                // La búsqueda sobrevive al cierre del canal sólo si era global:
+                // volver a la lista y perder los resultados obliga a teclear
+                // otra vez lo mismo.
+                showSearch = it.showSearch && !it.searchInChannel,
+                searchInChannel = false,
+                searchResults = if (it.searchInChannel) emptyList() else it.searchResults,
             )
         }
     }
@@ -1087,6 +1140,171 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             }.onFailure { e ->
                 _state.update { it.copy(uploading = false, messagesError = e.toUserMessage()) }
             }
+        }
+    }
+
+    // ── Ficha del canal, silencio y salida ───────────────────────────────────
+
+    /**
+     * `GET chat/channels/:id`. Falla en silencio a propósito: la ficha sólo
+     * alimenta el menú de opciones, y un canal que no la devuelve tiene que
+     * seguir leyéndose y escribiéndose igual.
+     */
+    fun loadChannelDetail(channelId: Long) {
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { repo.channelDetail(channelId) } }
+                .onSuccess { detail ->
+                    _state.update { s ->
+                        if (s.selectedChannel?.id != channelId) s
+                        else s.copy(
+                            channelDetail = detail,
+                            // El conteo de miembros de la ficha es el bueno: el
+                            // del listado se queda viejo en cuanto alguien entra.
+                            selectedChannel = s.selectedChannel.copy(
+                                memberCount = detail.memberCount,
+                                topic = detail.topic ?: s.selectedChannel.topic,
+                            ),
+                        )
+                    }
+                }
+        }
+    }
+
+    fun toggleMuted() {
+        val s = _state.value
+        val channelId = s.selectedChannel?.id ?: return
+        if (!s.canMuteChannel) return
+        val target = !s.isMuted
+        _state.update { it.copy(channelActionLoading = true, channelActionError = null) }
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { repo.setMuted(channelId, target) } }
+                .onSuccess { detail ->
+                    _state.update { it.copy(channelActionLoading = false, channelDetail = detail) }
+                }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(
+                            channelActionLoading = false,
+                            channelActionError = e.toUserMessage(
+                                if (target) "No se pudo silenciar el canal"
+                                else "No se pudo reactivar el canal",
+                            ),
+                        )
+                    }
+                }
+        }
+    }
+
+    /**
+     * Salir del canal. Al lograrlo se vuelve a la lista y se recarga: el canal
+     * ya no debe aparecer, y dejarlo pintado es prometer un acceso que el
+     * servidor ya quitó.
+     */
+    fun leaveChannel(onLeft: () -> Unit = {}) {
+        val channelId = _state.value.selectedChannel?.id ?: return
+        _state.update { it.copy(channelActionLoading = true, channelActionError = null) }
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { repo.leaveChannel(channelId) } }
+                .onSuccess {
+                    _state.update { it.copy(channelActionLoading = false) }
+                    clearChannel()
+                    refreshChannels()
+                    onLeft()
+                }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(
+                            channelActionLoading = false,
+                            channelActionError = e.toUserMessage("No se pudo salir del canal"),
+                        )
+                    }
+                }
+        }
+    }
+
+    // ── Búsqueda de mensajes ─────────────────────────────────────────────────
+
+    /**
+     * Abre o cierra el panel de búsqueda. Con un canal abierto arranca acotada
+     * a ese canal, que es lo que casi siempre se busca; el interruptor la
+     * amplía a toda la organización.
+     */
+    fun toggleSearch() {
+        val opening = !_state.value.showSearch
+        _state.update {
+            it.copy(
+                showSearch = opening,
+                searchInChannel = opening && it.selectedChannel != null,
+                searchError = null,
+                searchResults = if (opening) it.searchResults else emptyList(),
+            )
+        }
+    }
+
+    fun setSearchQuery(v: String) = _state.update { it.copy(searchQuery = v) }
+
+    fun setSearchInChannel(v: Boolean) {
+        _state.update { it.copy(searchInChannel = v) }
+        if (_state.value.searchQuery.trim().length >= 2) runSearch()
+    }
+
+    fun runSearch() {
+        val s = _state.value
+        val q = s.searchQuery.trim()
+        if (q.length < 2) {
+            _state.update {
+                it.copy(searchResults = emptyList(), searchError = "Escribe al menos dos letras")
+            }
+            return
+        }
+        val channelId = if (s.searchInChannel) s.selectedChannel?.id else null
+        _state.update { it.copy(searchLoading = true, searchError = null) }
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { repo.searchMessages(q, channelId) } }
+                .onSuccess { hits ->
+                    _state.update { it.copy(searchLoading = false, searchResults = hits) }
+                }
+                .onFailure { e ->
+                    _state.update {
+                        it.copy(
+                            searchLoading = false,
+                            searchResults = emptyList(),
+                            searchError = e.toUserMessage("No se pudo buscar"),
+                        )
+                    }
+                }
+        }
+    }
+
+    /**
+     * Salta de un resultado a su canal. Si el canal no está en la lista local
+     * —búsqueda global sobre un canal público al que no pertenezco— se refresca
+     * primero: sin eso el toque no hacía nada y parecía una pantalla rota.
+     */
+    fun openSearchHit(hit: ChatSearchHitDto) {
+        val existing = _state.value.channels.firstOrNull { it.id == hit.channelId }
+        if (existing != null) {
+            _state.update { it.copy(showSearch = false) }
+            selectChannel(existing)
+            return
+        }
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { repo.channels() } }
+                .onSuccess { list ->
+                    _state.update { s -> s.copy(channels = sortChannels(list, s.favoriteChannelIds)) }
+                    val found = _state.value.channels.firstOrNull { it.id == hit.channelId }
+                    if (found != null) {
+                        _state.update { it.copy(showSearch = false) }
+                        selectChannel(found)
+                    } else {
+                        _state.update {
+                            it.copy(searchError = "El canal de ese mensaje ya no está a tu alcance")
+                        }
+                    }
+                }
+                .onFailure { e ->
+                    _state.update { it.copy(searchError = e.toUserMessage("No se pudo abrir el canal")) }
+                }
         }
     }
 }
@@ -1294,6 +1512,8 @@ fun ChatScreen(
         val listState = rememberLazyListState()
         val prevMessageCount = remember { mutableIntStateOf(0) }
         var channelMenuExpanded by remember { mutableStateOf(false) }
+        // Salir de un canal borra la membresía en el servidor; se confirma.
+        var confirmLeave by remember { mutableStateOf(false) }
         val canEditTopic = channel.kind.uppercase() != "DIRECT"
         val canInviteMembers = channel.kind.uppercase() != "DIRECT"
         val messageListItems = remember(state.messages, state.unreadBoundaryAt, state.currentUserId) {
@@ -1326,6 +1546,10 @@ fun ChatScreen(
                                     append(channelKindLabel(channel.kind))
                                     channel.topic?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
                                     if (channel.memberCount > 0) append(" · ${channel.memberCount} miembros")
+                                    // Un canal silenciado tiene que decirlo:
+                                    // si no, se lee como que el chat no anda.
+                                    if (state.isMuted) append(" · silenciado")
+                                    if (state.channelDetail?.readOnly == true) append(" · solo lectura")
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 2,
@@ -1352,38 +1576,70 @@ fun ChatScreen(
                                 }
                             }
                         }
+                        IconButton(onClick = { vm.toggleSearch() }) {
+                            Icon(Icons.Default.Search, "Buscar mensajes")
+                        }
                         IconButton(onClick = { vm.refreshMessages(channel.id) }) {
                             Icon(Icons.Default.Refresh, "Actualizar")
                         }
-                        if (canEditTopic || canInviteMembers) {
-                            Box {
-                                IconButton(onClick = { channelMenuExpanded = true }) {
-                                    Icon(Icons.Default.MoreVert, "Opciones del canal")
+                        Box {
+                            IconButton(onClick = { channelMenuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, "Opciones del canal")
+                            }
+                            DropdownMenu(
+                                expanded = channelMenuExpanded,
+                                onDismissRequest = { channelMenuExpanded = false },
+                            ) {
+                                if (canInviteMembers) {
+                                    DropdownMenuItem(
+                                        text = { Text("Invitar miembro") },
+                                        leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = "Invitar miembro") },
+                                        onClick = {
+                                            channelMenuExpanded = false
+                                            vm.setShowInviteMember(true)
+                                        },
+                                    )
                                 }
-                                DropdownMenu(
-                                    expanded = channelMenuExpanded,
-                                    onDismissRequest = { channelMenuExpanded = false },
-                                ) {
-                                    if (canInviteMembers) {
-                                        DropdownMenuItem(
-                                            text = { Text("Invitar miembro") },
-                                            leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = "Invitar miembro") },
-                                            onClick = {
-                                                channelMenuExpanded = false
-                                                vm.setShowInviteMember(true)
-                                            },
-                                        )
-                                    }
-                                    if (canEditTopic) {
-                                        DropdownMenuItem(
-                                            text = { Text("Editar tema") },
-                                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = "Editar tema") },
-                                            onClick = {
-                                                channelMenuExpanded = false
-                                                vm.setShowEditTopic(true)
-                                            },
-                                        )
-                                    }
+                                if (canEditTopic) {
+                                    DropdownMenuItem(
+                                        text = { Text("Editar tema") },
+                                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = "Editar tema") },
+                                        onClick = {
+                                            channelMenuExpanded = false
+                                            vm.setShowEditTopic(true)
+                                        },
+                                    )
+                                }
+                                // Silenciar y salir: los dos ajustes que sólo
+                                // existían en la web y que se buscan justo
+                                // cuando el teléfono no para de vibrar.
+                                if (state.canMuteChannel) {
+                                    DropdownMenuItem(
+                                        text = { Text(if (state.isMuted) "Reactivar avisos" else "Silenciar canal") },
+                                        leadingIcon = {
+                                            Icon(
+                                                if (state.isMuted) Icons.Default.Notifications
+                                                else Icons.Default.NotificationsOff,
+                                                contentDescription = "Silenciar",
+                                            )
+                                        },
+                                        enabled = !state.channelActionLoading,
+                                        onClick = {
+                                            channelMenuExpanded = false
+                                            vm.toggleMuted()
+                                        },
+                                    )
+                                }
+                                if (state.canLeaveChannel) {
+                                    DropdownMenuItem(
+                                        text = { Text("Salir del canal") },
+                                        leadingIcon = { Icon(Icons.Default.Logout, contentDescription = "Salir") },
+                                        enabled = !state.channelActionLoading,
+                                        onClick = {
+                                            channelMenuExpanded = false
+                                            confirmLeave = true
+                                        },
+                                    )
                                 }
                             }
                         }
@@ -1437,10 +1693,22 @@ fun ChatScreen(
                 }
             },
         ) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+            if (state.showSearch) {
+                ChatSearchPanel(
+                    state = state,
+                    showScopeToggle = true,
+                    onQueryChange = { vm.setSearchQuery(it) },
+                    onSearch = { vm.runSearch() },
+                    onScopeChange = { vm.setSearchInChannel(it) },
+                    onClose = { vm.toggleSearch() },
+                    onOpenHit = { vm.openSearchHit(it) },
+                )
+            }
             PullToRefreshBox(
                 isRefreshing = state.refreshingMessages,
                 onRefresh = { vm.refreshMessages(channel.id) },
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 LazyColumn(
                     state = listState,
@@ -1448,6 +1716,9 @@ fun ChatScreen(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    state.channelActionError?.let { err ->
+                        item(key = "channel-action-error") { NxErrorBlock(err) }
+                    }
                     state.messagesError?.let { err ->
                         item(key = "messages-error") {
                             NxErrorBlock(err) { vm.refreshMessages(channel.id) }
@@ -1495,6 +1766,7 @@ fun ChatScreen(
                         }
                     }
                 }
+            }
             }
 
             if (openingAttachment || state.uploading) {
@@ -1597,6 +1869,27 @@ fun ChatScreen(
                 },
             )
         }
+        if (confirmLeave) {
+            AlertDialog(
+                onDismissRequest = { confirmLeave = false },
+                title = { Text("Salir de ${channel.name}") },
+                text = {
+                    Text(
+                        "Dejarás de recibir sus mensajes y el canal desaparecerá de tu lista. " +
+                            "Si es público podrás volver a entrar; si es privado, tendrán que invitarte.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmLeave = false
+                        vm.leaveChannel()
+                    }) { Text("Salir", color = NxColors.Danger) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmLeave = false }) { Text("Cancelar") }
+                },
+            )
+        }
         return
     }
 
@@ -1622,6 +1915,9 @@ fun ChatScreen(
                     containerColor = NxColors.Teal,
                 ) { Text("$totalUnread") }
             }
+            IconButton(onClick = { vm.toggleSearch() }) {
+                Icon(Icons.Default.Search, "Buscar mensajes")
+            }
             IconButton(onClick = { vm.toggleShowMentions() }) {
                 Icon(Icons.Default.AlternateEmail, "Menciones")
             }
@@ -1634,6 +1930,19 @@ fun ChatScreen(
             IconButton(onClick = { vm.refreshChannels() }) {
                 Icon(Icons.Default.Refresh, "Actualizar")
             }
+        }
+
+        if (state.showSearch) {
+            // Desde la lista la búsqueda es global: no hay canal al que acotar.
+            ChatSearchPanel(
+                state = state,
+                showScopeToggle = false,
+                onQueryChange = { vm.setSearchQuery(it) },
+                onSearch = { vm.runSearch() },
+                onScopeChange = { vm.setSearchInChannel(it) },
+                onClose = { vm.toggleSearch() },
+                onOpenHit = { vm.openSearchHit(it) },
+            )
         }
 
         if (state.showMentions) {
@@ -2914,6 +3223,133 @@ private fun MentionsPanel(
             }
             if (!loading && mentions.isEmpty()) {
                 TextButton(onClick = onRetry) { Text("Reintentar") }
+            }
+        }
+    }
+}
+
+/**
+ * Panel de búsqueda de mensajes (`GET chat/search`).
+ *
+ * La web lo tenía y el móvil no: sin él, encontrar «la dirección que me pasó
+ * Karla la semana pasada» obliga a desplazar el canal a mano con el teléfono
+ * en la mano y la camioneta parada.
+ *
+ * El servidor devuelve como mucho 30 resultados y exige dos caracteres; ambas
+ * cosas se dicen en pantalla en vez de dejar una lista muda.
+ */
+@Composable
+private fun ChatSearchPanel(
+    state: ChatUiState,
+    showScopeToggle: Boolean,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onScopeChange: (Boolean) -> Unit,
+    onClose: () -> Unit,
+    onOpenHit: (ChatSearchHitDto) -> Unit,
+) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Buscar en el chat", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar búsqueda") }
+            }
+            OutlinedTextField(
+                value = state.searchQuery,
+                onValueChange = onQueryChange,
+                placeholder = { Text("Palabra o frase…") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                trailingIcon = {
+                    IconButton(onClick = onSearch, enabled = !state.searchLoading) {
+                        Icon(Icons.Default.Search, "Buscar")
+                    }
+                },
+            )
+            if (showScopeToggle && state.selectedChannel != null) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = state.searchInChannel,
+                        onClick = { onScopeChange(true) },
+                        label = { Text("Este canal") },
+                    )
+                    FilterChip(
+                        selected = !state.searchInChannel,
+                        onClick = { onScopeChange(false) },
+                        label = { Text("Todos") },
+                    )
+                }
+            }
+            state.searchError?.let { err ->
+                Text(err, style = MaterialTheme.typography.bodySmall, color = NxColors.Danger)
+            }
+            when {
+                state.searchLoading -> NxLoadingBlock("Buscando…")
+                state.searchQuery.trim().length < 2 -> Text(
+                    "Escribe al menos dos letras para buscar.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                state.searchResults.isEmpty() -> Text(
+                    "Sin coincidencias.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        items(state.searchResults, key = { "hit-${it.id}" }) { hit ->
+                            Card(
+                                Modifier.fillMaxWidth().clickable { onOpenHit(hit) },
+                            ) {
+                                Column(Modifier.padding(10.dp)) {
+                                    Row(Modifier.fillMaxWidth()) {
+                                        Text(
+                                            hit.author?.nombre?.takeIf { it.isNotBlank() } ?: "Usuario",
+                                            fontWeight = FontWeight.SemiBold,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.weight(1f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            formatChannelTime(hit.createdAt),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    hit.channel?.let { ch ->
+                                        Text(
+                                            "${channelPrefix(ch.kind)}${ch.name}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = NxColors.Teal,
+                                        )
+                                    }
+                                    Text(
+                                        hit.body.ifBlank { hit.attachmentName ?: "(adjunto)" },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (state.searchResults.size >= 30) {
+                        Text(
+                            "Se muestran los 30 mensajes más recientes; afina la búsqueda para ver otros.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }

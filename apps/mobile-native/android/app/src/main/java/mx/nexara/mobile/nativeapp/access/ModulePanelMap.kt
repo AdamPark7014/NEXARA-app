@@ -38,7 +38,10 @@ object ModulePanelMap {
         // y no veía ni CVs ni reclutamiento — su trabajo diario.
         "cvs", "recruiting",
         "clients", "projects", "cotizaciones", "gestion-vendedores",
-        "contact-messages", "news", "newsletter",
+        // `comunicados` va en ERP porque su página web es /erp/news. Sin esta
+        // clave la tarjeta no se pinta nunca, por muy escrita que esté la
+        // pantalla — el mismo defecto que dejó `chat` invisible meses.
+        "contact-messages", "news", "newsletter", "comunicados",
         "settings", "my-profile", "my-preferences", "offline-queue",
         "companies", "kb", "exports", "architecture", "calendar", "orgchart", "kpis-hr",
         "chat",

@@ -106,6 +106,38 @@ private object ConsoleRoutes {
     fun module(key: String) = "console/m/$key"
 }
 
+/**
+ * Claves de módulo que la ruta genérica `console/m/{key}` sabe pintar.
+ *
+ * Estaba escrito como un `setOf(...)` suelto dentro del composable, donde
+ * ninguna prueba podía verlo: si alguien añadía la clave al catálogo y al
+ * `when` pero se olvidaba de esta lista, el módulo caía en `PlaceholderScreen`
+ * y parecía «no implementado» aunque la pantalla existiera. Sacarlo aquí lo
+ * pone al alcance de `ConsoleWiringTest`.
+ *
+ * Toda clave de `ModuleCatalog.console` con pantalla nativa tiene que estar
+ * aquí Y tener su rama en el `when` de abajo.
+ */
+internal object ConsoleModuleKeys {
+    val HANDLED: Set<String> = setOf(
+        "dashboard", "activities", "my-activities", "evidences", "my-evidences",
+        "viatics", "vehicles", "gps", "tools", "clients", "projects", "users",
+        "attendance", "settings", "offline-queue", "offline", "my-profile",
+        "news", "contact-messages", "newsletter", "comunicados",
+        "audit", "analytics", "bi", "executive", "dispatch", "approvals",
+        "reuniones",
+        "notifications-center", "chat", "noc", "support-sla", "support", "maintenance-contracts",
+        "companies", "kb", "exports", "architecture", "calendar", "orgchart", "kpis-hr",
+        "expenses",
+        "fines", "employee-payments", "cotizaciones", "lunch-breaks", "my-lunch-breaks",
+        "documents", "accounting", "invoicing", "banking", "my-viatics",
+        "my-vehicles", "my-preferences", "work-projects",
+        "hr", "warehouse", "stock", "procurement",
+        "maintenance", "assets", "service-sheets", "cvs", "recruiting", "client-tickets", "service-clients",
+        "gestion-vendedores",
+    )
+}
+
 data class ConsoleNavItem(
     val route: String,
     val label: String,
@@ -507,6 +539,10 @@ fun ConsoleNavHost(
                         )
                     } }
                     "news" -> { { mx.nexara.mobile.nativeapp.ui.modules.NewsModuleScreen() } }
+                    // Comunicados internos: en la web es una pestaña de
+                    // /erp/news; en el teléfono merece módulo propio, porque el
+                    // aviso de la empresa es justo lo que se lee de pie.
+                    "comunicados" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ComunicadosModuleScreen() } }
                     "contact-messages" -> { { mx.nexara.mobile.nativeapp.ui.modules.ContactMessagesModuleScreen() } }
                     "newsletter" -> { { mx.nexara.mobile.nativeapp.ui.modules.NewsletterModuleScreen() } }
                     "audit" -> { { mx.nexara.mobile.nativeapp.ui.modules.AuditModuleScreen() } }
@@ -602,22 +638,7 @@ fun ConsoleNavHost(
                     "gestion-vendedores" -> { { mx.nexara.mobile.nativeapp.ui.ventas.VentasSalesTeamScreen() } }
                     else -> { {} }
                 }
-                if (key in setOf(
-                        "dashboard", "activities", "my-activities", "evidences", "my-evidences",
-                        "viatics", "vehicles", "gps", "tools", "clients", "projects", "users",
-                        "attendance", "settings", "offline-queue", "offline", "my-profile",
-                        "news","contact-messages","newsletter","audit","analytics","bi","executive","dispatch","approvals",
-                        "reuniones",
-                        "notifications-center","chat","noc","support-sla","support","maintenance-contracts",
-                        "companies","kb","exports","architecture","calendar","orgchart","kpis-hr",
-                        "expenses",
-                        "fines","employee-payments","cotizaciones","lunch-breaks","my-lunch-breaks",
-                        "documents","accounting","invoicing","banking","my-viatics",
-                        "my-vehicles","my-preferences","work-projects",
-                        "hr","warehouse","stock","procurement",
-                        "maintenance","assets","service-sheets","cvs","recruiting","client-tickets","service-clients",
-                        "gestion-vendedores",
-                    )) {
+                if (key in ConsoleModuleKeys.HANDLED) {
                     handled()
                     return@nxComposable
                 }

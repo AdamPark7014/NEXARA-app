@@ -1,47 +1,102 @@
 # RELEVO
 
-- **Último turno:** cursor
-- **Fecha:** 2026-09-07
+- **Último turno:** claude-code
+- **Fecha:** 2026-09-08
 - **Rama:** mejora/calidad-y-web
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Segunda ola de profundidad iOS (paridad real, no solo catálogo)
+## Este turno — Barrido de paridad web ⇄ Android ⇄ iOS
 
-Adam: el catálogo ya emparejaba claves; el hueco era **LOC/operabilidad**
-(~7.8k → **~10.2k** líneas INTEGRA iOS vs ~25k Android; app completa ~42k vs ~94k).
+Adam: «las aplicaciones están disparejas … hay muchas funciones que tenemos en
+web y en las apps no». Seis agentes en paralelo con propiedad exclusiva de
+ficheros, sobre una **medición** en vez de sobre la matriz escrita a mano.
 
-Tres agentes en paralelo + cableado settings:
+### El hallazgo que ordenó todo lo demás
 
-| Agente | Qué profundizó |
+**La app iOS nunca se había compilado.** 45.000 líneas de Swift y el único flujo
+que tocaba ese código era `ios-testflight.yml`, que exige seis secretos de Apple
+inexistentes hasta que termine el alta. Compilar **no necesita cuenta de
+Apple**: con SDK de simulador y firma desactivada, `xcodebuild` verifica igual.
+Ya es un trabajo de CI que corre en cada push.
+
+Consecuencias que salieron al mirar:
+
+| Fallo | Estado |
 |---|---|
-| Core INTEGRA | Home summary vivo, Access live/mirror+página, Events cursor, People/Alarms/Visitors profundidad |
-| Advanced INTEGRA | Video FramePacing, Vehicles/ANPR, Schedules/Espacios, Detection, Settings create/delete/sync, Gov, Map/Dashboard — **cero DataStub** |
-| Consola no-INTEGRA | Evidencias multi-reject, viáticos/gastos «Marcar pagado», documentos approve, recruiting moveCv, settings api-keys |
+| `ActivityParse` y `MapPin` declarados dos veces | corregido |
+| 27 ficheros con APIs de iOS 17 y objetivo en 16.0 | mínimo subido a iOS 17 |
+| Llave de más en `PortalScreens.swift` (cerraba el `struct`) | corregido |
+| 3 `toUserMessage("…")` sin etiqueta `fallback:` | corregidos |
 
-Parent: `IntegraSettingsRepository.swift` (POST/PATCH/DELETE `integra/sites` + sync).
+### Medición (`scripts/parity-report.py`, 08-09-2026)
+
+| | web | Android | iOS |
+|---|---|---|---|
+| Endpoints consumidos | 235 | 361 | 413 |
+
+Huecos: **46** la web y ninguna app · **12** Android sin iOS · **64 iOS sin
+Android** ← deuda abierta.
+
+### Herramientas nuevas (esto es lo que queda, más que el código)
+
+- `scripts/parity-report.py` — paridad medida desde el código, no declarada.
+- `scripts/ios-static-check.py` — sin Mac: redeclaraciones, balance de
+  delimitadores (respeta cadenas, interpolación y comentarios anidados) y
+  **claves de catálogo sin caso en el router**.
+- `ConsoleWiringTest.kt` (Android, 8 pruebas) — el hermano de
+  `IntegraWiringTest` que la consola no tenía, y es donde vive la mayoría de
+  módulos. Obligó a sacar `ConsoleModuleKeys.HANDLED` fuera del composable.
+- CI: trabajos `ios-estructura` (ubuntu) e `ios` (macos-15, compila simulador).
 
 ### Verificado
 
-- Diff ~+3545/−870 en 37 archivos iOS
-- Catálogo console/ventas/contabilidad/studio/integra: **mismas claves** que Android
-- Honestidad intacta: sin EN VIVO, mapa RO, polígonos RO
+- `ios-static-check.py` limpio: 221 ficheros, 824 tipos, 160 claves, 0 huérfanas.
+- Android: `assembleDebug test` **BUILD SUCCESSFUL**, 0 fallos.
+- `typecheck:api` y `typecheck:web` limpios.
+- **iOS sigue sin pasar por `xcodebuild`**: el primer CI en macOS dirá la verdad.
 
-### Aún falta (honesto)
+### Dos bugs de la web que nunca han funcionado
 
-1. **xcodebuild nunca corrido** — primera CI fallará.
-2. INTEGRA iOS ~40 % LOC de Android — más pulido fino (agrupación alarmas, PTZ edge cases, fanout ACS UI).
-3. MFA / refresh sesión / X-Company-Id en iOS (también abiertos en Android).
-4. Apple enrollment + TestFlight pipeline (Adam).
+- `crm/leads/[id]` pedía `sales/leads/:id`; no existe `@Controller('sales')`.
+  404 siempre. Corregido a `ventas/leads/:id`.
+- STUDIO pedía `newsletter/stats`, inexistente, dentro de un `allSettled`:
+  fallaba en silencio. Implementado devolviendo **solo** lo que la tabla sabe
+  (total, altas 30 días, última). Sin `activeSubscribers` ni campañas: no hay
+  marca de baja ni modelo de campañas.
+
+## Decisiones que esperan a Adam
+
+1. **Android ya publicó `journal-entries/{id}/post` y `POST journal-entries`**
+   —contabilizar y dar de alta asientos— y siguen vivas en Google Play
+   (`ExtraApi.kt:948-951`). Es de la zona sin autorizar. **No se han retirado**:
+   quitar funcionalidad publicada es decisión suya.
+2. **Aprobar órdenes de compra** desde el móvil quedó activo; **aprobar multas**
+   quedó fuera (se descuenta de la nómina del trabajador).
+3. **Mínimo iOS 17** (iPhone XS en adelante). Volver a 16 exige reescribir 27
+   ficheros.
+4. La lista completa de escrituras sin autorizar está en
+   `docs/native-parity-matrix.md`.
+
+## Siguiente paso natural
+
+**Pasada de Android para los 64 endpoints en los que iOS va por delante**
+(contabilidad, evidencias de actividad, usuarios, ventas). Sin eso, las dos
+tiendas no reciben lo mismo. El agente de Android dejó además una lista de
+fichas que sí son de móvil y no entraron: `maintenance/work-orders/:id`,
+`viatics/:id`, `fines/:id`, `tenders/:id`, `sales-targets/performance`,
+`service-clients/:id/snapshot`, `workflow/instances/:id`.
 
 ## Heredado vivo
 
-- Demo store: `play.review@nexara.com.mx` en prod; creds en `C:\dev\secrets\nexara-store\`.
-- Enrollment Apple `49J96Q3WQ3` — esperar correo/pago.
-- P0 go2rtc Traefik prod.
+- Demo store: `play.review@nexara.com.mx`; creds en `C:\dev\secrets\nexara-store\`.
+- **Contraseña del revisor rotada el 07-09 con la app en revisión** — sin cerrar.
+- Enrollment Apple `49J96Q3WQ3` — esperando correo/pago.
+- Rotar contraseñas de cámaras (fuga de go2rtc cerrada, exposición pasada no).
 
 ## No tocar
 
-Puente NAS. Credenciales Apple. No fingir EN VIVO. Password revisor fuera del git.
+Puente NAS. Credenciales Apple. No fingir EN VIVO en INTEGRA. Contraseña del
+revisor fuera de git. **No marcar `NATIVO` lo que solo lista.**

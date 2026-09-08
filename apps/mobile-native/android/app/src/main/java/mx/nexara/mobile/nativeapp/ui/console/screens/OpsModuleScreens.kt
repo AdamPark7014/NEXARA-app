@@ -54,10 +54,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.GoodsReceiptDetailDto
+import mx.nexara.mobile.nativeapp.data.api.PurchaseOrderDetailDto
+import mx.nexara.mobile.nativeapp.data.api.RfqComparisonDto
+import mx.nexara.mobile.nativeapp.data.api.RfqDto
+import mx.nexara.mobile.nativeapp.data.api.RfqLineDto
 import mx.nexara.mobile.nativeapp.data.api.ServiceSheetListDto
+import mx.nexara.mobile.nativeapp.data.api.SupplierDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.ops.OpsRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.data.procurement.ProcurementRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
@@ -328,17 +335,36 @@ data class ProcurementUiState(
     val selected: mx.nexara.mobile.nativeapp.data.api.RequisitionDto? = null,
     val rejectReason: String = "",
     val acting: Boolean = false,
+    // ── Profundidad traída de la web (2026-09-08) ───────────────────────────
+    /** Catálogo de proveedores; alimenta el filtro de la pestaña de órdenes. */
+    val suppliers: List<SupplierDto> = emptyList(),
+    val supplierFilterId: Long? = null,
+    val rfqs: List<RfqDto> = emptyList(),
+    /** Ficha abierta; sólo una a la vez, como en la web. */
+    val orderDetail: PurchaseOrderDetailDto? = null,
+    val receiptDetail: GoodsReceiptDetailDto? = null,
+    val rfqComparison: RfqComparisonDto? = null,
+    val detailLoading: Boolean = false,
+    val detailError: String? = null,
+    /** Línea de RFQ en captura de precio; null = formulario cerrado. */
+    val quoteLineId: Long? = null,
+    val quotePrice: String = "",
+    val quoteLeadTime: String = "",
+    val quoteNotes: String = "",
 )
 
 class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = OpsRepository(app.applicationContext)
     private val extra = ExtraRepository(app.applicationContext)
+    private val deep = ProcurementRepository(app.applicationContext)
     private val _state = MutableStateFlow(ProcurementUiState())
     val state: StateFlow<ProcurementUiState> = _state
 
     init { refresh() }
 
-    fun setTab(v: Int) = _state.update { it.copy(tab = v, selected = null) }
+    fun setTab(v: Int) = _state.update {
+        it.copy(tab = v, selected = null, orderDetail = null, receiptDetail = null, rfqComparison = null)
+    }
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
     fun setRejectReason(v: String) = _state.update { it.copy(rejectReason = v) }
     fun select(item: mx.nexara.mobile.nativeapp.data.api.RequisitionDto?) = _state.update { it.copy(selected = item) }
@@ -358,12 +384,164 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
                 val gr = withContext(Dispatchers.IO) {
                     runCatching { extra.goodsReceiptDtos() }.getOrDefault(emptyList())
                 }
+                // Proveedores y RFQ son opcionales: un usuario con permiso de
+                // ver compras pero sin `PROCUREMENT_MANAGE` recibe 403 aquí, y
+                // eso no debe tumbar las tres listas que sí puede ver.
+                val sup = withContext(Dispatchers.IO) {
+                    runCatching { deep.suppliers() }.getOrDefault(emptyList())
+                }
+                val rfqs = withContext(Dispatchers.IO) {
+                    runCatching { deep.rfqs() }.getOrDefault(emptyList())
+                }
                 _state.update {
-                    it.copy(loading = false, isRefreshing = false, requisitions = reqs, orders = orders, goodsReceipts = gr)
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        requisitions = reqs,
+                        orders = orders,
+                        goodsReceipts = gr,
+                        suppliers = sup,
+                        rfqs = rfqs,
+                    )
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage()) }
             }
+        }
+    }
+
+    // ── Fichas y acciones traídas de la web ──────────────────────────────────
+
+    fun setSupplierFilter(id: Long?) = _state.update {
+        it.copy(supplierFilterId = if (it.supplierFilterId == id) null else id)
+    }
+
+    fun openOrder(id: Long) = loadDetail {
+        val po = deep.purchaseOrder(id)
+        _state.update { it.copy(orderDetail = po) }
+    }
+
+    fun closeOrder() = _state.update { it.copy(orderDetail = null, detailError = null) }
+
+    /**
+     * Confirma la orden de compra. La web hace lo mismo desde el listado; aquí
+     * se exige abrir la ficha antes, porque aprobar sin ver las partidas y el
+     * total es exactamente lo que nadie debería poder hacer desde un teléfono.
+     */
+    fun approveOrder(id: Long) = runWrite {
+        deep.approvePurchaseOrder(id)
+        _state.update { it.copy(orderDetail = null) }
+    }
+
+    fun openReceipt(id: Long) = loadDetail {
+        val gr = deep.goodsReceipt(id)
+        _state.update { it.copy(receiptDetail = gr) }
+    }
+
+    fun closeReceipt() = _state.update { it.copy(receiptDetail = null, detailError = null) }
+
+    fun openRfq(id: Long) = loadDetail {
+        val cmp = deep.rfqComparison(id)
+        _state.update { it.copy(rfqComparison = cmp) }
+    }
+
+    fun closeRfq() = _state.update {
+        it.copy(rfqComparison = null, detailError = null, quoteLineId = null)
+    }
+
+    fun startQuote(line: RfqLineDto) = _state.update {
+        it.copy(
+            quoteLineId = line.id,
+            quotePrice = line.unitPrice?.toString().orEmpty(),
+            quoteLeadTime = line.leadTimeDays?.toString().orEmpty(),
+            quoteNotes = line.notes,
+        )
+    }
+
+    fun cancelQuote() = _state.update {
+        it.copy(quoteLineId = null, quotePrice = "", quoteLeadTime = "", quoteNotes = "")
+    }
+
+    fun setQuotePrice(v: String) = _state.update { it.copy(quotePrice = v) }
+    fun setQuoteLeadTime(v: String) = _state.update { it.copy(quoteLeadTime = v) }
+    fun setQuoteNotes(v: String) = _state.update { it.copy(quoteNotes = v) }
+
+    fun submitQuote() {
+        val s = _state.value
+        val rfqId = s.rfqComparison?.rfq?.id ?: return
+        val lineId = s.quoteLineId ?: return
+        val price = s.quotePrice.trim().replace(',', '.').toDoubleOrNull()
+        if (price == null || price < 0.0) {
+            _state.update { it.copy(detailError = "Escribe un precio unitario válido") }
+            return
+        }
+        runWrite(reload = false) {
+            deep.quoteRfqLine(
+                rfqId = rfqId,
+                lineId = lineId,
+                unitPrice = price,
+                leadTimeDays = s.quoteLeadTime.trim().toIntOrNull(),
+                notes = s.quoteNotes,
+            )
+            val cmp = deep.rfqComparison(rfqId)
+            _state.update {
+                it.copy(rfqComparison = cmp, quoteLineId = null, quotePrice = "", quoteLeadTime = "", quoteNotes = "")
+            }
+        }
+    }
+
+    fun awardRfq(supplierId: Long) {
+        val rfqId = _state.value.rfqComparison?.rfq?.id ?: return
+        runWrite {
+            deep.awardRfq(rfqId, supplierId)
+            _state.update { it.copy(rfqComparison = null) }
+        }
+    }
+
+    fun cancelRfqDoc(rfqId: Long) = runWrite {
+        deep.cancelRfq(rfqId)
+        _state.update { it.copy(rfqComparison = null) }
+    }
+
+    /** Carga de ficha: no toca `acting`, para que el botón de acción no parpadee. */
+    private fun loadDetail(block: suspend () -> Unit) {
+        _state.update { it.copy(detailLoading = true, detailError = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { block() }
+                _state.update { it.copy(detailLoading = false) }
+            } catch (e: Exception) {
+                _state.update { it.copy(detailLoading = false, detailError = e.toUserMessage()) }
+            }
+        }
+    }
+
+    /**
+     * Acción de escritura. `reload = false` para las que ya refrescan su propia
+     * ficha (cotizar una línea): volver a bajar las cuatro listas por un precio
+     * es tirar la conexión del almacén a la basura.
+     */
+    private fun runWrite(reload: Boolean = true, block: suspend () -> Unit) {
+        _state.update { it.copy(acting = true, detailError = null, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { block() }
+                _state.update { it.copy(acting = false, message = "Actualizado") }
+                if (reload) refresh(initial = false)
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, detailError = e.toUserMessage()) }
+            }
+        }
+    }
+
+    fun filteredRfqs(): List<RfqDto> {
+        val q = _state.value.query.trim().lowercase()
+        val list = _state.value.rfqs
+        if (q.isBlank()) return list
+        return list.filter {
+            it.displayTitle.lowercase().contains(q) ||
+                it.requisitionNumber.lowercase().contains(q) ||
+                it.requisitionTitle.lowercase().contains(q)
         }
     }
 
@@ -403,7 +581,12 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
 
     fun filteredOrders(): List<mx.nexara.mobile.nativeapp.data.api.PurchaseOrderDto> {
         val q = _state.value.query.trim().lowercase()
-        val list = _state.value.orders
+        val supplierId = _state.value.supplierFilterId
+        var list = _state.value.orders
+        // El filtro por proveedor de la web (`?supplierId=`) se resuelve en
+        // memoria: el listado ya está descargado y una llamada más por cada
+        // toque de chip es precisamente lo que no aguanta la red de un almacén.
+        if (supplierId != null) list = list.filter { it.supplierId == supplierId }
         if (q.isBlank()) return list
         return list.filter {
             it.displayTitle.lowercase().contains(q) || it.supplierName.lowercase().contains(q)
@@ -459,11 +642,27 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
         return
     }
 
+    // Fichas: una a la vez, y siempre por encima del listado. Cada `return`
+    // deja la pantalla completa dedicada al documento abierto.
+    s.orderDetail?.let { po ->
+        PurchaseOrderDetailScreen(po, s, onApprove = { vm.approveOrder(it) }, onBack = { vm.closeOrder() })
+        return
+    }
+    s.receiptDetail?.let { gr ->
+        GoodsReceiptDetailScreen(gr, onBack = { vm.closeReceipt() })
+        return
+    }
+    s.rfqComparison?.let { cmp ->
+        RfqComparisonScreen(cmp, s, vm)
+        return
+    }
+
     Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
         ScrollableTabRow(selectedTabIndex = s.tab) {
             Tab(selected = s.tab == 0, onClick = { vm.setTab(0) }, text = { Text("Requisiciones") })
             Tab(selected = s.tab == 1, onClick = { vm.setTab(1) }, text = { Text("Órdenes") })
             Tab(selected = s.tab == 2, onClick = { vm.setTab(2) }, text = { Text("Recepciones") })
+            Tab(selected = s.tab == 3, onClick = { vm.setTab(3) }, text = { Text("RFQ") })
         }
         PullToRefreshBox(
             isRefreshing = s.isRefreshing,
@@ -476,6 +675,7 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
                     when (s.tab) {
                         1 -> "Órdenes de compra"
                         2 -> "Recepciones de mercancía"
+                        3 -> "Solicitudes de cotización"
                         else -> "Requisiciones"
                     },
                     subtitle = "Compras y abastecimiento",
@@ -490,11 +690,35 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
                     singleLine = true,
                 )
             }
+            // El filtro por proveedor sólo tiene sentido sobre las órdenes.
+            if (s.tab == 1 && s.suppliers.isNotEmpty()) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        s.suppliers.take(30).forEach { sup ->
+                            val id = sup.id
+                            FilterChip(
+                                selected = s.supplierFilterId == id,
+                                onClick = { vm.setSupplierFilter(id) },
+                                label = { Text(sup.displayTitle) },
+                            )
+                        }
+                    }
+                }
+            }
             if (!s.message.isNullOrBlank()) {
                 item { Text(s.message!!, color = NxColors.Success, fontWeight = FontWeight.SemiBold) }
             }
             if (!s.error.isNullOrBlank()) {
                 item { NxErrorBlock(s.error!!) { vm.refresh(initial = false) } }
+            }
+            if (!s.detailError.isNullOrBlank()) {
+                item { NxErrorBlock(s.detailError!!) }
+            }
+            if (s.detailLoading) {
+                item { NxLoadingBlock("Abriendo ficha…") }
             }
             if (s.loading) {
                 item { NxLoadingBlock("Cargando…") }
@@ -503,10 +727,19 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
                     val list = vm.filteredOrders()
                     if (list.isEmpty()) item { NxEmptyState("Sin órdenes", "No hay órdenes de compra registradas.") }
                     else items(list.take(80), key = { it.rowKey }) { r ->
-                        NxPanelShell {
+                        // La tarjeta ya no es un cartel: abre la ficha con las
+                        // partidas y, si es borrador, el botón de aprobar.
+                        NxPanelShell(onClick = { r.id?.let { vm.openOrder(it) } }) {
                             Text(r.displayTitle, fontWeight = FontWeight.Bold)
                             Text(r.supplierName, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
-                            NxStatusChip(r.status, NxTone.Info)
+                            NxStatusChip(purchaseOrderStatusLabel(r.status), purchaseOrderTone(r.status))
+                            r.totalAmount?.let { total ->
+                                Text(
+                                    "Total: ${procMoney(total)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = NxColors.Teal,
+                                )
+                            }
                         }
                     }
                 }
@@ -514,12 +747,48 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
                     val list = vm.filteredReceipts()
                     if (list.isEmpty()) item { NxEmptyState("Sin recepciones", "No hay recepciones de mercancía.") }
                     else items(list.take(80), key = { it.rowKey }) { r ->
-                        NxPanelShell {
+                        NxPanelShell(onClick = { r.id?.let { vm.openReceipt(it) } }) {
                             Text(r.displayTitle, fontWeight = FontWeight.Bold)
                             Text(r.warehouseName, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
-                            NxStatusChip(r.status, NxTone.Success)
+                            NxStatusChip(r.status.ifBlank { "Recibida" }, NxTone.Success)
                             r.quantity?.let { qty ->
                                 Text("Cantidad: $qty", style = MaterialTheme.typography.labelSmall, color = NxColors.Teal)
+                            }
+                        }
+                    }
+                }
+                3 -> {
+                    val list = vm.filteredRfqs()
+                    if (list.isEmpty()) {
+                        item {
+                            NxEmptyState(
+                                "Sin solicitudes de cotización",
+                                "Las RFQ se crean desde la consola web, a partir de una requisición.",
+                            )
+                        }
+                    } else items(list.take(80), key = { it.rowKey }) { r ->
+                        NxPanelShell(onClick = { r.id?.let { vm.openRfq(it) } }) {
+                            Text(r.displayTitle, fontWeight = FontWeight.Bold)
+                            Text(
+                                listOf(r.requisitionNumber, r.requisitionTitle)
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = NxColors.Muted,
+                            )
+                            NxStatusChip(rfqStatusLabel(r.status), rfqTone(r.status))
+                            Text(
+                                "${r.lineCount} línea(s)" +
+                                    if (r.dueDate.isNotBlank()) " · vence ${r.dueDate}" else "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NxColors.Teal,
+                            )
+                            if (r.awardedPoNumber.isNotBlank()) {
+                                Text(
+                                    "Adjudicada → ${r.awardedPoNumber}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = NxColors.Success,
+                                )
                             }
                         }
                     }

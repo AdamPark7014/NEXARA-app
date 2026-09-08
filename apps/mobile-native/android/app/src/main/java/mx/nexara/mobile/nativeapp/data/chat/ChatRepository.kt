@@ -6,11 +6,14 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.AddChatMemberBody
 import mx.nexara.mobile.nativeapp.data.api.ChatApi
+import mx.nexara.mobile.nativeapp.data.api.ChatChannelDetailDto
 import mx.nexara.mobile.nativeapp.data.api.ChatChannelDto
 import mx.nexara.mobile.nativeapp.data.api.ChatColleagueDto
 import mx.nexara.mobile.nativeapp.data.api.ChatMentionDto
 import mx.nexara.mobile.nativeapp.data.api.ChatMessageDto
+import mx.nexara.mobile.nativeapp.data.api.ChatSearchHitDto
 import mx.nexara.mobile.nativeapp.data.api.ChatUploadResponse
+import mx.nexara.mobile.nativeapp.data.api.SetChatMutedBody
 import mx.nexara.mobile.nativeapp.data.api.CreateChatChannelBody
 import mx.nexara.mobile.nativeapp.data.api.OpenChatDmBody
 import mx.nexara.mobile.nativeapp.data.api.PatchChatMessageBody
@@ -119,6 +122,28 @@ class ChatRepository(context: Context) {
 
     suspend fun pinMessage(messageId: Long): ChatMessageDto =
         api.pinMessage(messageId)
+
+    /** Ficha del canal: miembros, silencio y si la vista es supervisada. */
+    suspend fun channelDetail(channelId: Long): ChatChannelDetailDto =
+        api.getChannel(channelId)
+
+    /** El API devuelve la ficha ya actualizada, así que no hace falta releer. */
+    suspend fun setMuted(channelId: Long, muted: Boolean): ChatChannelDetailDto =
+        api.setChannelMuted(channelId, SetChatMutedBody(muted))
+
+    suspend fun leaveChannel(channelId: Long) {
+        api.leaveChannel(channelId)
+    }
+
+    /**
+     * El servidor exige dos caracteres como mínimo y con menos devuelve lista
+     * vacía; se corta aquí para no gastar la petición.
+     */
+    suspend fun searchMessages(query: String, channelId: Long? = null): List<ChatSearchHitDto> {
+        val q = query.trim()
+        if (q.length < 2) return emptyList()
+        return api.searchMessages(q, channelId).messages
+    }
 
     private fun filePart(uri: Uri): MultipartBody.Part? {
         val resolver = appContext.contentResolver
