@@ -125,17 +125,10 @@ class ConsoleDashboardViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching { extraRepo.workflowApprovals() }.getOrElse { emptyList() }
             }
 
-            val viaticsError = viaticsResult.exceptionOrNull()
             val activitiesError = activitiesResult.exceptionOrNull()
-            val softError = when {
-                viaticsError != null && activitiesError != null ->
-                    (viaticsError ?: activitiesError).toUserMessage("No se pudo cargar el dashboard")
-                viaticsError != null ->
-                    viaticsError.toUserMessage("No se pudieron cargar los viáticos")
-                activitiesError != null ->
-                    activitiesError.toUserMessage("No se pudieron cargar las actividades")
-                else -> null
-            }
+            // Solo actividades son núcleo del home OPS. Viáticos (p. ej. 403
+            // RBAC) degradan a lista vacía; no tumbar el Resumen ejecutivo.
+            val softError = activitiesError?.toUserMessage("No se pudieron cargar las actividades")
 
             _state.update {
                 it.copy(

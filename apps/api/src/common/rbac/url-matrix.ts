@@ -417,6 +417,11 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/gps/**', scope: 'read' },
     { path: '/api/service-sheets/**', scope: 'write' },
     { path: '/api/tool-requests/**', methods: ['GET', 'POST', 'PUT', 'PATCH'], scope: 'write' },
+    // PAGE_MATRIX ya da `/ops/**` (incl. viáticos de equipo). Sin estas reglas
+    // la web/app abrían el dashboard y reventaban en GET /api/viatics (403).
+    { path: '/ops/viatics/**', scope: 'approve' },
+    { path: '/api/viaticos/**', scope: 'approve' },
+    { path: '/api/viatics/**', scope: 'approve' },
     { path: '/integra/**', scope: 'write' },
     { path: '/api/integra/**', scope: 'write' },
     ...SELF_ATTENDANCE_URL_RULES,
