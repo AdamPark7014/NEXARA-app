@@ -3,7 +3,50 @@
 Checklist de **paridad honesta** entre el panel web (`apps/web`) y la app nativa Android (+ referencia iOS).
 Fuente de verdad del catálogo: `ModuleCatalog.kt` (`parityStatus` + `nativeImplemented` derivado).
 
-**Verificación:** `python scripts/check-app-web-parity.py` (falla si la matriz y el catálogo divergen).
+**Verificación:**
+- `python scripts/check-app-web-parity.py` — falla si esta matriz y el catálogo de Android divergen.
+- `python scripts/parity-report.py` — **no lee este documento**: cuenta qué endpoints
+  de la API consume de verdad cada cliente, leyendo el código. Úsalo antes de
+  creerte una fila de aquí.
+- `python scripts/ios-static-check.py` — errores de compilación de Swift sin Mac, y
+  claves de catálogo iOS sin caso en el router.
+
+## Medición del 08-09-2026
+
+Ejecutar `scripts/parity-report.py` no es lo mismo que leer esta tabla. Las
+cifras del día del barrido:
+
+| | endpoints distintos |
+|---|---|
+| Web | 235 |
+| Android | 361 |
+| iOS | 413 |
+
+| Hueco | Endpoints |
+|---|---|
+| La web tiene y **ninguna** app | 46 |
+| Android tiene y iOS no | 12 |
+| **iOS tiene y Android no** | **64** |
+
+Esa última fila es la deuda abierta: el barrido llevó a iOS por delante en
+contabilidad, evidencias de actividad, usuarios y ventas. Android necesita una
+pasada equivalente para que las dos tiendas reciban lo mismo.
+
+### Cómo se lee el informe, y cómo engaña
+
+Mide **superficie de API consumida**, no calidad de pantalla: un listado muerto
+y un CRUD completo consumen el mismo `GET`. Y solo ve la ruta cuando es un
+literal pegado al helper. Dos veces en el mismo día invirtió el diagnóstico:
+
+- No reconocía `postJSON` ni `getBinary`, y llegó a afirmar que la app iOS no
+  tenía `auth/login`. iOS pasó de 157 a 381 endpoints al arreglarlo.
+- `TicketsRepository` elegía la ruta con un ternario entre `client-portal/...` y
+  `branch-portal/...`. El informe daba las 20 por ausentes: **26 endpoints de
+  hueco donde solo había 8.**
+- Normalizaba `newsletter${qs}` a `newsletter:id`, fabricando endpoints que no
+  existen.
+
+Si un hueco te sorprende, compruébalo a mano antes de mandar a nadie a taparlo.
 
 ## Leyenda (columna Android / iOS)
 
@@ -28,6 +71,35 @@ detección y los pines del plano se ven pero no se editan**.
 > advertencia, de los que 13 eran módulos de solo lectura y 3 inalcanzables.
 > Por eso ahora `check-app-web-parity.py` compara en los dos sentidos y falla
 > si la matriz y el catálogo divergen. No edites una fila sin ejecutarlo.
+
+## Escrituras que el dueño NO ha autorizado
+
+Ninguna de estas está implementada en iOS, y en Android solo las marcadas. La
+regla del barrido fue: **consulta sí, escritura fiscal o de nómina no**, y las
+pantallas lo dicen en su propio pie en vez de esconder el botón.
+
+| Zona | Endpoints |
+|---|---|
+| Timbrado y SAT | `invoices/:id/stamp`, `/credit-note`, `/cancel`, `payments/:id/stamp-complement`, `compliance/diot`, `compliance/sat-agrupador-status` |
+| Cierre contable | `journal-entries/:id/reverse`, `fiscal-periods/:id/close`, `/reopen` |
+| Conciliación bancaria | `banking/transactions/:id/reconcile`, `banking/accounts/:id/transactions/import` |
+| Nómina | `employee-payments` (alta, edición, marcar pagado), `fines/:id/approve` |
+| Usuarios y roles | `POST users`, `users/:id/manager`, `users/:id/hr`, `users/bulk/active`, `users/:id/unlock`, sesiones ajenas, `POST/PATCH/DELETE roles` |
+| Privacidad | `audit/privacy/erase/:id` |
+| Cobro | `company/billing/checkout`, `company/billing/portal` |
+
+> **Android ya publicó dos de estas y siguen vivas en Google Play:**
+> `PATCH accounting/journal-entries/{id}/post` (contabilizar asiento) y
+> `POST accounting/journal-entries` (alta de asiento) —
+> `ExtraApi.kt:948-951` → `FinanceRichScreens.kt`, alcanzables con la clave
+> `accounting`. Son trabajo anterior al barrido y **no se han retirado**:
+> quitar funcionalidad ya publicada es decisión del dueño, no de un agente.
+
+Dos decisiones de criterio tomadas durante el barrido, señaladas para revisión:
+**aprobar órdenes de compra** desde el móvil se dejó activo (es el paso
+siguiente de aprobar requisiciones, que sí estaba autorizado, y el servidor lo
+protege con `PROCUREMENT_APPROVE`); **aprobar multas** se dejó fuera, porque una
+multa se descuenta de la nómina del trabajador.
 
 ## Reglas
 

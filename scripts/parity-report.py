@@ -65,7 +65,13 @@ PATRONES = {
 
 IGNORAR_DIR = ('node_modules', 'DerivedData', '.next', 'dist')
 
-INTERPOLACION_JS = re.compile(r'\$\{[^}]*\}')
+# Un `${...}` PRECEDIDO de barra es un identificador de ruta: `users/${id}/hr`.
+# Pegado a la palabra anterior no lo es: `newsletter${qs}` es la lista con su
+# cadena de consulta. Meterlos en el mismo saco fabricaba endpoints fantasma
+# --`newsletter:id`, `procurement/goods-receipts:id`,
+# `client-ticket-requests:id`-- que luego figuraban como huecos de las apps.
+INTERPOLACION_JS = re.compile(r'(?<=/)\$\{[^}]*\}')
+SUFIJO_JS = re.compile(r'\$\{[^}]*\}')
 INTERPOLACION_SWIFT = re.compile(re.escape(chr(92)) + r'\([^)]*\)')
 PARAM_RETROFIT = re.compile(r'\{[A-Za-z_]+\}')
 NUMERO_EN_RUTA = re.compile(r'/\d+(?=/|$)')
@@ -85,6 +91,7 @@ def ficheros(rel, extensiones):
 
 def normalizar(ruta):
     ruta = INTERPOLACION_JS.sub(':id', ruta)
+    ruta = SUFIJO_JS.sub('', ruta)
     ruta = INTERPOLACION_SWIFT.sub(':id', ruta)
     ruta = PARAM_RETROFIT.sub(':id', ruta)
     ruta = ruta.split('?')[0].strip('/')
