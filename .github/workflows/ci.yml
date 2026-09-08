@@ -118,3 +118,55 @@ jobs:
       - name: Assemble debug + unit tests
         working-directory: apps/mobile-native/android
         run: ./gradlew :app:assembleDebug test --no-daemon
+
+  ios-estructura:
+    name: iOS · estructura (sin Mac)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Barato y rapido: caza redeclaraciones y extensiones huerfanas en
+      # segundos. No sustituye a `xcodebuild` (ese es el trabajo `ios`), pero
+      # da el aviso sin arrancar un runner de macOS.
+      - name: Comprobacion estatica de Swift
+        run: python3 scripts/ios-static-check.py
+
+  ios:
+    name: iOS · compilar (simulador)
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar XcodeGen
+        run: brew install xcodegen
+
+      - name: Generar NexaraApp.xcodeproj
+        working-directory: apps/mobile-native/ios
+        run: xcodegen generate
+
+      # Compilar NO necesita cuenta de Apple ni certificado: con el SDK del
+      # simulador y la firma desactivada, `xcodebuild` type-checkea las 45.000
+      # lineas de Swift igual de bien.
+      #
+      # Sin este trabajo, el unico flujo que tocaba el codigo iOS era
+      # `ios-testflight.yml`, que exige seis secretos de Apple y por tanto no
+      # podia ejecutarse hasta que terminara el alta de Apple. Resultado: el
+      # arbol de Swift crecio hasta 45.000 lineas sin compilarse una sola vez,
+      # y acumulo redeclaraciones que rompian la construccion entera.
+      - name: Compilar para simulador (sin firmar)
+        working-directory: apps/mobile-native/ios
+        run: |
+          xcodebuild build \
+            -project NexaraApp.xcodeproj \
+            -scheme NexaraApp \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""

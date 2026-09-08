@@ -666,70 +666,9 @@ private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
-enum ActivityParse {
-    static func str(_ values: Any?...) -> String {
-        for v in values {
-            if let s = v as? String, !s.isEmpty, s != "null" { return s }
-            if let n = v as? NSNumber { return n.stringValue }
-            if let m = v as? [String: Any] {
-                let nested = str(m["nombre"], m["name"], m["code"])
-                if !nested.isEmpty { return nested }
-            }
-        }
-        return ""
-    }
-
-    static func nestedName(_ values: Any?...) -> String {
-        for v in values {
-            let s = str(v)
-            if !s.isEmpty { return s }
-        }
-        return ""
-    }
-
-    static func int(_ value: Any?) -> Int? {
-        if let n = value as? Int { return n }
-        if let n = value as? NSNumber { return n.intValue }
-        if let s = value as? String, let n = Int(s) { return n }
-        return nil
-    }
-
-    static func double(_ value: Any?) -> Double? {
-        if let n = value as? Double { return n }
-        if let n = value as? NSNumber { return n.doubleValue }
-        if let s = value as? String, let n = Double(s) { return n }
-        return nil
-    }
-
-    static func isoDate(_ value: String) -> Date? {
-        guard !value.isEmpty else { return nil }
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: value) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        if let d = f.date(from: value) { return d }
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "es_MX")
-        df.dateFormat = "yyyy-MM-dd"
-        return df.date(from: String(value.prefix(10)))
-    }
-
-    static func fmtDate(_ date: Date) -> String {
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "es_MX")
-        df.dateStyle = .short
-        return df.string(from: date)
-    }
-
-    static func fmtIso(_ value: String) -> String {
-        isoDate(value).map(fmtDate) ?? value
-    }
-
-    static func mapsUrl(lat: Double?, lng: Double?) -> URL? {
-        guard let lat, let lng, lat.isFinite, lng.isFinite else { return nil }
-        return URL(string: "https://www.google.com/maps?q=\(lat),\(lng)")
-    }
-}
+// `ActivityParse` vivia aqui duplicado, identico salvo por dos miembros, y
+// ese segundo ejemplar rompia la compilacion ("invalid redeclaration"). La
+// version buena, ya fusionada, esta en `Data/ActivityModels.swift`.
 
 private func actStatusColor(_ status: String) -> Color {
     let s = status.lowercased()
