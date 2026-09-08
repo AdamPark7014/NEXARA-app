@@ -40,6 +40,9 @@ fun Throwable.toUserMessage(fallback: String = "No se pudo completar la operaci√
 
 fun Throwable.isSessionExpired(): Boolean = (this as? HttpException)?.code() == 401
 
+/** 403 del guard RBAC: la secci√≥n es opcional; no debe tumbar pantallas enteras. */
+fun Throwable.isForbidden(): Boolean = (this as? HttpException)?.code() == 403
+
 /**
  * Saca el texto de error del cuerpo de la respuesta.
  *
