@@ -14,7 +14,11 @@ func mapPinKind(of raw: String?) -> MapPinKind {
     }
 }
 
-struct MapPin {
+// Se llamaba `MapPin`, igual que el punto geografico de `NexaraMapView`, y
+// las dos declaraciones a nivel de fichero no compilan juntas. Son cosas
+// distintas: esta marca una posicion en PORCENTAJE sobre el plano de un
+// sitio; aquella lleva latitud y longitud reales.
+struct IntegraFloorPin {
     let id: Int
     let kind: MapPinKind
     let entityType: String
@@ -30,13 +34,13 @@ struct MapPin {
         return entityId
     }
 
-    static func fromMap(_ m: [String: Any]) -> MapPin? {
+    static func fromMap(_ m: [String: Any]) -> IntegraFloorPin? {
         guard let id = m.integraInt("id"),
               let entityId = m.integraStr("entityId"),
               let x = m.integraFloat("xPct"),
               let y = m.integraFloat("yPct") else { return nil }
         let type = m.integraStr("entityType") ?? ""
-        return MapPin(
+        return IntegraFloorPin(
             id: id,
             kind: mapPinKind(of: type),
             entityType: type,
@@ -52,7 +56,7 @@ struct Floorplan {
     let id: Int
     let name: String
     let imageData: String?
-    let pins: [MapPin]
+    let pins: [IntegraFloorPin]
 
     var doorPins: Int { pins.filter { $0.kind == .door }.count }
     var cameraPins: Int { pins.filter { $0.kind == .camera }.count }
@@ -64,7 +68,7 @@ struct Floorplan {
             id: id,
             name: m.integraStr("name") ?? "Plano \(id)",
             imageData: m.integraStr("imageData"),
-            pins: pinMaps.compactMap { MapPin.fromMap($0) }
+            pins: pinMaps.compactMap { IntegraFloorPin.fromMap($0) }
         )
     }
 }

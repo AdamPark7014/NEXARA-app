@@ -66,6 +66,49 @@ enum ActivityParse {
         if let s = value as? String, let n = Int64(s) { return n }
         return nil
     }
+
+    static func int(_ value: Any?) -> Int? {
+        if let n = value as? Int { return n }
+        if let n = value as? NSNumber { return n.intValue }
+        if let s = value as? String, let n = Int(s) { return n }
+        return nil
+    }
+
+    static func double(_ value: Any?) -> Double? {
+        if let n = value as? Double { return n }
+        if let n = value as? NSNumber { return n.doubleValue }
+        if let s = value as? String, let n = Double(s) { return n }
+        return nil
+    }
+
+    static func isoDate(_ value: String) -> Date? {
+        guard !value.isEmpty else { return nil }
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: value) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        if let d = f.date(from: value) { return d }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "es_MX")
+        df.dateFormat = "yyyy-MM-dd"
+        return df.date(from: String(value.prefix(10)))
+    }
+
+    static func fmtDate(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "es_MX")
+        df.dateStyle = .short
+        return df.string(from: date)
+    }
+
+    static func fmtIso(_ value: String) -> String {
+        isoDate(value).map(fmtDate) ?? value
+    }
+
+    static func mapsUrl(lat: Double?, lng: Double?) -> URL? {
+        guard let lat, let lng, lat.isFinite, lng.isFinite else { return nil }
+        return URL(string: "https://www.google.com/maps?q=\(lat),\(lng)")
+    }
 }
 
 private extension String {
