@@ -104,4 +104,43 @@ export class NewsletterService {
       orderBy: { subscribedAt: 'desc' },
     });
   }
+
+  /**
+   * Resumen para el panel de STUDIO.
+   *
+   * El panel llamaba a `newsletter/stats` desde el primer dia y esa ruta no
+   * existia: la peticion iba dentro de un `Promise.allSettled`, asi que fallaba
+   * en silencio y la tarjeta se quedaba en blanco para siempre.
+   *
+   * Solo devuelve lo que la tabla sabe de verdad. `NewsletterSubscriber` no
+   * tiene marca de baja ni hay modelo de campanas, asi que `activeSubscribers`,
+   * `lastCampaignSentAt` y `lastCampaignOpenRate` NO se envian: el panel ya los
+   * comprueba contra `null` y oculta esas lineas. Rellenarlos con el total o
+   * con ceros seria inventar datos de negocio.
+   */
+  async stats(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where = companyWhere(tenantId);
+
+    const hace30Dias = new Date();
+    hace30Dias.setDate(hace30Dias.getDate() - 30);
+
+    const [totalSubscribers, last30Days, ultimo] = await Promise.all([
+      this.db.newsletterSubscriber.count({ where }),
+      this.db.newsletterSubscriber.count({
+        where: { ...where, subscribedAt: { gte: hace30Dias } },
+      }),
+      this.db.newsletterSubscriber.findFirst({
+        where,
+        orderBy: { subscribedAt: 'desc' },
+        select: { subscribedAt: true },
+      }),
+    ]);
+
+    return {
+      totalSubscribers,
+      last30Days,
+      lastSubscribedAt: ultimo?.subscribedAt ?? null,
+    };
+  }
 }

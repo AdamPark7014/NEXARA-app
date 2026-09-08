@@ -65,7 +65,11 @@ export default function LeadDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch(`sales/leads/${id}`, token);
+      // `sales/leads/:id` no existe: no hay ningun `@Controller('sales')` en la
+      // API. El controlador real es `ventas/leads` (`ventas-leads.controller.ts`),
+      // asi que esta pantalla devolvia 404 siempre y la ficha del lead no se
+      // abria nunca.
+      const data = await apiFetch(`ventas/leads/${id}`, token);
       setLead(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar el lead");

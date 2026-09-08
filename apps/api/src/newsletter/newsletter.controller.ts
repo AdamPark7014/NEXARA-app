@@ -15,6 +15,14 @@ export class NewsletterController {
     return this.newsletterService.subscribe(payload);
   }
 
+  // Antes de `stats`: si fuera despues, `@Get()` no lo tapa, pero mantener
+  // juntas las rutas concretas evita que una futura `@Get(':id')` se coma esta.
+  @Get('stats')
+  @UseGuards(RbacGuard)
+  stats(@CurrentCompanyId() companyId: number | null) {
+    return this.newsletterService.stats(companyId);
+  }
+
   @Get()
   @UseGuards(RbacGuard)
   list(
