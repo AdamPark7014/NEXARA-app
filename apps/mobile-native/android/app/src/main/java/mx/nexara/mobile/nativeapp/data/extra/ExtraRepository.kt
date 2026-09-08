@@ -37,7 +37,9 @@ import mx.nexara.mobile.nativeapp.data.api.CreateHrLeaveBody
 import mx.nexara.mobile.nativeapp.data.api.HrLeaveBalanceDto
 import mx.nexara.mobile.nativeapp.data.api.HrLeaveRejectBody
 import mx.nexara.mobile.nativeapp.data.api.HrLeaveDto
+import mx.nexara.mobile.nativeapp.data.api.HrReviewDto
 import mx.nexara.mobile.nativeapp.data.api.HrStaffDto
+import mx.nexara.mobile.nativeapp.data.api.InternalComunicadoDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceMatchWaiveRequest
 import mx.nexara.mobile.nativeapp.data.api.InvoicePaymentRequest
@@ -418,7 +420,34 @@ class ExtraRepository(context: Context) {
         return HrLeaveBalanceDto.fromRaw(row)
     }
     suspend fun hrReviews() = loadGeneric { api.getHrReviewsRaw() }
+
+    /** Evaluaciones de desempeño tipadas — antes sólo había mapas sueltos. */
+    suspend fun hrReviewDtos(): List<HrReviewDto> =
+        loadGeneric { api.getHrReviewsRaw() }.map { HrReviewDto.fromRaw(it) }
+
+    suspend fun submitHrReview(id: Long) {
+        api.submitHrReview(id)
+    }
+
+    suspend fun acknowledgeHrReview(id: Long) {
+        api.acknowledgeHrReview(id)
+    }
+
     suspend fun hrDashboardRaw(): String = api.getHrDashboardRaw().string()
+
+    // ── Comunicados internos ────────────────────────────────────────────────
+
+    suspend fun internalComunicados(estado: String? = null): List<InternalComunicadoDto> =
+        loadGeneric { api.getInternalComunicadosRaw(estado = estado?.takeIf { it.isNotBlank() }) }
+            .map { InternalComunicadoDto.fromRaw(it) }
+
+    /** Ficha con el cuerpo del comunicado, que el listado no devuelve. */
+    suspend fun internalComunicado(id: Long): InternalComunicadoDto =
+        InternalComunicadoDto.fromRaw(parseObject(api.getInternalComunicadoRaw(id).string()))
+
+    suspend fun enviarInternalComunicado(id: Long) {
+        api.enviarInternalComunicado(id)
+    }
     suspend fun warehouse(): List<Map<String, Any?>> =
         warehouses().map { it.toFlatMap() }
 

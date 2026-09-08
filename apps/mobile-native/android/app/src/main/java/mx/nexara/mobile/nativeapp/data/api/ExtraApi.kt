@@ -1011,8 +1011,36 @@ interface ExtraApi {
     @GET("hr/reviews")
     suspend fun getHrReviewsRaw(): okhttp3.ResponseBody
 
+    /**
+     * `DRAFT → SUBMITTED`. La firma la da quien evalúa; exige `hr.manage`.
+     */
+    @PATCH("hr/reviews/{id}/submit")
+    suspend fun submitHrReview(@Path("id") id: Long): okhttp3.ResponseBody
+
+    /**
+     * `SUBMITTED → ACKNOWLEDGED`. El acuse de recibido del evaluado: es la
+     * acción más móvil de todo RR. HH. y sólo existía en la web.
+     */
+    @PATCH("hr/reviews/{id}/acknowledge")
+    suspend fun acknowledgeHrReview(@Path("id") id: Long): okhttp3.ResponseBody
+
     @GET("hr/dashboard")
     suspend fun getHrDashboardRaw(): okhttp3.ResponseBody
+
+    // Comunicados internos (web: /erp/news, pestaña «Comunicados»)
+    @GET("internal-comunicados")
+    suspend fun getInternalComunicadosRaw(
+        @Query("limit") limit: Int = 50,
+        @Query("estado") estado: String? = null,
+    ): okhttp3.ResponseBody
+
+    /** El listado no trae `cuerpo`; el texto completo sólo viene en la ficha. */
+    @GET("internal-comunicados/{id}")
+    suspend fun getInternalComunicadoRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    /** Marca el comunicado como enviado y le pone fecha de envío. */
+    @PATCH("internal-comunicados/{id}/enviar")
+    suspend fun enviarInternalComunicado(@Path("id") id: Long): okhttp3.ResponseBody
 
     // Warehouse / Stock
     @GET("warehouse")

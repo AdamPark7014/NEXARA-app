@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.data.api
 
 import okhttp3.MultipartBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
@@ -115,6 +116,78 @@ data class OpenChatDmBody(
     val userId: Long,
 )
 
+// ── Ficha de canal, silencio, salida y búsqueda ─────────────────────────────
+// Cuatro endpoints que la consola web consumía y ninguna de las dos apps:
+// `chat/channels/:id`, `chat/channels/:id/mute`, `chat/channels/:id/leave` y
+// `chat/search`. Los tres primeros son ajustes que se hacen justo cuando el
+// teléfono vibra por décima vez; el cuarto es cómo se encuentra el mensaje con
+// el dato que hace falta estando en la calle.
+
+data class ChatChannelMemberDto(
+    val id: Long = 0L,
+    val nombre: String = "",
+    val email: String = "",
+    val role: String = "",
+    val lastReadAt: String? = null,
+)
+
+/**
+ * `GET chat/channels/:id`.
+ *
+ * `supervised` y `readOnly` no son adorno: el servidor rechaza silenciar una
+ * conversación supervisada (un jefe mirando el DM de sus reportes) con 403, así
+ * que la app tiene que apagar el interruptor antes de intentarlo.
+ */
+data class ChatChannelDetailDto(
+    val id: Long = 0L,
+    val kind: String = "",
+    val slug: String? = null,
+    val name: String = "",
+    val topic: String? = null,
+    val description: String? = null,
+    val lastMessageAt: String? = null,
+    val memberCount: Int = 0,
+    val supervised: Boolean = false,
+    val readOnly: Boolean = false,
+    val muted: Boolean = false,
+    val mutedUntil: String? = null,
+    val members: List<ChatChannelMemberDto> = emptyList(),
+)
+
+data class SetChatMutedBody(
+    val muted: Boolean,
+)
+
+/** Canal al que pertenece un resultado de búsqueda. */
+data class ChatSearchChannelDto(
+    val id: Long = 0L,
+    val name: String = "",
+    val kind: String = "",
+    val slug: String? = null,
+)
+
+/**
+ * Mensaje encontrado. Es el mismo cuerpo que `ChatMessageDto` más el canal,
+ * porque una búsqueda global cruza canales y sin decir cuál el resultado no
+ * sirve de nada.
+ */
+data class ChatSearchHitDto(
+    val id: Long = 0L,
+    val channelId: Long = 0L,
+    val authorId: Long = 0L,
+    val parentId: Long? = null,
+    val body: String = "",
+    val attachmentUrl: String? = null,
+    val attachmentName: String? = null,
+    val createdAt: String = "",
+    val author: ChatAuthorDto? = null,
+    val channel: ChatSearchChannelDto? = null,
+)
+
+data class ChatSearchResponse(
+    val messages: List<ChatSearchHitDto> = emptyList(),
+)
+
 interface ChatApi {
     @GET("chat/channels")
     suspend fun listChannels(): List<ChatChannelDto>
@@ -184,4 +257,29 @@ interface ChatApi {
 
     @POST("chat/messages/{id}/pin")
     suspend fun pinMessage(@Path("id") messageId: Long): ChatMessageDto
+
+    /** Ficha del canal: miembros, silencio y si la vista es supervisada. */
+    @GET("chat/channels/{id}")
+    suspend fun getChannel(@Path("id") channelId: Long): ChatChannelDetailDto
+
+    /** Silencia o reactiva el canal para el usuario actual. */
+    @PATCH("chat/channels/{id}/mute")
+    suspend fun setChannelMuted(
+        @Path("id") channelId: Long,
+        @Body body: SetChatMutedBody,
+    ): ChatChannelDetailDto
+
+    /**
+     * Salir del canal. El servidor lo prohíbe en DM y en `general`/`anuncios`;
+     * la app no ofrece el gesto en esos casos para no provocar un 400.
+     */
+    @DELETE("chat/channels/{id}/leave")
+    suspend fun leaveChannel(@Path("id") channelId: Long): okhttp3.ResponseBody
+
+    /** Búsqueda de mensajes; sin `channelId` cruza todos los canales visibles. */
+    @GET("chat/search")
+    suspend fun searchMessages(
+        @Query("q") query: String,
+        @Query("channelId") channelId: Long? = null,
+    ): ChatSearchResponse
 }

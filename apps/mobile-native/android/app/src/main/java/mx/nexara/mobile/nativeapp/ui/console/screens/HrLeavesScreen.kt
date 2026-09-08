@@ -23,11 +23,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -249,9 +252,33 @@ class HrLeavesViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * RR. HH. en la app: permisos y evaluaciones.
+ *
+ * La web parte `/erp/hr` en pestañas y una de ellas es «Evaluaciones»
+ * (`hr/reviews`), que en el móvil no existía pese a que el cliente HTTP ya la
+ * tenía escrita. El módulo `hr` sigue entrando por la misma clave; sólo se le
+ * pone encima la barra de pestañas.
+ */
 @Composable
 fun HrLeavesScreen(onBack: () -> Unit = {}, contentPadding: PaddingValues = PaddingValues(16.dp)) {
+    var tab by remember { mutableIntStateOf(0) }
+    Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
+        TabRow(selectedTabIndex = tab) {
+            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Permisos") })
+            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Evaluaciones") })
+        }
+        if (tab == 0) {
+            HrLeavesTab(onBack = onBack, contentPadding = contentPadding)
+        } else {
+            HrReviewsSection(contentPadding = contentPadding)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HrLeavesTab(onBack: () -> Unit = {}, contentPadding: PaddingValues = PaddingValues(16.dp)) {
     val vm: HrLeavesViewModel = viewModel()
     val state by vm.state.collectAsState()
     val filtered = vm.filtered()

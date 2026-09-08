@@ -62,6 +62,9 @@ object ModuleCatalog {
         mod("attendance", "Asistencia", "🕒", "/console/attendance", ParityStatus.NATIVO),
         mod("lunch-breaks", "Comidas", "🥪", "/console/lunch-breaks", ParityStatus.NATIVO),
         mod("my-lunch-breaks", "Mis comidas", "🥪", "/console/my-lunch-breaks", ParityStatus.NATIVO),
+        // Permisos con alta/aprobación/rechazo/cancelación + pestaña de
+        // evaluaciones (`hr/reviews`) con enviar y acusar de recibido, cableada
+        // el 2026-09-08. Redactar la evaluación sigue en la web.
         mod("hr", "Recursos humanos", "👥", "/console/hr", ParityStatus.NATIVO),
         mod("employee-payments", "Pagos a empleados", "💵", "/console/employee-payments", ParityStatus.NATIVO),
         mod("accounting", "Contabilidad", "📒", "/console/accounting", ParityStatus.NATIVO),
@@ -75,6 +78,8 @@ object ModuleCatalog {
         mod("dispatch", "Despacho OT", "🗺️", "/ops/dispatch", ParityStatus.NATIVO),
         mod("approvals", "Aprobaciones", "🛡️", "/erp/approvals", ParityStatus.NATIVO),
         mod("notifications-center", "Notificaciones", "🔔", "/erp/notifications-center", ParityStatus.NATIVO),
+        // Suma búsqueda de mensajes, silenciar canal y salir del canal
+        // (2026-09-08): tres cosas que sólo estaban en la consola web.
         mod("chat", "Chat", "💬", "/erp/chat", ParityStatus.NATIVO),
         // `MeetingsApi.kt` llevaba escrito sin que lo referenciara nadie, ni
         // siquiera el cliente HTTP. Con el módulo montado encima, pasa a NATIVO.
@@ -85,6 +90,10 @@ object ModuleCatalog {
         mod("assets", "Activos", "📦", "/operacion/assets", ParityStatus.SOLO_LECTURA),
         mod("stock", "Almacén", "📦", "/console/stock", ParityStatus.NATIVO),
         mod("warehouse", "Bodega", "🏭", "/console/warehouse", ParityStatus.NATIVO),
+        // Requisiciones (aprobar/rechazar), ficha de OC con aprobación, ficha
+        // de recepción y ciclo de RFQ completo — cotizar línea, comparar,
+        // adjudicar y cancelar — cableado el 2026-09-08. Crear la RFQ y
+        // capturar una recepción renglón a renglón se quedan en la web.
         mod("procurement", "Compras", "🛒", "/console/procurement", ParityStatus.NATIVO),
         mod("maintenance", "Mantenimiento", "🔧", "/operacion/maintenance", ParityStatus.NATIVO),
         mod("service-sheets", "Hojas de servicio", "📄", "/operacion/service-sheets", ParityStatus.SOLO_LECTURA),
@@ -100,6 +109,15 @@ object ModuleCatalog {
         mod("contact-messages", "Mensajes de contacto", "✉️", "/console/contact-messages", ParityStatus.SOLO_LECTURA),
         mod("news", "Noticias", "📰", "/console/news", ParityStatus.SOLO_LECTURA),
         mod("newsletter", "Newsletter", "📮", "/console/newsletter", ParityStatus.SOLO_LECTURA),
+        // Cableado el 2026-09-08. `internal-comunicados` no existía en ninguna
+        // de las dos apps; en la web va escondido dentro de /erp/news.
+        //
+        // SOLO_LECTURA y no NATIVO a propósito: la pantalla lista, abre la
+        // ficha con el cuerpo completo y publica un borrador ya redactado
+        // (`PATCH internal-comunicados/:id/enviar`), pero NO da de alta, NO
+        // edita y NO borra. Eso no es CRUD nativo, y esta matriz ya mintió una
+        // vez. Redactar un aviso a toda la plantilla es trabajo de escritorio.
+        mod("comunicados", "Comunicados", "📣", "/erp/news", ParityStatus.SOLO_LECTURA),
         mod("my-profile", "Mi perfil", "👤", "/console/my-profile", ParityStatus.NATIVO),
         mod("my-preferences", "Mis preferencias", "⚙️", "/console/my-preferences", ParityStatus.SOLO_LECTURA),
         mod("offline-queue", "Cola offline", "☁️", "/console/offline-queue", ParityStatus.NATIVO),

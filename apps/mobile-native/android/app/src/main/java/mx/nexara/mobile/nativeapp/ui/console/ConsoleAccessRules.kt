@@ -278,7 +278,7 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ),
         ConsoleSidebarGroup(
             "system", "Administración interna",
-            pick("tools", "news", "newsletter", "settings", "companies", "kb", "architecture", "offline-queue"),
+            pick("tools", "news", "newsletter", "comunicados", "settings", "companies", "kb", "architecture", "offline-queue"),
         ),
         ConsoleSidebarGroup(
             "inventory", "Inventario y compras",
