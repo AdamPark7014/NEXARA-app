@@ -263,47 +263,4 @@ final class IntegraHomeSummaryVM: ObservableObject {
     }
 }
 
-/// Formato / edad de espejo compartido por pantallas core (paridad Android IntegraFormat / syncAge).
-enum IntegraCoreFormat {
-    static let syncStaleMs: TimeInterval = 60 * 60
-
-    struct SyncAge {
-        let label: String
-        let stale: Bool
-    }
-
-    static func parseMs(_ raw: String?) -> TimeInterval? {
-        guard let raw, !raw.isEmpty else { return nil }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = iso.date(from: raw) { return d.timeIntervalSince1970 }
-        iso.formatOptions = [.withInternetDateTime]
-        if let d = iso.date(from: raw) { return d.timeIntervalSince1970 }
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        if let d = f.date(from: String(raw.prefix(19))) { return d.timeIntervalSince1970 }
-        return nil
-    }
-
-    static func syncAge(lastSyncMs: TimeInterval, now: Date = Date()) -> SyncAge {
-        let edad = now.timeIntervalSince1970 - lastSyncMs
-        if edad < 0 { return SyncAge(label: "recién", stale: false) }
-        let minutos = Int(edad / 60)
-        let label: String
-        switch minutos {
-        case ..<1: label = "hace menos de 1 min"
-        case ..<60: label = "hace \(minutos) min"
-        case ..<(60 * 24): label = "hace \(minutos / 60) h"
-        default: label = "hace \(minutos / (60 * 24)) d"
-        }
-        return SyncAge(label: label, stale: edad > syncStaleMs)
-    }
-
-    static func dateOnly(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
-    }
-}
+// IntegraCoreFormat → typealias de IntegraFormat en IntegraCommon.swift

@@ -70,6 +70,32 @@ enum IntegraSettingsRepository {
         )
     }
 
+    /// Salud del abanico ACS (`GET integra/acs-fanout/status`).
+    static func acsFanout(siteId: Int? = nil) async throws -> [AcsFanoutEntry] {
+        let root = IntegraJSON.decodeMap(
+            try await IntegraHTTP.get("integra/acs-fanout/status", query: IntegraQuery.site(siteId))
+        )
+        return IntegraJSON.itemsOf(root).compactMap(AcsFanoutEntry.parse)
+    }
+
+    /// Conteos / módulos del espejo (`GET integra/capabilities`) — forma abierta.
+    static func capabilities(siteId: Int? = nil) async throws -> IntegraCapabilityCounts {
+        let root = IntegraJSON.decodeMap(
+            try await IntegraHTTP.get("integra/capabilities", query: IntegraQuery.site(siteId))
+        )
+        return IntegraCapabilityCounts.parse(root)
+    }
+
+    /// Nombres de regiones del espejo (`GET integra/regions`).
+    static func regions(siteId: Int? = nil) async throws -> [String] {
+        let root = IntegraJSON.decodeMap(
+            try await IntegraHTTP.get("integra/regions", query: IntegraQuery.site(siteId))
+        )
+        return IntegraJSON.itemsOf(root).compactMap { row in
+            row.integraStr("name") ?? row.integraStr("id")
+        }
+    }
+
     static func siteDraftProblems(name: String, host: String, appKey: String, appSecret: String) -> [String] {
         var out: [String] = []
         if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

@@ -20,8 +20,14 @@ struct CrmOpportunityDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var pdfData: Data?
     @State private var pdfTitle = ""
+    @State private var activities: [CrmActivity] = []
+    @State private var loadingActivities = false
+    @State private var completingActivity = false
+    @State private var showStagePicker = false
+    @State private var pickedStage = "DISCOVERY"
+    @State private var updatingStage = false
 
-    private let tabs = ["Resumen", "Notas", "Adjuntos", "Cotizaciones", "Historial"]
+    private let tabs = ["Resumen", "Notas", "Actividades", "Adjuntos", "Cotizaciones", "Historial"]
 
     var body: some View {
         Group {
@@ -53,6 +59,15 @@ struct CrmOpportunityDetailView: View {
                 onDismiss: { showEdit = false },
                 onSave: { Task { await saveEdit() } }
             )
+        }
+        .confirmationDialog("Cambiar etapa", isPresented: $showStagePicker, titleVisibility: .visible) {
+            ForEach(opportunityStages, id: \.id) { s in
+                Button(s.label) {
+                    pickedStage = s.id
+                    Task { await updateStage() }
+                }
+            }
+            Button("Cancelar", role: .cancel) {}
         }
         .alert("Eliminar oportunidad", isPresented: $showDeleteConfirm) {
             Button("Eliminar", role: .destructive) { Task { await deleteOpp() } }
@@ -87,6 +102,11 @@ struct CrmOpportunityDetailView: View {
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
+            .onChange(of: tab) { newTab in
+                if newTab == 2 && activities.isEmpty && !loadingActivities {
+                    Task { await loadActivities() }
+                }
+            }
 
             Group {
                 if isLoading {
@@ -102,8 +122,9 @@ struct CrmOpportunityDetailView: View {
                     switch tab {
                     case 0: summaryTab
                     case 1: notesTab
-                    case 2: attachmentsTab
-                    case 3: quotesTab
+                    case 2: activitiesTab
+                    case 3: attachmentsTab
+                    case 4: quotesTab
                     default: historialTab
                     }
                 }
@@ -114,7 +135,22 @@ struct CrmOpportunityDetailView: View {
     private var summaryTab: some View {
         List {
             Section {
-                CrmStageChip(text: detail.stageKey)
+                Button {
+                    pickedStage = detail.stageKey.isEmpty ? "DISCOVERY" : detail.stageKey
+                    showStagePicker = true
+                } label: {
+                    HStack {
+                        CrmStageChip(text: detail.stageKey)
+                        Spacer()
+                        Text(updatingStage ? "Actualizando…" : "Cambiar etapa")
+                            .font(.caption)
+                            .foregroundColor(.accentColor)
+                    }
+                }
+                .disabled(updatingStage)
+            }
+            if let actionError {
+                Section { Text(actionError).foregroundColor(.red).font(.footnote) }
             }
             Section("Datos") {
                 oppRow("Valor", crmMxn(detail.value))
@@ -163,6 +199,50 @@ struct CrmOpportunityDetailView: View {
                 .padding(.bottom, 8)
             }
         }
+    }
+
+    private var activitiesTab: some View {
+        List {
+            if let actionError {
+                Section { Text(actionError).foregroundColor(.red).font(.footnote) }
+            }
+            if loadingActivities {
+                ProgressView()
+            } else if activities.isEmpty {
+                NxEmptyState(
+                    title: "Sin actividades",
+                    subtitle: "Las tareas CRM vinculadas a esta oportunidad aparecerán aquí."
+                )
+            } else {
+                ForEach(activities) { act in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(act.displayTitle).font(.subheadline.bold())
+                            Spacer()
+                            Text(act.status).font(.caption2).foregroundColor(.secondary)
+                        }
+                        if !act.activityType.isEmpty {
+                            Text(act.activityType).font(.caption).foregroundColor(.secondary)
+                        }
+                        if !act.dueDate.isEmpty {
+                            Text(String(act.dueDate.prefix(16)))
+                                .font(.caption2)
+                                .foregroundColor(act.isOverdue ? .red : .secondary)
+                        }
+                        if act.isPending {
+                            Button(completingActivity ? "Completando…" : "Marcar completada") {
+                                Task { await completeActivity(act.id) }
+                            }
+                            .font(.caption)
+                            .disabled(completingActivity)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .refreshable { await loadActivities() }
     }
 
     private var attachmentsTab: some View {
@@ -280,8 +360,43 @@ struct CrmOpportunityDetailView: View {
         do {
             detail = try await CrmRepository.shared.opportunityDetail(id: oppId)
             error = nil
+            if tab == 2 { await loadActivities() }
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
+        }
+    }
+
+    private func loadActivities() async {
+        loadingActivities = true
+        defer { loadingActivities = false }
+        do {
+            activities = try await CrmRepository.shared.crmActivitiesForOpportunity(opportunityId: Int64(oppId))
+            actionError = nil
+        } catch {
+            actionError = error.toUserMessage()
+        }
+    }
+
+    private func completeActivity(_ id: Int64) async {
+        completingActivity = true
+        defer { completingActivity = false }
+        do {
+            try await CrmRepository.shared.completeCrmActivity(id: id, outcome: "Completada desde móvil")
+            await loadActivities()
+        } catch {
+            actionError = error.toUserMessage()
+        }
+    }
+
+    private func updateStage() async {
+        updatingStage = true
+        defer { updatingStage = false }
+        do {
+            _ = try await CrmRepository.shared.updateOpportunityStage(id: oppId, stage: pickedStage)
+            showStagePicker = false
+            await reload()
+        } catch {
+            actionError = error.toUserMessage()
         }
     }
 
@@ -293,7 +408,7 @@ struct CrmOpportunityDetailView: View {
             noteText = ""
             await reload()
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 
@@ -305,7 +420,7 @@ struct CrmOpportunityDetailView: View {
             pickerItem = nil
             await reload()
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 
@@ -317,7 +432,7 @@ struct CrmOpportunityDetailView: View {
             showEdit = false
             await reload()
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 
@@ -326,7 +441,7 @@ struct CrmOpportunityDetailView: View {
             try await CrmRepository.shared.deleteOpportunity(id: oppId)
             onBack()
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 
@@ -336,7 +451,7 @@ struct CrmOpportunityDetailView: View {
             pdfTitle = title
             pdfData = bytes
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 }

@@ -20,6 +20,11 @@ struct ClientTicketRequest: Hashable, Identifiable {
         return d.isEmpty ? "Solicitud" : d
     }
     var isHighUrgency: Bool { urgency.uppercased() == "HIGH" }
+    var isNew: Bool { status.uppercased() == "NEW" || status.uppercased() == "NUEVA" }
+    var isClosed: Bool {
+        let s = status.uppercased()
+        return s == "CLOSED" || s == "CERRADA" || s.contains("CLOSE")
+    }
 
     func toFlatMap() -> [String: Any] {
         [
@@ -91,6 +96,35 @@ struct PortalTicket: Hashable, Identifiable {
     var isHighPriority: Bool {
         let p = displayPriority.lowercased()
         return p.contains("alta") || p.contains("high") || p.contains("urgent") || p == "high"
+    }
+
+    /// OT finalizada (API acepta CONFIRM_RESOLVED / REQUEST_REOPEN).
+    var isFinished: Bool {
+        let s = status.lowercased()
+        return s.contains("finaliz") || s.contains("complet") || s.contains("finished") || s.contains("done")
+    }
+
+    var commentsFeedback: String {
+        StockParse.str(raw["comentariosFeedback"], raw["comments"], raw["comentarios"])
+    }
+
+    var responsableName: String {
+        if let map = raw["responsable"] as? [String: Any] {
+            return StockParse.str(map["nombre"], map["name"])
+        }
+        return StockParse.str(raw["responsable"], raw["responsableNombre"], raw["technicianName"])
+    }
+
+    var serviceSheet: [String: Any]? {
+        raw["serviceSheet"] as? [String: Any]
+    }
+
+    var evidences: [[String: Any]] {
+        var out: [[String: Any]] = []
+        if let a = raw["evidencias"] as? [[String: Any]] { out.append(contentsOf: a) }
+        if let a = raw["activityEvidence"] as? [[String: Any]] { out.append(contentsOf: a) }
+        if let a = raw["evidences"] as? [[String: Any]] { out.append(contentsOf: a) }
+        return out
     }
 
     /// Horas desde asignación / creación (aprox. ISO prefix).
@@ -171,6 +205,9 @@ struct PendingFeedbackItem: Hashable, Identifiable {
         if !title.isEmpty { return title }
         if !anNumber.isEmpty { return anNumber }
         return "Actividad"
+    }
+    var subtitle: String {
+        [anNumber, responsibleName].filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     func toFlatMap() -> [String: Any] {

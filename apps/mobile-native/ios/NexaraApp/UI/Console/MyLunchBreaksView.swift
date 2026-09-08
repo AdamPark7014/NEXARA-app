@@ -37,7 +37,7 @@ final class MyLunchBreaksVM: ObservableObject {
             actionMessage = msg
             load()
         } catch {
-            actionMessage = "❌ \(error.localizedDescription)"
+            actionMessage = "❌ \(error.toUserMessage())"
         }
         actionLoading = false
     }
@@ -61,7 +61,7 @@ final class MyLunchBreaksVM: ObservableObject {
             actionMessage = msg
             load()
         } catch {
-            actionMessage = "❌ \(error.localizedDescription)"
+            actionMessage = "❌ \(error.toUserMessage())"
         }
         actionLoading = false
     }

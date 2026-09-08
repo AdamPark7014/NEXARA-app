@@ -86,6 +86,8 @@ struct IntegraSettingsView: View {
     @State private var isLoading = true
     @State private var errorText: String?
     @State private var message: String?
+    @State private var capabilityCounts: IntegraCapabilityCounts?
+    @State private var regionNames: [String] = []
 
     var body: some View {
         Group {
@@ -132,6 +134,29 @@ struct IntegraSettingsView: View {
                             }
                         }
                     }
+                    if let c = capabilityCounts, !c.isEmpty {
+                        Section("Lo que hay en el espejo") {
+                            ForEach(Array(c.entries.enumerated()), id: \.offset) { _, entry in
+                                LabeledContent(entry.key, value: "\(entry.value)")
+                            }
+                            if !c.modules.isEmpty {
+                                Text(
+                                    "Módulos encendidos: "
+                                        + c.modules.filter(\.on).map(\.key).joined(separator: ", ")
+                                        .ifEmpty("ninguno")
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if !regionNames.isEmpty {
+                        Section("Regiones del espejo") {
+                            Text(regionNames.joined(separator: " · "))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }
@@ -144,11 +169,19 @@ struct IntegraSettingsView: View {
         isLoading = true
         errorText = nil
         defer { isLoading = false }
-        do { sites = try await IntegraSettingsService.sites() }
-        catch { errorText = error.localizedDescription }
+        do {
+            sites = try await IntegraSettingsService.sites()
+            capabilityCounts = try? await IntegraSettingsRepository.capabilities()
+            regionNames = (try? await IntegraSettingsRepository.regions()) ?? []
+        } catch {
+            errorText = error.localizedDescription
+        }
     }
 }
 
+private extension String {
+    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
+}
 struct IntegraNewSiteView: View {
     var onCreated: () -> Void = {}
 
@@ -233,6 +266,10 @@ struct IntegraSiteDetailView: View {
     @State private var errorText: String?
     @State private var isLoading = true
     @State private var busy = false
+    @State private var lastSync: [String: Any]?
+    @State private var fanout: [AcsFanoutEntry] = []
+    @State private var siteCaps: IntegraCapabilityCounts?
+    @State private var siteRegions: [String] = []
 
     var body: some View {
         Form {
@@ -244,7 +281,7 @@ struct IntegraSiteDetailView: View {
                     if let host = site.host {
                         Text(host).font(.caption.monospaced()).foregroundStyle(.secondary)
                     }
-                    Text(site.provider ?? "Proveedor desconocido").foregroundStyle(.secondary)
+                    Text(IntegraRules.providerLabel(site.provider)).foregroundStyle(.secondary)
                     Button("Marcar como predeterminado") {
                         Task {
                             busy = true
@@ -283,12 +320,78 @@ struct IntegraSiteDetailView: View {
                                 try await IntegraSettingsService.syncSite(id: siteId)
                                 message = "Sincronización solicitada"
                                 errorText = nil
+                                await load()
                             } catch {
                                 errorText = error.localizedDescription
                             }
                         }
                     }
                     .disabled(busy)
+                }
+                if let lastSync, !lastSync.isEmpty {
+                    Section("Última corrida") {
+                        if let status = lastSync.integraStr("status") {
+                            LabeledContent("Estado", value: IntegraRules.syncStatusLabel(status))
+                        }
+                        if let finished = lastSync.integraStr("finishedAt") {
+                            LabeledContent("Terminó", value: IntegraFormat.relative(finished))
+                        }
+                        if let cams = lastSync.integraInt("cameras") {
+                            LabeledContent("Cámaras", value: "\(cams)")
+                        }
+                        if let doors = lastSync.integraInt("doors") {
+                            LabeledContent("Puertas", value: "\(doors)")
+                        }
+                        if let err = lastSync.integraStr("error") {
+                            Text(err).font(.caption).foregroundStyle(NxTone.danger.fg)
+                        }
+                    }
+                }
+                if let siteCaps, !siteCaps.isEmpty {
+                    Section("Capacidades del sitio") {
+                        ForEach(Array(siteCaps.entries.enumerated()), id: \.offset) { _, entry in
+                            LabeledContent(entry.key, value: "\(entry.value)")
+                        }
+                        if !siteCaps.modules.isEmpty {
+                            Text(
+                                "Módulos: "
+                                    + siteCaps.modules.map { "\($0.key)=\($0.on ? "sí" : "no")" }
+                                    .joined(separator: " · ")
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                if !siteRegions.isEmpty {
+                    Section("Regiones") {
+                        Text(siteRegions.joined(separator: " · "))
+                            .font(.caption)
+                    }
+                }
+                if !fanout.isEmpty {
+                    Section("Últimos envíos a las terminales ACS") {
+                        ForEach(fanout.prefix(10)) { entry in
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(entry.op) · \(entry.employeeNo)")
+                                        .font(.subheadline)
+                                    Text(
+                                        "\(entry.at.map { IntegraFormat.relative($0) } ?? "—") · \(entry.okCount) ok / \(entry.failCount) fallos"
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    if let note = entry.note, !note.isEmpty {
+                                        Text(note).font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                if entry.pendingRetry {
+                                    NxStatusChip(text: "Reintento", tone: .warning)
+                                }
+                            }
+                        }
+                    }
                 }
                 if let message {
                     Section { Text(message).foregroundStyle(NxTone.success.fg) }
@@ -334,5 +437,9 @@ struct IntegraSiteDetailView: View {
         isLoading = true
         defer { isLoading = false }
         site = try? await IntegraSettingsService.sites().first { $0.id == siteId }
+        lastSync = try? await IntegraSettingsRepository.lastSync(siteId: siteId)
+        fanout = (try? await IntegraSettingsRepository.acsFanout(siteId: siteId)) ?? []
+        siteCaps = try? await IntegraSettingsRepository.capabilities(siteId: siteId)
+        siteRegions = (try? await IntegraSettingsRepository.regions(siteId: siteId)) ?? []
     }
 }

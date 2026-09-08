@@ -131,7 +131,7 @@ private func opsIdKey(_ m: [String: Any], _ prefix: String) -> String {
             message = "✅ Orden iniciada\(coord.messageSuffixOrNone)"
             selectedOrder = nil
             load()
-        } catch { message = "❌ \(error.localizedDescription)" }
+        } catch { message = "❌ \(error.toUserMessage())" }
     }
 
     func completeOrder(_ id: Int64) async {
@@ -148,7 +148,7 @@ private func opsIdKey(_ m: [String: Any], _ prefix: String) -> String {
             completeNotes = ""
             selectedOrder = nil
             load()
-        } catch { message = "❌ \(error.localizedDescription)" }
+        } catch { message = "❌ \(error.toUserMessage())" }
     }
 }
 

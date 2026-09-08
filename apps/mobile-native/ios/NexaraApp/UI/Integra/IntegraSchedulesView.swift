@@ -14,6 +14,8 @@ struct IntegraScheduleDoor: Identifiable, Hashable {
 struct IntegraScheduleTemplate: Identifiable, Hashable {
     let id: String
     var name: String
+    var weekPlanNo: Int?
+    var days: [ScheduleDayPlan]
 }
 
 struct IntegraSchedulePerson: Identifiable, Hashable {
@@ -184,6 +186,15 @@ struct IntegraSchedulesView: View {
                                         Text(t.name).tag(t.id)
                                     }
                                 }
+                                if let tpl = templates.first(where: { $0.id == plan.planTemplateNo }) {
+                                    ScheduleWeekGrid(
+                                        templateId: tpl.id,
+                                        templateName: tpl.name,
+                                        weekPlanNo: tpl.weekPlanNo,
+                                        days: tpl.days
+                                    )
+                                    .padding(.top, 4)
+                                }
                             }
                         }
                     }
@@ -277,15 +288,27 @@ struct IntegraSchedulesView: View {
                 )
             }
 
+            let daysByPlan = ScheduleWeekCatalog.daysByWeekPlan(from: cat)
+            let weekPlanByTpl = ScheduleWeekCatalog.weekPlanNoByTemplate(from: cat)
+
             var tpls = (IntegraJSON.asMapList(cat["templates"]) ?? []).compactMap { m -> IntegraScheduleTemplate? in
                 guard let id = m.integraStr("id", "planTemplateNo") else { return nil }
+                let weekPlanNo = m.integraInt("weekPlanNo") ?? weekPlanByTpl[id]
+                let days = weekPlanNo.flatMap { daysByPlan[$0] }
+                    ?? Int(id).flatMap { daysByPlan[$0] }
+                    ?? []
                 return IntegraScheduleTemplate(
                     id: id,
-                    name: m.integraStr("templateName", "name") ?? "Plantilla \(id)"
+                    name: m.integraStr("templateName", "name") ?? "Plantilla \(id)",
+                    weekPlanNo: weekPlanNo,
+                    days: days
                 )
             }
             if !tpls.contains(where: { $0.id == "0" }) {
-                tpls.insert(IntegraScheduleTemplate(id: "0", name: "Sin acceso"), at: 0)
+                tpls.insert(
+                    IntegraScheduleTemplate(id: "0", name: "Sin acceso", weekPlanNo: nil, days: []),
+                    at: 0
+                )
             }
             templates = tpls
 

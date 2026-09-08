@@ -17,6 +17,8 @@ struct IntegraNotificationRow: Identifiable, Hashable {
     var body: String?
     var createdAt: String?
     var read: Bool
+    var category: String?
+    var priority: String?
 }
 
 struct IntegraIdentitySnapshot {
@@ -24,6 +26,8 @@ struct IntegraIdentitySnapshot {
     var email: String?
     var acsPersonId: String?
     var acsSiteId: Int?
+    var linkStatus: String?
+    var acsPersonName: String?
 }
 
 struct IntegraCredentialRow: Identifiable, Hashable {
@@ -31,8 +35,11 @@ struct IntegraCredentialRow: Identifiable, Hashable {
     var kind: String
     var label: String
     var status: String
+    var detalle: String?
+    var queAbre: String?
+    var fuente: String?
+    var presente: Bool = true
 }
-
 /// Bitácora: reconstruir qué pasó un día/franja. No es tabla de escritorio.
 struct IntegraAuditView: View {
     @State private var day = Date()

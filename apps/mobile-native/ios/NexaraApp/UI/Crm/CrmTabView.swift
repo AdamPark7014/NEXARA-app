@@ -308,9 +308,27 @@ private struct CotizacionCard: View {
 
 // MARK: – Leads list screen
 
+private let leadStatuses = ["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"]
+
 struct CrmLeadsView: View {
     @StateObject private var vm = CrmLeadsVM()
     @State private var selected: CrmLead?
+    @State private var showCreate = false
+    @State private var showConvert = false
+    @State private var editing = false
+    @State private var actionError: String?
+    @State private var acting = false
+    @State private var convertedOppId: Int?
+
+    @State private var name = ""
+    @State private var company = ""
+    @State private var email = ""
+    @State private var phone = ""
+    @State private var source = ""
+    @State private var notes = ""
+    @State private var status = "NEW"
+    @State private var convertValue = ""
+    @State private var convertStage = "DISCOVERY"
 
     var body: some View {
         Group {
@@ -318,76 +336,311 @@ struct CrmLeadsView: View {
         }
         .task { vm.load() }
         .refreshable { if selected == nil { vm.load() } }
+        .sheet(isPresented: $showCreate) { createSheet }
+        .sheet(isPresented: $showConvert) { convertSheet }
+        .alert("Lead convertido", isPresented: Binding(
+            get: { convertedOppId != nil },
+            set: { if !$0 { convertedOppId = nil } }
+        )) {
+            Button("OK") { convertedOppId = nil }
+        } message: {
+            if let id = convertedOppId {
+                Text("Se creó la oportunidad #\(id). Ábrela desde Oportunidades.")
+            }
+        }
     }
 
     private var listBody: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                TextField("Buscar lead…", text: $vm.query)
-                    .autocorrectionDisabled()
-                if !vm.query.isEmpty {
-                    Button { vm.query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundColor(.secondary) }
-                }
-            }
-            .padding(10)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(.horizontal).padding(.top, 8)
-
-            if vm.isLoading {
-                Spacer(); ProgressView(); Spacer()
-            } else if vm.filtered.isEmpty {
-                Spacer(); Text("Sin leads").foregroundColor(.secondary); Spacer()
-            } else {
-                List(vm.filtered) { lead in
-                    Button { selected = lead } label: {
-                        LeadCard(item: lead)
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+                    TextField("Buscar lead…", text: $vm.query)
+                        .autocorrectionDisabled()
+                    if !vm.query.isEmpty {
+                        Button { vm.query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundColor(.secondary) }
                     }
-                    .buttonStyle(.plain)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                    .listRowSeparator(.hidden)
                 }
-                .listStyle(.plain)
+                .padding(10)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal).padding(.top, 8)
+
+                if let actionError {
+                    Text(actionError).font(.caption).foregroundColor(.red).padding(.horizontal)
+                }
+
+                if vm.isLoading {
+                    Spacer(); ProgressView(); Spacer()
+                } else if vm.filtered.isEmpty {
+                    Spacer(); Text("Sin leads").foregroundColor(.secondary); Spacer()
+                } else {
+                    List(vm.filtered) { lead in
+                        Button { openDetail(lead) } label: {
+                            LeadCard(item: lead)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                        .listRowSeparator(.hidden)
+                    }
+                    .listStyle(.plain)
+                }
             }
+            Button {
+                resetForm()
+                showCreate = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.title2.bold())
+                    .foregroundColor(.white)
+                    .frame(width: 56, height: 56)
+                    .background(Color(red: 0.06, green: 0.73, blue: 0.51))
+                    .clipShape(Circle())
+                    .shadow(radius: 4, y: 2)
+            }
+            .padding(20)
+            .accessibilityLabel("Nuevo lead")
         }
     }
 
     @ViewBuilder
     private func leadDetail(_ lead: CrmLead) -> some View {
-        let raw = lead.raw
-        let status = lead.status
-        let color  = cotStatusColor(status)
+        let color = cotStatusColor(lead.status)
         List {
             Section {
                 HStack {
-                    Button("← Leads") { selected = nil }
+                    Button("← Leads") {
+                        selected = nil
+                        editing = false
+                        actionError = nil
+                    }
                     Spacer()
-                    if !status.isEmpty {
-                        Text(status.capitalized).font(.caption).bold().foregroundColor(color)
+                    if !lead.status.isEmpty {
+                        Text(lead.status.capitalized).font(.caption).bold().foregroundColor(color)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(color.opacity(0.12)).clipShape(Capsule())
                     }
                 }
             }
-            Section("Lead") {
-                ldRow("Título", lead.displayTitle)
-                ldRow("Cliente", lead.clientName)
-                ldRow("Email", StockParse.str(raw["email"], raw["correo"]))
-                ldRow("Teléfono", StockParse.str(raw["phone"], raw["telefono"]))
-                ldRow("Origen", StockParse.str(raw["source"], raw["origen"], raw["fuente"]))
-                ldRow("Asignado a", StockParse.str(raw["ownerName"], raw["assignedTo"]))
-                ldRow("Fecha", String(StockParse.str(raw["createdAt"], raw["fecha"]).prefix(10)))
+            if let actionError {
+                Section { Text(actionError).foregroundColor(.red).font(.footnote) }
             }
-            if !lead.description.isEmpty {
-                Section("Notas") { Text(lead.description).font(.subheadline) }
+            if editing {
+                Section("Editar") {
+                    TextField("Nombre *", text: $name)
+                    TextField("Empresa", text: $company)
+                    TextField("Email", text: $email).textInputAutocapitalization(.never).keyboardType(.emailAddress)
+                    TextField("Teléfono", text: $phone).keyboardType(.phonePad)
+                    TextField("Origen", text: $source)
+                    TextField("Notas", text: $notes, axis: .vertical).lineLimit(2...4)
+                    Picker("Estado", selection: $status) {
+                        ForEach(leadStatuses, id: \.self) { Text($0).tag($0) }
+                    }
+                }
+                Section {
+                    Button(acting ? "Guardando…" : "Guardar cambios") {
+                        Task { await saveLead(lead) }
+                    }
+                    .disabled(acting || name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Cancelar edición") { editing = false }
+                }
+            } else {
+                Section("Lead") {
+                    ldRow("Título", lead.displayTitle)
+                    ldRow("Cliente", lead.clientName)
+                    ldRow("Email", StockParse.str(lead.raw["email"], lead.raw["correo"]))
+                    ldRow("Teléfono", StockParse.str(lead.raw["phone"], lead.raw["telefono"]))
+                    ldRow("Origen", StockParse.str(lead.raw["source"], lead.raw["origen"], lead.raw["fuente"]))
+                    ldRow("Asignado a", StockParse.str(lead.raw["ownerName"], lead.raw["assignedTo"]))
+                    ldRow("Fecha", String(StockParse.str(lead.raw["createdAt"], lead.raw["fecha"]).prefix(10)))
+                }
+                if !lead.description.isEmpty {
+                    Section("Notas") { Text(lead.description).font(.subheadline) }
+                }
+                Section {
+                    Button("Editar") { beginEdit(lead) }
+                    if lead.isConvertible {
+                        Button("Convertir a oportunidad") {
+                            convertValue = ""
+                            convertStage = "DISCOVERY"
+                            showConvert = true
+                        }
+                    }
+                    if lead.numericId != nil {
+                        Button("Eliminar", role: .destructive) {
+                            Task { await deleteLead(lead) }
+                        }
+                        .disabled(acting)
+                    }
+                }
             }
         }
         .listStyle(.insetGrouped)
     }
 
+    private var createSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Nombre *", text: $name)
+                    TextField("Empresa", text: $company)
+                    TextField("Email", text: $email).textInputAutocapitalization(.never).keyboardType(.emailAddress)
+                    TextField("Teléfono", text: $phone).keyboardType(.phonePad)
+                    TextField("Origen", text: $source)
+                    TextField("Notas", text: $notes, axis: .vertical).lineLimit(2...4)
+                }
+                if let actionError {
+                    Section { Text(actionError).foregroundColor(.red).font(.footnote) }
+                }
+            }
+            .navigationTitle("Nuevo lead")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { showCreate = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(acting ? "Creando…" : "Crear") { Task { await createLead() } }
+                        .disabled(acting || name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    private var convertSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Oportunidad") {
+                    TextField("Valor estimado (MXN)", text: $convertValue).keyboardType(.decimalPad)
+                    Picker("Etapa inicial", selection: $convertStage) {
+                        ForEach(opportunityStages.prefix(5), id: \.id) { s in
+                            Text(s.label).tag(s.id)
+                        }
+                    }
+                }
+                if let actionError {
+                    Section { Text(actionError).foregroundColor(.red).font(.footnote) }
+                }
+            }
+            .navigationTitle("Convertir lead")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { showConvert = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(acting ? "Convirtiendo…" : "Convertir") {
+                        Task { await convertSelected() }
+                    }
+                    .disabled(acting || Double(convertValue.replacingOccurrences(of: ",", with: "")) == nil)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
     @ViewBuilder private func ldRow(_ k: String, _ v: String) -> some View {
         if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
+    }
+
+    private func openDetail(_ lead: CrmLead) {
+        selected = lead
+        editing = false
+        actionError = nil
+        beginEdit(lead, applyOnly: true)
+    }
+
+    private func beginEdit(_ lead: CrmLead, applyOnly: Bool = false) {
+        name = StockParse.str(lead.raw["name"], lead.displayTitle)
+        company = StockParse.str(lead.raw["company"], lead.clientName)
+        email = StockParse.str(lead.raw["email"], lead.raw["correo"])
+        phone = StockParse.str(lead.raw["phone"], lead.raw["telefono"])
+        source = StockParse.str(lead.raw["source"], lead.raw["origen"], lead.raw["fuente"])
+        notes = StockParse.str(lead.raw["notes"], lead.description)
+        status = lead.status.isEmpty ? "NEW" : lead.status.uppercased()
+        if !applyOnly { editing = true }
+    }
+
+    private func resetForm() {
+        name = ""; company = ""; email = ""; phone = ""; source = ""; notes = ""
+        status = "NEW"; actionError = nil
+    }
+
+    private func createLead() async {
+        acting = true
+        defer { acting = false }
+        do {
+            _ = try await CrmRepository.shared.createLead([
+                "name": name.trimmingCharacters(in: .whitespaces),
+                "company": company,
+                "email": email,
+                "phone": phone,
+                "source": source,
+                "notes": notes,
+                "status": "NEW",
+            ])
+            showCreate = false
+            vm.load()
+        } catch {
+            actionError = error.toUserMessage()
+        }
+    }
+
+    private func saveLead(_ lead: CrmLead) async {
+        guard let id = lead.numericId else { return }
+        acting = true
+        defer { acting = false }
+        do {
+            let updated = try await CrmRepository.shared.updateLead(id: id, fields: [
+                "name": name.trimmingCharacters(in: .whitespaces),
+                "company": company,
+                "email": email,
+                "phone": phone,
+                "source": source,
+                "notes": notes,
+                "status": status,
+            ])
+            selected = updated
+            editing = false
+            vm.load()
+        } catch {
+            actionError = error.toUserMessage()
+        }
+    }
+
+    private func deleteLead(_ lead: CrmLead) async {
+        guard let id = lead.numericId else { return }
+        acting = true
+        defer { acting = false }
+        do {
+            try await CrmRepository.shared.deleteLead(id: id)
+            selected = nil
+            vm.load()
+        } catch {
+            actionError = error.toUserMessage()
+        }
+    }
+
+    private func convertSelected() async {
+        guard let lead = selected else { return }
+        guard let value = Double(convertValue.replacingOccurrences(of: ",", with: "")) else { return }
+        acting = true
+        defer { acting = false }
+        do {
+            let created = try await CrmRepository.shared.convertLeadToOpportunity(
+                lead: lead,
+                value: value,
+                stage: convertStage
+            )
+            showConvert = false
+            selected = nil
+            vm.load()
+            if let id = StockParse.int64(created["id"]) {
+                convertedOppId = Int(id)
+            }
+        } catch {
+            actionError = error.toUserMessage()
+        }
     }
 }
 
@@ -403,18 +656,18 @@ final class CrmLeadsVM: ObservableObject {
         return items.filter { row in
             row.displayTitle.lowercased().contains(q) ||
             row.clientName.lowercased().contains(q) ||
-            row.branchName.lowercased().contains(q)
+            row.branchName.lowercased().contains(q) ||
+            row.status.lowercased().contains(q)
         }
     }
 
     func load() {
         isLoading = true
         Task {
-            let leads = (try? await CrmRepository.shared.leadItems()) ?? []
-            if leads.isEmpty {
-                items = await ExtraRepository.shared.clientTicketRequests().map { CrmLead(raw: $0) }
-            } else {
-                items = leads
+            do {
+                items = try await CrmRepository.shared.leadItems()
+            } catch {
+                items = []
             }
             isLoading = false
         }

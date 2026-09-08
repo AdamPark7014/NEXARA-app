@@ -93,7 +93,7 @@ final class WarehouseWmsVM: ObservableObject {
             load()
             return true
         } catch {
-            message = "❌ \(error.localizedDescription)"
+            message = "❌ \(error.toUserMessage())"
             return false
         }
     }

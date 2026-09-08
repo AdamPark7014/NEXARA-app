@@ -176,7 +176,7 @@ struct ExportsView: View {
                 loading = nil
             }
         } catch {
-            await MainActor.run { self.error = error.localizedDescription; loading = nil }
+            await MainActor.run { self.error = error.toUserMessage(); loading = nil }
         }
     }
 }

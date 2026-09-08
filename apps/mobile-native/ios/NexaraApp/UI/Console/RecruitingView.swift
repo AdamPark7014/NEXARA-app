@@ -40,6 +40,7 @@ struct RecruitingView: View {
     @State private var selected: CandidateItem?
     @State private var acting = false
     @State private var actionMessage: String?
+    @State private var showCreate = false
 
     private var filtered: [CandidateItem] {
         candidates.filter { c in
@@ -64,7 +65,16 @@ struct RecruitingView: View {
 
     var body: some View {
         Group {
-            if let c = selected {
+            if showCreate {
+                RecruitingCreateForm(
+                    saving: acting,
+                    message: actionMessage,
+                    onCancel: { showCreate = false; actionMessage = nil },
+                    onSubmit: { fullName, email, whatsapp, category, fileURL in
+                        Task { await createCv(fullName: fullName, email: email, whatsapp: whatsapp, category: category, fileURL: fileURL) }
+                    }
+                )
+            } else if let c = selected {
                 candidateDetail(c)
             } else if isLoading {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -77,9 +87,52 @@ struct RecruitingView: View {
                 content
             }
         }
-        .navigationTitle(selected == nil ? "Reclutamiento" : "")
+        .navigationTitle(showCreate ? "Registrar CV" : (selected == nil ? "Reclutamiento" : ""))
         .task { await load() }
-        .refreshable { if selected == nil { await load() } }
+        .refreshable { if selected == nil && !showCreate { await load() } }
+    }
+
+    private func createCv(
+        fullName: String,
+        email: String,
+        whatsapp: String,
+        category: String,
+        fileURL: URL
+    ) async {
+        acting = true
+        actionMessage = nil
+        defer { acting = false }
+        guard fileURL.startAccessingSecurityScopedResource() else {
+            actionMessage = "❌ No se pudo leer el archivo"
+            return
+        }
+        defer { fileURL.stopAccessingSecurityScopedResource() }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            let name = fileURL.lastPathComponent
+            let ext = fileURL.pathExtension.lowercased()
+            let mime: String
+            switch ext {
+            case "pdf": mime = "application/pdf"
+            case "png": mime = "image/png"
+            case "webp": mime = "image/webp"
+            default: mime = "image/jpeg"
+            }
+            try await ExtraRepository.shared.createCv(
+                fullName: fullName,
+                fileData: data,
+                fileName: name.isEmpty ? "cv.\(ext.isEmpty ? "pdf" : ext)" : name,
+                mimeType: mime,
+                email: email.isEmpty ? nil : email,
+                whatsapp: whatsapp.isEmpty ? nil : whatsapp,
+                category: category.isEmpty ? nil : category
+            )
+            actionMessage = "✅ CV registrado"
+            showCreate = false
+            await load()
+        } catch {
+            actionMessage = "❌ \(error.toUserMessage("No se pudo registrar el CV"))"
+        }
     }
 
     @ViewBuilder
@@ -180,6 +233,23 @@ struct RecruitingView: View {
                 }
                 .padding(.horizontal)
 
+                Button {
+                    showCreate = true
+                    actionMessage = nil
+                } label: {
+                    Text("+ Registrar CV")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.horizontal)
+
+                if let actionMessage {
+                    Text(actionMessage)
+                        .font(.footnote)
+                        .foregroundColor(actionMessage.hasPrefix("✅") ? .green : .red)
+                        .padding(.horizontal)
+                }
+
                 if grouped.isEmpty {
                     Text("Sin candidatos").foregroundColor(.secondary).padding()
                 } else {
@@ -233,6 +303,97 @@ struct RecruitingView: View {
         isLoading = true; error = nil
         candidates = await ExtraRepository.shared.candidateItems()
         isLoading = false
+    }
+}
+
+private struct RecruitingCreateForm: View {
+    let saving: Bool
+    let message: String?
+    let onCancel: () -> Void
+    let onSubmit: (_ fullName: String, _ email: String, _ whatsapp: String, _ category: String, _ fileURL: URL) -> Void
+
+    @State private var fullName = ""
+    @State private var email = ""
+    @State private var whatsapp = ""
+    @State private var category = ""
+    @State private var pickedURL: URL?
+    @State private var pickedName = ""
+    @State private var localError: String?
+    @State private var showPicker = false
+
+    var body: some View {
+        Form {
+            Section {
+                Button("← Cancelar") { onCancel() }
+                    .disabled(saving)
+            }
+            Section("Datos") {
+                TextField("Nombre completo *", text: $fullName)
+                TextField("Email", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                TextField("WhatsApp", text: $whatsapp)
+                    .keyboardType(.phonePad)
+                TextField("Categoría / puesto", text: $category)
+            }
+            Section("Archivo del CV (PDF o imagen) *") {
+                Button {
+                    showPicker = true
+                } label: {
+                    Label(
+                        pickedName.isEmpty ? "Elegir archivo…" : pickedName,
+                        systemImage: "doc.badge.plus"
+                    )
+                }
+                .disabled(saving)
+            }
+            if let localError {
+                Section { Text(localError).foregroundColor(.red).font(.footnote) }
+            }
+            if let message {
+                Section {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundColor(message.hasPrefix("✅") ? .green : .red)
+                }
+            }
+            Section {
+                Button {
+                    guard !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                        localError = "El nombre es obligatorio"
+                        return
+                    }
+                    guard let url = pickedURL else {
+                        localError = "Adjunta el CV (PDF o imagen)"
+                        return
+                    }
+                    localError = nil
+                    onSubmit(fullName, email, whatsapp, category, url)
+                } label: {
+                    if saving {
+                        ProgressView()
+                    } else {
+                        Text("Registrar CV")
+                    }
+                }
+                .disabled(saving)
+            }
+        }
+        .fileImporter(
+            isPresented: $showPicker,
+            allowedContentTypes: [.pdf, .image],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                pickedURL = url
+                pickedName = url.lastPathComponent
+                localError = nil
+            case .failure(let err):
+                localError = err.toUserMessage()
+            }
+        }
     }
 }
 

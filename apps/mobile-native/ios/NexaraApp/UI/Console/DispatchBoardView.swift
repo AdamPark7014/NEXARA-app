@@ -99,7 +99,7 @@ struct DispatchBoardView: View {
             let data = try await ApiClient.shared.get("activities/dispatch-board")
             board = ConsoleHelpers.decodeMap(data)
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
         loading = false
     }

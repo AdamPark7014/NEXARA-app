@@ -192,7 +192,7 @@ struct ProcurementModuleView: View {
       message = "Requisición aprobada"
       selected = nil
       await reload()
-    } catch { message = error.localizedDescription }
+    } catch { message = error.toUserMessage() }
   }
 
   private func reject(_ id: Int64) async {
@@ -206,6 +206,6 @@ struct ProcurementModuleView: View {
       selected = nil
       rejectReason = ""
       await reload()
-    } catch { message = error.localizedDescription }
+    } catch { message = error.toUserMessage() }
   }
 }

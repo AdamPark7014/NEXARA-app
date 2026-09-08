@@ -772,7 +772,7 @@ struct CrmClientDetailByIdView: View {
                 error = "Cliente no encontrado"
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
         loading = false
     }
@@ -899,7 +899,7 @@ struct CrmClientDetailView: View {
             showEdit = false
             reloadKey += 1
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 
@@ -912,7 +912,7 @@ struct CrmClientDetailView: View {
             clientData = try await CrmRepository.shared.provisionServiceClient(id: clientId)
             reloadKey += 1
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 

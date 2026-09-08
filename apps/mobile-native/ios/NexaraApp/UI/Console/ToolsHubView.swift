@@ -223,7 +223,7 @@ private struct ToolRenewalsView: View {
             rejectionReason = ""
             await load()
         } catch {
-            feedback = "Error: \(error.localizedDescription)"
+            feedback = "Error: \(error.toUserMessage())"
         }
     }
 
@@ -241,7 +241,7 @@ private struct ToolRenewalsView: View {
             rejectionReason = ""
             await load()
         } catch {
-            feedback = "Error: \(error.localizedDescription)"
+            feedback = "Error: \(error.toUserMessage())"
         }
     }
 }

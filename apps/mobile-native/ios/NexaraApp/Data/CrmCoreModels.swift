@@ -192,10 +192,15 @@ struct CrmLead: Hashable, Identifiable {
     let raw: [String: Any]
 
     var id: String { leadId.isEmpty ? title : leadId }
+    var numericId: Int64? { StockParse.int64(raw["id"]) }
     var displayTitle: String {
         if !title.isEmpty { return title }
         if !description.isEmpty { return description }
         return "Lead"
+    }
+    var isConvertible: Bool {
+        let s = status.uppercased()
+        return s != "CONVERTED" && s != "LOST" && numericId != nil
     }
 
     static func == (lhs: CrmLead, rhs: CrmLead) -> Bool { lhs.id == rhs.id }
@@ -207,7 +212,7 @@ struct CrmLead: Hashable, Identifiable {
         title = StockParse.str(raw["title"], raw["titulo"], raw["name"], raw["subject"], raw["asunto"])
         description = StockParse.str(raw["description"], raw["descripcion"], raw["notes"], raw["notas"])
         status = StockParse.str(raw["status"], raw["estatus"], raw["estado"], raw["urgency"])
-        clientName = StockParse.str(raw["clientName"], raw["cliente"])
+        clientName = StockParse.str(raw["clientName"], raw["cliente"], raw["company"], raw["empresa"])
         branchName = StockParse.str(raw["branchName"], raw["sucursal"])
     }
 }
@@ -378,6 +383,86 @@ struct CrmSalesProject: Hashable, Identifiable {
         margin = StockParse.dbl(raw["margin"]) ?? 0
         startDate = StockParse.str(raw["startDate"], raw["startAt"], raw["createdAt"])
         endDate = StockParse.str(raw["endDate"], raw["closedAt"])
+    }
+}
+
+/// Actividad CRM — GET /crm-activities y /crm-activities/my-agenda
+struct CrmActivity: Hashable, Identifiable {
+    let id: Int64
+    let title: String
+    let activityType: String
+    let status: String
+    let dueDate: String
+    let notes: String
+    let outcome: String
+    let relatedLabel: String
+    let raw: [String: Any]
+
+    var displayTitle: String {
+        if !title.isEmpty { return title }
+        if !activityType.isEmpty { return activityType }
+        return "Actividad"
+    }
+    var isPending: Bool { status.uppercased() == "PENDING" || status.isEmpty }
+    var isOverdue: Bool {
+        guard isPending, dueDate.count >= 10 else { return false }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyy-MM-dd"
+        let today = df.string(from: Date())
+        return String(dueDate.prefix(10)) < today
+    }
+
+    static func == (lhs: CrmActivity, rhs: CrmActivity) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    init(raw: [String: Any]) {
+        self.raw = raw
+        let lead = raw["lead"] as? [String: Any]
+        let opp = raw["opportunity"] as? [String: Any]
+        let tender = raw["tender"] as? [String: Any]
+        id = StockParse.int64(raw["id"]) ?? 0
+        title = StockParse.str(raw["title"], raw["subject"])
+        activityType = StockParse.str(raw["activityType"], raw["type"])
+        status = StockParse.str(raw["status"]).isEmpty ? "PENDING" : StockParse.str(raw["status"])
+        dueDate = StockParse.str(raw["dueDate"])
+        notes = StockParse.str(raw["notes"], raw["description"])
+        outcome = StockParse.str(raw["outcome"])
+        if let opp {
+            relatedLabel = StockParse.str(opp["title"])
+        } else if let lead {
+            relatedLabel = StockParse.str(lead["name"], lead["company"])
+        } else if let tender {
+            relatedLabel = StockParse.str(tender["tenderNumber"])
+        } else {
+            relatedLabel = ""
+        }
+    }
+}
+
+struct CrmAgenda {
+    var pendingToday: [CrmActivity] = []
+    var overdue: [CrmActivity] = []
+    var upcoming: [CrmActivity] = []
+    var recentlyCompleted: [CrmActivity] = []
+
+    var allPending: [CrmActivity] {
+        var seen = Set<Int64>()
+        var out: [CrmActivity] = []
+        for act in overdue + pendingToday + upcoming {
+            if seen.insert(act.id).inserted { out.append(act) }
+        }
+        return out
+    }
+
+    init(raw: [String: Any] = [:]) {
+        func list(_ key: String) -> [CrmActivity] {
+            ((raw[key] as? [[String: Any]]) ?? []).map(CrmActivity.init)
+        }
+        pendingToday = list("pendingToday")
+        overdue = list("overdue")
+        upcoming = list("upcoming")
+        recentlyCompleted = list("recentlyCompleted")
     }
 }
 

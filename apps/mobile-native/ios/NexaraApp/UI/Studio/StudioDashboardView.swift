@@ -74,6 +74,6 @@ struct StudioDashboardView: View {
         isLoading = true; error = nil
         defer { isLoading = false }
         do { stats = try await StudioRepository.shared.dashboardStats() }
-        catch { self.error = error.localizedDescription }
+        catch { self.error = error.toUserMessage() }
     }
 }

@@ -5,6 +5,7 @@ struct NexaraApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var session = SessionStore.shared
     @StateObject private var appState = AppState()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -17,6 +18,10 @@ struct NexaraApp: App {
             .onOpenURL { url in
                 DeepLinkCoordinator.shared.ingest(url)
                 applyPendingDeepLink()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active, session.currentUser != nil else { return }
+                Task { await AuthRepository.shared.maybeExtendSession() }
             }
         }
     }

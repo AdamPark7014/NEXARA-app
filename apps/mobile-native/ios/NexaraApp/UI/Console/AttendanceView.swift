@@ -53,7 +53,7 @@ final class AttendanceVM: ObservableObject {
             } catch {
                 records = await ExtraRepository.shared.attendanceEventItems()
                 if records.isEmpty {
-                    loadError = error.localizedDescription
+                    loadError = error.toUserMessage()
                 }
             }
             isLoading = false
@@ -89,7 +89,7 @@ final class AttendanceVM: ObservableObject {
                 checkInMessage = base + geo
                 load()
             } catch {
-                checkInMessage = "Error: \(error.localizedDescription)"
+                checkInMessage = "Error: \(error.toUserMessage())"
             }
             checkInLoading = false
         }

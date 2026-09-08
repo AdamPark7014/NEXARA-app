@@ -225,7 +225,7 @@ struct PortalHomeView: View {
         isLoading = true; error = nil
         defer { isLoading = false }
         do { profile = try await TicketsRepository.shared.profile() }
-        catch { self.error = error.localizedDescription }
+        catch { self.error = error.toUserMessage() }
     }
 }
 

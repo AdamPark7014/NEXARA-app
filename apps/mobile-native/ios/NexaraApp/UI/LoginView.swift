@@ -162,7 +162,7 @@ struct LoginView: View {
             quickProfiles = QuickProfileStore.load()
             await MainActor.run { onLoggedIn() }
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = error.toUserMessage()
         }
     }
 }

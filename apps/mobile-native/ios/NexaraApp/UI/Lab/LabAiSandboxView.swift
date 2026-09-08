@@ -62,7 +62,7 @@ struct LabAiSandboxView: View {
             let mock = (res["isMock"] as? Bool) == true ? " · mock" : ""
             meta = "\(provider) · \(elapsed) ms\(mock)"
         } catch {
-            output = error.localizedDescription
+            output = error.toUserMessage()
         }
     }
 }
