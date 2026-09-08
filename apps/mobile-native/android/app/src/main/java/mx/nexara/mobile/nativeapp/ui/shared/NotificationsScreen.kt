@@ -44,6 +44,7 @@ import mx.nexara.mobile.nativeapp.data.api.NotificationRowDto
 import mx.nexara.mobile.nativeapp.data.notifications.NotificationsRepository
 import mx.nexara.mobile.nativeapp.data.realtime.RealtimeBus
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 
 enum class NotificationFilter { ALL, UNREAD }
 
@@ -104,7 +105,7 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         isLoading = false,
-                        error = e.message ?: "No se pudo cargar el feed",
+                        error = e.toUserMessage("No se pudo cargar el feed"),
                     )
                 }
             }
@@ -149,7 +150,7 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(saving = false, message = "Marcadas como leídas") }
                 refresh(initial = false)
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo marcar") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo marcar")) }
             }
         }
     }
@@ -173,7 +174,7 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 onDone?.invoke()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo marcar") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo marcar")) }
             }
         }
     }
@@ -186,7 +187,7 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(saving = false, message = "Eliminada") }
                 refresh(initial = false)
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.message ?: "No se pudo eliminar") }
+                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo eliminar")) }
             }
         }
     }

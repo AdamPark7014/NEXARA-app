@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 
 /**
  * Visor PDF nativo (usa android.graphics.pdf.PdfRenderer). Renderiza todas
@@ -44,7 +45,7 @@ fun PdfViewer(
         try {
             pages = withContext(Dispatchers.IO) { renderPdfPages(file) }
         } catch (e: Exception) {
-            error = e.message ?: "No se pudo abrir el PDF"
+            error = e.toUserMessage("No se pudo abrir el PDF")
         }
     }
 

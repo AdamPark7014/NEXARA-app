@@ -119,6 +119,25 @@ jobs:
         working-directory: apps/mobile-native/android
         run: ./gradlew :app:assembleDebug test --no-daemon
 
+      # Un `e.message` de Retrofit es literalmente "HTTP 403 Forbidden". Puesto
+      # en un `Text(...)` eso es lo que lee el usuario --y lo que acabo en las
+      # capturas de la ficha de Google Play de la v1, a la vista de cualquiera
+      # que fuera a descargar la app.
+      #
+      # `toUserMessage()` ya traduce cada codigo, y ademas saca el mensaje en
+      # castellano que manda NestJS. Esto impide que el patron viejo vuelva.
+      - name: Ningun error crudo de HTTP en pantalla
+        working-directory: apps/mobile-native/android
+        run: |
+          set -o pipefail
+          PATRON='(error|message|feedback|errorText)[[:space:]]*=[[:space:]]*e(x|rr)?\.message[[:space:]]*\?:'
+          if grep -rInE "$PATRON" app/src/main --include='*.kt' > /tmp/crudos.txt; then
+            echo "::error::Estas pantallas ensenarian 'HTTP 403' tal cual. Usa toUserMessage():"
+            cat /tmp/crudos.txt
+            exit 1
+          fi
+          echo "Sin errores crudos de HTTP."
+
   ios-estructura:
     name: iOS · estructura (sin Mac)
     runs-on: ubuntu-latest

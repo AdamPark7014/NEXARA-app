@@ -103,6 +103,51 @@ function Capture-Screenshot([string]$Adb, [string]$Serial, [string]$Path) {
   }
   $sizeKb = [math]::Round((Get-Item $Path).Length / 1KB, 1)
   Write-Host "  OK $($Path | Split-Path -Leaf) ($sizeKb KB)" -ForegroundColor Green
+
+  Assert-PantallaSinError $Adb $Serial $Path
+}
+
+# Una captura con un error dentro no se puede subir a la tienda.
+#
+# Las imagenes publicadas de la v1 ensenaban "HTTP 403" en GPS, Chat y Tickets,
+# a la vista de cualquiera que abriera la ficha de Google Play antes de
+# descargar. El script las guardo sin rechistar: solo miraba que `screencap`
+# devolviera un PNG con bytes dentro.
+#
+# `uiautomator dump` da el texto real de la pantalla, asi que aqui se lee y se
+# aborta si aparece un error. Vale la pena que falle la captura: rehacerla
+# cuesta minutos, y una imagen mala en la ficha se queda ahi hasta que alguien
+# la mira.
+function Assert-PantallaSinError([string]$Adb, [string]$Serial, [string]$Path) {
+  $volcado = & $Adb -s $Serial exec-out uiautomator dump /dev/tty 2>$null | Out-String
+  if ([string]::IsNullOrWhiteSpace($volcado)) {
+    Write-Host "  AVISO: no se pudo leer la pantalla; revisa $($Path | Split-Path -Leaf) a mano." -ForegroundColor Yellow
+    return
+  }
+
+  # `HTTP 4xx/5xx` es el patron viejo de Retrofit. El resto son los textos que
+  # `toUserMessage()` y las pantallas ensenan cuando algo falla de verdad.
+  $senales = @(
+    'HTTP \d{3}',
+    'Sin permisos',
+    'Sesion expirada', 'Sesión expirada',
+    'Error del servidor',
+    'Sin conexion', 'Sin conexión',
+    'No se pudo'
+  )
+
+  foreach ($senal in $senales) {
+    if ($volcado -match $senal) {
+      Remove-Item $Path -Force -ErrorAction SilentlyContinue
+      throw @"
+La pantalla mostraba un error, asi que la captura NO se guarda: $($Path | Split-Path -Leaf)
+  Coincidencia: '$($Matches[0])'
+
+Casi siempre es que la cuenta de capturas no tiene permiso para ese modulo.
+Comprueba que PLAY_REVIEWER_EMAIL puede abrirlo, y vuelve a lanzar el script.
+"@
+    }
+  }
 }
 
 function Invoke-GradleInstall([string]$Task) {
