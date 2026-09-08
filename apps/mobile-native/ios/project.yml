@@ -8,7 +8,13 @@ name: NexaraApp
 options:
   bundleIdPrefix: mx.nexara.mobile
   deploymentTarget:
-    iOS: "16.0"
+    # iOS 17, no 16, porque el codigo YA usa APIs de iOS 17 en 27 ficheros:
+    # `onChange(of:)` de dos parametros (25) y `ContentUnavailableView` (2), sin
+    # una sola guarda `@available`. Con el objetivo en 16.0 no compilaba; se
+    # descubrio el 08-09-2026, cuando se anadio a CI la compilacion para
+    # simulador. Las alternativas eran reescribir 27 ficheros o subir el minimo:
+    # iOS 17 cubre iPhone XS (2018) en adelante.
+    iOS: "17.0"
   createIntermediateGroups: true
 
 configs:
@@ -18,7 +24,7 @@ configs:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     # La versión real la inyecta el flujo de trabajo por línea de órdenes
     # (`MARKETING_VERSION` de la entrada, `CURRENT_PROJECT_VERSION` del número
     # de ejecución). Estos valores solo sirven para compilar en local.
