@@ -23,8 +23,17 @@ final class ConsoleRepository {
     }
 
     func attendanceRangeItem(from: String, to: String, hierarchy: Bool = true) async throws -> AttendanceRange {
-        let path = hierarchy ? "attendance/hierarchy/range" : "attendance/range"
-        let data = try await api.get(path, query: ["from": from, "to": to])
+        // Las dos rutas se escriben literales en la llamada, no en una variable.
+        // Mismo comportamiento, pero `parity-report.py` sólo reconoce la ruta
+        // cuando es el primer argumento escrito a mano, y con la variable estos
+        // dos endpoints salían en el informe como si iOS no los llamara.
+        let query = ["from": from, "to": to]
+        let data: Data
+        if hierarchy {
+            data = try await api.get("attendance/hierarchy/range", query: query)
+        } else {
+            data = try await api.get("attendance/range", query: query)
+        }
         return AttendanceRange(raw: ConsoleHelpers.decodeMap(data))
     }
 
@@ -57,8 +66,16 @@ final class ConsoleRepository {
         try await activities(scope: scope).map { ActivityItem(raw: $0) }
     }
 
+    /// Alta de actividad / OT.
+    ///
+    /// El cuerpo llega como `[String: Any]` porque la pantalla lo arma campo a
+    /// campo (`OpsNewActivityView`), y `[String: Any]` **no** conforma a
+    /// `Encodable`: `postJSON` es genérico sobre `Encodable`, así que esta
+    /// llamada no compilaba. Se envuelve en `ConsoleJsonMapBody`, que sí
+    /// codifica, en vez de mandarlo por `IntegraHTTP.postMap`: aquel camino no
+    /// pone la cabecera `X-Company-Id` ni pasa por la cola de sin conexión.
     func createActivity(body: [String: Any]) async throws -> Int64 {
-        let data = try await api.postJSON("activities", body: body)
+        let data = try await api.postJSON("activities", body: ConsoleJsonMapBody(map: body))
         let map = ConsoleHelpers.decodeMap(data)
         return Int64(ConsoleHelpers.mapInt(map, "id"))
     }
@@ -481,5 +498,70 @@ final class ConsoleRepository {
     func replayWebhookDelivery(deliveryId: Int64) async throws {
         struct Empty: Encodable {}
         _ = try await api.postJSON("webhooks/deliveries/\(deliveryId)/replay", body: Empty())
+    }
+}
+
+/// Clave dinámica: el mapa que llega no tiene un juego de claves conocido en
+/// tiempo de compilación, así que `CodingKeys` no sirve.
+private struct ConsoleJsonMapKey: CodingKey {
+    let stringValue: String
+    var intValue: Int? { nil }
+    init(_ value: String) { stringValue = value }
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init?(intValue: Int) { return nil }
+}
+
+/// Envoltorio `Encodable` para un `[String: Any]` con valores JSON.
+///
+/// Cubre los tipos que la app mete de verdad en estos cuerpos: cadena, entero,
+/// decimal, booleano, nulo, y listas/objetos anidados de lo mismo. Un valor de
+/// otro tipo se guarda como su descripción antes que perderlo en silencio.
+/// El booleano se comprueba ANTES que el entero: en Swift un `Bool` metido en
+/// un `Any` puede colarse por un `as? Int` y viajar como `1`.
+private struct ConsoleJsonMapBody: Encodable {
+    let map: [String: Any]
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: ConsoleJsonMapKey.self)
+        for (key, value) in map {
+            try ConsoleJsonMapBody.encode(value, forKey: ConsoleJsonMapKey(key), into: &container)
+        }
+    }
+
+    private static func encode(
+        _ value: Any,
+        forKey key: ConsoleJsonMapKey,
+        into container: inout KeyedEncodingContainer<ConsoleJsonMapKey>
+    ) throws {
+        switch value {
+        case is NSNull:
+            try container.encodeNil(forKey: key)
+        case let v as Bool:
+            try container.encode(v, forKey: key)
+        case let v as Int:
+            try container.encode(v, forKey: key)
+        case let v as Int64:
+            try container.encode(v, forKey: key)
+        case let v as Double:
+            try container.encode(v, forKey: key)
+        case let v as String:
+            try container.encode(v, forKey: key)
+        case let v as [String: Any]:
+            try container.encode(ConsoleJsonMapBody(map: v), forKey: key)
+        case let v as [Any]:
+            var nested = container.nestedUnkeyedContainer(forKey: key)
+            for element in v {
+                switch element {
+                case let e as Bool: try nested.encode(e)
+                case let e as Int: try nested.encode(e)
+                case let e as Double: try nested.encode(e)
+                case let e as String: try nested.encode(e)
+                case let e as [String: Any]: try nested.encode(ConsoleJsonMapBody(map: e))
+                default: try nested.encode(String(describing: element))
+                }
+            }
+        default:
+            try container.encode(String(describing: value), forKey: key)
+        }
     }
 }

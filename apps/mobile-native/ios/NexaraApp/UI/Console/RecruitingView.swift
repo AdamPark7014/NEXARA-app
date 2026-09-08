@@ -131,7 +131,7 @@ struct RecruitingView: View {
             showCreate = false
             await load()
         } catch {
-            actionMessage = "❌ \(error.toUserMessage("No se pudo registrar el CV"))"
+            actionMessage = "❌ \(error.toUserMessage(fallback: "No se pudo registrar el CV"))"
         }
     }
 
@@ -198,7 +198,7 @@ struct RecruitingView: View {
             selected = nil
             await load()
         } catch {
-            actionMessage = "❌ \(error.toUserMessage("No se pudo mover el candidato"))"
+            actionMessage = "❌ \(error.toUserMessage(fallback: "No se pudo mover el candidato"))"
         }
     }
 
@@ -301,8 +301,16 @@ struct RecruitingView: View {
 
     private func load() async {
         isLoading = true; error = nil
-        candidates = await ExtraRepository.shared.candidateItems()
-        isLoading = false
+        defer { isLoading = false }
+        do {
+            candidates = try await HrRepository.shared.candidates()
+        } catch {
+            // Antes esto pasaba por `ExtraRepository`, que se traga el error y
+            // devuelve lista vacía: un 403 se leía en pantalla exactamente
+            // igual que «no hay candidatos».
+            candidates = []
+            self.error = error.toUserMessage(fallback: "No se pudieron cargar los candidatos")
+        }
     }
 }
 

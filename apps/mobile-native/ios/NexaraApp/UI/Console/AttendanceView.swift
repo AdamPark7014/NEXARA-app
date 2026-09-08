@@ -14,6 +14,16 @@ final class AttendanceVM: ObservableObject {
     @Published var checkInLoading = false
     @Published var checkInMessage: String?
 
+    // Resumen de un día concreto — GET attendance/day.
+    @Published var dayDate = Date()
+    @Published var daySummary: AttendanceDaySummary?
+    @Published var dayLoading = false
+    @Published var dayError: String?
+    /// `true` cuando el servidor contestó y no había jornada ese día. Se guarda
+    /// aparte de `daySummary == nil` para no confundir "todavía no he
+    /// preguntado" con "ese día no marcaste".
+    @Published var dayAnswered = false
+
     var isCheckedIn: Bool { current?.isOpen == true }
 
     var filtered: [AttendanceEvent] {
@@ -94,6 +104,25 @@ final class AttendanceVM: ObservableObject {
             checkInLoading = false
         }
     }
+
+    /// Consulta el día seleccionado. Se llama al abrir la pantalla y cada vez que
+    /// se cambia la fecha; no se cachea porque una jornada abierta cambia sola
+    /// según pasan los minutos.
+    func loadDay() async {
+        dayLoading = true
+        dayError = nil
+        dayAnswered = false
+        defer { dayLoading = false }
+        do {
+            daySummary = try await FieldOpsDayRepository.shared.attendanceDay(
+                date: FieldOpsDayRepository.dayString(dayDate)
+            )
+            dayAnswered = true
+        } catch {
+            daySummary = nil
+            dayError = error.toUserMessage(fallback: "No se pudo leer la jornada de ese día")
+        }
+    }
 }
 
 // MARK: – View
@@ -146,6 +175,7 @@ struct AttendanceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 checkInCard
+                dayCard
 
                 Text("Semana: \(vm.weekFrom) → \(vm.weekTo)")
                     .font(.caption).foregroundColor(.secondary).padding(.horizontal)
@@ -265,6 +295,46 @@ struct AttendanceView: View {
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .padding(.horizontal)
+    }
+
+    /// Jornada de un día concreto — `GET attendance/day`.
+    /// La lista semanal enseña marcajes sueltos; esto contesta la pregunta que de
+    /// verdad hace el empleado: "¿cuántas horas me contaron el martes?".
+    private var dayCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Jornada de un día").font(.subheadline.bold())
+                Spacer()
+                if vm.dayLoading { ProgressView().controlSize(.small) }
+            }
+
+            DatePicker("Día", selection: $vm.dayDate, displayedComponents: .date)
+                .font(.caption)
+
+            if let err = vm.dayError {
+                Text(err).font(.caption).foregroundColor(.red)
+            } else if let d = vm.daySummary {
+                HStack(spacing: 0) {
+                    AttKpi(label: "Entrada", value: d.checkInLabel, color: .teal)
+                    Divider().frame(height: 34)
+                    AttKpi(label: "Salida", value: d.checkOutLabel, color: .blue)
+                    Divider().frame(height: 34)
+                    AttKpi(label: "Total", value: d.hoursLabel, color: .primary)
+                }
+                if d.isOpen {
+                    Label("Jornada abierta: falta marcar salida.", systemImage: "clock.badge.exclamationmark")
+                        .font(.caption2).foregroundColor(.orange)
+                }
+            } else if vm.dayAnswered {
+                Text("Ese día no tiene jornada registrada.")
+                    .font(.caption).foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal)
+        .task(id: vm.dayDate) { await vm.loadDay() }
     }
 }
 

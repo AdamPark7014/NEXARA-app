@@ -235,7 +235,7 @@ struct CrmTendersView: View {
         Group {
             if let s = selected { tenderDetail(s) } else { listBody }
         }
-        .navigationTitle("Licitaciones")
+        .navigationTitle(selected == nil ? "Licitaciones" : "")
         .task { await reload() }
         .refreshable { if selected == nil { await reload() } }
     }
@@ -307,20 +307,28 @@ struct CrmTendersView: View {
 
     @ViewBuilder
     private func tenderDetail(_ t: Tender) -> some View {
-        List {
-            Section { Button("← Licitaciones") { selected = nil } }
-            Section("Licitación") {
-                tdRow("Título", t.displayTitle)
-                tdRow("Cliente", t.clientName)
-                tdRow("Estado", t.status)
-                tdRow("Monto", fmtMxn(t.amount))
-                tdRow("Fecha límite", String(t.deadline.prefix(10)))
-                tdRow("Descripción", t.description)
-                tdRow("Resultado", t.result)
-                tdRow("Responsable", t.ownerName)
+        // El detalle de verdad se pide a `tenders/:id`: la fila de la lista no
+        // trae ni documentos ni hitos ni permite mover el estado. Si el id no es
+        // numérico (respuesta rara del backend) se cae al resumen de la fila
+        // para no dejar la pantalla en blanco.
+        if let numericId = Int64(t.tenderId), numericId > 0 {
+            CrmTenderDetailView(tenderId: numericId, onBack: { selected = nil })
+        } else {
+            List {
+                Section { Button("← Licitaciones") { selected = nil } }
+                Section("Licitación") {
+                    tdRow("Título", t.displayTitle)
+                    tdRow("Cliente", t.clientName)
+                    tdRow("Estado", t.status)
+                    tdRow("Monto", fmtMxn(t.amount))
+                    tdRow("Fecha límite", String(t.deadline.prefix(10)))
+                    tdRow("Descripción", t.description)
+                    tdRow("Resultado", t.result)
+                    tdRow("Responsable", t.ownerName)
+                }
             }
+            .listStyle(.insetGrouped)
         }
-        .listStyle(.insetGrouped)
     }
 
     private func tdKpi(_ l: String, _ v: String, _ c: Color) -> some View {
@@ -342,83 +350,244 @@ struct CrmTendersView: View {
 // MARK: - Metas comerciales
 
 struct CrmTargetsView: View {
-    @State private var items: [SalesTarget] = []
+    @State private var performance = CrmTargetPerformance()
     @State private var isLoading = true
     @State private var query = ""
+    @State private var error: String?
+    @State private var actionError: String?
+    @State private var pendingDelete: CrmTargetPerformanceRow?
+    @State private var period: CrmTargetPeriod = .current
 
-    private var filtered: [SalesTarget] {
-        guard !query.isEmpty else { return items }
+    private var filtered: [CrmTargetPerformanceRow] {
+        guard !query.isEmpty else { return performance.rows }
         let q = query.lowercased()
-        return items.filter { $0.ownerName.lowercased().contains(q) }
+        return performance.rows.filter { $0.ownerName.lowercased().contains(q) }
     }
-
-    private var totalTarget: Double { items.reduce(0.0) { $0 + $1.targetAmount } }
-    private var totalActual: Double { items.reduce(0.0) { $0 + $1.actualAmount } }
 
     var body: some View {
         VStack(spacing: 0) {
-            if !items.isEmpty {
-                HStack(spacing: 0) {
-                    tgKpi("Vendedores", "\(items.count)", .primary)
-                    Divider().frame(height: 36)
-                    tgKpi("Meta total", fmtMxn(totalTarget), .blue)
-                    Divider().frame(height: 36)
-                    tgKpi("Alcanzado", fmtMxn(totalActual), totalActual >= totalTarget ? .green : .orange)
-                }
-                .padding(.horizontal).padding(.vertical, 6)
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal).padding(.top, 8)
-            }
+            headerKpis
+            periodPicker
 
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundColor(.secondary)
                 TextField("Buscar vendedor…", text: $query).autocorrectionDisabled()
-                if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundColor(.secondary) } }
+                if !query.isEmpty {
+                    Button { query = "" } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                    }
+                }
             }
             .padding(10).background(Color(.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12)).padding(.horizontal).padding(.top, 8)
 
-            if isLoading { Spacer(); ProgressView(); Spacer() }
-            else if filtered.isEmpty { Spacer(); Text("Sin metas definidas").foregroundColor(.secondary); Spacer() }
-            else {
-                List(filtered) { t in
-                    let pct = t.progress
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(t.ownerName).font(.headline)
-                            Spacer()
-                            Text(fmtMxn(t.actualAmount)).font(.subheadline.bold()).foregroundColor(pct >= 1 ? .green : .orange)
-                        }
-                        Text("\(t.year) / \(t.month)").font(.caption).foregroundColor(.secondary)
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.2)).frame(height: 6)
-                                RoundedRectangle(cornerRadius: 4).fill(pct >= 1 ? Color.green : Color.orange)
-                                    .frame(width: geo.size.width * CGFloat(pct), height: 6)
+            if let banner = error ?? actionError {
+                Text(banner).font(.caption).foregroundColor(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal).padding(.top, 6)
+            }
+
+            if isLoading && performance.rows.isEmpty {
+                Spacer(); ProgressView(); Spacer()
+            } else if filtered.isEmpty {
+                Spacer()
+                Text("Sin cuotas en el periodo").foregroundColor(.secondary)
+                Spacer()
+            } else {
+                List {
+                    ForEach(filtered) { row in
+                        targetRow(row)
+                            .swipeActions(edge: .trailing) {
+                                // Sólo se puede borrar lo que existe como cuota:
+                                // las filas sin meta son vendedores que el
+                                // backend agrega para comparar, no registros.
+                                if row.hasQuota {
+                                    Button(role: .destructive) {
+                                        pendingDelete = row
+                                    } label: {
+                                        Label("Borrar", systemImage: "trash")
+                                    }
+                                }
                             }
-                        }
-                        .frame(height: 6)
-                        Text("Meta: \(fmtMxn(t.targetAmount)) · \(Int(pct * 100))%").font(.caption2).foregroundColor(.secondary)
                     }
-                    .padding(.vertical, 4)
                 }
+                .listStyle(.plain)
             }
         }
         .navigationTitle("Metas")
         .task { await reload() }
         .refreshable { await reload() }
+        .alert(
+            "Borrar cuota",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            )
+        ) {
+            Button("Borrar", role: .destructive) { Task { await deletePending() } }
+            Button("Cancelar", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text("Se elimina la cuota de \(pendingDelete?.ownerName ?? "este vendedor"). No hay deshacer.")
+        }
+    }
+
+    // MARK: – Cabecera
+
+    private var headerKpis: some View {
+        HStack(spacing: 0) {
+            tgKpi("Meta", crmMxn(performance.revenueTarget), .blue)
+            Divider().frame(height: 36)
+            tgKpi(
+                "Alcanzado",
+                crmMxn(performance.revenueAchieved),
+                performance.revenueAchieved >= performance.revenueTarget ? .green : .orange
+            )
+            Divider().frame(height: 36)
+            tgKpi("Comisiones", crmMxn(performance.totalCommissions), .purple)
+            Divider().frame(height: 36)
+            tgKpi("Cumpl. medio", String(format: "%.0f%%", performance.avgAttainmentPct), .primary)
+        }
+        .padding(.horizontal).padding(.vertical, 6)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal).padding(.top, 8)
+    }
+
+    private var periodPicker: some View {
+        Picker("Periodo", selection: $period) {
+            ForEach(CrmTargetPeriod.allCases, id: \.self) { p in
+                Text(p.label).tag(p)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal).padding(.top, 8)
+        .onChange(of: period) { _, _ in Task { await reload() } }
+    }
+
+    // MARK: – Fila
+
+    @ViewBuilder
+    private func targetRow(_ t: CrmTargetPerformanceRow) -> some View {
+        let pct = t.progress
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(t.ownerName).font(.headline)
+                if !t.hasQuota {
+                    Text("sin cuota").font(.caption2)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+                Spacer()
+                Text(crmMxn(t.revenueAchieved))
+                    .font(.subheadline.bold())
+                    .foregroundColor(pct >= 1 ? .green : .orange)
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.2)).frame(height: 6)
+                    RoundedRectangle(cornerRadius: 4).fill(pct >= 1 ? Color.green : Color.orange)
+                        .frame(width: geo.size.width * CGFloat(pct), height: 6)
+                }
+            }
+            .frame(height: 6)
+
+            HStack {
+                Text("Meta \(crmMxn(t.revenueTarget)) · \(String(format: "%.1f", t.attainmentPct))%")
+                    .font(.caption2).foregroundColor(.secondary)
+                Spacer()
+                // La comisión es el número por el que un vendedor abre la app;
+                // va en verde cuando ya cruzó el umbral de bono.
+                if t.commission > 0 {
+                    Text(crmMxn(t.commission))
+                        .font(.caption2.bold())
+                        .foregroundColor(t.reachedBonus ? .green : .purple)
+                }
+                if t.reachedBonus {
+                    Image(systemName: "star.fill").font(.caption2).foregroundColor(.green)
+                }
+            }
+
+            HStack(spacing: 12) {
+                counterChip("Oport.", t.opportunitiesCreated, t.opportunitiesTarget)
+                counterChip("Clientes", t.newClientsAchieved, t.newClientsTarget)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func counterChip(_ label: String, _ actual: Int, _ target: Int) -> some View {
+        if target > 0 || actual > 0 {
+            Text("\(label) \(actual)/\(target)")
+                .font(.caption2)
+                .foregroundColor(actual >= target && target > 0 ? .green : .secondary)
+        }
     }
 
     private func tgKpi(_ l: String, _ v: String, _ c: Color) -> some View {
-        VStack(spacing: 2) { Text(v).font(.headline).bold().foregroundColor(c); Text(l).font(.caption2).foregroundColor(.secondary) }
-            .frame(maxWidth: .infinity).padding(.vertical, 4)
+        VStack(spacing: 2) {
+            Text(v).font(.subheadline).bold().foregroundColor(c).lineLimit(1).minimumScaleFactor(0.7)
+            Text(l).font(.caption2).foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 4)
     }
+
+    // MARK: – Datos
 
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await CrmRepository.shared.salesTargetItems()) ?? []
+        let (year, month) = period.yearMonth()
+        do {
+            performance = try await CrmRepository.shared.salesTargetPerformance(year: year, month: month)
+            error = nil
+        } catch {
+            self.error = error.toUserMessage()
+        }
+    }
+
+    private func deletePending() async {
+        guard let row = pendingDelete, row.targetId > 0 else { pendingDelete = nil; return }
+        defer { pendingDelete = nil }
+        do {
+            try await CrmRepository.shared.deleteSalesTarget(id: row.targetId)
+            actionError = nil
+            await reload()
+        } catch {
+            actionError = error.toUserMessage()
+        }
+    }
+}
+
+/// Periodo que se consulta en Metas. El backend acepta `year`/`month` sueltos;
+/// tres opciones cubren lo que se mira desde un teléfono sin montar un
+/// calendario entero.
+enum CrmTargetPeriod: CaseIterable {
+    case current, previous, twoAgo
+
+    var label: String {
+        switch self {
+        case .current: return "Este mes"
+        case .previous: return "Mes previo"
+        case .twoAgo: return "Hace 2 meses"
+        }
+    }
+
+    private var monthsBack: Int {
+        switch self {
+        case .current: return 0
+        case .previous: return 1
+        case .twoAgo: return 2
+        }
+    }
+
+    /// Resta meses con `Calendar` para que el cambio de año no dé mes 0 o -1.
+    func yearMonth() -> (Int, Int) {
+        let cal = Calendar.current
+        let date = cal.date(byAdding: .month, value: -monthsBack, to: Date()) ?? Date()
+        return (cal.component(.year, from: date), cal.component(.month, from: date))
     }
 }
 

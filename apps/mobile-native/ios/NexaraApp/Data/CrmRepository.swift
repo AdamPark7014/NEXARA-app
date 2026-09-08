@@ -23,9 +23,17 @@ final class CrmRepository {
         return ConsoleHelpers.decodeMap(data)
     }
 
-    func downloadCotizacionPdf(id: Int, internal: Bool = false) async throws -> Data {
-        let path = internal ? "cotizaciones/\(id)/pdf/internal" : "cotizaciones/\(id)/pdf"
-        return try await api.getBinary(path)
+    /// PDF de la cotización. Dos rutas distintas, no una con parámetro: la
+    /// interna lleva costos y margen y sólo la ve el equipo comercial.
+    ///
+    /// Antes se construía la ruta en una variable; escritas como literales, un
+    /// `grep` por el endpoint encuentra la llamada —y el informe de paridad deja
+    /// de contarlas como huecos que no existen.
+    func downloadCotizacionPdf(id: Int, internal isInternal: Bool = false) async throws -> Data {
+        if isInternal {
+            return try await api.getBinary("cotizaciones/\(id)/pdf/internal")
+        }
+        return try await api.getBinary("cotizaciones/\(id)/pdf")
     }
 
     func sendCotizacion(id: Int, email: String, message: String? = nil) async throws {
@@ -150,7 +158,10 @@ final class CrmRepository {
     }
 
     func updateProject(id: Int64, fields: [String: Any]) async throws -> [String: Any] {
-        ConsoleHelpers.decodeMap(try await IntegraHTTP.patchMap("ventas/proyectos/\(id)", body: fields))
+        // `AnyCodable` ya envuelve JSON heterogéneo, así que se puede usar
+        // `patchJSON` —cuerpo tipado y ruta literal— en vez de `patchMap`.
+        let body = fields.mapValues { AnyCodable($0) }
+        return ConsoleHelpers.decodeMap(try await api.patchJSON("ventas/proyectos/\(id)", body: body))
     }
 
     func updateProjectStatus(id: Int64, status: String) async throws -> [String: Any] {
@@ -179,6 +190,36 @@ final class CrmRepository {
         )
     }
 
+    /// Costos del proyecto ya tipados. `projectCosts` devuelve el mapa crudo y
+    /// se conserva por compatibilidad con lo que ya lo usa.
+    func projectCostSummary(id: Int64) async throws -> CrmProjectCosts {
+        CrmProjectCosts(raw: try await projectCosts(id: id))
+    }
+
+    /// Valida presupuesto contra costos — GET `ventas/proyectos/:id/validar-presupuesto`.
+    /// Devuelve `{valid, message}` con el mensaje ya redactado por el backend.
+    func validateProjectBudget(id: Int64) async throws -> CrmBudgetCheck {
+        let data = try await api.get("ventas/proyectos/\(id)/validar-presupuesto")
+        return CrmBudgetCheck(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Recalcula `costViaticos` sumando los viáticos del proyecto —
+    /// POST `ventas/proyectos/:id/sync-viaticos`. Devuelve los costos ya
+    /// recalculados, así que no hace falta una segunda llamada.
+    @discardableResult
+    func syncProjectViaticos(id: Int64) async throws -> CrmProjectCosts {
+        let data = try await api.postJSON("ventas/proyectos/\(id)/sync-viaticos", body: EmptyBody())
+        return CrmProjectCosts(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Baja los costos reales de campo (viáticos aprobados + gastos de OT) al
+    /// proyecto — POST `ventas/proyectos/:id/sync-actual-costs`.
+    @discardableResult
+    func syncProjectActualCosts(id: Int64) async throws -> CrmProjectCosts {
+        let data = try await api.postJSON("ventas/proyectos/\(id)/sync-actual-costs", body: EmptyBody())
+        return CrmProjectCosts(raw: ConsoleHelpers.decodeMap(data))
+    }
+
     func closeProject(id: Int64) async throws -> [String: Any] {
         ConsoleHelpers.decodeMap(
             try await IntegraHTTP.postMap("ventas/proyectos/\(id)/close", body: [:])
@@ -199,6 +240,28 @@ final class CrmRepository {
         try await api.get("ventas/reportes/cockpit")
     }
 
+    /// Insights ejecutivos de ventas — GET `ventas/reportes/insights`.
+    ///
+    /// Es lo que la web pinta en `/crm/reports`: forecast ponderado, higiene de
+    /// pipeline y alertas de riesgo. Se modela sólo la parte que cabe en un
+    /// teléfono (ver `CrmSalesInsights`).
+    func salesInsights(period: String = "month") async throws -> CrmSalesInsights {
+        let data = try await api.get("ventas/reportes/insights", query: ["period": period])
+        return CrmSalesInsights(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Notificaciones del panel comercial — GET `ventas/reportes/notificaciones`.
+    ///
+    /// No es la bandeja general (`notifications`): el backend la filtra al
+    /// equipo de ventas y, si eres admin comercial, agrega las de todo el equipo.
+    func salesNotifications(limit: Int = 20, offset: Int = 0) async throws -> [CrmSalesNotification] {
+        let data = try await api.get("ventas/reportes/notificaciones", query: [
+            "limit": String(limit),
+            "offset": String(offset),
+        ])
+        return ApiClient.decodeMapList(data).map(CrmSalesNotification.init)
+    }
+
     func calendarEvents() async throws -> [[String: Any]] {
         try await calendarEventItems().map(\.raw)
     }
@@ -215,12 +278,76 @@ final class CrmRepository {
         ApiClient.decodeMapList(try await api.get("tenders")).map { Tender(raw: $0) }
     }
 
+    /// Detalle de licitación — GET `tenders/:id`.
+    /// Trae documentos, hitos, responsable y la oportunidad vinculada; la lista
+    /// (`tenders`) no trae nada de eso.
+    func tenderDetail(id: Int64) async throws -> CrmTenderDetail {
+        let data = try await api.get("tenders/\(id)")
+        return CrmTenderDetail(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Cambia el estado de la licitación — PATCH `tenders/:id/status`.
+    ///
+    /// `awardedToCompetitor` / `awardNotes` sólo tienen sentido al marcarla
+    /// perdida o descalificada; se envían únicamente si vienen con contenido
+    /// para no sobrescribir con cadenas vacías lo que ya hubiera guardado.
+    @discardableResult
+    func setTenderStatus(
+        id: Int64,
+        status: String,
+        awardedToCompetitor: String? = nil,
+        awardNotes: String? = nil
+    ) async throws -> CrmTenderDetail {
+        let competitor = awardedToCompetitor?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let notes = awardNotes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = TenderStatusBody(
+            status: status,
+            awardedToCompetitor: (competitor?.isEmpty ?? true) ? nil : competitor,
+            awardNotes: (notes?.isEmpty ?? true) ? nil : notes
+        )
+        let data = try await api.patchJSON("tenders/\(id)/status", body: body)
+        return CrmTenderDetail(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Promueve una licitación adjudicada a oportunidad ganada —
+    /// POST `tenders/:id/promote-opportunity`.
+    ///
+    /// El backend devuelve 400 si el estado no es `AWARDED`; la vista sólo
+    /// ofrece el botón cuando `CrmTenderDetail.canPromote` lo permite, pero el
+    /// error se propaga igual por si alguien cambia el estado en paralelo.
+    @discardableResult
+    func promoteTenderToOpportunity(id: Int64) async throws -> [String: Any] {
+        let data = try await api.postJSON("tenders/\(id)/promote-opportunity", body: EmptyBody())
+        return ConsoleHelpers.decodeMap(data)
+    }
+
     func salesTargets() async throws -> [[String: Any]] {
         try await salesTargetItems().map(\.raw)
     }
 
     func salesTargetItems() async throws -> [SalesTarget] {
         ApiClient.decodeMapList(try await api.get("sales-targets")).map { SalesTarget(raw: $0) }
+    }
+
+    /// Cumplimiento de cuota y comisión por vendedor —
+    /// GET `sales-targets/performance`.
+    ///
+    /// `sales-targets` a secas sólo devuelve la meta guardada. Esto la cruza con
+    /// lo realmente vendido en el periodo y calcula la comisión: es el dato por
+    /// el que un vendedor abre la app.
+    func salesTargetPerformance(year: Int? = nil, month: Int? = nil) async throws -> CrmTargetPerformance {
+        var params: [String: String] = [:]
+        if let year { params["year"] = String(year) }
+        if let month { params["month"] = String(month) }
+        let data = try await api.get("sales-targets/performance", query: params)
+        return CrmTargetPerformance(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Borra una cuota — DELETE `sales-targets/:id`.
+    /// Requiere permiso de gestión; la vista lo pide con confirmación porque no
+    /// hay deshacer.
+    func deleteSalesTarget(id: Int64) async throws {
+        try await api.delete("sales-targets/\(id)")
     }
 
     func salesTeam(period: String = "month") async throws -> [[String: Any]] {
@@ -330,9 +457,70 @@ final class CrmRepository {
     }
 
     func completeCrmActivity(id: Int64, outcome: String? = nil) async throws {
-        var body: [String: Any] = [:]
-        if let outcome, !outcome.isEmpty { body["outcome"] = outcome }
-        _ = try await IntegraHTTP.patchMap("crm-activities/\(id)/complete", body: body)
+        // Cuerpo tipado en vez de `[String: Any]`: `outcome` nulo desaparece del
+        // JSON y la ruta queda escrita como literal, localizable con un `grep`.
+        let clean = outcome?.trimmingCharacters(in: .whitespacesAndNewlines)
+        _ = try await api.patchJSON(
+            "crm-activities/\(id)/complete",
+            body: CrmActivityOutcomeBody(outcome: (clean?.isEmpty ?? true) ? nil : clean)
+        )
+    }
+
+    /// Crea una tarea CRM — POST `crm-activities`.
+    ///
+    /// El backend rechaza con 400 una actividad que no cuelgue de un lead, una
+    /// oportunidad o una licitación: por eso `opportunityId` es obligatorio aquí
+    /// (es el único origen desde el que la app la ofrece hoy).
+    @discardableResult
+    func createCrmActivity(
+        opportunityId: Int64,
+        subject: String,
+        dueDate: String,
+        activityType: String = "TASK",
+        description: String? = nil
+    ) async throws -> CrmActivity {
+        var body: [String: Any] = [
+            "opportunityId": opportunityId,
+            "subject": subject.trimmingCharacters(in: .whitespacesAndNewlines),
+            "dueDate": dueDate,
+            "activityType": activityType,
+        ]
+        if let description = description?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !description.isEmpty {
+            body["description"] = description
+        }
+        let data = try await IntegraHTTP.postMap("crm-activities", body: body)
+        return CrmActivity(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Reprograma o edita una tarea CRM — PATCH `crm-activities/:id`.
+    /// Sólo se envían los campos presentes: el backend hace merge y un campo
+    /// vacío borraría el asunto.
+    @discardableResult
+    func updateCrmActivity(
+        id: Int64,
+        subject: String? = nil,
+        dueDate: String? = nil,
+        activityType: String? = nil,
+        description: String? = nil
+    ) async throws -> CrmActivity {
+        let cleanSubject = subject?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = CrmActivityPatchBody(
+            subject: (cleanSubject?.isEmpty ?? true) ? nil : cleanSubject,
+            dueDate: (dueDate?.isEmpty ?? true) ? nil : dueDate,
+            activityType: (activityType?.isEmpty ?? true) ? nil : activityType,
+            description: description
+        )
+        guard body.hasChanges else {
+            throw ApiError.http(400, "Sin cambios que guardar")
+        }
+        let data = try await api.patchJSON("crm-activities/\(id)", body: body)
+        return CrmActivity(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Borra una tarea CRM — DELETE `crm-activities/:id`. No hay papelera.
+    func deleteCrmActivity(id: Int64) async throws {
+        try await api.delete("crm-activities/\(id)")
     }
 
     func downloadAssetBytes(_ relativeOrAbsoluteUrl: String) async throws -> Data {
@@ -353,4 +541,31 @@ private struct EmptyBody: Encodable {}
 private struct SendCotizacionBody: Encodable {
     let email: String
     let message: String?
+}
+
+/// Cuerpo de `PATCH tenders/:id/status`. Los opcionales se omiten del JSON
+/// (Swift sintetiza `encodeIfPresent`), que es justo lo que quiere el backend:
+/// un `null` sobrescribiría las notas de adjudicación ya guardadas.
+private struct TenderStatusBody: Encodable {
+    let status: String
+    let awardedToCompetitor: String?
+    let awardNotes: String?
+}
+
+/// Cuerpo de `PATCH crm-activities/:id/complete`.
+private struct CrmActivityOutcomeBody: Encodable {
+    let outcome: String?
+}
+
+/// Cuerpo de `PATCH crm-activities/:id`. Mismo criterio: sólo viaja lo que se
+/// tocó de verdad.
+private struct CrmActivityPatchBody: Encodable {
+    let subject: String?
+    let dueDate: String?
+    let activityType: String?
+    let description: String?
+
+    var hasChanges: Bool {
+        subject != nil || dueDate != nil || activityType != nil || description != nil
+    }
 }

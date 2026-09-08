@@ -23,6 +23,14 @@ struct EvidencesView: View {
     @State private var resetFullFlow = false
     @State private var rejectedSteps: Set<String> = []
 
+    // Reporte PDF del historial propio de evidencias — GET
+    // activity-evidence/history/report. Por defecto, el mes corriente: es el
+    // rango con el que el técnico justifica su trabajo ante nómina.
+    @State private var historyFrom = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    @State private var historyTo = Date()
+    @State private var historyLoading = false
+    @State private var historyMessage: String?
+
     private let rejectStepOptions: [(String, String)] = [
         ("ENTRY_PHOTO", "Paso 1: Foto de Entrada"),
         ("EVIDENCE_PHOTOS", "Paso 2: Fotos de Evidencia"),
@@ -106,6 +114,8 @@ struct EvidencesView: View {
                     }
                 }
 
+                if !reviewMode { historyReportCard }
+
                 searchBar
                 if statuses.count > 1 { statusChips }
 
@@ -150,6 +160,57 @@ struct EvidencesView: View {
         .padding(10)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// Reporte PDF del historial propio — `GET activity-evidence/history/report`.
+    /// El servidor solo devuelve las evidencias del usuario autenticado, así que
+    /// no hay selector de persona: aquí nadie descarga el historial de otro.
+    private var historyReportCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Reporte de mis evidencias").font(.subheadline.bold())
+            DatePicker("Desde", selection: $historyFrom, displayedComponents: .date).font(.caption)
+            DatePicker("Hasta", selection: $historyTo, displayedComponents: .date).font(.caption)
+            Button {
+                Task { await downloadHistoryReport() }
+            } label: {
+                Label(historyLoading ? "Generando…" : "Generar PDF", systemImage: "doc.text.magnifyingglass")
+                    .font(.caption)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(historyLoading || historyFrom > historyTo)
+            if historyFrom > historyTo {
+                Text("La fecha inicial es posterior a la final.")
+                    .font(.caption2).foregroundColor(.orange)
+            }
+            if let msg = historyMessage {
+                Text(msg).font(.caption2).foregroundColor(.orange)
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func downloadHistoryReport() async {
+        historyLoading = true
+        historyMessage = nil
+        defer { historyLoading = false }
+        do {
+            let data = try await FieldOpsDayRepository.shared.evidenceHistoryReport(
+                from: FieldOpsDayRepository.dayString(historyFrom),
+                to: FieldOpsDayRepository.dayString(historyTo)
+            )
+            if data.isEmpty {
+                historyMessage = "El servidor devolvió un reporte vacío."
+            } else {
+                // Se reutiliza la hoja de PDF que ya tiene la pantalla en vez de
+                // abrir otra: un solo visor, un solo botón de compartir.
+                reportData = data
+            }
+        } catch {
+            historyMessage = error.toUserMessage(fallback: "No se pudo generar el reporte")
+        }
     }
 
     private var statusChips: some View {
@@ -420,7 +481,7 @@ struct EvidencesView: View {
     private func downloadReport(_ activityId: Int64) async {
         do {
             reportData = try await ConsoleRepository.shared.ticketReportPdf(activityId: activityId)
-        } catch { uploadMessage = "❌ \(error.toUserMessage("No se pudo descargar el PDF"))" }
+        } catch { uploadMessage = "❌ \(error.toUserMessage(fallback: "No se pudo descargar el PDF"))" }
     }
 }
 

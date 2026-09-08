@@ -355,7 +355,7 @@ struct ViaticsView: View {
             selected = nil
             vm.load(personalOnly: personalOnly)
         } catch {
-            actionMessage = "❌ \(error.toUserMessage("No se pudo marcar pagado"))"
+            actionMessage = "❌ \(error.toUserMessage(fallback: "No se pudo marcar pagado"))"
         }
     }
 

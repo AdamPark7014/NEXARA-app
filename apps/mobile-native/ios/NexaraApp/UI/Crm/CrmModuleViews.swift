@@ -290,6 +290,14 @@ struct CrmProjectDetailView: View {
     @State private var detail: CrmSalesProject?
     @State private var loading = true
 
+    // Costos reales del proyecto: la pestaña vivía sólo de lo que venía
+    // incrustado en la fila, que no distingue lo planeado de lo gastado en campo.
+    @State private var costs: CrmProjectCosts?
+    @State private var costsLoading = false
+    @State private var costsError: String?
+    @State private var budgetCheck: CrmBudgetCheck?
+    @State private var syncing = false
+
     private let tabs = ["Info", "Costos", "Orden de cierre"]
 
     private var current: CrmSalesProject { detail ?? project }
@@ -358,19 +366,156 @@ struct CrmProjectDetailView: View {
             }
             return current.costRows
         }()
-        return Group {
-            if rows.isEmpty {
-                VStack { Spacer(); Text("Sin costos registrados").foregroundColor(.secondary); Spacer() }
-            } else {
-                List(Array(rows.enumerated()), id: \.offset) { _, row in
+
+        return List {
+            if let costsError {
+                Section { Text(costsError).font(.footnote).foregroundColor(.red) }
+            }
+
+            if let c = costs {
+                Section("Plan vs presupuesto") {
+                    costLine("Presupuesto", c.budget, highlight: true)
+                    costLine("Productos", c.costProducts)
+                    costLine("Viáticos", c.costViaticos)
+                    costLine("Operativo", c.costOperativo)
+                    costLine("Costo total", c.totalCost, bold: true)
                     HStack {
-                        Text(row.0).font(.subheadline)
+                        Text("Margen").foregroundColor(.secondary)
                         Spacer()
-                        Text(crmMxn(row.1)).font(.subheadline.bold())
+                        Text("\(crmMxn(c.margin)) · \(String(format: "%.1f", c.marginPercent))%")
+                            .font(.subheadline.bold())
+                            .foregroundColor(c.isOverBudget ? .red : .green)
+                    }
+                    if c.isOverBudget {
+                        Label("Costos por encima del presupuesto", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundColor(.red)
                     }
                 }
-                .listStyle(.plain)
+
+                // «Real» es lo que se gastó en campo (viáticos aprobados + gastos
+                // de OT). Es la cifra que un jefe de proyecto quiere ver desde el
+                // teléfono, y el proyecto no la refleja hasta que se sincroniza.
+                if c.hasActual {
+                    Section("Real de campo") {
+                        costLine("Viáticos reales", c.actualViaticos)
+                        costLine("Operativo real", c.actualOperativo)
+                        costLine("Total real", c.actualTotalWithProducts, bold: true)
+                        HStack {
+                            Text("Margen real").foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(crmMxn(c.marginActual)) · \(String(format: "%.1f", c.marginActualPercent))%")
+                                .font(.subheadline.bold())
+                                .foregroundColor(c.isOverBudgetActual ? .red : .green)
+                        }
+                    }
+                }
+            } else if costsLoading {
+                Section { ProgressView() }
             }
+
+            Section("Acciones") {
+                Button {
+                    Task { await validateBudget() }
+                } label: {
+                    Label("Validar presupuesto", systemImage: "checkmark.seal")
+                }
+                .disabled(syncing || current.id <= 0)
+
+                Button {
+                    Task { await syncViaticos() }
+                } label: {
+                    Label("Sincronizar viáticos", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(syncing || current.id <= 0)
+
+                Button {
+                    Task { await syncActualCosts() }
+                } label: {
+                    Label("Bajar costos reales de campo", systemImage: "square.and.arrow.down")
+                }
+                .disabled(syncing || current.id <= 0)
+
+                if syncing { ProgressView() }
+                if let check = budgetCheck {
+                    Label(check.message, systemImage: check.valid ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                        .font(.caption)
+                        .foregroundColor(check.valid ? .green : .red)
+                }
+            }
+
+            if !rows.isEmpty {
+                Section("Desglose registrado") {
+                    ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                        HStack {
+                            Text(row.0).font(.subheadline)
+                            Spacer()
+                            Text(crmMxn(row.1)).font(.subheadline.bold())
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .task { await loadCosts() }
+    }
+
+    @ViewBuilder
+    private func costLine(_ label: String, _ value: Double, bold: Bool = false, highlight: Bool = false) -> some View {
+        HStack {
+            Text(label).foregroundColor(highlight ? .primary : .secondary)
+            Spacer()
+            Text(crmMxn(value)).font(bold ? .subheadline.bold() : .subheadline)
+        }
+    }
+
+    // MARK: – Costos: carga y acciones
+
+    private func loadCosts() async {
+        guard current.id > 0, costs == nil, !costsLoading else { return }
+        costsLoading = true
+        defer { costsLoading = false }
+        do {
+            costs = try await CrmRepository.shared.projectCostSummary(id: current.id)
+            costsError = nil
+        } catch {
+            costsError = error.toUserMessage()
+        }
+    }
+
+    private func validateBudget() async {
+        syncing = true
+        defer { syncing = false }
+        do {
+            budgetCheck = try await CrmRepository.shared.validateProjectBudget(id: current.id)
+            costsError = nil
+        } catch {
+            costsError = error.toUserMessage()
+        }
+    }
+
+    private func syncViaticos() async {
+        syncing = true
+        defer { syncing = false }
+        do {
+            // El endpoint devuelve los costos ya recalculados: se pintan sin
+            // pedir otra vez `costos`.
+            costs = try await CrmRepository.shared.syncProjectViaticos(id: current.id)
+            budgetCheck = nil
+            costsError = nil
+        } catch {
+            costsError = error.toUserMessage()
+        }
+    }
+
+    private func syncActualCosts() async {
+        syncing = true
+        defer { syncing = false }
+        do {
+            costs = try await CrmRepository.shared.syncProjectActualCosts(id: current.id)
+            budgetCheck = nil
+            costsError = nil
+        } catch {
+            costsError = error.toUserMessage()
         }
     }
 

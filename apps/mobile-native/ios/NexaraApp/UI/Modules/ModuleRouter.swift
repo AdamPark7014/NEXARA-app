@@ -174,8 +174,11 @@ struct ModuleRouter {
             ErpCalendarView()
         case (.console, "orgchart"):
             OrgchartView()
+        // `kpis-hr` apunta a /erp/hr/kpis, que en la API es `hr/dashboard`.
+        // `HrKpisView` mostraba una aproximacion propia; `HrDashboardView` pide
+        // ese endpoint y ensena lo mismo que la web.
         case (.console, "kpis-hr"):
-            HrKpisView()
+            HrDashboardView()
         case (.ventas, "reportes"):
             CrmReportsView(mode: .reportes)
         case (.ventas, "crecimiento"):
@@ -234,6 +237,53 @@ struct ModuleRouter {
             LabAiSandboxView()
         case (.lab, "dashboard"), (.lab, "lab-home"):
             LabTabView(onExit: {})
+        // ── Pantallas del barrido de paridad del 08-09-2026 ────────────
+        //
+        // Todas nacieron de medir que endpoints consume la web y no consumian
+        // las apps. Van aqui, y no dispersas, porque el fallo que se repite en
+        // este proyecto es escribir una pantalla y no enrutarla: en Android
+        // hubo 13.438 lineas inalcanzables por eso mismo.
+        //
+        // Portal y sucursales
+        case (.tickets, "projects"):
+            PortalProjectsView()
+        case (.tickets, "legacy-login"):
+            PortalLegacyLoginView()
+        case (.console, "inventories"):
+            PortalConsoleInventoriesView()
+        case (.console, "client-360"):
+            PortalServiceClient360View()
+        case (.console, "kb-categories"):
+            PortalKbCategoriesView()
+        case (.console, "sla-insights"):
+            PortalSlaInsightsView()
+        case (.console, "tool-inventory-search"):
+            PortalToolInventorySearchView()
+        // Operacion de campo
+        case (.console, "activities-detailed"):
+            OpsDetailedActivitiesView()
+        case (.console, "maintenance-visits"):
+            OpsMaintenanceVisitsView()
+        case (.console, "vehicle-fleet"):
+            OpsVehicleFleetView()
+        // Identidad y seguridad de la propia cuenta
+        case (.console, "iam"), (.console, "identidad"):
+            UsersIamView()
+        case (.console, "my-security"), (.console, "mi-seguridad"):
+            UsersMfaView()
+        case (.console, "billing"), (.console, "facturacion"):
+            CompanyBillingView()
+        // Contabilidad y compras
+        case (.console, "accounting-general"), (.contabilidad, "accounting-general"):
+            AccountingLedgerView()
+        case (.console, "rfq"), (.contabilidad, "rfq"):
+            ProcurementRfqView()
+        case (.contabilidad, "compras"), (.contabilidad, "procurement"):
+            ProcurementModuleView()
+        // Licitaciones: la lista ya abre el detalle; este caso es para el
+        // enlace profundo desde una notificacion.
+        case (.ventas, "licitacion-detalle"), (.ventas, "tender-detail"):
+            CrmTenderDetailView(tenderId: Int64(params["id"] ?? "") ?? 0)
         // ── INTEGRA: un solo host con NavigationStack interno
         case (.integra, let key):
             IntegraRootView(initialKey: key == "integra-home" || key == "home" ? nil : key)

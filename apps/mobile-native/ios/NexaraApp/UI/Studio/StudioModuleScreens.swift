@@ -391,7 +391,10 @@ struct StudioNewsView: View {
 
     private func reload() async {
         isLoading = true; defer { isLoading = false }
-        do { items = try await StudioRepository.shared.news() }
+        // `news/admin` en vez de `news`: el feed público esconde borradores y
+        // programadas, así que el editor no veía en el móvil lo que acababa de
+        // guardar sin publicar.
+        do { items = try await StudioRepository.shared.newsAdmin() }
         catch { error = error.toUserMessage() }
     }
 

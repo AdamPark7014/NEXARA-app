@@ -17,8 +17,19 @@ final class TicketsRepository {
     }
 
     func portalProfile() async throws -> PortalClientProfile? {
-        let path = isBranchUser ? "branch-portal/profile" : "client-portal/profile"
-        let data = try await api.get(path)
+        // Las dos rutas se escriben enteras en cada rama en vez de armarse en una
+        // variable. No es estilo: `scripts/parity-report.py` sólo ve rutas
+        // literales, y con el ternario daba por ausentes en iOS veinte endpoints
+        // que la app sí llamaba. Una matriz de paridad que miente ya costó cara.
+        //
+        // Se usa `if/else` y no un ternario porque Swift no admite `try` a la
+        // derecha de un operador no-asignación.
+        let data: Data
+        if isBranchUser {
+            data = try await api.get("branch-portal/profile")
+        } else {
+            data = try await api.get("client-portal/profile")
+        }
         let map = ConsoleHelpers.decodeMap(data)
         return map.isEmpty ? nil : PortalClientProfile(raw: map)
     }
@@ -116,8 +127,13 @@ final class TicketsRepository {
     }
 
     func portalRequests() async throws -> [ClientTicketRequest] {
-        let path = isBranchUser ? "branch-portal/requests" : "client-portal/requests"
-        return ApiClient.decodeMapList(try await api.get(path)).map { ClientTicketRequest(raw: $0) }
+        let data: Data
+        if isBranchUser {
+            data = try await api.get("branch-portal/requests")
+        } else {
+            data = try await api.get("client-portal/requests")
+        }
+        return ApiClient.decodeMapList(data).map { ClientTicketRequest(raw: $0) }
     }
 
     func createRequest(
@@ -165,10 +181,15 @@ final class TicketsRepository {
     }
 
     func portalTickets(branchId: Int64? = nil) async throws -> [PortalTicket] {
-        let path = isBranchUser ? "branch-portal/tickets" : "client-portal/tickets"
         var q: [String: String] = [:]
         if let b = branchId { q["branchId"] = String(b) }
-        return ApiClient.decodeMapList(try await api.get(path, query: q)).map { PortalTicket(raw: $0) }
+        let data: Data
+        if isBranchUser {
+            data = try await api.get("branch-portal/tickets", query: q)
+        } else {
+            data = try await api.get("client-portal/tickets", query: q)
+        }
+        return ApiClient.decodeMapList(data).map { PortalTicket(raw: $0) }
     }
 
     func ticket(id: Int64) async throws -> [String: Any]? {
@@ -176,23 +197,32 @@ final class TicketsRepository {
     }
 
     func portalTicket(id: Int64) async throws -> PortalTicket? {
-        let path = isBranchUser ? "branch-portal/tickets/\(id)" : "client-portal/tickets/\(id)"
-        let map = ConsoleHelpers.decodeMap(try await api.get(path))
+        let data: Data
+        if isBranchUser {
+            data = try await api.get("branch-portal/tickets/\(id)")
+        } else {
+            data = try await api.get("client-portal/tickets/\(id)")
+        }
+        let map = ConsoleHelpers.decodeMap(data)
         return map.isEmpty ? nil : PortalTicket(raw: map)
     }
 
     func ticketReportPdf(id: Int64) async throws -> Data {
-        let path = isBranchUser ? "branch-portal/tickets/\(id)/report" : "client-portal/tickets/\(id)/report"
-        return try await api.get(path)
+        if isBranchUser {
+            return try await api.get("branch-portal/tickets/\(id)/report")
+        }
+        return try await api.get("client-portal/tickets/\(id)/report")
     }
 
     /// POST `…/tickets/{id}/comments` — body `{ body }`.
     func postTicketComment(id: Int64, body: String) async throws {
         struct Body: Encodable { let body: String }
-        let path = isBranchUser
-            ? "branch-portal/tickets/\(id)/comments"
-            : "client-portal/tickets/\(id)/comments"
-        _ = try await api.postJSON(path, body: Body(body: body.trimmingCharacters(in: .whitespacesAndNewlines)))
+        let payload = Body(body: body.trimmingCharacters(in: .whitespacesAndNewlines))
+        if isBranchUser {
+            _ = try await api.postJSON("branch-portal/tickets/\(id)/comments", body: payload)
+        } else {
+            _ = try await api.postJSON("client-portal/tickets/\(id)/comments", body: payload)
+        }
     }
 
     /// PATCH `…/tickets/{id}/status` — action ACK | CONFIRM_RESOLVED | REQUEST_REOPEN.
@@ -201,10 +231,12 @@ final class TicketsRepository {
             let action: String
             let note: String?
         }
-        let path = isBranchUser
-            ? "branch-portal/tickets/\(id)/status"
-            : "client-portal/tickets/\(id)/status"
-        _ = try await api.patchJSON(path, body: Body(action: action, note: note))
+        let payload = Body(action: action, note: note)
+        if isBranchUser {
+            _ = try await api.patchJSON("branch-portal/tickets/\(id)/status", body: payload)
+        } else {
+            _ = try await api.patchJSON("client-portal/tickets/\(id)/status", body: payload)
+        }
     }
 
     // MARK: Feedback
@@ -263,10 +295,15 @@ final class TicketsRepository {
     }
 
     func portalInventories(search: String? = nil) async throws -> [PortalInventorySnapshot] {
-        let path = isBranchUser ? "branch-portal/inventories" : "client-portal/inventories"
         var q: [String: String] = [:]
         if let s = search, !s.isEmpty { q["search"] = s }
-        return ApiClient.decodeMapList(try await api.get(path, query: q)).map { PortalInventorySnapshot(raw: $0) }
+        let data: Data
+        if isBranchUser {
+            data = try await api.get("branch-portal/inventories", query: q)
+        } else {
+            data = try await api.get("client-portal/inventories", query: q)
+        }
+        return ApiClient.decodeMapList(data).map { PortalInventorySnapshot(raw: $0) }
     }
 
     func inventoryDetail(id: Int64) async throws -> [String: Any] {
@@ -274,13 +311,20 @@ final class TicketsRepository {
     }
 
     func portalInventoryDetail(id: Int64) async throws -> PortalInventorySnapshot {
-        let path = isBranchUser ? "branch-portal/inventories/\(id)" : "client-portal/inventories/\(id)"
-        return PortalInventorySnapshot(raw: ConsoleHelpers.decodeMap(try await api.get(path)))
+        let data: Data
+        if isBranchUser {
+            data = try await api.get("branch-portal/inventories/\(id)")
+        } else {
+            data = try await api.get("client-portal/inventories/\(id)")
+        }
+        return PortalInventorySnapshot(raw: ConsoleHelpers.decodeMap(data))
     }
 
     func inventoryReportPdf(id: Int64) async throws -> Data {
-        let path = isBranchUser ? "branch-portal/inventories/\(id)/report" : "client-portal/inventories/\(id)/report"
-        return try await api.get(path)
+        if isBranchUser {
+            return try await api.get("branch-portal/inventories/\(id)/report")
+        }
+        return try await api.get("client-portal/inventories/\(id)/report")
     }
 
     func syncInventory(
@@ -346,8 +390,10 @@ final class TicketsRepository {
         var q: [String: String] = [:]
         if let start, !start.isEmpty { q["start"] = start }
         if let end, !end.isEmpty { q["end"] = end }
-        let path = isBranchUser ? "branch-portal/report" : "client-portal/report"
-        return try await api.get(path, query: q)
+        if isBranchUser {
+            return try await api.get("branch-portal/report", query: q)
+        }
+        return try await api.get("client-portal/report", query: q)
     }
 
     // MARK: Mis servicios (portal cliente)

@@ -25,6 +25,11 @@ final class CrmReportsVM: ObservableObject {
     @Published var period = "month"
     @Published var metrics = SalesMetrics()
     @Published var vendors: [VendorReportItem] = []
+    // Insights y notificaciones comerciales: la web los pinta en /crm/reports y
+    // /crm/dashboard, el móvil no los tenía. Ninguno de los dos es crítico para
+    // que la pantalla funcione, así que fallan en silencio y sólo se ocultan.
+    @Published var insights = CrmSalesInsights()
+    @Published var notifications: [CrmSalesNotification] = []
     @Published var isLoading = false
     @Published var error: String?
 
@@ -35,6 +40,8 @@ final class CrmReportsVM: ObservableObject {
             async let v = CrmRepository.shared.vendorReportItems(period: period)
             metrics = await m
             vendors = await v
+            insights = (try? await CrmRepository.shared.salesInsights(period: period)) ?? CrmSalesInsights()
+            notifications = (try? await CrmRepository.shared.salesNotifications(limit: 10)) ?? []
             if metrics.raw.isEmpty && vendors.isEmpty { error = "No se pudieron cargar los reportes." }
             isLoading = false
         }
@@ -159,6 +166,8 @@ struct CrmReportsView: View {
         switch mode {
         case .reportes:
             metricsGrid(full: true)
+            riskAlertsSection
+            notificationsSection
             if !vm.vendors.isEmpty {
                 sectionHeader("Equipo de ventas", "\(vm.vendors.count) vendedores")
                 ForEach(vm.vendors) { v in
@@ -167,6 +176,8 @@ struct CrmReportsView: View {
             }
         case .crecimiento:
             growthHighlight
+            forecastSection
+            hygieneSection
             metricsGrid(full: false)
         case .equipoComparativa:
             if vm.vendors.isEmpty {
@@ -181,6 +192,108 @@ struct CrmReportsView: View {
                 ForEach(vm.vendors.sorted { $0.revenue > $1.revenue }) { v in
                     Button { selectedVendor = v } label: { VendorCardView(vendor: v, showQuota: true) }.buttonStyle(.plain)
                 }
+            }
+        }
+    }
+
+    // MARK: – Insights (GET ventas/reportes/insights)
+
+    /// Forecast comprometido / mejor caso / peor caso. Es lo que un jefe de
+    /// ventas mira antes de una reunión, y no estaba en el teléfono.
+    @ViewBuilder
+    private var forecastSection: some View {
+        let i = vm.insights
+        if !i.isEmpty && (i.weightedForecast > 0 || i.commitForecast > 0) {
+            sectionHeader("Forecast", periodLabel(vm.period))
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                CrmMetricTile(label: "Ponderado", value: crmFmtMxn(i.weightedForecast), accent: .blue)
+                CrmMetricTile(label: "Comprometido", value: crmFmtMxn(i.commitForecast), accent: .green)
+                CrmMetricTile(label: "Mejor caso", value: crmFmtMxn(i.bestCaseForecast), accent: .teal)
+                CrmMetricTile(label: "Peor caso", value: crmFmtMxn(i.worstCaseForecast), accent: .orange)
+            }
+            Text("Cobertura \(crmFmtPct(i.forecastCoverage)) · ciclo medio \(String(format: "%.0f", i.avgCycleDays)) días")
+                .font(.caption).foregroundColor(.secondary)
+        }
+    }
+
+    /// Higiene del pipeline: cuántas oportunidades llevan semanas sin tocarse.
+    /// Es la lista de tareas real de un comercial.
+    @ViewBuilder
+    private var hygieneSection: some View {
+        let i = vm.insights
+        if !i.isEmpty && i.activeOpportunities > 0 {
+            sectionHeader("Higiene del pipeline", "Score \(String(format: "%.0f", i.hygieneScore))/100")
+            VStack(alignment: .leading, spacing: 6) {
+                hygieneRow("Sin actividad reciente", i.withoutRecentActivity, warn: true)
+                hygieneRow("Paradas +14 días", i.staleOpportunities14d, warn: true)
+                hygieneRow("Paradas +30 días", i.staleOpportunities30d, warn: true)
+                hygieneRow("Próxima acción vencida", i.overdueNextActions, warn: true)
+                hygieneRow("Alto valor, baja probabilidad", i.highValueLowProbability, warn: true)
+                Text("Plan de acción en \(crmFmtPct(i.actionPlanCoverage)) de \(i.activeOpportunities) activas")
+                    .font(.caption2).foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    @ViewBuilder
+    private func hygieneRow(_ label: String, _ count: Int, warn: Bool) -> some View {
+        if count > 0 {
+            HStack {
+                Text(label).font(.caption)
+                Spacer()
+                Text("\(count)").font(.caption.bold()).foregroundColor(warn ? .orange : .secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var riskAlertsSection: some View {
+        if !vm.insights.alerts.isEmpty {
+            sectionHeader("Alertas", "\(vm.insights.alerts.count)")
+            ForEach(vm.insights.alerts) { alert in
+                NxAlertBanner(
+                    alert: NxAlert(
+                        id: alert.id.uuidString,
+                        title: alert.message,
+                        tone: alert.isHigh ? .danger : (alert.isMedium ? .warning : .info)
+                    )
+                )
+            }
+        }
+    }
+
+    // MARK: – Notificaciones del panel comercial
+
+    @ViewBuilder
+    private var notificationsSection: some View {
+        if !vm.notifications.isEmpty {
+            sectionHeader("Notificaciones", "\(vm.notifications.count)")
+            ForEach(vm.notifications) { n in
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(n.displayTitle)
+                            .font(.subheadline.weight(n.isRead ? .regular : .semibold))
+                        Spacer()
+                        if !n.createdAt.isEmpty {
+                            Text(String(n.createdAt.prefix(10)))
+                                .font(.caption2).foregroundColor(.secondary)
+                        }
+                    }
+                    if !n.body.isEmpty {
+                        Text(n.body).font(.caption).foregroundColor(.secondary).lineLimit(3)
+                    }
+                    if !n.triggerUserName.isEmpty {
+                        Text(n.triggerUserName).font(.caption2).foregroundColor(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
     }

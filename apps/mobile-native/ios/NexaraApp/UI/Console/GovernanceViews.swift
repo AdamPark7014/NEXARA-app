@@ -5,31 +5,146 @@ import SwiftUI
 @MainActor final class CompaniesVM: ObservableObject {
     @Published var items: [Company] = []
     @Published var isLoading = false
-    func load() { isLoading = true; Task { items = await ExtraRepository.shared.companyItems(); isLoading = false } }
+    @Published var message: String?
+    @Published var messageIsError = false
+    /// Empresa sobre la que se está actuando; bloquea sus botones.
+    @Published var actingId: Int64?
+
+    func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        items = await ExtraRepository.shared.companyItems()
+    }
+
+    func setActive(_ company: Company, isActive: Bool) async {
+        actingId = company.id
+        defer { actingId = nil }
+        do {
+            try await CompanyAdminRepository.shared.setCompanyActive(id: company.id, isActive: isActive)
+            show(isActive ? "Empresa activada" : "Empresa desactivada", isError: false)
+            await load()
+        } catch {
+            show(error.toUserMessage(fallback: "No se pudo cambiar el estado"), isError: true)
+        }
+    }
+
+    func setPrimary(_ company: Company) async {
+        actingId = company.id
+        defer { actingId = nil }
+        do {
+            try await CompanyAdminRepository.shared.setCompanyPrimary(id: company.id)
+            show("«\(company.displayName)» es ahora la empresa principal", isError: false)
+            await load()
+        } catch {
+            show(error.toUserMessage(fallback: "No se pudo cambiar la empresa principal"), isError: true)
+        }
+    }
+
+    func save(
+        _ company: Company,
+        legalName: String, tradeName: String, rfc: String, fiscalRegime: String,
+        email: String, phone: String, address: String, city: String, state: String
+    ) async -> Bool {
+        actingId = company.id
+        defer { actingId = nil }
+        do {
+            _ = try await CompanyAdminRepository.shared.updateCompany(
+                id: company.id,
+                legalName: legalName, tradeName: tradeName, rfc: rfc,
+                fiscalRegime: fiscalRegime, email: email, phone: phone,
+                address: address, city: city, state: state
+            )
+            show("Datos guardados", isError: false)
+            await load()
+            return true
+        } catch {
+            show(error.toUserMessage(fallback: "No se pudieron guardar los datos"), isError: true)
+            return false
+        }
+    }
+
+    private func show(_ text: String, isError: Bool) {
+        message = text
+        messageIsError = isError
+    }
 }
 
 struct CompaniesView: View {
+    @EnvironmentObject var session: SessionStore
     @StateObject private var vm = CompaniesVM()
-    @State private var selected: Company?
+    @State private var selectedId: Int64?
+    @State private var editing = false
+    @State private var confirmingPrimary: Company?
+
+    /// Puede escribir quien tenga `console.admin` o `company.settings.manage`;
+    /// el resto ve exactamente la misma pantalla sin botones, en vez de
+    /// tocarlos para recibir un 403.
+    private var canManage: Bool {
+        guard let user = session.currentUser else { return false }
+        return user.isSuperAdmin
+            || user.permissions.contains("console.admin")
+            || user.permissions.contains("company.settings.manage")
+    }
+
+    /// Se resuelve por id en cada dibujado: así el detalle refleja lo guardado
+    /// sin cerrarlo y volver a abrirlo.
+    private var selected: Company? {
+        guard let selectedId else { return nil }
+        return vm.items.first { $0.id == selectedId }
+    }
+
     var body: some View {
         Group {
-            if let s = selected { companyDetail(s) } else { companyList }
+            if let company = selected { companyDetail(company) } else { companyList }
         }
         .navigationTitle(selected == nil ? "Multi-empresa" : "")
-        .task { vm.load() }
-        .refreshable { if selected == nil { vm.load() } }
+        .task { await vm.load() }
+        .refreshable { await vm.load() }
+        .sheet(isPresented: $editing) {
+            if let company = selected {
+                CompanyEditSheet(company: company, vm: vm, isPresented: $editing)
+            }
+        }
+        .alert("Cambiar empresa principal", isPresented: primaryAlertBinding) {
+            Button("Cancelar", role: .cancel) { confirmingPrimary = nil }
+            Button("Cambiar") {
+                if let target = confirmingPrimary {
+                    Task { await vm.setPrimary(target) }
+                }
+                confirmingPrimary = nil
+            }
+        } message: {
+            // Afecta a todo el grupo, no sólo a quien pulsa: se confirma.
+            Text("«\(confirmingPrimary?.displayName ?? "")» pasará a ser la empresa principal del grupo para todo el mundo.")
+        }
+    }
+
+    private var primaryAlertBinding: Binding<Bool> {
+        Binding(
+            get: { confirmingPrimary != nil },
+            set: { if !$0 { confirmingPrimary = nil } }
+        )
     }
 
     private var companyList: some View {
         List {
-            if vm.isLoading { ProgressView() }
+            if vm.isLoading && vm.items.isEmpty { ProgressView() }
+            if let message = vm.message {
+                Text(message).font(.footnote)
+                    .foregroundColor(vm.messageIsError ? .red : .green)
+            }
             ForEach(vm.items) { c in
-                Button { selected = c } label: {
+                Button { selectedId = c.id } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(c.displayName).font(.headline).foregroundColor(.primary)
                         Text(c.rfc).font(.caption).foregroundColor(.secondary)
-                        if c.isPrimary {
-                            Text("Principal").font(.caption2).foregroundColor(.green)
+                        HStack(spacing: 6) {
+                            if c.isPrimary {
+                                Text("Principal").font(.caption2).foregroundColor(.green)
+                            }
+                            if !c.isActive {
+                                Text("Inactiva").font(.caption2).foregroundColor(.orange)
+                            }
                         }
                     }
                 }
@@ -40,7 +155,13 @@ struct CompaniesView: View {
     @ViewBuilder
     private func companyDetail(_ c: Company) -> some View {
         List {
-            Section { Button("← Empresas") { selected = nil } }
+            Section { Button("← Empresas") { selectedId = nil } }
+            if let message = vm.message {
+                Section {
+                    Text(message).font(.footnote)
+                        .foregroundColor(vm.messageIsError ? .red : .green)
+                }
+            }
             Section("Empresa") {
                 govRow("Razón social",  c.legalName)
                 govRow("Nombre comercial", c.tradeName)
@@ -52,7 +173,42 @@ struct CompaniesView: View {
                 govRow("Ciudad",        c.city)
                 govRow("Estado",        c.state)
                 if c.isPrimary {
-                    HStack { Text("Empresa principal").foregroundColor(.secondary); Spacer(); Image(systemName: "checkmark.circle.fill").foregroundColor(.green) }
+                    HStack {
+                        Text("Empresa principal").foregroundColor(.secondary)
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                    }
+                }
+            }
+            if canManage {
+                Section("Gestión") {
+                    Button {
+                        editing = true
+                    } label: {
+                        Label("Editar datos fiscales", systemImage: "square.and.pencil")
+                    }
+                    .disabled(vm.actingId == c.id)
+
+                    if !c.isPrimary {
+                        Button {
+                            confirmingPrimary = c
+                        } label: {
+                            Label("Hacer empresa principal", systemImage: "star")
+                        }
+                        .disabled(vm.actingId == c.id)
+                    }
+
+                    // La principal no se desactiva: dejaría al grupo sin tenant
+                    // por omisión. Es la misma regla que aplica la web.
+                    if !c.isPrimary {
+                        Button(role: c.isActive ? ButtonRole.destructive : nil) {
+                            Task { await vm.setActive(c, isActive: !c.isActive) }
+                        } label: {
+                            Label(c.isActive ? "Desactivar empresa" : "Activar empresa",
+                                  systemImage: c.isActive ? "pause.circle" : "play.circle")
+                        }
+                        .disabled(vm.actingId == c.id)
+                    }
                 }
             }
         }
@@ -62,6 +218,92 @@ struct CompaniesView: View {
     @ViewBuilder private func govRow(_ label: String, _ value: String) -> some View {
         if !value.isEmpty {
             HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
+    }
+}
+
+/// Alta de datos fiscales de una empresa del grupo.
+/// Los campos que se dejen vacíos NO se mandan: el API hace merge y un `""`
+/// borraría el valor guardado.
+private struct CompanyEditSheet: View {
+    let company: Company
+    @ObservedObject var vm: CompaniesVM
+    @Binding var isPresented: Bool
+
+    @State private var legalName: String
+    @State private var tradeName: String
+    @State private var rfc: String
+    @State private var fiscalRegime: String
+    @State private var email: String
+    @State private var phone: String
+    @State private var address: String
+    @State private var city: String
+    @State private var state: String
+    @State private var saving = false
+
+    init(company: Company, vm: CompaniesVM, isPresented: Binding<Bool>) {
+        self.company = company
+        self.vm = vm
+        self._isPresented = isPresented
+        _legalName = State(initialValue: company.legalName)
+        _tradeName = State(initialValue: company.tradeName)
+        _rfc = State(initialValue: company.rfc)
+        _fiscalRegime = State(initialValue: company.fiscalRegime)
+        _email = State(initialValue: company.email)
+        _phone = State(initialValue: company.phone)
+        _address = State(initialValue: company.address)
+        _city = State(initialValue: company.city)
+        _state = State(initialValue: company.state)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Identidad fiscal") {
+                    TextField("Razón social", text: $legalName)
+                    TextField("Nombre comercial", text: $tradeName)
+                    TextField("RFC", text: $rfc).textInputAutocapitalization(.characters)
+                    TextField("Régimen fiscal", text: $fiscalRegime)
+                }
+                Section("Contacto") {
+                    TextField("Email", text: $email)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                    TextField("Teléfono", text: $phone).keyboardType(.phonePad)
+                }
+                Section("Domicilio") {
+                    TextField("Dirección", text: $address)
+                    TextField("Ciudad", text: $city)
+                    TextField("Estado", text: $state)
+                }
+                Section {
+                    Text("Un campo vacío no se envía: se conserva el valor guardado.")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+            }
+            .navigationTitle("Editar empresa")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { isPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "Guardando…" : "Guardar") {
+                        Task {
+                            saving = true
+                            let ok = await vm.save(
+                                company,
+                                legalName: legalName, tradeName: tradeName, rfc: rfc,
+                                fiscalRegime: fiscalRegime, email: email, phone: phone,
+                                address: address, city: city, state: state
+                            )
+                            saving = false
+                            if ok { isPresented = false }
+                        }
+                    }
+                    .disabled(saving)
+                }
+            }
         }
     }
 }

@@ -44,17 +44,17 @@ enum ModuleCatalog {
         ModuleEntry("clients", "Clientes", "🤝", "/console/clients"),
         ModuleEntry("projects", "Proyectos", "🧩", "/operacion/projects"),
         ModuleEntry("work-projects", "Proyectos internos", "🧱", "/operacion/work-projects"),
-        ModuleEntry("users", "Usuarios", "🧑‍💼", "/console/users"),
+        ModuleEntry("users", "Usuarios", "🧑‍💼", "/console/users", parityStatus: .soloLectura),
         ModuleEntry("attendance", "Asistencia", "🕒", "/console/attendance"),
         ModuleEntry("lunch-breaks", "Comidas", "🥪", "/console/lunch-breaks"),
         ModuleEntry("my-lunch-breaks", "Mis comidas", "🥪", "/console/my-lunch-breaks"),
         ModuleEntry("hr", "Recursos humanos", "👥", "/console/hr"),
-        ModuleEntry("employee-payments", "Pagos a empleados", "💵", "/console/employee-payments"),
-        ModuleEntry("accounting", "Contabilidad", "📒", "/console/accounting"),
-        ModuleEntry("banking", "Banca", "🏦", "/console/banking"),
+        ModuleEntry("employee-payments", "Pagos a empleados", "💵", "/console/employee-payments", parityStatus: .soloLectura),
+        ModuleEntry("accounting", "Contabilidad", "📒", "/console/accounting", parityStatus: .soloLectura),
+        ModuleEntry("banking", "Banca", "🏦", "/console/banking", parityStatus: .soloLectura),
         ModuleEntry("invoicing", "Facturación", "🧾", "/console/invoicing"),
         ModuleEntry("expenses", "Gastos", "💸", "/console/expenses"),
-        ModuleEntry("fines", "Multas", "⚠️", "/console/fines"),
+        ModuleEntry("fines", "Multas", "⚠️", "/console/fines", parityStatus: .soloLectura),
         ModuleEntry("cotizaciones", "Cotizaciones", "🧮", "/console/cotizaciones", parityStatus: .soloLectura),
         ModuleEntry("gestion-vendedores", "Gestión vendedores", "📈", "/console/gestion-vendedores", parityStatus: .soloLectura),
         ModuleEntry("executive", "Vista ejecutiva", "📊", "/erp/executive", parityStatus: .soloLectura),
@@ -95,6 +95,25 @@ enum ModuleCatalog {
         ModuleEntry("calendar", "Mi calendario", "📅", "/erp/calendar", parityStatus: .soloLectura),
         ModuleEntry("orgchart", "Organigrama", "🌳", "/erp/hr/orgchart", parityStatus: .soloLectura),
         ModuleEntry("kpis-hr", "KPIs de personas", "📊", "/erp/hr/kpis", parityStatus: .soloLectura),
+
+        // --- Barrido de paridad 08-09-2026 -------------------------------
+        // Modulos que la web tenia y las apps no. El `parityStatus` de cada uno
+        // dice lo que la pantalla hace DE VERDAD, no lo que se pretende que
+        // haga: la matriz de este proyecto ya declaro 68 modulos en verde
+        // teniendo 13 de solo lectura y 3 inalcanzables.
+        ModuleEntry("inventories", "Inventarios (consola)", "📦", "/ops/inventories"),
+        ModuleEntry("client-360", "Ficha de cliente", "🗂️", "/crm/clients"),
+        ModuleEntry("kb-categories", "KB por categoria", "📚", "/erp/kb", parityStatus: .soloLectura),
+        ModuleEntry("sla-insights", "SLA - cumplimiento", "⏱️", "/ops/support/sla", parityStatus: .soloLectura),
+        ModuleEntry("tool-inventory-search", "Buscar herramienta", "🔧", "/operacion/tools", parityStatus: .soloLectura),
+        ModuleEntry("activities-detailed", "Servicios - detalle", "🧾", "/operacion/activities", parityStatus: .soloLectura),
+        ModuleEntry("maintenance-visits", "Visitas de contrato", "🗓️", "/ops/maintenance/contracts"),
+        ModuleEntry("vehicle-fleet", "Flota", "🚙", "/operacion/vehicles"),
+        ModuleEntry("accounting-general", "Contabilidad general", "🧾", "/erp/accounting", parityStatus: .soloLectura),
+        ModuleEntry("rfq", "Cotizaciones (RFQ)", "📩", "/erp/procurement", parityStatus: .soloLectura),
+        ModuleEntry("iam", "Identidad y accesos", "🔐", "/erp/users", parityStatus: .soloLectura),
+        ModuleEntry("my-security", "Mi seguridad", "🛡️", "/erp/my-profile"),
+        ModuleEntry("billing", "Plan y consumo", "💳", "/erp/settings/billing", parityStatus: .soloLectura),
     ]
 
     static let tickets: [ModuleEntry] = [
@@ -106,6 +125,8 @@ enum ModuleCatalog {
         ModuleEntry("inventories", "Inventarios", "📦", "/tickets/inventories"),
         ModuleEntry("feedback-pending", "Feedback pendiente", "💬", "/tickets/feedback-pending"),
         ModuleEntry("profile", "Perfil", "👤", "/tickets/profile"),
+        ModuleEntry("projects", "Mis proyectos", "🧩", "/tickets/projects", parityStatus: .soloLectura),
+        ModuleEntry("legacy-login", "Acceso de portal", "🔑", "/tickets/portal"),
     ]
 
     static let ventas: [ModuleEntry] = [
@@ -119,8 +140,9 @@ enum ModuleCatalog {
         ModuleEntry("proyectos", "Proyectos", "🧩", "/ventas/proyectos"),
         ModuleEntry("pipeline", "Pipeline", "📊", "/crm/pipeline"),
         ModuleEntry("agenda", "Agenda", "📅", "/crm/agenda"),
-        ModuleEntry("licitaciones", "Licitaciones", "📑", "/crm/tenders", parityStatus: .soloLectura),
-        ModuleEntry("metas", "Metas comerciales", "🎯", "/crm/targets", parityStatus: .soloLectura),
+        ModuleEntry("licitaciones", "Licitaciones", "📑", "/crm/tenders"),
+        ModuleEntry("licitacion-detalle", "Licitacion", "📋", "/crm/tenders"),
+        ModuleEntry("metas", "Metas comerciales", "🎯", "/crm/targets"),
         ModuleEntry("plantillas", "Plantillas", "🧾", "/ventas/plantillas"),
         ModuleEntry("gestion-vendedores", "Gestión vendedores", "📈", "/ventas/gestion-vendedores", parityStatus: .soloLectura),
         ModuleEntry("equipo-comparativa", "Comparativa equipo", "⚖️", "/ventas/equipo-comparativa", parityStatus: .soloLectura),
@@ -133,17 +155,20 @@ enum ModuleCatalog {
 
     static let contabilidad: [ModuleEntry] = [
         ModuleEntry("dashboard", "Dashboard", "📊", "/contabilidad/dashboard", parityStatus: .soloLectura),
-        ModuleEntry("accounting", "Contabilidad", "📒", "/contabilidad/accounting"),
-        ModuleEntry("banking", "Banca", "🏦", "/contabilidad/banking"),
+        ModuleEntry("accounting", "Contabilidad", "📒", "/contabilidad/accounting", parityStatus: .soloLectura),
+        ModuleEntry("banking", "Banca", "🏦", "/contabilidad/banking", parityStatus: .soloLectura),
         ModuleEntry("invoicing", "Facturación", "🧾", "/contabilidad/invoicing"),
         ModuleEntry("expenses", "Gastos", "💸", "/contabilidad/expenses"),
-        ModuleEntry("employee-payments", "Pagos a empleados", "💵", "/contabilidad/employee-payments"),
+        ModuleEntry("employee-payments", "Pagos a empleados", "💵", "/contabilidad/employee-payments", parityStatus: .soloLectura),
         ModuleEntry("viaticos", "Viáticos", "💼", "/contabilidad/viaticos"),
         ModuleEntry("pagos", "Pagos", "💳", "/contabilidad/pagos"),
         ModuleEntry("horas", "Horas", "⏱️", "/contabilidad/horas", parityStatus: .soloLectura),
         ModuleEntry("proyectos", "Proyectos", "🧩", "/contabilidad/proyectos"),
         ModuleEntry("work-projects", "Proyectos internos", "🧱", "/contabilidad/work-projects"),
-        ModuleEntry("multas", "Multas", "⚠️", "/contabilidad/multas"),
+        ModuleEntry("multas", "Multas", "⚠️", "/contabilidad/multas", parityStatus: .soloLectura),
+        ModuleEntry("accounting-general", "Contabilidad general", "🧾", "/contabilidad/accounting", parityStatus: .soloLectura),
+        ModuleEntry("rfq", "Cotizaciones (RFQ)", "📩", "/contabilidad/procurement", parityStatus: .soloLectura),
+        ModuleEntry("compras", "Compras", "🛒", "/contabilidad/procurement"),
         ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat"),
     ]
 

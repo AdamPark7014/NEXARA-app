@@ -43,6 +43,13 @@ struct ChatView: View {
     @State private var createPrivate = false
     @State private var topicDraft = ""
     @State private var pollToken = UUID()
+    // Búsqueda y ficha de canal: `chat/search`, `chat/channels/:id` y sus
+    // acciones de silenciar / salir vivían sólo en la web.
+    @State private var showSearch = false
+    /// La lupa de la barra busca en todo; la entrada del menú del canal arranca
+    /// acotada al canal abierto.
+    @State private var searchScopedToChannel = false
+    @State private var showChannelInfo = false
 
     private var currentUserId: Int64 {
         Int64(SessionStore.shared.currentUser?.id ?? "") ?? 0
@@ -77,6 +84,9 @@ struct ChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
+                    Button { searchScopedToChannel = false; showSearch = true } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
                     Button { showDmPicker = true; Task { await loadColleagues() } } label: {
                         Image(systemName: "person.bubble")
                     }
@@ -113,6 +123,33 @@ struct ChatView: View {
             .sheet(isPresented: $showDmPicker) { colleaguesSheet(mode: .dm) }
             .sheet(isPresented: $showInviteMember) { colleaguesSheet(mode: .invite) }
             .sheet(isPresented: $showEditTopic) { editTopicSheet }
+            .sheet(isPresented: $showSearch) {
+                ChatSearchSheet(
+                    channelId: selectedChannelId,
+                    channelName: ConsoleHelpers.mapStr(selectedChannel ?? [:], "name", "nombre"),
+                    startScoped: searchScopedToChannel,
+                    onOpen: { channel, message in
+                        showSearch = false
+                        Task { await openSearchHit(channelId: channel, messageId: message) }
+                    },
+                    onDismiss: { showSearch = false }
+                )
+            }
+            .sheet(isPresented: $showChannelInfo) {
+                if let id = selectedChannelId, id > 0 {
+                    ChatChannelInfoSheet(
+                        channelId: id,
+                        onDismiss: { showChannelInfo = false },
+                        onLeft: {
+                            showChannelInfo = false
+                            selectedChannelId = nil
+                            messages = []
+                            pinned = []
+                            Task { await loadChannels(refresh: true) }
+                        }
+                    )
+                }
+            }
             .alert("Editar mensaje", isPresented: Binding(
                 get: { editingMessage != nil },
                 set: { if !$0 { editingMessage = nil } }
@@ -320,6 +357,13 @@ struct ChatView: View {
                         showInviteMember = true
                         Task { await loadColleagues() }
                     }
+                }
+                // Ficha del canal: miembros, silenciar y salir. Todo eso vive en
+                // `chat/channels/:id`, que la lista de canales no devuelve.
+                Button("Información del canal") { showChannelInfo = true }
+                Button("Buscar en el canal") {
+                    searchScopedToChannel = true
+                    showSearch = true
                 }
                 Button("Actualizar") {
                     if let id = selectedChannelId {
@@ -690,6 +734,40 @@ struct ChatView: View {
         loading = false
         refreshingChannels = false
         await openInitialMessageIfNeeded()
+    }
+
+    /// Salta al canal y al mensaje que devolvió la búsqueda.
+    ///
+    /// El resultado puede estar en un canal que no es el abierto y en un mensaje
+    /// anterior a los 50 que carga la vista: por eso se pagina hacia atrás hasta
+    /// encontrarlo, con tope para no tirar de la lista entera de un canal con
+    /// años de historial.
+    private func openSearchHit(channelId: Int64, messageId: Int64) async {
+        guard channelId > 0 else { return }
+        if selectedChannelId != channelId {
+            selectedChannelId = channelId
+            replyTo = nil
+            threadRoot = nil
+            threadReplies = []
+            await loadMessages(channelId: channelId, markRead: true)
+        }
+        guard messageId > 0 else { return }
+        var intentos = 0
+        while !messages.contains(where: { ConsoleHelpers.mapInt64($0, "id") == messageId }),
+              hasMoreMessages, intentos < 6 {
+            await loadOlderMessages()
+            intentos += 1
+        }
+        if let msg = messages.first(where: { ConsoleHelpers.mapInt64($0, "id") == messageId }) {
+            // Si el mensaje es respuesta dentro de un hilo, se abre el hilo; si
+            // no, basta con haberlo traído a la lista.
+            let parentId = ConsoleHelpers.mapInt64(msg, "parentId") ?? 0
+            if parentId > 0,
+               let root = messages.first(where: { ConsoleHelpers.mapInt64($0, "id") == parentId }) {
+                threadRoot = root
+                await loadThreadReplies(parentId: parentId)
+            }
+        }
     }
 
     private func openInitialMessageIfNeeded() async {

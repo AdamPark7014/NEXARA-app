@@ -12,6 +12,13 @@ final class InvoicesVM: ObservableObject {
     @Published var message: String?
     @Published var detail: [String: Any] = [:]
 
+    /// Consulta del estatus del CFDI en el SAT. Es lectura pura: la API sólo
+    /// interroga el servicio público del SAT con el UUID; no timbra, no cancela
+    /// y no modifica la factura local.
+    @Published var satStatus: SatCfdiStatus?
+    @Published var satError: String?
+    @Published var satLoading = false
+
     let statuses = ["todos", "pagada", "pendiente", "cancelada", "vencida"]
 
     var canManage: Bool {
@@ -52,6 +59,32 @@ final class InvoicesVM: ObservableObject {
 
     func loadDetail(id: Int64) {
         Task { detail = await ExtraRepository.shared.invoiceDetail(id: id) }
+    }
+
+    func clearSat() {
+        satStatus = nil
+        satError = nil
+        satLoading = false
+    }
+
+    /// GET accounting/invoices/:id/sat-status
+    /// El error se enseña tal cual porque distingue casos que importan: "la
+    /// factura no tiene UUID CFDI" (no está timbrada) no es lo mismo que "el
+    /// SAT no contestó".
+    func checkSatStatus(id: Int64) async {
+        satLoading = true
+        satError = nil
+        defer { satLoading = false }
+        switch await AccountingRepository.shared.invoiceSatStatus(id: id) {
+        case .success(let status):
+            satStatus = status
+            if !status.hasData {
+                satError = "El SAT no devolvió datos para esta factura."
+            }
+        case .failure(let error):
+            satStatus = nil
+            satError = error.toUserMessage()
+        }
     }
 
     func registerPayment(id: Int64, amount: Double, method: String?, reference: String?) async -> Bool {
@@ -189,7 +222,10 @@ struct InvoicesView: View {
         List {
             Section {
                 HStack {
-                    Button("← Facturas") { selected = nil; payAmount = ""; payRef = ""; vm.message = nil }
+                    Button("← Facturas") {
+                        selected = nil; payAmount = ""; payRef = ""
+                        vm.message = nil; vm.clearSat()
+                    }
                     Spacer()
                     if !status.isEmpty {
                         Text(status.capitalized).font(.caption).bold().foregroundColor(color)
@@ -217,6 +253,35 @@ struct InvoicesView: View {
                     if let url = URL(string: pdfUrl) {
                         Link("Abrir PDF", destination: url)
                     }
+                }
+            }
+            if inv.id > 0 {
+                Section {
+                    Button(vm.satLoading ? "Consultando al SAT…" : "Consultar estatus en el SAT") {
+                        Task { await vm.checkSatStatus(id: inv.id) }
+                    }
+                    .disabled(vm.satLoading)
+                    if let sat = vm.satStatus, sat.hasData {
+                        satRow("Estado", sat.estado, color: satColor(sat))
+                        satRow("¿Cancelable?", sat.esCancelable)
+                        satRow("Estatus cancelación", sat.estatusCancelacion)
+                        satRow("Código", sat.codigoEstatus)
+                        satRow("Validación EFOS", sat.validacionEfos)
+                        // Si el SAT contesta con una forma que no reconocemos,
+                        // vale más enseñar el crudo que una sección vacía que
+                        // parezca "todo correcto".
+                        if sat.estado.isEmpty && sat.codigoEstatus.isEmpty && !sat.rawText.isEmpty {
+                            Text(sat.rawText).font(.caption2).foregroundColor(.secondary)
+                        }
+                    }
+                    if let err = vm.satError {
+                        Text(err).font(.caption).foregroundColor(.orange)
+                    }
+                } header: {
+                    Text("SAT")
+                } footer: {
+                    Text("Consulta al servicio público del SAT. Timbrar y cancelar se hacen en la web.")
+                        .font(.caption2)
                 }
             }
             if vm.canManage, inv.id > 0 {
@@ -260,6 +325,16 @@ struct InvoicesView: View {
 
     @ViewBuilder private func iRow(_ k: String, _ v: String) -> some View {
         if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
+    }
+
+    @ViewBuilder private func satRow(_ k: String, _ v: String, color: Color = .secondary) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).bold().foregroundColor(color) } }
+    }
+
+    private func satColor(_ sat: SatCfdiStatus) -> Color {
+        if sat.isCancelado { return .red }
+        if sat.isVigente { return .green }
+        return .secondary
     }
 }
 

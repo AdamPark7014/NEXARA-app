@@ -40,6 +40,49 @@ final class ChatRepository {
         return ConsoleHelpers.decodeMap(data)
     }
 
+    /// Detalle del canal — GET `chat/channels/:id`.
+    ///
+    /// La lista (`chat/channels`) no trae miembros ni el estado de silencio; sin
+    /// esto la pantalla no puede saber si el botón «Silenciar» debe salir
+    /// activado ni si el usuario está viendo el canal como supervisor.
+    func channelDetail(channelId: Int64) async throws -> ChatChannelDetail {
+        let data = try await api.get("chat/channels/\(channelId)")
+        return ChatChannelDetail(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Silencia o reactiva el canal — PATCH `chat/channels/:id/mute`.
+    /// Devuelve el canal actualizado para no tener que recargar la lista entera.
+    @discardableResult
+    func setChannelMuted(channelId: Int64, muted: Bool) async throws -> ChatChannelDetail {
+        struct Body: Encodable { let muted: Bool }
+        let data = try await api.patchJSON("chat/channels/\(channelId)/mute", body: Body(muted: muted))
+        return ChatChannelDetail(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    /// Abandona el canal — DELETE `chat/channels/:id/leave`.
+    /// El backend rechaza salir de un DM y de un canal supervisado; la vista
+    /// oculta la acción en esos casos (`ChatChannelDetail.canLeave`).
+    func leaveChannel(channelId: Int64) async throws {
+        try await api.delete("chat/channels/\(channelId)/leave")
+    }
+
+    /// Busca mensajes — GET `chat/search`.
+    ///
+    /// El backend exige `q` de al menos dos caracteres y devuelve `{messages}`
+    /// vacío si no llega; se corta aquí para no gastar la llamada.
+    func searchMessages(query: String, channelId: Int64? = nil) async throws -> [ChatSearchHit] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard q.count >= 2 else { return [] }
+        var params: [String: String] = ["q": q]
+        if let channelId, channelId > 0 { params["channelId"] = String(channelId) }
+        let data = try await api.get("chat/search", query: params)
+        let map = ConsoleHelpers.decodeMap(data)
+        if let list = map["messages"] as? [[String: Any]] {
+            return list.map(ChatSearchHit.init)
+        }
+        return ApiClient.decodeMapList(data).map(ChatSearchHit.init)
+    }
+
     func updateTopic(channelId: Int64, topic: String) async throws -> [String: Any] {
         struct Body: Encodable { let topic: String }
         let data = try await api.patchJSON(
