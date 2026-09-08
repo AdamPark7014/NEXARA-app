@@ -149,6 +149,11 @@ struct StudioNewsletterView: View {
 
 struct StudioPagesView: View {
     @State private var sections: [String] = []
+    /// Secciones que ya tienen contenido guardado, sacadas de
+    /// `studio/page-content`. Sin esto todas las secciones se ven igual y hay
+    /// que entrar una por una para descubrir cuáles están vacías.
+    @State private var filled: Set<String> = []
+    @State private var updatedAt: [String: String] = [:]
     @State private var selected: String?
     @State private var jsonDraft = ""
     @State private var isLoading = true
@@ -170,8 +175,18 @@ struct StudioPagesView: View {
             else {
                 List(sections, id: \.self) { section in
                     Button { Task { await openSection(section) } } label: {
-                        Text(section.replacingOccurrences(of: "_", with: " "))
-                            .font(.body)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(section.replacingOccurrences(of: "_", with: " "))
+                                    .font(.body)
+                                if let fecha = updatedAt[section], !fecha.isEmpty {
+                                    Text("Actualizada \(String(fecha.prefix(10)))")
+                                        .font(.caption2).foregroundColor(StudioTheme.muted)
+                                }
+                            }
+                            Spacer()
+                            StudioStatusChip(text: filled.contains(section) ? "con contenido" : "vacía")
+                        }
                     }
                 }
                 .listStyle(.insetGrouped)
@@ -205,6 +220,18 @@ struct StudioPagesView: View {
         isLoading = true; defer { isLoading = false }
         do { sections = try await StudioRepository.shared.pageSections() }
         catch { error = error.toUserMessage() }
+        // Una sola llamada para saber qué secciones están rellenas. Si falla, la
+        // lista sigue funcionando: sólo se pierden las etiquetas.
+        if let rows = try? await StudioRepository.shared.allPageContent() {
+            filled = Set(rows.compactMap(\.section))
+            updatedAt = Dictionary(
+                rows.compactMap { row -> (String, String)? in
+                    guard let s = row.section else { return nil }
+                    return (s, row.updatedAt ?? "")
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+        }
     }
 
     private func openSection(_ section: String) async {

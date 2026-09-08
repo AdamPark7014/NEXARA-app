@@ -13,13 +13,49 @@ struct ActivityDetailView: View {
     @State private var evidence: EvidenceDetail?
     @State private var loading = true
     @State private var loadError: String?
-    private let tabs = ["Info", "Operación", "Evidencias", "Viáticos", "Equipo", "Materiales", "Historial", "Aprobaciones"]
+    // "Incidencias" se inserta antes de "Aprobaciones" porque
+    // `activityDetailTabIndex` ya mapeaba la clave "incidencias" al índice 7 y
+    // las notificaciones que abrían esa pestaña caían en Aprobaciones.
+    private let tabs = ["Info", "Operación", "Evidencias", "Viáticos", "Equipo", "Materiales", "Historial", "Incidencias", "Aprobaciones"]
 
     @State private var team: [[String: Any]] = []
     @State private var materials: [[String: Any]] = []
     @State private var timeline: [[String: Any]] = []
 
+    // Operación de campo: ejecutar (iniciar/finalizar), reasignar y reporte PDF.
+    @State private var executing = false
+    @State private var actionMessage: String?
+    @State private var showReassign = false
+    @State private var loadingReport = false
+    @State private var report: OpsTicketReport?
+
     private var current: ActivityItem { detail ?? activity }
+
+    /// `activities.manage` es lo que el API exige para registrar incidencias,
+    /// recomendaciones y reasignar. Sin él la pestaña es de solo lectura.
+    private var canManageActivities: Bool {
+        guard let u = SessionStore.shared.currentUser else { return false }
+        return u.isSuperAdmin
+            || u.permissions.contains("activities.manage")
+            || u.permissions.contains("console.admin")
+    }
+
+    /// El reporte PDF de ticket exige `console.admin`; para el resto ni se pinta
+    /// el botón en vez de enseñar un 403.
+    private var canSeeTicketReport: Bool {
+        guard let u = SessionStore.shared.currentUser else { return false }
+        return u.isSuperAdmin || u.permissions.contains("console.admin")
+    }
+
+    /// `PATCH activities/:id/execute` solo lo acepta el responsable de la OT (o
+    /// un superadmin). Comprobarlo aquí evita ofrecer un botón que va a fallar.
+    private var isMyActivity: Bool {
+        guard let u = SessionStore.shared.currentUser else { return false }
+        if u.isSuperAdmin { return true }
+        if let rid = current.responsableId, rid == u.id { return true }
+        return !current.responsable.isEmpty
+            && current.responsable.localizedCaseInsensitiveContains(u.nombre)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,6 +104,7 @@ struct ActivityDetailView: View {
                 case 4: teamTab
                 case 5: materialsTab
                 case 6: historialTab
+                case 7: OpsActivityIssuesView(activityId: current.id, canManage: canManageActivities)
                 default: aprobacionesTab
                 }
             }
@@ -79,6 +116,19 @@ struct ActivityDetailView: View {
             }
         }
         .task { await load() }
+        .sheet(isPresented: $showReassign) {
+            OpsActivityReassignView(
+                activityId: current.id,
+                currentResponsable: current.responsable,
+                canManage: canManageActivities,
+                onReassigned: { Task { await load() } }
+            )
+        }
+        .sheet(item: $report) { rep in
+            NavigationStack {
+                PDFViewerScreen(title: rep.title, data: rep.data)
+            }
+        }
     }
 
     private var infoTab: some View {
@@ -170,8 +220,143 @@ struct ActivityDetailView: View {
                         .foregroundStyle(.orange)
                     Text(ActivityParse.fmtIso(slaAlerted)).font(.caption2).foregroundStyle(.secondary)
                 }
+
+                Divider()
+                ejecucionBlock(closed: closed)
             }
             .padding()
+        }
+    }
+
+    /// Iniciar / finalizar la OT en sitio — `PATCH activities/:id/execute`.
+    /// Es lo único que el ingeniero de campo puede cambiar de su propia orden;
+    /// el cambio libre de estatus sigue siendo de despacho, en la web.
+    @ViewBuilder
+    private func ejecucionBlock(closed: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Ejecución en sitio").font(.headline)
+
+            if current.id <= 0 {
+                Text("Sin identificador de OT: no se puede ejecutar.")
+                    .font(.caption).foregroundColor(.secondary)
+            } else if !isMyActivity {
+                // Se dice el porqué en vez de esconder el bloque sin explicación:
+                // el técnico que abre la OT de un compañero merece saber que no
+                // es que falle, es que no es suya.
+                Text("Esta OT no está asignada a ti, así que no puedes iniciarla ni finalizarla.")
+                    .font(.caption).foregroundColor(.secondary)
+            } else {
+                let started = !current.startDate.isEmpty
+                HStack(spacing: 8) {
+                    Button {
+                        Task { await runExecute(estatus: "En Proceso", start: true) }
+                    } label: {
+                        Label(started ? "Reiniciar" : "Iniciar servicio", systemImage: "play.fill")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
+                    .disabled(executing || closed)
+
+                    Button {
+                        Task { await runExecute(estatus: "Finalizada", start: false) }
+                    } label: {
+                        Label("Finalizar servicio", systemImage: "checkmark.seal.fill")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .disabled(executing || closed || !started)
+                }
+
+                if closed {
+                    Text("La OT ya está cerrada.").font(.caption2).foregroundColor(.secondary)
+                } else if !started {
+                    Text("Finalizar se habilita cuando la OT tiene hora de inicio.")
+                        .font(.caption2).foregroundColor(.secondary)
+                }
+
+                // Aviso, no bloqueo: quien decide si una OT puede cerrarse sin
+                // evidencia es el backend, pero el técnico tiene que verlo antes
+                // de darle a finalizar y no enterarse en la revisión.
+                if let ev = evidence, !ev.hasEntry, !closed {
+                    Label("Esta OT no tiene foto de entrada registrada.",
+                          systemImage: "exclamationmark.triangle")
+                        .font(.caption2).foregroundColor(.orange)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    showReassign = true
+                } label: {
+                    Label(canManageActivities ? "Reasignar" : "Historial de reasignación",
+                          systemImage: "arrow.triangle.swap")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .disabled(current.id <= 0)
+
+                if canSeeTicketReport {
+                    Button {
+                        Task { await openTicketReport() }
+                    } label: {
+                        Label(loadingReport ? "Generando…" : "Reporte PDF",
+                              systemImage: "doc.text.magnifyingglass")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(loadingReport || current.id <= 0)
+                }
+            }
+
+            if let msg = actionMessage {
+                Text(msg).font(.caption).foregroundColor(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func runExecute(estatus: String, start: Bool) async {
+        guard current.id > 0 else { return }
+        executing = true
+        actionMessage = nil
+        defer { executing = false }
+        let now = ConsoleHelpers.isoNow()
+        do {
+            let updated = try await FieldOpsActivityRepository.shared.execute(
+                activityId: current.id,
+                estatus: estatus,
+                fechaInicio: start ? now : nil,
+                fechaFinalizacion: start ? nil : now
+            )
+            if updated.id > 0 { detail = updated }
+            actionMessage = start ? "Servicio iniciado." : "Servicio finalizado."
+            await load()
+        } catch {
+            actionMessage = error.toUserMessage(fallback: "No se pudo actualizar la OT")
+        }
+    }
+
+    private func openTicketReport() async {
+        guard current.id > 0 else { return }
+        loadingReport = true
+        actionMessage = nil
+        defer { loadingReport = false }
+        do {
+            let data = try await FieldOpsActivityRepository.shared.ticketReportPdf(activityId: current.id)
+            if data.isEmpty {
+                actionMessage = "El servidor devolvió un reporte vacío."
+            } else {
+                let an = ActivityParse.str(current.raw["anNumber"])
+                report = OpsTicketReport(
+                    id: current.id,
+                    title: an.isEmpty ? "Reporte OT \(current.id)" : "Reporte \(an)",
+                    data: data
+                )
+            }
+        } catch {
+            actionMessage = error.toUserMessage(fallback: "No se pudo generar el reporte")
         }
     }
 

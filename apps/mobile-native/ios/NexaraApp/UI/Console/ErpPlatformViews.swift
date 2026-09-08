@@ -282,12 +282,31 @@ final class ApprovalsVM: ObservableObject {
     @Published var message: String?
     @Published var rejectNotes: [Int64: String] = [:]
 
+    /// Cadena completa del trámite, por id de instancia. Se pide bajo demanda
+    /// (`workflow/instances/:id`): la bandeja sólo dice "te toca el paso 2" y
+    /// para decidir hace falta ver quién firmó antes y con qué comentario.
+    @Published var trails: [Int64: WorkflowInstanceItem] = [:]
+    @Published var loadingTrail: Int64?
+
     func load() {
         isLoading = true
         Task {
             items = await ExtraRepository.shared.workflowApprovals()
             isLoading = false
             actingId = nil
+        }
+    }
+
+    func toggleTrail(instanceId: Int64) {
+        if trails[instanceId] != nil {
+            trails[instanceId] = nil
+            return
+        }
+        loadingTrail = instanceId
+        Task {
+            let inst = await ProcurementRepository.shared.workflowInstance(id: instanceId)
+            if inst.hasData { trails[instanceId] = inst }
+            loadingTrail = nil
         }
     }
 
@@ -337,6 +356,9 @@ struct ApprovalsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(item.displayTitle).font(.headline)
                     Text(item.displaySubtitle).font(.caption).foregroundColor(.secondary)
+                    if let instId = item.instanceId {
+                        ApprovalTrail(instanceId: instId, vm: vm)
+                    }
                     TextField("Comentario / motivo rechazo", text: Binding(
                         get: { vm.rejectNotes[item.id] ?? "" },
                         set: { vm.rejectNotes[item.id] = $0 }
@@ -356,6 +378,56 @@ struct ApprovalsView: View {
         .navigationTitle("Aprobaciones")
         .task { vm.load() }
         .refreshable { vm.load() }
+    }
+}
+
+/// Desplegable con la cadena de aprobación de una instancia de workflow.
+/// Se pide sólo cuando el usuario lo abre: en una bandeja con veinte
+/// pendientes, cargarlas todas de golpe serían veinte peticiones que casi
+/// nadie va a mirar.
+private struct ApprovalTrail: View {
+    let instanceId: Int64
+    @ObservedObject var vm: ApprovalsVM
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                vm.toggleTrail(instanceId: instanceId)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: vm.trails[instanceId] == nil ? "chevron.right" : "chevron.down")
+                    Text(vm.trails[instanceId] == nil ? "Ver trámite" : "Ocultar trámite")
+                }
+                .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.blue)
+
+            if vm.loadingTrail == instanceId {
+                ProgressView().scaleEffect(0.7)
+            }
+            if let inst = vm.trails[instanceId] {
+                Text("\(inst.displayTitle) · \(inst.statusLabel)")
+                    .font(.caption2).foregroundColor(.secondary)
+                ForEach(inst.steps, id: \.rowKey) { step in
+                    HStack(spacing: 6) {
+                        Image(systemName: step.isApproved ? "checkmark.circle.fill"
+                                : (step.isRejected ? "xmark.circle.fill" : "clock"))
+                            .font(.caption2)
+                            .foregroundColor(step.isApproved ? .green : (step.isRejected ? .red : .orange))
+                        Text(step.displayName).font(.caption2)
+                        Spacer()
+                        if !step.decidedByName.isEmpty {
+                            Text(step.decidedByName).font(.caption2).foregroundColor(.secondary)
+                        }
+                    }
+                    if !step.comments.isEmpty {
+                        Text(step.comments).font(.caption2).foregroundColor(.secondary)
+                            .padding(.leading, 18)
+                    }
+                }
+            }
+        }
     }
 }
 

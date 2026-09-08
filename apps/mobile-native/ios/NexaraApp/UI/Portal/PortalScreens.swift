@@ -90,7 +90,7 @@ struct PortalBranchesView: View {
             }
         }
         .navigationTitle("Sucursales")
-        .toolbar { ToolbarItem(placement: .primaryAction) { Button { onNew() } label: { Image(systemName: "plus") } } } }
+        .toolbar { ToolbarItem(placement: .primaryAction) { Button { onNew() } label: { Image(systemName: "plus") } } }
         .task { await reload() }
         .refreshable { await reload() }
     }

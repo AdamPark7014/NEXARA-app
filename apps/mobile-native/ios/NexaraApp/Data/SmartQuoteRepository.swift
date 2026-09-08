@@ -69,6 +69,17 @@ final class SmartQuoteRepository {
         return []
     }
 
+    /// Reglas comerciales vigentes — GET `smart-quote/rules`.
+    ///
+    /// `rules/check-margin` ya estaba, pero sólo dice sí/no sobre una línea
+    /// concreta. Esto lista el criterio completo (margen mínimo, descuento
+    /// máximo, si exige aprobación) para que el vendedor sepa por qué le
+    /// rechazan un precio antes de teclearlo. El endpoint siembra la regla por
+    /// defecto si la empresa no tiene ninguna, así que nunca viene vacío.
+    func commercialRules() async throws -> [CrmCommercialRule] {
+        ApiClient.decodeMapList(try await api.get("smart-quote/rules")).map(CrmCommercialRule.init)
+    }
+
     func checkMargin(unitCost: Double, unitPrice: Double, category: String?, brand: String?) async throws -> [String: Any] {
         struct Body: Encodable {
             let unitCost: Double

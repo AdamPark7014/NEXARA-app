@@ -109,6 +109,60 @@ struct AttendanceCheckInResult {
     }
 }
 
+/// Resumen de **un** día — `GET attendance/day?date=YYYY-MM-DD`.
+///
+/// El backend devuelve la fila de `AttendanceDay` o `null` si ese día no existe.
+/// `null` es información: significa "no marcaste", y la pantalla lo dice así en
+/// vez de enseñar ceros que se leerían como una jornada de cero minutos.
+struct AttendanceDaySummary: Hashable {
+    let id: Int64?
+    let date: String
+    let checkIn: String
+    let checkOut: String
+    let totalMinutes: Int
+    let isOpen: Bool
+    let raw: [String: Any]
+
+    /// `true` cuando el servidor no tenía fila para ese día.
+    var isMissing: Bool { id == nil && checkIn.isEmpty && checkOut.isEmpty }
+
+    var hoursLabel: String {
+        guard totalMinutes > 0 else { return "—" }
+        return String(format: "%dh %02dm", totalMinutes / 60, totalMinutes % 60)
+    }
+
+    var checkInLabel: String { Self.clock(checkIn) }
+    var checkOutLabel: String { Self.clock(checkOut) }
+
+    /// Hora `HH:mm` de un ISO-8601. Se recorta la cadena en vez de reformatear
+    /// con `DateFormatter` porque el backend ya manda la hora en el huso de la
+    /// empresa; convertirla a la del teléfono movería los marcajes de un técnico
+    /// que viaja entre husos.
+    private static func clock(_ iso: String) -> String {
+        guard iso.count >= 16 else { return iso.isEmpty ? "—" : iso }
+        return String(iso.prefix(16).suffix(5))
+    }
+
+    static func == (lhs: AttendanceDaySummary, rhs: AttendanceDaySummary) -> Bool {
+        lhs.id == rhs.id && lhs.date == rhs.date && lhs.totalMinutes == rhs.totalMinutes
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id); hasher.combine(date); hasher.combine(totalMinutes)
+    }
+
+    init(raw: [String: Any]) {
+        self.raw = raw
+        id = StockParse.int64(raw["id"])
+        date = StockParse.str(raw["date"], raw["fecha"])
+        checkIn = StockParse.str(raw["checkIn"], raw["entrada"])
+        checkOut = StockParse.str(raw["checkOut"], raw["salida"])
+        totalMinutes = StockParse.int(raw["totalMinutes"], raw["minutos"]) ?? 0
+        isOpen = (raw["isOpen"] as? Bool) ?? (!StockParse.str(raw["checkIn"]).isEmpty
+                                              && StockParse.str(raw["checkOut"]).isEmpty)
+    }
+}
+
 // MARK: - Viatics (mirror Android ViaticDto)
 
 struct ViaticItem: Hashable, Identifiable {

@@ -126,29 +126,86 @@ struct ProjectsView: View {
     }
 }
 
+/// Directorio de usuarios.
+///
+/// Antes era una lista muerta: nombre, correo, y punto. Ahora cada fila abre la
+/// ficha (`UsersDetailView`) con sesiones, actividad de acceso y bitácora, y se
+/// puede filtrar por rol y departamento con los catálogos que ya expone el API
+/// (`users/roles`, `users/departments`) y que Android usa desde hace meses.
+///
+/// Sigue siendo de consulta: dar de alta a alguien o cambiarle el rol está
+/// pendiente de autorización del dueño y se hace desde la consola web.
 struct UsersView: View {
     @State private var users: [[String: Any]] = []
+    @State private var roles: [UserPickerOption] = []
+    @State private var departments: [UserPickerOption] = []
     @State private var query = ""
+    @State private var roleFilter: Int64 = 0
+    @State private var departmentFilter: Int64 = 0
     @State private var isLoading = true
 
     private var filtered: [[String: Any]] {
-        guard !query.isEmpty else { return users }
+        var list = users
+        if roleFilter > 0 {
+            list = list.filter { row in
+                let nested = row["role"] as? [String: Any]
+                return StockParse.int64(row["roleId"], nested?["id"]) == roleFilter
+            }
+        }
+        if departmentFilter > 0 {
+            list = list.filter { row in
+                let nested = row["department"] as? [String: Any]
+                return StockParse.int64(row["departmentId"], nested?["id"]) == departmentFilter
+            }
+        }
+        guard !query.isEmpty else { return list }
         let q = query.lowercased()
-        return users.filter {
+        return list.filter {
             ConsoleHelpers.mapStr($0, "nombre", "name").lowercased().contains(q) ||
-            ConsoleHelpers.mapStr($0, "email").lowercased().contains(q)
+            ConsoleHelpers.mapStr($0, "email").lowercased().contains(q) ||
+            ConsoleHelpers.mapStr($0, "puesto", "position").lowercased().contains(q)
         }
     }
 
     var body: some View {
         List {
             if isLoading { ProgressView() }
-            ForEach(filtered, id: \.userKey) { u in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ConsoleHelpers.mapStr(u, "nombre", "name")).font(.headline)
-                    Text(ConsoleHelpers.mapStr(u, "email", "rol", "role"))
-                        .font(.caption).foregroundColor(.secondary)
+
+            if !roles.isEmpty || !departments.isEmpty {
+                Section {
+                    if !roles.isEmpty {
+                        Picker("Rol", selection: $roleFilter) {
+                            Text("Todos").tag(Int64(0))
+                            ForEach(roles) { role in Text(role.label).tag(role.id) }
+                        }
+                    }
+                    if !departments.isEmpty {
+                        Picker("Departamento", selection: $departmentFilter) {
+                            Text("Todos").tag(Int64(0))
+                            ForEach(departments) { dept in Text(dept.label).tag(dept.id) }
+                        }
+                    }
                 }
+            }
+
+            Section {
+                ForEach(filtered, id: \.userKey) { u in
+                    let userId = StockParse.int64(u["id"]) ?? 0
+                    let name = ConsoleHelpers.mapStr(u, "nombre", "name")
+                    if userId > 0 {
+                        NavigationLink {
+                            UsersDetailView(userId: userId, fallbackName: name)
+                        } label: {
+                            userRow(u, name: name)
+                        }
+                    } else {
+                        // Sin id no hay ficha que abrir; se enseña la fila igual
+                        // en vez de esconder al usuario de la lista.
+                        userRow(u, name: name)
+                    }
+                }
+            } footer: {
+                Text("Toca a alguien para ver su ficha, sus sesiones y su actividad de acceso.")
             }
         }
         .navigationTitle("Usuarios")
@@ -157,10 +214,29 @@ struct UsersView: View {
         .refreshable { await reload() }
     }
 
+    private func userRow(_ u: [String: Any], name: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(name.isEmpty ? ConsoleHelpers.mapStr(u, "email") : name).font(.headline)
+            Text(ConsoleHelpers.mapStr(u, "email", "rol", "role"))
+                .font(.caption).foregroundColor(.secondary)
+            let extra = [
+                ConsoleHelpers.mapStr(u, "puesto", "position"),
+                ConsoleHelpers.mapStr(u, "departmentName", "departamento"),
+            ].filter { !$0.isEmpty }.joined(separator: " · ")
+            if !extra.isEmpty {
+                Text(extra).font(.caption2).foregroundColor(.secondary)
+            }
+        }
+    }
+
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        users = (try? await ConsoleRepository.shared.users()) ?? []
+        users = (try? await ConsoleRepository.shared.users(preferAssignable: false)) ?? []
+        // Los catálogos son opcionales: sin permiso para leerlos la lista sigue
+        // funcionando, sólo que sin filtros.
+        roles = (try? await UsersAdminRepository.shared.rolePicker()) ?? []
+        departments = (try? await UsersAdminRepository.shared.departmentPicker()) ?? []
     }
 }
 

@@ -27,6 +27,17 @@ struct CrmOpportunityDetailView: View {
     @State private var pickedStage = "DISCOVERY"
     @State private var updatingStage = false
 
+    // Alta / edición / borrado de tareas CRM. Antes sólo se podía marcar
+    // completada: reprogramar una llamada —lo que de verdad se hace desde la
+    // calle— obligaba a abrir la web.
+    @State private var activityForm: CrmActivityFormTarget?
+    @State private var activitySubject = ""
+    @State private var activityNotes = ""
+    @State private var activityType = "CALL"
+    @State private var activityDue = Date()
+    @State private var savingActivity = false
+    @State private var pendingDeleteActivity: CrmActivity?
+
     private let tabs = ["Resumen", "Notas", "Actividades", "Adjuntos", "Cotizaciones", "Historial"]
 
     var body: some View {
@@ -74,6 +85,62 @@ struct CrmOpportunityDetailView: View {
             Button("Cancelar", role: .cancel) {}
         } message: {
             Text("¿Eliminar esta oportunidad del pipeline?")
+        }
+        .sheet(item: $activityForm) { target in
+            activitySheet(target)
+        }
+        .alert(
+            "Eliminar tarea",
+            isPresented: Binding(
+                get: { pendingDeleteActivity != nil },
+                set: { if !$0 { pendingDeleteActivity = nil } }
+            )
+        ) {
+            Button("Eliminar", role: .destructive) { Task { await deleteActivity() } }
+            Button("Cancelar", role: .cancel) { pendingDeleteActivity = nil }
+        } message: {
+            Text("Se borra «\(pendingDeleteActivity?.displayTitle ?? "la tarea")». No hay papelera.")
+        }
+    }
+
+    /// Formulario compartido por alta y edición: sólo cambia el título y a qué
+    /// endpoint va al guardar.
+    private func activitySheet(_ target: CrmActivityFormTarget) -> some View {
+        NavigationStack {
+            Form {
+                Section("Tarea") {
+                    TextField("Asunto", text: $activitySubject)
+                    Picker("Tipo", selection: $activityType) {
+                        ForEach(crmActivityTypes, id: \.key) { t in
+                            Text(t.label).tag(t.key)
+                        }
+                    }
+                    DatePicker("Vence", selection: $activityDue)
+                }
+                Section("Notas") {
+                    TextField("Detalle (opcional)", text: $activityNotes, axis: .vertical)
+                        .lineLimit(2...5)
+                }
+                if let actionError {
+                    Section { Text(actionError).font(.footnote).foregroundColor(.red) }
+                }
+            }
+            .navigationTitle(target.isNew ? "Nueva tarea" : "Editar tarea")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { activityForm = nil }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(savingActivity ? "Guardando…" : "Guardar") {
+                        Task { await saveActivity(target) }
+                    }
+                    .disabled(
+                        savingActivity ||
+                        activitySubject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                }
+            }
         }
     }
 
@@ -206,6 +273,14 @@ struct CrmOpportunityDetailView: View {
             if let actionError {
                 Section { Text(actionError).foregroundColor(.red).font(.footnote) }
             }
+            Section {
+                Button {
+                    prepareNewActivity()
+                } label: {
+                    Label("Nueva tarea", systemImage: "plus.circle")
+                }
+                .disabled(oppId <= 0)
+            }
             if loadingActivities {
                 ProgressView()
             } else if activities.isEmpty {
@@ -238,6 +313,19 @@ struct CrmOpportunityDetailView: View {
                         }
                     }
                     .padding(.vertical, 2)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            pendingDeleteActivity = act
+                        } label: {
+                            Label("Eliminar", systemImage: "trash")
+                        }
+                        Button {
+                            prepareEditActivity(act)
+                        } label: {
+                            Label("Editar", systemImage: "pencil")
+                        }
+                        .tint(.blue)
+                    }
                 }
             }
         }
@@ -388,6 +476,70 @@ struct CrmOpportunityDetailView: View {
         }
     }
 
+    // MARK: – Tareas CRM: alta, edición y borrado
+
+    private func prepareNewActivity() {
+        activitySubject = ""
+        activityNotes = ""
+        activityType = "CALL"
+        // Por defecto mañana a la misma hora: casi ninguna tarea que se crea
+        // desde la calle es para hoy mismo.
+        activityDue = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        actionError = nil
+        activityForm = CrmActivityFormTarget(activityId: nil)
+    }
+
+    private func prepareEditActivity(_ act: CrmActivity) {
+        activitySubject = act.displayTitle
+        activityNotes = act.notes
+        activityType = act.activityType.isEmpty ? "TASK" : act.activityType.uppercased()
+        activityDue = CrmActivityFormTarget.parseDate(act.dueDate) ?? Date()
+        actionError = nil
+        activityForm = CrmActivityFormTarget(activityId: act.id)
+    }
+
+    private func saveActivity(_ target: CrmActivityFormTarget) async {
+        savingActivity = true
+        defer { savingActivity = false }
+        let iso = ISO8601DateFormatter().string(from: activityDue)
+        do {
+            if let id = target.activityId {
+                _ = try await CrmRepository.shared.updateCrmActivity(
+                    id: id,
+                    subject: activitySubject,
+                    dueDate: iso,
+                    activityType: activityType,
+                    description: activityNotes
+                )
+            } else {
+                _ = try await CrmRepository.shared.createCrmActivity(
+                    opportunityId: Int64(oppId),
+                    subject: activitySubject,
+                    dueDate: iso,
+                    activityType: activityType,
+                    description: activityNotes
+                )
+            }
+            actionError = nil
+            activityForm = nil
+            await loadActivities()
+        } catch {
+            actionError = error.toUserMessage()
+        }
+    }
+
+    private func deleteActivity() async {
+        guard let act = pendingDeleteActivity, act.id > 0 else { pendingDeleteActivity = nil; return }
+        defer { pendingDeleteActivity = nil }
+        do {
+            try await CrmRepository.shared.deleteCrmActivity(id: act.id)
+            actionError = nil
+            await loadActivities()
+        } catch {
+            actionError = error.toUserMessage()
+        }
+    }
+
     private func updateStage() async {
         updatingStage = true
         defer { updatingStage = false }
@@ -455,3 +607,40 @@ struct CrmOpportunityDetailView: View {
         }
     }
 }
+
+/// Identifica qué está editando la hoja de tarea CRM: `nil` = alta nueva.
+///
+/// Existe sólo para poder usar `.sheet(item:)`, que exige `Identifiable`, sin
+/// arrastrar un segundo booleano de estado que se desincronice con el id.
+struct CrmActivityFormTarget: Identifiable {
+    let activityId: Int64?
+
+    var id: String { activityId.map(String.init) ?? "nueva" }
+    var isNew: Bool { activityId == nil }
+
+    /// El backend serializa `dueDate` como ISO-8601, a veces con milisegundos y
+    /// a veces sin ellos. Se prueban las dos variantes antes de rendirse.
+    static func parseDate(_ raw: String) -> Date? {
+        guard !raw.isEmpty else { return nil }
+        let withFractional = ISO8601DateFormatter()
+        withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = withFractional.date(from: raw) { return d }
+        if let d = ISO8601DateFormatter().date(from: raw) { return d }
+        let plain = DateFormatter()
+        plain.locale = Locale(identifier: "en_US_POSIX")
+        plain.dateFormat = "yyyy-MM-dd"
+        return plain.date(from: String(raw.prefix(10)))
+    }
+}
+
+/// Valores de `CrmActivityType` en Prisma. El backend rechaza cualquier otro,
+/// así que el picker no puede ser texto libre.
+let crmActivityTypes: [(key: String, label: String)] = [
+    ("CALL", "Llamada"),
+    ("EMAIL", "Correo"),
+    ("MEETING", "Reunión"),
+    ("VISIT", "Visita"),
+    ("WHATSAPP", "WhatsApp"),
+    ("TASK", "Tarea"),
+    ("NOTE", "Nota"),
+]

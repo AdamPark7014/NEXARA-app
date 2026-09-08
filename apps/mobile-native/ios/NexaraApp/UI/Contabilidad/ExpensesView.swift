@@ -107,7 +107,7 @@ final class ExpensesVM: ObservableObject {
             load()
             return true
         } catch {
-            message = "❌ \(error.toUserMessage("No se pudo marcar pagado"))"
+            message = "❌ \(error.toUserMessage(fallback: "No se pudo marcar pagado"))"
             return false
         }
     }

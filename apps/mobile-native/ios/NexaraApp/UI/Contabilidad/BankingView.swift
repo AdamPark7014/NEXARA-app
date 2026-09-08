@@ -7,6 +7,14 @@ final class BankingVM: ObservableObject {
     @Published var accounts: [BankAccountItem] = []
     @Published var isLoading = false
 
+    /// Movimientos y resumen de la cuenta abierta. La lista de cuentas sólo
+    /// traía el saldo; "¿entró ya el pago?" era justamente lo que no se podía
+    /// contestar desde el teléfono.
+    @Published var transactions: [BankTransaction] = []
+    @Published var summary: BankAccountSummary?
+    @Published var isLoadingDetail = false
+    @Published var detailError: String?
+
     var totalBalance: Double { accounts.reduce(0) { $0 + $1.balance } }
 
     func load() {
@@ -15,6 +23,35 @@ final class BankingVM: ObservableObject {
             accounts = await ExtraRepository.shared.bankAccountItems()
             isLoading = false
         }
+    }
+
+    /// GET banking/accounts/:id/summary + /transactions.
+    func loadDetail(accountId: Int64) {
+        transactions = []
+        summary = nil
+        detailError = nil
+        guard accountId > 0 else {
+            detailError = "La cuenta no trae identificador; no se pueden pedir sus movimientos."
+            return
+        }
+        isLoadingDetail = true
+        Task {
+            async let s = AccountingRepository.shared.bankAccountSummary(id: accountId)
+            async let t = AccountingRepository.shared.bankTransactions(accountId: accountId, limit: 50)
+            let (resumen, movs) = await (s, t)
+            summary = resumen.hasData ? resumen : nil
+            // Si el listado paginado viene vacío pero el resumen sí trae los
+            // últimos movimientos, se enseñan esos antes que un "sin datos"
+            // que sería falso.
+            transactions = movs.isEmpty ? resumen.lastTransactions : movs
+            isLoadingDetail = false
+        }
+    }
+
+    func clearDetail() {
+        transactions = []
+        summary = nil
+        detailError = nil
     }
 }
 
@@ -69,7 +106,10 @@ struct BankingView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Cuentas").font(.headline).padding(.horizontal)
                         ForEach(vm.accounts) { acc in
-                            Button { selected = acc } label: {
+                            Button {
+                                selected = acc
+                                vm.loadDetail(accountId: acc.id)
+                            } label: {
                                 BankAccountCard(item: acc).padding(.horizontal)
                             }
                             .buttonStyle(.plain)
@@ -87,7 +127,7 @@ struct BankingView: View {
         let isNeg = acc.balance < 0
         List {
             Section {
-                Button("← Banca") { selected = nil }
+                Button("← Banca") { selected = nil; vm.clearDetail() }
             }
             Section {
                 VStack(spacing: 4) {
@@ -105,6 +145,49 @@ struct BankingView: View {
                 bRow("Moneda",         acc.currency)
                 bRow("Tipo",           acc.type)
                 bRow("Responsable",    acc.ownerName)
+            }
+            if let s = vm.summary {
+                Section("Este mes") {
+                    HStack(spacing: 0) {
+                        BankSummaryCell(label: "Abonos", value: fmtBank(s.monthCredits), color: .green)
+                        Divider().frame(height: 32)
+                        BankSummaryCell(label: "Cargos", value: fmtBank(s.monthDebits), color: .red)
+                        Divider().frame(height: 32)
+                        BankSummaryCell(
+                            label: "Neto",
+                            value: fmtBank(s.monthNet),
+                            color: s.monthNet < 0 ? .red : .green
+                        )
+                    }
+                    if s.unreconciledCount > 0 {
+                        HStack {
+                            Text("Sin conciliar")
+                            Spacer()
+                            Text("\(s.unreconciledCount)").bold().foregroundColor(.orange)
+                        }
+                    }
+                }
+            }
+            Section {
+                if vm.isLoadingDetail {
+                    ProgressView().frame(maxWidth: .infinity)
+                } else if let err = vm.detailError {
+                    Text(err).font(.caption).foregroundColor(.orange)
+                } else if vm.transactions.isEmpty {
+                    Text("Sin movimientos importados para esta cuenta.")
+                        .font(.caption).foregroundColor(.secondary)
+                } else {
+                    ForEach(vm.transactions, id: \.rowKey) { tx in
+                        BankTransactionRow(item: tx)
+                    }
+                }
+            } header: {
+                Text("Movimientos")
+            } footer: {
+                // No se puede conciliar desde la app: `PATCH banking/transactions/:id/reconcile`
+                // es una escritura contable y está fuera de lo autorizado.
+                Text("Sólo consulta. Conciliar un movimiento se hace en la web.")
+                    .font(.caption2)
             }
         }
         .listStyle(.insetGrouped)
@@ -143,6 +226,56 @@ private struct BankAccountCard: View {
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+private struct BankSummaryCell: View {
+    let label: String
+    let value: String
+    let color: Color
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(value).font(.subheadline).bold().foregroundColor(color).lineLimit(1).minimumScaleFactor(0.7)
+            Text(label).font(.caption2).foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 2)
+    }
+}
+
+private struct BankTransactionRow: View {
+    let item: BankTransaction
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: item.isDebit ? "arrow.up.right" : "arrow.down.left")
+                .font(.caption)
+                .foregroundColor(item.isDebit ? .red : .green)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.displayDescription).font(.subheadline).lineLimit(2)
+                HStack(spacing: 6) {
+                    if !item.dateLabel.isEmpty {
+                        Text(item.dateLabel).font(.caption2).foregroundColor(.secondary)
+                    }
+                    if !item.counterpartyName.isEmpty {
+                        Text(item.counterpartyName).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                    }
+                    // La clave de rastreo SPEI es lo que se le pide al cliente
+                    // cuando dice "ya te transferí"; merece estar a la vista.
+                    if !item.speiTrackingKey.isEmpty {
+                        Text(item.speiTrackingKey).font(.caption2).foregroundColor(.blue).lineLimit(1)
+                    }
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(fmtBank(item.amount))
+                    .font(.caption).bold()
+                    .foregroundColor(item.isDebit ? .red : .green)
+                if !item.isReconciled {
+                    Text("sin conciliar").font(.caption2).foregroundColor(.orange)
+                }
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 

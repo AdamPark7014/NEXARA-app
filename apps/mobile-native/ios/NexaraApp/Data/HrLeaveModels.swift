@@ -6,6 +6,9 @@ struct HrLeave: Hashable, Identifiable {
     let type: String
     let reason: String
     let status: String
+    /// Quién la solicitó. Decide si el usuario en sesión puede cancelarla:
+    /// el API rechaza cancelar la solicitud de otro.
+    let userId: Int64
     let userName: String
     let startDate: String
     let endDate: String
@@ -15,9 +18,17 @@ struct HrLeave: Hashable, Identifiable {
     let raw: [String: Any]
 
     var rowKey: String { "hr-\(id)" }
+
+    /// Tipo en español; nunca la clave cruda del enum del API.
+    var typeLabel: String { HrLeaveCatalog.typeLabel(type) }
+    /// Estatus en español; nunca «PENDING» en pantalla.
+    var statusLabel: String { HrLeaveCatalog.statusLabel(status) }
+    /// Sigue esperando decisión: es lo único aprobable o cancelable.
+    var isPending: Bool { HrLeaveCatalog.isPending(status) }
+
     var displayReason: String {
         if !reason.isEmpty { return reason }
-        if !type.isEmpty { return type }
+        if !type.isEmpty { return typeLabel }
         return "Permiso"
     }
     var dateRange: String {
@@ -39,6 +50,7 @@ struct HrLeave: Hashable, Identifiable {
         type = StockParse.str(raw["type"], raw["tipo"])
         reason = StockParse.str(raw["reason"], raw["motivo"])
         status = StockParse.str(raw["status"], raw["estado"])
+        userId = StockParse.int64(raw["userId"], user?["id"], employee?["id"]) ?? 0
         userName = StockParse.str(
             raw["userName"], raw["employeeName"], raw["nombre"],
             user?["name"], user?["nombre"],

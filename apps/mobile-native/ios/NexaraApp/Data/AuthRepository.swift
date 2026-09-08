@@ -175,6 +175,43 @@ final class AuthRepository {
         return next
     }
 
+    /// `GET auth/profile` — quién soy según el token, no según lo que se
+    /// guardó al iniciar sesión.
+    ///
+    /// Android lo tiene desde siempre (`AuthApi.profile`) y iOS no lo llamaba
+    /// nunca: los permisos de la sesión eran los del momento del login y no se
+    /// refrescaban jamás. Si a alguien le daban o le quitaban un permiso, en el
+    /// teléfono seguía viendo (o sin ver) módulos hasta el siguiente login.
+    ///
+    /// Devuelve el usuario ya guardado en la sesión. Best-effort: si el API
+    /// falla, se conserva lo que había y no se tumba la sesión.
+    @discardableResult
+    func refreshProfile() async -> SessionUser? {
+        guard var current = SessionStore.shared.currentUser else { return nil }
+        guard !current.isClient, !current.isBranchUser else { return current }
+        guard let data = try? await ApiClient.shared.get("auth/profile") else { return current }
+        let map = ConsoleHelpers.decodeMap(data)
+        guard !map.isEmpty else { return current }
+
+        if let nombre = ConsoleHelpers.mapStr(map, "nombre", "name").nilIfEmpty { current.nombre = nombre }
+        if let email = ConsoleHelpers.mapStr(map, "email").nilIfEmpty { current.email = email }
+        if let role = ConsoleHelpers.mapStr(map, "role", "rol").nilIfEmpty { current.role = role }
+        if let roleKey = ConsoleHelpers.mapStr(map, "roleKey").nilIfEmpty { current.roleKey = roleKey }
+        if let orgRoleKey = ConsoleHelpers.mapStr(map, "orgRoleKey").nilIfEmpty { current.orgRoleKey = orgRoleKey }
+        if let dept = ConsoleHelpers.mapStr(map, "department", "departamento").nilIfEmpty {
+            current.department = dept
+        }
+        // La lista de permisos se sustituye entera, nunca se fusiona: fusionar
+        // dejaría vivo un permiso que el servidor acaba de retirar.
+        if let permissions = map["permissions"] as? [String] {
+            current.permissions = permissions
+        }
+        if let superAdmin = map["isSuperAdmin"] as? Bool { current.isSuperAdmin = superAdmin }
+
+        SessionStore.shared.save(current)
+        return current
+    }
+
     /// Sliding session: si faltan < 20 min, pide token nuevo. Paridad Android `maybeExtendSession`.
     func maybeExtendSession() async {
         guard var current = SessionStore.shared.currentUser else { return }
@@ -182,6 +219,11 @@ final class AuthRepository {
 
         current = await enrichSession(current)
         SessionStore.shared.save(current)
+
+        // Los permisos se refrescan aquí y no sólo al iniciar sesión: es el
+        // único punto que la app vuelve a pisar de forma periódica
+        // (`NexaraApp.swift` lo llama al volver a primer plano).
+        if let refreshed = await refreshProfile() { current = refreshed }
 
         guard let expiresRaw = current.expiresAt,
               let expires = ISO8601DateFormatter().date(from: expiresRaw)

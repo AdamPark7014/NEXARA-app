@@ -150,6 +150,23 @@ final class StudioRepository {
         return try decodeList(NewsPost.self, from: try await api.get("news", query: q))
     }
 
+    /// Listado de noticias para el panel — GET `news/admin`.
+    ///
+    /// `news` a secas es el feed público: filtra borradores y programadas. Un
+    /// editor que abre STUDIO en el teléfono no veía sus propios borradores.
+    /// Si el usuario no tiene permiso de contenidos el backend responde 403, así
+    /// que se cae al listado público en vez de dejar la pantalla vacía.
+    func newsAdmin(search: String? = nil, status: String? = nil) async throws -> [NewsPost] {
+        var q: [String: String] = [:]
+        if let s = search, !s.isEmpty { q["search"] = s }
+        if let s = status, !s.isEmpty { q["status"] = s }
+        do {
+            return try decodeList(NewsPost.self, from: try await api.get("news/admin", query: q))
+        } catch {
+            return try await news(search: search, status: status)
+        }
+    }
+
     func createNews(_ body: CreateNewsBody) async throws -> NewsPost {
         try ApiClient.decodeOne(try await api.postJSON("news", body: body))
     }
@@ -192,6 +209,17 @@ final class StudioRepository {
             return resp.sections ?? []
         }
         return []
+    }
+
+    /// Todas las secciones con contenido en una sola llamada —
+    /// GET `studio/page-content`.
+    ///
+    /// `page-content/sections` sólo devuelve los nombres válidos, así que la
+    /// pantalla tenía que hacer una petición por sección para saber cuáles
+    /// estaban rellenas. Esto lo resuelve en una, y devuelve sólo las que
+    /// existen de verdad en base de datos.
+    func allPageContent() async throws -> [PageContent] {
+        try ApiClient.decodeList(try await api.get("studio/page-content"))
     }
 
     func getPageContent(section: String) async throws -> PageContent {

@@ -81,6 +81,19 @@ struct ConsoleSettingsView: View {
                     OfflineQueueView()
                 }
             }
+            // Puntos de entrada a las pantallas nuevas mientras el enrutador de
+            // módulos no las liste: sin esto no habría forma de llegar a ellas.
+            Section("Cuenta y empresa") {
+                NavigationLink("Mi seguridad · segundo factor") {
+                    UsersMfaView()
+                }
+                NavigationLink("Facturación y asientos") {
+                    CompanyBillingView()
+                }
+                NavigationLink("Identidad y acceso") {
+                    UsersIamView()
+                }
+            }
             Section("API keys de la empresa") {
                 if let err = vm.apiKeysError {
                     Text(err).font(.footnote).foregroundColor(.red)
@@ -111,6 +124,32 @@ struct ConsoleSettingsView: View {
                     }
                 }
                 TextField("Nombre de la nueva API key", text: $vm.newApiKeyName)
+                // Una llave sin ámbitos no abre nada. Hasta ahora el formulario
+                // las creaba siempre vacías porque no tenía de dónde sacar la
+                // lista; `company/api-keys/catalog` es esa lista.
+                if !vm.scopeCatalog.isEmpty {
+                    DisclosureGroup("Ámbitos (\(vm.selectedScopes.count) de \(vm.scopeCatalog.count))") {
+                        ForEach(vm.scopeCatalog, id: \.self) { scope in
+                            Button {
+                                vm.toggleScope(scope)
+                            } label: {
+                                HStack {
+                                    Image(systemName: vm.selectedScopes.contains(scope)
+                                          ? "checkmark.square.fill" : "square")
+                                        .foregroundColor(vm.selectedScopes.contains(scope)
+                                                         ? .accentColor : .secondary)
+                                    Text(scope).font(.caption).foregroundColor(.primary)
+                                    Spacer()
+                                }
+                            }
+                        }
+                    }
+                    .font(.subheadline)
+                    if vm.selectedScopes.isEmpty {
+                        Text("Sin ámbitos marcados la llave se creará sin permisos.")
+                            .font(.caption2).foregroundColor(.orange)
+                    }
+                }
                 Button("+ Crear API key") { Task { await vm.createApiKey() } }
                     .disabled(vm.integrationsBusy || vm.newApiKeyName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
@@ -200,6 +239,10 @@ final class ConsoleSettingsVM: ObservableObject {
     @Published var apiKeys: [ApiKeyRow] = []
     @Published var apiKeysError: String?
     @Published var newApiKeyName = ""
+    /// Ámbitos que ofrece el servidor y los que se han marcado para la llave
+    /// nueva. Si el catálogo no se puede leer, el alta sigue como antes.
+    @Published var scopeCatalog: [String] = []
+    @Published var selectedScopes: Set<String> = []
     @Published var createdApiKeyToken: String?
     @Published var webhooks: [WebhookRow] = []
     @Published var webhooksError: String?
@@ -254,6 +297,12 @@ final class ConsoleSettingsVM: ObservableObject {
     }
 
     func loadIntegrations() async {
+        // El catálogo de ámbitos es opcional: si el API no lo da, el formulario
+        // de alta se dibuja sin selector, exactamente como antes.
+        scopeCatalog = ((try? await CompanyAdminRepository.shared.apiKeyScopeCatalog())
+                        ?? CompanyApiScopeCatalog()).scopes
+        selectedScopes = selectedScopes.filter { scopeCatalog.contains($0) }
+
         do {
             let list = try await ConsoleRepository.shared.companyApiKeys()
             apiKeys = list.compactMap { m in
@@ -272,7 +321,7 @@ final class ConsoleSettingsVM: ObservableObject {
             apiKeysError = nil
         } catch {
             apiKeys = []
-            apiKeysError = error.toUserMessage("No se pudieron cargar API keys")
+            apiKeysError = error.toUserMessage(fallback: "No se pudieron cargar API keys")
         }
 
         do {
@@ -290,7 +339,7 @@ final class ConsoleSettingsVM: ObservableObject {
             webhooksError = nil
         } catch {
             webhooks = []
-            webhooksError = error.toUserMessage("No se pudieron cargar webhooks")
+            webhooksError = error.toUserMessage(fallback: "No se pudieron cargar webhooks")
         }
 
         do {
@@ -343,19 +392,34 @@ final class ConsoleSettingsVM: ObservableObject {
         } catch { message = error.toUserMessage(); messageIsError = true }
     }
 
+    func toggleScope(_ scope: String) {
+        if selectedScopes.contains(scope) {
+            selectedScopes.remove(scope)
+        } else {
+            selectedScopes.insert(scope)
+        }
+    }
+
     func createApiKey() async {
         let name = newApiKeyName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
         integrationsBusy = true
         defer { integrationsBusy = false }
         do {
-            let created = try await ConsoleRepository.shared.createCompanyApiKey(name: name)
+            // Se manda `nil` y no `[]` cuando no hay nada marcado: dejar que el
+            // servidor aplique su valor por omisión es más honesto que pedirle
+            // explícitamente una llave sin ningún ámbito.
+            let scopes = selectedScopes.isEmpty ? nil : selectedScopes.sorted()
+            let created = try await ConsoleRepository.shared.createCompanyApiKey(
+                name: name, scopes: scopes
+            )
             createdApiKeyToken = ConsoleHelpers.mapStr(created, "token", "apiKey", "key")
             newApiKeyName = ""
+            selectedScopes = []
             message = "API key creada"; messageIsError = false
             await loadIntegrations()
         } catch {
-            message = error.toUserMessage("No se pudo crear la API key")
+            message = error.toUserMessage(fallback: "No se pudo crear la API key")
             messageIsError = true
         }
     }
@@ -368,7 +432,7 @@ final class ConsoleSettingsVM: ObservableObject {
             message = "API key revocada"; messageIsError = false
             await loadIntegrations()
         } catch {
-            message = error.toUserMessage("No se pudo revocar")
+            message = error.toUserMessage(fallback: "No se pudo revocar")
             messageIsError = true
         }
     }
@@ -381,7 +445,7 @@ final class ConsoleSettingsVM: ObservableObject {
             message = "Entrega reenviada"; messageIsError = false
             await loadIntegrations()
         } catch {
-            message = error.toUserMessage("No se pudo reenviar")
+            message = error.toUserMessage(fallback: "No se pudo reenviar")
             messageIsError = true
         }
     }

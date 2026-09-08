@@ -219,9 +219,12 @@ struct BankAccountItem: Hashable, Identifiable {
         bank = StockParse.str(raw["bank"], raw["banco"], raw["bankName"])
         accountNumber = StockParse.str(raw["accountNumber"], raw["numeroCuenta"])
         clabe = StockParse.str(raw["clabe"])
-        balance = StockParse.dbl(raw["balance"], raw["saldo"]) ?? 0
+        // El campo real de la API es `currentBalance` (Prisma `BankAccount`).
+        // Leyendo sólo `balance`/`saldo` el saldo salía siempre en $0 y el
+        // "Saldo total" de la pantalla de Banca era una suma de ceros.
+        balance = StockParse.dbl(raw["currentBalance"], raw["balance"], raw["saldo"]) ?? 0
         currency = StockParse.str(raw["currency"], raw["moneda"])
-        type = StockParse.str(raw["type"], raw["tipo"])
+        type = StockParse.str(raw["accountType"], raw["type"], raw["tipo"])
         ownerName = StockParse.str(raw["ownerName"], raw["responsable"])
     }
 }

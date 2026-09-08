@@ -28,6 +28,26 @@ struct SmartQuoteView: View {
     @State private var supplierStats: [String: Any]?
     @State private var supplierStatsLoading = false
     @State private var supplierStatsError: String?
+    @State private var commercialRules: [CrmCommercialRule] = []
+    @State private var rulesLoading = false
+
+    /// Margen mínimo de la regla GLOBAL, que es la que aplica siempre.
+    private var minimumMargin: Double? {
+        commercialRules
+            .first { $0.scope.uppercased() == "GLOBAL" && $0.minMarginPercent != nil }?
+            .minMarginPercent
+    }
+
+    private func ruleSummary(_ rule: CrmCommercialRule) -> String {
+        var partes: [String] = [rule.scopeLabel]
+        if let m = rule.minMarginPercent {
+            partes.append("margen mín. \(String(format: "%.1f", m))%")
+        }
+        if let d = rule.maxDiscountPercent {
+            partes.append("desc. máx. \(String(format: "%.1f", d))%")
+        }
+        return partes.joined(separator: " · ")
+    }
 
     private let templates: [(id: String, label: String)] = [
         ("CCTV", "CCTV"),
@@ -109,6 +129,45 @@ struct SmartQuoteView: View {
             }
             Section("Margen objetivo") {
                 Stepper("\(targetMargin)%", value: $targetMargin, in: 5...80)
+            }
+            // Las reglas comerciales (`smart-quote/rules`) son el criterio con el
+            // que el backend acepta o rechaza un precio. Antes sólo se veía el
+            // veredicto de `check-margin` línea a línea, nunca el porqué: el
+            // vendedor descubría el mínimo chocando contra él.
+            Section("Reglas comerciales") {
+                if rulesLoading {
+                    ProgressView()
+                } else if commercialRules.isEmpty {
+                    Text("Sin reglas configuradas.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(commercialRules) { rule in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(rule.name.isEmpty ? rule.scopeLabel : rule.name)
+                                    .font(.subheadline)
+                                Spacer()
+                                if rule.requiresApproval {
+                                    Text("requiere aprobación")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                            Text(ruleSummary(rule))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    if let minimo = minimumMargin, targetMargin < Int(minimo) {
+                        Label(
+                            "El margen objetivo (\(targetMargin)%) está por debajo del mínimo global (\(Int(minimo))%).",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    }
+                }
             }
             if let message, step == 1 {
                 Text(message).font(.caption)
@@ -359,6 +418,11 @@ struct SmartQuoteView: View {
         } catch {
             message = error.toUserMessage()
         }
+        // Las reglas no bloquean el cotizador: si no se pueden leer, la pantalla
+        // sigue funcionando y sólo se queda sin el aviso de margen mínimo.
+        rulesLoading = true
+        commercialRules = (try? await SmartQuoteRepository.shared.commercialRules()) ?? []
+        rulesLoading = false
     }
 
     private func goNext() {

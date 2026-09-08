@@ -48,12 +48,21 @@ private struct ContabilidadMoreView: View {
         List {
             Section("Finanzas") {
                 nav("accounting", "📒", "Contabilidad")
+                // Catálogo de cuentas, centros de costo, periodos y
+                // presupuestos: la estructura contable que hasta ahora sólo
+                // estaba en la web. Se resuelve en el switch de abajo y no en
+                // `ModuleRouter`, así que no hace falta darla de alta en el
+                // catálogo de módulos para poder llegar a ella.
+                nav("accounting-general", "🧾", "Contabilidad general")
                 nav("banking", "🏦", "Banca")
                 nav("employee-payments", "💳", "Pagos a empleados")
                 nav("pagos", "💳", "Pagos")
                 nav("multas", "⚠️", "Multas")
             }
             Section("Operación") {
+                // Compras estaba sólo en el panel de Console; desde Contabilidad
+                // es donde se revisan las órdenes que hay que pagar.
+                nav("compras", "🛒", "Compras")
                 nav("viaticos", "💼", "Viáticos")
                 nav("work-projects", "🛠️", "Proyectos internos")
                 nav("proyectos", "📐", "Proyectos")
@@ -83,7 +92,9 @@ private struct ContabilidadMoreView: View {
         switch key {
         case "invoicing": InvoicesView()
         case "expenses": ExpensesView()
+        case "accounting-general": AccountingLedgerView()
         case "banking": BankingView()
+        case "compras": ProcurementModuleView()
         case "viaticos": ViaticsView(personalOnly: false)
         case "horas": LunchBreaksAdminView()
         default:
