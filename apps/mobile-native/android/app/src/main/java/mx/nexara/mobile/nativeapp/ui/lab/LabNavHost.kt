@@ -49,6 +49,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxModuleScaffold
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 
 private const val Home = "lab/home"
 private const val Health = "lab/health"
@@ -100,7 +101,7 @@ class LabHomeViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Error al cargar LAB") }
+                _state.update { it.copy(loading = false, error = e.toUserMessage("Error al cargar LAB")) }
             }
         }
     }
