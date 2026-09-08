@@ -311,7 +311,7 @@ final class ApprovalsVM: ObservableObject {
                 actingId = nil
                 load()
             } catch {
-                self.error = error.localizedDescription
+                self.error = error.toUserMessage()
                 actingId = nil
             }
         }

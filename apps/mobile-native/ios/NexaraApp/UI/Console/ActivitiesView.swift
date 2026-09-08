@@ -375,7 +375,7 @@ struct ActivityDetailView: View {
         } catch {
             detail = activity
             if evidence == nil {
-                loadError = error.localizedDescription
+                loadError = error.toUserMessage()
             }
         }
     }
@@ -451,7 +451,7 @@ final class ActivitiesVM: ObservableObject {
             } catch {
                 items = await ExtraRepository.shared.activityItems()
                 if items.isEmpty {
-                    loadError = error.localizedDescription
+                    loadError = error.toUserMessage()
                 }
             }
             isLoading = false
@@ -783,7 +783,7 @@ struct ActivityDetailByIdView: View {
                 error = "Actividad no encontrada"
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
         loading = false
     }

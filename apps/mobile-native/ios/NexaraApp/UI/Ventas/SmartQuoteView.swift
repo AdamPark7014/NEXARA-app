@@ -345,7 +345,7 @@ struct SmartQuoteView: View {
         do {
             supplierStats = try await SmartQuoteRepository.shared.supplierStats()
         } catch {
-            supplierStatsError = error.localizedDescription
+            supplierStatsError = error.toUserMessage()
         }
         supplierStatsLoading = false
     }
@@ -357,7 +357,7 @@ struct SmartQuoteView: View {
             brands = f.brands.prefix(12).map { $0 }
             categories = f.categories.prefix(12).map { $0 }
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
     }
 
@@ -390,7 +390,7 @@ struct SmartQuoteView: View {
                 category: selectedCategory
             )
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
         loading = false
     }
@@ -412,7 +412,7 @@ struct SmartQuoteView: View {
             }
             step = 2
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
         copilotLoading = false
     }
@@ -424,7 +424,7 @@ struct SmartQuoteView: View {
             results = subs
             message = "\(subs.count) sustitutos para \(clave)"
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
         loading = false
     }
@@ -441,7 +441,7 @@ struct SmartQuoteView: View {
             }
             message = "Mano de obra · \(items.count) líneas"
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
         loading = false
     }
@@ -457,7 +457,7 @@ struct SmartQuoteView: View {
             step = 2
             message = "Plantilla \(template) aplicada · \(lines.count) líneas"
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
         loading = false
     }
@@ -530,7 +530,7 @@ struct SmartQuoteView: View {
             marginWarnings = [:]
             step = 1
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
         saving = false
     }
@@ -555,7 +555,7 @@ struct SmartQuoteView: View {
             message = "Pedido CT enviado para cotización #\(id)"
             await loadCtPreview(id)
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
         ctSubmitting = false
     }
@@ -567,7 +567,7 @@ struct SmartQuoteView: View {
             message = "Pedido confirmado en CT"
             if let id = createdQuoteId { await loadCtPreview(id) }
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
         ctSubmitting = false
     }

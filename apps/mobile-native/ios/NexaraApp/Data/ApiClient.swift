@@ -164,6 +164,9 @@ final class ApiClient {
         if let token = SessionStore.shared.token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        if let companyId = SessionStore.shared.currentUser?.companyId, companyId > 0 {
+            req.setValue(String(companyId), forHTTPHeaderField: "X-Company-Id")
+        }
         return req
     }
 

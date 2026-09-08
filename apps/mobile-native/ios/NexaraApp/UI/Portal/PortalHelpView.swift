@@ -74,9 +74,9 @@ final class PortalHelpVM: ObservableObject {
                 selected = list.first { $0.id == selectedId }
             }
         } catch let err {
-            self.error = err.localizedDescription.isEmpty
+            self.error = err.toUserMessage().isEmpty
                 ? "No se pudieron cargar los artículos"
-                : err.localizedDescription
+                : err.toUserMessage()
             isLoading = false
             isRefreshing = false
         }

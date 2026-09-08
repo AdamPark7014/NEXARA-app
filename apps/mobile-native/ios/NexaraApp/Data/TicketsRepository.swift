@@ -150,6 +150,12 @@ final class TicketsRepository {
         _ = try await api.putJSON("client-portal/requests/\(id)/close", body: EmptyClose())
     }
 
+    /// PUT `client-portal/requests/{id}/decision` — APPROVED | REJECTED (paridad Android).
+    func decideRequest(id: Int64, decision: String) async throws {
+        struct Body: Encodable { let decision: String }
+        _ = try await api.putJSON("client-portal/requests/\(id)/decision", body: Body(decision: decision))
+    }
+
     private struct EmptyClose: Encodable {}
 
     // MARK: Tickets
@@ -180,6 +186,27 @@ final class TicketsRepository {
         return try await api.get(path)
     }
 
+    /// POST `…/tickets/{id}/comments` — body `{ body }`.
+    func postTicketComment(id: Int64, body: String) async throws {
+        struct Body: Encodable { let body: String }
+        let path = isBranchUser
+            ? "branch-portal/tickets/\(id)/comments"
+            : "client-portal/tickets/\(id)/comments"
+        _ = try await api.postJSON(path, body: Body(body: body.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+
+    /// PATCH `…/tickets/{id}/status` — action ACK | CONFIRM_RESOLVED | REQUEST_REOPEN.
+    func patchTicketStatus(id: Int64, action: String, note: String? = nil) async throws {
+        struct Body: Encodable {
+            let action: String
+            let note: String?
+        }
+        let path = isBranchUser
+            ? "branch-portal/tickets/\(id)/status"
+            : "client-portal/tickets/\(id)/status"
+        _ = try await api.patchJSON(path, body: Body(action: action, note: note))
+    }
+
     // MARK: Feedback
 
     func pendingFeedback() async throws -> [[String: Any]] {
@@ -197,11 +224,19 @@ final class TicketsRepository {
         struct Body: Encodable {
             let activityId: Int64
             let rating: Int?
-            let wasOnTime, wasFriendly, wasSolved, comments: String?
+            let wasOnTime: Bool?
+            let wasFriendly: Bool?
+            let wasSolved: Bool?
+            let comments: String?
         }
         _ = try await api.postJSON("client-portal/feedback", body: Body(
             activityId: activityId, rating: rating,
-            wasOnTime: wasOnTime, wasFriendly: wasFriendly, wasSolved: wasSolved, comments: comments
+            wasOnTime: Self.feedbackYesNo(wasOnTime),
+            wasFriendly: Self.feedbackYesNo(wasFriendly),
+            wasSolved: Self.feedbackYesNo(wasSolved),
+            comments: comments?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                ? comments?.trimmingCharacters(in: .whitespacesAndNewlines)
+                : nil
         ))
     }
 
@@ -211,6 +246,14 @@ final class TicketsRepository {
             activityId: activityId, rating: rating,
             wasOnTime: "YES", wasFriendly: "YES", wasSolved: "YES", comments: comments
         )
+    }
+
+    private static func feedbackYesNo(_ raw: String?) -> Bool? {
+        switch raw?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() {
+        case "YES", "SI", "TRUE": return true
+        case "NO", "FALSE": return false
+        default: return nil
+        }
     }
 
     // MARK: Inventories
@@ -242,18 +285,41 @@ final class TicketsRepository {
 
     func syncInventory(
         branchId: Int64, snapshotId: Int64?, title: String?, notes: String?,
-        completed: Bool, confirmDifference: Bool
+        completed: Bool, confirmDifference: Bool,
+        items: [PortalInventoryItem]? = nil
     ) async throws -> [String: Any] {
+        struct SyncItem: Encodable {
+            let id: Int64?
+            let groupName, itemName, brand: String?
+            let modelBefore, modelAfter, serialNumber: String?
+            let itemStatus, compareState, notes: String?
+        }
         struct Body: Encodable {
             let branchId: Int64
             let snapshotId: Int64?
             let title, notes: String?
             let completed, confirmDifference: Bool
+            let items: [SyncItem]?
         }
-        let path = "client-portal/inventories/sync"
-        let data = try await api.postJSON(path, body: Body(
+        let syncItems: [SyncItem]? = items.map { list in
+            list.map { it in
+                SyncItem(
+                    id: it.id > 0 ? it.id : nil,
+                    groupName: it.groupName.isEmpty ? nil : it.groupName,
+                    itemName: it.itemName.isEmpty ? nil : it.itemName,
+                    brand: it.brand.isEmpty ? nil : it.brand,
+                    modelBefore: it.modelBefore.isEmpty ? nil : it.modelBefore,
+                    modelAfter: it.modelAfter.isEmpty ? nil : it.modelAfter,
+                    serialNumber: it.serialNumber.isEmpty ? nil : it.serialNumber,
+                    itemStatus: it.itemStatus.isEmpty ? nil : it.itemStatus,
+                    compareState: it.compareState.isEmpty ? nil : it.compareState,
+                    notes: it.notes.isEmpty ? nil : it.notes
+                )
+            }
+        }
+        let data = try await api.postJSON("client-portal/inventories/sync", body: Body(
             branchId: branchId, snapshotId: snapshotId, title: title, notes: notes,
-            completed: completed, confirmDifference: confirmDifference
+            completed: completed, confirmDifference: confirmDifference, items: syncItems
         ))
         return ConsoleHelpers.decodeMap(data)
     }
@@ -262,6 +328,18 @@ final class TicketsRepository {
         struct Body: Encodable { let decision: String }
         let data = try await api.putJSON("client-portal/inventories/\(id)/decision", body: Body(decision: decision))
         return ConsoleHelpers.decodeMap(data)
+    }
+
+    /// POST `client-portal/inventories/upload` — multipart field `files`.
+    func uploadInventoryMedia(files: [(fileName: String, data: Data)]) async throws -> [String] {
+        let parts = files.map { (field: "files", data: $0.data, fileName: $0.fileName, mimeType: "image/jpeg") }
+        let data = try await api.uploadMultipartFiles("client-portal/inventories/upload", fields: [:], files: parts)
+        let map = ConsoleHelpers.decodeMap(data)
+        if let urls = map["urls"] as? [String] { return urls }
+        if let urls = map["urls"] as? [Any] {
+            return urls.compactMap { $0 as? String }
+        }
+        return []
     }
 
     func portalReportPdf(start: String? = nil, end: String? = nil) async throws -> Data {

@@ -133,6 +133,7 @@ struct IntegraDetectionTuningView: View {
     @State private var windowEnd = "23:59"
     @State private var windowDays: Set<Int> = [0, 1, 2, 3, 4, 5, 6]
     @State private var polygonPoints: [CGPoint] = []
+    @State private var regionPolygons: [[CGPoint]] = []
     @State private var confidenceOptions: [String] = DetectionDefaults.confidenceOrder
     @State private var targetOptions: [String] = DetectionDefaults.targetOrder
     @State private var sensMin: Double = 0
@@ -199,8 +200,8 @@ struct IntegraDetectionTuningView: View {
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        DetectionRegionPreview(points: polygonPoints)
-                            .frame(height: 160)
+                        DetectionRegionPreview(regions: regionPolygons)
+                            .aspectRatio(16 / 9, contentMode: .fit)
                             .allowsHitTesting(false)
                     }
                     if let message {
@@ -271,6 +272,7 @@ struct IntegraDetectionTuningView: View {
             windowStart = w.start
             windowEnd = w.end
             windowDays = Set(w.days)
+            regionPolygons = p.regionPolygons
             polygonPoints = p.regionPolygons.first ?? []
         } catch {
             errorText = error.localizedDescription
@@ -321,53 +323,116 @@ struct IntegraDetectionTuningView: View {
 
 /// Read-only polygon overlay. No drag handles, no vertex insert/delete.
 struct DetectionRegionPreview: View {
-    let points: [CGPoint]
+    /// Normalized 0…1 polygons (up to 4). Empty = full-frame zone.
+    let regions: [[CGPoint]]
+
+    private let palette: [Color] = [
+        Color(red: 0.15, green: 0.39, blue: 0.92),
+        Color(red: 0.05, green: 0.58, blue: 0.53),
+        Color(red: 0.98, green: 0.45, blue: 0.09),
+        Color(red: 0.58, green: 0.20, blue: 0.92),
+    ]
+
+    init(regions: [[CGPoint]]) {
+        self.regions = regions
+    }
+
+    /// Convenience for a single polygon.
+    init(points: [CGPoint]) {
+        self.regions = points.isEmpty ? [] : [points]
+    }
+
+    private var summary: String {
+        if regions.isEmpty {
+            return "Fotograma completo · sin zonas dibujadas"
+        }
+        let verts = regions.map { "\($0.count) vértices" }.joined(separator: " · ")
+        return "\(regions.count) de 4 zonas · \(verts)"
+    }
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                Color(red: 0.06, green: 0.09, blue: 0.16)
-                if points.count >= 3 {
+        VStack(alignment: .leading, spacing: 8) {
+            GeometryReader { geo in
+                let w = geo.size.width
+                let h = geo.size.height
+                ZStack {
+                    Color(red: 0.06, green: 0.09, blue: 0.16)
+                    // Rule-of-thirds guides — framing reference, not fake video.
                     Path { path in
-                        let mapped = points.map {
-                            CGPoint(x: $0.x * geo.size.width, y: $0.y * geo.size.height)
+                        for i in 1...2 {
+                            let x = w * CGFloat(i) / 3
+                            let y = h * CGFloat(i) / 3
+                            path.move(to: CGPoint(x: x, y: 0))
+                            path.addLine(to: CGPoint(x: x, y: h))
+                            path.move(to: CGPoint(x: 0, y: y))
+                            path.addLine(to: CGPoint(x: w, y: y))
                         }
-                        path.move(to: mapped[0])
-                        for p in mapped.dropFirst() { path.addLine(to: p) }
-                        path.closeSubpath()
                     }
-                    .stroke(Color.teal, lineWidth: 2)
-                    .background(
-                        Path { path in
-                            let mapped = points.map {
-                                CGPoint(x: $0.x * geo.size.width, y: $0.y * geo.size.height)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+
+                    if regions.isEmpty {
+                        RoundedRectangle(cornerRadius: 2)
+                            .stroke(
+                                Color.white.opacity(0.45),
+                                style: StrokeStyle(lineWidth: 3, dash: [14, 10])
+                            )
+                            .padding(2)
+                    } else {
+                        ForEach(Array(regions.enumerated()), id: \.offset) { index, points in
+                            if points.count >= 3 {
+                                let color = palette[index % palette.count]
+                                let mapped = points.map {
+                                    CGPoint(x: $0.x * w, y: $0.y * h)
+                                }
+                                Path { path in
+                                    path.move(to: mapped[0])
+                                    for p in mapped.dropFirst() { path.addLine(to: p) }
+                                    path.closeSubpath()
+                                }
+                                .fill(color.opacity(0.22))
+                                Path { path in
+                                    path.move(to: mapped[0])
+                                    for p in mapped.dropFirst() { path.addLine(to: p) }
+                                    path.closeSubpath()
+                                }
+                                .stroke(color, lineWidth: 3)
+                                ForEach(Array(mapped.enumerated()), id: \.offset) { _, p in
+                                    Circle()
+                                        .fill(color)
+                                        .frame(width: 10, height: 10)
+                                        .position(p)
+                                }
                             }
-                            path.move(to: mapped[0])
-                            for p in mapped.dropFirst() { path.addLine(to: p) }
-                            path.closeSubpath()
                         }
-                        .fill(Color.teal.opacity(0.2))
-                    )
-                } else {
-                    Text("Sin polígono de zona (fotograma completo)")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.7))
+                    }
+
+                    Text("SOLO LECTURA")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.black.opacity(0.55))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(6)
                 }
-                Text("SOLO LECTURA")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.black.opacity(0.55))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(6)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .aspectRatio(16 / 9, contentMode: .fit)
+
+            Text(summary)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            NxStatusChip(text: "Zonas: solo lectura · se editan en la consola web", tone: .info)
+            Text(
+                "Dibujar polígonos con el dedo no da la precisión que necesita un equipo en "
+                    + "producción: una zona mal puesta deja de vigilar sin avisar."
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
         }
     }
 }
-
 // MARK: - Capabilities
 
 struct IntegraDetectionCapabilitiesView: View {

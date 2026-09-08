@@ -18,6 +18,7 @@ struct IntegraFloorPlan: Identifiable {
     let id: String
     var name: String
     var image: UIImage?
+    var imageUnavailableReason: String?
     var pins: [IntegraMapPin]
     var coveredEntityIds: Set<String>
     var orphanPins: Int
@@ -51,28 +52,88 @@ enum IntegraMapRoutes {
 }
 
 private enum FloorplanImageDecode {
-    static func image(from imageData: String?) -> UIImage? {
+    enum State {
+        case ready(UIImage)
+        case unavailable(String)
+    }
+
+    static func decode(_ imageData: String?) -> State {
         guard let raw = imageData?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
-            return nil
+            return .unavailable("Este plano no tiene imagen guardada.")
         }
-        if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
-            return nil // remote URLs are not fetched here — honesty: embedded only
+        if isRemoteUrl(raw) {
+            return .unavailable(
+                "El plano está guardado como enlace y no como imagen incrustada. Ábrelo en la consola web."
+            )
         }
-        let b64: String
-        if let range = raw.range(of: ";base64,") {
-            b64 = String(raw[range.upperBound...])
-        } else if raw.hasPrefix("data:") {
-            return nil
-        } else {
-            b64 = raw
+        guard let payload = parsePayload(raw) else {
+            return .unavailable("La imagen del plano no está en un formato que se pueda abrir aquí.")
         }
-        guard let data = Data(base64Encoded: b64, options: [.ignoreUnknownCharacters]) else {
-            return nil
+        guard let data = Data(base64Encoded: payload, options: [.ignoreUnknownCharacters]), !data.isEmpty else {
+            return .unavailable("La imagen del plano llegó dañada.")
+        }
+        // Downsample large CAD exports to avoid OOM on device.
+        guard let image = downsampledImage(data: data, maxDimension: 2048) else {
+            return .unavailable("El archivo guardado como plano no es una imagen legible.")
+        }
+        return .ready(image)
+    }
+
+    static func image(from imageData: String?) -> UIImage? {
+        if case .ready(let img) = decode(imageData) { return img }
+        return nil
+    }
+
+    static func reason(from imageData: String?) -> String? {
+        if case .unavailable(let r) = decode(imageData) { return r }
+        return nil
+    }
+
+    private static func isRemoteUrl(_ s: String) -> Bool {
+        s.hasPrefix("http://") || s.hasPrefix("https://")
+            || (s.hasPrefix("/") && !s.hasPrefix("//"))
+    }
+
+    private static func parsePayload(_ s: String) -> String? {
+        if s.lowercased().hasPrefix("data:") {
+            guard let mark = s.range(of: ";base64,", options: .caseInsensitive) else {
+                return nil
+            }
+            let body = stripWhitespace(String(s[mark.upperBound...]))
+            return body.isEmpty ? nil : body
+        }
+        let body = stripWhitespace(s)
+        guard body.count >= 32, looksLikeBase64(body) else { return nil }
+        return body
+    }
+
+    private static func stripWhitespace(_ raw: String) -> String {
+        if raw.first(where: \.isWhitespace) == nil { return raw.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return raw.filter { !$0.isWhitespace }
+    }
+
+    private static func looksLikeBase64(_ s: String) -> Bool {
+        s.allSatisfy {
+            ($0 >= "A" && $0 <= "Z") || ($0 >= "a" && $0 <= "z")
+                || ($0 >= "0" && $0 <= "9") || $0 == "+" || $0 == "/" || $0 == "="
+        }
+    }
+
+    private static func downsampledImage(data: Data, maxDimension: CGFloat) -> UIImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return UIImage(data: data)
+        }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimension,
+        ]
+        if let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) {
+            return UIImage(cgImage: cg)
         }
         return UIImage(data: data)
     }
 }
-
 /// Plano del sitio — **solo lectura**. Tocing a pin opens its card; never moves/deletes.
 struct IntegraMapView: View {
     var onOpenKey: ((String) -> Void)? = nil
@@ -203,8 +264,11 @@ struct IntegraMapView: View {
                         .resizable()
                         .scaledToFit()
                 } else {
-                    Text("Plano sin imagen incrustada")
+                    Text(plan?.imageUnavailableReason ?? "Plano sin imagen incrustada")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding()
                 }
                 ForEach(visiblePins) { pin in
                     Circle()
@@ -316,10 +380,18 @@ struct IntegraMapView: View {
                     )
                 }
                 let covered = Set(pins.filter { !$0.orphan }.map(\.entityId))
+                let decoded = FloorplanImageDecode.decode(fp.imageData)
+                let image: UIImage?
+                let reason: String?
+                switch decoded {
+                case .ready(let img): image = img; reason = nil
+                case .unavailable(let r): image = nil; reason = r
+                }
                 return IntegraFloorPlan(
                     id: "\(fp.id)",
                     name: fp.name,
-                    image: FloorplanImageDecode.image(from: fp.imageData),
+                    image: image,
+                    imageUnavailableReason: reason,
                     pins: pins,
                     coveredEntityIds: covered,
                     orphanPins: pins.filter(\.orphan).count

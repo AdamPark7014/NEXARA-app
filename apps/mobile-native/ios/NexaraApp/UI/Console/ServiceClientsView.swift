@@ -163,7 +163,7 @@ struct ServiceClientsView: View {
             try data.write(to: url)
             message = "PDF guardado en \(url.lastPathComponent)"
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
     }
 }
@@ -325,7 +325,7 @@ private struct ServiceClientFormView: View {
                 onDone(nil); dismiss()
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 }

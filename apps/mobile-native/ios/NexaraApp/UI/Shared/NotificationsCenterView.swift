@@ -160,7 +160,7 @@ struct NotificationsCenterView: View {
         do {
             rows = try await NotificationsRepository.shared.list(limit: 50)
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 
@@ -171,7 +171,7 @@ struct NotificationsCenterView: View {
         do {
             feedItems = try await NotificationsRepository.shared.activityFeed(limit: 40)
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 
@@ -184,7 +184,7 @@ struct NotificationsCenterView: View {
             await load()
             await NotificationsBadgeStore.shared.refresh()
         } catch {
-            message = error.localizedDescription
+            message = error.toUserMessage()
         }
     }
 
@@ -197,7 +197,7 @@ struct NotificationsCenterView: View {
             await load()
             await NotificationsBadgeStore.shared.refresh()
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 
@@ -210,7 +210,7 @@ struct NotificationsCenterView: View {
             await load()
             await NotificationsBadgeStore.shared.refresh()
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 

@@ -281,6 +281,50 @@ final class ExtraRepository {
     func cvs() async -> [[String: Any]] { await candidateItems().map(\.raw) }
     func candidateItems() async -> [CandidateItem] { await load("cvs").map { CandidateItem(raw: $0) } }
 
+    /// POST cvs — multipart; Nest exige el archivo en la parte `file` (paridad Android `ExtraRepository.createCv`).
+    func createCv(
+        fullName: String,
+        fileData: Data,
+        fileName: String,
+        mimeType: String,
+        email: String? = nil,
+        whatsapp: String? = nil,
+        category: String? = nil,
+        employmentStatus: String? = nil,
+        recruiterNotes: String? = nil,
+        tags: String? = nil
+    ) async throws {
+        var fields: [String: String] = [
+            "fullName": fullName.trimmingCharacters(in: .whitespacesAndNewlines),
+        ]
+        if let email, !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["email"] = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let whatsapp, !whatsapp.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["whatsapp"] = whatsapp.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let category, !category.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["category"] = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let employmentStatus, !employmentStatus.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["employmentStatus"] = employmentStatus.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let recruiterNotes, !recruiterNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["recruiterNotes"] = recruiterNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let tags, !tags.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            fields["tags"] = tags.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        _ = try await ApiClient.shared.uploadMultipart(
+            "cvs",
+            fields: fields,
+            fileField: "file",
+            fileData: fileData,
+            fileName: fileName,
+            mimeType: mimeType
+        )
+    }
+
     func moveCv(id: Int64, stage: String, sortOrder: Int? = nil) async throws {
         struct Body: Encodable {
             let stage: String

@@ -67,12 +67,12 @@ final class MeetingsVM: ObservableObject {
                 mios = mine.acuerdos
                 miosVencidos = mine.vencidos
             } catch {
-                firstError = firstError ?? error.localizedDescription
+                firstError = firstError ?? error.toUserMessage()
             }
             do {
                 meetings = try await repo.meetings()
             } catch {
-                firstError = firstError ?? error.localizedDescription
+                firstError = firstError ?? error.toUserMessage()
             }
             self.error = firstError
             loading = false
@@ -83,7 +83,7 @@ final class MeetingsVM: ObservableObject {
     func loadOverdue() {
         Task {
             do { vencidos = try await repo.overdueAgreements() }
-            catch { error = error.localizedDescription }
+            catch { error = error.toUserMessage() }
         }
     }
 
@@ -91,7 +91,7 @@ final class MeetingsVM: ObservableObject {
         let q = leccionesQuery
         Task {
             do { lecciones = try await repo.lessons(query: q) }
-            catch { error = error.localizedDescription }
+            catch { error = error.toUserMessage() }
         }
     }
 
@@ -102,7 +102,7 @@ final class MeetingsVM: ObservableObject {
             do {
                 detail = try await repo.meeting(id: id)
             } catch {
-                actionMessage = "❌ \(error.localizedDescription)"
+                actionMessage = "❌ \(error.toUserMessage())"
             }
             detailLoading = false
         }
@@ -122,7 +122,7 @@ final class MeetingsVM: ObservableObject {
                 actionMessage = "✅ \(ok)"
                 refresh(initial: false)
             } catch {
-                actionMessage = "❌ \(error.localizedDescription.isEmpty ? fallback : error.localizedDescription)"
+                actionMessage = "❌ \(error.toUserMessage().isEmpty ? fallback : error.toUserMessage())"
             }
             busy = false
         }
@@ -232,7 +232,7 @@ final class MeetingsVM: ObservableObject {
                     actionMessage = "✅ Reunión convocada"
                     refresh(initial: false)
                 } catch {
-                    actionMessage = "❌ \(error.localizedDescription)"
+                    actionMessage = "❌ \(error.toUserMessage())"
                 }
                 busy = false
             }
@@ -248,7 +248,7 @@ final class MeetingsVM: ObservableObject {
                 actionMessage = "✅ \(MeetingCatalog.agreementStatusLabel(estado))"
                 refresh(initial: false)
             } catch {
-                actionMessage = "❌ \(error.localizedDescription)"
+                actionMessage = "❌ \(error.toUserMessage())"
             }
             busy = false
         }

@@ -79,12 +79,110 @@ final class CrmRepository {
         ApiClient.decodeMapList(try await api.get("ventas/leads")).map { CrmLead(raw: $0) }
     }
 
+    func getLead(id: Int64) async throws -> CrmLead {
+        let data = try await api.get("ventas/leads/\(id)")
+        return CrmLead(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    func createLead(_ fields: [String: Any]) async throws -> CrmLead {
+        let data = try await IntegraHTTP.postMap("ventas/leads", body: fields)
+        return CrmLead(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    func updateLead(id: Int64, fields: [String: Any]) async throws -> CrmLead {
+        let data = try await IntegraHTTP.patchMap("ventas/leads/\(id)", body: fields)
+        return CrmLead(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    func deleteLead(id: Int64) async throws {
+        try await api.delete("ventas/leads/\(id)")
+    }
+
+    func createClient(_ fields: [String: Any]) async throws -> [String: Any] {
+        ConsoleHelpers.decodeMap(try await IntegraHTTP.postMap("ventas/clientes", body: fields))
+    }
+
+    /// Convierte lead → cliente + oportunidad (misma secuencia que Android `convertLeadToOpportunity`).
+    func convertLeadToOpportunity(
+        lead: CrmLead,
+        value: Double,
+        stage: String = "DISCOVERY"
+    ) async throws -> [String: Any] {
+        guard let leadId = lead.numericId else {
+            throw ApiError.http(400, "Lead sin ID")
+        }
+        let clientLabel = lead.clientName.isEmpty ? lead.displayTitle : lead.clientName
+        let email = StockParse.str(lead.raw["email"], lead.raw["correo"])
+        let phone = StockParse.str(lead.raw["phone"], lead.raw["telefono"])
+        var clientFields: [String: Any] = [
+            "legalName": clientLabel,
+            "notes": "Cliente desde lead #\(leadId)",
+        ]
+        if !email.isEmpty { clientFields["billingEmail"] = email }
+        if !phone.isEmpty { clientFields["billingPhone"] = phone }
+        let client = try await createClient(clientFields)
+        let clientId = StockParse.int64(client["id"])
+        var leadPatch: [String: Any] = ["status": "CONVERTED"]
+        if let clientId { leadPatch["clientId"] = clientId }
+        _ = try await updateLead(id: leadId, fields: leadPatch)
+        var oppFields: [String: Any] = [
+            "title": clientLabel,
+            "value": value,
+            "stage": stage,
+            "probability": 30,
+            "leadId": leadId,
+            "clientName": clientLabel,
+        ]
+        if let clientId { oppFields["clientId"] = clientId }
+        return ConsoleHelpers.decodeMap(try await IntegraHTTP.postMap("ventas/oportunidades", body: oppFields))
+    }
+
     func proyectos() async throws -> [[String: Any]] {
         try await projectItems().map(\.raw)
     }
 
     func projectItems() async throws -> [CrmSalesProject] {
         ApiClient.decodeMapList(try await api.get("ventas/proyectos")).map { CrmSalesProject(raw: $0) }
+    }
+
+    func getProjectSummary(id: Int64) async throws -> [String: Any] {
+        ConsoleHelpers.decodeMap(try await api.get("ventas/proyectos/\(id)/resumen"))
+    }
+
+    func updateProject(id: Int64, fields: [String: Any]) async throws -> [String: Any] {
+        ConsoleHelpers.decodeMap(try await IntegraHTTP.patchMap("ventas/proyectos/\(id)", body: fields))
+    }
+
+    func updateProjectStatus(id: Int64, status: String) async throws -> [String: Any] {
+        try await updateProject(id: id, fields: ["status": status])
+    }
+
+    func projectCosts(id: Int64) async throws -> [String: Any] {
+        ConsoleHelpers.decodeMap(try await api.get("ventas/proyectos/\(id)/costos"))
+    }
+
+    func updateProjectCosts(
+        id: Int64,
+        costProducts: Double? = nil,
+        costViaticos: Double? = nil,
+        costOperativo: Double? = nil
+    ) async throws -> [String: Any] {
+        var payload: [String: Any] = [:]
+        if let costProducts { payload["costProducts"] = costProducts }
+        if let costViaticos { payload["costViaticos"] = costViaticos }
+        if let costOperativo { payload["costOperativo"] = costOperativo }
+        guard !payload.isEmpty else {
+            throw ApiError.http(400, "Sin costos que actualizar")
+        }
+        return ConsoleHelpers.decodeMap(
+            try await IntegraHTTP.patchMap("ventas/proyectos/\(id)/costos", body: payload)
+        )
+    }
+
+    func closeProject(id: Int64) async throws -> [String: Any] {
+        ConsoleHelpers.decodeMap(
+            try await IntegraHTTP.postMap("ventas/proyectos/\(id)/close", body: [:])
+        )
     }
 
     func productos(search: String? = nil) async throws -> [CrmProduct] {
@@ -214,6 +312,27 @@ final class CrmRepository {
 
     func deleteOpportunity(id: Int) async throws {
         try await api.delete("ventas/oportunidades/\(id)")
+    }
+
+    func updateOpportunityStage(id: Int, stage: String) async throws -> [String: Any] {
+        try await updateOpportunity(id: id, fields: ["stage": stage])
+    }
+
+    func crmActivitiesForOpportunity(opportunityId: Int64) async throws -> [CrmActivity] {
+        ApiClient.decodeMapList(
+            try await api.get("crm-activities", query: ["opportunityId": "\(opportunityId)"])
+        ).map(CrmActivity.init)
+    }
+
+    func crmAgenda() async throws -> CrmAgenda {
+        let data = try await api.get("crm-activities/my-agenda")
+        return CrmAgenda(raw: ConsoleHelpers.decodeMap(data))
+    }
+
+    func completeCrmActivity(id: Int64, outcome: String? = nil) async throws {
+        var body: [String: Any] = [:]
+        if let outcome, !outcome.isEmpty { body["outcome"] = outcome }
+        _ = try await IntegraHTTP.patchMap("crm-activities/\(id)/complete", body: body)
     }
 
     func downloadAssetBytes(_ relativeOrAbsoluteUrl: String) async throws -> Data {

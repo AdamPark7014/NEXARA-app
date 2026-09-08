@@ -167,7 +167,7 @@ struct PortalServicesView: View {
             invoices = try await TicketsRepository.shared.portalInvoices()
             quotes = try await TicketsRepository.shared.portalQuotes()
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
         loading = false
     }
@@ -184,7 +184,7 @@ struct PortalServicesView: View {
                 pdfItem = PortalPDFItem(title: "Factura \(id)", data: data)
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 
@@ -196,7 +196,7 @@ struct PortalServicesView: View {
             let data = try await TicketsRepository.shared.downloadQuotePdf(id: id)
             pdfItem = PortalPDFItem(title: "Cotización \(id)", data: data)
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 }

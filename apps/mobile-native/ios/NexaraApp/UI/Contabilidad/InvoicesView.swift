@@ -71,7 +71,7 @@ final class InvoicesVM: ObservableObject {
             loadDetail(id: id)
             return true
         } catch {
-            message = "❌ \(error.localizedDescription)"
+            message = "❌ \(error.toUserMessage())"
             return false
         }
     }
@@ -85,7 +85,7 @@ final class InvoicesVM: ObservableObject {
             message = "✅ 3-way match: \(status.isEmpty ? "evaluado" : status)"
             loadDetail(id: id)
         } catch {
-            message = "❌ \(error.localizedDescription)"
+            message = "❌ \(error.toUserMessage())"
         }
     }
 }

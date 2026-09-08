@@ -238,7 +238,7 @@ struct VentasQuoteDetailView: View {
             detail = try await CrmRepository.shared.cotizacionDetail(id: cotizacionId)
             sendEmail = ConsoleHelpers.mapStr(detail ?? [:], "clientEmail")
         } catch let e {
-            self.error = e.localizedDescription
+            self.error = e.toUserMessage()
             detail = nil
         }
         loading = false
@@ -267,7 +267,7 @@ struct VentasQuoteDetailView: View {
                 showPdf = true
             }
         } catch {
-            actionMessage = error.localizedDescription
+            actionMessage = error.toUserMessage()
         }
         downloading = false
     }
@@ -287,7 +287,7 @@ struct VentasQuoteDetailView: View {
             actionMessage = "Cotización enviada a \(email)"
             await load()
         } catch {
-            actionMessage = error.localizedDescription
+            actionMessage = error.toUserMessage()
         }
         sending = false
     }
@@ -303,7 +303,7 @@ struct VentasQuoteDetailView: View {
                   let root = scene.windows.first?.rootViewController else { return }
             root.present(av, animated: true)
         } catch {
-            actionMessage = error.localizedDescription
+            actionMessage = error.toUserMessage()
         }
     }
 

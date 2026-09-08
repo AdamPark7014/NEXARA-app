@@ -123,7 +123,7 @@ struct OpsNewActivityView: View {
                 if let t = tickets.first(where: { $0.id == requestId }) { prefill(t) }
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
         loading = false
     }
@@ -178,7 +178,7 @@ struct OpsNewActivityView: View {
             onDone(Int(newId))
             dismiss()
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
         saving = false
     }

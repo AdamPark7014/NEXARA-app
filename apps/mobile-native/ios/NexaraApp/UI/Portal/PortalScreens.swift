@@ -50,7 +50,7 @@ struct PortalProfileView: View {
                 address: address, city: city, state: nil, country: nil
             )
             message = "Perfil actualizado"
-        } catch { message = error.localizedDescription }
+        } catch { message = error.toUserMessage(fallback: "No se pudo actualizar el perfil") }
     }
 }
 
@@ -116,6 +116,7 @@ struct PortalBranchEditView: View {
     @State private var city = ""
     @State private var state = ""
     @State private var country = ""
+    @State private var placeId = ""
     @State private var latitud = ""
     @State private var longitud = ""
     @State private var isActive = true
@@ -129,6 +130,9 @@ struct PortalBranchEditView: View {
 
     var body: some View {
         Form {
+            if isLoading && branchId != nil {
+                ProgressView("Cargando sucursal…")
+            }
             if let message { Text(message).foregroundColor(.green).font(.footnote) }
             if let error { Text(error).foregroundColor(.red).font(.footnote) }
             Section("Datos") {
@@ -142,6 +146,7 @@ struct PortalBranchEditView: View {
                 TextField("Ciudad", text: $city)
                 TextField("Estado", text: $state)
                 TextField("País", text: $country)
+                TextField("Place ID (Google)", text: $placeId)
             }
             Section("Coordenadas") {
                 TextField("Latitud", text: $latitud).keyboardType(.decimalPad)
@@ -150,7 +155,7 @@ struct PortalBranchEditView: View {
             Section("Logo") {
                 if let logoData, let ui = UIImage(data: logoData) {
                     Image(uiImage: ui).resizable().scaledToFit().frame(maxHeight: 120)
-                } else if let existingLogoUrl, let url = URL(string: existingLogoUrl) {
+                } else if let existingLogoUrl, let url = URL(string: ApiUrls.absoluteAsset(existingLogoUrl)) {
                     AsyncImage(url: url) { $0.resizable().scaledToFit() } placeholder: { ProgressView() }
                         .frame(maxHeight: 120)
                 }
@@ -180,19 +185,27 @@ struct PortalBranchEditView: View {
         isLoading = true
         defer { isLoading = false }
         guard let branchId else { return }
-        let list = (try? await TicketsRepository.shared.portalBranches()) ?? []
-        guard let b = list.first(where: { $0.id == branchId }) else { return }
-        name = b.name
-        branchNumber = b.branchNumber
-        portalEmail = b.portalEmail
-        address = b.address
-        city = b.city
-        state = b.state
-        country = b.country
-        if let lat = b.latitud { latitud = String(lat) }
-        if let lng = b.longitud { longitud = String(lng) }
-        isActive = b.isActive
-        existingLogoUrl = b.logoUrl.nilIfEmpty
+        do {
+            let list = try await TicketsRepository.shared.portalBranches()
+            guard let b = list.first(where: { $0.id == branchId }) else {
+                error = "Sucursal no encontrada"
+                return
+            }
+            name = b.name
+            branchNumber = b.branchNumber
+            portalEmail = b.portalEmail
+            address = b.address
+            city = b.city
+            state = b.state
+            country = b.country
+            placeId = b.placeId
+            if let lat = b.latitud { latitud = String(lat) }
+            if let lng = b.longitud { longitud = String(lng) }
+            isActive = b.isActive
+            existingLogoUrl = b.logoUrl.nilIfEmpty
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo cargar la sucursal")
+        }
     }
 
     private func save() async {
@@ -206,7 +219,7 @@ struct PortalBranchEditView: View {
                     id: branchId, name: name, branchNumber: branchNumber,
                     portalEmail: portalEmail, portalPassword: portalPassword.nilIfEmpty,
                     address: address.nilIfEmpty, city: city.nilIfEmpty, state: state.nilIfEmpty, country: country.nilIfEmpty,
-                    placeId: nil, latitud: lat, longitud: lng, isActive: isActive,
+                    placeId: placeId.nilIfEmpty, latitud: lat, longitud: lng, isActive: isActive,
                     logoData: logoData, logoFileName: "logo.jpg"
                 )
                 message = "Sucursal actualizada"
@@ -214,13 +227,13 @@ struct PortalBranchEditView: View {
                 _ = try await TicketsRepository.shared.createBranch(
                     name: name, branchNumber: branchNumber, portalEmail: portalEmail, portalPassword: portalPassword,
                     address: address.nilIfEmpty, city: city.nilIfEmpty, state: state.nilIfEmpty, country: country.nilIfEmpty,
-                    placeId: nil, latitud: lat, longitud: lng, isActive: isActive,
+                    placeId: placeId.nilIfEmpty, latitud: lat, longitud: lng, isActive: isActive,
                     logoData: logoData, logoFileName: "logo.jpg"
                 )
                 message = "Sucursal creada"
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { onDone() }
             }
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = error.toUserMessage(fallback: "No se pudo guardar la sucursal") }
     }
 }
 
@@ -274,7 +287,6 @@ struct PortalRequestsView: View {
 
     @ViewBuilder
     private func reqDetail(_ r: ClientTicketRequest) -> some View {
-        let status = r.status.uppercased()
         List {
             Section {
                 Button("← Solicitudes") { selected = nil }
@@ -288,8 +300,16 @@ struct PortalRequestsView: View {
                 rRow("Creada", String(r.createdAt.prefix(10)))
                 rRow("Vence", String(r.dueAt.prefix(10)))
             }
-            if status != "CLOSED", status != "CERRADA", r.id > 0 {
-                Section {
+            if !r.isClosed, r.id > 0 {
+                Section("Acciones") {
+                    if r.isNew {
+                        Button("Autorizar") {
+                            Task { await decide(r.id, "APPROVED"); selected = nil }
+                        }
+                        Button("Rechazar", role: .destructive) {
+                            Task { await decide(r.id, "REJECTED"); selected = nil }
+                        }
+                    }
                     Button("Cerrar solicitud", role: .destructive) {
                         Task { await close(r.id); selected = nil }
                     }
@@ -306,22 +326,43 @@ struct PortalRequestsView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await TicketsRepository.shared.portalRequests()) ?? []
+        do {
+            items = try await TicketsRepository.shared.portalRequests()
+        } catch {
+            items = []
+        }
     }
 
     private func close(_ id: Int64) async {
-        try? await TicketsRepository.shared.closeRequest(id: id)
-        await reload()
+        do {
+            try await TicketsRepository.shared.closeRequest(id: id)
+            await reload()
+        } catch { /* list refresh shows state */ }
+    }
+
+    private func decide(_ id: Int64, _ decision: String) async {
+        do {
+            try await TicketsRepository.shared.decideRequest(id: id, decision: decision)
+            await reload()
+        } catch { /* list refresh shows state */ }
     }
 }
 
 struct PortalRequestNewView: View {
     let onDone: () -> Void
+    @EnvironmentObject private var session: SessionStore
     @State private var description = ""
     @State private var urgency = "MEDIUM"
     @State private var requestType = "ISSUE"
+    @State private var branches: [PortalBranch] = []
+    @State private var selectedBranchId: Int64?
+    @State private var evidenceItems: [PhotosPickerItem] = []
+    @State private var evidenceFiles: [(fileName: String, data: Data)] = []
     @State private var saving = false
+    @State private var loadingBranches = false
     @State private var error: String?
+
+    private var isBranchUser: Bool { session.currentUser?.isBranchUser == true }
 
     var body: some View {
         Form {
@@ -337,10 +378,66 @@ struct PortalRequestNewView: View {
                     Text("Inventario preventivo").tag("PREVENTIVE_INVENTORY")
                 }
             }
+            if !isBranchUser {
+                Section("Sucursal") {
+                    if loadingBranches {
+                        ProgressView()
+                    } else if branches.isEmpty {
+                        Text("Sin sucursales disponibles").foregroundStyle(.secondary)
+                    } else {
+                        Picker("Sucursal", selection: $selectedBranchId) {
+                            Text("Sin seleccionar").tag(Optional<Int64>.none)
+                            ForEach(branches) { b in
+                                Text(b.name).tag(Optional(b.id))
+                            }
+                        }
+                    }
+                }
+            }
+            if isBranchUser {
+                Section("Evidencias") {
+                    PhotosPicker(selection: $evidenceItems, maxSelectionCount: 8, matching: .images) {
+                        Label("Agregar fotos", systemImage: "photo.on.rectangle")
+                    }
+                    if !evidenceFiles.isEmpty {
+                        Text("\(evidenceFiles.count) archivo(s) listos")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("Quitar evidencias", role: .destructive) {
+                            evidenceItems = []; evidenceFiles = []
+                        }
+                    }
+                }
+            }
             if let error { Text(error).foregroundColor(.red).font(.footnote) }
-            Button(saving ? "Enviando…" : "Crear solicitud") { Task { await submit() } }.disabled(saving || description.isEmpty)
+            Button(saving ? "Enviando…" : "Crear solicitud") { Task { await submit() } }
+                .disabled(saving || description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .navigationTitle("Nueva solicitud")
+        .task { await loadBranches() }
+        .onChange(of: evidenceItems) { _, items in
+            Task { await loadEvidence(items) }
+        }
+    }
+
+    private func loadBranches() async {
+        guard !isBranchUser else { return }
+        loadingBranches = true
+        defer { loadingBranches = false }
+        do {
+            branches = try await TicketsRepository.shared.portalBranches()
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudieron cargar sucursales")
+        }
+    }
+
+    private func loadEvidence(_ items: [PhotosPickerItem]) async {
+        var files: [(fileName: String, data: Data)] = []
+        for (idx, item) in items.enumerated() {
+            if let data = try? await item.loadTransferable(type: Data.self) {
+                files.append((fileName: "evidencia-\(idx + 1).jpg", data: data))
+            }
+        }
+        evidenceFiles = files
     }
 
     private func submit() async {
@@ -348,10 +445,16 @@ struct PortalRequestNewView: View {
         defer { saving = false }
         do {
             _ = try await TicketsRepository.shared.createRequest(
-                description: description, urgency: urgency, requestType: requestType, branchId: nil
+                description: description,
+                urgency: urgency,
+                requestType: requestType,
+                branchId: isBranchUser ? nil : selectedBranchId,
+                evidenceFiles: isBranchUser ? evidenceFiles : []
             )
             onDone()
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo crear la solicitud")
+        }
     }
 }
 
@@ -651,7 +754,7 @@ struct PortalFeedbackView: View {
             )
             message = "Feedback enviado"
             await reload()
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = error.toUserMessage() }
     }
 }
 
@@ -787,7 +890,7 @@ struct PortalInventoryDetailView: View {
             )
             detail = PortalInventorySnapshot(raw: updated)
             message = "Inventario sincronizado"
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = error.toUserMessage() }
     }
 
     private func decide(_ decision: String) async {
@@ -797,7 +900,7 @@ struct PortalInventoryDetailView: View {
             let updated = try await TicketsRepository.shared.decideInventory(id: inventoryId, decision: decision)
             detail = PortalInventorySnapshot(raw: updated)
             message = "Inventario actualizado"
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = error.toUserMessage() }
     }
 }
 

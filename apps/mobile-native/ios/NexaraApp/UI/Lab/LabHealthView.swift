@@ -65,7 +65,7 @@ struct LabHealthView: View {
             basic = try await b
             summary = try await s
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 }

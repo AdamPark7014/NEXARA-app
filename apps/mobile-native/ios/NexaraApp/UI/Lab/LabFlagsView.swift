@@ -46,7 +46,7 @@ struct LabFlagsView: View {
         do {
             flags = try await LabRepository.shared.flags()
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 
@@ -57,7 +57,7 @@ struct LabFlagsView: View {
             _ = try await LabRepository.shared.setFlag(key: key, enabled: enabled)
             await reload()
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 }

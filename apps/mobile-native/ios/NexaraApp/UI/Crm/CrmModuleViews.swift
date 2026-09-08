@@ -95,7 +95,7 @@ struct CrmOpportunitiesView: View {
                 selectedId = Int(id)
             }
         } catch {
-            createError = error.localizedDescription
+            createError = error.toUserMessage()
         }
     }
 

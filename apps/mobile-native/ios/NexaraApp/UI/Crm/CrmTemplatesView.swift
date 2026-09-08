@@ -164,7 +164,7 @@ struct CrmTemplatesView: View {
             items = try await CrmRepository.shared.orderTemplateItems()
             error = nil
         } catch {
-            self.error = error.localizedDescription
+            self.error = error.toUserMessage()
         }
     }
 
@@ -184,7 +184,7 @@ struct CrmTemplatesView: View {
             showForm = false
             await reload()
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 
@@ -193,7 +193,7 @@ struct CrmTemplatesView: View {
             try await CrmRepository.shared.setOrderTemplateDefault(id: id)
             await reload()
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 
@@ -202,7 +202,7 @@ struct CrmTemplatesView: View {
             try await CrmRepository.shared.deleteOrderTemplate(id: id)
             await reload()
         } catch {
-            actionError = error.localizedDescription
+            actionError = error.toUserMessage()
         }
     }
 }
