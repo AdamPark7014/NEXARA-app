@@ -62,7 +62,7 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     fecha: toDateInputValue(
       (record.fechaInicio as string) ?? (record.fechaEntregaEsperada as string) ?? (record.fechaMaxima as string),
     ),
-    clientId: record.clientId ? String(record.clientId) : client?.id ? String(client.id) : "",
+    clientId: record.projectId ? (record.client?.id ?? (record.clientId ? Number(record.clientId) : undefined)) : (record.clientId ? Number(record.clientId) : undefined),
     projectId,
     ticketType: String(record.ticketType ?? "PREVENTIVO"),
     ticketTypeCustom: String(record.ticketTypeCustom ?? ""),
@@ -72,7 +72,7 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     branchCity: String(record.branchCity ?? ""),
     branchState: String(record.branchState ?? ""),
     branchAddress: String(record.branchAddress ?? ""),
-    projectMode: record.projectId ? "with_project" : "without_project",
+    projectMode: record.projectId ? 'with_project' : 'without_project',
   };
 }
 
@@ -90,7 +90,7 @@ export function buildActivityPayload(
     ticketTypeCustom: form.ticketType === "OTRO" ? form.ticketTypeCustom || undefined : undefined,
     workType: form.ticketType === "INVENTARIO" ? "PREVENTIVE_INVENTORY" : form.workType || "ISSUE",
     projectId: form.projectMode === 'with_project' && form.projectId ? Number(form.projectId) : undefined,
-    clientId: form.projectMode === 'with_project' ? (project?.client.id ?? (form.clientId ? Number(form.clientId) : undefined)) : (form.clientId ? Number(form.clientId) : undefined),
+    clientId: form.projectMode === 'with_project' ? (form.project?.client.id ?? (form.clientId ? Number(form.clientId) : undefined)) : (form.clientId ? Number(form.clientId) : undefined),
     branchName: form.branchName || undefined,
     branchNumber: form.branchNumber || undefined,
     branchCity: form.branchCity || undefined,

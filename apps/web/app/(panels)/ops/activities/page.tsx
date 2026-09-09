@@ -96,6 +96,9 @@ export default function ActivitiesPage() {
           </>
         }
       />
+      <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)" }}>
+        Aquí asignas y das seguimiento. El técnico ejecuta en Mis OT.
+      </p>
 
       {summary && (() => {
         const total = (summary.abiertas ?? 0) + (summary.enProceso ?? 0) + (summary.completadas ?? 0);

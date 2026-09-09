@@ -15,7 +15,7 @@ export default function NewActivityPage() {
       <PageHeader
         eyebrow="OPS · OT"
         title="Nueva orden de trabajo"
-        subtitle="Asigna proyecto, responsable y tiempos."
+        subtitle="Elige si la OT va con proyecto operativo o sin proyecto (interna / ad-hoc)."
         actions={
           <button
             type="button"

@@ -1,8 +1,24 @@
-/** Formulario moderno de OT — extraído del legacy `ActivitiesTable`. */
+export type ActivityFormState = {
+  titulo: string;
+  indicaciones: string;
+  prioridad: string;
+  responsableId: string;
+  tiempoEstimadoMin: string;
+  tiempoMaximoMin: string;
+  fecha: string;
+  clientId: string;
+  projectId: string;
+  ticketType: string;
+  ticketTypeCustom: string;
+  workType: "ISSUE" | "PREVENTIVE_INVENTORY";
+  branchName: string;
+  branchNumber: string;
+  branchCity: string;
+  branchState: string;
+  branchAddress: string;
+};
 
-export type ActivityProjectMode = 'with_project' | 'without_project';
-
-export const EMPTY_ACTIVITY_FORM = {
+export const EMPTY_ACTIVITY_FORM: ActivityFormState = {
   titulo: "",
   indicaciones: "",
   prioridad: "Media",
@@ -14,32 +30,15 @@ export const EMPTY_ACTIVITY_FORM = {
   projectId: "",
   ticketType: "PREVENTIVO",
   ticketTypeCustom: "",
-  workType: "ISSUE" as "ISSUE" | "PREVENTIVE_INVENTORY",
+  workType: "ISSUE",
   branchName: "",
   branchNumber: "",
   branchCity: "",
   branchState: "",
   branchAddress: "",
-  projectMode: 'with_project' as ActivityProjectMode,
 };
-
-export type ActivityFormState = typeof EMPTY_ACTIVITY_FORM;
 
 export const PRIORIDAD_LIST = ["Baja", "Media", "Alta"];
-
-export type OperationalProjectOption = {
-  id: number;
-  title: string;
-  status: string;
-  client: { id: number; name: string };
-};
-
-export type AssignableUserOption = {
-  id: number;
-  nombre: string;
-  email?: string;
-  role?: { nombre: string };
-};
 
 export function toDateInputValue(iso?: string | null): string {
   if (!iso) return "";
@@ -62,7 +61,7 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     fecha: toDateInputValue(
       (record.fechaInicio as string) ?? (record.fechaEntregaEsperada as string) ?? (record.fechaMaxima as string),
     ),
-    clientId: record.clientId ? String(record.clientId) : client?.id ? String(client.id) : "",
+    clientId: record.projectId ? (record.client?.id ?? (record.clientId ? Number(record.clientId) : undefined)) : (record.clientId ? Number(record.clientId) : undefined),
     projectId,
     ticketType: String(record.ticketType ?? "PREVENTIVO"),
     ticketTypeCustom: String(record.ticketTypeCustom ?? ""),
@@ -72,7 +71,6 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     branchCity: String(record.branchCity ?? ""),
     branchState: String(record.branchState ?? ""),
     branchAddress: String(record.branchAddress ?? ""),
-    projectMode: record.projectId ? "with_project" : "without_project",
   };
 }
 
@@ -85,12 +83,12 @@ export function buildActivityPayload(
     titulo: form.titulo,
     indicaciones: form.indicaciones || undefined,
     prioridad: form.prioridad,
-    activityType: form.projectMode === 'with_project' ? 'CLIENT' : 'INTERNAL',
+    activityType: form.projectId ? 'CLIENT' : 'INTERNAL',
     ticketType: form.ticketType === "INVENTARIO" ? "PREVENTIVO" : form.ticketType,
     ticketTypeCustom: form.ticketType === "OTRO" ? form.ticketTypeCustom || undefined : undefined,
     workType: form.ticketType === "INVENTARIO" ? "PREVENTIVE_INVENTORY" : form.workType || "ISSUE",
-    projectId: form.projectMode === 'with_project' && form.projectId ? Number(form.projectId) : undefined,
-    clientId: form.projectMode === 'with_project' ? (project?.client.id ?? (form.clientId ? Number(form.clientId) : undefined)) : (form.clientId ? Number(form.clientId) : undefined),
+    projectId: form.projectId ? Number(form.projectId) : undefined,
+    clientId: form.projectId ? (project?.client.id ?? (form.clientId ? Number(form.clientId) : undefined)) : (form.clientId ? Number(form.clientId) : undefined),
     branchName: form.branchName || undefined,
     branchNumber: form.branchNumber || undefined,
     branchCity: form.branchCity || undefined,

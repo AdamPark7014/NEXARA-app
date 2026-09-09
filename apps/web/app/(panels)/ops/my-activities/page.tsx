@@ -37,6 +37,8 @@ interface ActivityRow {
   titulo: string;
   descripcion?: string | null;
   estatus: string;
+  ticketType?: string | null;
+  projectId?: number | null;
   branchName?: string | null;
   branchAddress?: string | null;
   fechaAsignacion: string;
@@ -44,6 +46,7 @@ interface ActivityRow {
   fechaEntregaEsperada?: string | null;
   fechaFinalizacion?: string | null;
   client?: { name: string } | null;
+  project?: { id?: number; title?: string } | null;
   activityEvidence?: ActivityEvidenceInfo | null;
 }
 
@@ -248,6 +251,21 @@ export default function MyActivitiesPage() {
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 
+      <div
+        style={{
+          marginBottom: 14,
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: "1px solid var(--border)",
+          background: "var(--surface-2)",
+          fontSize: 13,
+          color: "var(--text-secondary)",
+        }}
+      >
+        <strong style={{ color: "var(--text-primary)" }}>Cómo trabajar tu OT:</strong>{" "}
+        1. Iniciar → 2. Evidencias → 3. Cerrar
+      </div>
+
       {highlightActivityId && Number.isFinite(highlightActivityId) && (
         <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
           Enlace desde notificación · OT <strong>#{highlightActivityId}</strong>.{" "}
@@ -288,19 +306,24 @@ export default function MyActivitiesPage() {
       })()}
 
       <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)", marginBottom: 16, gap: 4 }}>
-        {(["actividades", "evidencias"] as const).map((t) => (
+        {(
+          [
+            { key: "actividades" as const, label: "Mis OT" },
+            { key: "evidencias" as const, label: "Evidencias" },
+          ] as const
+        ).map((t) => (
           <button
-            key={t}
+            key={t.key}
             type="button"
-            onClick={() => router.replace(t === "evidencias" ? "/ops/my-activities?tab=evidencias" : "/ops/my-activities")}
+            onClick={() => router.replace(t.key === "evidencias" ? "/ops/my-activities?tab=evidencias" : "/ops/my-activities")}
             style={{
               padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none",
-              borderBottom: viewTab === t ? "2px solid var(--primary)" : "2px solid transparent",
-              background: "transparent", color: viewTab === t ? "var(--primary)" : "var(--text-secondary)",
-              fontFamily: "inherit", textTransform: "capitalize",
+              borderBottom: viewTab === t.key ? "2px solid var(--primary)" : "2px solid transparent",
+              background: "transparent", color: viewTab === t.key ? "var(--primary)" : "var(--text-secondary)",
+              fontFamily: "inherit",
             }}
           >
-            {t}
+            {t.label}
           </button>
         ))}
       </div>
@@ -323,14 +346,20 @@ export default function MyActivitiesPage() {
         }
       />
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {(["hoy", "semana", "todas"] as const).map((t) => (
-          <button key={t} type="button" onClick={() => setRangeTab(t)} style={{
+        {(
+          [
+            { key: "hoy" as const, label: "Hoy" },
+            { key: "semana" as const, label: "Esta semana" },
+            { key: "todas" as const, label: "Todas" },
+          ] as const
+        ).map((t) => (
+          <button key={t.key} type="button" onClick={() => setRangeTab(t.key)} style={{
             padding: "7px 16px", fontSize: 12.5, fontWeight: 600, borderRadius: 999,
-            border: rangeTab === t ? "1px solid var(--primary)" : "1px solid var(--border)",
-            background: rangeTab === t ? "color-mix(in srgb, var(--primary) 10%, transparent)" : "var(--surface)",
-            color: rangeTab === t ? "var(--primary)" : "var(--text-primary)", cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize",
+            border: rangeTab === t.key ? "1px solid var(--primary)" : "1px solid var(--border)",
+            background: rangeTab === t.key ? "color-mix(in srgb, var(--primary) 10%, transparent)" : "var(--surface)",
+            color: rangeTab === t.key ? "var(--primary)" : "var(--text-primary)", cursor: "pointer", fontFamily: "inherit",
           }}>
-            {t}
+            {t.label}
           </button>
         ))}
       </div>
@@ -377,16 +406,36 @@ export default function MyActivitiesPage() {
                     <Tag variant="accent">{a.anNumber}</Tag>
                   </Link>
                   <Tag variant={estadoVariant(a.estatus)}>{a.estatus}</Tag>
+                  {a.ticketType && <Tag variant="neutral">{a.ticketType}</Tag>}
+                  {a.projectId || a.project?.id ? (
+                    <Tag variant="accent">Con proyecto</Tag>
+                  ) : (
+                    <Tag variant="neutral">Sin proyecto</Tag>
+                  )}
                 </div>
                 <Link href={`/ops/activities/${a.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                  <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15.5 }}>{a.client?.name ?? a.branchName ?? "—"}</div>
+                  <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15.5 }}>{a.client?.name ?? a.branchName ?? "Interna"}</div>
                 </Link>
+                {a.project?.title && (
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                    Proyecto: {a.project.title}
+                  </div>
+                )}
                 {a.branchAddress && <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 3 }}>📍 {a.branchAddress}</div>}
                 <div style={{ fontSize: 12.5, color: "var(--text-primary)", marginTop: 6 }}>{a.titulo}</div>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
                     ⏱ {a.fechaEntregaEsperada ? new Date(a.fechaEntregaEsperada).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "Sin fecha límite"}
                   </span>
+                  {(() => {
+                    const action = fieldActionLabel(a.estatus, a.activityEvidence);
+                    if (!action) return null;
+                    return (
+                      <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--primary)" }}>
+                        Siguiente: {action.label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
 

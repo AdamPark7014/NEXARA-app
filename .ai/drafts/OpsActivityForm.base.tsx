@@ -8,13 +8,11 @@ import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import {
-  activitySubmitLabel,
   buildActivityPayload,
   EMPTY_ACTIVITY_FORM,
   formFromActivityRecord,
   PRIORIDAD_LIST,
   type ActivityFormState,
-  type ActivityProjectMode,
 } from "@/lib/ops-activity-form";
 import {
   assignTicketRequest,
@@ -143,7 +141,6 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
       prioridad: request.urgency === "HIGH" ? "Alta" : request.urgency === "LOW" ? "Baja" : "Media",
       clientId,
       projectId: matching.length === 1 ? String(matching[0].id) : "",
-      projectMode: "with_project",
       branchName: request.branchName || prev.branchName,
       branchNumber: request.branchNumber || prev.branchNumber,
       branchCity: request.city || prev.branchCity,
@@ -184,7 +181,7 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
       setError("Título y responsable son obligatorios");
       return;
     }
-    if (form.projectMode === "with_project" && !form.projectId) {
+    if (!form.projectId) {
       setError("Selecciona un proyecto");
       return;
     }
@@ -213,7 +210,7 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
             return;
           }
         }
-        setSuccess(form.responsableId ? "OT asignada" : "OT creada");
+        setSuccess("OT asignada");
         setForm({ ...EMPTY_ACTIVITY_FORM });
         const next = await fetchNextAnNumber(token);
         setNextAn(typeof next?.next === "string" ? next.next : "");
@@ -245,11 +242,7 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
   return (
     <Section
       title={isEdit ? `Editar OT #${activityId}` : "Nueva orden de trabajo"}
-      subtitle={
-        form.projectMode === "with_project"
-          ? "OT con proyecto operativo: el cliente sale del proyecto."
-          : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto."
-      }
+      subtitle="Proyecto, responsable, fecha y tiempos estimados."
       actions={
         !isEdit ? (
           <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
@@ -305,59 +298,6 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
         </div>
       )}
 
-      {(
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 10,
-            marginBottom: 16,
-          }}
-        >
-          {(
-            [
-              {
-                mode: "with_project" as ActivityProjectMode,
-                title: "Con proyecto",
-                help: "OT ligada a un proyecto operativo; el cliente sale del proyecto.",
-              },
-              {
-                mode: "without_project" as ActivityProjectMode,
-                title: "Sin proyecto",
-                help: "OT interna o ad-hoc; no pide proyecto.",
-              },
-            ] as const
-          ).map((opt) => {
-            const selected = form.projectMode === opt.mode;
-            return (
-              <button
-                key={opt.mode}
-                type="button"
-                onClick={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    projectMode: opt.mode,
-                    projectId: opt.mode === "without_project" ? "" : prev.projectId,
-                    clientId: opt.mode === "without_project" ? "" : prev.clientId,
-                  }))
-                }
-                style={{
-                  textAlign: "left",
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  border: selected ? "2px solid var(--primary)" : "1px solid var(--border)",
-                  background: selected ? "color-mix(in srgb, var(--primary) 8%, var(--surface))" : "var(--surface)",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{opt.title}</div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.35 }}>{opt.help}</div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       <div style={gridStyle}>
         {!isEdit && (
           <input
@@ -369,44 +309,36 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
         )}
         <input
           className="input"
-          placeholder="Título de la OT"
+          placeholder="Título de la actividad"
           value={form.titulo}
           onChange={(e) => setForm({ ...form, titulo: e.target.value })}
         />
-        {form.projectMode === "with_project" ? (
-          <>
-            <select
-              className="input"
-              value={form.projectId}
-              onChange={(e) => {
-                const projectId = e.target.value;
-                const project = activeProjects.find((p) => String(p.id) === projectId);
-                setForm({
-                  ...form,
-                  projectId,
-                  clientId: project ? String(project.client.id) : "",
-                });
-              }}
-            >
-              <option value="">Seleccionar proyecto…</option>
-              {activeProjects
-                .filter((p) => !form.clientId || String(p.client.id) === form.clientId)
-                .map((project) => (
-                  <option key={project.id} value={project.id}>{project.title}</option>
-                ))}
-            </select>
-            <input
-              className="input"
-              placeholder="Cliente (automático)"
-              value={activeProjects.find((p) => String(p.id) === form.projectId)?.client.name ?? ""}
-              disabled
-            />
-          </>
-        ) : (
-          <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-secondary)" }}>
-            Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo.
-          </div>
-        )}
+        <select
+          className="input"
+          value={form.projectId}
+          onChange={(e) => {
+            const projectId = e.target.value;
+            const project = activeProjects.find((p) => String(p.id) === projectId);
+            setForm({
+              ...form,
+              projectId,
+              clientId: project ? String(project.client.id) : "",
+            });
+          }}
+        >
+          <option value="">Seleccionar proyecto…</option>
+          {activeProjects
+            .filter((p) => !form.clientId || String(p.client.id) === form.clientId)
+            .map((project) => (
+              <option key={project.id} value={project.id}>{project.title}</option>
+            ))}
+        </select>
+        <input
+          className="input"
+          placeholder="Cliente (automático)"
+          value={activeProjects.find((p) => String(p.id) === form.projectId)?.client.name ?? ""}
+          disabled
+        />
         <select
           className="input"
           value={form.ticketType}
@@ -500,7 +432,7 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
         )}
         <Button size="sm" onClick={() => void handleSubmit()} disabled={saving}>
-          {saving ? "Guardando…" : activitySubmitLabel(form, isEdit)}
+          {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Asignar OT"}
         </Button>
         {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
         {success && <span style={{ color: "var(--success)", fontSize: 13 }}>{success}</span>}

@@ -11,6 +11,10 @@ export type ActivityDetail = {
   estatus: string;
   prioridad?: string | null;
   ticketType?: string | null;
+  ticketTypeCustom?: string | null;
+  workType?: string | null;
+  projectId?: number | null;
+  project?: { id: number; title: string } | null;
   branchName?: string | null;
   branchAddress?: string | null;
   branchCity?: string | null;

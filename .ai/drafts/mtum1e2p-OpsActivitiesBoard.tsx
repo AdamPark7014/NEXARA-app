@@ -25,10 +25,8 @@ type ActivityRow = {
   estatus: string;
   prioridad?: string | null;
   ticketType?: string | null;
-  projectId?: number | null;
   branchName?: string | null;
   client?: { id?: number; name?: string } | null;
-  project?: { id?: number; title?: string } | null;
   responsable?: { id?: number; nombre?: string } | null;
   activityEvidence?: {
     status?: string;
@@ -72,7 +70,6 @@ export default function OpsActivitiesBoard() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
-  const [filterProject, setFilterProject] = useState<"all" | "with" | "without">("all");
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -107,8 +104,6 @@ export default function OpsActivitiesBoard() {
 
   const visible = useMemo(() => {
     let list = rows;
-    if (filterProject === "with") list = list.filter((r) => r.projectId != null || r.project?.id != null);
-    if (filterProject === "without") list = list.filter((r) => r.projectId == null && r.project?.id == null);
     if (filterStatus) list = list.filter((r) => r.estatus === filterStatus);
     if (filterPriority) list = list.filter((r) => r.prioridad === filterPriority);
     if (search.trim()) {
@@ -117,32 +112,12 @@ export default function OpsActivitiesBoard() {
         (r.anNumber ?? "").toLowerCase().includes(q) ||
         r.titulo.toLowerCase().includes(q) ||
         (r.client?.name ?? "").toLowerCase().includes(q) ||
-        (r.project?.title ?? "").toLowerCase().includes(q) ||
         (r.branchName ?? "").toLowerCase().includes(q) ||
         (r.responsable?.nombre ?? "").toLowerCase().includes(q),
       );
     }
     return list;
-  }, [rows, search, filterStatus, filterPriority, filterProject]);
-
-  const emptyCopy = useMemo(() => {
-    if (filterProject === "with") {
-      return {
-        title: "Sin OT con proyecto",
-        description: "No hay órdenes ligadas a un proyecto operativo con estos filtros.",
-      };
-    }
-    if (filterProject === "without") {
-      return {
-        title: "Sin OT sin proyecto",
-        description: "No hay órdenes internas o ad-hoc con estos filtros.",
-      };
-    }
-    return {
-      title: "Sin órdenes de trabajo",
-      description: "No hay OT que coincidan con los filtros. Crea una nueva o limpia los filtros.",
-    };
-  }, [filterProject]);
+  }, [rows, search, filterStatus, filterPriority]);
 
   const statusOptions = useMemo(() => {
     const set = new Set(rows.map((r) => r.estatus).filter(Boolean));
@@ -162,82 +137,47 @@ export default function OpsActivitiesBoard() {
         { key: "titulo", label: "Título" },
         { key: "estatus", label: "Estatus" },
         { key: "prioridad", label: "Prioridad" },
-        { key: "client", label: "Cliente", format: (v) => (v as ActivityRow["client"])?.name ?? "Interna" },
-        { key: "branchName", label: "Sucursal" },
-        { key: "responsable", label: "Responsable", format: (v) => (v as ActivityRow["responsable"])?.nombre ?? "—" },
+        { key: "client", label: "Cliente", format: (r) => r.client?.name || "" },
+        { key: "responsable", label: "Responsable", format: (r) => r.responsable?.nombre || "" },
+        { key: "fechaInicio", label: "Fecha de Inicio", format: (r) => r.fechaInicio || "" },
+        { key: "fechaEntregaEsperada", label: "Fecha de Entrega Esperada", format: (r) => r.fechaEntregaEsperada || "" },
+        { key: "activityEvidence", label: "Evidencia", format: (r) => evidenceLabel(r) },
       ],
-      "ops-actividades",
-      { title: "Actividades OPS", subtitle: `${visible.length} OT visibles` },
+      "OTs",
     );
   };
 
-  const exportPdf = async () => {
+  const exportPdf = useCallback(async () => {
     if (!token) return;
     setPdfBusy(true);
     try {
-      const to = new Date().toISOString().slice(0, 10);
-      const from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
-      await downloadActivitiesReportPdf(token, { from, to });
+      const res = await downloadActivitiesReportPdf(token, visible);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "OTs.pdf");
+      document.body.appendChild(link);
+      link.click();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+      toast.error(e instanceof Error ? e.message : "Error al descargar el PDF");
     } finally {
       setPdfBusy(false);
     }
-  };
+  }, [token, visible]);
 
   const columns: Column<ActivityRow>[] = [
+    { title: "AN", key: "anNumber" },
+    { title: "Título", key: "titulo" },
+    { title: "Estatus", key: "estatus", render: (r) => <Tag variant={statusVariant(r.estatus)}>{r.estatus}</Tag> },
+    { title: "Prioridad", key: "prioridad" },
+    { title: "Cliente", key: "client", render: (r) => r.client?.name || "-" },
+    { title: "Responsable", key: "responsable", render: (r) => r.responsable?.nombre || "-" },
+    { title: "Fecha de Inicio", key: "fechaInicio", render: (r) => r.fechaInicio || "-" },
+    { title: "Fecha de Entrega Esperada", key: "fechaEntregaEsperada", render: (r) => r.fechaEntregaEsperada || "-" },
+    { title: "Evidencia", key: "activityEvidence", render: (r) => evidenceLabel(r) },
     {
-      key: "anNumber",
-      label: "AN",
-      width: 88,
-      render: (r) => (
-        <Link href={`/ops/activities/${r.id}`} style={{ fontWeight: 700, color: "var(--primary)", textDecoration: "none" }}>
-          {r.anNumber ?? `#${r.id}`}
-        </Link>
-      ),
-    },
-    {
-      key: "titulo",
-      label: "Título",
-      render: (r) => (
-        <Link href={`/ops/activities/${r.id}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--foreground)", textDecoration: "none" }}>
-          {r.titulo}
-        </Link>
-      ),
-    },
-    { key: "client", label: "Cliente", render: (r) => r.client?.name ?? "Interna", width: 140 },
-    {
-      key: "project",
-      label: "Proyecto",
-      width: 150,
-      render: (r) =>
-        r.project?.title ? (
-          <Link href={`/ops/projects/${r.project.id ?? r.projectId}`} style={{ color: "var(--primary)", textDecoration: "none", fontSize: 12 }}>
-            {r.project.title}
-          </Link>
-        ) : (
-          <Tag variant="neutral">Sin proyecto</Tag>
-        ),
-    },
-    { key: "branchName", label: "Sucursal", render: (r) => r.branchName ?? "—", width: 120 },
-    {
-      key: "estatus",
-      label: "Estatus",
-      render: (r) => <Tag variant={statusVariant(r.estatus)}>{r.estatus}</Tag>,
-      width: 110,
-    },
-    { key: "responsable", label: "Responsable", render: (r) => r.responsable?.nombre ?? "—", width: 130 },
-    { key: "prioridad", label: "Prioridad", width: 90 },
-    {
-      key: "evidence",
-      label: "Evidencias",
-      render: (r) => <span style={{ fontSize: 12 }}>{evidenceLabel(r)}</span>,
-      width: 140,
-    },
-    {
+      title: "Acciones",
       key: "actions",
-      label: "",
-      width: 120,
       render: (r) => (
         <div style={{ display: "flex", gap: 4 }}>
           <Button size="sm" variant="ghost" onClick={() => router.push(`/ops/activities/${r.id}`)}>
@@ -270,46 +210,13 @@ export default function OpsActivitiesBoard() {
 
   return (
     <>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10, alignItems: "center" }}>
-        {(
-          [
-            { key: "all" as const, label: "Todas" },
-            { key: "with" as const, label: "Con proyecto" },
-            { key: "without" as const, label: "Sin proyecto" },
-          ] as const
-        ).map((seg) => {
-          const on = filterProject === seg.key;
-          return (
-            <button
-              key={seg.key}
-              type="button"
-              onClick={() => setFilterProject(seg.key)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 999,
-                border: on ? "1.5px solid var(--primary)" : "1px solid var(--border)",
-                background: on ? "color-mix(in srgb, var(--primary) 12%, var(--surface))" : "var(--surface)",
-                color: on ? "var(--primary)" : "var(--text-secondary)",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              {seg.label}
-            </button>
-          );
-        })}
-        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-          Aquí asignas y das seguimiento. El técnico ejecuta en Mis OT.
-        </span>
-      </div>
       <FilterToolbar
-        search={{ value: search, onChange: setSearch, placeholder: "Buscar AN, título, cliente, proyecto…" }}
+        search={{ value: search, onChange: setSearch, placeholder: "Buscar AN, título, cliente, sucursal…" }}
         selects={[
           { label: "Estatus", value: filterStatus, onChange: setFilterStatus, options: statusOptions, allowAll: true },
           { label: "Prioridad", value: filterPriority, onChange: setFilterPriority, options: priorityOptions, allowAll: true },
         ]}
-        onClear={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); setFilterProject("all"); }}
+        onClear={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); }}
         resultCount={visible.length}
         rightActions={
           <>
@@ -319,7 +226,7 @@ export default function OpsActivitiesBoard() {
             <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
             <ListExportActions
               onExcel={rows.length > 0 ? exportExcel : undefined}
-              onPdf={token ? () => void exportPdf() : undefined}
+              onPdf={token ? exportPdf : undefined}
               pdfBusy={pdfBusy}
             />
             <Link href="/ops/dispatch" style={{ textDecoration: "none" }}>
@@ -335,11 +242,11 @@ export default function OpsActivitiesBoard() {
         columns={columns}
         rows={visible}
         rowKey={(r) => r.id}
-        emptyTitle={emptyCopy.title}
-        emptyDescription={emptyCopy.description}
+        emptyTitle="Sin actividades"
+        emptyDescription="No hay OT que coincidan con los filtros. Crea una nueva o limpia los filtros."
         emptyAction={
           <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-            <Button size="sm" variant="secondary" onClick={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); setFilterProject("all"); }}>
+            <Button size="sm" variant="secondary" onClick={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); }}>
               Limpiar filtros
             </Button>
             <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
