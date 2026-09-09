@@ -1,16 +1,12 @@
-"use client";
-import { toast } from "@/components/Toast";
-import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
-import {
-  evidenceStepLabel,
-  isEvidenceLocked,
-  rejectedStepsList,
-} from "@/lib/evidence-lock";
+'use client';
+import { toast } from '@/components/Toast';
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
+import { evidenceStepLabel, isEvidenceLocked, rejectedStepsList } from '@/lib/evidence-lock';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
 import { Socket } from 'socket.io-client';
-import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import ConfirmDialog, { type ConfirmState } from '@/components/ui/ConfirmDialog';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface ActivityOption {
@@ -39,7 +35,13 @@ const normalizeActivitiesPayload = (data: unknown): ActivityOption[] => {
 
 interface EvidenceFlowData {
   activityId: number;
-  step: 'ENTRY_PHOTO' | 'EVIDENCE_PHOTOS' | 'SERVICE_SHEET_PDF' | 'SERVICE_SHEET_DATA' | 'EXIT_PHOTO' | 'COMPLETED';
+  step:
+    | 'ENTRY_PHOTO'
+    | 'EVIDENCE_PHOTOS'
+    | 'SERVICE_SHEET_PDF'
+    | 'SERVICE_SHEET_DATA'
+    | 'EXIT_PHOTO'
+    | 'COMPLETED';
   reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejectedStep?: string;
   rejectedSteps?: string[];
@@ -122,18 +124,27 @@ const ActivityEvidenceFlow = () => {
       ...flowData,
       ...local,
       step: (saved.status as EvidenceFlowData['step']) ?? flowData.step,
-      reviewStatus: (saved.reviewStatus as EvidenceFlowData['reviewStatus']) ?? flowData.reviewStatus,
+      reviewStatus:
+        (saved.reviewStatus as EvidenceFlowData['reviewStatus']) ?? flowData.reviewStatus,
       rejectedStep: (saved.rejectedStep as string | null) ?? undefined,
-      rejectedSteps: Array.isArray(saved.rejectedSteps) ? (saved.rejectedSteps as string[]) : undefined,
+      rejectedSteps: Array.isArray(saved.rejectedSteps)
+        ? (saved.rejectedSteps as string[])
+        : undefined,
       entryPhotoUrl: (saved.entryPhotoUrl as string | undefined) ?? flowData.entryPhotoUrl,
-      entryLatitude: saved.entryLatitude != null ? Number(saved.entryLatitude) : flowData.entryLatitude,
-      entryLongitude: saved.entryLongitude != null ? Number(saved.entryLongitude) : flowData.entryLongitude,
-      evidencePhotos: Array.isArray(saved.evidencePhotos) ? (saved.evidencePhotos as string[]) : flowData.evidencePhotos,
-      serviceSheetPdfUrl: (saved.serviceSheetPdfUrl as string | undefined) ?? flowData.serviceSheetPdfUrl,
+      entryLatitude:
+        saved.entryLatitude != null ? Number(saved.entryLatitude) : flowData.entryLatitude,
+      entryLongitude:
+        saved.entryLongitude != null ? Number(saved.entryLongitude) : flowData.entryLongitude,
+      evidencePhotos: Array.isArray(saved.evidencePhotos)
+        ? (saved.evidencePhotos as string[])
+        : flowData.evidencePhotos,
+      serviceSheetPdfUrl:
+        (saved.serviceSheetPdfUrl as string | undefined) ?? flowData.serviceSheetPdfUrl,
       serviceSheetData: saved.serviceSheetData ?? flowData.serviceSheetData,
       exitPhotoUrl: (saved.exitPhotoUrl as string | undefined) ?? flowData.exitPhotoUrl,
       exitLatitude: saved.exitLatitude != null ? Number(saved.exitLatitude) : flowData.exitLatitude,
-      exitLongitude: saved.exitLongitude != null ? Number(saved.exitLongitude) : flowData.exitLongitude,
+      exitLongitude:
+        saved.exitLongitude != null ? Number(saved.exitLongitude) : flowData.exitLongitude,
     });
   };
 
@@ -146,7 +157,9 @@ const ActivityEvidenceFlow = () => {
     }
     return fallback;
   };
-  const selectedActivity = actividades.find((activity) => activity.id === Number(selectedActivityId || flowData?.activityId));
+  const selectedActivity = actividades.find(
+    (activity) => activity.id === Number(selectedActivityId || flowData?.activityId),
+  );
   const isInventoryFlow = selectedActivity?.workType === 'PREVENTIVE_INVENTORY';
 
   useEffect(() => {
@@ -263,8 +276,16 @@ const ActivityEvidenceFlow = () => {
               equipmentName: item.equipmentName || '',
               serialNumber: item.serialAfter || item.serialNumber || item.serialBefore || '',
               model: item.modelAfter || item.model || item.modelBefore || '',
-              panoramicPhotoUrl: item.afterPanoramicPhotoUrl || item.panoramicPhotoUrl || item.beforePanoramicPhotoUrl || '',
-              closeupPhotoUrl: item.afterCloseupPhotoUrl || item.closeupPhotoUrl || item.beforeCloseupPhotoUrl || '',
+              panoramicPhotoUrl:
+                item.afterPanoramicPhotoUrl ||
+                item.panoramicPhotoUrl ||
+                item.beforePanoramicPhotoUrl ||
+                '',
+              closeupPhotoUrl:
+                item.afterCloseupPhotoUrl ||
+                item.closeupPhotoUrl ||
+                item.beforeCloseupPhotoUrl ||
+                '',
               stickerPhotoUrl: item.maintenanceStickerPhotoUrl || item.stickerPhotoUrl || '',
               serialBefore: item.serialBefore || item.serialNumber || '',
               serialAfter: item.serialAfter || item.serialNumber || '',
@@ -274,7 +295,8 @@ const ActivityEvidenceFlow = () => {
               beforeCloseupPhotoUrl: item.beforeCloseupPhotoUrl || item.closeupPhotoUrl || '',
               afterPanoramicPhotoUrl: item.afterPanoramicPhotoUrl || item.panoramicPhotoUrl || '',
               afterCloseupPhotoUrl: item.afterCloseupPhotoUrl || item.closeupPhotoUrl || '',
-              maintenanceStickerPhotoUrl: item.maintenanceStickerPhotoUrl || item.stickerPhotoUrl || '',
+              maintenanceStickerPhotoUrl:
+                item.maintenanceStickerPhotoUrl || item.stickerPhotoUrl || '',
               maintenanceActions: item.maintenanceActions || '',
               maintenanceComments: item.maintenanceComments || '',
               itemStatus: item.itemStatus || 'ACTIVE',
@@ -306,7 +328,9 @@ const ActivityEvidenceFlow = () => {
     if (!user?.token || !selectedActivityId) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, {
+      transports: ['polling', 'websocket'],
+    });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRefresh = () => {
@@ -385,7 +409,11 @@ const ActivityEvidenceFlow = () => {
     if (/^https?:\/\//i.test(raw)) {
       try {
         const parsed = new URL(raw);
-        if (!/^\/(uploads|activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(parsed.pathname)) {
+        if (
+          !/^\/(uploads|activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(
+            parsed.pathname,
+          )
+        ) {
           return raw;
         }
       } catch {
@@ -466,7 +494,7 @@ const ActivityEvidenceFlow = () => {
       const photoUrl = await capturePhoto();
       const { latitude, longitude } = await getGeolocation();
 
-      const endpoint = isCorrection 
+      const endpoint = isCorrection
         ? `activity-evidence/${flowData.activityId}/resubmit`
         : `activity-evidence/${flowData.activityId}/entry-photo`;
 
@@ -490,9 +518,11 @@ const ActivityEvidenceFlow = () => {
           entryLatitude: latitude,
           entryLongitude: longitude,
         });
-        setSuccessMsg(isCorrection
-          ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-          : '✅ Foto de entrada guardada. Siguiente: Tomar evidencias (4-8 fotos)');
+        setSuccessMsg(
+          isCorrection
+            ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
+            : '✅ Foto de entrada guardada. Siguiente: Tomar evidencias (4-8 fotos)',
+        );
         setCameraActive(false);
       } else {
         const errorData = await res.json();
@@ -515,7 +545,7 @@ const ActivityEvidenceFlow = () => {
       const photoUrl = await capturePhoto();
       const updatedPhotos = [...flowData.evidencePhotos, photoUrl];
       setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
-      
+
       if (updatedPhotos.length === 1) {
         setSuccessMsg(`📷 Foto agregada (1/${updatedPhotos.length})`);
       } else {
@@ -554,13 +584,24 @@ const ActivityEvidenceFlow = () => {
     if (isInventoryFlow) {
       const invalidIndex = inventoryItems.findIndex((item) => {
         const hasCore = item.equipmentName.trim() && item.groupName.trim();
-        const hasBefore = item.serialBefore.trim() && item.modelBefore.trim() && item.beforePanoramicPhotoUrl.trim() && item.beforeCloseupPhotoUrl.trim();
-        const hasAfter = item.serialAfter.trim() && item.modelAfter.trim() && item.afterPanoramicPhotoUrl.trim() && item.afterCloseupPhotoUrl.trim();
-        const hasMaintenance = item.maintenanceStickerPhotoUrl.trim() && item.maintenanceComments.trim();
+        const hasBefore =
+          item.serialBefore.trim() &&
+          item.modelBefore.trim() &&
+          item.beforePanoramicPhotoUrl.trim() &&
+          item.beforeCloseupPhotoUrl.trim();
+        const hasAfter =
+          item.serialAfter.trim() &&
+          item.modelAfter.trim() &&
+          item.afterPanoramicPhotoUrl.trim() &&
+          item.afterCloseupPhotoUrl.trim();
+        const hasMaintenance =
+          item.maintenanceStickerPhotoUrl.trim() && item.maintenanceComments.trim();
         return !(hasCore && hasBefore && hasAfter && hasMaintenance);
       });
       if (invalidIndex >= 0) {
-        setError(`Completa datos antes/después y comentario de mantenimiento en el equipo #${invalidIndex + 1}`);
+        setError(
+          `Completa datos antes/después y comentario de mantenimiento en el equipo #${invalidIndex + 1}`,
+        );
         return;
       }
     }
@@ -605,9 +646,11 @@ const ActivityEvidenceFlow = () => {
       if (res.ok) {
         const updated = await res.json();
         syncFlowFromSaved(updated);
-        setSuccessMsg(isCorrection
-          ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-          : '✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF');
+        setSuccessMsg(
+          isCorrection
+            ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
+            : '✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF',
+        );
       } else {
         const errorData = await res.json();
         setError(errorData.message || 'Error al guardar evidencias');
@@ -645,9 +688,7 @@ const ActivityEvidenceFlow = () => {
           ? `activity-evidence/${flowData.activityId}/resubmit`
           : `activity-evidence/${flowData.activityId}/service-sheet-pdf`;
 
-        const body = isCorrection
-          ? { step: 'SERVICE_SHEET_PDF', data: { pdfUrl } }
-          : { pdfUrl };
+        const body = isCorrection ? { step: 'SERVICE_SHEET_PDF', data: { pdfUrl } } : { pdfUrl };
 
         const res = await fetch(buildApiUrl(endpoint), {
           method: 'POST',
@@ -661,9 +702,11 @@ const ActivityEvidenceFlow = () => {
         if (res.ok) {
           const updated = await res.json();
           syncFlowFromSaved(updated, { serviceSheetPdfUrl: pdfUrl });
-          setSuccessMsg(isCorrection
-            ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-            : '✅ PDF guardado. Siguiente: Completa la plantilla interna');
+          setSuccessMsg(
+            isCorrection
+              ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
+              : '✅ PDF guardado. Siguiente: Completa la plantilla interna',
+          );
         } else {
           const errorData = await res.json();
           setError(errorData.message || 'Error al cargar PDF');
@@ -688,9 +731,7 @@ const ActivityEvidenceFlow = () => {
         ? `activity-evidence/${flowData.activityId}/resubmit`
         : `activity-evidence/${flowData.activityId}/service-sheet-data`;
 
-      const body = isCorrection
-        ? { step: 'SERVICE_SHEET_DATA', data: { formData: data } }
-        : data;
+      const body = isCorrection ? { step: 'SERVICE_SHEET_DATA', data: { formData: data } } : data;
 
       const res = await fetch(buildApiUrl(endpoint), {
         method: 'POST',
@@ -704,9 +745,11 @@ const ActivityEvidenceFlow = () => {
       if (res.ok) {
         const updated = await res.json();
         syncFlowFromSaved(updated, { serviceSheetData: data });
-        setSuccessMsg(isCorrection
-          ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-          : '✅ Plantilla completada. Siguiente: Toma foto de salida');
+        setSuccessMsg(
+          isCorrection
+            ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
+            : '✅ Plantilla completada. Siguiente: Toma foto de salida',
+        );
       } else {
         const errorData = await res.json();
         setError(errorData.message || 'Error al guardar plantilla');
@@ -731,25 +774,30 @@ const ActivityEvidenceFlow = () => {
           setLoading(false);
           setConfirmState({
             message: `Se detectaron ${Math.abs(delta)} equipos ${delta > 0 ? 'de más' : 'de menos'} vs inventario previo. ¿Deseas guardar de todos modos?`,
-            fn: async () => { await handleExitPhoto(true); },
+            fn: async () => {
+              await handleExitPhoto(true);
+            },
           });
           return;
         }
 
-        const syncRes = await fetch(buildApiUrl(`inventories/activity/${flowData.activityId}/sync`), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${user!.token}`,
+        const syncRes = await fetch(
+          buildApiUrl(`inventories/activity/${flowData.activityId}/sync`),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${user!.token}`,
+            },
+            body: JSON.stringify({
+              title: `Inventario comparativo ${selectedActivity?.anNumber || flowData.activityId}`,
+              notes: inventoryNotes,
+              completed: true,
+              confirmDifference: true,
+              items: inventoryItems,
+            }),
           },
-          body: JSON.stringify({
-            title: `Inventario comparativo ${selectedActivity?.anNumber || flowData.activityId}`,
-            notes: inventoryNotes,
-            completed: true,
-            confirmDifference: true,
-            items: inventoryItems,
-          }),
-        });
+        );
 
         if (!syncRes.ok) {
           const syncError = await syncRes.json().catch(() => ({}));
@@ -787,9 +835,11 @@ const ActivityEvidenceFlow = () => {
           exitLongitude: saved.exitLongitude ?? longitude,
         });
         if (saved.status === 'COMPLETED') {
-          setSuccessMsg(isCorrection
-            ? '🎉 ¡Corrección enviada exitosamente! Tu evidencia será revisada nuevamente.'
-            : '🎉 ¡Asignación completada! Queda en revisión administrativa.');
+          setSuccessMsg(
+            isCorrection
+              ? '🎉 ¡Corrección enviada exitosamente! Tu evidencia será revisada nuevamente.'
+              : '🎉 ¡Asignación completada! Queda en revisión administrativa.',
+          );
         } else if (isCorrection) {
           setSuccessMsg(correctionSuccessMessage(saved, '✅ Paso corregido.'));
         }
@@ -836,62 +886,84 @@ const ActivityEvidenceFlow = () => {
   return (
     <div className={`card ${styles.flowCard}`}>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-      {error && (
-        <div className={styles.alertError}>
-          ❌ {error}
-        </div>
-      )}
+      {error && <div className={styles.alertError}>❌ {error}</div>}
 
-      {successMsg && (
-        <div className={styles.alertSuccess}>
-          {successMsg}
-        </div>
-      )}
+      {successMsg && <div className={styles.alertSuccess}>{successMsg}</div>}
 
       {/* Banner de Rechazo */}
-      {flowData.reviewStatus === 'REJECTED' && (rejectedList.length > 0 || flowData.reviewNotes) && (
-        <div className={styles.rejectedBanner}>
-          <h3 className={styles.rejectedTitle}>
-            <span className={styles.rejectedEmoji}>⚠️</span>
-            Tu evidencia fue rechazada
-          </h3>
-          {rejectedList.length > 0 && (
-            <div className={styles.rejectedStepRow}>
-              <strong className={styles.rejectedStrong}>
-                {rejectedList.length > 1 ? 'Pasos a corregir:' : 'Paso rechazado:'}
-              </strong>{' '}
-              <span className={styles.rejectedStepText}>
-                {rejectedList.map((step) => evidenceStepLabel(step)).join(' · ')}
-              </span>
+      {flowData.reviewStatus === 'REJECTED' &&
+        (rejectedList.length > 0 || flowData.reviewNotes) && (
+          <div className={styles.rejectedBanner}>
+            <h3 className={styles.rejectedTitle}>
+              <span className={styles.rejectedEmoji}>⚠️</span>
+              Tu evidencia fue rechazada
+            </h3>
+            {rejectedList.length > 0 && (
+              <div className={styles.rejectedStepRow}>
+                <strong className={styles.rejectedStrong}>
+                  {rejectedList.length > 1 ? 'Pasos a corregir:' : 'Paso rechazado:'}
+                </strong>{' '}
+                <span className={styles.rejectedStepText}>
+                  {rejectedList.map((step) => evidenceStepLabel(step)).join(' · ')}
+                </span>
+              </div>
+            )}
+            <div>
+              <strong className={styles.rejectedStrong}>Observaciones del revisor:</strong>
+              <p className={styles.rejectedNotes}>
+                {(flowData.reviewNotes || '').trim() || 'Sin observaciones registradas.'}
+              </p>
             </div>
-          )}
-          <div>
-            <strong className={styles.rejectedStrong}>Observaciones del revisor:</strong>
-            <p className={styles.rejectedNotes}>
-              {(flowData.reviewNotes || '').trim() || 'Sin observaciones registradas.'}
-            </p>
+            <div className={styles.rejectedHint}>
+              💡 <strong>Instrucciones:</strong> Corrige el paso actual.{' '}
+              {rejectedList.length > 1
+                ? 'Luego podrás corregir los demás pasos indicados.'
+                : 'Al terminar, se enviará nuevamente a revisión.'}
+            </div>
           </div>
-          <div className={styles.rejectedHint}>
-            💡 <strong>Instrucciones:</strong> Corrige el paso actual. {rejectedList.length > 1 ? 'Luego podrás corregir los demás pasos indicados.' : 'Al terminar, se enviará nuevamente a revisión.'}
-          </div>
-        </div>
-      )}
+        )}
 
       {/* Barra de progreso */}
       <div className={styles.progressWrap}>
         <div className={styles.progressMeta}>
-          Actividad: <strong>{actividades.find((a) => a.id === flowData.activityId)?.anNumber}</strong>
+          Actividad:{' '}
+          <strong>{actividades.find((a) => a.id === flowData.activityId)?.anNumber}</strong>
         </div>
         <div className={styles.progressRow}>
-          <ProgressStep step={1} active={flowData.step === 'ENTRY_PHOTO'} completed={flowData.entryPhotoUrl ? true : false} label="Entrada" />
+          <ProgressStep
+            step={1}
+            active={flowData.step === 'ENTRY_PHOTO'}
+            completed={flowData.entryPhotoUrl ? true : false}
+            label="Entrada"
+          />
           <div className={styles.progressDivider} />
-          <ProgressStep step={2} active={flowData.step === 'EVIDENCE_PHOTOS'} completed={flowData.evidencePhotos.length > 0} label="Evidencias" />
+          <ProgressStep
+            step={2}
+            active={flowData.step === 'EVIDENCE_PHOTOS'}
+            completed={flowData.evidencePhotos.length > 0}
+            label="Evidencias"
+          />
           <div className={styles.progressDivider} />
-          <ProgressStep step={3} active={flowData.step === 'SERVICE_SHEET_PDF'} completed={flowData.serviceSheetPdfUrl ? true : false} label="PDF" />
+          <ProgressStep
+            step={3}
+            active={flowData.step === 'SERVICE_SHEET_PDF'}
+            completed={flowData.serviceSheetPdfUrl ? true : false}
+            label="PDF"
+          />
           <div className={styles.progressDivider} />
-          <ProgressStep step={4} active={flowData.step === 'SERVICE_SHEET_DATA'} completed={flowData.serviceSheetData ? true : false} label="Plantilla" />
+          <ProgressStep
+            step={4}
+            active={flowData.step === 'SERVICE_SHEET_DATA'}
+            completed={flowData.serviceSheetData ? true : false}
+            label="Plantilla"
+          />
           <div className={styles.progressDivider} />
-          <ProgressStep step={5} active={flowData.step === 'EXIT_PHOTO'} completed={flowData.exitPhotoUrl ? true : false} label="Salida" />
+          <ProgressStep
+            step={5}
+            active={flowData.step === 'EXIT_PHOTO'}
+            completed={flowData.exitPhotoUrl ? true : false}
+            label="Salida"
+          />
         </div>
       </div>
 
@@ -912,7 +984,9 @@ const ActivityEvidenceFlow = () => {
             </button>
             <button
               className={`${styles.actionButton} ${styles.actionSecondary}`}
-              onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+              onClick={() =>
+                setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
+              }
               disabled={loading}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
@@ -978,14 +1052,126 @@ const ActivityEvidenceFlow = () => {
               {inventoryItems.map((item, index) => (
                 <div key={`${item.equipmentName}-${index}`} className={styles.inventoryItemCard}>
                   <div className={styles.inventoryFieldsGrid}>
-                    <input className="input" placeholder="Apartado" value={item.sectionName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, sectionName: e.target.value } : current))} />
-                    <input className="input" placeholder="Grupo (servidores, scanner, impresora...)" value={item.groupName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, groupName: e.target.value } : current))} />
-                    <input className="input" placeholder="Nombre equipo" value={item.equipmentName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, equipmentName: e.target.value } : current))} />
-                    <input className="input" placeholder="Serie ANTES" value={item.serialBefore} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, serialBefore: e.target.value, serialNumber: e.target.value } : current))} />
-                    <input className="input" placeholder="Modelo ANTES" value={item.modelBefore} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, modelBefore: e.target.value, model: e.target.value } : current))} />
-                    <input className="input" placeholder="Serie DESPUÉS" value={item.serialAfter} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, serialAfter: e.target.value, serialNumber: e.target.value } : current))} />
-                    <input className="input" placeholder="Modelo DESPUÉS" value={item.modelAfter} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, modelAfter: e.target.value, model: e.target.value } : current))} />
-                    <input className="input" placeholder="¿Qué se le hizo al equipo?" value={item.maintenanceActions} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, maintenanceActions: e.target.value } : current))} />
+                    <input
+                      className="input"
+                      placeholder="Apartado"
+                      value={item.sectionName}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? { ...current, sectionName: e.target.value }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="input"
+                      placeholder="Grupo (servidores, scanner, impresora...)"
+                      value={item.groupName}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? { ...current, groupName: e.target.value }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="input"
+                      placeholder="Nombre equipo"
+                      value={item.equipmentName}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? { ...current, equipmentName: e.target.value }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="input"
+                      placeholder="Serie ANTES"
+                      value={item.serialBefore}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...current,
+                                  serialBefore: e.target.value,
+                                  serialNumber: e.target.value,
+                                }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="input"
+                      placeholder="Modelo ANTES"
+                      value={item.modelBefore}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? { ...current, modelBefore: e.target.value, model: e.target.value }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="input"
+                      placeholder="Serie DESPUÉS"
+                      value={item.serialAfter}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...current,
+                                  serialAfter: e.target.value,
+                                  serialNumber: e.target.value,
+                                }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="input"
+                      placeholder="Modelo DESPUÉS"
+                      value={item.modelAfter}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? { ...current, modelAfter: e.target.value, model: e.target.value }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="input"
+                      placeholder="¿Qué se le hizo al equipo?"
+                      value={item.maintenanceActions}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? { ...current, maintenanceActions: e.target.value }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
                   </div>
                   <div className={styles.inventoryFieldsGrid}>
                     {[
@@ -1021,13 +1207,25 @@ const ActivityEvidenceFlow = () => {
                             type="file"
                             accept="image/*"
                             className={styles.hiddenInput}
-                            onChange={(event) => setInventoryImageField(index, field, event.target.files?.[0])}
+                            onChange={(event) =>
+                              setInventoryImageField(index, field, event.target.files?.[0])
+                            }
                           />
-                          <button type="button" className="button-secondary" onClick={() => inventoryFileRefs.current[fileKey]?.click()}>
-                            {inventoryUploadingKey === fileKey ? 'Subiendo...' : 'Cargar / arrastrar imagen'}
+                          <button
+                            type="button"
+                            className="button-secondary"
+                            onClick={() => inventoryFileRefs.current[fileKey]?.click()}
+                          >
+                            {inventoryUploadingKey === fileKey
+                              ? 'Subiendo...'
+                              : 'Cargar / arrastrar imagen'}
                           </button>
                           {imageUrl ? (
-                            <img src={getAssetUrl(imageUrl)} alt={label} className={styles.inventoryPreviewImage} />
+                            <img
+                              src={getAssetUrl(imageUrl)}
+                              alt={label}
+                              className={styles.inventoryPreviewImage}
+                            />
                           ) : (
                             <div className={styles.inventoryDropLabel}>Sin imagen</div>
                           )}
@@ -1036,15 +1234,46 @@ const ActivityEvidenceFlow = () => {
                     })}
                   </div>
                   <div className={styles.inventoryFooterRow}>
-                    <input className="input" placeholder="Comentario técnico de mantenimiento" value={item.maintenanceComments} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, maintenanceComments: e.target.value, notes: e.target.value } : current))} />
-                    <button type="button" className="button-secondary" onClick={() => setInventoryItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}>
+                    <input
+                      className="input"
+                      placeholder="Comentario técnico de mantenimiento"
+                      value={item.maintenanceComments}
+                      onChange={(e) =>
+                        setInventoryItems((prev) =>
+                          prev.map((current, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...current,
+                                  maintenanceComments: e.target.value,
+                                  notes: e.target.value,
+                                }
+                              : current,
+                          ),
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      onClick={() =>
+                        setInventoryItems((prev) =>
+                          prev.filter((_, itemIndex) => itemIndex !== index),
+                        )
+                      }
+                    >
                       Eliminar
                     </button>
                   </div>
                 </div>
               ))}
 
-              <textarea className="input" rows={2} placeholder="Notas globales del inventario y mantenimiento" value={inventoryNotes} onChange={(e) => setInventoryNotes(e.target.value)} />
+              <textarea
+                className="input"
+                rows={2}
+                placeholder="Notas globales del inventario y mantenimiento"
+                value={inventoryNotes}
+                onChange={(e) => setInventoryNotes(e.target.value)}
+              />
             </div>
           )}
 
@@ -1097,12 +1326,16 @@ const ActivityEvidenceFlow = () => {
             </button>
             <button
               className={`${styles.actionButton} ${styles.actionSecondary}`}
-              onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+              onClick={() =>
+                setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
+              }
               disabled={loading}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
-            {(isInventoryFlow ? flowData.evidencePhotos.length >= 1 : flowData.evidencePhotos.length >= 4) && (
+            {(isInventoryFlow
+              ? flowData.evidencePhotos.length >= 1
+              : flowData.evidencePhotos.length >= 4) && (
               <button
                 className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionSuccess}`}
                 onClick={handleSaveEvidencePhotos}
@@ -1150,7 +1383,14 @@ const ActivityEvidenceFlow = () => {
               accept=".pdf,application/pdf"
               onChange={handleServiceSheetPdfUpload}
               disabled={loading}
-              style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
+              style={{
+                position: 'absolute',
+                width: 0,
+                height: 0,
+                opacity: 0,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+              }}
             />
             <div
               onClick={() => {
@@ -1166,17 +1406,20 @@ const ActivityEvidenceFlow = () => {
                 cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease',
                 borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%)',
+                background:
+                  'linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%)',
                 opacity: loading ? 0.6 : 1,
               }}
               onMouseEnter={(e) => {
                 if (!loading) {
-                  (e.currentTarget as any).style.background = 'linear-gradient(135deg, rgba(249, 144, 0, 0.12) 0%, rgba(249, 144, 0, 0.08) 100%)';
+                  (e.currentTarget as any).style.background =
+                    'linear-gradient(135deg, rgba(249, 144, 0, 0.12) 0%, rgba(249, 144, 0, 0.08) 100%)';
                   (e.currentTarget as any).style.transform = 'translateY(-2px)';
                 }
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as any).style.background = 'linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%)';
+                (e.currentTarget as any).style.background =
+                  'linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%)';
                 (e.currentTarget as any).style.transform = 'translateY(0)';
               }}
             >
@@ -1200,16 +1443,19 @@ const ActivityEvidenceFlow = () => {
                 <div style={{ fontSize: '16px', fontWeight: 700, color: '#1f2937' }}>
                   Seleccionar PDF
                 </div>
-                <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                  o arrastra aquí
-                </div>
+                <div style={{ fontSize: '13px', color: '#6b7280' }}>o arrastra aquí</div>
               </div>
             </div>
           </div>
           {flowData.serviceSheetPdfUrl && (
             <div className={styles.pdfPreviewCard}>
               <div>✅ PDF cargado correctamente</div>
-              <object data={getAssetUrl(flowData.serviceSheetPdfUrl)} type="application/pdf" width="100%" height="280">
+              <object
+                data={getAssetUrl(flowData.serviceSheetPdfUrl)}
+                type="application/pdf"
+                width="100%"
+                height="280"
+              >
                 <embed src={getAssetUrl(flowData.serviceSheetPdfUrl)} type="application/pdf" />
               </object>
             </div>
@@ -1224,7 +1470,11 @@ const ActivityEvidenceFlow = () => {
           <p className={styles.stepDescription}>
             Completa los datos requeridos de la hoja de servicio.
           </p>
-          <ServiceSheetForm onSubmit={handleServiceSheetFormSubmit} loading={loading} initialData={flowData.serviceSheetData} />
+          <ServiceSheetForm
+            onSubmit={handleServiceSheetFormSubmit}
+            loading={loading}
+            initialData={flowData.serviceSheetData}
+          />
         </div>
       )}
 
@@ -1233,11 +1483,13 @@ const ActivityEvidenceFlow = () => {
         <div className={`${styles.stepCard} ${styles.stepExit}`}>
           <h3 className={styles.stepTitle}>🚪 Paso 5: Foto de Salida</h3>
           <p className={styles.stepDescription}>
-            Toma la foto de salida en el sitio. Se capturará automáticamente tu ubicación GPS — es obligatoria para cerrar la actividad.
+            Toma la foto de salida en el sitio. Se capturará automáticamente tu ubicación GPS — es
+            obligatoria para cerrar la actividad.
           </p>
           {flowData.exitLatitude != null && flowData.exitLongitude != null && (
             <p className={styles.stepDescription}>
-              📍 Última ubicación registrada: {Number(flowData.exitLatitude).toFixed(5)}, {Number(flowData.exitLongitude).toFixed(5)}
+              📍 Última ubicación registrada: {Number(flowData.exitLatitude).toFixed(5)},{' '}
+              {Number(flowData.exitLongitude).toFixed(5)}
             </p>
           )}
           <div className={styles.actionGrid}>
@@ -1250,7 +1502,9 @@ const ActivityEvidenceFlow = () => {
             </button>
             <button
               className={`${styles.actionButton} ${styles.actionSecondary}`}
-              onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+              onClick={() =>
+                setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
+              }
               disabled={loading}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
@@ -1263,7 +1517,9 @@ const ActivityEvidenceFlow = () => {
       {flowData.step === 'COMPLETED' && (
         <div className={styles.completedCard}>
           <h2 className={styles.completedTitle}>
-            {isFlowLocked ? '⏳ Evidencias enviadas a revisión' : '🎉 ¡Asignación Completada Exitosamente!'}
+            {isFlowLocked
+              ? '⏳ Evidencias enviadas a revisión'
+              : '🎉 ¡Asignación Completada Exitosamente!'}
           </h2>
           <p className={styles.completedText}>
             {isFlowLocked
@@ -1289,9 +1545,21 @@ const ActivityEvidenceFlow = () => {
 };
 
 // Componente para paso de progreso
-const ProgressStep = ({ step, active, completed, label }: { step: number; active: boolean; completed: boolean; label: string }) => (
+const ProgressStep = ({
+  step,
+  active,
+  completed,
+  label,
+}: {
+  step: number;
+  active: boolean;
+  completed: boolean;
+  label: string;
+}) => (
   <div className={styles.progressStep}>
-    <div className={`${styles.progressCircle} ${active ? styles.progressCircleActive : ''} ${completed ? styles.progressCircleCompleted : ''}`}>
+    <div
+      className={`${styles.progressCircle} ${active ? styles.progressCircleActive : ''} ${completed ? styles.progressCircleCompleted : ''}`}
+    >
       {completed ? '✓' : step}
     </div>
     <div className={styles.progressLabel}>{label}</div>
@@ -1300,15 +1568,27 @@ const ProgressStep = ({ step, active, completed, label }: { step: number; active
 
 // Formulario de plantilla interna
 // Pad de firma digital (mouse + touch + stylus)
-const SignaturePad = ({ onSignature, disabled, initialValue }: { onSignature: (dataUrl: string | null) => void; disabled: boolean; initialValue?: string | null }) => {
+const SignaturePad = ({
+  onSignature,
+  disabled,
+  initialValue,
+}: {
+  onSignature: (dataUrl: string | null) => void;
+  disabled: boolean;
+  initialValue?: string | null;
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
   const savedDataUrl = useRef<string | null>(initialValue ?? null);
   const onSigRef = useRef(onSignature);
   const disabledRef = useRef(disabled);
-  useEffect(() => { onSigRef.current = onSignature; });
-  useEffect(() => { disabledRef.current = disabled; });
+  useEffect(() => {
+    onSigRef.current = onSignature;
+  });
+  useEffect(() => {
+    disabledRef.current = disabled;
+  });
 
   const syncCanvasSize = useCallback((canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d');
@@ -1325,26 +1605,29 @@ const SignaturePad = ({ onSignature, disabled, initialValue }: { onSignature: (d
     return { ctx, rect };
   }, []);
 
-  const paintImage = useCallback((dataUrl: string) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const setup = syncCanvasSize(canvas);
-    if (!setup) return;
-    const { ctx } = setup;
-    const image = new Image();
-    image.onload = () => {
-      if (isDrawing.current) return;
-      const rect = canvas.getBoundingClientRect();
-      ctx.clearRect(0, 0, rect.width, rect.height);
-      const ratio = Math.min(rect.width / image.width, rect.height / image.height);
-      const width = image.width * ratio;
-      const height = image.height * ratio;
-      const offsetX = (rect.width - width) / 2;
-      const offsetY = (rect.height - height) / 2;
-      ctx.drawImage(image, offsetX, offsetY, width, height);
-    };
-    image.src = dataUrl;
-  }, [syncCanvasSize]);
+  const paintImage = useCallback(
+    (dataUrl: string) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const setup = syncCanvasSize(canvas);
+      if (!setup) return;
+      const { ctx } = setup;
+      const image = new Image();
+      image.onload = () => {
+        if (isDrawing.current) return;
+        const rect = canvas.getBoundingClientRect();
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        const ratio = Math.min(rect.width / image.width, rect.height / image.height);
+        const width = image.width * ratio;
+        const height = image.height * ratio;
+        const offsetX = (rect.width - width) / 2;
+        const offsetY = (rect.height - height) / 2;
+        ctx.drawImage(image, offsetX, offsetY, width, height);
+      };
+      image.src = dataUrl;
+    },
+    [syncCanvasSize],
+  );
 
   // Solo hidratar firma externa al montar o cuando cambia desde fuera (no durante el trazo)
   useEffect(() => {
@@ -1451,13 +1734,27 @@ const SignaturePad = ({ onSignature, disabled, initialValue }: { onSignature: (d
           display: 'block',
         }}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: '6px',
+        }}
+      >
         <span style={{ fontSize: '12px', color: '#9ca3af' }}>✍️ Firmar con el dedo o el mouse</span>
         <button
           type="button"
           onClick={clear}
           disabled={disabled}
-          style={{ fontSize: '12px', color: '#ef4444', background: 'none', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', padding: '2px 8px' }}
+          style={{
+            fontSize: '12px',
+            color: '#ef4444',
+            background: 'none',
+            border: 'none',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            padding: '2px 8px',
+          }}
         >
           🗑️ Limpiar
         </button>
@@ -1466,7 +1763,9 @@ const SignaturePad = ({ onSignature, disabled, initialValue }: { onSignature: (d
   );
 };
 
-const buildInitialServiceSheetFormData = (initialData?: Partial<ServiceSheetFormData> | null): ServiceSheetFormData => ({
+const buildInitialServiceSheetFormData = (
+  initialData?: Partial<ServiceSheetFormData> | null,
+): ServiceSheetFormData => ({
   technicianName: initialData?.technicianName || '',
   serviceDate: initialData?.serviceDate || new Date().toISOString().split('T')[0],
   clientCompany: initialData?.clientCompany || '',
@@ -1480,8 +1779,18 @@ const buildInitialServiceSheetFormData = (initialData?: Partial<ServiceSheetForm
   managerSignature: initialData?.managerSignature || null,
 });
 
-const ServiceSheetForm = ({ onSubmit, loading, initialData }: { onSubmit: (data: any) => void; loading: boolean; initialData?: Partial<ServiceSheetFormData> | null }) => {
-  const [data, setData] = useState<ServiceSheetFormData>(() => buildInitialServiceSheetFormData(initialData));
+const ServiceSheetForm = ({
+  onSubmit,
+  loading,
+  initialData,
+}: {
+  onSubmit: (data: any) => void;
+  loading: boolean;
+  initialData?: Partial<ServiceSheetFormData> | null;
+}) => {
+  const [data, setData] = useState<ServiceSheetFormData>(() =>
+    buildInitialServiceSheetFormData(initialData),
+  );
 
   useEffect(() => {
     setData(buildInitialServiceSheetFormData(initialData));
@@ -1497,75 +1806,130 @@ const ServiceSheetForm = ({ onSubmit, loading, initialData }: { onSubmit: (data:
   };
 
   const inp: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', borderRadius: '8px',
-    border: '1.5px solid #d1d5db', fontSize: '14px', background: '#fff',
-    outline: 'none', boxSizing: 'border-box', marginBottom: '10px',
+    width: '100%',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    border: '1.5px solid #d1d5db',
+    fontSize: '14px',
+    background: '#fff',
+    outline: 'none',
+    boxSizing: 'border-box',
+    marginBottom: '10px',
   };
   const lbl: React.CSSProperties = {
-    fontSize: '12px', fontWeight: 600, color: '#6b7280',
-    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginBottom: '4px',
+    display: 'block',
   };
   const sec: React.CSSProperties = {
-    background: '#f8fafc', border: '1px solid #e5e7eb',
-    borderRadius: '10px', padding: '14px', marginBottom: '14px',
+    background: '#f8fafc',
+    border: '1px solid #e5e7eb',
+    borderRadius: '10px',
+    padding: '14px',
+    marginBottom: '14px',
   };
   const secTitle: React.CSSProperties = {
-    fontSize: '13px', fontWeight: 700, color: '#374151',
-    marginBottom: '12px', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#374151',
+    marginBottom: '12px',
+    paddingBottom: '6px',
+    borderBottom: '1px solid #e5e7eb',
   };
 
   return (
     <form onSubmit={handleSubmit} className={styles.serviceForm}>
-
       {/* Datos del Servicio */}
       <div style={sec}>
         <div style={secTitle}>📋 Datos del Servicio</div>
         <label style={lbl}>Nombre del Técnico</label>
-        <input type="text" style={inp} placeholder="Nombre completo del técnico"
-          value={data.technicianName} onChange={(e) => setData({ ...data, technicianName: e.target.value })}
-          required disabled={loading} />
+        <input
+          type="text"
+          style={inp}
+          placeholder="Nombre completo del técnico"
+          value={data.technicianName}
+          onChange={(e) => setData({ ...data, technicianName: e.target.value })}
+          required
+          disabled={loading}
+        />
         <label style={lbl}>Fecha del Servicio</label>
-        <input type="date" style={inp} value={data.serviceDate}
+        <input
+          type="date"
+          style={inp}
+          value={data.serviceDate}
           onChange={(e) => setData({ ...data, serviceDate: e.target.value })}
-          required disabled={loading} />
+          required
+          disabled={loading}
+        />
       </div>
 
       {/* Datos del Cliente */}
       <div style={sec}>
         <div style={secTitle}>🏢 Datos del Cliente</div>
         <label style={lbl}>Empresa / Organización</label>
-        <input type="text" style={inp} placeholder="Nombre de la empresa o cliente"
-          value={data.clientCompany} onChange={(e) => setData({ ...data, clientCompany: e.target.value })}
-          required disabled={loading} />
+        <input
+          type="text"
+          style={inp}
+          placeholder="Nombre de la empresa o cliente"
+          value={data.clientCompany}
+          onChange={(e) => setData({ ...data, clientCompany: e.target.value })}
+          required
+          disabled={loading}
+        />
         <label style={lbl}>Teléfono de Contacto</label>
-        <input type="tel" style={inp} placeholder="Número de teléfono"
-          value={data.clientPhone} onChange={(e) => setData({ ...data, clientPhone: e.target.value })}
-          disabled={loading} />
+        <input
+          type="tel"
+          style={inp}
+          placeholder="Número de teléfono"
+          value={data.clientPhone}
+          onChange={(e) => setData({ ...data, clientPhone: e.target.value })}
+          disabled={loading}
+        />
       </div>
 
       {/* Trabajo Realizado */}
       <div style={sec}>
         <div style={secTitle}>🔧 Trabajo Realizado</div>
         <label style={lbl}>Resumen del trabajo realizado</label>
-        <textarea style={{ ...inp, minHeight: '90px', resize: 'vertical' } as React.CSSProperties}
+        <textarea
+          style={{ ...inp, minHeight: '90px', resize: 'vertical' } as React.CSSProperties}
           placeholder="Describe el trabajo realizado..."
-          value={data.workSummary} onChange={(e) => setData({ ...data, workSummary: e.target.value })}
-          required disabled={loading} />
+          value={data.workSummary}
+          onChange={(e) => setData({ ...data, workSummary: e.target.value })}
+          required
+          disabled={loading}
+        />
         <label style={lbl}>Materiales / Equipos utilizados</label>
-        <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' } as React.CSSProperties}
+        <textarea
+          style={{ ...inp, minHeight: '70px', resize: 'vertical' } as React.CSSProperties}
           placeholder="Lista de materiales o equipos utilizados"
-          value={data.materialsUsed} onChange={(e) => setData({ ...data, materialsUsed: e.target.value })}
-          disabled={loading} />
+          value={data.materialsUsed}
+          onChange={(e) => setData({ ...data, materialsUsed: e.target.value })}
+          disabled={loading}
+        />
         <label style={lbl}>Horas trabajadas</label>
-        <input type="number" style={{ ...inp, width: '140px' }} placeholder="ej. 4.5"
-          min="0" step="0.5" value={data.hoursWorked}
+        <input
+          type="number"
+          style={{ ...inp, width: '140px' }}
+          placeholder="ej. 4.5"
+          min="0"
+          step="0.5"
+          value={data.hoursWorked}
           onChange={(e) => setData({ ...data, hoursWorked: e.target.value })}
-          disabled={loading} />
+          disabled={loading}
+        />
         <label style={lbl}>Observaciones</label>
-        <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' } as React.CSSProperties}
+        <textarea
+          style={{ ...inp, minHeight: '70px', resize: 'vertical' } as React.CSSProperties}
           placeholder="Observaciones adicionales"
-          value={data.observations} onChange={(e) => setData({ ...data, observations: e.target.value })}
-          disabled={loading} />
+          value={data.observations}
+          onChange={(e) => setData({ ...data, observations: e.target.value })}
+          disabled={loading}
+        />
       </div>
 
       {/* Conformidad del Gerente */}
@@ -1574,18 +1938,40 @@ const ServiceSheetForm = ({ onSubmit, loading, initialData }: { onSubmit: (data:
           ✅ Conformidad del Gerente / Representante
         </div>
         <label style={lbl}>Nombre del Gerente / Representante</label>
-        <input type="text" style={inp} placeholder="Nombre completo"
-          value={data.managerName} onChange={(e) => setData({ ...data, managerName: e.target.value })}
-          required disabled={loading} />
+        <input
+          type="text"
+          style={inp}
+          placeholder="Nombre completo"
+          value={data.managerName}
+          onChange={(e) => setData({ ...data, managerName: e.target.value })}
+          required
+          disabled={loading}
+        />
         <label style={lbl}>Cargo</label>
-        <input type="text" style={inp} placeholder="Cargo del gerente o representante"
-          value={data.managerRole} onChange={(e) => setData({ ...data, managerRole: e.target.value })}
-          required disabled={loading} />
+        <input
+          type="text"
+          style={inp}
+          placeholder="Cargo del gerente o representante"
+          value={data.managerRole}
+          onChange={(e) => setData({ ...data, managerRole: e.target.value })}
+          required
+          disabled={loading}
+        />
         <label style={{ ...lbl, marginTop: '4px' }}>
           Firma Digital <span style={{ color: '#ef4444' }}>*</span>
         </label>
         {data.managerSignature && (
-          <div style={{ marginBottom: '8px', padding: '6px', background: '#ecfdf5', borderRadius: '6px', border: '1px solid #a7f3d0', fontSize: '12px', color: '#059669' }}>
+          <div
+            style={{
+              marginBottom: '8px',
+              padding: '6px',
+              background: '#ecfdf5',
+              borderRadius: '6px',
+              border: '1px solid #a7f3d0',
+              fontSize: '12px',
+              color: '#059669',
+            }}
+          >
             ✓ Firma capturada correctamente
           </div>
         )}
@@ -1596,11 +1982,7 @@ const ServiceSheetForm = ({ onSubmit, loading, initialData }: { onSubmit: (data:
         />
       </div>
 
-      <button
-        type="submit"
-        className={`button-primary ${styles.serviceSubmit}`}
-        disabled={loading}
-      >
+      <button type="submit" className={`button-primary ${styles.serviceSubmit}`} disabled={loading}>
         {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
       </button>
     </form>
