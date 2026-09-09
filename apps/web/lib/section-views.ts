@@ -653,8 +653,8 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canDelete: true,
       canAssign: true,
       canApprove: true,
-      title: 'Actividades · Asignación',
-      subtitle: 'Asigna OT al equipo y supervisa el avance.',
+      title: 'Órdenes de trabajo · Asignación',
+      subtitle: 'Aquí asignas y das seguimiento. El técnico ejecuta en Mis OT.',
     };
   }
   if (EXECUTIVE.has(v2)) {
@@ -666,8 +666,8 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canDelete: false,
       canAssign: true,
       canApprove: true,
-      title: 'Actividades · Asignación',
-      subtitle: 'Supervisa y asigna órdenes de trabajo. No tienes OT personales en campo.',
+      title: 'Órdenes de trabajo · Asignación',
+      subtitle: 'Supervisa OT del equipo. No tienes OT personales de campo.',
     };
   }
   // Admin (DIR_ADMIN / COORD_ADMIN): lectura de reportes para facturación y seguimiento
@@ -680,8 +680,8 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canDelete: false,
       canAssign: false,
       canApprove: false,
-      title: 'Actividades · Reportes',
-      subtitle: 'Reportes de campo del equipo — evidencias y avances para facturación.',
+      title: 'Órdenes de trabajo · Reportes',
+      subtitle: 'Reportes de campo — evidencias y avances para facturación.',
     };
   }
   if (OPS_MANAGERS.has(v2)) {
@@ -693,8 +693,8 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canDelete: tier(v2) >= 85,
       canAssign: true,
       canApprove: true,
-      title: 'Actividades · Equipo',
-      subtitle: 'Asigna OT a tu equipo o cambia a "Mis actividades" para ejecutar las tuyas.',
+      title: 'Órdenes de trabajo · Equipo',
+      subtitle: 'Asigna OT al equipo. Para ejecutar las tuyas usa Mis OT.',
     };
   }
   if (isSupportRole(v2)) {
@@ -706,8 +706,8 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canDelete: false,
       canAssign: false,
       canApprove: false,
-      title: 'Mis actividades',
-      subtitle: 'OT asignadas a ti — ejecuta, evidencia y cierra en sitio.',
+      title: 'Mis OT',
+      subtitle: '1. Iniciar → 2. Evidencias → 3. Cerrar.',
     };
   }
   return {
@@ -718,8 +718,8 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
     canDelete: false,
     canAssign: false,
     canApprove: false,
-    title: 'Mis actividades',
-    subtitle: 'Tus OT asignadas — ejecuta, evidencia y cierra en sitio.',
+    title: 'Mis OT',
+    subtitle: '1. Iniciar → 2. Evidencias → 3. Cerrar.',
   };
 }
 

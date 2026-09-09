@@ -116,6 +116,7 @@ export class ActivitiesService {
       creador: true,
       responsable: true,
       client: true,
+      project: { select: { id: true, title: true } },
       serviceSheet: true,
       activityEvidence: {
         include: {
@@ -284,6 +285,7 @@ export class ActivitiesService {
             salesClients: { select: { id: true, name: true }, take: 1, orderBy: { id: 'asc' } },
           },
         },
+        project: { select: { id: true, title: true } },
         serviceSheet: true,
         evidencias: { orderBy: { subidoEn: 'desc' } },
         assignees: {

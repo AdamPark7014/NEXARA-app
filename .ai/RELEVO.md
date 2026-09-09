@@ -1,59 +1,47 @@
 # RELEVO
 
 - **Último turno:** cursor
-- **Fecha:** 2026-09-08
+- **Fecha:** 2026-09-09
 - **Rama:** mejora/calidad-y-web
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — 403 en Resumen ejecutivo (`coord_operaciones`)
+## Este turno — UX Actividades OPS (claridad + segmentación)
 
-Adam mandó captura del Samsung: home OPS «Resumen ejecutivo» (semana
-2026-09-07 → 2026-09-13) con:
+Plan: `ux_actividades_ops_05ca5884` — ola 1 **solo Web OPS**.
 
-> Tu rol (coord_operaciones) no puede acceder a GET /api/viatics
+### Hecho
 
-### Causa (dos capas)
+1. **Alta guiada** (`OpsActivityForm` + `ops-activity-form.ts`):
+   - Modos **Con proyecto** / **Sin proyecto** con ayuda corta.
+   - Payload: `activityType CLIENT` + `projectId` vs `INTERNAL` sin proyecto.
+   - CTA `Crear OT` / `Asignar OT` vía `activitySubmitLabel`.
+2. **Bandeja equipo** (`OpsActivitiesBoard`):
+   - Segmentos Todas · Con proyecto · Sin proyecto.
+   - Columna Proyecto (link o badge Sin proyecto).
+   - Empty states por segmento + línea de ayuda del módulo.
+3. **Mis OT** (`my-activities`):
+   - Tabs «Mis OT» / «Evidencias»; rangos Hoy / Esta semana / Todas.
+   - Leyenda 1→2→3; badges Con/Sin proyecto + siguiente acción.
+4. **Detalle**: bloque Contexto (modo, proyecto, ticket, workType); estatus/prioridad canónicos (`Pendiente`…`Finalizada`, `Baja`…`Urgente`); stepper alineado.
+5. **API**: `findAll` / `findOne` incluyen `project { id, title }`.
+6. **Copy** en `section-views`: títulos «Órdenes de trabajo…» / «Mis OT».
 
-1. **RBAC API:** `PAGE_MATRIX` da `/ops/**` a `coord_operaciones` (incluye
-   viáticos de equipo y el comentario «aprueba viáticos»), pero
-   `url-matrix.ts` **no** tenía `/api/viatics/**`. La web/app abrían el home y
-   el guard de URL respondía 403.
-2. **Android home:** `ConsoleDashboardScreen` trataba cualquier fallo de
-   `viaticsFetch()` como error duro y hacía `return@LazyColumn` — pantalla en
-   blanco solo con el banner, aunque actividades/asistencia hubieran cargado.
+`typecheck:web` y `typecheck:api` limpios.
 
-### Qué se cambió
+### Fuera de esta ola
 
-- `apps/api/src/common/rbac/url-matrix.ts` — `COORD_OPERACIONES`:
-  `/ops/viatics/**`, `/api/viatics/**`, `/api/viaticos/**` con scope `approve`.
-  Verificado local: `checkUrlAccess(coord_operaciones, GET /api/viatics)` →
-  `allowed`.
-- `ConsoleDashboardScreen.kt` — solo las **actividades** tumbaron el home;
-  viáticos degradan a lista vacía.
-- `ApiErrors.kt` — helper `isForbidden()` (403) para reutilizar en secciones
-  opcionales.
-
-### Para que el teléfono deje de fallar YA
-
-Hay que **desplegar la API** en Hetzner (`nexara-api`). Con solo el fix RBAC
-en prod, «Reintentar» en la app publicada basta; el soft-fail Android llega en
-el próximo build de Play.
+- Homologar Android/iOS al mismo modelo Con/Sin proyecto.
+- Deploy Hetzner del fix RBAC viatics (hilo anterior) sigue pendiente si no se desplegó.
 
 ## Heredado vivo
 
 - Demo store: `play.review@nexara.com.mx`; creds en `C:\dev\secrets\nexara-store\`.
-- Enrollment Apple `49J96Q3WQ3` — esperando correo/pago.
-- Paridad iOS CI / 64 endpoints Android-behind: ver turno claude-code anterior.
-- Rotar contraseñas de cámaras (fuga de go2rtc cerrada).
-
-## A medias
-
-Nada de este bug. Despliegue API pendiente de Adam.
+- Enrollment Apple `49J96Q3WQ3`.
+- No fingir EN VIVO en INTEGRA.
 
 ## No tocar
 
-Puente NAS. Credenciales Apple. No fingir EN VIVO en INTEGRA. Contraseña del
-revisor fuera de git. **No marcar `NATIVO` lo que solo lista.**
+Puente NAS. Credenciales Apple. Contraseña del revisor fuera de git.

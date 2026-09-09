@@ -19,8 +19,41 @@ import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missi
 import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
 
-const STATUSES = ["PROGRAMADA", "EN_CURSO", "COMPLETADA", "REPROGRAMAR", "CANCELADA"];
-const PRIORITIES = ["BAJA", "MEDIA", "ALTA", "URGENTE"];
+const STATUSES = [
+  "Pendiente",
+  "Asignada",
+  "En Proceso",
+  "Por Validar",
+  "Finalizada",
+  "Rechazada",
+  "Cancelada",
+];
+const PRIORITIES = ["Baja", "Media", "Alta", "Urgente"];
+
+function workTypeLabel(workType?: string | null): string {
+  if (workType === "PREVENTIVE_INVENTORY") return "Inventario preventivo";
+  return "Incidencia / servicio";
+}
+
+function normalizePriorityDisplay(raw?: string | null): string {
+  if (!raw) return "";
+  const key = raw.trim().toLowerCase();
+  if (key === "baja" || key === "low") return "Baja";
+  if (key === "media" || key === "medium") return "Media";
+  if (key === "alta" || key === "high") return "Alta";
+  if (key === "urgente" || key === "urgent") return "Urgente";
+  return raw;
+}
+
+function flowStepForStatus(estatus: string): string {
+  if (/cancel/i.test(estatus)) return "Cancelada";
+  if (/rechaz/i.test(estatus)) return "Rechazada";
+  if (/finaliz|complet/i.test(estatus)) return "Finalizada";
+  if (/validar|validaci/i.test(estatus)) return "Por Validar";
+  if (/proceso|curso/i.test(estatus)) return "En Proceso";
+  if (/asignad/i.test(estatus)) return "Asignada";
+  return "Pendiente";
+}
 
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const res = await fetch(buildApiUrl(path), {
@@ -85,8 +118,8 @@ export default function ActivityDetailPage() {
   const openEdit = useCallback(() => {
     if (!activity) return;
     setForm({
-      estatus: activity.estatus ?? "PROGRAMADA",
-      prioridad: activity.prioridad ?? "",
+      estatus: flowStepForStatus(activity.estatus ?? "Pendiente"),
+      prioridad: normalizePriorityDisplay(activity.prioridad) || "Media",
       descripcion: activity.descripcion ?? "",
       indicaciones: activity.indicaciones ?? "",
       fechaInicio: toDateLocal(activity.fechaInicio),
@@ -142,18 +175,22 @@ export default function ActivityDetailPage() {
 
   const evidenceCount = countEvidenceFiles(activity.activityEvidence);
 
-  const isCancelOrReschedule = activity.estatus === "CANCELADA" || activity.estatus === "REPROGRAMAR";
+  const isCancelOrReschedule = /cancel|rechaz/i.test(activity.estatus);
   const activityFlow: { key: string; label: string; icon: string }[] = isCancelOrReschedule
     ? [
-        { key: "PROGRAMADA", label: "Programada", icon: "📅" },
-        { key: activity.estatus, label: activity.estatus === "CANCELADA" ? "Cancelada" : "Reprogramar", icon: activity.estatus === "CANCELADA" ? "✕" : "🔄" },
+        { key: "Pendiente", label: "Pendiente", icon: "📅" },
+        { key: flowStepForStatus(activity.estatus), label: flowStepForStatus(activity.estatus), icon: /cancel/i.test(activity.estatus) ? "✕" : "⛔" },
       ]
     : [
-        { key: "PROGRAMADA", label: "Programada", icon: "📅" },
-        { key: "EN_CURSO", label: "En curso", icon: "⚙️" },
-        { key: "COMPLETADA", label: "Completada", icon: "✅" },
+        { key: "Pendiente", label: "Pendiente", icon: "📅" },
+        { key: "En Proceso", label: "En proceso", icon: "⚙️" },
+        { key: "Por Validar", label: "Por validar", icon: "🔎" },
+        { key: "Finalizada", label: "Finalizada", icon: "✅" },
       ];
-  const activeFlowIdx = activityFlow.findIndex((s) => s.key === activity.estatus);
+  const activeFlowKey = flowStepForStatus(activity.estatus);
+  const activeFlowIdx = Math.max(0, activityFlow.findIndex((s) => s.key === activeFlowKey));
+  const priorityDisplay = normalizePriorityDisplay(activity.prioridad) || activity.prioridad || "—";
+  const hasProject = Boolean(activity.projectId || activity.project?.id);
 
   return (
     <>
@@ -176,10 +213,33 @@ export default function ActivityDetailPage() {
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
         <KpiCard label="Estado" value={activity.estatus.replace(/_/g, " ")} variant={activityStatusVariant(activity.estatus)} icon="📋" />
-        <KpiCard label="Prioridad" value={activity.prioridad || "—"} variant={activity.prioridad === "URGENTE" ? "danger" : activity.prioridad === "ALTA" ? "warning" : "default"} icon="⚡" />
+        <KpiCard label="Prioridad" value={priorityDisplay} variant={/urgente|alta/i.test(priorityDisplay) ? (/urgente/i.test(priorityDisplay) ? "danger" : "warning") : "default"} icon="⚡" />
         <KpiCard label="Evidencias" value={evidenceCount} icon="📎" hint="Archivos adjuntos" />
         <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon="👷" />
       </div>
+
+      <DetailSection title="Contexto de la OT">
+        <DetailFieldGrid>
+          <DetailField
+            label="Modo"
+            value={hasProject ? "Con proyecto" : "Sin proyecto"}
+          />
+          <DetailField
+            label="Proyecto"
+            value={
+              activity.project?.id ? (
+                <Link href={`/ops/projects/${activity.project.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                  {activity.project.title} →
+                </Link>
+              ) : (
+                "Sin proyecto operativo"
+              )
+            }
+          />
+          <DetailField label="Tipo de ticket" value={activity.ticketTypeCustom || activity.ticketType || "—"} />
+          <DetailField label="Tipo de trabajo" value={workTypeLabel(activity.workType)} />
+        </DetailFieldGrid>
+      </DetailSection>
 
       {/* Status flow stepper */}
       <div style={{ marginBottom: 16, padding: "14px 20px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
@@ -222,8 +282,9 @@ export default function ActivityDetailPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Tag variant={activityStatusVariant(activity.estatus)}>{activity.estatus.replace(/_/g, " ")}</Tag>
-            {activity.prioridad && <Tag variant="warning">{activity.prioridad}</Tag>}
+            {priorityDisplay !== "—" && <Tag variant="warning">{priorityDisplay}</Tag>}
             {activity.ticketType && <Tag variant="neutral">{activity.ticketType}</Tag>}
+            <Tag variant={hasProject ? "accent" : "neutral"}>{hasProject ? "Con proyecto" : "Sin proyecto"}</Tag>
           </div>
           {canEdit && !editing && (
             <Button size="sm" variant="ghost" onClick={openEdit}>✎ Editar</Button>
@@ -305,7 +366,7 @@ export default function ActivityDetailPage() {
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Estado *</span>
                 <select value={form.estatus} onChange={(e) => setForm((f) => ({ ...f, estatus: e.target.value }))} style={inp}>
-                  {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
+                  {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
               <label style={{ display: "grid", gap: 4 }}>

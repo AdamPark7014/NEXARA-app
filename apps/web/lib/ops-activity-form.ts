@@ -1,5 +1,7 @@
 /** Formulario moderno de OT — extraído del legacy `ActivitiesTable`. */
 
+export type ActivityProjectMode = 'with_project' | 'without_project';
+
 export const EMPTY_ACTIVITY_FORM = {
   titulo: "",
   indicaciones: "",
@@ -18,6 +20,7 @@ export const EMPTY_ACTIVITY_FORM = {
   branchCity: "",
   branchState: "",
   branchAddress: "",
+  projectMode: 'with_project' as ActivityProjectMode,
 };
 
 export type ActivityFormState = typeof EMPTY_ACTIVITY_FORM;
@@ -69,6 +72,7 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     branchCity: String(record.branchCity ?? ""),
     branchState: String(record.branchState ?? ""),
     branchAddress: String(record.branchAddress ?? ""),
+    projectMode: record.projectId ? "with_project" : "without_project",
   };
 }
 
@@ -81,12 +85,12 @@ export function buildActivityPayload(
     titulo: form.titulo,
     indicaciones: form.indicaciones || undefined,
     prioridad: form.prioridad,
-    activityType: "INTERNAL",
+    activityType: form.projectMode === 'with_project' ? 'CLIENT' : 'INTERNAL',
     ticketType: form.ticketType === "INVENTARIO" ? "PREVENTIVO" : form.ticketType,
     ticketTypeCustom: form.ticketType === "OTRO" ? form.ticketTypeCustom || undefined : undefined,
     workType: form.ticketType === "INVENTARIO" ? "PREVENTIVE_INVENTORY" : form.workType || "ISSUE",
-    clientId: project?.client.id,
-    projectId: Number(form.projectId),
+    projectId: form.projectMode === 'with_project' && form.projectId ? Number(form.projectId) : undefined,
+    clientId: form.projectMode === 'with_project' ? (project?.client.id ?? (form.clientId ? Number(form.clientId) : undefined)) : (form.clientId ? Number(form.clientId) : undefined),
     branchName: form.branchName || undefined,
     branchNumber: form.branchNumber || undefined,
     branchCity: form.branchCity || undefined,
@@ -104,4 +108,10 @@ export function buildActivityPayload(
   }
 
   return payload;
+}
+
+export function activitySubmitLabel(form: ActivityFormState, isEdit: boolean): string {
+  if (isEdit) return 'Guardar cambios';
+  if (form.responsableId) return 'Asignar OT';
+  return 'Crear OT';
 }

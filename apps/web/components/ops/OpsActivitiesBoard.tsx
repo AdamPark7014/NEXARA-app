@@ -25,8 +25,10 @@ type ActivityRow = {
   estatus: string;
   prioridad?: string | null;
   ticketType?: string | null;
+  projectId?: number | null;
   branchName?: string | null;
   client?: { id?: number; name?: string } | null;
+  project?: { id?: number; title?: string } | null;
   responsable?: { id?: number; nombre?: string } | null;
   activityEvidence?: {
     status?: string;
@@ -70,6 +72,7 @@ export default function OpsActivitiesBoard() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
+  const [filterProject, setFilterProject] = useState<"all" | "with" | "without">("all");
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -104,6 +107,8 @@ export default function OpsActivitiesBoard() {
 
   const visible = useMemo(() => {
     let list = rows;
+    if (filterProject === "with") list = list.filter((r) => r.projectId != null || r.project?.id != null);
+    if (filterProject === "without") list = list.filter((r) => r.projectId == null && r.project?.id == null);
     if (filterStatus) list = list.filter((r) => r.estatus === filterStatus);
     if (filterPriority) list = list.filter((r) => r.prioridad === filterPriority);
     if (search.trim()) {
@@ -112,12 +117,32 @@ export default function OpsActivitiesBoard() {
         (r.anNumber ?? "").toLowerCase().includes(q) ||
         r.titulo.toLowerCase().includes(q) ||
         (r.client?.name ?? "").toLowerCase().includes(q) ||
+        (r.project?.title ?? "").toLowerCase().includes(q) ||
         (r.branchName ?? "").toLowerCase().includes(q) ||
         (r.responsable?.nombre ?? "").toLowerCase().includes(q),
       );
     }
     return list;
-  }, [rows, search, filterStatus, filterPriority]);
+  }, [rows, search, filterStatus, filterPriority, filterProject]);
+
+  const emptyCopy = useMemo(() => {
+    if (filterProject === "with") {
+      return {
+        title: "Sin OT con proyecto",
+        description: "No hay órdenes ligadas a un proyecto operativo con estos filtros.",
+      };
+    }
+    if (filterProject === "without") {
+      return {
+        title: "Sin OT sin proyecto",
+        description: "No hay órdenes internas o ad-hoc con estos filtros.",
+      };
+    }
+    return {
+      title: "Sin órdenes de trabajo",
+      description: "No hay OT que coincidan con los filtros. Crea una nueva o limpia los filtros.",
+    };
+  }, [filterProject]);
 
   const statusOptions = useMemo(() => {
     const set = new Set(rows.map((r) => r.estatus).filter(Boolean));
@@ -181,6 +206,19 @@ export default function OpsActivitiesBoard() {
       ),
     },
     { key: "client", label: "Cliente", render: (r) => r.client?.name ?? "Interna", width: 140 },
+    {
+      key: "project",
+      label: "Proyecto",
+      width: 150,
+      render: (r) =>
+        r.project?.title ? (
+          <Link href={`/ops/projects/${r.project.id ?? r.projectId}`} style={{ color: "var(--primary)", textDecoration: "none", fontSize: 12 }}>
+            {r.project.title}
+          </Link>
+        ) : (
+          <Tag variant="neutral">Sin proyecto</Tag>
+        ),
+    },
     { key: "branchName", label: "Sucursal", render: (r) => r.branchName ?? "—", width: 120 },
     {
       key: "estatus",
@@ -232,13 +270,46 @@ export default function OpsActivitiesBoard() {
 
   return (
     <>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10, alignItems: "center" }}>
+        {(
+          [
+            { key: "all" as const, label: "Todas" },
+            { key: "with" as const, label: "Con proyecto" },
+            { key: "without" as const, label: "Sin proyecto" },
+          ] as const
+        ).map((seg) => {
+          const on = filterProject === seg.key;
+          return (
+            <button
+              key={seg.key}
+              type="button"
+              onClick={() => setFilterProject(seg.key)}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: on ? "1.5px solid var(--primary)" : "1px solid var(--border)",
+                background: on ? "color-mix(in srgb, var(--primary) 12%, var(--surface))" : "var(--surface)",
+                color: on ? "var(--primary)" : "var(--text-secondary)",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {seg.label}
+            </button>
+          );
+        })}
+        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+          Aquí asignas y das seguimiento. El técnico ejecuta en Mis OT.
+        </span>
+      </div>
       <FilterToolbar
-        search={{ value: search, onChange: setSearch, placeholder: "Buscar AN, título, cliente, sucursal…" }}
+        search={{ value: search, onChange: setSearch, placeholder: "Buscar AN, título, cliente, proyecto…" }}
         selects={[
           { label: "Estatus", value: filterStatus, onChange: setFilterStatus, options: statusOptions, allowAll: true },
           { label: "Prioridad", value: filterPriority, onChange: setFilterPriority, options: priorityOptions, allowAll: true },
         ]}
-        onClear={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); }}
+        onClear={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); setFilterProject("all"); }}
         resultCount={visible.length}
         rightActions={
           <>
@@ -264,11 +335,11 @@ export default function OpsActivitiesBoard() {
         columns={columns}
         rows={visible}
         rowKey={(r) => r.id}
-        emptyTitle="Sin actividades"
-        emptyDescription="No hay OT que coincidan con los filtros. Crea una nueva o limpia los filtros."
+        emptyTitle={emptyCopy.title}
+        emptyDescription={emptyCopy.description}
         emptyAction={
           <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-            <Button size="sm" variant="secondary" onClick={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); }}>
+            <Button size="sm" variant="secondary" onClick={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); setFilterProject("all"); }}>
               Limpiar filtros
             </Button>
             <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
