@@ -31,6 +31,8 @@ Plan: `ux_actividades_ops_05ca5884` — ola 1 **solo Web OPS**.
 
 `typecheck:web` y `typecheck:api` limpios.
 
+También: `.ai/drafts/` fuera del tracking (gitignore) — no versionar borradores Ollama.
+
 ### Fuera de esta ola
 
 - Homologar Android/iOS al mismo modelo Con/Sin proyecto.
