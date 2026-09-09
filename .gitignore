@@ -119,3 +119,5 @@ apps/web/NUL
 # Herramientas locales descargadas (go2rtc y compañía). Binarios y, sobre todo,
 # configuraciones con credenciales de equipos: nunca al repo.
 .tools/
+
+.ai/drafts/
