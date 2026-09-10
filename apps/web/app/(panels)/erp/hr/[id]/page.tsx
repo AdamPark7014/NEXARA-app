@@ -12,6 +12,7 @@ import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
+import { resolveAssetUrl } from "@/lib/evidence-display";
 
 interface EmployeeDetail {
   id: number;
@@ -29,12 +30,11 @@ interface EmployeeDetail {
   role?: { id: number; nombre: string } | null;
 }
 
-interface AttendanceRow {
+interface AttendancePunch {
   id: number;
-  date: string;
-  checkIn?: string | null;
-  checkOut?: string | null;
-  totalMinutes?: number;
+  type: string;
+  timestamp: string;
+  photoUrl?: string | null;
 }
 
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
@@ -63,7 +63,7 @@ export default function EmployeeDetailPage() {
   const token = user?.token ?? "";
 
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null);
-  const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
+  const [punches, setPunches] = useState<AttendancePunch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -77,7 +77,7 @@ export default function EmployeeDetailPage() {
     try {
       const [empData, attData] = await Promise.allSettled([
         apiFetch(`users/${id}`, token),
-        apiFetch(`attendance?userId=${id}&limit=10`, token),
+        apiFetch(`attendance/for-user?userId=${id}&limit=20`, token),
       ]);
       if (empData.status === "fulfilled" && empData.value) {
         setEmployee(empData.value);
@@ -85,8 +85,10 @@ export default function EmployeeDetailPage() {
         throw empData.reason;
       }
       if (attData.status === "fulfilled") {
-        const arr = Array.isArray(attData.value) ? attData.value : (attData.value?.data ?? []);
-        setAttendance(arr.slice(0, 10));
+        const arr = Array.isArray(attData.value) ? attData.value : [];
+        setPunches(arr as AttendancePunch[]);
+      } else {
+        setPunches([]);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar el empleado");
@@ -173,19 +175,21 @@ export default function EmployeeDetailPage() {
         <KpiCard label="Antigüedad" value={yearsAtCompany ?? "—"} icon="📅" />
       </div>
 
-      {attendance.length > 0 && (() => {
-        const complete = attendance.filter((a) => a.checkIn && a.checkOut).length;
-        const partial = attendance.filter((a) => a.checkIn && !a.checkOut).length;
-        const missing = attendance.filter((a) => !a.checkIn).length;
-        const total = attendance.length;
+      {punches.length > 0 && (() => {
+        const entradas = punches.filter((p) => p.type === "entrada").length;
+        const salidas = punches.filter((p) => p.type === "salida").length;
+        const conFoto = punches.filter((p) => Boolean(p.photoUrl)).length;
+        const total = punches.length;
         return (
           <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Asistencia reciente ({total} registros)</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+              Checadas recientes ({total})
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {([
-                { label: "Completa", count: complete, color: "var(--success)" },
-                { label: "Sin salida", count: partial, color: "var(--warning)" },
-                { label: "Sin registro", count: missing, color: "var(--danger)" },
+                { label: "Entradas", count: entradas, color: "var(--success)" },
+                { label: "Salidas", count: salidas, color: "var(--primary)" },
+                { label: "Con foto", count: conFoto, color: "var(--accent, var(--primary))" },
               ] as { label: string; count: number; color: string }[]).filter((r) => r.count > 0).map((r) => (
                 <div key={r.label} style={{ display: "grid", gridTemplateColumns: "100px 1fr 36px", gap: 10, alignItems: "center" }}>
                   <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
@@ -253,39 +257,73 @@ export default function EmployeeDetailPage() {
         </Section>
       )}
 
-      {attendance.length > 0 && (
-        <Section
-          eyebrow="Asistencia"
-          title="Registros recientes"
-          subtitle="Últimas 10 entradas de checador"
-          actions={<Link href="/erp/hr/attendance" style={{ fontSize: 12, color: "var(--primary)" }}>Ver todo →</Link>}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {attendance.map((a) => {
-              const mins = a.totalMinutes ?? 0;
-              const hrs = Math.floor(mins / 60);
-              const rem = mins % 60;
+      <Section
+        eyebrow="Asistencia"
+        title="Fotos de entrada y salida"
+        subtitle="Últimas checadas del checador (con foto cuando exista)"
+        actions={<Link href="/erp/hr/attendance" style={{ fontSize: 12, color: "var(--primary)" }}>Ver gestión →</Link>}
+      >
+        {punches.length === 0 ? (
+          <EmptyState
+            icon="📷"
+            title="Sin checadas recientes"
+            description="Cuando registre entrada o salida con la app, aquí verás la hora y la foto."
+          />
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+            {punches.map((p) => {
+              const src = p.photoUrl ? resolveAssetUrl(p.photoUrl) : "";
+              const label = p.type === "salida" ? "Salida" : p.type === "entrada" ? "Entrada" : p.type;
               return (
-                <div key={a.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 12, alignItems: "center", padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 600 }}>
-                    {new Date(a.date).toLocaleDateString("es-MX", { weekday: "short", day: "2-digit", month: "short" })}
-                  </span>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                    {a.checkIn ? new Date(a.checkIn).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) : "—"}
-                    {" – "}
-                    {a.checkOut ? new Date(a.checkOut).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) : "—"}
-                  </span>
-                  {mins > 0 && (
-                    <Tag variant={mins >= 480 ? "positive" : mins >= 360 ? "warning" : "danger"}>
-                      {hrs > 0 ? `${hrs}h` : ""}{rem > 0 ? ` ${rem}m` : ""}
-                    </Tag>
+                <article
+                  key={p.id}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    background: "var(--surface)",
+                  }}
+                >
+                  {src ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={src}
+                      alt={`Foto ${label}`}
+                      style={{ width: "100%", height: 140, objectFit: "cover", display: "block", background: "var(--surface-2)" }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        height: 140,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "var(--surface-2)",
+                        color: "var(--text-tertiary)",
+                        fontSize: 12,
+                      }}
+                    >
+                      Sin foto
+                    </div>
                   )}
-                </div>
+                  <div style={{ padding: "8px 10px" }}>
+                    <Tag variant={p.type === "entrada" ? "positive" : "accent"}>{label}</Tag>
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>
+                      {new Date(p.timestamp).toLocaleString("es-MX", {
+                        weekday: "short",
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
+                  </div>
+                </article>
               );
             })}
           </div>
-        </Section>
-      )}
+        )}
+      </Section>
     </>
   );
 }

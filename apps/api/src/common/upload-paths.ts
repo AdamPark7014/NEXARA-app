@@ -45,8 +45,11 @@ export function getCvsUploadDir(dirname: string): string {
 }
 
 export function getUploadSubdir(dirname: string, subdir: string): string {
-  const projectRoot = resolveProjectRoot(dirname);
-  const dir = path.join(projectRoot, 'uploads', subdir);
+  // En Docker: UPLOADS_ROOT=/app/uploads (volumen montado). Sin env, cae al repo.
+  const envRoot = process.env.UPLOADS_ROOT?.trim();
+  const dir = envRoot
+    ? path.join(envRoot, subdir)
+    : path.join(resolveProjectRoot(dirname), 'uploads', subdir);
 
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });

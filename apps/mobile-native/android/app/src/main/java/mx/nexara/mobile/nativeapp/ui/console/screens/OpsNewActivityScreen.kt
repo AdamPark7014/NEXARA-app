@@ -79,6 +79,8 @@ data class OpsNewActivityUiState(
     val branchState: String = "",
     val branchAddress: String = "",
     val pendingRequestId: Long? = null,
+    /** with_project | without_project — misma semántica que la web OPS. */
+    val projectMode: String = "with_project",
 )
 
 class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
@@ -139,6 +141,13 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setProjectId(id: Long?) = _state.update { it.copy(projectId = id) }
+
+    fun setProjectMode(mode: String) = _state.update {
+        it.copy(
+            projectMode = mode,
+            projectId = if (mode == "without_project") null else it.projectId,
+        )
+    }
     fun setResponsableId(id: Long?) = _state.update { it.copy(responsableId = id) }
     fun setTicketType(type: String) = _state.update { it.copy(ticketType = type) }
 
@@ -174,8 +183,12 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(error = "Sesión inválida") }
             return
         }
-        if (s.titulo.isBlank() || s.responsableId == null || s.projectId == null) {
-            _state.update { it.copy(error = "Título, proyecto y responsable son obligatorios") }
+        if (s.titulo.isBlank() || s.responsableId == null) {
+            _state.update { it.copy(error = "Título y responsable son obligatorios") }
+            return
+        }
+        if (s.projectMode == "with_project" && s.projectId == null) {
+            _state.update { it.copy(error = "Selecciona un proyecto") }
             return
         }
         val project = s.projects.firstOrNull { it.id == s.projectId }
@@ -183,14 +196,16 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(saving = true, error = null, success = null) }
         viewModelScope.launch {
             try {
+                val withProject = s.projectMode == "with_project"
                 val body = CreateActivityRequest(
                     titulo = s.titulo.trim(),
                     indicaciones = s.indicaciones.takeIf { it.isNotBlank() },
                     prioridad = s.prioridad,
+                    activityType = if (withProject) "CLIENT" else "INTERNAL",
                     ticketType = if (s.ticketType == "INVENTARIO") "PREVENTIVO" else s.ticketType,
                     workType = if (s.ticketType == "INVENTARIO") "PREVENTIVE_INVENTORY" else "ISSUE",
-                    clientId = project?.client?.id,
-                    projectId = s.projectId,
+                    clientId = if (withProject) project?.client?.id else null,
+                    projectId = if (withProject) s.projectId else null,
                     branchName = s.branchName.takeIf { it.isNotBlank() },
                     branchNumber = s.branchNumber.takeIf { it.isNotBlank() },
                     branchCity = s.branchCity.takeIf { it.isNotBlank() },
@@ -289,7 +304,33 @@ fun OpsNewActivityScreen(
 
                     item {
                         NxPanelShell {
-                            NxSectionHeader(title = "Nueva OT", subtitle = "Proyecto, responsable y tiempos")
+                            NxSectionHeader(
+                                title = "Nueva OT",
+                                subtitle = if (state.projectMode == "with_project") {
+                                    "OT con proyecto operativo"
+                                } else {
+                                    "OT sin proyecto (interna / ad-hoc)"
+                                },
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = { vm.setProjectMode("with_project") },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(
+                                        if (state.projectMode == "with_project") "● Con proyecto" else "Con proyecto",
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = { vm.setProjectMode("without_project") },
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(
+                                        if (state.projectMode == "without_project") "● Sin proyecto" else "Sin proyecto",
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = state.titulo,
                                 onValueChange = { vm.update("titulo", it) },
@@ -297,8 +338,17 @@ fun OpsNewActivityScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Spacer(Modifier.height(8.dp))
-                            ProjectPicker(state, vm::setProjectId)
-                            Spacer(Modifier.height(8.dp))
+                            if (state.projectMode == "with_project") {
+                                ProjectPicker(state, vm::setProjectId)
+                                Spacer(Modifier.height(8.dp))
+                            } else {
+                                Text(
+                                    "Sin proyecto: trabajo interno o ad-hoc.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = NxColors.Muted,
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
                             UserPicker(state, vm::setResponsableId)
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(

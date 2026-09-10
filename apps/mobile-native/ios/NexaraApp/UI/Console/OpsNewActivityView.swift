@@ -18,6 +18,7 @@ struct OpsNewActivityView: View {
     @State private var indicaciones = ""
     @State private var prioridad = "Media"
     @State private var projectId: Int?
+    @State private var projectMode = "with_project"
     @State private var responsableId: Int?
     @State private var tiempoEstimado = ""
     @State private var fecha = ""
@@ -45,15 +46,29 @@ struct OpsNewActivityView: View {
                             }
                         }
                         Section("OT") {
+                            Picker("Modo", selection: $projectMode) {
+                                Text("Con proyecto").tag("with_project")
+                                Text("Sin proyecto").tag("without_project")
+                            }
+                            .pickerStyle(.segmented)
+                            .onChange(of: projectMode) { _, mode in
+                                if mode == "without_project" { projectId = nil }
+                            }
                             TextField("Título", text: $titulo)
-                            Picker("Proyecto", selection: Binding(
-                                get: { projectId ?? 0 },
-                                set: { projectId = $0 > 0 ? $0 : nil },
-                            )) {
-                                Text("Seleccionar…").tag(0)
-                                ForEach(activeProjects, id: \.id) { p in
-                                    Text(p.title).tag(Int(p.id))
+                            if projectMode == "with_project" {
+                                Picker("Proyecto", selection: Binding(
+                                    get: { projectId ?? 0 },
+                                    set: { projectId = $0 > 0 ? $0 : nil },
+                                )) {
+                                    Text("Seleccionar…").tag(0)
+                                    ForEach(activeProjects, id: \.id) { p in
+                                        Text(p.title).tag(Int(p.id))
+                                    }
                                 }
+                            } else {
+                                Text("OT interna / ad-hoc — no pide proyecto.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                             Picker("Responsable", selection: Binding(
                                 get: { responsableId ?? 0 },
@@ -142,27 +157,34 @@ struct OpsNewActivityView: View {
     }
 
     private func save() async {
-        guard let projectId, let responsableId else {
-            error = "Proyecto y responsable son obligatorios"
+        guard let responsableId else {
+            error = "Responsable es obligatorio"
+            return
+        }
+        if projectMode == "with_project" && projectId == nil {
+            error = "Selecciona un proyecto"
             return
         }
         guard let uid = SessionStore.shared.currentUser?.id, let creadoPorId = Int(uid) else {
             error = "Sesión inválida"
             return
         }
-        let project = activeProjects.first { Int($0.id) == projectId }
+        let withProject = projectMode == "with_project"
+        let project = withProject ? activeProjects.first { Int($0.id) == projectId } : nil
         var body: [String: Any] = [
             "titulo": titulo.trimmingCharacters(in: .whitespacesAndNewlines),
             "prioridad": prioridad,
-            "projectId": projectId,
             "responsableId": responsableId,
             "creadoPorId": creadoPorId,
             "estatus": "Pendiente",
-            "activityType": "INTERNAL",
+            "activityType": withProject ? "CLIENT" : "INTERNAL",
             "ticketType": "PREVENTIVO",
             "workType": "ISSUE",
         ]
-        if let clientId = project?.clientId { body["clientId"] = Int(clientId) }
+        if withProject, let projectId {
+            body["projectId"] = projectId
+            if let clientId = project?.clientId { body["clientId"] = Int(clientId) }
+        }
         if let indicaciones = indicaciones.nilIfEmpty { body["indicaciones"] = indicaciones }
         if let mins = Int(tiempoEstimado) { body["tiempoEstimadoMin"] = mins }
         if !fecha.isEmpty { body["fechaInicio"] = "\(fecha)T08:00:00.000Z" }

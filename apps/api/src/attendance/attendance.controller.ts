@@ -48,6 +48,20 @@ export class AttendanceController {
     return this.attendanceService.getHistory(req.user?.id, date, companyId);
   }
 
+  /** Fotos y checadas de un colaborador — bandeja RRHH / ficha de persona. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_MANAGE] })
+  @Get('for-user')
+  async forUser(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('userId') userId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const id = parseInt(userId || '', 10);
+    const take = limit ? parseInt(limit, 10) : 20;
+    return this.attendanceService.getPunchesForUser(id, take, companyId);
+  }
+
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   @Get('day')
