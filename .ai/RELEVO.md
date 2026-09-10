@@ -8,42 +8,34 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — UX Actividades OPS (claridad + segmentación)
-
-Plan: `ux_actividades_ops_05ca5884` — ola 1 **solo Web OPS**.
+## Este turno — continuar pendientes + deploy Hetzner
 
 ### Hecho
 
-1. **Alta guiada** (`OpsActivityForm` + `ops-activity-form.ts`):
-   - Modos **Con proyecto** / **Sin proyecto** con ayuda corta.
-   - Payload: `activityType CLIENT` + `projectId` vs `INTERNAL` sin proyecto.
-   - CTA `Crear OT` / `Asignar OT` vía `activitySubmitLabel`.
-2. **Bandeja equipo** (`OpsActivitiesBoard`):
-   - Segmentos Todas · Con proyecto · Sin proyecto.
-   - Columna Proyecto (link o badge Sin proyecto).
-   - Empty states por segmento + línea de ayuda del módulo.
-3. **Mis OT** (`my-activities`):
-   - Tabs «Mis OT» / «Evidencias»; rangos Hoy / Esta semana / Todas.
-   - Leyenda 1→2→3; badges Con/Sin proyecto + siguiente acción.
-4. **Detalle**: bloque Contexto (modo, proyecto, ticket, workType); estatus/prioridad canónicos (`Pendiente`…`Finalizada`, `Baja`…`Urgente`); stepper alineado.
-5. **API**: `findAll` / `findOne` incluyen `project { id, title }`.
-6. **Copy** en `section-views`: títulos «Órdenes de trabajo…» / «Mis OT».
+1. **Fotos asistencia RRHH**
+   - API `GET /api/attendance/for-user?userId=&limit=` (ATTENDANCE_MANAGE).
+   - Ficha `/erp/hr/[id]`: galería entrada/salida con foto (data-URI legacy o `/uploads/…`).
+   - Bandeja `/erp/hr/attendance`: thumbs en TeamCard.
+   - Persistencia: `UPLOADS_ROOT` + nunca guardar data-URI en DB; paths `/uploads/attendance/…`.
+   - `resolveAssetUrl` reconoce `attendance/`.
 
-`typecheck:web` y `typecheck:api` limpios.
+2. **Homologación móvil OT Con/Sin proyecto**
+   - Android `OpsNewActivityScreen` + iOS `OpsNewActivityView`.
 
-También: `.ai/drafts/` fuera del tracking (gitignore) — no versionar borradores Ollama.
+3. **Deploy** (este cierre): push `mejora/calidad-y-web` + `deploy/update.sh` en Hetzner
+   `/var/www/nexara-app` (API+web). Incluye RBAC viatics + UX Actividades + fotos.
 
-### Fuera de esta ola
+### Verificar en prod
 
-- Homologar Android/iOS al mismo modelo Con/Sin proyecto.
-- Deploy Hetzner del fix RBAC viatics (hilo anterior) sigue pendiente si no se desplegó.
+- Resumen ejecutivo con `coord_operaciones` → Reintentar (viatics).
+- `/ops/activities/new` modos Con/Sin proyecto.
+- `/erp/hr/13` fotos de Carolina.
 
 ## Heredado vivo
 
-- Demo store: `play.review@nexara.com.mx`; creds en `C:\dev\secrets\nexara-store\`.
-- Enrollment Apple `49J96Q3WQ3`.
-- No fingir EN VIVO en INTEGRA.
+- Demo store / Apple enrollment sin cambio.
+- Play Store APK: soft-fail dashboard ya en rama; fotos/OT móvil en próximo build.
 
 ## No tocar
 
-Puente NAS. Credenciales Apple. Contraseña del revisor fuera de git.
+Puente NAS. Credenciales. No fingir EN VIVO.

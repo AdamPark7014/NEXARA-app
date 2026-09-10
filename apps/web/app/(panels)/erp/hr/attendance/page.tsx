@@ -20,6 +20,7 @@ import HrModuleRail from "@/components/hr/HrModuleRail";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import ListExportActions from "@/components/ui/ListExportActions";
+import { resolveAssetUrl } from "@/lib/evidence-display";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 
@@ -37,7 +38,7 @@ interface TeamMember {
   email?: string;
   department?: string;
   roleName?: string;
-  attendances?: { type: string; timestamp: string; entryLatitude?: number; entryLongitude?: number; exitLatitude?: number; exitLongitude?: number }[];
+  attendances?: { type: string; timestamp: string; photoUrl?: string; entryLatitude?: number; entryLongitude?: number; exitLatitude?: number; exitLongitude?: number }[];
   totalMinutes?: number;
   checkIn?: string;
   checkOut?: string;
@@ -59,7 +60,7 @@ interface ApiAttendanceUser {
   roleName?: string;
   totalMinutes?: number;
   days?: { date: string; totalMinutes?: number; isOpen?: boolean }[];
-  attendances?: { type: string; timestamp: string; entryLatitude?: number; entryLongitude?: number; exitLatitude?: number; exitLongitude?: number }[];
+  attendances?: { type: string; timestamp: string; photoUrl?: string; entryLatitude?: number; entryLongitude?: number; exitLatitude?: number; exitLongitude?: number }[];
 }
 
 interface WeekDay {
@@ -356,6 +357,33 @@ function TeamCard({ member, token, dateFilter }: { member: TeamMember; token: st
           <div style={{ marginLeft: "auto", color: "var(--text-tertiary)" }}>{fmtMinutes(member.totalMinutes)}</div>
         )}
       </div>
+      {(() => {
+        const entryPhoto = [...(member.attendances ?? [])].filter((a) => a.type === "entrada" && a.photoUrl).pop();
+        const exitPhoto = [...(member.attendances ?? [])].filter((a) => a.type === "salida" && a.photoUrl).pop();
+        if (!entryPhoto?.photoUrl && !exitPhoto?.photoUrl) return null;
+        return (
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            {entryPhoto?.photoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={resolveAssetUrl(entryPhoto.photoUrl)}
+                alt="Entrada"
+                title="Foto entrada"
+                style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }}
+              />
+            )}
+            {exitPhoto?.photoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={resolveAssetUrl(exitPhoto.photoUrl)}
+                alt="Salida"
+                title="Foto salida"
+                style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)" }}
+              />
+            )}
+          </div>
+        );
+      })()}
       {(member.estado === "PRESENTE" || member.estado === "COMPLETO") && (
         <AttendanceGpsDayPanel
           token={token}

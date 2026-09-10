@@ -30,7 +30,15 @@ export class AttendanceService {
   private persistAttendancePhoto(photoBase64?: string | null): string | null {
     if (!photoBase64 || !photoBase64.trim()) return null;
     try {
-      return saveBase64Photo(photoBase64, __dirname, 'attendance');
+      const saved = saveBase64Photo(photoBase64, __dirname, 'attendance');
+      // Nunca guardar data-URI en DB (rompe listados y el disco queda vacío).
+      if (!saved || saved.startsWith('data:')) {
+        this.logger.warn('Foto de asistencia no persistió a archivo; se omite photoUrl');
+        return null;
+      }
+      return saved.startsWith('/uploads/')
+        ? saved
+        : `/uploads/${saved.replace(/^\//, '')}`;
     } catch (err) {
       this.logger.warn(`No se pudo persistir foto de asistencia: ${(err as Error).message}`);
       return null;
@@ -177,6 +185,35 @@ export class AttendanceService {
         ...companyWhere(tenantId),
       },
       orderBy: { timestamp: 'asc' },
+    });
+  }
+
+  /** Checadas recientes de un colaborador (RH / gestión de asistencia). */
+  async getPunchesForUser(
+    targetUserId: number,
+    limit = 20,
+    companyId?: number | null,
+  ) {
+    if (!targetUserId || !Number.isFinite(targetUserId)) {
+      throw new BadRequestException('userId inválido');
+    }
+    const tenantId = requireCompanyId(companyId);
+    const take = Math.min(Math.max(limit || 20, 1), 100);
+    return this.prisma.attendance.findMany({
+      where: { userId: targetUserId, ...companyWhere(tenantId) },
+      orderBy: { timestamp: 'desc' },
+      take,
+      select: {
+        id: true,
+        type: true,
+        timestamp: true,
+        photoUrl: true,
+        deviceInfo: true,
+        entryLatitude: true,
+        entryLongitude: true,
+        exitLatitude: true,
+        exitLongitude: true,
+      },
     });
   }
 

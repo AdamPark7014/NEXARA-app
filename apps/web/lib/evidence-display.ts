@@ -50,7 +50,7 @@ export function resolveAssetUrl(url?: string | null): string {
   if (
     !normalizedPath.startsWith("/uploads/") &&
     !normalizedPath.startsWith("/api/uploads/") &&
-    /^\/(activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(normalizedPath)
+    /^\/(activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles|attendance)\//i.test(normalizedPath)
   ) {
     normalizedPath = `/uploads${normalizedPath}`;
   }
