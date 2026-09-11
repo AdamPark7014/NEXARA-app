@@ -1,0 +1,929 @@
+[
+  {
+    "id": "executive",
+    "panel": "erp",
+    "path": "/executive",
+    "label": "Vista ejecutiva",
+    "description": "KPIs cross-módulo del negocio",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "dashboard",
+    "panel": "erp",
+    "path": "/dashboard",
+    "label": "Resumen general",
+    "description": "Tu día en NEXARA",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "chat",
+    "panel": "erp",
+    "path": "/chat",
+    "label": "Chat",
+    "description": "Canales, DMs y colaboración en tiempo real",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "reuniones",
+    "panel": "erp",
+    "path": "/reuniones",
+    "label": "Reuniones",
+    "description": "Ritmo operativo, acuerdos y lecciones aprendidas",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "approvals",
+    "panel": "erp",
+    "path": "/approvals",
+    "label": "Aprobaciones",
+    "description": "Flujo de aprobaciones jerárquicas",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "bi",
+    "panel": "erp",
+    "path": "/analytics/bi",
+    "label": "Analítica",
+    "description": "Tableros y reportes del negocio",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "users",
+    "panel": "erp",
+    "path": "/users",
+    "label": "Usuarios y roles",
+    "description": "Plantilla, accesos por URL y auditoría",
+    "group": "Gobierno",
+    "visible": true
+  },
+  {
+    "id": "companies",
+    "panel": "erp",
+    "path": "/companies",
+    "label": "Empresas",
+    "description": "Razones sociales y sucursales",
+    "group": "Gobierno",
+    "visible": true
+  },
+  {
+    "id": "settings",
+    "panel": "erp",
+    "path": "/settings",
+    "label": "Configuración",
+    "description": "Parámetros, integraciones y branding",
+    "group": "Gobierno",
+    "visible": true
+  },
+  {
+    "id": "architecture",
+    "panel": "erp",
+    "path": "/architecture",
+    "label": "Mapa del sistema",
+    "description": "Módulos, paneles y dependencias",
+    "group": "Gobierno",
+    "visible": true
+  },
+  {
+    "id": "kb",
+    "panel": "erp",
+    "path": "/kb",
+    "label": "Base de conocimiento",
+    "description": "Procedimientos y documentación interna",
+    "group": "Gobierno",
+    "visible": true
+  },
+  {
+    "id": "accounting",
+    "panel": "erp",
+    "path": "/accounting",
+    "label": "Contabilidad",
+    "description": "Pólizas, períodos y reportes",
+    "group": "Finanzas",
+    "visible": true
+  },
+  {
+    "id": "invoicing",
+    "panel": "erp",
+    "path": "/invoicing",
+    "label": "Facturación CFDI",
+    "description": "Timbrado, cancelaciones y cobranza",
+    "group": "Finanzas",
+    "visible": true
+  },
+  {
+    "id": "banking",
+    "panel": "erp",
+    "path": "/banking",
+    "label": "Bancos",
+    "description": "Movimientos, pagos y conciliación",
+    "group": "Finanzas",
+    "visible": true
+  },
+  {
+    "id": "viatics-admin",
+    "panel": "erp",
+    "path": "/finance/viatics",
+    "label": "Viáticos",
+    "description": "Comprobación y autorización de viáticos",
+    "group": "Finanzas",
+    "visible": true
+  },
+  {
+    "id": "expenses-admin",
+    "panel": "erp",
+    "path": "/finance/expenses",
+    "label": "Gastos",
+    "description": "Captura y autorización de gastos",
+    "group": "Finanzas",
+    "visible": true
+  },
+  {
+    "id": "employee-payments",
+    "panel": "erp",
+    "path": "/finance/employee-payments",
+    "label": "Pagos a personal",
+    "description": "Dispersiones internas (no CFDI nómina)",
+    "group": "Finanzas",
+    "visible": true
+  },
+  {
+    "id": "hr",
+    "panel": "erp",
+    "path": "/hr",
+    "label": "Plantilla RRHH",
+    "description": "Colaboradores, vacaciones e incidencias",
+    "group": "Personas",
+    "visible": true
+  },
+  {
+    "id": "attendance",
+    "panel": "erp",
+    "path": "/hr/attendance",
+    "label": "Asistencia",
+    "description": "Checador ERP + contraste ACS Integra",
+    "group": "Personas",
+    "visible": true
+  },
+  {
+    "id": "lunch-breaks",
+    "panel": "erp",
+    "path": "/hr/lunch-breaks",
+    "label": "Comidas y descansos",
+    "description": "Registro y control de pausas",
+    "group": "Personas",
+    "visible": true
+  },
+  {
+    "id": "fines",
+    "panel": "erp",
+    "path": "/hr/fines",
+    "label": "Incidencias",
+    "description": "Multas y faltas administrativas",
+    "group": "Personas",
+    "visible": true
+  },
+  {
+    "id": "orgchart",
+    "panel": "erp",
+    "path": "/hr/orgchart",
+    "label": "Organigrama",
+    "description": "Jerarquía y reportes",
+    "group": "Personas",
+    "visible": true
+  },
+  {
+    "id": "kpis-hr",
+    "panel": "erp",
+    "path": "/hr/kpis",
+    "label": "KPIs de personas",
+    "description": "Productividad y desempeño por área",
+    "group": "Personas",
+    "visible": true
+  },
+  {
+    "id": "warehouse",
+    "panel": "erp",
+    "path": "/warehouse",
+    "label": "Almacén",
+    "description": "Entradas, salidas, stock y mínimos",
+    "group": "Logística",
+    "visible": true
+  },
+  {
+    "id": "procurement",
+    "panel": "erp",
+    "path": "/procurement",
+    "label": "Compras",
+    "description": "Requisiciones, OC y proveedores",
+    "group": "Logística",
+    "visible": true
+  },
+  {
+    "id": "documents",
+    "panel": "erp",
+    "path": "/documents",
+    "label": "Documentos",
+    "description": "Contratos, manuales y compliance",
+    "group": "Gobierno",
+    "visible": true
+  },
+  {
+    "id": "audit",
+    "panel": "erp",
+    "path": "/audit",
+    "label": "Registro de auditoría",
+    "description": "Trazabilidad de cambios sensibles",
+    "group": "Auditoría",
+    "visible": true
+  },
+  {
+    "id": "exports",
+    "panel": "erp",
+    "path": "/exports",
+    "label": "Exportaciones",
+    "description": "Reportes Excel/PDF globales",
+    "group": "Auditoría",
+    "visible": true
+  },
+  {
+    "id": "notifications-center",
+    "panel": "erp",
+    "path": "/notifications-center",
+    "label": "Notificaciones",
+    "description": "Alertas y comunicados",
+    "group": "Auditoría",
+    "visible": true
+  },
+  {
+    "id": "news",
+    "panel": "erp",
+    "path": "/news",
+    "label": "Comunicados",
+    "description": "Boletín interno y métricas de lectura",
+    "group": "Auditoría",
+    "visible": true
+  },
+  {
+    "id": "calendar",
+    "panel": "erp",
+    "path": "/calendar",
+    "label": "Mi calendario",
+    "description": "Agenda personal y de equipo",
+    "group": "Mi cuenta",
+    "visible": true
+  },
+  {
+    "id": "my-profile",
+    "panel": "erp",
+    "path": "/my-profile",
+    "label": "Mi perfil",
+    "description": "Datos personales y preferencias",
+    "group": "Mi cuenta",
+    "visible": true
+  },
+  {
+    "id": "crm-dashboard",
+    "panel": "crm",
+    "path": "/dashboard",
+    "label": "Resumen comercial",
+    "description": "KPIs, pipeline y actividad del equipo",
+    "group": "Pipeline",
+    "visible": true
+  },
+  {
+    "id": "crm-chat",
+    "panel": "crm",
+    "path": "/chat",
+    "label": "Chat",
+    "description": "Canales y mensajes del equipo",
+    "group": "Pipeline",
+    "visible": true
+  },
+  {
+    "id": "crm-leads",
+    "panel": "crm",
+    "path": "/leads",
+    "label": "Leads",
+    "description": "Prospectos sin calificar",
+    "group": "Pipeline",
+    "visible": true
+  },
+  {
+    "id": "crm-opportunities",
+    "panel": "crm",
+    "path": "/opportunities",
+    "label": "Oportunidades",
+    "description": "Negocios en proceso",
+    "group": "Pipeline",
+    "visible": true
+  },
+  {
+    "id": "crm-pipeline",
+    "panel": "crm",
+    "path": "/pipeline",
+    "label": "Kanban del pipeline",
+    "description": "Vista visual por etapa",
+    "group": "Pipeline",
+    "visible": true
+  },
+  {
+    "id": "crm-agenda",
+    "panel": "crm",
+    "path": "/agenda",
+    "label": "Agenda comercial",
+    "description": "Llamadas, visitas y demos",
+    "group": "Pipeline",
+    "visible": true
+  },
+  {
+    "id": "crm-clients",
+    "panel": "crm",
+    "path": "/clients",
+    "label": "Clientes",
+    "description": "Cuentas y contactos",
+    "group": "Catálogo y clientes",
+    "visible": true
+  },
+  {
+    "id": "crm-products",
+    "panel": "crm",
+    "path": "/products",
+    "label": "Catálogo de productos",
+    "description": "SKUs, precios y stock",
+    "group": "Catálogo y clientes",
+    "visible": true
+  },
+  {
+    "id": "crm-quotes",
+    "panel": "crm",
+    "path": "/quotes",
+    "label": "Cotizaciones",
+    "description": "Documentos comerciales y firma digital",
+    "group": "Catálogo y clientes",
+    "visible": true
+  },
+  {
+    "id": "crm-templates",
+    "panel": "crm",
+    "path": "/templates",
+    "label": "Plantillas",
+    "description": "Documentos y mensajes reutilizables",
+    "group": "Catálogo y clientes",
+    "visible": true
+  },
+  {
+    "id": "crm-projects",
+    "panel": "crm",
+    "path": "/projects",
+    "label": "Proyectos de venta",
+    "description": "Negocios ganados pendientes de handoff",
+    "group": "Proyectos",
+    "visible": true
+  },
+  {
+    "id": "crm-tenders",
+    "panel": "crm",
+    "path": "/tenders",
+    "label": "Licitaciones",
+    "description": "Públicas y privadas",
+    "group": "Proyectos",
+    "visible": true
+  },
+  {
+    "id": "crm-sales-team",
+    "panel": "crm",
+    "path": "/team",
+    "label": "Equipo de ventas",
+    "description": "Gestión de ejecutivos",
+    "group": "Equipo y métricas",
+    "visible": true
+  },
+  {
+    "id": "crm-targets",
+    "panel": "crm",
+    "path": "/targets",
+    "label": "Cuotas y metas",
+    "description": "Forecast y cumplimiento",
+    "group": "Equipo y métricas",
+    "visible": true
+  },
+  {
+    "id": "crm-reports",
+    "panel": "crm",
+    "path": "/reports",
+    "label": "Reportes comerciales",
+    "description": "Análisis de pipeline y cierre",
+    "group": "Equipo y métricas",
+    "visible": true
+  },
+  {
+    "id": "ops-dashboard",
+    "panel": "ops",
+    "path": "/dashboard",
+    "label": "Hoy en operaciones",
+    "description": "OT abiertas, alertas y SLA",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "ops-dispatch",
+    "panel": "ops",
+    "path": "/dispatch",
+    "label": "Centro de despacho",
+    "description": "Asignación masiva y mapa en vivo",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "ops-chat",
+    "panel": "ops",
+    "path": "/chat",
+    "label": "Chat",
+    "description": "Canales y mensajes del equipo",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "ops-projects",
+    "panel": "ops",
+    "path": "/projects",
+    "label": "Proyectos operativos",
+    "description": "Conversión de ventas a OT",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "ops-activities",
+    "panel": "ops",
+    "path": "/activities",
+    "label": "Actividades · Todas",
+    "description": "Vista global de OT",
+    "group": "Campo",
+    "visible": true
+  },
+  {
+    "id": "ops-my-activities",
+    "panel": "ops",
+    "path": "/my-activities",
+    "label": "Mis actividades",
+    "description": "Mis OT asignadas hoy",
+    "group": "Campo",
+    "visible": true
+  },
+  {
+    "id": "ops-evidences",
+    "panel": "ops",
+    "path": "/evidences",
+    "label": "Evidencias · Revisión",
+    "description": "Aprobar evidencias de campo",
+    "group": "Campo",
+    "visible": false
+  },
+  {
+    "id": "ops-my-evidences",
+    "panel": "ops",
+    "path": "/my-evidences",
+    "label": "Mis evidencias",
+    "description": "Fotos, firmas y hojas de servicio",
+    "group": "Campo",
+    "visible": false
+  },
+  {
+    "id": "ops-viatics",
+    "panel": "ops",
+    "path": "/viatics",
+    "label": "Viáticos · Revisión",
+    "description": "Revisar viáticos del equipo",
+    "group": "Campo",
+    "visible": true
+  },
+  {
+    "id": "ops-my-viatics",
+    "panel": "ops",
+    "path": "/my-viatics",
+    "label": "Mis viáticos",
+    "description": "Solicitar y comprobar viáticos",
+    "group": "Campo",
+    "visible": true
+  },
+  {
+    "id": "ops-vehicles",
+    "panel": "ops",
+    "path": "/vehicles",
+    "label": "Vehículos · Flotilla",
+    "description": "Gestión y asignación",
+    "group": "Campo",
+    "visible": true
+  },
+  {
+    "id": "ops-my-vehicles",
+    "panel": "ops",
+    "path": "/my-vehicles",
+    "label": "Mis vehículos",
+    "description": "Solicitar y entregar",
+    "group": "Campo",
+    "visible": true
+  },
+  {
+    "id": "ops-gps",
+    "panel": "ops",
+    "path": "/gps",
+    "label": "GPS en vivo",
+    "description": "Rastreo de cuadrillas",
+    "group": "Campo",
+    "visible": true
+  },
+  {
+    "id": "ops-tools",
+    "panel": "ops",
+    "path": "/tools",
+    "label": "Herramientas",
+    "description": "Kits y préstamos",
+    "group": "Campo",
+    "visible": true
+  },
+  {
+    "id": "ops-service-clients",
+    "panel": "ops",
+    "path": "/service-clients",
+    "label": "Clientes con contrato",
+    "description": "Cuentas con servicio activo",
+    "group": "Servicio continuo",
+    "visible": true
+  },
+  {
+    "id": "ops-maintenance",
+    "panel": "ops",
+    "path": "/maintenance",
+    "label": "Mantenimiento",
+    "description": "Visitas preventivas y correctivas",
+    "group": "Servicio continuo",
+    "visible": true
+  },
+  {
+    "id": "ops-maintenance-contracts",
+    "panel": "ops",
+    "path": "/maintenance/contracts",
+    "label": "Contratos de servicio",
+    "description": "SLA, vigencias y alcance",
+    "group": "Servicio continuo",
+    "visible": false
+  },
+  {
+    "id": "ops-assets",
+    "panel": "ops",
+    "path": "/assets",
+    "label": "Activos en campo",
+    "description": "Equipos instalados por cliente",
+    "group": "Servicio continuo",
+    "visible": true
+  },
+  {
+    "id": "ops-noc",
+    "panel": "ops",
+    "path": "/noc",
+    "label": "NOC · Monitoreo",
+    "description": "Uptime y alertas 24/7",
+    "group": "Monitoreo y soporte",
+    "visible": true
+  },
+  {
+    "id": "ops-support-inbox",
+    "panel": "ops",
+    "path": "/support",
+    "label": "Bandeja de soporte",
+    "description": "Tickets de clientes",
+    "group": "Monitoreo y soporte",
+    "visible": true
+  },
+  {
+    "id": "ops-support-sla",
+    "panel": "ops",
+    "path": "/support/sla",
+    "label": "SLA y tiempos",
+    "description": "Cumplimiento por contrato",
+    "group": "Monitoreo y soporte",
+    "visible": true
+  },
+  {
+    "id": "ops-cvs",
+    "panel": "ops",
+    "path": "/recruiting",
+    "label": "Reclutamiento técnico",
+    "description": "CVs de ingenieros candidatos",
+    "group": "Monitoreo y soporte",
+    "visible": true
+  },
+  {
+    "id": "studio-dashboard",
+    "panel": "studio",
+    "path": "/dashboard",
+    "label": "Studio dashboard",
+    "description": "Tráfico, leads y campañas",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "studio-chat",
+    "panel": "studio",
+    "path": "/chat",
+    "label": "Chat",
+    "description": "Canales y mensajes del equipo",
+    "group": "Tablero",
+    "visible": true
+  },
+  {
+    "id": "studio-hero",
+    "panel": "studio",
+    "path": "/hero",
+    "label": "Banner del inicio",
+    "description": "Imágenes y orden del carrusel principal",
+    "group": "Contenido",
+    "visible": true
+  },
+  {
+    "id": "studio-pages",
+    "panel": "studio",
+    "path": "/pages",
+    "label": "Páginas públicas",
+    "description": "Las 5 secciones principales del sitio",
+    "group": "Contenido",
+    "visible": true
+  },
+  {
+    "id": "studio-cases",
+    "panel": "studio",
+    "path": "/cases",
+    "label": "Casos de éxito",
+    "description": "Proyectos publicados",
+    "group": "Contenido",
+    "visible": true
+  },
+  {
+    "id": "studio-news",
+    "panel": "studio",
+    "path": "/news",
+    "label": "Noticias y blog",
+    "description": "Publicaciones del sitio",
+    "group": "Contenido",
+    "visible": true
+  },
+  {
+    "id": "studio-social",
+    "panel": "studio",
+    "path": "/social",
+    "label": "Redes sociales",
+    "description": "Calendario y métricas",
+    "group": "Contenido",
+    "visible": true
+  },
+  {
+    "id": "studio-newsletter",
+    "panel": "studio",
+    "path": "/newsletter",
+    "label": "Newsletter público",
+    "description": "Boletín a clientes y leads",
+    "group": "Contenido",
+    "visible": true
+  },
+  {
+    "id": "studio-contacts",
+    "panel": "studio",
+    "path": "/contacts",
+    "label": "Contactos web",
+    "description": "Formularios y leads del sitio",
+    "group": "Captación",
+    "visible": true
+  },
+  {
+    "id": "studio-leads",
+    "panel": "studio",
+    "path": "/leads",
+    "label": "Leads del sitio",
+    "description": "Prospectos que llegaron por marketing",
+    "group": "Captación",
+    "visible": true
+  },
+  {
+    "id": "lab-home",
+    "panel": "lab",
+    "path": "/",
+    "label": "Lab home",
+    "description": "Playground y feature flags",
+    "group": "Lab",
+    "visible": true
+  },
+  {
+    "id": "lab-chat",
+    "panel": "lab",
+    "path": "/chat",
+    "label": "Chat",
+    "description": "Canales y mensajes del equipo",
+    "group": "Lab",
+    "visible": true
+  },
+  {
+    "id": "lab-ai",
+    "panel": "lab",
+    "path": "/ai",
+    "label": "AI sandbox",
+    "description": "Pruebas de modelos y prompts",
+    "group": "Lab",
+    "visible": true
+  },
+  {
+    "id": "lab-flags",
+    "panel": "lab",
+    "path": "/flags",
+    "label": "Feature flags",
+    "description": "Consola ops de flags de plataforma",
+    "group": "Lab",
+    "visible": true
+  },
+  {
+    "id": "lab-health",
+    "panel": "lab",
+    "path": "/health",
+    "label": "Health API",
+    "description": "Estado de servicios",
+    "group": "Lab",
+    "visible": true
+  },
+  {
+    "id": "facilities-access",
+    "panel": "erp",
+    "path": "/facilities/access",
+    "label": "Accesos oficinas",
+    "description": "Control de accesos de sedes NEXARA",
+    "group": "Facilities",
+    "visible": true
+  },
+  {
+    "id": "integra-home",
+    "panel": "integra",
+    "path": "/",
+    "label": "Consola Ops",
+    "description": "Árbol, puertas, video y eventos en vivo",
+    "group": "Monitoreo",
+    "visible": true
+  },
+  {
+    "id": "integra-video",
+    "panel": "integra",
+    "path": "/video",
+    "label": "Video · 24h",
+    "description": "Vivo, muro y playback NVR",
+    "group": "Monitoreo",
+    "visible": true
+  },
+  {
+    "id": "integra-detection",
+    "panel": "integra",
+    "path": "/detection",
+    "label": "Detección",
+    "description": "Región, sensibilidad y ruido por cámara",
+    "group": "Monitoreo",
+    "visible": true
+  },
+  {
+    "id": "integra-events",
+    "panel": "integra",
+    "path": "/events",
+    "label": "Eventos Face",
+    "description": "Accesos ACS con nombre y foto",
+    "group": "Monitoreo",
+    "visible": true
+  },
+  {
+    "id": "integra-alarms",
+    "panel": "integra",
+    "path": "/alarms",
+    "label": "Alarmas",
+    "description": "Búsqueda de alarmas del sitio",
+    "group": "Monitoreo",
+    "visible": true
+  },
+  {
+    "id": "integra-access",
+    "panel": "integra",
+    "path": "/access",
+    "label": "Accesos",
+    "description": "Abrir puertas y asignar privilegios",
+    "group": "Acceso",
+    "visible": true
+  },
+  {
+    "id": "integra-people",
+    "panel": "integra",
+    "path": "/people",
+    "label": "Personas",
+    "description": "Alta persona · Face ID en terminales",
+    "group": "Acceso",
+    "visible": true
+  },
+  {
+    "id": "integra-schedules",
+    "panel": "integra",
+    "path": "/schedules",
+    "label": "Horarios",
+    "description": "Cuándo y por qué puertas puede entrar cada persona",
+    "group": "Acceso",
+    "visible": true
+  },
+  {
+    "id": "integra-espacios",
+    "panel": "integra",
+    "path": "/espacios",
+    "label": "Espacios",
+    "description": "Puertas · indefinido vs temporal · uso planificado · vivo",
+    "group": "Acceso",
+    "visible": true
+  },
+  {
+    "id": "integra-attendance",
+    "panel": "integra",
+    "path": "/attendance",
+    "label": "Asistencia",
+    "description": "Puertas ACS; contraste ERP en /hr/attendance",
+    "group": "Acceso",
+    "visible": true
+  },
+  {
+    "id": "integra-visitors",
+    "panel": "integra",
+    "path": "/visitors",
+    "label": "Visitas",
+    "description": "Única · recurrente · acceso ACS limitado",
+    "group": "Acceso",
+    "visible": true
+  },
+  {
+    "id": "integra-vehicles",
+    "panel": "integra",
+    "path": "/vehicles",
+    "label": "Vehículos",
+    "description": "Flota registrada en el sitio",
+    "group": "Flota",
+    "visible": true
+  },
+  {
+    "id": "integra-anpr",
+    "panel": "integra",
+    "path": "/anpr",
+    "label": "ANPR / placas",
+    "description": "Cruces de reconocimiento vehicular",
+    "group": "Flota",
+    "visible": true
+  },
+  {
+    "id": "integra-settings",
+    "panel": "integra",
+    "path": "/settings",
+    "label": "Sitios",
+    "description": "Conexiones de plataforma y sincronización",
+    "group": "Administración",
+    "visible": true
+  },
+  {
+    "id": "integra-audit",
+    "panel": "integra",
+    "path": "/audit",
+    "label": "Auditoría",
+    "description": "Bitácora de controles y mutaciones",
+    "group": "Administración",
+    "visible": true
+  },
+  {
+    "id": "integra-map",
+    "panel": "integra",
+    "path": "/map",
+    "label": "Plano",
+    "description": "Planta con pines de puertas y cámaras",
+    "group": "Monitoreo",
+    "visible": true
+  },
+  {
+    "id": "integra-notifications",
+    "panel": "integra",
+    "path": "/notifications-center",
+    "label": "Notificaciones",
+    "description": "Alertas y avisos",
+    "group": "Mi cuenta",
+    "visible": true
+  },
+  {
+    "id": "integra-my-profile",
+    "panel": "integra",
+    "path": "/my-profile",
+    "label": "Mi perfil",
+    "description": "Cuenta y preferencias",
+    "group": "Mi cuenta",
+    "visible": true
+  }
+]
