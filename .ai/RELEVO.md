@@ -9,36 +9,29 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Acomodado total NEXARA (sin duplicados)
+## Este turno — Roles dinámicos (árbol IAM)
 
 ### Hecho
 
-1. **8 paneles en switcher** (`access-matrix.ts`): NEXARA Core, Contabilidad (`finance`), RRHH (`hr`), Operaciones corporativas, CRM, Integra, Studio, Nexara Desarrollo. `routePanel` mantiene URLs canónicas bajo `/erp/...`.
-2. **Shell dinámico:** `shell-panel.ts` + `erp/layout.tsx` + `cross-panel-handoff.ts` — Contabilidad/RRHH/OPS-asistencia según pathname.
-3. **Menú operativo vs avanzado:** `nav-mode.ts` + toggle en AppShell (`nxNavMode`).
-4. **Fusiones UI:**
-   - Reuniones › Agenda (calendar redirect + `PersonalCalendar`)
-   - RRHH rail: plantilla / organigrama / incidencias / KPIs (sin asistencia)
-   - OPS Asistencia rail: checadas + comidas
-   - CRM Pipeline rail: lista + kanban
-   - Soporte inbox + SLA; Vehículos + GPS
-5. **Dedup menú:** facilities → Integra; ops-service-clients → CRM clients (redirects).
-6. **Copy/defaults:** Catálogo CRM sin KPIs stock; Almacén default Inventario; Conta default Pólizas; glosario «Una verdad por dominio» en architecture + `domain-truths.ts`.
-7. Layouts thin `(panels)/finance` y `(panels)/hr` + redirects índice.
-8. `tsc` web OK.
+1. **Modelo:** `User.moduleAccess` JSON + migración `20260911190000_user_module_access`.
+2. **Catálogo UI:** `apps/web/lib/access-tree.ts` — Core/Contabilidad/RRHH/OPS/CRM/Integra/Studio; pares OPS con Supervisa|Entrega|Ambas|Off.
+3. **UI:** `UserAccessTree` en `/erp/users` (crear/editar) debajo del rol.
+4. **API:** PATCH/create aceptan `moduleAccess`; `GET roles/:id/nav-preview`; `MeService` aplica overrides sin ampliar techo del rol (`module-access-merge.ts`).
+5. **Runtime:** `moduleAccess` en sesión/JWT profile; `resolveOpsPairNav` + sidebar respetan overrides (incl. ambas).
+6. `tsc` web + api OK.
 
 ### Verificar
 
-- Switcher: Core / Contabilidad / RRHH / Operaciones…
-- Toggle Operativo↔Avanzado en topbar
-- `/erp/reuniones?tab=agenda`, `/erp/hr`, `/erp/hr/attendance`, `/crm/opportunities`
-- `/erp/facilities/access` → Integra; `/ops/service-clients` → CRM clients
+- Migrar DB: `cd apps/api; npx prisma migrate deploy` (o `migrate dev`).
+- `/erp/users` → editar Juanito → cambiar Actividades a Entrega → guardar → re-login Juanito y ver menú OPS.
+- Rol sigue siendo techo: no se puede activar Contabilidad si el rol no la tiene.
 
 ### A medias / siguiente
 
-- Opcional: páginas catch-all bajo `/finance/*` y `/hr/*` (hoy se navega por URLs `/erp/...` con shell correcto).
-- Hard-delete Nest/Prisma de módulos absorbidos = ola Claude Max.
+- Aplicar migración en local/prod.
+- Opcional: mismo árbol al editar plantillas de rol (ola 2).
+- Ampliar privilegios por encima del rol = no en esta ola.
 
 ## No tocar
 
-Puente NAS. Credenciales. Plan file. No fingir EN VIVO.
+Puente NAS. Credenciales. Plan acomodado. No fingir EN VIVO.

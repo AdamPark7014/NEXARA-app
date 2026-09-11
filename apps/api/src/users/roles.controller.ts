@@ -9,7 +9,9 @@ import { PERMISSIONS } from '../common/permissions.js';
 
 import { ORG_ROLE_TEMPLATES } from '../common/org-roles.js';
 import { buildRoleData, resolveTemplateOrThrow } from './role-template.js';
-import { buildRoleAccessSummary } from './role-access-summary.js';
+import { buildRoleAccessSummary, resolveMatrixKey } from './role-access-summary.js';
+import { listAllowedUrls } from '../common/rbac/url-matrix.js';
+import { deriveModuleKeysFromPaths } from '../me/navigation-module-map.js';
 
 @Controller('roles')
 export class RolesController {
@@ -136,6 +138,29 @@ export class RolesController {
     }));
   }
 
+  /** Preview de webModuleIds de la plantilla (para el árbol IAM al elegir rol). */
+  @Get(':id/nav-preview')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ROLES_MANAGE, PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  async navPreview(@Param('id') id: string) {
+    const roleId = Number(id);
+    if (!Number.isInteger(roleId) || roleId <= 0) {
+      throw new BadRequestException('id de rol inválido');
+    }
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+      select: { id: true, nombre: true, orgRoleKey: true },
+    });
+    if (!role) throw new BadRequestException('Rol no encontrado');
+    const roleKey = resolveMatrixKey(role.orgRoleKey, null);
+    if (!roleKey) {
+      return { roleId: role.id, roleKey: null, webModuleIds: [] as string[] };
+    }
+    const paths = listAllowedUrls(roleKey).map((r) => r.path);
+    const { webModuleIds } = deriveModuleKeysFromPaths(paths);
+    return { roleId: role.id, roleKey, webModuleIds };
+  }
+
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ROLES_MANAGE] })
@@ -172,4 +197,6 @@ export class RolesController {
 
     return this.prisma.role.delete({ where: { id: roleId } });
   }
+
+
 }

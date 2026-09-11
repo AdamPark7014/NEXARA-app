@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { parseModuleAccess } from '../me/module-access-merge.js';
 import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ChatService } from '../chat/chat.service.js';
@@ -658,6 +659,12 @@ export class UsersService {
             passwordHash: hash,
             passwordChangedAt: new Date(),
             managerId: await this.resolveManagerId(createUserDto.managerId, tx, tenantId),
+            moduleAccess:
+              createUserDto.moduleAccess === undefined
+                ? undefined
+                : createUserDto.moduleAccess === null
+                  ? Prisma.DbNull
+                  : (parseModuleAccess(createUserDto.moduleAccess) as object | null) ?? Prisma.DbNull,
           },
         });
 
@@ -1086,6 +1093,12 @@ export class UsersService {
     if (data.avatarUrl !== undefined) {
       const normalizedAvatar = String(data.avatarUrl ?? '').trim();
       data.avatarUrl = normalizedAvatar ? normalizedAvatar : null;
+    }
+    if (data.moduleAccess !== undefined) {
+      data.moduleAccess =
+        data.moduleAccess === null
+          ? Prisma.DbNull
+          : (parseModuleAccess(data.moduleAccess) as object | null) ?? Prisma.DbNull;
     }
 
     try {

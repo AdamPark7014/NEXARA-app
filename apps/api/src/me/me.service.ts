@@ -3,6 +3,7 @@ import { AuthService } from '../auth/auth.service.js';
 import { listAllowedUrls, type UrlRule } from '../common/rbac/url-matrix.js';
 import { ALL_ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { deriveModuleKeysFromPaths } from './navigation-module-map.js';
+import { applyModuleAccessOverrides, parseModuleAccess } from './module-access-merge.js';
 
 /** Prefijo de panel web → PanelId móvil / hub. */
 const PANEL_PREFIXES: Array<{ prefix: string; panel: string }> = [
@@ -30,11 +31,15 @@ export class MeService {
     const rules: UrlRule[] = roleKey ? listAllowedUrls(roleKey) : [];
     const paths = rules.map((r) => r.path);
     const panels = this.derivePanels(paths);
-    const { moduleKeys, webModuleIds } = deriveModuleKeysFromPaths(paths);
+    const derived = deriveModuleKeysFromPaths(paths);
+    const moduleAccess = parseModuleAccess((profile as any)?.moduleAccess);
+    const webModuleIds = applyModuleAccessOverrides(derived.webModuleIds, moduleAccess);
+    const moduleKeys = derived.moduleKeys;
 
     return {
       roleKey: roleKeyRaw ?? null,
       orgRoleKey: profile?.orgRoleKey ?? null,
+      moduleAccess,
       panels,
       paths,
       /** Claves Android ModuleCatalog — fuente para menú nativo. */

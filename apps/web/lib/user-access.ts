@@ -58,6 +58,7 @@ import {
 export type UserAccessInput = RoleMappingUserInput & {
   email?: string | null;
   isPlatformOwner?: boolean;
+  moduleAccess?: Record<string, string> | null;
 };
 
 const V2_PANEL_TO_ID: Record<PanelKey, PanelId> = {

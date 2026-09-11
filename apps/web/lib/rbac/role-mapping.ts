@@ -15,6 +15,8 @@ export type UserAccessInput = {
   email?: string | null;
   isSuperAdmin?: boolean;
   isPlatformOwner?: boolean;
+  /** Overrides IAM por módulo (supervise/deliver/both/on/off). */
+  moduleAccess?: Record<string, string> | null;
 };
 
 /** Resuelve el roleKey RBAC v2 efectivo del usuario. */

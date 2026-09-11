@@ -99,6 +99,13 @@ const OPS_UNIFIED_COPY: Record<OpsNavPair, { team: { label: string; description:
 };
 
 /** ¿Vista de equipo, propia o sin acceso para un par OPS? */
+const OPS_PAIR_ACCESS_KEY: Record<OpsNavPair, string> = {
+  activities: 'ops-activities',
+  evidences: 'ops-activities',
+  viatics: 'ops-viatics',
+  vehicles: 'ops-vehicles',
+};
+
 export function resolveOpsPairNav(
   user: UserAccessInput | null | undefined,
   pair: OpsNavPair,
@@ -106,6 +113,12 @@ export function resolveOpsPairNav(
   const v2 = resolveV2RoleKey(user);
   if (!v2) return null;
   if (user?.isSuperAdmin) return 'team';
+
+  const override = user?.moduleAccess?.[OPS_PAIR_ACCESS_KEY[pair]];
+  if (override === 'off') return null;
+  if (override === 'supervise') return 'team';
+  if (override === 'deliver') return 'self';
+  if (override === 'both') return 'team';
 
   switch (pair) {
     case 'activities':
@@ -222,11 +235,17 @@ export function shouldShowModuleInSidebar(
   }
 
   switch (module.id as ModuleId) {
-    case 'ops-activities':
+    case 'ops-activities': {
+      const ov = user?.moduleAccess?.['ops-activities'];
+      if (ov === 'both') return true;
       return resolveOpsPairNav(user, 'activities') === 'team';
-    case 'ops-my-activities':
-      if (EXECUTIVE.has(v2)) return false;
+    }
+    case 'ops-my-activities': {
+      if (EXECUTIVE.has(v2) && user?.moduleAccess?.['ops-activities'] !== 'both' && user?.moduleAccess?.['ops-activities'] !== 'deliver') return false;
+      const ov = user?.moduleAccess?.['ops-activities'];
+      if (ov === 'both' || ov === 'deliver') return true;
       return resolveOpsPairNav(user, 'activities') === 'self';
+    }
     case 'ops-evidences':
     case 'ops-my-evidences':
       // Evidencias integradas en Actividades (pestaña) — no duplicar menú.
@@ -236,11 +255,17 @@ export function shouldShowModuleInSidebar(
     case 'ops-my-viatics':
       if (EXECUTIVE.has(v2)) return false;
       return resolveViaticsSidebarHome(user) === 'ops-self';
-    case 'ops-vehicles':
+    case 'ops-vehicles': {
+      const ov = user?.moduleAccess?.['ops-vehicles'];
+      if (ov === 'both') return true;
       return resolveOpsPairNav(user, 'vehicles') === 'team';
-    case 'ops-my-vehicles':
-      if (EXECUTIVE.has(v2)) return false;
+    }
+    case 'ops-my-vehicles': {
+      if (EXECUTIVE.has(v2) && user?.moduleAccess?.['ops-vehicles'] !== 'both' && user?.moduleAccess?.['ops-vehicles'] !== 'deliver') return false;
+      const ov = user?.moduleAccess?.['ops-vehicles'];
+      if (ov === 'both' || ov === 'deliver') return true;
       return resolveOpsPairNav(user, 'vehicles') === 'self';
+    }
     case 'ops-gps':
       return isOpsManager(v2);
     case 'ops-tools':
