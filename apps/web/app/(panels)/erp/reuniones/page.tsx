@@ -52,12 +52,15 @@ import {
   type MeetingRow,
   type MeetingType,
 } from "@/lib/meetings-api";
+import PersonalCalendar from "@/components/calendar/PersonalCalendar";
+import { useSearchParams } from "next/navigation";
 
-type Tab = "mios" | "reuniones" | "vencidos" | "lecciones";
+type Tab = "mios" | "reuniones" | "vencidos" | "lecciones" | "agenda";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "mios", label: "Mis acuerdos" },
   { id: "reuniones", label: "Reuniones" },
+  { id: "agenda", label: "Agenda" },
   { id: "vencidos", label: "Vencidos" },
   { id: "lecciones", label: "Lecciones aprendidas" },
 ];
@@ -91,7 +94,13 @@ export default function ReunionesPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
 
-  const [tab, setTab] = useState<Tab>("mios");
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get("tab") as Tab | null);
+  const [tab, setTab] = useState<Tab>(
+    initialTab && ["mios", "reuniones", "vencidos", "lecciones", "agenda"].includes(initialTab)
+      ? initialTab
+      : "mios",
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -354,6 +363,8 @@ export default function ReunionesPage() {
         <Section title="Cargando…">
           <p style={{ color: "var(--muted-foreground)", fontSize: 13 }}>Un momento.</p>
         </Section>
+      ) : tab === "agenda" ? (
+        <PersonalCalendar />
       ) : tab === "mios" ? (
         <Section
           title="Lo que me toca"

@@ -16,7 +16,7 @@ import { attendanceMapUrl } from "@/lib/gps-map-links";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import HybridAttendancePanel from "@/components/HybridAttendancePanel";
 import { EnSitioStrip } from "@/components/presence/EnSitioStrip";
-import HrModuleRail from "@/components/hr/HrModuleRail";
+import OpsAttendanceRail from "@/components/ops/OpsAttendanceRail";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import ListExportActions from "@/components/ui/ListExportActions";
@@ -664,7 +664,7 @@ export default function AttendancePage() {
         ) : undefined}
       />
 
-      <HrModuleRail />
+      <OpsAttendanceRail />
 
       {(viewMode === "manage" || viewMode === "manage_register") && (
         <div style={{ marginBottom: 16 }}>

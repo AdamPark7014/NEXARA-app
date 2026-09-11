@@ -15,6 +15,7 @@ import {
   type PanelId,
   type SidebarGroup,
 } from '@/lib/access-matrix';
+import { sortSidebarGroups } from '@/lib/nav-mode';
 import { resolveOrgRoleKey, type OrgRoleKey } from '@/lib/org-roles';
 import {
   adaptModulePresentation,
@@ -119,8 +120,7 @@ function canUserAccessModule(user: UserAccessInput, module: ModuleEntry): boolea
 
 /** URL canónica de un módulo (respeta path adaptado por rol en sidebar/paleta). */
 export function getModuleEntryUrl(module: ModuleEntry): string {
-  const p = module.path ?? '/';
-  return `/${module.panel}${p === '/' ? '' : p.startsWith('/') ? p : `/${p}`}`;
+  return getModuleUrl(module.id);
 }
 
 /** Sidebar filtrado con las mismas reglas que el guard de ruta. */
@@ -160,11 +160,7 @@ export function buildUserSidebar(
       title,
       items: list,
     }));
-    if (panel === 'erp') {
-      const { sortSidebarGroups } = require('@/lib/nav-mode') as typeof import('@/lib/nav-mode');
-      return sortSidebarGroups(groups);
-    }
-    return groups;
+    return sortSidebarGroups(groups, panel);
   }
 
   return buildSidebar(panel, orgKey, false);
@@ -194,7 +190,8 @@ export function canUserAccessPanel(
   if (user.isSuperAdmin) return true;
 
   const v2 = resolveV2RoleKey(user);
-  if (v2) {
+  // finance/hr usan URLs canónicas /erp/... — no exigir PAGE_MATRIX /finance|/hr
+  if (v2 && panel !== 'finance' && panel !== 'hr') {
     const prefix = `/${panel}`;
     const rules = PAGE_MATRIX[v2] ?? [];
     const hasPanelRules = rules.some(
@@ -215,7 +212,10 @@ export function getUserPanelEntryPath(
   if (!user) return null;
   if (user.isSuperAdmin) {
     const meta = PANEL_META[panel];
-    return `/${panel}${meta.entryPath === '/' ? '' : meta.entryPath}`;
+    const entry = meta.entryPath || '/';
+    // finance/hr guardan entryPath canónico absoluto (/erp/...)
+    if (/^\/(erp|crm|ops|studio|lab|integra)(\/|$)/.test(entry)) return entry;
+    return `/${panel}${entry === '/' ? '' : entry}`;
   }
 
   const sidebar = buildUserSidebar(panel, user);
@@ -301,7 +301,7 @@ export function getUserHomePanel(user: UserAccessInput | null | undefined): Pane
 
   const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
   const url = getOrgHomeUrl(orgKey, false, resolveIsPlatformOwner(user), isTechnicalSuperAdmin(user));
-  const match = url.match(/^\/(erp|crm|ops|studio|lab|integra)/);
+  const match = url.match(/^\/(erp|finance|hr|crm|ops|studio|lab|integra)/);
   return (match?.[1] as PanelId) ?? 'erp';
 }
 

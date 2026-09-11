@@ -114,7 +114,7 @@ export default function WarehousePage() {
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
   const [savingWarehouse, setSavingWarehouse] = useState(false);
 
-  const [tab, setTab] = useState<TabKey>("dashboard");
+  const [tab, setTab] = useState<TabKey>("inventario");
   const [insights, setInsights] = useState<InventoryInsights | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
 

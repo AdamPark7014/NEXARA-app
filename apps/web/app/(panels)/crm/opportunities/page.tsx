@@ -6,6 +6,7 @@ import { toast } from "@/components/Toast";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
+import CrmPipelineRail from "@/components/crm/CrmPipelineRail";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";

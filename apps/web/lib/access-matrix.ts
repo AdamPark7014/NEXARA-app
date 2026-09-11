@@ -7,9 +7,11 @@
  * middlewares, guards backend, paleta de comandos, switcher de paneles)
  * consume esta matriz — nunca duplica reglas en otro lado.
  *
- * Modelo de 6 paneles:
+ * Modelo de 8 paneles:
  *
- *   ERP     ·  Operación administrativa, finanzas, RH, almacén, compras, BI, gobierno.
+ *   ERP     ·  Gobierno, inventario y operación administrativa.
+ *   FINANCE ·  Contabilidad, facturación, bancos, viáticos/gastos admin.
+ *   HR      ·  Plantilla, incidencias, organigrama.
  *   CRM     ·  Pipeline comercial puro (leads, oportunidades, cotizaciones, clientes).
  *   OPS     ·  Operación de campo, NOC, soporte, mantenimiento, ingenieros, evidencias.
  *   STUDIO  ·  Sitio público, marketing, redes, newsletter, casos de éxito, catálogo público.
@@ -25,7 +27,7 @@ import { ORG_ROLE_KEYS, type OrgRoleKey } from "@/lib/org-roles";
 import { ROLES, type RoleKey } from "@/lib/rbac/roles";
 
 // ─────────────────────────────────────────────────────────────────────
-// 5 PANELES CONSOLIDADOS
+// 8 PANELES CONSOLIDADOS
 // ─────────────────────────────────────────────────────────────────────
 
 export const PANELS = {
@@ -35,6 +37,8 @@ export const PANELS = {
   STUDIO: "studio",
   LAB: "lab",
   INTEGRA: "integra",
+  FINANCE: "finance",
+  HR: "hr",
 } as const;
 
 export type PanelId = (typeof PANELS)[keyof typeof PANELS];
@@ -59,11 +63,29 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
   [PANELS.ERP]: {
     id: PANELS.ERP,
     publicSubdomain: "core",
-    name: "NEXARA ERP",
-    tagline: "Administración, finanzas, RH y gobierno corporativo",
+    name: "NEXARA Core",
+    tagline: "Gobierno, inventario y operación administrativa",
     accent: "#0ea5e9",
     icon: "⚙️",
     entryPath: "/executive",
+  },
+  [PANELS.FINANCE]: {
+    id: PANELS.FINANCE,
+    publicSubdomain: "contabilidad",
+    name: "Contabilidad",
+    tagline: "Facturación, pólizas y bancos",
+    accent: "#059669",
+    icon: "💰",
+    entryPath: "/erp/accounting",
+  },
+  [PANELS.HR]: {
+    id: PANELS.HR,
+    publicSubdomain: "people",
+    name: "RRHH",
+    tagline: "Plantilla, incidencias y organigrama",
+    accent: "#7c3aed",
+    icon: "👥",
+    entryPath: "/erp/hr",
   },
   [PANELS.CRM]: {
     id: PANELS.CRM,
@@ -77,7 +99,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
   [PANELS.OPS]: {
     id: PANELS.OPS,
     publicSubdomain: "ops",
-    name: "NEXARA OPS",
+    name: "Operaciones corporativas",
     tagline: "Campo, NOC, soporte y mantenimiento",
     accent: "#f97316",
     icon: "🚀",
@@ -95,7 +117,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
   [PANELS.LAB]: {
     id: PANELS.LAB,
     publicSubdomain: "lab",
-    name: "NEXARA LAB",
+    name: "Nexara Desarrollo",
     tagline: "Sandbox técnico, API health y feature flags",
     accent: "#64748b",
     icon: "🧪",
@@ -119,8 +141,11 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
 
 export const LEGACY_PANEL_MAP: Record<string, PanelId> = {
   console: PANELS.ERP,
-  contabilidad: PANELS.ERP,
-  people: PANELS.ERP,
+  contabilidad: PANELS.FINANCE,
+  finance: PANELS.FINANCE,
+  people: PANELS.HR,
+  hr: PANELS.HR,
+  rh: PANELS.HR,
   operacion: PANELS.OPS,
   noc: PANELS.OPS,
   support: PANELS.OPS,
@@ -254,6 +279,8 @@ export type ModuleId =
 export type ModuleEntry = {
   id: ModuleId;
   panel: PanelId;
+  /** Si se define, getModuleUrl usa este panel como prefijo de URL en vez de `panel`. */
+  routePanel?: PanelId;
   /** Ruta canónica dentro del panel (sin prefijo /erp, /crm, etc.). */
   path: string;
   /** Nombre mostrado en sidebar/menú. */
@@ -328,39 +355,39 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   // ════════════════════════════════════════════════════════════════
   executive: {
     id: "executive", panel: PANELS.ERP, path: "/executive",
-    label: "Vista ejecutiva", description: "KPIs cross-módulo del negocio",
+    label: "Hoy", description: "KPIs cross-módulo del negocio",
     icon: "📊", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL],
-    group: "Tablero", visible: true,
+    group: "Hoy", visible: true,
   },
   dashboard: {
     id: "dashboard", panel: PANELS.ERP, path: "/dashboard",
     label: "Resumen general", description: "Tu día en NEXARA",
     icon: "🏠", allowedRoles: ANY_INTERNAL,
-    group: "Tablero", visible: true,
+    group: "Hoy", visible: true,
   },
   chat: {
     id: "chat", panel: PANELS.ERP, path: "/chat",
     label: "Chat", description: "Canales, DMs y colaboración en tiempo real",
     icon: "💬", allowedRoles: ANY_INTERNAL,
-    group: "Tablero", visible: true,
+    group: "Hoy", visible: true,
   },
   reuniones: {
     id: "reuniones", panel: PANELS.ERP, path: "/reuniones",
     label: "Reuniones", description: "Ritmo operativo, acuerdos y lecciones aprendidas",
     icon: "📅", allowedRoles: ANY_INTERNAL,
-    group: "Tablero", visible: true,
+    group: "Hoy", visible: true,
   },
   approvals: {
     id: "approvals", panel: PANELS.ERP, path: "/approvals",
     label: "Aprobaciones", description: "Flujo de aprobaciones jerárquicas",
     icon: "🛡️", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL, R.SALES_MANAGER, R.PROJECT_MANAGER, R.WAREHOUSE_MANAGER, R.ACCOUNTANT],
-    group: "Tablero", visible: true,
+    group: "Hoy", visible: true,
   },
   bi: {
     id: "bi", panel: PANELS.ERP, path: "/analytics/bi",
     label: "Analítica", description: "Tableros y reportes del negocio",
     icon: "📈", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL, R.SALES_MANAGER, R.PROJECT_MANAGER],
-    group: "Tablero", visible: true,
+    group: "Hoy", visible: true,
   },
 
   // ── Gobierno corporativo ──
@@ -397,37 +424,37 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
 
   // ── Finanzas ──
   accounting: {
-    id: "accounting", panel: PANELS.ERP, path: "/accounting",
+    id: "accounting", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/accounting",
     label: "Contabilidad", description: "Pólizas, períodos y reportes",
     icon: "📒", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },
   invoicing: {
-    id: "invoicing", panel: PANELS.ERP, path: "/invoicing",
+    id: "invoicing", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/invoicing",
     label: "Facturación CFDI", description: "Timbrado, cancelaciones y cobranza",
     icon: "🧾", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },
   banking: {
-    id: "banking", panel: PANELS.ERP, path: "/banking",
+    id: "banking", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/banking",
     label: "Bancos", description: "Movimientos, pagos y conciliación",
     icon: "🏦", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },
   "viatics-admin": {
-    id: "viatics-admin", panel: PANELS.ERP, path: "/finance/viatics",
+    id: "viatics-admin", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/finance/viatics",
     label: "Viáticos", description: "Comprobación y autorización de viáticos",
     icon: "💸", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ACCOUNTANT, R.PROJECT_MANAGER, R.ADMIN_STAFF],
     group: "Finanzas", visible: true,
   },
   "expenses-admin": {
-    id: "expenses-admin", panel: PANELS.ERP, path: "/finance/expenses",
+    id: "expenses-admin", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/finance/expenses",
     label: "Gastos", description: "Captura y autorización de gastos",
     icon: "💳", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },
   "employee-payments": {
-    id: "employee-payments", panel: PANELS.ERP, path: "/finance/employee-payments",
+    id: "employee-payments", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/finance/employee-payments",
     label: "Pagos a personal", description: "Dispersiones internas (no CFDI nómina)",
     icon: "💼", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.ACCOUNTANT, R.HR_SPECIALIST],
     group: "Finanzas", visible: true,
@@ -435,37 +462,37 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
 
   // ── RH y personas ──
   hr: {
-    id: "hr", panel: PANELS.ERP, path: "/hr",
+    id: "hr", panel: PANELS.HR, routePanel: PANELS.ERP, path: "/hr",
     label: "Plantilla RRHH", description: "Colaboradores, vacaciones e incidencias",
     icon: "👥", allowedRoles: HR_TEAM,
     group: "Personas", visible: true,
   },
   attendance: {
-    id: "attendance", panel: PANELS.ERP, path: "/hr/attendance",
-    label: "Asistencia", description: "Checador ERP + contraste ACS Integra",
+    id: "attendance", panel: PANELS.OPS, routePanel: PANELS.ERP, path: "/hr/attendance",
+    label: "Asistencia", description: "Checador laboral",
     icon: "⏰", allowedRoles: SELF_ATTENDANCE_TEAM,
     group: "Personas", visible: true,
   },
   "lunch-breaks": {
-    id: "lunch-breaks", panel: PANELS.ERP, path: "/hr/lunch-breaks",
+    id: "lunch-breaks", panel: PANELS.OPS, routePanel: PANELS.ERP, path: "/hr/lunch-breaks",
     label: "Comidas y descansos", description: "Registro y control de pausas",
     icon: "🥪", allowedRoles: SELF_ATTENDANCE_TEAM,
     group: "Personas", visible: true,
   },
   fines: {
-    id: "fines", panel: PANELS.ERP, path: "/hr/fines",
-    label: "Incidencias", description: "Multas y faltas administrativas",
+    id: "fines", panel: PANELS.HR, routePanel: PANELS.ERP, path: "/hr/fines",
+    label: "Multas e incidencias", description: "Sanciones administrativas del personal",
     icon: "⚠️", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST],
     group: "Personas", visible: true,
   },
   orgchart: {
-    id: "orgchart", panel: PANELS.ERP, path: "/hr/orgchart",
+    id: "orgchart", panel: PANELS.HR, routePanel: PANELS.ERP, path: "/hr/orgchart",
     label: "Organigrama", description: "Jerarquía y reportes",
     icon: "🌳", allowedRoles: ANY_INTERNAL,
     group: "Personas", visible: true,
   },
   "kpis-hr": {
-    id: "kpis-hr", panel: PANELS.ERP, path: "/hr/kpis",
+    id: "kpis-hr", panel: PANELS.HR, routePanel: PANELS.ERP, path: "/hr/kpis",
     label: "KPIs de personas", description: "Productividad y desempeño por área",
     icon: "📊", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST],
     group: "Personas", visible: true,
@@ -474,15 +501,15 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   // ── Almacén y compras ──
   warehouse: {
     id: "warehouse", panel: PANELS.ERP, path: "/warehouse",
-    label: "Almacén", description: "Entradas, salidas, stock y mínimos",
+    label: "Inventario", description: "Entradas, salidas, stock y mínimos",
     icon: "📦", allowedRoles: WAREHOUSE_TEAM,
-    group: "Logística", visible: true,
+    group: "Inventario", visible: true,
   },
   procurement: {
     id: "procurement", panel: PANELS.ERP, path: "/procurement",
     label: "Compras", description: "Requisiciones, OC y proveedores",
     icon: "🛒", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.PROCUREMENT_OFFICER, R.WAREHOUSE_MANAGER, R.ADMIN_STAFF],
-    group: "Logística", visible: true,
+    group: "Inventario", visible: true,
   },
   documents: {
     id: "documents", panel: PANELS.ERP, path: "/documents",
@@ -499,10 +526,10 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     group: "Auditoría", visible: true,
   },
   exports: {
-    id: "exports", panel: PANELS.ERP, path: "/exports",
+    id: "exports", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/exports",
     label: "Exportaciones", description: "Reportes Excel/PDF globales",
     icon: "📥", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL, R.ACCOUNTANT],
-    group: "Auditoría", visible: true,
+    group: "Finanzas", visible: true,
   },
   "notifications-center": {
     id: "notifications-center", panel: PANELS.ERP, path: "/notifications-center",
@@ -512,7 +539,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   news: {
     id: "news", panel: PANELS.ERP, path: "/news",
-    label: "Comunicados", description: "Boletín interno y métricas de lectura",
+    label: "Comunicados internos", description: "Boletín interno y métricas de lectura",
     icon: "📰", allowedRoles: ADMIN_PLUS,
     group: "Auditoría", visible: true,
   },
@@ -556,11 +583,11 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "crm-opportunities", panel: PANELS.CRM, path: "/opportunities",
     label: "Oportunidades", description: "Negocios en proceso",
     icon: "🎯", allowedRoles: SALES_TEAM,
-    group: "Pipeline", visible: true,
+    group: "Pipeline", visible: false,
   },
   "crm-pipeline": {
     id: "crm-pipeline", panel: PANELS.CRM, path: "/pipeline",
-    label: "Kanban del pipeline", description: "Vista visual por etapa",
+    label: "Pipeline", description: "Lista y kanban de oportunidades",
     icon: "📊", allowedRoles: SALES_TEAM,
     group: "Pipeline", visible: true,
   },
@@ -580,7 +607,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "crm-products": {
     id: "crm-products", panel: PANELS.CRM, path: "/products",
-    label: "Catálogo de productos", description: "SKUs, precios y stock",
+    label: "Catálogo", description: "Precios y SKUs para cotizar. El stock físico está en Core › Inventario.",
     icon: "📦", allowedRoles: [...SALES_TEAM, R.WAREHOUSE_MANAGER, R.DESIGNER],
     group: "Catálogo y clientes", visible: true,
   },
@@ -712,7 +739,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "ops-gps", panel: PANELS.OPS, path: "/gps",
     label: "GPS en vivo", description: "Rastreo de cuadrillas",
     icon: "📍", allowedRoles: OPS_LEADS,
-    group: "Campo", visible: true,
+    group: "Campo", visible: false,
   },
   "ops-tools": {
     id: "ops-tools", panel: PANELS.OPS, path: "/tools",
@@ -764,7 +791,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "ops-support-sla", panel: PANELS.OPS, path: "/support/sla",
     label: "SLA y tiempos", description: "Cumplimiento por contrato",
     icon: "⏱️", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.MAINTENANCE_COORDINATOR, R.SUPPORT_AGENT, R.NOC_LEAD],
-    group: "Monitoreo y soporte", visible: true,
+    group: "Monitoreo y soporte", visible: false,
   },
 
   // ── Reclutamiento técnico (CVs) — solo lectura para PMs ──
@@ -834,7 +861,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "studio-leads": {
     id: "studio-leads", panel: PANELS.STUDIO, path: "/leads",
-    label: "Leads del sitio", description: "Prospectos que llegaron por marketing",
+    label: "Leads del sitio", description: "Captación web → se califican en CRM › Leads",
     icon: "🌐", allowedRoles: [...STUDIO_TEAM, R.SALES_MANAGER, R.SALES_REP],
     group: "Captación", visible: true,
   },
@@ -944,7 +971,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "integra-attendance": {
     id: "integra-attendance", panel: PANELS.INTEGRA, path: "/attendance",
-    label: "Asistencia", description: "Puertas ACS; contraste ERP en /hr/attendance",
+    label: "Eventos ACS", description: "Puertas ACS; contraste ERP en /hr/attendance",
     icon: "🕘", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
     group: "Acceso", visible: true,
   },
@@ -1005,7 +1032,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
 /** URL absoluta canónica de un módulo: `/erp/dashboard`, `/crm/leads`, etc. */
 export function getModuleUrl(moduleId: ModuleId): string {
   const m = MODULES[moduleId];
-  return joinPath(`/${m.panel}`, m.path);
+  return joinPath(`/${m.routePanel ?? m.panel}`, m.path);
 }
 
 function joinPath(prefix: string, path: string) {
@@ -1086,9 +1113,9 @@ export function canAccessUrl(
   }
 
   // 2) Rutas personales `/[panel]/my-profile` / `/[panel]/calendar` siempre permitidas
-  if (/^\/(erp|crm|ops|studio|lab|integra)\/(my-profile|calendar)(\/|$)/.test(normalized)) return true;
+  if (/^\/(erp|crm|ops|studio|lab|integra|finance|hr)\/(my-profile|calendar)(\/|$)/.test(normalized)) return true;
   // Chat corporativo — mismo módulo en los paneles, misma API/DB
-  if (/^\/(erp|crm|ops|studio|lab|integra)\/chat(\/|$)/.test(normalized)) return true;
+  if (/^\/(erp|crm|ops|studio|lab|integra|finance|hr)\/chat(\/|$)/.test(normalized)) return true;
 
   return false;
 }
@@ -1153,8 +1180,8 @@ export const ROLE_HOME_PANEL: Record<OrgRoleKey, PanelId> = {
   [R.FIELD_ENGINEER]: PANELS.OPS,
   [R.DESIGNER]: PANELS.STUDIO,
   [R.ADMIN_STAFF]: PANELS.ERP,
-  [R.ACCOUNTANT]: PANELS.ERP,
-  [R.HR_SPECIALIST]: PANELS.ERP,
+  [R.ACCOUNTANT]: PANELS.FINANCE,
+  [R.HR_SPECIALIST]: PANELS.HR,
   [R.WAREHOUSE_MANAGER]: PANELS.ERP,
   [R.PROCUREMENT_OFFICER]: PANELS.ERP,
   [R.MAINTENANCE_COORDINATOR]: PANELS.OPS,
@@ -1197,5 +1224,6 @@ export function getHomeUrl(
 
   const entry = PANEL_META[panel].entryPath;
   if (!entry || entry === "/") return `/${panel}`;
+  if (/^\/(erp|crm|ops|studio|lab|integra)(\/|$)/.test(entry)) return entry;
   return `/${panel}${entry}`;
 }

@@ -1224,3 +1224,6 @@ export function resolveModuleIdFromPath(pathname: string): ModuleId | null {
   }
   return best?.id ?? null;
 }
+
+export { DOMAIN_TRUTHS, type DomainTruth } from './domain-truths';
+

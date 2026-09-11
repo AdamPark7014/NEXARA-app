@@ -11,7 +11,7 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
-import HrModuleRail from "@/components/hr/HrModuleRail";
+import OpsAttendanceRail from "@/components/ops/OpsAttendanceRail";
 import { useUser } from "@/components/UserContext";
 import { getAttendanceViewMode } from "@/lib/user-access";
 import { getLunchBreaksSectionConfig } from "@/lib/section-views";
@@ -696,7 +696,7 @@ export default function LunchBreaksPage() {
         }
       />
 
-      <HrModuleRail />
+      <OpsAttendanceRail />
 
       {highlightId && (
         <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 8, border: "1px solid var(--nx-panel-hairline)", background: "var(--nx-panel-surface-overlay)", fontSize: 12.5 }}>

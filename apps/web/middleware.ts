@@ -278,7 +278,7 @@ export function middleware(request: NextRequest) {
   // El portal cliente (`/tickets`) tiene su propio gate dentro del layout
   // porque permite registro/login desde la misma URL.
   if (request.method === 'GET' || request.method === 'HEAD') {
-    const isPanelPath = /^\/(erp|crm|ops|studio|lab|core|sales|console|consola|contabilidad|people|operacion|noc|support|ventas|web)(\/.*)?$/.test(requestPathname);
+    const isPanelPath = /^\/(erp|finance|hr|crm|ops|studio|lab|core|sales|console|consola|contabilidad|people|operacion|noc|support|ventas|web)(\/.*)?$/.test(requestPathname);
     const accept = (request.headers.get('accept') || '').toLowerCase();
     const isHtmlNav = accept.includes('text/html');
     if (isPanelPath && isHtmlNav) {

@@ -19,6 +19,7 @@ import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import KpiCard from "@/components/ui/KpiCard";
 import { getModuleGuide } from "@/lib/module-guides";
+import { DOMAIN_TRUTHS } from "@/lib/domain-truths";
 
 const ERP_ADMIN_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
 
@@ -73,6 +74,70 @@ export default function ArchitecturePage() {
         <KpiCard label="Roles" value={Object.keys(ORG_ROLE_META).length} icon="🎭" variant="positive" />
         <KpiCard label="Vista actual" value={selectedPanel === "all" ? "Todos" : (PANEL_META[selectedPanel as PanelId]?.name ?? selectedPanel)} icon="📋" variant="default" />
       </div>
+
+      <Section
+        title="Una verdad por dominio"
+        subtitle="Canónico vs legacy/avanzado — evita duplicar datos o pantallas"
+      >
+        <ul
+          style={{
+            margin: 0,
+            padding: 0,
+            listStyle: "none",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          {DOMAIN_TRUTHS.map((row) => (
+            <li
+              key={row.canonical}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+                padding: "10px 12px",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                fontSize: 12.5,
+                lineHeight: 1.4,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: "var(--text-tertiary)",
+                    marginBottom: 4,
+                  }}
+                >
+                  Fuente de verdad
+                </div>
+                <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{row.canonical}</div>
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    color: "var(--text-tertiary)",
+                    marginBottom: 4,
+                  }}
+                >
+                  No confundir con
+                </div>
+                <div style={{ color: "var(--text-secondary)" }}>{row.alternate}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Section>
 
       {/* Módulos por panel */}
       {(() => {

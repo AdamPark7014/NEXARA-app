@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import ContextRail from "@/components/ui/ContextRail";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
@@ -180,6 +181,13 @@ export default function SupportInboxPage() {
 
   return (
     <>
+      <ContextRail
+        ariaLabel="Soporte"
+        items={[
+          { id: "inbox", label: "Inbox", href: "/ops/support", active: true },
+          { id: "sla", label: "SLA", href: "/ops/support/sla", active: false },
+        ]}
+      />
       <PageHeader
         eyebrow="OPS · Soporte"
         title="Bandeja de soporte"

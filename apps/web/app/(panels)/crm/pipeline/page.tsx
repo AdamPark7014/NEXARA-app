@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
+import CrmPipelineRail from "@/components/crm/CrmPipelineRail";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { Money, Tag } from "@/components/ui/DataTable";
@@ -99,6 +100,7 @@ export default function PipelinePage() {
 
   return (
     <>
+      <CrmPipelineRail />
       <PageHeader
         eyebrow="CRM · Pipeline"
         title={cfg.title}

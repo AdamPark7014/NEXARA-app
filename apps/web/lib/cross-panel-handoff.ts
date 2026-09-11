@@ -22,6 +22,8 @@ export const HANDOFF_PARAM = '_nxt';
 /** Panel ID → subdominio canónico (ver middleware CANONICAL_BY_INTERNAL_PREFIX). */
 export const PANEL_CANONICAL_SUBDOMAIN: Record<PanelId, string> = {
   erp: 'core',
+  finance: 'core',
+  hr: 'core',
   crm: 'sales',
   ops: 'ops',
   studio: 'studio',
@@ -35,7 +37,11 @@ const SUBDOMAIN_TO_PANEL_ID: Record<string, PanelId> = {
   app: 'erp',
   console: 'erp',
   consola: 'erp',
-  finance: 'erp',
+  finance: 'finance',
+  contabilidad: 'finance',
+  hr: 'hr',
+  people: 'hr',
+  rh: 'hr',
   sales: 'crm',
   crm: 'crm',
   ventas: 'crm',
@@ -51,6 +57,8 @@ const SUBDOMAIN_TO_PANEL_ID: Record<string, PanelId> = {
 export function panelHomeInternalPath(panelId: PanelId): string {
   const entry = PANEL_META[panelId]?.entryPath ?? '/dashboard';
   if (entry === '/' || entry === '') return `/${panelId}`;
+  // finance/hr guardan ruta canónica absoluta bajo /erp/...
+  if (/^\/(erp|crm|ops|studio|lab|integra)(\/|$)/.test(entry)) return entry;
   return `/${panelId}${entry.startsWith('/') ? entry : `/${entry}`}`;
 }
 
@@ -77,10 +85,34 @@ export function resolvePanelId(input: string): PanelId {
   return SUBDOMAIN_TO_PANEL_ID[input] ?? (input as PanelId);
 }
 
+/**
+ * Panel de shell (switcher/sidebar) según pathname canónico.
+ * Contabilidad/RRHH viven en /erp/... pero el menú es panel finance|hr;
+ * asistencia/comidas en OPS aunque la URL sea /erp/hr/attendance.
+ */
+export function resolveShellPanelFromPath(pathname?: string | null): PanelId {
+  const p = (pathname || '').split('?')[0].split('#')[0];
+  if (p === '/finance' || p.startsWith('/finance/')) return 'finance';
+  if (p === '/hr' || p.startsWith('/hr/')) return 'hr';
+  if (p.startsWith('/erp/hr/attendance') || p.startsWith('/erp/hr/lunch-breaks')) return 'ops';
+  if (p === '/erp/hr' || p.startsWith('/erp/hr/')) return 'hr';
+  if (
+    p.startsWith('/erp/accounting')
+    || p.startsWith('/erp/invoicing')
+    || p.startsWith('/erp/banking')
+    || p.startsWith('/erp/finance/')
+    || p === '/erp/exports'
+    || p.startsWith('/erp/exports/')
+  ) {
+    return 'finance';
+  }
+  return panelIdFromInternalPath(p) ?? 'erp';
+}
+
 /** Extrae el PanelId de una ruta interna `/erp/...`, `/ops/...`, etc. */
 export function panelIdFromInternalPath(path: string): PanelId | null {
   const bare = (path || "").trim().split("?")[0].split("#")[0];
-  const m = /^\/(erp|crm|ops|studio|lab|integra)(\/|$)/.exec(bare);
+  const m = /^\/(erp|finance|hr|crm|ops|studio|lab|integra)(\/|$)/.exec(bare);
   return m ? (m[1] as PanelId) : null;
 }
 
@@ -152,7 +184,7 @@ export function normalizeInternalPanelPath(panelId: PanelId, path: string): stri
     return withSlash;
   }
 
-  const foreign = /^\/(erp|crm|ops|studio|lab|integra)(\/.*)?$/.exec(withSlash);
+  const foreign = /^\/(erp|finance|hr|crm|ops|studio|lab|integra)(\/.*)?$/.exec(withSlash);
   if (foreign && foreign[1] !== panelId) {
     return home;
   }
