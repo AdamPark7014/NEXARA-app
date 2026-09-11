@@ -25,6 +25,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import CompanySwitcher from "@/components/CompanySwitcher";
+import ModuleGuideBanner from "@/components/ModuleGuideBanner";
 import { NEXARA_LOGO_MARK } from "@/lib/brand";
 import {
   MODULES,
@@ -1040,6 +1041,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
       {/* ───────── MAIN ───────── */}
       <main id="nx-main" className={`${styles.main}${isFullBleed ? ` ${styles.mainFullBleed}` : ""}`} tabIndex={-1}>
         <div className={`${styles.contentInner}${isFullBleed ? ` ${styles.contentInnerFullBleed}` : ""}`}>
+          {!isFullBleed && <ModuleGuideBanner />}
           {children}
         </div>
       </main>

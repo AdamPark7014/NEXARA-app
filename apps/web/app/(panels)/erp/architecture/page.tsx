@@ -18,6 +18,7 @@ import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import KpiCard from "@/components/ui/KpiCard";
+import { getModuleGuide } from "@/lib/module-guides";
 
 const ERP_ADMIN_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
 
@@ -56,7 +57,7 @@ export default function ArchitecturePage() {
       <PageHeader
         eyebrow="ERP · Gobierno corporativo"
         title="Arquitectura del sistema"
-        subtitle="Mapa completo de NEXARA: 5 paneles consolidados, sus módulos, los roles que los habitan y el flujo end-to-end del negocio (CCTV · Redes · Mantenimiento · Ventas)."
+        subtitle="Mapa completo de NEXARA: paneles, módulos, roles, flujo end-to-end y guías detalladas de cómo funciona cada módulo (capacitación en no-producción)."
         actions={
           <Link href="/erp/users" style={{ textDecoration: "none" }}>
             <Button variant="primary" iconLeft="🧑‍💼">
@@ -293,30 +294,61 @@ export default function ArchitecturePage() {
                       gap: 8,
                     }}
                   >
-                    {mods.map((m) => (
-                      <Link
+                    {mods.map((m) => {
+                      const guide = getModuleGuide(m.id);
+                      return (
+                      <div
                         key={m.id}
-                        href={`/${panelId}${m.path === "/" ? "" : m.path}`}
                         style={{
                           padding: "11px 12px",
                           background: "var(--surface)",
                           border: "1px solid var(--border)",
                           borderRadius: 11,
-                          textDecoration: "none",
                           color: "var(--text-primary)",
                           display: "flex",
                           flexDirection: "column",
                           gap: 4,
-                          transition: "border-color var(--nx-motion-fast) ease, transform var(--nx-motion-fast) ease",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 15 }}>{m.icon}</span>
-                          <span style={{ fontSize: 13, fontWeight: 700 }}>{m.label}</span>
-                        </div>
-                        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
-                          {m.description}
-                        </div>
+                        <Link
+                          href={`/${panelId}${m.path === "/" ? "" : m.path}`}
+                          style={{ textDecoration: "none", color: "inherit" }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 15 }}>{m.icon}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700 }}>{m.label}</span>
+                          </div>
+                          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.4, marginTop: 4 }}>
+                            {m.description}
+                          </div>
+                        </Link>
+                        {guide && (
+                          <details style={{ marginTop: 6 }}>
+                            <summary
+                              style={{
+                                cursor: "pointer",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "var(--primary)",
+                                listStyle: "none",
+                              }}
+                            >
+                              Cómo funciona (detalle)
+                            </summary>
+                            <div style={{ marginTop: 8, fontSize: 11.5, lineHeight: 1.45, color: "var(--text-secondary)" }}>
+                              <p style={{ margin: "0 0 6px" }}><strong>Resumen:</strong> {guide.summary}</p>
+                              <p style={{ margin: "0 0 6px" }}><strong>Quién:</strong> {guide.audience}</p>
+                              <p style={{ margin: "0 0 6px" }}><strong>Cómo:</strong> {guide.how}</p>
+                              <p style={{ margin: "0 0 4px" }}><strong>Pasos:</strong></p>
+                              <ol style={{ margin: "0 0 6px", paddingLeft: 16 }}>
+                                {guide.steps.map((s) => (
+                                  <li key={s} style={{ marginBottom: 3 }}>{s}</li>
+                                ))}
+                              </ol>
+                              <p style={{ margin: 0 }}><strong>Conecta:</strong> {guide.connects}</p>
+                            </div>
+                          </details>
+                        )}
                         <div
                           style={{
                             display: "flex",
@@ -354,8 +386,9 @@ export default function ArchitecturePage() {
                             </span>
                           )}
                         </div>
-                      </Link>
-                    ))}
+                      </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}

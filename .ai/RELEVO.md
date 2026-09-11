@@ -3,40 +3,33 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-10
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** `b2288029`
+- **HEAD:** (cerrar)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — localhost ON
+## Este turno — guías detalladas por módulo (no-prod)
 
 ### Hecho
 
-1. `npm run dev` (turbo api+web) corriendo en background.
-2. **Web** http://localhost:3000 (login `/login`, paneles `/erp` `/crm` `/ops` …) — 200.
-3. **API** http://localhost:3001 — `/api/health/live` y `/ready` 200. (`/api/health` 500 en Windows por check de disco `/` — cosmético).
-4. Postgres local `:5432` OK. Aplicadas **17 migraciones** pendientes (Integra edge/push, tickets notes, etc.).
-5. Docker Desktop **no** está arriba (no hace falta: DB nativa + `npm run dev`).
+1. **`apps/web/lib/module-guides.ts`** — 103 guías (summary, audience, how, steps, connects).
+2. **`ModuleGuideBanner`** en AppShell: banner colapsable en cada pantalla de módulo, **solo si `NODE_ENV !== 'production'`**.
+3. **`/erp/architecture`** — cada módulo tiene `<details>Cómo funciona (detalle)</details>`.
+4. Generador: `.ai/gen-module-guides.py` + `.ai/module-guides.json`.
+5. `tsc` web OK. Localhost seguía arriba.
 
-### URLs locales
+### Verificar
 
-| Qué | URL |
-|-----|-----|
-| Login | http://localhost:3000/login |
-| ERP | http://localhost:3000/erp |
-| CRM | http://localhost:3000/crm |
-| OPS | http://localhost:3000/ops |
-| API | http://localhost:3001/api |
-| Base .env | `NEXT_PUBLIC_API_URL=http://localhost:3001/api` |
-
-Nota: `*.localhost` (erp.localhost) no resuelve en ping de este Windows; usar paths `/erp` etc. o añadir hosts.
+- http://localhost:3000/ops/dashboard → banner «Guía · no producción».
+- http://localhost:3000/erp/architecture → expandir «Cómo funciona» en tarjetas.
+- En build production el banner no debe aparecer.
 
 ## A medias / siguiente
 
-- Adam va a trabajar local a fondo — stack ya prendido.
-- Opcional: arrancar Docker Desktop solo si se quiere redis compose; hoy no hay REDIS en `.env` API.
+- Ampliar guías cortas si Adam pide más profundidad en un producto concreto.
+- Opcional: regenerar PDF con el mismo JSON.
 
 ## No tocar
 
-Puente NAS. Credenciales. No fingir EN VIVO. No `git reset --hard` sin pedirlo Adam.
+Puente NAS. Credenciales. No fingir EN VIVO.

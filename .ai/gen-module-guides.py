@@ -1,0 +1,946 @@
+# -*- coding: utf-8 -*-
+"""Genera apps/web/lib/module-guides.ts — guías detalladas por módulo (no inventar features)."""
+from __future__ import annotations
+import json
+from pathlib import Path
+from textwrap import dedent
+
+ROOT = Path(r"C:\dev\apps\NEXARA-app")
+CATALOG = json.loads((ROOT / ".ai" / "modules-catalog.json").read_text(encoding="utf-8"))
+OUT_TS = ROOT / ".ai" / "drafts" / "module-guides.ts"
+OUT_JSON = ROOT / ".ai" / "module-guides.json"
+
+# Guías largas (español claro). Clave = ModuleId.
+EXTRA = {
+  "executive": {
+    "summary": "Tablero de dirección con KPIs de todo el negocio en un solo lugar.",
+    "audience": "CEO, directores de admin, ops y comercial.",
+    "how": (
+      "Al entrar ves indicadores agregados: OT cerradas, pipeline comercial, contratos de mantenimiento, "
+      "y señales financieras. No se capturan datos aquí: solo se leen de OPS, CRM y finanzas. "
+      "Si un KPI sale en cero, casi siempre es porque el dato fuente (por ejemplo el estatus de una actividad) "
+      "no está en el vocabulario canónico; eso ya se unificó en el backend."
+    ),
+    "steps": [
+      "Abre /erp/executive con un rol de dirección.",
+      "Revisa cada bloque (ops, ventas, contratos) y cruza con el detalle del módulo fuente si algo no cuadra.",
+      "Usa esta vista para la junta diaria/semanal; no para operar tickets o facturas.",
+    ],
+    "connects": "activities, ventas, accounting, maintenance-contracts, analytics/sla",
+  },
+  "dashboard": {
+    "summary": "Tu día en NEXARA: pendientes personales según tu rol.",
+    "audience": "Cualquier usuario interno.",
+    "how": (
+      "A diferencia de la vista ejecutiva, el resumen general se centra en lo que TÚ debes atender: "
+      "aprobaciones, alertas y accesos frecuentes. Es el punto de aterrizaje operativo del ERP."
+    ),
+    "steps": [
+      "Entra a /erp/dashboard tras el login (según rol).",
+      "Atiende tarjetas de pendientes; cada una enlaza al módulo dueño.",
+    ],
+    "connects": "approvals, notifications-center, calendar",
+  },
+  "chat": {
+    "summary": "Mensajería interna en tiempo real (canales y mensajes directos).",
+    "audience": "Todo el personal autenticado.",
+    "how": (
+      "Los canales viven en la misma base multi-empresa. Antes de listar mensajes se valida que pertenezcas "
+      "al canal. Los tokens del portal de cliente no pueden usar este chat interno."
+    ),
+    "steps": [
+      "Abre Chat desde el panel (ERP/CRM/OPS/Studio tienen espejo).",
+      "Entra a un canal de equipo o inicia un DM.",
+      "Usa notificaciones para no perder menciones.",
+    ],
+    "connects": "notifications-center, mismo módulo en otros paneles",
+  },
+  "reuniones": {
+    "summary": "Ritmo operativo: reuniones, acuerdos con dueño y lecciones aprendidas.",
+    "audience": "Dirección, coordinadores y equipos que siguen el organigrama diario/semanal.",
+    "how": (
+      "Modela el pulso de NEXARA (planeación 10:00, cierre viernes). Un acuerdo sin responsable no sirve: "
+      "el sistema exige dueño. 'Vencido' se calcula al vuelo, no se guarda como bandera que se pudre."
+    ),
+    "steps": [
+      "Crea o abre la reunión del día.",
+      "Registra acuerdos con responsable y fecha.",
+      "Al cierre, captura lecciones/riesgos ligados al trabajo real.",
+    ],
+    "connects": "activities, projects, orgchart",
+  },
+  "approvals": {
+    "summary": "Bandeja única de aprobaciones jerárquicas (viáticos, cotizaciones, compras, cierres).",
+    "audience": "Quienes autorizan: CEO, directores, coord. ventas/ops, almacén, contabilidad.",
+    "how": (
+      "El motor WorkflowDefinition/Instance existe. Si la empresa no tiene un flujo activo para un tipo "
+      "(por ejemplo ACTIVITY_CLOSURE), no pasa nada al cerrar — es normal. Los umbrales en MXN son configurables. "
+      "Aquí ves tarjetas con monto, quien aprobó antes y adjuntos."
+    ),
+    "steps": [
+      "Abre /erp/approvals.",
+      "Revisa la tarjeta, adjuntos y monto.",
+      "Aprueba o rechaza; el siguiente escalón recibe notificación.",
+    ],
+    "connects": "viatics, cotizaciones, procurement, activity lifecycle",
+  },
+  "bi": {
+    "summary": "Analítica y tableros de negocio (lectura).",
+    "audience": "Dirección y gerencias.",
+    "how": "Capa de reportes: tendencias, aging, cohortes. No escribe transacciones. 'Hoy' usa zona México.",
+    "steps": ["Abre Analítica", "Elige el tablero del área", "Exporta si tu rol tiene exportaciones"],
+    "connects": "executive, crm-reports, warehouse insights, sla",
+  },
+  "users": {
+    "summary": "Plantilla de personal, roles v2, sesiones IAM y MFA.",
+    "audience": "Admin, RH, CEO.",
+    "how": (
+      "Aquí se dan de alta usuarios, se asigna roleKey v2 y se gestionan sesiones (lockout, force logout, MFA TOTP). "
+      "Los permisos reales de pantallas viven en url-matrix / page-matrix: cambiar solo el rol no basta si la URL no está permitida."
+    ),
+    "steps": [
+      "Alta de usuario + rol.",
+      "Verifica que pueda abrir su panel home.",
+      "Ante incidente de seguridad: force logout / revisar IAM insights.",
+    ],
+    "connects": "companies (membresía), audit, SCIM",
+  },
+  "companies": {
+    "summary": "Razones sociales y membresías multi-empresa.",
+    "audience": "CEO / Dir. Admin.",
+    "how": (
+      "Cada transacción fiscal/ops lleva companyId. El switcher de empresa en el shell cambia el contexto "
+      "(cabecera X-Company-Id). Sin membresía UserCompany no ves esa empresa."
+    ),
+    "steps": ["Administra empresas", "Asigna usuarios a empresa", "Prueba el switcher y verifica emisor CFDI"],
+    "connects": "accounting, invoicing, TenantInterceptor",
+  },
+  "settings": {
+    "summary": "Parámetros de empresa, branding, webhooks e integraciones.",
+    "audience": "CEO / Dir. Admin.",
+    "how": "Control center: feature gates del plan, webhooks outbound con HMAC y validación anti-SSRF, branding.",
+    "steps": ["Ajusta parámetros", "Configura webhooks solo a URLs públicas permitidas", "Revisa entregas fallidas / DLQ"],
+    "connects": "webhooks, billing, OIDC",
+  },
+  "architecture": {
+    "summary": "Mapa vivo de paneles, módulos y roles (esta pantalla).",
+    "audience": "Dirección y admin.",
+    "how": "Lee el registro MODULES del frontend. En no-producción también muestra la guía detallada de cada módulo.",
+    "steps": ["Filtra por panel", "Abre un módulo desde la tarjeta", "Usa las guías expandibles para capacitar al equipo"],
+    "connects": "access-matrix, module-guides",
+  },
+  "kb": {
+    "summary": "Base de conocimiento interna (procedimientos).",
+    "audience": "Todo el personal; fragmento público vía portal de ayuda.",
+    "how": "Documenta el 'cómo hacemos las cosas'. El portal de cliente enlaza un centro de ayuda derivado.",
+    "steps": ["Busca o publica un procedimiento", "Enlace desde soporte cuando el ticket es recurrente"],
+    "connects": "portal KB, support",
+  },
+  "accounting": {
+    "summary": "Contabilidad: pólizas, períodos fiscales y reportes SAT.",
+    "audience": "Contabilidad, admin, CEO.",
+    "how": (
+      "Principio: un egreso/ingreso operativo genera póliza (JournalEntry) idempotente. "
+      "Gastos/viáticos/pagos al marcar pagado → asiento. Recepción de compra → póliza de recepción. "
+      "Hay base de DIOT y XML de Balanza/Catálogo condicionados a mapeo de cuentas SAT."
+    ),
+    "steps": [
+      "Revisa períodos abiertos.",
+      "Consulta pólizas generadas desde ops/compras.",
+      "En Cumplimiento SAT, valida mapeo antes de exportar XML.",
+    ],
+    "connects": "invoicing, banking, expenses, viatics, procurement, warehouse",
+  },
+  "invoicing": {
+    "summary": "Facturación CFDI 4.0: timbrado, cancelación y cobranza AR.",
+    "audience": "Contabilidad / admin.",
+    "how": (
+      "Emite facturas con folio atómico (FolioCounter). Los impuestos se redondean por concepto para que el PAC/SAT "
+      "no rechace por un centavo. Las FKs de cliente/producto se validan contra la misma empresa. "
+      "El portal del cliente descarga solo facturas propias."
+    ),
+    "steps": ["Crea factura desde cliente/servicio", "Timbra (PAC o mock en no-prod)", "Entrega PDF/XML"],
+    "connects": "SalesClient, accounting, PAC, client-portal",
+  },
+  "banking": {
+    "summary": "Cuentas bancarias, pagos y conciliación básica.",
+    "audience": "Finanzas.",
+    "how": "Cierra el ciclo de caja con movimientos y pagos ligados a pólizas. Matching avanzado es roadmap.",
+    "steps": ["Registra cuenta", "Carga movimientos", "Conciliá pagos de facturas/nómina interna"],
+    "connects": "accounting, invoicing, employee-payments",
+  },
+  "viatics-admin": {
+    "summary": "Vista financiera de viáticos: comprobar y autorizar gastos de campo.",
+    "audience": "Admin, contabilidad, dirección; coord ops ve la variante OPS.",
+    "how": (
+      "Los viáticos son individuales (cada técnico solicita los suyos ligados a una actividad). "
+      "Cadena: campo → admin → umbrales → pagado → póliza. En el menú, finanzas ve esta versión; campo ve Mis viáticos."
+    ),
+    "steps": ["Revisa solicitud y comprobantes", "Aprueba o regresa", "Al pagar, verifica póliza en Contabilidad"],
+    "connects": "ops-viatics, approvals, accounting, activities",
+  },
+  "expenses-admin": {
+    "summary": "Gastos generales: captura, autorización y pago con póliza.",
+    "audience": "Finanzas / admin.",
+    "how": "Mismo patrón que viáticos: autorizar → pagar → JournalEntry.",
+    "steps": ["Captura o revisa gasto", "Aprueba", "Marca pagado y valida asiento"],
+    "connects": "approvals, accounting",
+  },
+  "employee-payments": {
+    "summary": "Dispersiones internas al personal (no es CFDI nómina).",
+    "audience": "Admin, RH, contabilidad.",
+    "how": (
+      "Pagos internos con póliza. Puedes calcular el monto desde minutos reales de AttendanceDay del periodo. "
+      "CFDI tipo N (nómina fiscal) está fuera de esta fase."
+    ),
+    "steps": ["Elige periodo", "Usa Calcular desde asistencia si aplica", "Autoriza y paga"],
+    "connects": "attendance, accounting, hr",
+  },
+  "hr": {
+    "summary": "Expediente de colaboradores, vacaciones e incidencias de personal.",
+    "audience": "RH, admin, CEO.",
+    "how": "Ficha del colaborador (incluye fotos de asistencia cuando existen). People Intelligence resume puntualidad y carga.",
+    "steps": ["Abre plantilla", "Entra a la ficha", "Gestiona vacaciones/incidencias"],
+    "connects": "attendance, fines, orgchart, users",
+  },
+  "attendance": {
+    "summary": "Checador ERP + contraste con accesos ACS de Integra.",
+    "audience": "Personal que marca + RH.",
+    "how": (
+      "La jornada se mide en zona México (no UTC del contenedor). Las jornadas abiertas se cortan al fin del día. "
+      "Puedes contrastar con marcas de puertas ACS. Fotos en /uploads/attendance y ficha HR."
+    ),
+    "steps": ["Marca entrada/salida", "RH revisa AttendanceDay", "Contrasta con Integra si hay discrepancia"],
+    "connects": "integra-attendance, lunch-breaks, employee-payments",
+  },
+  "lunch-breaks": {
+    "summary": "Registro de comidas y descansos dentro de la jornada.",
+    "audience": "Personal + RH.",
+    "how": "Hermano de asistencia: pausas controladas para no distorsionar minutos trabajados.",
+    "steps": ["Registra inicio/fin de comida", "RH audita abusos junto a asistencia"],
+    "connects": "attendance",
+  },
+  "fines": {
+    "summary": "Multas y faltas administrativas con estatus de pago canónico.",
+    "audience": "RH / admin.",
+    "how": "Antes 'Pagado' vs 'Pagada' partía reportes; ahora la API normaliza al escribir y tolera historial.",
+    "steps": ["Alta de multa", "Marca pagada cuando aplique", "Revisa KPIs de pagadas"],
+    "connects": "hr, employee-payments",
+  },
+  "orgchart": {
+    "summary": "Organigrama por jefe directo (managerId).",
+    "audience": "Todos (lectura); RH administra.",
+    "how": "Árbol plano de reportes. No modela aún la cadena completa Ingeniería→Arquitecto→Admin como workflow de validación.",
+    "steps": ["Consulta tu rama", "RH actualiza managerId al mover gente"],
+    "connects": "users, notification hierarchy",
+  },
+  "kpis-hr": {
+    "summary": "KPIs de personas: productividad y desempeño por área.",
+    "audience": "CEO, Dir. Admin, RH.",
+    "how": "Analítica de RH sobre asistencia, carga y tendencias.",
+    "steps": ["Abre KPIs", "Filtra por área/periodo"],
+    "connects": "hr, attendance, activities",
+  },
+  "warehouse": {
+    "summary": "Almacén: stock, ubicaciones, reservas, conteos cíclicos e inteligencia ABC.",
+    "audience": "Almacén, compras, admin, ops.",
+    "how": (
+      "StockLevel con movimientos. Reservas/descuentos son atómicos (no se vende dos veces la misma pieza). "
+      "Cycle counts ajustan stock al cerrar. StockMovement puede ligarse a activityId = material de una OT."
+    ),
+    "steps": ["Consulta existencias", "Reserva para venta/OT", "Registra salida/entrada", "Cierra conteo cíclico"],
+    "connects": "procurement, activities, crm-products",
+  },
+  "procurement": {
+    "summary": "Compras: requisición → RFQ → OC → recepción (landed cost) → stock y AP.",
+    "audience": "Compras, almacén, admin.",
+    "how": (
+      "Flujo completo con proveedores/mayoristas (crédito y precio por volumen: el crédito avisa, no bloquea). "
+      "Al recibir se prorratea flete/seguro y se actualiza costo promedio; nace póliza de recepción."
+    ),
+    "steps": ["Crea requisición/RFQ", "Adjudica → OC", "Recibe mercancía", "Revisa factura AP y stock"],
+    "connects": "warehouse, accounting, approvals",
+  },
+  "documents": {
+    "summary": "Gestión documental versionada (contratos, compliance).",
+    "audience": "Admin, RH, contabilidad, CEO.",
+    "how": "Categorías, documentos y versiones para no perder el archivo 'bueno'.",
+    "steps": ["Sube documento", "Versiona al cambiar", "Comparte enlace interno según rol"],
+    "connects": "companies, hr, crm",
+  },
+  "audit": {
+    "summary": "Bitácora de cambios sensibles y herramientas de privacidad.",
+    "audience": "CEO / Dir. Admin.",
+    "how": "MutationAuditInterceptor registra mutaciones. Hay borrado de PII (LFPDPPP/GDPR) desde IAM.",
+    "steps": ["Filtra por actor/empresa", "Exporta CSV si investigas un incidente"],
+    "connects": "users IAM",
+  },
+  "exports": {
+    "summary": "Exportaciones masivas Excel/PDF autorizadas.",
+    "audience": "Dirección y contabilidad.",
+    "how": "Salida global de reportes; respeta permisos de rol.",
+    "steps": ["Elige reporte", "Descarga archivo"],
+    "connects": "varios dominios",
+  },
+  "notifications-center": {
+    "summary": "Centro de notificaciones y alertas del usuario.",
+    "audience": "Todos.",
+    "how": "Inbox de avisos del sistema (aprobaciones, SLA, chat, etc.).",
+    "steps": ["Abre campana o centro", "Marca leídas", "Sigue el deep-link al módulo"],
+    "connects": "todos los paneles",
+  },
+  "news": {
+    "summary": "Comunicados internos con métricas de lectura.",
+    "audience": "Admin / RH publican; personal lee.",
+    "how": "Boletín interno. El portal externo no puede mutar comunicados (StaffOnlyGuard).",
+    "steps": ["Publica comunicado", "Revisa quién lo leyó"],
+    "connects": "notifications",
+  },
+  "calendar": {
+    "summary": "Agenda personal y de equipo.",
+    "audience": "Todos.",
+    "how": "Vista de tiempo que concentra reuniones, visitas y OT según permisos.",
+    "steps": ["Revisa la semana", "Abre el evento para ir al módulo dueño"],
+    "connects": "reuniones, activities, crm-agenda",
+  },
+  "my-profile": {
+    "summary": "Tu perfil, preferencias y datos personales.",
+    "audience": "Todos.",
+    "how": "Cuenta propia: datos, preferencias UI, a veces MFA.",
+    "steps": ["Actualiza datos", "Revisa preferencias de notificación"],
+    "connects": "users",
+  },
+  "facilities-access": {
+    "summary": "Control de accesos de las oficinas NEXARA (no es Integra de cliente).",
+    "audience": "Admin, ops, NOC.",
+    "how": (
+      "API /api/access-control con credenciales OFFICES_HIK_*. Frontera estricta: no mezclar con integra.nexara "
+      "(sitios de cliente). Puente LAN vía NAS Synology."
+    ),
+    "steps": ["Abre Accesos oficinas", "Consulta puertas/eventos de sede NEXARA"],
+    "connects": "distinto de /api/integra",
+  },
+  # CRM
+  "crm-dashboard": {
+    "summary": "Home comercial: pipeline, actividad del equipo e insights (LTV, forecast).",
+    "audience": "Ventas y dirección comercial.",
+    "how": "Resumen del embudo. No captura oportunidades: te manda a Leads/Oportunidades.",
+    "steps": ["Revisa KPIs del periodo", "Entra al cuello de botella del pipeline"],
+    "connects": "opportunities, quotes, targets",
+  },
+  "crm-chat": {
+    "summary": "Chat del equipo de ventas.",
+    "audience": "Equipo comercial.",
+    "how": "Misma infra de chat, contexto panel CRM.",
+    "steps": ["Coordina cotizaciones y visitas por canal"],
+    "connects": "chat",
+  },
+  "crm-leads": {
+    "summary": "Prospectos aún no calificados (incluye origen web/Studio).",
+    "audience": "Vendedores y managers.",
+    "how": "Entrada del embudo. Califica a oportunidad o descarta. Tenant companyId obligatorio.",
+    "steps": ["Revisa leads nuevos", "Califica / asigna dueño", "Convierte a oportunidad"],
+    "connects": "studio-leads, studio-contacts, crm-opportunities",
+  },
+  "crm-opportunities": {
+    "summary": "Negocios en proceso con etapas, cotizaciones y actividades comerciales.",
+    "audience": "Ventas.",
+    "how": (
+      "Corazón del CRM. Tabs: pipeline, cotizaciones, actividades (llamadas/visitas — no confundir con OT de OPS), documentos. "
+      "Al ganar, nace el handoff a proyecto de venta / OPS."
+    ),
+    "steps": ["Abre oportunidad", "Avanza etapa con evidencia", "Adjunta cotización", "Marca ganada/perdida"],
+    "connects": "quotes, pipeline, agenda, projects",
+  },
+  "crm-pipeline": {
+    "summary": "Kanban visual del mismo embudo de oportunidades.",
+    "audience": "Ventas.",
+    "how": "Arrastra tarjetas entre etapas; es otra vista de crm-opportunities.",
+    "steps": ["Mueve tarjetas", "Abre detalle para editar"],
+    "connects": "crm-opportunities",
+  },
+  "crm-agenda": {
+    "summary": "Agenda comercial: llamadas, visitas y demos.",
+    "audience": "Ventas.",
+    "how": "Actividades de CRM (sales-activities). No son órdenes de trabajo de campo.",
+    "steps": ["Agenda visita/demo", "Registra resultado", "Liga a oportunidad"],
+    "connects": "opportunities, calendar",
+  },
+  "crm-clients": {
+    "summary": "Maestro comercial SalesClient (cuentas y contactos).",
+    "audience": "Ventas + admin.",
+    "how": (
+      "Una cuenta comercial con tabs: datos, sucursales, servicios, tickets, cotizaciones, facturas. "
+      "ServiceClient es la proyección para OPS/portal vía FK."
+    ),
+    "steps": ["Busca o crea cliente", "Completa contactos", "Revisa servicios y documentos ligados"],
+    "connects": "ops-service-clients, invoicing, portal, quotes",
+  },
+  "crm-products": {
+    "summary": "Catálogo SKU/precios compartido con almacén.",
+    "audience": "Ventas, almacén, diseño.",
+    "how": "Productos y tarifas. En cotización la mano de obra (horas × tarifa) sí suma al total.",
+    "steps": ["Mantén SKUs y precios", "Úsalos en el builder de cotización"],
+    "connects": "warehouse, cotizaciones, smart-quote",
+  },
+  "crm-quotes": {
+    "summary": "Cotizaciones con builder, aprobaciones por monto y PDF/firma.",
+    "audience": "Ventas, diseño, admin, ingenieros senior.",
+    "how": (
+      "Siempre con cliente (SalesClient). Cadena de aprobación por umbral. "
+      "El portal puede listar/descargar PDF de cotizaciones del cliente."
+    ),
+    "steps": ["Abre builder", "Arma líneas producto+horas", "Envía a aprobación", "Comparte PDF"],
+    "connects": "approvals, products, clients, portal",
+  },
+  "crm-templates": {
+    "summary": "Plantillas reutilizables de documentos y mensajes.",
+    "audience": "Leads de ventas + diseño.",
+    "how": "Acelera propuestas repetibles.",
+    "steps": ["Crea plantilla", "Úsala al generar cotización/mensaje"],
+    "connects": "quotes, studio",
+  },
+  "crm-projects": {
+    "summary": "Proyectos de venta ganados pendientes de ejecutar en OPS.",
+    "audience": "Ventas + PM.",
+    "how": "Puente comercial→operación: costos de productos/viáticos y handoff a OperationalProject / OT.",
+    "steps": ["Abre proyecto ganado", "Revisa costos", "Coordina handoff con OPS"],
+    "connects": "ops-projects, ops-activities",
+  },
+  "crm-tenders": {
+    "summary": "Seguimiento de licitaciones públicas y privadas.",
+    "audience": "Managers comerciales.",
+    "how": "Track de procesos de compra; documentos y fechas clave.",
+    "steps": ["Alta de licitación", "Liga oportunidad", "Adjunta bases/respuesta"],
+    "connects": "opportunities, documents",
+  },
+  "crm-sales-team": {
+    "summary": "Gestión del equipo de ejecutivos de venta.",
+    "audience": "Coord. ventas / dirección.",
+    "how": "Quién vende qué; base para metas y reportes.",
+    "steps": ["Revisa equipo", "Ajusta asignaciones"],
+    "connects": "targets, reports, users",
+  },
+  "crm-targets": {
+    "summary": "Cuotas, forecast y cumplimiento.",
+    "audience": "Managers comerciales.",
+    "how": "Metas por persona/equipo contrastadas con cierre real.",
+    "steps": ["Define cuota del periodo", "Monitorea % cumplimiento"],
+    "connects": "opportunities, reports",
+  },
+  "crm-reports": {
+    "summary": "Reportes de pipeline y cierre.",
+    "audience": "Managers + Dir. Admin.",
+    "how": "Analítica comercial más profunda que el dashboard.",
+    "steps": ["Elige reporte", "Filtra periodo/vendedor"],
+    "connects": "bi, dashboard",
+  },
+  # OPS
+  "ops-dashboard": {
+    "summary": "Hoy en operaciones: OT abiertas, alertas y SLA.",
+    "audience": "Coord ops, campo, soporte.",
+    "how": "Home de OPS. Debe seguir usable aunque un widget (p.ej. viáticos) falle.",
+    "steps": ["Revisa OT del día", "Atiende alertas rojas de SLA", "Despacha o abre Mis actividades"],
+    "connects": "activities, noc, support, viatics",
+  },
+  "ops-dispatch": {
+    "summary": "Centro de despacho: asignación masiva y mapa en vivo.",
+    "audience": "Líderes OPS.",
+    "how": "Asigna varias OT y ve cuadrillas/GPS.",
+    "steps": ["Filtra OT sin asignar", "Asigna técnico/cuadrilla", "Confirma en mapa"],
+    "connects": "activities, gps",
+  },
+  "ops-chat": {
+    "summary": "Chat de operaciones de campo.",
+    "audience": "Equipo OPS.",
+    "how": "Coordinación en sitio / NOC.",
+    "steps": ["Usa canales de cuadrilla o proyecto"],
+    "connects": "chat",
+  },
+  "ops-projects": {
+    "summary": "Proyectos operativos: contenedor de OT tras handoff comercial.",
+    "audience": "PM / líderes OPS.",
+    "how": "Convierte venta en trabajo: ingenieros, avance, varias actividades Con proyecto.",
+    "steps": ["Abre proyecto", "Crea OT ligadas", "Sigue avance y costos"],
+    "connects": "crm-projects, activities",
+  },
+  "ops-activities": {
+    "summary": "Órdenes de trabajo del equipo (vista global).",
+    "audience": "Coord ops, directores, admin (seguimiento).",
+    "how": (
+      "Eje de OPS. Puedes crear OT Con o Sin proyecto. Multi-asignación (LEAD/TÉCNICO/APOYO), reasignación con historial "
+      "(reinicia fechaAsignacion para SLA). Tabs: detalle, evidencias, viáticos, equipo, aprobaciones. "
+      "El cierre real pasa por hoja de servicio → lifecycle: visita de contrato COMPLETED, ticket portal CLOSED, "
+      "workflow ACTIVITY_CLOSURE si está definido (p.ej. validación Arquitecto)."
+    ),
+    "steps": [
+      "Lista / filtra OT del equipo",
+      "Crea Con proyecto o Sin proyecto",
+      "Asigna responsables",
+      "Revisa evidencias y cierra vía hoja de servicio",
+    ],
+    "connects": "evidences, viatics, warehouse, maintenance, portal tickets, service-sheets",
+  },
+  "ops-my-activities": {
+    "summary": "Tus OT asignadas (vista de campo).",
+    "audience": "Ingenieros de campo/soporte.",
+    "how": "Misma Activity filtrada a ti. En móvil/web: iniciar, subir evidencias, cerrar en sitio.",
+    "steps": ["Abre la OT del día", "Registra avance y evidencias", "Cierra con hoja de servicio"],
+    "connects": "ops-activities",
+  },
+  "ops-evidences": {
+    "summary": "Revisión de evidencias del equipo (menú oculto; vive en pestaña de Actividades).",
+    "audience": "Líderes OPS.",
+    "how": "Fotos, firmas, hojas. Completar evidencias puede dejar la OT en Pendiente hasta validación admin.",
+    "steps": ["Desde detalle de actividad → pestaña Evidencias", "Aprueba o solicita corrección"],
+    "connects": "activities, service-sheets",
+  },
+  "ops-my-evidences": {
+    "summary": "Tus evidencias de campo (acceso desde la OT).",
+    "audience": "Campo.",
+    "how": "Sube evidencia obligatoria ligada a tu actividad.",
+    "steps": ["Desde Mis actividades → Evidencias", "Sube fotos/firma"],
+    "connects": "ops-my-activities",
+  },
+  "ops-viatics": {
+    "summary": "Revisión de viáticos del equipo en OPS.",
+    "audience": "Coord ops.",
+    "how": "Vista team; la autorización financiera profunda también vive en ERP Finanzas según rol.",
+    "steps": ["Revisa solicitudes", "Aprueba o escala"],
+    "connects": "viatics-admin, activities",
+  },
+  "ops-my-viatics": {
+    "summary": "Solicita y comprueba tus viáticos de campo.",
+    "audience": "Ingenieros.",
+    "how": "Cada asignado pide los suyos (no se prorratean). Liga a actividad.",
+    "steps": ["Nueva solicitud", "Adjunta comprobantes", "Espera autorización"],
+    "connects": "activities, approvals",
+  },
+  "ops-vehicles": {
+    "summary": "Flotilla NEXARA: unidades y asignación a cuadrillas.",
+    "audience": "Líderes OPS / admin.",
+    "how": "Gestión de VehicleAsset. El rol Arquitecto no gestiona flotilla en menú.",
+    "steps": ["Alta/edición de unidad", "Asigna a técnico", "Recibe devolución"],
+    "connects": "my-vehicles, gps",
+  },
+  "ops-my-vehicles": {
+    "summary": "Unidades asignadas a ti: solicitar y entregar.",
+    "audience": "Campo.",
+    "how": "Vista self de la flotilla.",
+    "steps": ["Solicita unidad", "Confirma entrega/devolución"],
+    "connects": "ops-vehicles",
+  },
+  "ops-gps": {
+    "summary": "Rastreo en vivo de cuadrillas (día zona MX).",
+    "audience": "Managers OPS.",
+    "how": "Mapa de posiciones/recorridos para despacho y seguridad.",
+    "steps": ["Abre GPS", "Localiza cuadrilla", "Cruza con OT del día"],
+    "connects": "dispatch, vehicles",
+  },
+  "ops-tools": {
+    "summary": "Herramientas y préstamos a técnicos.",
+    "audience": "Campo, líderes, almacén.",
+    "how": "Kits/préstamos con entrega atómica (una herramienta no se asigna a dos personas a la vez).",
+    "steps": ["Solicita kit", "Almacén entrega", "Devuelve al terminar"],
+    "connects": "warehouse",
+  },
+  "ops-service-clients": {
+    "summary": "Clientes con servicio/contrato activo (proyección OPS).",
+    "audience": "Ops, soporte, mantenimiento.",
+    "how": "Vista operativa del cliente (ServiceClient) ligada al maestro comercial.",
+    "steps": ["Busca cuenta", "Revisa contratos/activos/tickets"],
+    "connects": "crm-clients, maintenance, assets, portal",
+  },
+  "ops-maintenance": {
+    "summary": "Mantenimiento preventivo/correctivo y visitas.",
+    "audience": "Coord mantenimiento, PM, líderes.",
+    "how": "Las visitas se materializan como Activity. Al cerrar la OT, la visita pasa a COMPLETED.",
+    "steps": ["Programa visita", "Genera OT", "Cierra en campo", "Verifica visita cerrada"],
+    "connects": "maintenance-contracts, activities",
+  },
+  "ops-maintenance-contracts": {
+    "summary": "Contratos de servicio: SLA, vigencia y alcance.",
+    "audience": "Ops leads.",
+    "how": "Accesible desde Mantenimiento (no duplica menú). Alimenta analytics y alertas de visitas.",
+    "steps": ["Define contrato y SLA", "Programa visitas", "Monitorea cumplimiento"],
+    "connects": "sla-tracker, analytics, maintenance",
+  },
+  "ops-assets": {
+    "summary": "Activos instalados en sitio del cliente.",
+    "audience": "Ops / mantenimiento.",
+    "how": "Inventario de equipos en campo (CMMS ligero).",
+    "steps": ["Registra activo por cliente", "Liga a visitas/OT"],
+    "connects": "service-clients, maintenance",
+  },
+  "ops-noc": {
+    "summary": "NOC: monitoreo y alertas 24/7.",
+    "audience": "NOC y soporte.",
+    "how": "Sala de monitoreo; se apoya en alertas propias y señales de Integra.",
+    "steps": ["Revisa panel de alertas", "Escala a soporte/campo"],
+    "connects": "integra alarms/events, support",
+  },
+  "ops-support-inbox": {
+    "summary": "Bandeja de tickets de clientes.",
+    "audience": "Soporte.",
+    "how": "ClientTicketRequest del portal → se asigna y puede volverse Activity. Al cerrar servicio el ticket queda CLOSED.",
+    "steps": ["Toma ticket", "Diagnostica / crea OT", "Cierra y comunica al cliente"],
+    "connects": "portal, activities, sla",
+  },
+  "ops-support-sla": {
+    "summary": "Cumplimiento de SLA, MTTR y aging de backlog.",
+    "audience": "Dirección ops, soporte, NOC lead.",
+    "how": "Command Center SLA. Reasignar OT reinicia el reloj de respuesta.",
+    "steps": ["Revisa incumplimientos", "Prioriza backlog", "Ajusta proceso"],
+    "connects": "support, contracts, portal countdown",
+  },
+  "ops-cvs": {
+    "summary": "CVs de candidatos técnicos (reclutamiento ligero).",
+    "audience": "PM, Dir Ops, RH.",
+    "how": "Banco de CVs; no es un ATS completo.",
+    "steps": ["Carga/consulta CV", "Comparte con quien contrata"],
+    "connects": "hr",
+  },
+  # STUDIO
+  "studio-dashboard": {
+    "summary": "Home de marketing/CMS: tráfico, leads y campañas.",
+    "audience": "Diseño / marketing.",
+    "how": "Resumen creativo del sitio público.",
+    "steps": ["Revisa captación", "Entra a leads/contactos calientes"],
+    "connects": "studio-leads, contacts",
+  },
+  "studio-chat": {
+    "summary": "Chat del equipo creativo.",
+    "audience": "Studio.",
+    "how": "Coordinación de publicaciones y diseño.",
+    "steps": ["Usa canales de campaña"],
+    "connects": "chat",
+  },
+  "studio-hero": {
+    "summary": "Carrusel/video del inicio del sitio público.",
+    "audience": "Diseño.",
+    "how": "Orden e imágenes del hero. Solo personal interno (StaffOnly).",
+    "steps": ["Edita slides", "Publica / reordena", "Verifica en el sitio"],
+    "connects": "sitio nexara.com.mx",
+  },
+  "studio-pages": {
+    "summary": "Páginas CMS con draft, publish y versionado/rollback.",
+    "audience": "Diseño.",
+    "how": "Cada publish guarda revisión (PageContentRevision) para poder volver atrás.",
+    "steps": ["Edita sección", "Preview", "Publish", "Rollback si rompiste algo"],
+    "connects": "sitio público",
+  },
+  "studio-cases": {
+    "summary": "Casos de éxito publicados.",
+    "audience": "Diseño / comercial.",
+    "how": "Portafolio en el sitio.",
+    "steps": ["Alta caso", "Publica", "Verifica SEO básico"],
+    "connects": "sitio público",
+  },
+  "studio-news": {
+    "summary": "Blog / noticias del sitio.",
+    "audience": "Diseño / marketing.",
+    "how": "Contenido editorial público.",
+    "steps": ["Redacta", "Publica", "Comparte"],
+    "connects": "sitio público",
+  },
+  "studio-social": {
+    "summary": "Calendario de redes + métricas de resultado.",
+    "audience": "Creativa.",
+    "how": "Programa posts y registra impresiones/alcance/interacción (ya no solo 'se publicó').",
+    "steps": ["Agenda post", "Publica", "Captura métricas del cierre del día"],
+    "connects": "redes externas",
+  },
+  "studio-newsletter": {
+    "summary": "Boletín a clientes y leads.",
+    "audience": "Marketing.",
+    "how": "Email marketing ligero del sitio.",
+    "steps": ["Arma edición", "Envía / programa", "Revisa lista"],
+    "connects": "contacts",
+  },
+  "studio-contacts": {
+    "summary": "Mensajes de formularios del sitio.",
+    "audience": "Studio + ventas.",
+    "how": "Bandeja de contactos web; muchos se convierten en leads CRM.",
+    "steps": ["Lee mensaje", "Responde o crea lead"],
+    "connects": "crm-leads",
+  },
+  "studio-leads": {
+    "summary": "Prospectos captados por marketing.",
+    "audience": "Studio + ventas.",
+    "how": "Handoff creativo → CRM.",
+    "steps": ["Califica", "Pasa a crm-leads / oportunidad"],
+    "connects": "crm-leads",
+  },
+  # LAB
+  "lab-home": {
+    "summary": "Hub sandbox técnico.",
+    "audience": "CEO / super_admin.",
+    "how": "No es superficie de negocio; experimentación controlada.",
+    "steps": ["Entra solo si sabes qué estás probando"],
+    "connects": "flags, ai, health",
+  },
+  "lab-chat": {
+    "summary": "Chat en Lab.",
+    "audience": "CEO.",
+    "how": "Canal técnico aislado.",
+    "steps": ["Úsalo para pruebas de mensajería"],
+    "connects": "chat",
+  },
+  "lab-ai": {
+    "summary": "Sandbox de modelos y prompts.",
+    "audience": "CEO.",
+    "how": "Pruebas; no sustituye flujos productivos.",
+    "steps": ["Prueba prompt", "No uses resultados como verdad de negocio sin revisión"],
+    "connects": "ai module",
+  },
+  "lab-flags": {
+    "summary": "Feature flags de plataforma.",
+    "audience": "CEO.",
+    "how": "Enciende/apaga capacidades sin redeploy completo.",
+    "steps": ["Cambia flag", "Verifica efecto en panel afectado"],
+    "connects": "settings",
+  },
+  "lab-health": {
+    "summary": "Estado de servicios / health API.",
+    "audience": "CEO.",
+    "how": "Diagnóstico. En Windows /api/health puede fallar el check de disco; usa /live o /ready.",
+    "steps": ["Consulta health-summary", "Si hay rojo, revisa logs API"],
+    "connects": "observability",
+  },
+  # INTEGRA
+  "integra-home": {
+    "summary": "Consola ops del sitio: árbol, puertas, video y eventos.",
+    "audience": "Ops/NOC; cliente con lectura limitada.",
+    "how": (
+      "Espejo Prisma sincronizado (cron ~15 min + backoff). Providers: ISAPI (LAN+edge), Artemis, HCT. "
+      "Frontera estricta vs oficinas NEXARA (facilities)."
+    ),
+    "steps": ["Elige sitio", "Revisa estado sync", "Navega a video/accesos"],
+    "connects": "todos los módulos Integra",
+  },
+  "integra-video": {
+    "summary": "Video wall y playback: go2rtc MSE H.264 (no HLS autoplay).",
+    "audience": "NOC / ops.",
+    "how": (
+      "Transporte correcto: WebSocket MSE vía go2rtc, sub-stream H.264. HCT usa EZUIKit (no go2rtc). "
+      "La caja edge debe estar en la LAN del sitio para RTSP ISAPI."
+    ),
+    "steps": ["Abre muro", "Selecciona cámaras", "Playback desde NVR si aplica"],
+    "connects": "go2rtc, edge, detection",
+  },
+  "integra-detection": {
+    "summary": "Ajuste de detección por cámara (región, sensibilidad, ruido).",
+    "audience": "Ops técnico (no módulo cliente).",
+    "how": "Configura el equipo; no es solo visualización.",
+    "steps": ["Elige cámara", "Ajusta perfil", "Verifica eventos"],
+    "connects": "video, events",
+  },
+  "integra-events": {
+    "summary": "Eventos Face/ACS con identidad y foto.",
+    "audience": "NOC / ops.",
+    "how": "Stream de accesos reconocidos desde terminales.",
+    "steps": ["Filtra por puerta/persona", "Abre detalle con foto"],
+    "connects": "people, access",
+  },
+  "integra-alarms": {
+    "summary": "Búsqueda de alarmas del sitio.",
+    "audience": "NOC.",
+    "how": "Histórico/consulta de alarmas para monitoreo.",
+    "steps": ["Busca por rango", "Escala incidencias"],
+    "connects": "noc, video",
+  },
+  "integra-access": {
+    "summary": "Abrir puertas y gestionar privilegios de acceso.",
+    "audience": "Ops/NOC.",
+    "how": "Comandos live al equipo del sitio según provider.",
+    "steps": ["Selecciona puerta", "Abre / asigna derecho", "Audita"],
+    "connects": "people, schedules, espacios",
+  },
+  "integra-people": {
+    "summary": "Personas del sitio + Face en terminales.",
+    "audience": "Ops (roles altos).",
+    "how": (
+      "Alta en espejo y enrolamiento. Hoy el espejo guarda campos base; se puede ampliar con faceURL/gender/Valid/RightPlan "
+      "solo con rutas ISAPI verificadas en docs/INTEGRA-LAN.md."
+    ),
+    "steps": ["Alta persona", "Enrolar face/tarjeta", "Asigna horario"],
+    "connects": "schedules, visitors, attendance",
+  },
+  "integra-schedules": {
+    "summary": "Horarios / RightPlan: cuándo y por qué puertas.",
+    "audience": "Ops/NOC.",
+    "how": "Política temporal de acceso por persona.",
+    "steps": ["Define plan", "Asigna a personas", "Prueba en puerta"],
+    "connects": "people, access",
+  },
+  "integra-espacios": {
+    "summary": "Espacios/puertas: indefinido vs temporal, uso planificado.",
+    "audience": "Ops/NOC.",
+    "how": "Organiza la planta lógica del sitio.",
+    "steps": ["Define espacio", "Liga puertas", "Monitorea uso"],
+    "connects": "access",
+  },
+  "integra-attendance": {
+    "summary": "Marcas ACS por puerta; contraste con checador ERP.",
+    "audience": "Ops / RH vía ERP.",
+    "how": "No reemplaza /erp/hr/attendance: lo complementa.",
+    "steps": ["Consulta marcas del sitio", "Contrasta en RH"],
+    "connects": "erp attendance",
+  },
+  "integra-visitors": {
+    "summary": "Visitas únicas o recurrentes con acceso ACS limitado.",
+    "audience": "Ops.",
+    "how": "Recurrentes: acceso limitado al llegar (ver guía INTEGRA-VISITAS-RECURRENTES).",
+    "steps": ["Alta visita", "Elige única/recurrente", "Valida en puerta"],
+    "connects": "people, access",
+  },
+  "integra-vehicles": {
+    "summary": "Vehículos registrados en el sitio del cliente.",
+    "audience": "Ops.",
+    "how": "Distinto de la flotilla OPS de NEXARA.",
+    "steps": ["Alta vehículo", "Liga a ANPR si aplica"],
+    "connects": "anpr",
+  },
+  "integra-anpr": {
+    "summary": "Reconocimiento de placas / cruces vehiculares.",
+    "audience": "Ops/NOC.",
+    "how": "Eventos ANPR del sitio.",
+    "steps": ["Consulta cruces", "Cruza con lista de vehículos"],
+    "connects": "vehicles, alarms",
+  },
+  "integra-settings": {
+    "summary": "Sitios Integra: provider, secretos cifrados, edge y sync.",
+    "audience": "Dirección ops/admin.",
+    "how": "Alta de IntegraSite, tokens edge (una vez), sync manual. Credenciales fuera del repo.",
+    "steps": ["Crea/edita sitio", "Configura provider ISAPI/HCT/Artemis", "Emite token edge si LAN"],
+    "connects": "edge ADR-0021, sync cron",
+  },
+  "integra-audit": {
+    "summary": "Bitácora de controles y mutaciones Integra.",
+    "audience": "Ops leads.",
+    "how": "Quién abrió puertas / cambió personas.",
+    "steps": ["Filtra por sitio/fecha", "Investiga incidentes"],
+    "connects": "settings, access",
+  },
+  "integra-map": {
+    "summary": "Plano del sitio con pines de cámaras y puertas.",
+    "audience": "NOC/ops.",
+    "how": "Situational awareness espacial.",
+    "steps": ["Abre plano", "Click en pin → video/acceso"],
+    "connects": "video, access",
+  },
+  "integra-notifications": {
+    "summary": "Notificaciones del panel Integra.",
+    "audience": "Usuarios Integra.",
+    "how": "Inbox local del panel.",
+    "steps": ["Revisa alertas", "Abre deep-link"],
+    "connects": "notifications-center",
+  },
+  "integra-my-profile": {
+    "summary": "Perfil en panel Integra.",
+    "audience": "Todos en Integra.",
+    "how": "Cuenta y preferencias.",
+    "steps": ["Actualiza datos"],
+    "connects": "users",
+  },
+}
+
+
+def fallback(m: dict) -> dict:
+    return {
+        "summary": m["description"],
+        "audience": "Usuarios con permiso sobre este módulo (ver roles en la tarjeta).",
+        "how": (
+            f"Módulo «{m['label']}» del panel {m['panel'].upper()} (grupo {m['group']}). "
+            f"{m['description']} "
+            "En no-producción esta guía existe para capacitar: sigue el menú, completa el flujo feliz "
+            "y verifica en módulos conectados que el dato quedó consistente."
+        ),
+        "steps": [
+            f"Entra a /{m['panel']}{m['path'] if m['path'] != '/' else ''}.",
+            "Identifica la acción primaria (crear/listar/aprobar).",
+            "Confirma el resultado en listados o en un módulo dependiente.",
+        ],
+        "connects": "Ver mapa de arquitectura y sidebar del panel",
+    }
+
+
+guides = {}
+for m in CATALOG:
+    mid = m["id"]
+    base = EXTRA.get(mid, fallback(m))
+    guides[mid] = {
+        "id": mid,
+        "label": m["label"],
+        "panel": m["panel"],
+        "path": m["path"],
+        "group": m["group"],
+        "short": m["description"],
+        "summary": base["summary"],
+        "audience": base["audience"],
+        "how": base["how"],
+        "steps": base["steps"],
+        "connects": base["connects"],
+    }
+
+OUT_JSON.write_text(json.dumps(guides, ensure_ascii=False, indent=2), encoding="utf-8")
+
+# Emit TypeScript
+lines = [
+    "/**",
+    " * Guías detalladas por módulo — capacitación en no-producción.",
+    " * Fuente: access-matrix + docs de arquitectura. No inventar endpoints.",
+    " * Generado/actualizado por scripts; revisar al cambiar un módulo.",
+    " */",
+    "import type { ModuleId } from '@/lib/access-matrix';",
+    "",
+    "export type ModuleGuide = {",
+    "  id: ModuleId;",
+    "  summary: string;",
+    "  audience: string;",
+    "  how: string;",
+    "  steps: string[];",
+    "  connects: string;",
+    "};",
+    "",
+    "export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {",
+]
+
+def esc(s: str) -> str:
+    return s.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${")
+
+for mid, g in guides.items():
+    steps = ",\n".join(f"      `{esc(st)}`" for st in g["steps"])
+    lines.append(f"  '{mid}': {{")
+    lines.append(f"    id: '{mid}',")
+    lines.append(f"    summary: `{esc(g['summary'])}`,")
+    lines.append(f"    audience: `{esc(g['audience'])}`,")
+    lines.append(f"    how: `{esc(g['how'])}`,")
+    lines.append(f"    steps: [\n{steps},\n    ],")
+    lines.append(f"    connects: `{esc(g['connects'])}`,")
+    lines.append("  },")
+
+lines.append("};")
+lines.append("")
+lines.append("export function getModuleGuide(id: ModuleId): ModuleGuide | null {")
+lines.append("  return MODULE_GUIDES[id] ?? null;")
+lines.append("}")
+lines.append("")
+lines.append("/** Resuelve el módulo más específico cuya URL es prefijo del pathname. */")
+lines.append("export function resolveModuleIdFromPath(pathname: string): ModuleId | null {")
+lines.append("  const { MODULES, getModuleUrl } = require('@/lib/access-matrix') as typeof import('@/lib/access-matrix');")
+lines.append("  const clean = (pathname || '/').split('?')[0].split('#')[0].replace(/\\/$/, '') || '/';")
+lines.append("  let best: { id: ModuleId; len: number } | null = null;")
+lines.append("  for (const m of Object.values(MODULES)) {")
+lines.append("    const url = getModuleUrl(m.id);")
+lines.append("    if (clean === url || clean.startsWith(url + '/')) {")
+lines.append("      if (!best || url.length > best.len) best = { id: m.id, len: url.length };")
+lines.append("    }")
+lines.append("  }")
+lines.append("  return best?.id ?? null;")
+lines.append("}")
+lines.append("")
+
+OUT_TS.parent.mkdir(parents=True, exist_ok=True)
+OUT_TS.write_text("\n".join(lines), encoding="utf-8")
+print("guides", len(guides), "->", OUT_TS, "json", OUT_JSON)
