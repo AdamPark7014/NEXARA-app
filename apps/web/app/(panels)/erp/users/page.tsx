@@ -23,10 +23,13 @@ import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { DashGrid, DashCol, DashPanel, StatStrip, DashPill } from "@/components/dashboard/DashKit";
+import UserAccessTree from "@/components/UserAccessTree";
+import { defaultModesFromWebModuleIds, normalizeModuleAccess, type ModuleAccessMap } from "@/lib/access-tree";
 import RoleAccessMatrix from "@/components/RoleAccessMatrix";
 
 /* ─── tipos ─────────────────────────────────────────────────────────── */
 interface ApiUser {
+  moduleAccess?: Record<string, string> | null;
   id: number;
   nombre: string;
   email: string;
@@ -172,6 +175,7 @@ const emptyForm = {
   employeeNumber: "",
   autoEmployeeNumber: true,
   autoPassword: true,
+  moduleAccess: null as ModuleAccessMap | null,
 };
 
 function generateTempPassword() {
@@ -263,6 +267,7 @@ export default function UsersPage() {
   const [modal, setModal] = useState<ModalMode>(null);
   const [target, setTarget] = useState<ApiUser | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [roleDefaultModes, setRoleDefaultModes] = useState<ModuleAccessMap>(() => defaultModesFromWebModuleIds([]));
   const [pwForm, setPwForm] = useState({ newPassword: "", confirm: "" });
   const [createdCreds, setCreatedCreds] = useState<{
     nombre: string;
@@ -437,39 +442,64 @@ export default function UsersPage() {
     return ceo ? String(ceo.id) : "";
   }, [users]);
 
+
+  const loadRoleNavPreview = useCallback(async (roleId: string) => {
+    if (!token || !roleId) {
+      setRoleDefaultModes(defaultModesFromWebModuleIds([]));
+      return;
+    }
+    try {
+      const res = await fetch(buildApiUrl(`roles/${roleId}/nav-preview`), {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      setRoleDefaultModes(defaultModesFromWebModuleIds(Array.isArray(data.webModuleIds) ? data.webModuleIds : []));
+    } catch {
+      setRoleDefaultModes(defaultModesFromWebModuleIds([]));
+    }
+  }, [token]);
+
   const openCreate = () => {
     setTarget(null);
     const defaultRole =
       roles.find((r) => /empleado|staff|operador/i.test(r.nombre))?.id ??
       roles.find((r) => r.orgRoleKey && r.orgRoleKey !== "ceo" && r.orgRoleKey !== "super_admin")?.id ??
       roles[0]?.id;
+    const roleId = defaultRole != null ? String(defaultRole) : "";
     setForm({
       ...emptyForm,
       managerId: resolveDefaultManagerId(),
-      roleId: defaultRole != null ? String(defaultRole) : "",
+      roleId,
       departmentId: depts[0] ? String(depts[0].id) : "",
       password: generateTempPassword(),
       autoPassword: true,
       autoEmployeeNumber: true,
       employeeNumber: "",
+      moduleAccess: null,
     });
+    void loadRoleNavPreview(roleId);
     setCreatedCreds(null);
     setSaveErr(null);
     setModal("create");
   };
   const openEdit = (u: ApiUser) => {
     setTarget(u);
+    const roleId = userRoleId(u);
     setForm({
       nombre: u.nombre,
       email: u.email,
       password: "",
-      roleId: userRoleId(u),
+      roleId,
       departmentId: userDepartmentId(u),
       managerId: userManagerId(u),
       employeeNumber: u.employeeNumber || "",
       autoEmployeeNumber: !u.employeeNumber,
       autoPassword: false,
+      moduleAccess: normalizeModuleAccess(u.moduleAccess),
     });
+    void loadRoleNavPreview(roleId);
     setSaveErr(null); setModal("edit");
   };
   const openPassword = (u: ApiUser) => {
@@ -514,6 +544,7 @@ export default function UsersPage() {
           email: form.email.trim(),
           password,
           roleId: Number(form.roleId),
+          moduleAccess: form.moduleAccess,
           departmentId: Number(form.departmentId),
           ...(form.managerId ? { managerId: Number(form.managerId) } : {}),
           ...(!form.autoEmployeeNumber && form.employeeNumber.trim()
@@ -540,6 +571,7 @@ export default function UsersPage() {
           nombre: form.nombre.trim(),
           email: form.email.trim(),
           roleId: Number(form.roleId),
+          moduleAccess: form.moduleAccess,
           departmentId: Number(form.departmentId),
           managerId: form.managerId ? Number(form.managerId) : null,
           employeeNumber: form.autoEmployeeNumber ? undefined : (form.employeeNumber.trim() || null),
@@ -1311,7 +1343,11 @@ export default function UsersPage() {
                 <Lbl text="Rol ERP *" />
                 <select
                   value={form.roleId}
-                  onChange={(e) => setForm((f) => ({ ...f, roleId: e.target.value }))}
+                  onChange={(e) => {
+                    const roleId = e.target.value;
+                    setForm((f) => ({ ...f, roleId, moduleAccess: null }));
+                    void loadRoleNavPreview(roleId);
+                  }}
                   style={inp}
                   disabled={roles.length === 0}
                 >
@@ -1334,6 +1370,13 @@ export default function UsersPage() {
                     <option key={d.id} value={String(d.id)}>{d.nombre}</option>
                   ))}
                 </select>
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <UserAccessTree
+                  value={form.moduleAccess}
+                  defaultModes={roleDefaultModes}
+                  onChange={(next) => setForm((f) => ({ ...f, moduleAccess: next }))}
+                />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 12.5 }}>

@@ -523,6 +523,9 @@ model User {
   // Coexiste con roleId/Role mientras dura la migración. Fuente de verdad
   // para UrlAccessGuard y canOpenPage().  Ver apps/api/src/common/rbac/roles.v2.ts
   roleKey                   String?                    @db.VarChar(40)
+  /// Overrides de menú por módulo (JSON). null = 100% plantilla del rol.
+  /// Ej: { "ops-activities": "deliver", "crm-clients": "on", "ops-vehicles": "off" }
+  moduleAccess              Json?
   departmentId              Int
   fechaCreacion             DateTime                   @default(now())
   avatarUrl                 String?                    @db.VarChar(500)

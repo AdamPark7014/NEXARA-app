@@ -16,6 +16,8 @@ export interface User {
 	orgRoleKey?: string | null;
 	/** RBAC v2 — clave normalizada (super_admin, ceo, dir_admin, vendedor, …) */
 	roleKey?: string | null;
+	/** Overrides de menú por módulo (IAM). */
+	moduleAccess?: Record<string, string> | null;
 	nivelAutoridad?: number;
 	roleFlags?: {
 		accesoConsole?: boolean;
@@ -111,6 +113,7 @@ const normalizeUser = (value: unknown): User | null => {
 		roleId: candidate.roleId,
 		orgRoleKey: candidate.orgRoleKey ?? null,
 		roleKey: candidate.roleKey ?? null,
+		moduleAccess: (candidate as { moduleAccess?: Record<string, string> | null }).moduleAccess ?? null,
 		nivelAutoridad: Number(candidate.nivelAutoridad || 0),
 		roleFlags: candidate.roleFlags,
 		department: candidate.department || '',

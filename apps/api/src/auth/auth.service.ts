@@ -709,6 +709,7 @@ export class AuthService {
       isSuperAdmin,
       isPlatformOwner: this.isPlatformOwner(user.email),
       avatarUrl: user.avatarUrl,
+      moduleAccess: user.moduleAccess ?? null,
       ...(loginDevice ? { loginDevice } : {}),
     };
   }

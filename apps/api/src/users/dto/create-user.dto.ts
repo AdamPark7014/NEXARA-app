@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsInt } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsInt, IsObject, ValidateIf } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class CreateUserDto {
@@ -35,4 +35,10 @@ export class CreateUserDto {
   @Type(() => Number)
   @IsInt()
   managerId?: number | null;
+
+  /** Overrides opcionales al crear (misma forma que UpdateUserDto.moduleAccess). */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsObject()
+  moduleAccess?: Record<string, string> | null;
 }
