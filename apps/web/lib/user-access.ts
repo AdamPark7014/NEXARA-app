@@ -155,11 +155,16 @@ export function buildUserSidebar(
       byGroup.set(item.group, list);
     }
 
-    return Array.from(byGroup.entries()).map(([title, list]) => ({
+    const groups = Array.from(byGroup.entries()).map(([title, list]) => ({
       id: title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
       title,
       items: list,
     }));
+    if (panel === 'erp') {
+      const { sortSidebarGroups } = require('@/lib/nav-mode') as typeof import('@/lib/nav-mode');
+      return sortSidebarGroups(groups);
+    }
+    return groups;
   }
 
   return buildSidebar(panel, orgKey, false);

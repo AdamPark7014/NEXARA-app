@@ -8,6 +8,7 @@ import type { ModuleEntry, ModuleId } from '@/lib/access-matrix';
 import { canOpenPage } from '@/lib/rbac/page-matrix';
 import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac/roles';
 import { resolveV2RoleKey, type UserAccessInput } from '@/lib/rbac/role-mapping';
+import { isAdvancedOnlyModuleId, isNavAdvanced } from '@/lib/nav-mode';
 
 export type SectionViewMode = 'manage' | 'execute' | 'manage_execute';
 
@@ -204,11 +205,21 @@ export function canAccessMaintenanceContracts(
 export function shouldShowModuleInSidebar(
   user: UserAccessInput | null | undefined,
   module: ModuleEntry,
+  opts?: { advanced?: boolean },
 ): boolean {
   const v2 = resolveV2RoleKey(user);
   // isSuperAdmin resolves to ROLES.SUPER_ADMIN via resolveV2RoleKey;
   // fall through to switch so ops-my-* modules stay hidden for admin/exec roles
   if (!v2) return module.visible !== false;
+
+  // Menú operativo: oculta Analítica / Architecture / Inteligencia suelta / etc.
+  // Se reactivan con Menú avanzado (localStorage) o opts.advanced en tests.
+  const advanced =
+    opts?.advanced
+    ?? (typeof window !== 'undefined' ? isNavAdvanced() : false);
+  if (!advanced && isAdvancedOnlyModuleId(module.id)) {
+    return false;
+  }
 
   switch (module.id as ModuleId) {
     case 'ops-activities':
@@ -468,12 +479,16 @@ export function adaptModulePresentation(
       description: 'Solicitudes, aprobación y pago de viáticos de campo.',
     },
     warehouse: {
-      label: 'Almacén',
-      description: 'Stock, ubicaciones y despacho de equipo.',
+      label: 'Inventario',
+      description: 'Stock físico, ubicaciones y movimientos (fuente de verdad).',
     },
     procurement: {
       label: 'Compras',
-      description: 'Requisiciones, órdenes de compra y proveedores.',
+      description: 'Comprar y recibir → llena el inventario.',
+    },
+    'crm-products': {
+      label: 'Catálogo',
+      description: 'SKUs y precios para cotizar. El stock físico está en ERP › Inventario.',
     },
     attendance: EXECUTIVE.has(v2)
       ? { label: 'Asistencia · Gestión', description: 'Supervisión de jornadas del equipo' }
