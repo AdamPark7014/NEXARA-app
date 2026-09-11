@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import ContextRail from "@/components/ui/ContextRail";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
@@ -434,6 +435,13 @@ export default function GpsPage() {
 
   return (
     <>
+      <ContextRail
+        ariaLabel="Flotilla"
+        items={[
+          { id: "vehiculos", label: "Vehículos", href: "/ops/vehicles", active: false },
+          { id: "gps", label: "GPS", href: "/ops/gps", active: true },
+        ]}
+      />
       <PageHeader
         eyebrow="OPS · Campo"
         title={isManager ? "GPS y telemetria del equipo" : "Mi GPS y trayecto"}

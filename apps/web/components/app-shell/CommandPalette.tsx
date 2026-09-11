@@ -140,11 +140,13 @@ const SYNONYMS: Record<string, string[]> = {
 };
 
 const PANEL_LABEL: Record<PanelId, string> = {
-  erp: "ERP",
+  erp: "Core",
+  finance: "Contabilidad",
+  hr: "RRHH",
   crm: "CRM",
   ops: "OPS",
   studio: "STUDIO",
-  lab: "LAB",
+  lab: "Lab",
   integra: "INTEGRA",
 };
 

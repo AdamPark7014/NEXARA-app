@@ -190,7 +190,7 @@ export default function AccountingPage() {
   const highlightId = searchParams.get("highlight");
   const tabParam = searchParams.get("tab") as TabKey | null;
 
-  const [tab, setTab] = useState<TabKey>(tabParam && TABS.some((t) => t.key === tabParam) ? tabParam : "inteligencia");
+  const [tab, setTab] = useState<TabKey>(tabParam && TABS.some((t) => t.key === tabParam) ? tabParam : "polizas");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [financeInsights, setFinanceInsights] = useState<any>(null);
   const [financeInsightsLoading, setFinanceInsightsLoading] = useState(false);

@@ -68,6 +68,12 @@ import {
   filterModulesByNavigation,
   type MeNavigation,
 } from "@/lib/me-navigation";
+import {
+  readNavMode,
+  writeNavMode,
+  subscribeNavMode,
+  type NavMode,
+} from "@/lib/nav-mode";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 import ShellConnectionStatus from "./ShellConnectionStatus";
@@ -95,6 +101,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifPreview, setNotifPreview] = useState<NotifPreviewItem[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [navMode, setNavMode] = useState<NavMode>("operativo");
   const drawerRef = useRef<HTMLElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -125,6 +132,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
       router.replace("/login");
     }
   }, [isContextReady, user, logout, router]);
+
+  useEffect(() => {
+    setNavMode(readNavMode());
+    return subscribeNavMode(setNavMode);
+  }, []);
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -334,7 +346,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
         ),
       }))
       .filter((g) => g.items.length > 0);
-  }, [panel, user, integraCaps, integraProvider, v2RoleKey, serverNav]);
+  }, [panel, user, integraCaps, integraProvider, v2RoleKey, serverNav, navMode]);
 
   const allowedPanels = useMemo(
     () => getUserAllowedPanels(user),
@@ -656,7 +668,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
             <div key={group.id} className={styles.group}>
               <p className={styles.groupTitle}>{group.title}</p>
               {group.items.map((item) => {
-                const target = `/${panel}${item.path === "/" ? "" : item.path}`;
+                const target = getModuleUrl(item.id);
                 const active = isPathActive(target);
                 return (
                   <Link
@@ -741,6 +753,21 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 </span>
                 {darkMode ? "Modo claro" : "Modo oscuro"}
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = navMode === "avanzado" ? "operativo" : "avanzado";
+                  writeNavMode(next);
+                  setNavMode(next);
+                }}
+                style={menuItemStyle()}
+                aria-pressed={navMode === "avanzado"}
+              >
+                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
+                  {navMode === "avanzado" ? "✦" : "·"}
+                </span>
+                {navMode === "avanzado" ? "Menú avanzado: on" : "Menú avanzado"}
+              </button>
               <Link
                 href={buildFreshLoginUrl()}
                 target="_blank"
@@ -795,6 +822,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
         <div className={styles.topbarActions}>
           <CompanySwitcher compact />
+
 
           {(isSuperAdmin || orgRoleKey) && (
             <div

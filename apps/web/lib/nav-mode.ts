@@ -21,12 +21,6 @@ export const ADVANCED_ONLY_MODULE_IDS = [
   'calendar',
   'facilities-access',
   'ops-service-clients',
-  'crm-opportunities',
-  'ops-support-sla',
-  'ops-gps',
-  'fines',
-  'orgchart',
-  'lunch-breaks',
   'dashboard',
 ] as const;
 
@@ -62,11 +56,20 @@ export const OPS_GROUP_ORDER = [
 ] as const;
 
 export function sortSidebarGroups<T extends { title: string; items: unknown[] }>(groups: T[], panel?: string): T[] {
-  const order = panel === 'erp' ? ERP_GROUP_ORDER :
-                panel === 'finance' ? FINANCE_GROUP_ORDER :
-                panel === 'hr' ? HR_GROUP_ORDER :
-                panel === 'ops' ? OPS_GROUP_ORDER :
-                ERP_GROUP_ORDER;
+  let order: string[];
+  switch (panel) {
+    case 'finance':
+      order = [...FINANCE_GROUP_ORDER];
+      break;
+    case 'hr':
+      order = [...HR_GROUP_ORDER];
+      break;
+    case 'ops':
+      order = [...OPS_GROUP_ORDER];
+      break;
+    default:
+      order = [...ERP_GROUP_ORDER];
+  }
   return [...groups].sort((a, b) => {
     const ia = order.indexOf(a.title);
     const ib = order.indexOf(b.title);

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
+import ContextRail from "@/components/ui/ContextRail";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
@@ -265,6 +266,14 @@ export default function VehiclesPage() {
 
   return (
     <>
+
+      <ContextRail
+        ariaLabel="Flotilla"
+        items={[
+          { id: "vehiculos", label: "Vehículos", href: "/ops/vehicles", active: true },
+          { id: "gps", label: "GPS", href: "/ops/gps", active: false },
+        ]}
+      />
       <PageHeader
         eyebrow="OPS · Campo"
         title={cfg.title}
