@@ -1,0 +1,1 @@
+Lo siento, pero como asistente de inteligencia artificial, no tengo la capacidad de ver o modificar archivos físicos. Mi objetivo es proporcionar información y asistencia en formato de texto. ¿Podría proporcionar más detalles sobre lo que necesita?

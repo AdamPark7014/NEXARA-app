@@ -21,7 +21,13 @@ export const ADVANCED_ONLY_MODULE_IDS = [
   'calendar',
   'facilities-access',
   'ops-service-clients',
-  'reuniones',
+  'crm-opportunities',
+  'ops-support-sla',
+  'ops-gps',
+  'fines',
+  'orgchart',
+  'lunch-breaks',
+  'dashboard',
 ] as const;
 
 export type AdvancedOnlyModuleId = (typeof ADVANCED_ONLY_MODULE_IDS)[number];
