@@ -18,6 +18,10 @@ export const ADVANCED_ONLY_MODULE_IDS = [
   'kpis-hr',
   'crm-reports',
   'ops-cvs',
+  'calendar',
+  'facilities-access',
+  'ops-service-clients',
+  'reuniones',
 ] as const;
 
 export type AdvancedOnlyModuleId = (typeof ADVANCED_ONLY_MODULE_IDS)[number];
@@ -29,16 +33,34 @@ export function isAdvancedOnlyModuleId(id: string): boolean {
 /** Orden de grupos del sidebar ERP (operativo). */
 export const ERP_GROUP_ORDER = [
   'Hoy',
-  'Personas',
-  'Dinero',
+  'Gobierno',
   'Inventario',
-  'Facilities',
   'Sistema',
   'Mi cuenta',
 ] as const;
 
-export function sortSidebarGroups<T extends { title: string; items: unknown[] }>(groups: T[]): T[] {
-  const order = ERP_GROUP_ORDER as readonly string[];
+/** Orden de grupos del sidebar FINANZAS (operativo). */
+export const FINANCE_GROUP_ORDER = ['Finanzas', 'Sistema'] as const;
+
+/** Orden de grupos del sidebar PERSONAS (operativo). */
+export const HR_GROUP_ORDER = ['Personas', 'Mi cuenta'] as const;
+
+/** Orden de grupos del sidebar SERVICIOS (operativo). */
+export const OPS_GROUP_ORDER = [
+  'Tablero',
+  'Campo',
+  'Servicio continuo',
+  'Monitoreo y soporte',
+  'Personas',
+  'Mi cuenta',
+] as const;
+
+export function sortSidebarGroups<T extends { title: string; items: unknown[] }>(groups: T[], panel?: string): T[] {
+  const order = panel === 'erp' ? ERP_GROUP_ORDER :
+                panel === 'finance' ? FINANCE_GROUP_ORDER :
+                panel === 'hr' ? HR_GROUP_ORDER :
+                panel === 'ops' ? OPS_GROUP_ORDER :
+                ERP_GROUP_ORDER;
   return [...groups].sort((a, b) => {
     const ia = order.indexOf(a.title);
     const ib = order.indexOf(b.title);
