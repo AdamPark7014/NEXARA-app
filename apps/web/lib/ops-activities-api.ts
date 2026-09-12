@@ -71,6 +71,7 @@ export type ViaticoRow = {
 async function apiFetch<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
     ...init,
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
       ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }),

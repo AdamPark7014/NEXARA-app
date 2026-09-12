@@ -68,6 +68,7 @@ interface TrajectoryPoint {
 
 async function apiFetch<T>(path: string, token: string): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
+    credentials: "include",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
   if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));

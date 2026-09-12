@@ -12,6 +12,7 @@ import {
   type TeamBoardResponse,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
+import { formatApiError } from "@/lib/erp-api";
 
 const BUCKET_LABEL: Record<string, string> = {
   daily: "Diaria",
@@ -249,7 +250,7 @@ export default function PizarraPage() {
       const board = await fetchTeamBoard(token);
       setData(board);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar la pizarra");
+      setError(formatApiError(e, "No se pudo cargar la pizarra"));
       setData(null);
     } finally {
       setLoading(false);
