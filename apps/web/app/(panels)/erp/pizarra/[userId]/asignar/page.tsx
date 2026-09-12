@@ -7,6 +7,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import {
   ACTIVITY_KINDS,
+  extrasEmailsForKind,
   isServicioBridgeEmail,
   kindsForAssignment,
   metaForKind,
@@ -95,11 +96,16 @@ export default function AsignarActividadPage() {
   );
 
   const teamForExtras = useMemo(() => {
+    // Antonio puente: solo Carolina/Alejandro.
     if (kind === "servicio" && isServicioBridgeEmail(person?.email)) {
       const allow = new Set(servicioDelegateEmails());
       return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
     }
-    return roster;
+    // Servicio → soporte · Obra → instaladores · Proyecto → ambos · resto → todos.
+    const pool = extrasEmailsForKind(kind);
+    if (!pool) return roster;
+    const allow = new Set(pool.map((e) => e.toLowerCase()));
+    return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
   }, [kind, person?.email, roster]);
 
   const load = useCallback(async () => {
@@ -127,6 +133,14 @@ export default function AsignarActividadPage() {
     if (allowedKinds.length === 1) setKind(allowedKinds[0]);
     else if (kind && !allowedKinds.includes(kind)) setKind(null);
   }, [allowedKinds, kind]);
+
+  useEffect(() => {
+    const ok = new Set(teamForExtras.map((u) => u.id));
+    setExtraIds((prev) => {
+      const next = prev.filter((id) => ok.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [teamForExtras]);
 
   const toggleExtra = (id: number) => {
     setExtraIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -349,7 +363,13 @@ export default function AsignarActividadPage() {
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
               {kind === "servicio" && isServicioBridgeEmail(person?.email)
                 ? "Como puente, suma a Carolina o Alejandro (día/hora ya van en el formulario)."
-                : `El responsable es ${displayName}. Puedes sumar apoyo.`}
+                : kind === "servicio"
+                  ? "Solo soporte (Antonio, Carolina, Alejandro)."
+                  : kind === "obra"
+                    ? "Solo instaladores de campo (Joan, Israel, Juan José)."
+                    : kind === "proyecto"
+                      ? "Soporte e instaladores pueden colaborar en el proyecto."
+                      : `El responsable es ${displayName}. Puedes sumar apoyo.`}
             </p>
             {teamForExtras.length === 0 ? (
               <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>

@@ -149,6 +149,22 @@ export function servicioDelegateEmails(): string[] {
   return [ORG_EMAILS.carolina, ORG_EMAILS.alejandro];
 }
 
+export function soporteTeamEmails(): string[] {
+  return [ORG_EMAILS.antonio, ORG_EMAILS.carolina, ORG_EMAILS.alejandro];
+}
+
+export function fieldInstallerEmails(): string[] {
+  return [ORG_EMAILS.joan, ORG_EMAILS.israel, ORG_EMAILS.juan];
+}
+
+export function extrasEmailsForKind(kind: ActivityKind | null | undefined): string[] | null {
+  if (kind === 'servicio') return soporteTeamEmails();
+  if (kind === 'obra') return fieldInstallerEmails();
+  if (kind === 'proyecto') return [...fieldInstallerEmails(), ...soporteTeamEmails()];
+  if (kind === 'tarea' || kind === 'comercial' || kind === null || kind === undefined) return null;
+  return null;
+}
+
 export function canCreateServicio(email?: string | null, v2?: RoleKey | null, isSuperAdmin?: boolean): boolean {
   if (isSuperAdmin || v2 === ROLES.CEO || v2 === ROLES.SUPER_ADMIN) return true;
   const e = norm(email);
@@ -176,8 +192,15 @@ export function kindsForTarget(email?: string | null): ActivityKind[] {
 }
 
 /**
- * Tipos que se muestran al asignar A targetEmail siendo creatorEmail.
- * CEO puede crear todos, pero solo ve los que el destinatario puede recibir.
+ * Tipos de actividad Core (hub Actividades / pizarra).
+ *
+ * Tipos visibles al asignar = intersección:
+ *   lo que el CREADOR puede crear × lo que el DESTINATARIO puede recibir.
+ *
+ * Encargados de área (+ comercial): Christian, David, Luis, Antonio, Daniela, Mónica.
+ * Campo David (Joan/Israel/Juan): solo reciben tarea/proyecto/obra.
+ * Soporte Antonio (Carolina/Alejandro): solo reciben tarea/proyecto/servicio.
+ * Josué Encargado de Obra: todo menos servicio
  */
 export function kindsForAssignment(opts: {
   creatorEmail?: string | null;
