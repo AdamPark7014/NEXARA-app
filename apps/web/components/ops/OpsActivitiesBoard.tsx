@@ -61,7 +61,29 @@ function statusVariant(estatus: string): "positive" | "warning" | "danger" | "ac
   return "neutral";
 }
 
-export default function OpsActivitiesBoard() {
+export type ActivityBucket = "daily" | "projects" | "services";
+
+/** daily = sin projectId ni clientId; projects = con projectId; services = con clientId (servicio). */
+function matchesBucket(row: ActivityRow, bucket?: ActivityBucket): boolean {
+  if (!bucket) return true;
+  const hasProject = row.projectId != null || row.project?.id != null;
+  const hasClient = row.client?.id != null;
+  if (bucket === "daily") return !hasProject && !hasClient;
+  if (bucket === "projects") return hasProject;
+  if (bucket === "services") return hasClient && !hasProject;
+  return true;
+}
+
+export default function OpsActivitiesBoard({
+  bucket,
+  hideProjectSegments = false,
+  newHref = "/ops/activities/new",
+}: {
+  bucket?: ActivityBucket;
+  /** Cuando true (páginas ERP 3-buckets) oculta el toggle Todas/Con/Sin proyecto. */
+  hideProjectSegments?: boolean;
+  newHref?: string;
+} = {}) {
   const { user } = useUser();
   const token = user?.token ?? "";
   const router = useRouter();
@@ -106,9 +128,11 @@ export default function OpsActivitiesBoard() {
   }, [token, load]);
 
   const visible = useMemo(() => {
-    let list = rows;
-    if (filterProject === "with") list = list.filter((r) => r.projectId != null || r.project?.id != null);
-    if (filterProject === "without") list = list.filter((r) => r.projectId == null && r.project?.id == null);
+    let list = rows.filter((r) => matchesBucket(r, bucket));
+    if (!bucket) {
+      if (filterProject === "with") list = list.filter((r) => r.projectId != null || r.project?.id != null);
+      if (filterProject === "without") list = list.filter((r) => r.projectId == null && r.project?.id == null);
+    }
     if (filterStatus) list = list.filter((r) => r.estatus === filterStatus);
     if (filterPriority) list = list.filter((r) => r.prioridad === filterPriority);
     if (search.trim()) {
@@ -123,9 +147,27 @@ export default function OpsActivitiesBoard() {
       );
     }
     return list;
-  }, [rows, search, filterStatus, filterPriority, filterProject]);
+  }, [rows, search, filterStatus, filterPriority, filterProject, bucket]);
 
   const emptyCopy = useMemo(() => {
+    if (bucket === "daily") {
+      return {
+        title: "Sin actividades diarias",
+        description: "No hay OT sin proyecto ni cliente de servicio con estos filtros.",
+      };
+    }
+    if (bucket === "projects") {
+      return {
+        title: "Sin OT de proyecto",
+        description: "No hay órdenes ligadas a un proyecto operativo con estos filtros.",
+      };
+    }
+    if (bucket === "services") {
+      return {
+        title: "Sin OT de servicio",
+        description: "No hay órdenes con cliente de servicio (sin proyecto) con estos filtros.",
+      };
+    }
     if (filterProject === "with") {
       return {
         title: "Sin OT con proyecto",
@@ -142,7 +184,7 @@ export default function OpsActivitiesBoard() {
       title: "Sin órdenes de trabajo",
       description: "No hay OT que coincidan con los filtros. Crea una nueva o limpia los filtros.",
     };
-  }, [filterProject]);
+  }, [filterProject, bucket]);
 
   const statusOptions = useMemo(() => {
     const set = new Set(rows.map((r) => r.estatus).filter(Boolean));
@@ -270,6 +312,7 @@ export default function OpsActivitiesBoard() {
 
   return (
     <>
+      {!bucket && !hideProjectSegments && (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10, alignItems: "center" }}>
         {(
           [
@@ -303,6 +346,7 @@ export default function OpsActivitiesBoard() {
           Aquí asignas y das seguimiento. El técnico ejecuta en Mis OT.
         </span>
       </div>
+      )}
       <FilterToolbar
         search={{ value: search, onChange: setSearch, placeholder: "Buscar AN, título, cliente, proyecto…" }}
         selects={[
@@ -325,7 +369,7 @@ export default function OpsActivitiesBoard() {
             <Link href="/ops/dispatch" style={{ textDecoration: "none" }}>
               <Button variant="secondary" size="sm">Despacho</Button>
             </Link>
-            <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
+            <Link href={newHref} style={{ textDecoration: "none" }}>
               <Button variant="primary" size="sm">Nueva OT</Button>
             </Link>
           </>
@@ -342,7 +386,7 @@ export default function OpsActivitiesBoard() {
             <Button size="sm" variant="secondary" onClick={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); setFilterProject("all"); }}>
               Limpiar filtros
             </Button>
-            <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
+            <Link href={newHref} style={{ textDecoration: "none" }}>
               <Button size="sm" variant="primary">Nueva OT</Button>
             </Link>
           </div>
