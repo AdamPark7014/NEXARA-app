@@ -110,8 +110,9 @@ export function buildActivityPayload(
   return payload;
 }
 
-export function activitySubmitLabel(form: ActivityFormState, isEdit: boolean): string {
+export function activitySubmitLabel(form: ActivityFormState, isEdit: boolean, tone: 'ops' | 'core' = 'ops'): string {
   if (isEdit) return 'Guardar cambios';
+  if (tone === 'core') return form.responsableId ? 'Asignar actividad' : 'Crear actividad';
   if (form.responsableId) return 'Asignar OT';
   return 'Crear OT';
 }
