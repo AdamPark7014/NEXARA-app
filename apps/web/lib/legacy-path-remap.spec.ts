@@ -58,6 +58,18 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     expect(remapLegacySlugs('/blog/cotizaciones')).toBe('/blog/cotizaciones');
   });
 
+  it('preserva buckets Core ERP /erp/actividades/* en español', () => {
+    for (const path of [
+      '/erp/actividades/tareas',
+      '/erp/actividades/proyectos',
+      '/erp/actividades/servicios',
+      '/erp/actividades/diarias',
+    ]) {
+      expect(remapLegacySlugs(path)).toBe(path);
+      expect(normalizeLegacyPath(path)).toBe(path);
+    }
+  });
+
   it('todo destino del mapa de prefijos es una ruta canónica', () => {
     const canonicalPanels = ['/erp', '/crm', '/ops', '/studio', '/lab', '/tickets'];
     for (const target of Object.values(LEGACY_PANEL_PREFIX_MAP)) {

@@ -9,19 +9,20 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Tareas + asignar por tipo
+## Este turno — Tareas: fix 404 Diarias
 
 ### Hecho
 
-1. Sidebar/rail: **Diarias → Tareas**.
-2. Pizarra persona: un solo **Asignar actividad** → `/erp/pizarra/[id]/asignar`.
-3. Ahí eliges **Tarea** o **Proyecto**; el form muestra campos según el tipo (proyecto pide proyecto/cliente; tarea no).
-4. `OpsActivityForm`: `initialResponsableId`, `forcedProjectMode`, `hideProjectModePicker`.
+1. Página canónica **Tareas**: `/erp/actividades/tareas` (sidebar label Tareas).
+2. Redirects legacy: `actividades/diarias`, `activities/diarias`, `activities/tareas`, `activities/projects`, `activities/servicios`.
+3. **Bug raíz:** `legacy-path-remap` traducía `actividades→activities` y `proyectos→projects` → 404. Ahora `/erp/actividades/*` se preserva.
+4. page-matrix + url-matrix incluyen aliases EN.
 
 ### Verificar
 
-- Menú Actividades → "Tareas".
-- Perfil instalador → Asignar actividad → Tarea vs Proyecto → campos distintos → guardar.
+- Hard refresh (Ctrl+Shift+R) — el 308 viejo puede estar cacheado en Chrome.
+- Menú Actividades → **Tareas** → debe cargar board (no 404).
+- URL canónica: `http://127.0.0.1:3000/erp/actividades/tareas`
 
 ## No tocar
 
