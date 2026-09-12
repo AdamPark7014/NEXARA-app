@@ -70,6 +70,15 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     }
   });
 
+  it('preserva /erp/asistencias y no lo confunde con /asistencia', () => {
+    expect(normalizeLegacyPath('/erp/asistencias')).toBe('/erp/asistencias');
+    expect(remapLegacySlugs('/erp/asistencias')).toBe('/erp/asistencias');
+    // singular legacy sigue yendo a HR
+    expect(normalizeLegacyPath('/erp/asistencia')).toBe('/erp/hr/attendance');
+    // plural mal formado (caché 308 viejo) → Core
+    expect(normalizeLegacyPath('/erp/hr/attendances')).toBe('/erp/asistencias');
+  });
+
   it('todo destino del mapa de prefijos es una ruta canónica', () => {
     const canonicalPanels = ['/erp', '/crm', '/ops', '/studio', '/lab', '/tickets'];
     for (const target of Object.values(LEGACY_PANEL_PREFIX_MAP)) {
