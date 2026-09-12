@@ -2,37 +2,34 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-11
-- **Rama:** mejora/calidad-y-web
+- **Rama:** cursor/core-ola1-cd
 - **HEAD:** (cerrar)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Local up (migrate + seed + dev)
+## Este turno — Fase C+D (asistencias + actividades 3 buckets)
 
 ### Hecho
 
-1. **Postgres local:** servicio Windows `postgresql-x64-17` en `localhost:5432` / db `nexara_db` (Docker Desktop NO necesario; daemon down).
-2. **Migrate:** `prisma migrate deploy` aplicó `20260911190000_user_module_access` (171 migraciones OK).
-3. **Seed:** `prisma db seed` (demo-users) — 17 usuarios actualizados; login OK gerencia/soporte/etc.
-4. **Dev stack:** `npm run dev` (turbo api+web) corriendo en background.
-   - API `http://127.0.0.1:3001` — `/api/health/live` + `/api/health/ready` 200 (DB up).
-   - Web `http://127.0.0.1:3000` — `/` y `/login` 200.
-5. Demo: `gerencia@nexara.com.mx` / `Nexara!NX001`
-
-### Verificar (manual Adam)
-
-- `/erp/users` → editar Juanito → cambiar Actividades a Entrega → guardar → re-login y ver menú OPS.
-- Rol sigue siendo techo.
+1. **Fase C** `/erp/asistencias` — tabs Equipo | Comidas | Trayectoria; reutiliza `attendance/hierarchy/range?scope=subtree`, `lunch-breaks`, `gps/team` + `GpsTrajectoryPreview`. Ops routes intactas.
+2. **Attendance API** — `scope=subtree` en hierarchy range (CEO/plataforma company-wide; manager = árbol `managerId`).
+3. **Fase D** `/erp/actividades/{diarias|proyectos|servicios}` — thin wrappers sobre `OpsActivitiesBoard` con `bucket` daily/projects/services. Servicios redirige no-CEO → diarias.
+4. **Activities API** — `findAllScoped` (subtree no-CEO); validación soft `fechaInicio <= fechaMaxima` + ventana ≥ ayer en `update()`.
 
 ### A medias / siguiente
 
-- Opcional: mismo árbol al editar plantillas de rol (ola 2).
-- Ampliar privilegios por encima del rol = no en esta ola.
-- `/api/health` full puede 500 en local si Redis/disk fallan; usar `/live` + `/ready`.
+- Agent A: moduleAccess / sidebar (ocultar servicios para David).
+- Agent B: pizarra completa (no tocado).
+- No merge a `mejora/calidad-y-web` en este turno.
+
+### Verificar (manual Adam)
+
+- Login gerencia → `/erp/asistencias` tabs + `/erp/actividades/servicios` OK.
+- Login manager/David → diarias/proyectos OK; servicios redirige; asistencias subtree.
+- PATCH activity con `fechaInicio` > `fechaMaxima` → 400.
 
 ## No tocar
 
-Puente NAS. Credenciales. Plan acomodado. No fingir EN VIVO.
-Docker Desktop opcional (Postgres Windows ya cubre local).
+Puente NAS. Credenciales. Access-matrix wholesale (Agent A). Pizarra full (Agent B). No borrar rutas OPS.
