@@ -9,23 +9,20 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Fix 401 pizarra / Core fetches
+## Este turno — Fix Unauthorized pizarra (127 vs localhost)
 
 ### Hecho
 
-1. Causa: cliente enviaba `Bearer session-cookie` (sentinel) **sin** `credentials: "include"` → la cookie HttpOnly `nexara_token` no viajaba a `:3001` → JWT guard 401.
-2. Fix: `credentials: "include"` en `erp-api.ts`, `ops-activities-api.ts`, `OpsActivitiesBoard.tsx`, `asistencias/page.tsx`.
-3. Pizarra: `formatApiError` en vez de JSON crudo.
+1. Causa real: página en `127.0.0.1:3000` + `NEXT_PUBLIC_API_URL=http://localhost:3001/api` → cookie HttpOnly en jar `localhost`, fetch desde `127.0.0.1` no la manda → 401.
+2. `getApiBase()` local ahora siempre `${currentOrigin}/api` (rewrite Next).
+3. Login `credentials: include`.
+4. Spec: caso 127.0.0.1.
 
-### Verificar
+### Verificar (Adam)
 
-- Hard refresh `/erp/pizarra` logueado como gerencia → grid semáforo (no 401).
-- Asistencias + actividades igual.
-
-### A medias / siguiente
-
-- Ola E encargados/instaladores.
-- Worktrees core-* pendientes de borrar.
+1. Cerrar sesión / borrar cookies del sitio.
+2. Entrar de nuevo en **la misma URL** (`http://127.0.0.1:3000` o `http://localhost:3000`, no mezclar).
+3. `/erp/pizarra` debe mostrar el grid.
 
 ## No tocar
 

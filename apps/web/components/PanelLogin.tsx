@@ -231,6 +231,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       const loginToEndpoint = async (endpoint: string) => {
         const res = await fetch(endpoint, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json", ...deviceHeaders },
           body: JSON.stringify(payload),
         });
