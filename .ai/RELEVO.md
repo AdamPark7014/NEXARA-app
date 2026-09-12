@@ -9,18 +9,19 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Pizarra: sin CEO + submódulo persona
+## Este turno — Tareas + asignar por tipo
 
 ### Hecho
 
-1. Board API excluye `gerencia@` (Christian) y al viewer de la lista de gestión.
-2. Click perfil → `/erp/pizarra/[userId]` (página completa, no drawer).
-3. Grid más limpio (semáforo + OT o tiempo en sitio).
+1. Sidebar/rail: **Diarias → Tareas**.
+2. Pizarra persona: un solo **Asignar actividad** → `/erp/pizarra/[id]/asignar`.
+3. Ahí eliges **Tarea** o **Proyecto**; el form muestra campos según el tipo (proyecto pide proyecto/cliente; tarea no).
+4. `OpsActivityForm`: `initialResponsableId`, `forcedProjectMode`, `hideProjectModePicker`.
 
 ### Verificar
 
-- Login gerencia → pizarra sin tarjeta de Christian.
-- Click Adam/David/instalador → página detalle con tiempos y asignar.
+- Menú Actividades → "Tareas".
+- Perfil instalador → Asignar actividad → Tarea vs Proyecto → campos distintos → guardar.
 
 ## No tocar
 

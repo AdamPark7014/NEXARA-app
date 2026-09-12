@@ -39,9 +39,9 @@ const FULL_ACCESS_TREE: AccessTreePanel[] = [
       toggle('pizarra', 'Pizarra'),
       toggle('asistencias', 'Asistencias'),
       toggle('chat', 'Chat'),
-      toggle('activities-daily', 'Actividades diarias'),
-      toggle('activities-projects', 'Actividades proyectos'),
-      toggle('activities-services', 'Actividades servicios'),
+      toggle('activities-daily', 'Tareas'),
+      toggle('activities-projects', 'Proyectos'),
+      toggle('activities-services', 'Servicios'),
     ],
   },
   {

@@ -223,9 +223,9 @@ export default function PizarraPersonaPage() {
         )}
       </section>
 
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
+      <div style={{ display: "grid", gap: 10 }}>
         <Link
-          href={`/erp/actividades/diarias?responsableId=${user.id}`}
+          href={`/erp/pizarra/${user.id}/asignar`}
           style={{
             textAlign: "center",
             padding: "14px 12px",
@@ -236,22 +236,7 @@ export default function PizarraPersonaPage() {
             textDecoration: "none",
           }}
         >
-          Asignar diaria
-        </Link>
-        <Link
-          href={`/erp/actividades/proyectos?responsableId=${user.id}`}
-          style={{
-            textAlign: "center",
-            padding: "14px 12px",
-            borderRadius: 14,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            color: "var(--foreground)",
-            fontWeight: 700,
-            textDecoration: "none",
-          }}
-        >
-          Asignar proyecto
+          Asignar actividad
         </Link>
       </div>
     </div>
