@@ -41,6 +41,13 @@ type Props = {
   forcedProjectMode?: ActivityProjectMode;
   /** Oculta el selector Con/Sin proyecto (cuando forcedProjectMode) */
   hideProjectModePicker?: boolean;
+  /** Copy Core: sin jerga OT */
+  tone?: "ops" | "core";
+  /** Oculta el select de responsable (ya fijado desde pizarra) */
+  hideResponsableSelect?: boolean;
+  /** Prefija ticketType al montar (obra → INSTALACION, etc.) */
+  forcedTicketType?: string;
+  forcedTicketTypeCustom?: string;
   onSuccess?: (id: number) => void;
   onCancel?: () => void;
 };
@@ -58,6 +65,10 @@ export default function OpsActivityForm({
   initialResponsableId,
   forcedProjectMode,
   hideProjectModePicker,
+  tone = "ops",
+  hideResponsableSelect = false,
+  forcedTicketType,
+  forcedTicketTypeCustom,
   onSuccess,
   onCancel,
 }: Props) {
@@ -135,9 +146,18 @@ export default function OpsActivityForm({
       ...prev,
       projectMode: forcedProjectMode,
       projectId: forcedProjectMode === "without_project" ? "" : prev.projectId,
-      clientId: forcedProjectMode === "without_project" ? "" : prev.clientId,
     }));
   }, [forcedProjectMode, isEdit]);
+
+  useEffect(() => {
+    if (isEdit || !forcedTicketType) return;
+    setForm((prev) => ({
+      ...prev,
+      ticketType: forcedTicketType,
+      ticketTypeCustom: forcedTicketTypeCustom ?? "",
+      workType: forcedTicketType === "INVENTARIO" ? "PREVENTIVE_INVENTORY" : "ISSUE",
+    }));
+  }, [forcedTicketType, forcedTicketTypeCustom, isEdit]);
 
   useEffect(() => {
     if (!initialClientId || isEdit || requestId || !activeProjects.length) return;
@@ -233,7 +253,7 @@ export default function OpsActivityForm({
     try {
       if (isEdit && activityId) {
         await updateActivity(token, activityId, payload);
-        setSuccess("OT actualizada");
+        setSuccess(tone === "core" ? "Actividad actualizada" : "OT actualizada");
         onSuccess?.(activityId);
       } else {
         const created = await createActivity(token, payload);
@@ -243,11 +263,19 @@ export default function OpsActivityForm({
             await assignTicketRequest(token, pendingRequestId, newId);
             setPendingRequestId(null);
           } catch {
-            setError("OT creada pero no se pudo vincular al ticket de soporte");
+            setError(tone === "core" ? "Actividad creada pero no se pudo vincular al ticket" : "OT creada pero no se pudo vincular al ticket de soporte");
             return;
           }
         }
-        setSuccess(form.responsableId ? "OT asignada" : "OT creada");
+        setSuccess(
+          tone === "core"
+            ? form.responsableId
+              ? "Actividad asignada"
+              : "Actividad creada"
+            : form.responsableId
+              ? "OT asignada"
+              : "OT creada",
+        );
         setForm({ ...EMPTY_ACTIVITY_FORM });
         const next = await fetchNextAnNumber(token);
         setNextAn(typeof next?.next === "string" ? next.next : "");
@@ -262,15 +290,21 @@ export default function OpsActivityForm({
 
   if (!canAssign) {
     return (
-      <Section title="Sin permisos" subtitle="No tienes permiso para crear o asignar OT.">
-        <Link href="/ops/activities">← Volver a bandeja</Link>
+      <Section
+        title="Sin permisos"
+        subtitle={tone === "core" ? "No puedes asignar actividades." : "No tienes permiso para crear o asignar OT."}
+      >
+        <Link href={tone === "core" ? "/erp/pizarra" : "/ops/activities"}>← Volver</Link>
       </Section>
     );
   }
 
   if (loading) {
     return (
-      <Section title="Cargando OT…" subtitle="Preparando formulario.">
+      <Section
+        title={tone === "core" ? "Cargando…" : "Cargando OT…"}
+        subtitle="Preparando formulario."
+      >
         <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>Un momento…</p>
       </Section>
     );
@@ -278,11 +312,23 @@ export default function OpsActivityForm({
 
   return (
     <Section
-      title={isEdit ? `Editar OT #${activityId}` : "Nueva orden de trabajo"}
+      title={
+        isEdit
+          ? tone === "core"
+            ? `Editar actividad #${activityId}`
+            : `Editar OT #${activityId}`
+          : tone === "core"
+            ? "Datos de la actividad"
+            : "Nueva orden de trabajo"
+      }
       subtitle={
-        form.projectMode === "with_project"
-          ? "OT con proyecto operativo: el cliente sale del proyecto."
-          : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto."
+        tone === "core"
+          ? form.projectMode === "with_project"
+            ? "El cliente sale del proyecto seleccionado."
+            : "Sin proyecto operativo."
+          : form.projectMode === "with_project"
+            ? "OT con proyecto operativo: el cliente sale del proyecto."
+            : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto."
       }
       actions={
         !isEdit ? (
@@ -403,7 +449,7 @@ export default function OpsActivityForm({
         )}
         <input
           className="input"
-          placeholder="Título de la OT"
+          placeholder={tone === "core" ? "Título de la actividad" : "Título de la OT"}
           value={form.titulo}
           onChange={(e) => setForm({ ...form, titulo: e.target.value })}
         />
@@ -438,9 +484,12 @@ export default function OpsActivityForm({
           </>
         ) : (
           <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-secondary)" }}>
-            Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo.
+            {tone === "core"
+              ? "Trabajo del día sin proyecto. Si es servicio, elige cliente más abajo cuando aplique."
+              : "Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo."}
           </div>
         )}
+        {!(tone === "core" && forcedTicketType) && (
         <select
           className="input"
           value={form.ticketType}
@@ -467,6 +516,8 @@ export default function OpsActivityForm({
           <option value="INVENTARIO">Tipo: Inventario</option>
           <option value="OTRO">Tipo: Otro</option>
         </select>
+        )}
+        {!hideResponsableSelect && (
         <select
           className="input"
           value={form.responsableId}
@@ -479,6 +530,7 @@ export default function OpsActivityForm({
             </option>
           ))}
         </select>
+        )}
         <select
           className="input"
           value={form.prioridad}
@@ -534,7 +586,7 @@ export default function OpsActivityForm({
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
         )}
         <Button size="sm" onClick={() => void handleSubmit()} disabled={saving}>
-          {saving ? "Guardando…" : activitySubmitLabel(form, isEdit)}
+          {saving ? "Guardando…" : activitySubmitLabel(form, isEdit, tone)}
         </Button>
         {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
         {success && <span style={{ color: "var(--success)", fontSize: 13 }}>{success}</span>}

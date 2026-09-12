@@ -9,21 +9,28 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Actividades = ex-Pizarra (sin menú Tareas/OT)
+## Este turno — Asignación dinámica por tipo + equipo
+
+### Cómo queda el modelo (ola1)
+
+- **No** módulos sidebar Tareas/Proyectos/Servicios: el hub es **Actividades** (pizarra).
+- Tipos: Tarea · Proyecto · Obra · Servicio · Comercial (`activity-kinds.ts`).
+- Christian (CEO): los 5. David (`operaciones@` / coord_ops): Tarea, Proyecto, Obra.
+- Flujo: asignas a una persona (responsable). Opcional: sumas equipo (`POST /activities/:id/team`).
+- David puede recibir y luego reasignar (`/reasignar` ya existe en API). Christian puede ir directo a un instalador.
+- Formulario Core sin jerga OT (`tone="core"`).
 
 ### Hecho
 
-1. Sidebar Core: quitados Tareas / Proyectos / Servicios (ruido OT).
-2. **Pizarra → label Actividades** (ruta sigue `/erp/pizarra`).
-3. Listas `/erp/actividades/*` y aliases EN → redirect a pizarra.
-4. Asignar: foto de la persona + tipos según permiso (Tarea del día / Proyecto / Servicio CEO) sin decir “OT”.
-5. Copy perfil: “En actividad” en vez de “En la OT”.
+1. `lib/activity-kinds.ts` + matriz por rol.
+2. Asignar: avatar + tipos + chips de equipo extra + form limpio.
+3. OpsActivityForm: tone core, hide responsable, forced ticket types.
 
-### Verificar
+### Pendiente / siguiente
 
-- Sidebar HOY: Chat, Actividades, Asistencias (sin grupo Actividades).
-- Actividades → persona → Asignar → opciones amigables.
-- Hard refresh si el menú viejo sigue cacheado.
+- Selector de **cliente de servicio** cuando tipo = Servicio.
+- UI de reasignación/delegación en el perfil de la persona.
+- Hard refresh si el menú viejo “Tareas/Proyectos” sigue visible.
 
 ## No tocar
 
