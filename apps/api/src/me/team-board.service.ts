@@ -100,9 +100,17 @@ export class TeamBoardService {
       orderBy: { nombre: 'asc' },
     });
     const companyWide = this.isCompanyWide(viewerResolved);
-    const scoped: ScopedUser[] = companyWide
+    let scoped: ScopedUser[] = companyWide
       ? allActive
       : allActive.filter((u) => this.subtreeIds(viewer.id, allActive).has(u.id));
+
+    // Pizarra = gestión del equipo: no mostrar al CEO Christian ni al propio viewer.
+    scoped = scoped.filter(
+      (u) =>
+        u.id !== viewer.id &&
+        u.email.toLowerCase() !== 'gerencia@nexara.com.mx',
+    );
+
     return { companyWide, scoped, now: new Date() };
   }
 
