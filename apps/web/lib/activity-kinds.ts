@@ -183,7 +183,7 @@ export const ASSIGNMENT_CHARGES: Record<AssignmentCharge, AssignmentChargeMeta> 
 };
 
 /** Encargados a quienes Christian/dirección puede elegir ejecución vs despacho. */
-const CHARGE_MANAGER_EMAILS = new Set([
+const CHARGE_MANAGER_EMAILS = new Set<string>([
   ORG_EMAILS.david,
   ORG_EMAILS.luis,
   ORG_EMAILS.antonio,
@@ -202,6 +202,67 @@ export function dispatchPoolEmails(managerEmail?: string | null): string[] {
   if (e === ORG_EMAILS.josue) return fieldInstallerEmails();
   if (e === ORG_EMAILS.luis) return [ORG_EMAILS.antonio, ...servicioDelegateEmails()];
   return [];
+}
+
+/** Encargado de área del miembro (instaladores → David, soporte → Antonio). */
+export function coordinatorEmailForMember(email?: string | null): string | null {
+  const e = norm(email);
+  if (!e) return null;
+  if (
+    e === ORG_EMAILS.david ||
+    e === ORG_EMAILS.antonio ||
+    e === ORG_EMAILS.josue ||
+    e === ORG_EMAILS.luis
+  ) {
+    return e;
+  }
+  if (fieldInstallerEmails().includes(e)) return ORG_EMAILS.david;
+  if (servicioDelegateEmails().includes(e)) return ORG_EMAILS.antonio;
+  return null;
+}
+
+/**
+ * Pool de equipo al asignar: en despacho une subordinados del encargado +
+ * extras del tipo (p. ej. Proyecto = instaladores + soporte).
+ * Devuelve [] si no hay filtro (usar roster completo).
+ */
+export function teamPoolEmailsForAssignment(opts: {
+  managerEmail?: string | null;
+  kind?: ActivityKind | null;
+  charge?: AssignmentCharge | null;
+}): string[] {
+  const manager = norm(opts.managerEmail);
+  const fromCharge =
+    opts.charge === 'despacho' ? dispatchPoolEmails(opts.managerEmail) : [];
+  const fromKind = extrasEmailsForKind(opts.kind ?? null) ?? [];
+  if (!fromCharge.length && !fromKind.length) return [];
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of [...fromCharge, ...fromKind]) {
+    const e = norm(raw);
+    if (!e || e === manager || seen.has(e)) continue;
+    seen.add(e);
+    out.push(e);
+  }
+  return out;
+}
+
+/** Coordinadores ajenos al responsable primario que hay que sumar (LEAD). */
+export function peerCoordinatorEmails(opts: {
+  primaryEmail?: string | null;
+  memberEmails: string[];
+}): string[] {
+  const primary = norm(opts.primaryEmail);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of opts.memberEmails) {
+    const coord = coordinatorEmailForMember(raw);
+    if (!coord || coord === primary || seen.has(coord)) continue;
+    seen.add(coord);
+    out.push(coord);
+  }
+  return out;
 }
 
 export function labelForAssignmentCharge(charge?: string | null): AssignmentChargeMeta | null {

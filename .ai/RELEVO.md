@@ -9,27 +9,26 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Trayecto GPS jerárquico + fotos
+## Este turno — Despacho Proyecto multi-equipo
 
 ### Hecho
 
-1. **Sin trayecto de David hoy (dato real):** su entrada tiene `entryLatitude/Longitude = null` y 0 filas en `locationTracking`. No es un bug de UI: la checada no guardó GPS. Mensaje clarificado en `GpsTrajectoryPreview`.
+Al asignar a David (u otro encargado) con **Proyecto + Despacho**:
 
-2. **Quién ve trayecto**
-   - Dirección (`GPS_MANAGE`: Christian / dirs): propio + cualquiera.
-   - Encargados (`ATTENDANCE_MANAGE` sin `GPS_MANAGE`): **solo subordinados** (`managerId` subtree). **No** ven el propio.
-   - Campo (`GPS_VIEW` sin manage): solo el propio.
+1. **Pool ampliado:** instaladores **y** soporte (ya no solo el subtree del encargado).
+2. **Coordinadores automáticos:** si eliges gente de instaladores **y** de soporte, se suma como LEAD al otro encargado (p. ej. Antonio) además de David (responsable).
+3. **Subordinados** elegidos quedan como TECNICO (o LEAD si son el peer coordinador).
+4. Banner verde en UI cuando hay peers auto.
 
-3. **UI:** panel «GPS del día» oculto en tarjeta propia de encargados; pestaña Trayectoria sin «Mi trayecto» para ellos. `SessionImage` carga fotos `/uploads` con `credentials: include` (cookie HttpOnly).
-
-Archivos: `gps.service.ts`, `gps.controller.ts`, `asistencias/page.tsx`, `AttendanceGpsDayPanel.tsx`, `SessionImage.tsx`, `GpsTrajectoryPreview.tsx`, `attendance.service.ts` (`??` coords).
+Helpers: `teamPoolEmailsForAssignment`, `peerCoordinatorEmails`, `coordinatorEmailForMember` en `activity-kinds.ts`.
+UI: `pizarra/[userId]/asignar/page.tsx`.
 
 ### Verificar
 
-1. **Reiniciar API** (Nest) para cargar `gps.service`.
-2. Hard refresh Asistencias.
-3. Como Christian: foto de entrada de David vía SessionImage; GPS del día explica si no hay coords.
-4. Como David: sin «Mi trayecto»; sí puede abrir GPS del día en subordinados (cuando tengan puntos).
+1. Hard refresh → `/erp/pizarra/<id-david>/asignar`
+2. Tipo Proyecto · Despacho → deben aparecer Israel/Joan/Juan **y** Carolina/Alejandro/(Antonio).
+3. Elige Israel + Carolina → banner «Coordinadores automáticos: Antonio…»
+4. Crear → equipo: David LEAD, Antonio LEAD, Israel+Carolina TECNICO.
 
 ## A medias
 
@@ -37,7 +36,7 @@ Nada.
 
 ## Siguiente
 
-Si quieren trayecto real: al fichar hay que conceder ubicación (coords en la entrada). Consentimiento de rastreo continuo es aparte (`PATCH /gps/consent`).
+Lo que Adam diga.
 
 ## No tocar
 
