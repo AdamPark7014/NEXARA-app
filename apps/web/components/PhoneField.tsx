@@ -2,10 +2,10 @@
 
 import PhoneInput, {
   isPossiblePhoneNumber,
-  parsePhoneNumberFromString,
   type Country,
   type Value,
 } from "react-phone-number-input";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 import flags from "react-phone-number-input/flags";
 import "react-phone-number-input/style.css";
 import styles from "./PhoneField.module.css";

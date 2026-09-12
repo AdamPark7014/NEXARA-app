@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
 import CatalogPicker from "@/components/CatalogPicker";
 import { useUser } from "@/components/UserContext";
+import PhoneField from "@/components/PhoneField";
 import {
   getSalesQuoteDetail,
   listSalesClients,
@@ -486,11 +487,11 @@ export default function EditQuotePage() {
               </div>
               <div>
                 <label className={styles.quotesLabel}>Teléfono</label>
-                <input
+                <PhoneField
                   className={styles.quotesInput}
                   value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
-                  placeholder="10 dígitos"
+                  onChange={setClientPhone}
+                  placeholder="+52 222 000 0000"
                 />
               </div>
               <div>

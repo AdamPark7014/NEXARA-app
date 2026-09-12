@@ -9,35 +9,36 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Despacho Proyecto multi-equipo
+## Este turno — PhoneField profesional (+52 / bandera)
 
 ### Hecho
 
-Al asignar a David (u otro encargado) con **Proyecto + Despacho**:
-
-1. **Pool ampliado:** instaladores **y** soporte (ya no solo el subtree del encargado).
-2. **Coordinadores automáticos:** si eliges gente de instaladores **y** de soporte, se suma como LEAD al otro encargado (p. ej. Antonio) además de David (responsable).
-3. **Subordinados** elegidos quedan como TECNICO (o LEAD si son el peer coordinador).
-4. Banner verde en UI cuando hay peers auto.
-
-Helpers: `teamPoolEmailsForAssignment`, `peerCoordinatorEmails`, `coordinatorEmailForMember` en `activity-kinds.ts`.
-UI: `pizarra/[userId]/asignar/page.tsx`.
+1. Componente `apps/web/components/PhoneField.tsx` + CSS: bandera, prefijo país, default **MX (+52)**, máscara/dígitos por país (`react-phone-number-input`), valor E.164.
+2. Helpers `isValidNexaraPhone` / `toE164Phone`.
+3. Cableado en creación/edición de teléfonos:
+   - ERP: clientes/nuevo, my-profile, ClientCreationForm, MyProfileForm
+   - CRM: leads, clients datos/legacy, quotes edit, CtOrderPanel, templates
+   - OPS: service-clients
+   - INTEGRA: visitors
+   - Público: contacto, FloatingContactForm, ContactFormToggle
+   - Tickets portal, ActivityEvidenceFlow, OrderTemplatesManager
+4. Dep: `react-phone-number-input` en `apps/web`.
 
 ### Verificar
 
-1. Hard refresh → `/erp/pizarra/<id-david>/asignar`
-2. Tipo Proyecto · Despacho → deben aparecer Israel/Joan/Juan **y** Carolina/Alejandro/(Antonio).
-3. Elige Israel + Carolina → banner «Coordinadores automáticos: Antonio…»
-4. Crear → equipo: David LEAD, Antonio LEAD, Israel+Carolina TECNICO.
+1. Hard refresh → `/erp/clientes/nuevo?sector=proyecto`
+2. Campo Teléfono: bandera MX, `+52`, solo dígitos válidos para el país.
+3. Cambiar a US/otro → cambia prefijo y longitud.
+4. Crear cliente / lead / perfil con teléfono → se guarda E.164.
 
-## A medias
+### A medias
 
 Nada.
 
-## Siguiente
+### Siguiente
 
 Lo que Adam diga.
 
-## No tocar
+### No tocar
 
 Puente NAS. Plan files.

@@ -17,6 +17,7 @@ import styles from './ActivityEvidenceFlow.module.css';
 import { Socket } from 'socket.io-client';
 import ConfirmDialog, { type ConfirmState } from '@/components/ui/ConfirmDialog';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import PhoneField from '@/components/PhoneField';
 
 type EvidenceBootstrap = {
   status?: string;
@@ -2086,12 +2087,11 @@ const ServiceSheetForm = ({
           disabled={loading}
         />
         <label style={lbl}>Teléfono de Contacto</label>
-        <input
-          type="tel"
+        <PhoneField
           style={inp}
           placeholder="Número de teléfono"
           value={data.clientPhone}
-          onChange={(e) => setData({ ...data, clientPhone: e.target.value })}
+          onChange={(clientPhone) => setData({ ...data, clientPhone })}
           disabled={loading}
         />
       </div>

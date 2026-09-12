@@ -7,6 +7,7 @@ import styles from './OrderTemplatesManager.module.css';
 import { Socket } from 'socket.io-client';
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import PhoneField from '@/components/PhoneField';
 
 type TemplateSections = {
   showClientInfo: boolean;
@@ -449,7 +450,10 @@ export default function OrderTemplatesManager() {
                   </div>
                   <div className={styles.field}>
                     <label>Teléfono</label>
-                    <input name="companyPhone" value={form.companyPhone} onChange={onFormChange} />
+                    <PhoneField
+                      value={form.companyPhone}
+                      onChange={(companyPhone) => setForm((prev) => ({ ...prev, companyPhone }))}
+                    />
                   </div>
                 </div>
 

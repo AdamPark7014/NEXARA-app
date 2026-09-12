@@ -11,6 +11,7 @@ import { provisionSalesServiceClient, updateSalesClient } from "@/lib/sales-api"
 import { DetailError, DetailField, DetailFieldGrid, DetailSection } from "@/components/detail/DetailFrame";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { toast } from "@/components/Toast";
+import PhoneField from "@/components/PhoneField";
 
 const INDUSTRIES = ["Corporativo", "Gobierno", "PyME", "Hogar", "Retail", "Industrial", "Educación", "Salud", "Otro"];
 const ESTADOS = ["Activo", "Inactivo", "Prospecto"];
@@ -88,7 +89,6 @@ export default function ClientDatosPage() {
             { label: "Régimen fiscal", key: "fiscalRegime", ph: "601" },
             { label: "Sitio web", key: "website", ph: "https://www.empresa.com" },
             { label: "Email facturación", key: "billingEmail", ph: "facturación@empresa.com" },
-            { label: "Teléfono", key: "billingPhone", ph: "222 555 1234" },
             { label: "Dirección fiscal", key: "fiscalAddress", ph: "Calle, Col., CP, Estado", span: true },
           ] as const).map(({ label, key, ph, ...rest }) => (
             <div key={key} style={{ gridColumn: "span" in rest && rest.span ? "1 / -1" : undefined }}>
@@ -96,6 +96,10 @@ export default function ClientDatosPage() {
               <input value={(form as Record<string, string>)[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} placeholder={ph} style={inp} />
             </div>
           ))}
+          <div>
+            <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Teléfono</label>
+            <PhoneField value={form.billingPhone} onChange={(billingPhone) => setForm((f) => ({ ...f, billingPhone }))} placeholder="+52 222 555 1234" style={inp} />
+          </div>
           <div>
             <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Industria</label>
             <select value={form.industry} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} style={inp}>
