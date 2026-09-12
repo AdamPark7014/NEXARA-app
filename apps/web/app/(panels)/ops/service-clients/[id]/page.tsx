@@ -11,6 +11,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import PhoneField from "@/components/PhoneField";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
@@ -200,7 +201,7 @@ export default function ServiceClientDetailPage() {
             </div>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Teléfono</label>
-              <input value={form.telefono} onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))} placeholder="Teléfono" style={inp} />
+              <PhoneField value={form.telefono} onChange={(telefono) => setForm((f) => ({ ...f, telefono }))} placeholder="Teléfono" />
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Dirección</label>

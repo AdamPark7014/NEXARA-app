@@ -13,6 +13,7 @@ import type { PageVisualsContent } from "@/lib/page-content-api";
 import { findGeoCity } from "@/lib/seo/geo-cities";
 import { findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
+import PhoneField from "@/components/PhoneField";
 
 const WA_LABEL = "+52 222 696 0350";
 const PHONE_LABEL = "+52 222 696 0350";
@@ -29,6 +30,7 @@ export default function ContactoClient({ visuals }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [phone, setPhone] = useState("");
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const asideImg = visuals.slots[0];
 
@@ -73,7 +75,7 @@ export default function ContactoClient({ visuals }: Props) {
     const payload = {
       name: String(data.name || ""),
       email: String(data.email || ""),
-      phone: data.phone ? String(data.phone) : undefined,
+      phone: phone.trim() || undefined,
       subject: message.slice(0, 80) || "Contacto web",
       category: String(data.category || "VENTAS"),
       message,
@@ -187,7 +189,7 @@ export default function ContactoClient({ visuals }: Props) {
                   </div>
                   <label className={styles.field}>
                     <span>Teléfono</span>
-                    <input name="phone" type="tel" placeholder="+52 55 0000 0000" disabled={loading} />
+                    <PhoneField value={phone} onChange={setPhone} disabled={loading} placeholder="+52 55 0000 0000" />
                   </label>
                   <label className={styles.field}>
                     <span>¿En qué te ayudamos? *</span>

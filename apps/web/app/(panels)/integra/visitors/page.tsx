@@ -23,6 +23,7 @@ import {
   selectStyle,
 } from "../_lib";
 import { toast } from "@/components/Toast";
+import PhoneField from "@/components/PhoneField";
 import styles from "../integra.module.css";
 import {
   WEEK_DAYS,
@@ -341,12 +342,10 @@ export default function IntegraVisitorsPage() {
                     />
                   </IgField>
                   <IgField label="Teléfono">
-                    <input
+                    <PhoneField
                       value={rPhone}
-                      onChange={(e) => setRPhone(e.target.value)}
+                      onChange={setRPhone}
                       placeholder="Opcional"
-                      inputMode="tel"
-                      style={{ ...inputStyle, maxWidth: "100%" }}
                     />
                   </IgField>
                   <IgField label="Empleado anfitrión">
@@ -709,11 +708,7 @@ export default function IntegraVisitorsPage() {
                     />
                   </IgField>
                   <IgField label="Teléfono">
-                    <input
-                      value={phoneNo}
-                      onChange={(e) => setPhoneNo(e.target.value)}
-                      style={{ ...inputStyle, maxWidth: "100%" }}
-                    />
+                    <PhoneField value={phoneNo} onChange={setPhoneNo} />
                   </IgField>
                   <IgField label="Género">
                     <select

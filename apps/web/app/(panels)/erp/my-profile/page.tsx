@@ -8,6 +8,7 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import PhoneField from "@/components/PhoneField";
 import KpiCard from "@/components/ui/KpiCard";
 
 interface Profile {
@@ -274,7 +275,7 @@ export default function MyProfilePage() {
           <Section title="Datos personales" subtitle="Solo tú y RH/Dirección pueden ver esta información.">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Teléfono</span>
-                <input value={form.telefono ?? ""} onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))} style={inp} /></label>
+                <PhoneField value={form.telefono ?? ""} onChange={(telefono) => setForm((f) => ({ ...f, telefono }))} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Fecha de nacimiento</span>
                 <input type="date" value={form.fechaNacimiento ?? ""} onChange={(e) => setForm((f) => ({ ...f, fechaNacimiento: e.target.value }))} style={inp} /></label>
               <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}><span style={lbl}>Dirección</span>
@@ -303,7 +304,10 @@ export default function MyProfilePage() {
               <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Nombre</span>
                 <input value={form.contactoEmergenciaNombre ?? ""} onChange={(e) => setForm((f) => ({ ...f, contactoEmergenciaNombre: e.target.value }))} style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Teléfono</span>
-                <input value={form.contactoEmergenciaTelefono ?? ""} onChange={(e) => setForm((f) => ({ ...f, contactoEmergenciaTelefono: e.target.value }))} style={inp} /></label>
+                <PhoneField
+                  value={form.contactoEmergenciaTelefono ?? ""}
+                  onChange={(contactoEmergenciaTelefono) => setForm((f) => ({ ...f, contactoEmergenciaTelefono }))}
+                /></label>
             </div>
           </Section>
 

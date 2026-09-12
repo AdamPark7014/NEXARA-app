@@ -1,0 +1,77 @@
+.wrap {
+  display: flex;
+  width: 100%;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.wrap:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  outline-offset: 1px;
+  border-color: var(--primary);
+}
+
+.wrap :global(.PhoneInputCountry) {
+  margin: 0;
+  padding: 0 10px;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 88%, var(--border));
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wrap :global(.PhoneInputCountryIcon) {
+  width: 1.35em;
+  height: 1em;
+  box-shadow: none;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.wrap :global(.PhoneInputCountrySelect) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.wrap :global(.PhoneInputCountrySelectArrow) {
+  opacity: 0.55;
+  margin-left: 2px;
+  border-top-color: currentColor;
+}
+
+.wrap :global(.PhoneInputInput) {
+  flex: 1;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  min-width: 0;
+  width: 100%;
+}
+
+.wrap :global(.PhoneInputInput)::placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.85;
+}
+
+.invalid {
+  border-color: #dc2626;
+}

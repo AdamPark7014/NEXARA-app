@@ -5,6 +5,7 @@ import { useUser } from './UserContext';
 import styles from './ClientCreationForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import PhoneField from '@/components/PhoneField';
 
 interface ClientCreationFormProps {
   onClientCreated?: () => void;
@@ -200,11 +201,10 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
             value={newClient.contactEmail} 
             onChange={(e) => updateClientField('contactEmail', e.target.value)} 
           />
-          <input 
-            className="input" 
-            placeholder="Teléfono" 
-            value={newClient.contactPhone} 
-            onChange={(e) => updateClientField('contactPhone', e.target.value)} 
+          <PhoneField
+            value={newClient.contactPhone}
+            onChange={(v) => updateClientField('contactPhone', v)}
+            placeholder="Teléfono"
           />
           <input 
             className="input" 
