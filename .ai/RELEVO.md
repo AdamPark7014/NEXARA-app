@@ -9,22 +9,22 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Josué Encargado de Obra
+## Este turno — Equipo extra por tipo
 
 ### Hecho
 
-- Puesto/labels: **Encargado de Obra** (ya no “Arquitecto / Director Técnico”).
-- Seed DB actualizado (`infraestructura@nexara.com.mx`).
-- Tipos que recibe: **tarea · proyecto · obra · comercial** (todo menos **servicio**).
-- Hint de asignar actualizado.
+- **Servicio** → chips solo soporte (Antonio, Carolina, Alejandro).
+- **Obra** → solo instaladores (Joan, Israel, Juan José).
+- **Proyecto** → soporte + instaladores.
+- **Tarea / Comercial** → sin filtro de especialidad (tablero completo).
+- Al cambiar tipo se limpian extras inválidos.
 
 ### Verificar
 
-- CEO → Actividades → Josué → Asignar: cargo “Encargado de Obra”; 4 cards (sin Servicio).
-- Hard refresh si cachea.
+- Luis + Servicio: solo Antonio/Carolina/Alejandro (no David/Josué/comercial).
+- Obra: solo los 3 de campo.
+- Proyecto: mezcla de ambos pools.
 
 ## No tocar
 
-Puente NAS. Credenciales en repo. Plan file.
-
-
+Puente NAS. Credenciales. Plan file.
