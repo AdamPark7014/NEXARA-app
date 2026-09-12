@@ -9,19 +9,15 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Fix redirect Clientes → CRM
+## Este turno — Ocultar CompanySwitcher en Core
 
 ### Hecho
 
-- Causa: `legacy-path-remap` mandaba `/erp/clientes` → `/crm/clients` (bucle con el redirect).
-- `/erp/clientes` queda canónico (como asistencias/actividades).
-- `/erp/clients` → `/erp/clientes`.
-- Tests remap OK. CRM page usa `location.replace` de respaldo.
+- Con `CORE_SURFACE_ONLY`, el header ya no muestra “Cambiar empresa activa” (NEXARA / Demo).
 
 ### Verificar
 
-- Hard refresh → Core → Clientes → URL `/erp/clientes` (Nexara CORE, no CRM).
-- Sidebar con Chat / Actividades / Asistencias / Clientes.
+- Hard refresh → topbar sin dropdown N / NEXARA.
 
 ## A medias
 
@@ -29,8 +25,10 @@ Nada.
 
 ## Siguiente
 
-Smoke UI.
+Lo que Adam diga.
 
 ## No tocar
 
 Puente NAS. Plan file.
+
+
