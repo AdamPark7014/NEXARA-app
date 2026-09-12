@@ -85,6 +85,8 @@ export default function AsignarActividadPage() {
     servicioShouldGoToBridge({
       creatorEmail: user?.email,
       targetEmail: person?.email,
+      isSuperAdmin: Boolean(user?.isSuperAdmin),
+      isCeo: v2 === "ceo",
     });
 
   const antonioOnBoard = useMemo(
