@@ -163,14 +163,18 @@ export default function AsignarActividadPage() {
     }
     setTeamError(null);
     try {
+      // Actualiza indicaciones del LEAD (el create ya lo upserta sin notas personales).
+      if (leadNotes.trim()) {
+        await addTeamMember(token, activityId, userId, leadNotes, "LEAD");
+      }
       for (const id of extraIds) {
         await addTeamMember(token, activityId, id, extraNotes[id]);
       }
     } catch (e) {
       setTeamError(
         e instanceof Error
-          ? `Actividad creada, pero el equipo extra falló: ${e.message}`
-          : "Actividad creada; no se pudo agregar al equipo extra",
+          ? `Actividad creada, pero el equipo / indicaciones falló: ${e.message}`
+          : "Actividad creada; no se pudo guardar equipo o indicaciones",
       );
       return;
     }
