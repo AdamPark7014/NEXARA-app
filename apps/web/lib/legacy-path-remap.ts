@@ -201,6 +201,12 @@ export function remapLegacySlugs(pathname: string): string {
     return joinRemapTarget(target, rest);
   }
 
+  // Core ola1: buckets viven en ES (/erp/actividades/tareas|proyectos|servicios).
+  // El alias actividades→activities / proyectos→projects los manda a 404.
+  if (pathname === '/erp/actividades' || pathname.startsWith('/erp/actividades/')) {
+    return pathname;
+  }
+
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length < 2) return pathname;
 
