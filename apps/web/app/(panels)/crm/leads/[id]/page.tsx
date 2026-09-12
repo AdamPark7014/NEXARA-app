@@ -14,6 +14,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import { formatLeadStatus, updateSalesLead, createSalesClient, createSalesOpportunity, type SalesLead } from "@/lib/sales-api";
 import { toast } from "@/components/Toast";
+import PhoneField from "@/components/PhoneField";
 
 const STATUSES = ["NEW", "QUALIFIED", "NURTURING", "LOST", "CONVERTED"] as const;
 const FUENTES = ["Web", "Referido", "LinkedIn", "Llamada", "Feria", "Otro"];
@@ -241,7 +242,7 @@ export default function LeadDetailPage() {
             </div>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Teléfono</label>
-              <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} style={inp} />
+              <PhoneField value={form.phone} onChange={(phone) => setForm((f) => ({ ...f, phone }))} />
             </div>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Fuente</label>

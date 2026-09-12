@@ -12,6 +12,7 @@ import {
   type ClientSector,
 } from "@/lib/client-sectors";
 import { createSalesClient } from "@/lib/sales-api";
+import PhoneField, { isValidNexaraPhone } from "@/components/PhoneField";
 import styles from "../clientes-core.module.css";
 
 const empty = {
@@ -58,6 +59,11 @@ function NuevoClienteForm() {
     }
     setSaving(true);
     setError(null);
+    if (form.billingPhone.trim() && !isValidNexaraPhone(form.billingPhone)) {
+      setError("Teléfono inválido para el país seleccionado");
+      setSaving(false);
+      return;
+    }
     try {
       const created = await createSalesClient(token, {
         ...form,
@@ -183,11 +189,10 @@ function NuevoClienteForm() {
           </div>
           <div className={styles.field}>
             <label htmlFor="billingPhone">Teléfono</label>
-            <input
+            <PhoneField
               id="billingPhone"
-              className={styles.input}
               value={form.billingPhone}
-              onChange={(e) => setForm((f) => ({ ...f, billingPhone: e.target.value }))}
+              onChange={(billingPhone) => setForm((f) => ({ ...f, billingPhone }))}
             />
           </div>
         </div>

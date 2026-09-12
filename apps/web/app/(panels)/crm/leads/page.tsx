@@ -11,6 +11,7 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
 import { toast } from "@/components/Toast";
+import PhoneField from "@/components/PhoneField";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import {
@@ -365,13 +366,16 @@ export default function LeadsPage() {
                 { label: "Empresa", key: "company", ph: "Nombre de la empresa" },
                 { label: "Contacto *", key: "name", ph: "Nombre del contacto" },
                 { label: "Email", key: "email", ph: "correo@empresa.com", type: "email" },
-                { label: "Teléfono", key: "phone", ph: "+52 222 555 1234", type: "tel" },
               ] as const).map(({ label, key, ph, ...rest }) => (
                 <div key={key}>
                   <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>{label}</label>
                   <input type={"type" in rest ? rest.type : "text"} value={(form as Record<string, string | number>)[key] as string} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} placeholder={ph} style={inp} />
                 </div>
               ))}
+              <div>
+                <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Teléfono</label>
+                <PhoneField value={form.phone} onChange={(phone) => setForm((f) => ({ ...f, phone }))} />
+              </div>
               <div>
                 <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Fuente</label>
                 <select value={form.source} onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))} style={inp}>

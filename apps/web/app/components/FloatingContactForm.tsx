@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import styles from "./FloatingContactForm.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { openExternalUrl } from "@/lib/open-external-url";
+import PhoneField from "@/components/PhoneField";
 
 const WA_URL =
   "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
@@ -30,6 +31,7 @@ export default function FloatingContactForm() {
   const [tipo, setTipo] = useState<Tipo>("EMPRESA");
   const [category, setCategory] = useState("");
   const [categoryError, setCategoryError] = useState(false);
+  const [phone, setPhone] = useState("");
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function FloatingContactForm() {
     const payload = {
       name: String(data.name || ""),
       email: String(data.email || ""),
-      phone: data.phone ? String(data.phone) : undefined,
+      phone: phone.trim() || undefined,
       company: tipo === "EMPRESA" && data.company ? String(data.company) : undefined,
       subject: `${categoryLabel} · ${tipo === "EMPRESA" ? "Empresa" : "Persona"}`,
       category,
@@ -104,6 +106,7 @@ export default function FloatingContactForm() {
       setCategory("");
       setCategoryError(false);
       setTipo("EMPRESA");
+      setPhone("");
       form.reset();
       timeoutRef.current = null;
     }, 3000);
@@ -246,12 +249,12 @@ export default function FloatingContactForm() {
                   </div>
                   <div className={styles.formField}>
                     <label htmlFor="float-phone">Teléfono</label>
-                    <input
+                    <PhoneField
                       id="float-phone"
-                      name="phone"
-                      type="tel"
-                      placeholder="+52 55 0000 0000"
+                      value={phone}
+                      onChange={setPhone}
                       disabled={loading}
+                      placeholder="+52 55 0000 0000"
                     />
                   </div>
                 </div>

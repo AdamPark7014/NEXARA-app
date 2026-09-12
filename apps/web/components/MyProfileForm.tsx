@@ -5,6 +5,7 @@ import { useUser } from './UserContext';
 import styles from './MyProfileForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import PhoneField from '@/components/PhoneField';
 
 const requiredDocuments = [
   {
@@ -351,7 +352,7 @@ const MyProfileForm: React.FC = () => {
         <div className={styles.grid}>
           <div>
             <label className={styles.label}>Teléfono</label>
-            <input className="input" value={form.telefono} onChange={(e) => handleChange('telefono', e.target.value)} />
+            <PhoneField value={form.telefono} onChange={(v) => handleChange('telefono', v)} />
           </div>
           <div>
             <label className={styles.label}>Fecha nacimiento</label>
@@ -392,7 +393,11 @@ const MyProfileForm: React.FC = () => {
         <h3 className={styles.sectionTitle}>Contacto de emergencia</h3>
         <div className={styles.grid}>
           <input className="input" placeholder="Nombre" value={form.contactoEmergenciaNombre} onChange={(e) => handleChange('contactoEmergenciaNombre', e.target.value)} />
-          <input className="input" placeholder="Teléfono" value={form.contactoEmergenciaTelefono} onChange={(e) => handleChange('contactoEmergenciaTelefono', e.target.value)} />
+          <PhoneField
+            value={form.contactoEmergenciaTelefono}
+            onChange={(v) => handleChange('contactoEmergenciaTelefono', v)}
+            placeholder="Teléfono de emergencia"
+          />
         </div>
       </div>
 
