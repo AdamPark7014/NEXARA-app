@@ -737,7 +737,7 @@ export class ClientPortalController {
         responsable: true,
         evidencias: true,
         serviceSheet: true,
-        activityEvidence: true,
+        activityEvidences: true,
         project: { select: { id: true, title: true, status: true, projectType: true } },
       },
       orderBy: { fechaAsignacion: 'desc' },
@@ -748,7 +748,7 @@ export class ClientPortalController {
   async ticket(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
     return this.prisma['activity'].findFirst({
       where: { id, clientId: user.clientId },
-      include: { responsable: true, evidencias: true, serviceSheet: true, activityEvidence: true },
+      include: { responsable: true, evidencias: true, serviceSheet: true, activityEvidences: true },
     });
   }
 

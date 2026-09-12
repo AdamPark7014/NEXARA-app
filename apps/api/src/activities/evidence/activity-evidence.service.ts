@@ -6,11 +6,20 @@ import { ActivitiesService } from '../activities.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
+import {
+  clampEvidencePhotoRequired,
+  requiresServiceSheetPdf,
+  nextEvidenceStep,
+  isPdfUrl,
+  evidenceProgressPct,
+  evidenceStepsForKind,
+  type EvidenceStep,
+} from './evidence-flow.helpers.js';
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 
-type ActivityEvidenceStatus = 'ENTRY_PHOTO' | 'EVIDENCE_PHOTOS' | 'SERVICE_SHEET_PDF' | 'SERVICE_SHEET_DATA' | 'EXIT_PHOTO' | 'COMPLETED';
+type ActivityEvidenceStatus = EvidenceStep;
 
 const EVIDENCE_STEP_ORDER: ActivityEvidenceStatus[] = [
   'ENTRY_PHOTO',
@@ -268,20 +277,37 @@ export class ActivityEvidenceService {
     };
   }
 
+  private ensureActorUserId(user: any): number {
+    const id = Number(user?.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new BadRequestException('Usuario no autenticado');
+    }
+    return id;
+  }
+
   private async loadActivityForTenant(activityId: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const activity = await this.prisma.activity.findFirst({
       where: { id: activityId, ...companyWhere(tenantId) },
-      select: { id: true, estatus: true, companyId: true, workType: true },
+      select: {
+        id: true,
+        estatus: true,
+        companyId: true,
+        workType: true,
+        coreKind: true,
+        evidencePhotoRequired: true,
+        responsableId: true,
+        indicaciones: true,
+      },
     });
     assertCompanyAccess(activity, tenantId, 'Actividad');
     return activity!;
   }
 
   /**
-   * Obtener o crear el registro de evidencias de una actividad
+   * Obtener o crear el registro de evidencias de una actividad (por usuario)
    */
-  async getOrCreateActivityEvidence(activityId: number, companyId?: number | null) {
+  async getOrCreateActivityEvidence(activityId: number, userId: number, companyId?: number | null) {
     const activity = await this.loadActivityForTenant(activityId, companyId);
 
     if (activity.estatus === 'Aprobada') {
@@ -289,7 +315,7 @@ export class ActivityEvidenceService {
     }
 
     let evidence = await this.prisma.activityEvidence.findFirst({
-      where: { activityId, ...companyWhere(activity.companyId) },
+      where: { activityId, userId, ...companyWhere(activity.companyId) },
     });
 
     if (evidence?.reviewStatus === 'APPROVED') {
@@ -304,6 +330,7 @@ export class ActivityEvidenceService {
       evidence = await this.prisma.activityEvidence.create({
         data: {
           activityId,
+          userId,
           companyId: activity.companyId,
           status: 'ENTRY_PHOTO',
         },
@@ -313,24 +340,58 @@ export class ActivityEvidenceService {
     return evidence;
   }
 
+  /** Cierra la actividad solo cuando todos los assignees activos + responsable tienen evidencia COMPLETED. */
+  private async maybeFinalizeActivity(activityId: number, companyId?: number | null) {
+    const activity = await this.loadActivityForTenant(activityId, companyId);
+    const assignees = await this.prisma.activityAssignee.findMany({
+      where: { activityId, retiradoAt: null },
+      select: { userId: true },
+    });
+    const requiredUserIds = Array.from(
+      new Set([...assignees.map((a) => a.userId), activity.responsableId].filter(Boolean)),
+    );
+    if (requiredUserIds.length === 0) return;
+
+    const completed = await this.prisma.activityEvidence.findMany({
+      where: {
+        activityId,
+        userId: { in: requiredUserIds },
+        status: 'COMPLETED',
+        ...companyWhere(activity.companyId),
+      },
+      select: { userId: true },
+    });
+    const completedIds = new Set(completed.map((e) => e.userId));
+    if (!requiredUserIds.every((id) => completedIds.has(id))) return;
+
+    await this.prisma.activity.update({
+      where: { id: activityId },
+      data: {
+        estatus: 'Finalizada',
+        fechaFinalizacion: new Date(),
+      },
+    });
+  }
+
   /**
    * Guardar foto de entrada
    */
   async saveEntryPhoto(
     activityId: number,
+    userId: number,
     photoUrl: string,
     latitude: number,
     longitude: number,
     companyId?: number | null,
   ) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
     if (evidence.status !== 'ENTRY_PHOTO') {
       throw new BadRequestException('Ya se ha guardado la foto de entrada');
     }
 
     return this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         entryPhotoUrl: photoUrl,
         entryLatitude: latitude,
@@ -342,12 +403,18 @@ export class ActivityEvidenceService {
   }
 
   /**
-   * Guardar fotos de evidencia (4-8 fotos)
+   * Guardar fotos de evidencia (N fotos según evidencePhotoRequired)
    */
-  async saveEvidencePhotos(activityId: number, photoUrls: string[], companyId?: number | null) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+  async saveEvidencePhotos(
+    activityId: number,
+    userId: number,
+    photoUrls: string[],
+    companyId?: number | null,
+  ) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
     const activity = await this.loadActivityForTenant(activityId, companyId);
     const isInventoryFlow = activity?.workType === 'PREVENTIVE_INVENTORY';
+    const required = clampEvidencePhotoRequired(activity.evidencePhotoRequired);
 
     if (evidence.status !== 'EVIDENCE_PHOTOS') {
       throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
@@ -357,22 +424,16 @@ export class ActivityEvidenceService {
       if (photoUrls.length < 1) {
         throw new BadRequestException('Para mantenimiento e inventario se requiere al menos 1 evidencia visual');
       }
-    } else {
-      if (photoUrls.length < 4) {
-        throw new BadRequestException('Mínimo 4 fotos de evidencia son requeridas');
-      }
-
-      if (photoUrls.length > 8) {
-        throw new BadRequestException('Máximo 8 fotos de evidencia permitidas');
-      }
+    } else if (photoUrls.length !== required) {
+      throw new BadRequestException(`Se requieren exactamente ${required} fotos de evidencia`);
     }
 
     return this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         evidencePhotos: photoUrls,
         evidencePhotosUploadedAt: new Date(),
-        status: 'SERVICE_SHEET_PDF',
+        status: nextEvidenceStep('EVIDENCE_PHOTOS', activity.coreKind),
       },
     });
   }
@@ -380,19 +441,33 @@ export class ActivityEvidenceService {
   /**
    * Guardar hoja de servicio PDF
    */
-  async saveServiceSheetPdf(activityId: number, pdfUrl: string, companyId?: number | null) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+  async saveServiceSheetPdf(
+    activityId: number,
+    userId: number,
+    pdfUrl: string,
+    companyId?: number | null,
+  ) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
+    const activity = await this.loadActivityForTenant(activityId, companyId);
 
     if (evidence.status !== 'SERVICE_SHEET_PDF') {
       throw new BadRequestException('No estás en el paso correcto para guardar la hoja de servicio');
     }
 
+    if (!isPdfUrl(pdfUrl)) {
+      throw new BadRequestException('La hoja de servicio debe ser un PDF');
+    }
+
+    if (!requiresServiceSheetPdf(activity.coreKind)) {
+      throw new BadRequestException('Este tipo de actividad no requiere hoja de servicio PDF');
+    }
+
     return this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         serviceSheetPdfUrl: pdfUrl,
         serviceSheetUploadedAt: new Date(),
-        status: 'SERVICE_SHEET_DATA',
+        status: nextEvidenceStep('SERVICE_SHEET_PDF', activity.coreKind),
       },
     });
   }
@@ -400,19 +475,25 @@ export class ActivityEvidenceService {
   /**
    * Completar plantilla de hoja de servicio interna
    */
-  async completeServiceSheetForm(activityId: number, data: any, companyId?: number | null) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+  async completeServiceSheetForm(
+    activityId: number,
+    userId: number,
+    data: any,
+    companyId?: number | null,
+  ) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
+    const activity = await this.loadActivityForTenant(activityId, companyId);
 
     if (evidence.status !== 'SERVICE_SHEET_DATA') {
       throw new BadRequestException('No estás en el paso correcto para completar la plantilla');
     }
 
     return this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         serviceSheetData: data,
         serviceSheetCompletedAt: new Date(),
-        status: 'EXIT_PHOTO',
+        status: nextEvidenceStep('SERVICE_SHEET_DATA', activity.coreKind),
       },
     });
   }
@@ -422,12 +503,13 @@ export class ActivityEvidenceService {
    */
   async saveExitPhoto(
     activityId: number,
+    userId: number,
     photoUrl: string,
     latitude: number,
     longitude: number,
     companyId?: number | null,
   ) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
     if (evidence.status !== 'EXIT_PHOTO') {
       throw new BadRequestException('No estás en el paso correcto para guardar la foto de salida');
@@ -438,7 +520,7 @@ export class ActivityEvidenceService {
     }
 
     const updated = await this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         exitPhotoUrl: photoUrl,
         exitLatitude: latitude,
@@ -449,32 +531,39 @@ export class ActivityEvidenceService {
       },
     });
 
-    // Al completar el flujo, la actividad queda pendiente hasta revisión administrativa
-    await this.prisma.activity.update({
-      where: { id: activityId },
-      data: {
-        estatus: 'Pendiente',
-        fechaFinalizacion: new Date(),
-      },
-    });
-
+    await this.maybeFinalizeActivity(activityId, companyId);
     void this.notifyEvidenceReadyForReview(activityId);
 
     return updated;
   }
 
   /**
-   * Obtener evidencias de una actividad
+   * Obtener evidencias de una actividad (del usuario actor)
    */
   async getActivityEvidence(
     activityId: number,
     requester?: { id: number; permissions?: string[]; isSuperAdmin?: boolean },
     companyId?: number | null,
   ) {
+    const userId = this.ensureActorUserId(requester);
     const evidence = await this.prisma.activityEvidence.findFirst({
-      where: { activityId, ...companyWhere(companyId ?? null) },
+      where: { activityId, userId, ...companyWhere(companyId ?? null) },
       include: {
-        activity: true,
+        activity: {
+          select: {
+            id: true,
+            indicaciones: true,
+            coreKind: true,
+            evidencePhotoRequired: true,
+            responsableId: true,
+            companyId: true,
+            estatus: true,
+            assignees: {
+              where: { userId, retiradoAt: null },
+              select: { userId: true, indicaciones: true, rol: true },
+            },
+          },
+        },
       },
     });
 
@@ -484,18 +573,23 @@ export class ActivityEvidenceService {
 
     assertCompanyAccess(evidence, companyId, 'Evidencia');
 
-    if (requester?.id) {
-      const isResponsible = evidence.activity.responsableId === requester.id;
-      const canReview =
-        Boolean(requester.isSuperAdmin) ||
-        this.hasPermission(requester, PERMISSIONS.CONSOLE_ADMIN) ||
-        this.hasPermission(requester, PERMISSIONS.EVIDENCES_REVIEW);
-      if (!isResponsible && !canReview) {
-        throw new ForbiddenException('No tienes acceso a las evidencias de esta actividad');
-      }
+    const isOwner = evidence.userId === userId;
+    const isResponsible = evidence.activity.responsableId === userId;
+    const canReview =
+      Boolean(requester?.isSuperAdmin) ||
+      this.hasPermission(requester, PERMISSIONS.CONSOLE_ADMIN) ||
+      this.hasPermission(requester, PERMISSIONS.EVIDENCES_REVIEW);
+    if (!isOwner && !isResponsible && !canReview) {
+      throw new ForbiddenException('No tienes acceso a las evidencias de esta actividad');
     }
 
-    return evidence;
+    const coreKind = evidence.activity.coreKind;
+    return {
+      ...evidence,
+      assigneeIndicaciones: evidence.activity.assignees[0]?.indicaciones ?? null,
+      stepsForKind: evidenceStepsForKind(coreKind),
+      progressPct: evidenceProgressPct(evidence.status, coreKind),
+    };
   }
 
   /**
@@ -581,8 +675,8 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Usuario no autenticado');
     }
 
-    const evidence = await this.prisma.activityEvidence.findUnique({
-      where: { activityId },
+    const evidence = await this.prisma.activityEvidence.findFirst({
+      where: { activityId, userId },
       include: {
         activity: {
           select: {
@@ -596,7 +690,7 @@ export class ActivityEvidenceService {
       throw new NotFoundException('No se encontró evidencia para esta actividad');
     }
 
-    if (evidence.activity.responsableId !== userId) {
+    if (evidence.userId !== userId && evidence.activity.responsableId !== userId) {
       throw new ForbiddenException('No tienes permisos para descargar este reporte');
     }
 
@@ -1050,8 +1144,14 @@ export class ActivityEvidenceService {
   /**
    * Actualizar foto de evidencia (remover y reemplazar)
    */
-  async updateEvidencePhoto(activityId: number, index: number, newPhotoUrl: string, companyId?: number | null) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+  async updateEvidencePhoto(
+    activityId: number,
+    userId: number,
+    index: number,
+    newPhotoUrl: string,
+    companyId?: number | null,
+  ) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
     if (!evidence.evidencePhotos || evidence.evidencePhotos.length === 0) {
       throw new BadRequestException('No hay fotos de evidencia para actualizar');
@@ -1065,7 +1165,7 @@ export class ActivityEvidenceService {
     updatedPhotos[index] = newPhotoUrl;
 
     return this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         evidencePhotos: updatedPhotos,
       },
@@ -1075,8 +1175,13 @@ export class ActivityEvidenceService {
   /**
    * Remover foto de evidencia
    */
-  async removeEvidencePhoto(activityId: number, index: number, companyId?: number | null) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+  async removeEvidencePhoto(
+    activityId: number,
+    userId: number,
+    index: number,
+    companyId?: number | null,
+  ) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
     if (!evidence.evidencePhotos || evidence.evidencePhotos.length === 0) {
       throw new BadRequestException('No hay fotos de evidencia para remover');
@@ -1087,7 +1192,10 @@ export class ActivityEvidenceService {
     }
 
     const activity = await this.loadActivityForTenant(activityId, companyId);
-    const minPhotos = activity?.workType === 'PREVENTIVE_INVENTORY' ? 1 : 4;
+    const minPhotos =
+      activity?.workType === 'PREVENTIVE_INVENTORY'
+        ? 1
+        : clampEvidencePhotoRequired(activity.evidencePhotoRequired);
     if (evidence.evidencePhotos.length <= minPhotos) {
       throw new BadRequestException(`Mínimo ${minPhotos} foto${minPhotos > 1 ? 's' : ''} de evidencia son requeridas`);
     }
@@ -1095,7 +1203,7 @@ export class ActivityEvidenceService {
     const updatedPhotos = evidence.evidencePhotos.filter((_: string, i: number) => i !== index);
 
     return this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         evidencePhotos: updatedPhotos,
       },
@@ -1105,7 +1213,13 @@ export class ActivityEvidenceService {
   /**
    * Aprobar evidencias (Admin)
    */
-  async approveEvidence(activityId: number, reviewerId: number, notes?: string, companyId?: number | null) {
+  async approveEvidence(
+    activityId: number,
+    userId: number,
+    reviewerId: number,
+    notes?: string,
+    companyId?: number | null,
+  ) {
     // `isSuperAdmin` NO es columna de `User` —se calcula en el JWT
     // (`rbac.guard.ts`) o desde el correo (`platform-accounts.ts`)—, así que
     // pedirlo aquí no compilaba. El objeto solo se usa para comprobar que el
@@ -1120,14 +1234,19 @@ export class ActivityEvidenceService {
       throw new ForbiddenException('Revisor inválido');
     }
 
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+    const evidence = await this.prisma.activityEvidence.findFirst({
+      where: { activityId, userId, ...companyWhere(companyId ?? null) },
+    });
+    if (!evidence) {
+      throw new NotFoundException('Evidencias no encontradas');
+    }
 
     if (evidence.status !== 'COMPLETED') {
       throw new BadRequestException('Las evidencias deben estar completadas antes de aprobar');
     }
 
     const updated = await this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         reviewStatus: 'APPROVED',
         reviewNotes: notes || null,
@@ -1149,17 +1268,17 @@ export class ActivityEvidenceService {
         where: { id: activityId },
         select: { responsableId: true, titulo: true },
       });
-      const reviewer = await this.prisma.user.findUnique({
+      const reviewerUser = await this.prisma.user.findUnique({
         where: { id: reviewerId },
         select: { nombre: true },
       });
-      if (activity && reviewer?.nombre) {
+      if (activity && reviewerUser?.nombre) {
         await this.notificationHierarchy.notifyEvidenceReview(
           activity.responsableId,
           activityId,
           activity.titulo || '',
           'approved',
-          reviewer.nombre,
+          reviewerUser.nombre,
         );
       }
     } catch {
@@ -1174,6 +1293,7 @@ export class ActivityEvidenceService {
    */
   async rejectEvidence(
     activityId: number,
+    userId: number,
     reviewerId: number,
     notes: string,
     options: {
@@ -1186,7 +1306,7 @@ export class ActivityEvidenceService {
     await this.loadActivityForTenant(activityId, companyId);
 
     const evidence = await this.prisma.activityEvidence.findFirst({
-      where: { activityId, ...companyWhere(companyId ?? null) },
+      where: { activityId, userId, ...companyWhere(companyId ?? null) },
     });
 
     if (!evidence || evidence.status !== 'COMPLETED') {
@@ -1198,7 +1318,7 @@ export class ActivityEvidenceService {
     if (options.resetFullFlow) {
       const allSteps = [...EVIDENCE_STEP_ORDER];
       const updated = await this.prisma.activityEvidence.update({
-        where: { activityId },
+        where: { id: evidence.id },
         data: {
           ...this.clearEvidenceData(),
           reviewStatus: 'REJECTED',
@@ -1239,7 +1359,7 @@ export class ActivityEvidenceService {
     const firstStep = this.firstRejectedStep(steps);
 
     const updated = await this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: {
         reviewStatus: 'REJECTED',
         rejectedStep: firstStep,
@@ -1288,8 +1408,14 @@ export class ActivityEvidenceService {
   /**
    * Reenviar paso específico (Usuario corrige)
    */
-  async resubmitStep(activityId: number, step: string, data: any, companyId?: number | null) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+  async resubmitStep(
+    activityId: number,
+    userId: number,
+    step: string,
+    data: any,
+    companyId?: number | null,
+  ) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
     if (evidence.reviewStatus !== 'REJECTED') {
       throw new BadRequestException('Solo puedes reenviar si fue rechazada');
@@ -1327,13 +1453,14 @@ export class ActivityEvidenceService {
       case 'EVIDENCE_PHOTOS': {
         const activity = await this.loadActivityForTenant(activityId, companyId);
         const isInventoryFlow = activity?.workType === 'PREVENTIVE_INVENTORY';
+        const required = clampEvidencePhotoRequired(activity.evidencePhotoRequired);
 
         if (isInventoryFlow) {
           if (!Array.isArray(data.photoUrls) || data.photoUrls.length < 1) {
             throw new BadRequestException('Requiere al menos 1 evidencia visual');
           }
-        } else if (data.photoUrls.length < 4 || data.photoUrls.length > 8) {
-          throw new BadRequestException('Requiere entre 4-8 fotos de evidencia');
+        } else if (!Array.isArray(data.photoUrls) || data.photoUrls.length !== required) {
+          throw new BadRequestException(`Se requieren exactamente ${required} fotos de evidencia`);
         }
         updateData = {
           ...updateData,
@@ -1344,6 +1471,9 @@ export class ActivityEvidenceService {
       }
 
       case 'SERVICE_SHEET_PDF':
+        if (!isPdfUrl(String(data.pdfUrl || ''))) {
+          throw new BadRequestException('La hoja de servicio debe ser un PDF');
+        }
         updateData = {
           ...updateData,
           serviceSheetPdfUrl: data.pdfUrl,
@@ -1384,23 +1514,20 @@ export class ActivityEvidenceService {
     }
 
     const updated = await this.prisma.activityEvidence.update({
-      where: { activityId },
+      where: { id: evidence.id },
       data: updateData,
     });
 
-    const activityStatus =
-      transition.status === 'COMPLETED' ? 'Pendiente' : transition.reviewStatus === 'REJECTED' ? 'Rechazada' : 'Pendiente';
-
-    await this.prisma.activity.update({
-      where: { id: activityId },
-      data: {
-        estatus: activityStatus,
-        ...(transition.status === 'COMPLETED' ? { fechaFinalizacion: new Date() } : {}),
-      },
-    });
-
     if (transition.status === 'COMPLETED') {
+      await this.maybeFinalizeActivity(activityId, companyId);
       void this.notifyEvidenceReadyForReview(activityId);
+    } else {
+      await this.prisma.activity.update({
+        where: { id: activityId },
+        data: {
+          estatus: transition.reviewStatus === 'REJECTED' ? 'Rechazada' : 'Pendiente',
+        },
+      });
     }
 
     return updated;

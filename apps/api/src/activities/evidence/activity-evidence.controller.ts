@@ -79,6 +79,7 @@ export class ActivityEvidenceController {
   async saveEntryPhoto(
     @Param('activityId') activityId: string,
     @Body() body: { photoUrl: string; latitude: number; longitude: number },
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
     // Check if photoUrl contains base64 data and convert it
@@ -90,6 +91,7 @@ export class ActivityEvidenceController {
 
     return this.service.saveEntryPhoto(
       parseInt(activityId, 10),
+      req.user.id,
       fileUrl,
       body.latitude,
       body.longitude,
@@ -101,6 +103,7 @@ export class ActivityEvidenceController {
   async saveEvidencePhotos(
     @Param('activityId') activityId: string,
     @Body() body: { photoUrls: string[] },
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
     // Convert any base64 data URLs to file URLs
@@ -111,13 +114,19 @@ export class ActivityEvidenceController {
       return photoUrl;
     });
 
-    return this.service.saveEvidencePhotos(parseInt(activityId, 10), processedUrls, companyId);
+    return this.service.saveEvidencePhotos(
+      parseInt(activityId, 10),
+      req.user.id,
+      processedUrls,
+      companyId,
+    );
   }
 
   @Post(':activityId/service-sheet-pdf')
   async saveServiceSheetPdf(
     @Param('activityId') activityId: string,
     @Body() body: { pdfUrl: string },
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
     let fileUrl = body.pdfUrl;
@@ -130,22 +139,34 @@ export class ActivityEvidenceController {
     ) {
       fileUrl = saveBase64Pdf(body.pdfUrl, __dirname, 'activities');
     }
-    return this.service.saveServiceSheetPdf(parseInt(activityId, 10), fileUrl, companyId);
+    return this.service.saveServiceSheetPdf(
+      parseInt(activityId, 10),
+      req.user.id,
+      fileUrl,
+      companyId,
+    );
   }
 
   @Post(':activityId/service-sheet-data')
   async completeServiceSheetForm(
     @Param('activityId') activityId: string,
     @Body() body: any,
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.completeServiceSheetForm(parseInt(activityId, 10), body, companyId);
+    return this.service.completeServiceSheetForm(
+      parseInt(activityId, 10),
+      req.user.id,
+      body,
+      companyId,
+    );
   }
 
   @Post(':activityId/exit-photo')
   async saveExitPhoto(
     @Param('activityId') activityId: string,
     @Body() body: { photoUrl: string; latitude: number; longitude: number },
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
     // Check if photoUrl contains base64 data and convert it
@@ -157,6 +178,7 @@ export class ActivityEvidenceController {
 
     return this.service.saveExitPhoto(
       parseInt(activityId, 10),
+      req.user.id,
       fileUrl,
       body.latitude,
       body.longitude,
@@ -169,6 +191,7 @@ export class ActivityEvidenceController {
     @Param('activityId') activityId: string,
     @Param('index') index: string,
     @Body() body: { photoUrl: string },
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
     // Check if photoUrl contains base64 data and convert it
@@ -180,6 +203,7 @@ export class ActivityEvidenceController {
 
     return this.service.updateEvidencePhoto(
       parseInt(activityId, 10),
+      req.user.id,
       parseInt(index, 10),
       fileUrl,
       companyId,
@@ -190,24 +214,36 @@ export class ActivityEvidenceController {
   async removeEvidencePhoto(
     @Param('activityId') activityId: string,
     @Param('index') index: string,
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.removeEvidencePhoto(parseInt(activityId, 10), parseInt(index, 10), companyId);
+    return this.service.removeEvidencePhoto(
+      parseInt(activityId, 10),
+      req.user.id,
+      parseInt(index, 10),
+      companyId,
+    );
   }
 
   @Post(':activityId/approve')
   @RBAC({ permissions: [PERMISSIONS.EVIDENCES_REVIEW] })
   async approveEvidence(
     @Param('activityId') activityId: string,
-    @Body() body: { notes?: string },
+    @Body() body: { notes?: string; userId?: number },
+    @Query('userId') evidenceUserId: string | undefined,
     @CurrentUser() user: { id: number },
     @CurrentCompanyId() companyId: number | null,
   ) {
     if (!user?.id) {
       throw new ForbiddenException('Sesión inválida');
     }
+    const targetUserId = Number(evidenceUserId ?? body.userId);
+    if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
+      throw new BadRequestException('userId de evidencia requerido');
+    }
     return this.service.approveEvidence(
       parseInt(activityId, 10),
+      targetUserId,
       user.id,
       body.notes,
       companyId,
@@ -221,18 +257,25 @@ export class ActivityEvidenceController {
     @Body()
     body: {
       notes: string;
+      userId?: number;
       rejectedStep?: string;
       rejectedSteps?: string[];
       resetFullFlow?: boolean;
     },
+    @Query('userId') evidenceUserId: string | undefined,
     @CurrentUser() user: { id: number },
     @CurrentCompanyId() companyId: number | null,
   ) {
     if (!user?.id) {
       throw new ForbiddenException('Sesión inválida');
     }
+    const targetUserId = Number(evidenceUserId ?? body.userId);
+    if (!Number.isFinite(targetUserId) || targetUserId <= 0) {
+      throw new BadRequestException('userId de evidencia requerido');
+    }
     return this.service.rejectEvidence(
       parseInt(activityId, 10),
+      targetUserId,
       user.id,
       body.notes,
       {
@@ -248,8 +291,15 @@ export class ActivityEvidenceController {
   async resubmitStep(
     @Param('activityId') activityId: string,
     @Body() body: { step: string; data: any },
+    @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.resubmitStep(parseInt(activityId, 10), body.step, body.data, companyId);
+    return this.service.resubmitStep(
+      parseInt(activityId, 10),
+      req.user.id,
+      body.step,
+      body.data,
+      companyId,
+    );
   }
 }
