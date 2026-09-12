@@ -588,7 +588,8 @@ model User {
   salesAuditEvents          SalesAuditEvent[]          @relation("SalesAuditActor")
   notifications             Notification[]
   notificationsTriggered    Notification[]             @relation("NotificationTriggeredBy")
-  reviewedEvidences         ActivityEvidence[] // Evidencias revisadas por este usuario
+  reviewedEvidences         ActivityEvidence[]         @relation("EvidenceReviewedBy") // Evidencias revisadas por este usuario
+  submittedEvidences        ActivityEvidence[]         @relation("EvidenceOwner") // Evidencias propias (flujo por persona)
   fines                     Fine[]
   toolRequests              ToolRequest[]              @relation("UserToolRequests")
   approvedToolRequests      ToolRequest[]              @relation("AdminApprovals")
@@ -858,13 +859,17 @@ model Activity {
   clientSurveyCompletedAt DateTime?
   ticketReportUrl         String?                  @db.VarChar(500)
   ticketReportGeneratedAt DateTime?
+  /// Tipo Core (hub Actividades): tarea|proyecto|obra|servicio|comercial
+  coreKind                String?                  @db.VarChar(20)
+  /// Fotos de evidencia exigidas por persona (2–8), fijadas al asignar.
+  evidencePhotoRequired   Int                      @default(4)
   creador                 User                     @relation("CreadorActividades", fields: [creadoPorId], references: [id])
   responsable             User                     @relation("ResponsableActividades", fields: [responsableId], references: [id])
   project                 OperationalProject?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   client                  ServiceClient?           @relation(fields: [clientId], references: [id])
   serviceSheet            ServiceSheet?
   evidencias              Evidence[]
-  activityEvidence        ActivityEvidence?
+  activityEvidences       ActivityEvidence[]
   clientTicketRequest     ClientTicketRequest?
   clientFeedback          ClientActivityFeedback?
   expenses                Expense[]
@@ -1170,7 +1175,9 @@ model Evidence {
 // Nuevo modelo para el flujo de evidencias de actividades (5 pasos)
 model ActivityEvidence {
   id         Int @id @default(autoincrement())
-  activityId Int @unique
+  activityId Int
+  /// Dueño del flujo de evidencia (cada asignado tiene el suyo).
+  userId     Int
 
   // Paso 1: Foto de entrada
   entryPhotoUrl        String?   @db.VarChar(500)
@@ -1178,16 +1185,16 @@ model ActivityEvidence {
   entryLongitude       Decimal?  @db.Decimal(11, 8)
   entryPhotoUploadedAt DateTime?
 
-  // Paso 2: Evidencias (4-8 fotos)
+  // Paso 2: Evidencias (N fotos configurables 2–8)
   evidencePhotos           String[]  @default([]) // Array de URLs
   evidencePhotosUploadedAt DateTime?
 
-  // Paso 3: Hoja de servicio (PDF)
+  // Paso 3: Hoja de servicio (PDF) — solo coreKind=servicio
   serviceSheetPdfUrl     String?   @db.VarChar(500)
   serviceSheetUploadedAt DateTime?
 
-  // Paso 4: Plantilla de hoja de servicio interna
-  serviceSheetData        Json? // Datos del formulario de plantilla
+  // Paso 4: Formulario digital (plantilla por tipo)
+  serviceSheetData        Json? // Datos del formulario
   serviceSheetCompletedAt DateTime?
 
   // Paso 5: Foto de salida
@@ -1204,19 +1211,23 @@ model ActivityEvidence {
 
   // Sistema de Revisión y Aprobación
   reviewStatus          String    @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
-  rejectedStep          String?   @db.VarChar(50) // Cual paso fue rechazado: ENTRY_PHOTO, EVIDENCE_PHOTOS, etc.
-  rejectedSteps         Json? // Pasos rechazados (corrección parcial o reinicio completo)
-  reviewNotes           String?   @db.Text // Observaciones del revisor
-  reviewedAt            DateTime? // Fecha de revisión
-  reviewedById          Int? // Usuario que revisó
-  correctionSubmittedAt DateTime? // Fecha de corrección del usuario
+  rejectedStep          String?   @db.VarChar(50)
+  rejectedSteps         Json?
+  reviewNotes           String?   @db.Text
+  reviewedAt            DateTime?
+  reviewedById          Int?
+  correctionSubmittedAt DateTime?
 
   activity   Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  reviewedBy User?          @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  user       User           @relation("EvidenceOwner", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User?          @relation("EvidenceReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   companyId  Int
   company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([activityId, userId])
+  @@index([userId])
   @@index([companyId])
+  @@index([activityId])
   @@map("activity_evidences")
 }
 
@@ -5395,6 +5406,8 @@ model ActivityAssignee {
   horasPlan   Decimal?             @db.Decimal(6, 2)
   /// Horas realmente dedicadas, para el costo real del servicio.
   horasReales Decimal?             @db.Decimal(6, 2)
+  /// Indicaciones específicas para esta persona (opcionales).
+  indicaciones String?
   asignadoAt  DateTime             @default(now())
   /// Fecha de salida del equipo; null mientras sigue asignado.
   retiradoAt  DateTime?

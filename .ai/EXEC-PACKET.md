@@ -1,51 +1,78 @@
 # EXEC-PACKET — NEXARA-app
 
-- **Escrito por:** Claude (cabeza)
+- **Escrito por:** Cursor (ejecutor; plan Adam aprobado)
 - **Fecha:** 2026-09-12
 - **Rama:** mejora/calidad-y-web
-- **Estado:** BORRADOR
-<!-- Estados: BORRADOR → LISTO PARA CURSOR → EN EJECUCION → CERRADO -->
+- **Estado:** EN EJECUCION
 
 ## Objetivo
-(1–3 frases: qué se entrega y qué queda explícitamente fuera de alcance.)
+
+Flujo de evidencia **por persona** en Core: indicaciones generales + por miembro, N fotos (2–8), form por `coreKind`, PDF hoja solo en servicio, barras en Actividades, historial embebido. Fuera: móvil nativo.
 
 ## Criterios de éxito
-- [ ]
-- [ ] tests:
-- [ ] verificación manual:
+
+- [ ] Cada assignee tiene su `ActivityEvidence`; cierre cuando todos COMPLETED
+- [ ] Asignar: generales, notas por persona, stepper 2–8, `coreKind`
+- [ ] PDF solo servicio; no-PDF rechazado
+- [ ] Barras % bajo avatar; finalizadas de días previos ocultas del card
+- [ ] Historial con fotos/PDF embebidos
+- [ ] tests: smoke API evidence + board types
+- [ ] verificación manual: asignar multi → avanzar pasos → ver barras
 
 ## Contexto mínimo a cargar (≤7 archivos)
-(Rutas exactas. Cursor NO debe leer el monorepo entero.)
--
 
-## Archivos a tocar (máx 12)
+- `apps/api/prisma/schema.prisma` (Activity, ActivityEvidence, ActivityAssignee)
+- `apps/api/src/activities/evidence/activity-evidence.service.ts`
+- `apps/api/src/activities/activity-team.service.ts`
+- `apps/api/src/me/team-board.service.ts`
+- `apps/web/components/ActivityEvidenceFlow.tsx`
+- `apps/web/app/(panels)/erp/pizarra/[userId]/asignar/page.tsx`
+- `apps/web/app/(panels)/erp/pizarra/page.tsx`
+
+## Archivos a tocar (máx 12 + migraciones)
+
 | Archivo | Acción | Notas |
 |---------|--------|-------|
-|         |        |       |
+| schema.prisma | editar | coreKind, evidencePhotoRequired, userId evidence |
+| migration SQL | crear | backfill userId |
+| create-activity.dto + activities.service | editar | campos nuevos + seed evidence LEAD |
+| activity-team.* | editar | indicaciones + ensure evidence |
+| activity-evidence.service | editar | por userId, N fotos, skip PDF |
+| team-board.service + api | editar | openActivities + % |
+| asignar/page + ops form | editar | UX generador |
+| ActivityEvidenceFlow | editar | pasos/templates |
+| pizarra pages | editar | barras + historial |
 
-## Pasos numerados (hiperdetallados)
-1.
+## Pasos numerados
+
+1. Schema + migración + prisma generate
+2. API create/team/evidence por userId
+3. UI asignar
+4. UI evidencia
+5. Board bars
+6. Historial
+7. packet close + relevo
 
 ## Tests / verificación
+
 ```powershell
-# comandos exactos, p. ej.: pnpm -C apps/api test
+cd C:\dev\apps\NEXARA-app\apps\api
+npx prisma migrate deploy
+npx prisma generate
 ```
 
-## Workers (Cursor los dirige; un writer por worktree)
-- **NO_LLM** (rg / git / tests / lint / playwright):
-- **LOCAL** — comando exacto, no una intención. Ej.:
-  `pwsh -File C:\Users\adpoz\Projects\ai-oss-2026\scripts\ollama-worker.ps1 -Action digest -Repo "." -Max 120`
-  `... -Action find -Repo "." -Query "..."` · `... -Action map -ItemsInline "..." -Prompt "... {{item}}"`
-- **MCP / Firecrawl / n8n / Temporal**:
+## Workers
 
-## Worktrees
-(Si hay paralelismo: `pwsh -File C:\Users\adpoz\Projects\ai-oss-2026\scripts\worktree-new.ps1 -RepoPath . -Name <slice>`)
--
+- **NO_LLM:** rg, prisma migrate, git
+- **LOCAL:** ollama_implement tickets; no reescritura ciega de archivos grandes
+- **MCP:** ollama-worker
 
 ## No hacer / riesgos
--
+
+- No tocar plan file del usuario
+- No `findUnique({ activityId })` tras migración
+- Verificar tamaño tras ollama apply
 
 ## Handoff a Cursor
-(Una sola frase de arranque. `packet.ps1 handoff` la copia al portapapeles junto con el boot.)
-Implementa `.ai/EXEC-PACKET.md` de NEXARA-app paso a paso sin cambiar la arquitectura; cierra con relevo.
 
+Implementa el plan Flujo evidencia multi-persona aprobado; cierra con relevo.
