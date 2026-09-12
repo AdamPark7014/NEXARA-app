@@ -95,11 +95,31 @@ function fmtTime(iso?: string | null) {
   return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-function fmtMinutes(m?: number) {
-  if (!m) return "0h";
-  const h = Math.floor(m / 60);
-  const min = m % 60;
-  return h > 0 ? `${h}h${min > 0 ? ` ${min}m` : ""}` : `${min}m`;
+function pad2(n: number) {
+  return String(Math.max(0, Math.floor(n))).padStart(2, "0");
+}
+
+/** Duración legible con segundos: 0:00:00 · 1:05:09 · 12:03:44 */
+function fmtHms(totalMs: number): string {
+  if (!Number.isFinite(totalMs) || totalMs < 0) return "0:00:00";
+  const totalSec = Math.floor(totalMs / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h}:${pad2(m)}:${pad2(s)}`;
+}
+
+function elapsedMs(
+  checkIn?: string | null,
+  checkOut?: string | null,
+  nowMs: number = Date.now(),
+): number {
+  if (!checkIn) return 0;
+  const start = new Date(checkIn).getTime();
+  if (!Number.isFinite(start)) return 0;
+  const end = checkOut ? new Date(checkOut).getTime() : nowMs;
+  if (!Number.isFinite(end)) return 0;
+  return Math.max(0, end - start);
 }
 
 function initials(name: string): string {
@@ -186,6 +206,7 @@ export default function ErpAsistenciasPage() {
   >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const loadEquipo = useCallback(async () => {
     if (!token) return;
@@ -289,6 +310,23 @@ export default function ErpAsistenciasPage() {
   const presentes = mapped.filter((m) => m.estado === "PRESENTE").length;
   const completos = mapped.filter((m) => m.estado === "COMPLETO").length;
   const ausentes = mapped.filter((m) => m.estado === "AUSENTE").length;
+  const hasOpenJornada = presentes > 0;
+
+  useEffect(() => {
+    if (!hasOpenJornada) return;
+    setNowMs(Date.now());
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [hasOpenJornada]);
+
+  const productividadMs = useMemo(
+    () =>
+      mapped.reduce(
+        (sum, m) => sum + elapsedMs(m.checkIn, m.estado === "PRESENTE" ? null : m.checkOut, nowMs),
+        0,
+      ),
+    [mapped, nowMs],
+  );
 
   const filtered = useMemo(
     () => (filterEstado === "TODOS" ? mapped : mapped.filter((m) => m.estado === filterEstado)),
@@ -398,6 +436,49 @@ export default function ErpAsistenciasPage() {
                   variant={ausentes > 0 ? "danger" : "positive"}
                   onClick={() => setFilterEstado("AUSENTE")}
                 />
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginBottom: 12,
+                  padding: "12px 16px",
+                  borderRadius: 14,
+                  border: "1px solid color-mix(in srgb, #16a34a 28%, var(--border))",
+                  background: "color-mix(in srgb, #16a34a 8%, var(--surface))",
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: "var(--text-tertiary)",
+                    }}
+                  >
+                    Productividad del día
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                    Suma de jornadas abiertas y cerradas · se actualiza cada segundo
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 800,
+                    fontVariantNumeric: "tabular-nums",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                    color: "#16a34a",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {fmtHms(productividadMs)}
+                </div>
               </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
@@ -562,27 +643,109 @@ export default function ErpAsistenciasPage() {
                             }}
                           >
                             <div>
-                              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 650,
+                                  color: "var(--text-tertiary)",
+                                  letterSpacing: "0.04em",
+                                  textTransform: "uppercase",
+                                }}
+                              >
                                 Entrada
                               </div>
-                              <div style={{ fontSize: 16, fontWeight: 750, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+                              <div
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: 750,
+                                  fontVariantNumeric: "tabular-nums",
+                                  marginTop: 2,
+                                }}
+                              >
                                 {fmtTime(m.checkIn)}
                               </div>
                             </div>
                             <div>
-                              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 650,
+                                  color: "var(--text-tertiary)",
+                                  letterSpacing: "0.04em",
+                                  textTransform: "uppercase",
+                                }}
+                              >
                                 Salida
                               </div>
-                              <div style={{ fontSize: 16, fontWeight: 750, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+                              <div
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: 750,
+                                  fontVariantNumeric: "tabular-nums",
+                                  marginTop: 2,
+                                }}
+                              >
                                 {fmtTime(m.checkOut)}
                               </div>
                             </div>
-                            <div style={{ textAlign: "right", alignSelf: "center" }}>
-                              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-tertiary)", textTransform: "uppercase" }}>
-                                Tiempo
+                            <div style={{ textAlign: "right", alignSelf: "center", minWidth: 88 }}>
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 650,
+                                  color: "var(--text-tertiary)",
+                                  textTransform: "uppercase",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  justifyContent: "flex-end",
+                                }}
+                              >
+                                {m.estado === "PRESENTE" ? (
+                                  <>
+                                    <span
+                                      aria-hidden
+                                      style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: "50%",
+                                        background: "#16a34a",
+                                        boxShadow: "0 0 0 3px color-mix(in srgb, #16a34a 30%, transparent)",
+                                      }}
+                                    />
+                                    En vivo
+                                  </>
+                                ) : m.estado === "COMPLETO" ? (
+                                  "Jornada"
+                                ) : (
+                                  "Tiempo"
+                                )}
                               </div>
-                              <div style={{ fontSize: 15, fontWeight: 750, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
-                                {fmtMinutes(m.totalMinutes)}
+                              <div
+                                style={{
+                                  fontSize: m.estado === "AUSENTE" ? 15 : 18,
+                                  fontWeight: 800,
+                                  fontVariantNumeric: "tabular-nums",
+                                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                                  marginTop: 2,
+                                  color:
+                                    m.estado === "PRESENTE"
+                                      ? "#16a34a"
+                                      : m.estado === "COMPLETO"
+                                        ? "#2563eb"
+                                        : "var(--text-tertiary)",
+                                  letterSpacing: "-0.02em",
+                                }}
+                              >
+                                {m.estado === "AUSENTE"
+                                  ? "—"
+                                  : fmtHms(
+                                      elapsedMs(
+                                        m.checkIn,
+                                        m.estado === "PRESENTE" ? null : m.checkOut,
+                                        nowMs,
+                                      ),
+                                    )}
                               </div>
                             </div>
                           </div>
