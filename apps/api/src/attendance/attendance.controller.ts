@@ -98,6 +98,7 @@ export class AttendanceController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('departmentId') departmentId?: string,
+    @Query('scope') scope?: string,
   ) {
     const currentUser = req.user;
     return this.attendanceService.getHierarchyAttendanceRange(
@@ -106,6 +107,7 @@ export class AttendanceController {
       to,
       departmentId ? parseInt(departmentId) : undefined,
       companyId,
+      scope === 'subtree' ? 'subtree' : undefined,
     );
   }
 

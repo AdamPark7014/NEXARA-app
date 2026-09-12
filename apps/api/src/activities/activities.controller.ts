@@ -209,9 +209,8 @@ export class ActivitiesController {
     if (user.isSuperAdmin) {
       return this.activitiesService.findAll(query, companyId);
     } else if (this.hasTeamActivitiesScope(user)) {
-      const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
-      const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
-      return this.activitiesService.findByAllowedUsers(allowedUserIds, companyId);
+      // CEO / plataforma: company-wide; managers: subtree por managerId
+      return this.activitiesService.findAllScoped(user, companyId, query);
     } else {
       return this.activitiesService.findByResponsible(user.id, companyId);
     }

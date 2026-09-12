@@ -852,6 +852,52 @@ export class AttendanceService {
     return 'Baja';
   }
 
+  private isCompanyWideAttendanceViewer(viewer: {
+    isSuperAdmin?: boolean;
+    roleKey?: string | null;
+    email?: string | null;
+    permissions?: string[];
+  }): boolean {
+    if (viewer.isSuperAdmin) return true;
+    if (viewer.roleKey === 'ceo') return true;
+    if (viewer.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) return true;
+    const email = (viewer.email || '').toLowerCase();
+    return email === 'gerencia@nexara.com.mx' || email === 'developer@nexara.com.mx';
+  }
+
+  /** Viewer + descendientes por managerId dentro del tenant. */
+  private async getManagerSubtreeIds(
+    rootId: number,
+    companyId?: number | null,
+  ): Promise<Set<number>> {
+    const tenantId = requireCompanyId(companyId);
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        companyMemberships: { some: { companyId: tenantId } },
+      },
+      select: { id: true, managerId: true },
+    });
+    const children = new Map<number, number[]>();
+    for (const u of users) {
+      if (u.managerId == null) continue;
+      const list = children.get(u.managerId) ?? [];
+      list.push(u.id);
+      children.set(u.managerId, list);
+    }
+    const out = new Set<number>([rootId]);
+    const queue = [rootId];
+    while (queue.length) {
+      const id = queue.shift()!;
+      for (const child of children.get(id) ?? []) {
+        if (out.has(child)) continue;
+        out.add(child);
+        queue.push(child);
+      }
+    }
+    return out;
+  }
+
   /**
   * Obtiene usuarios accesibles según la jerarquía del usuario actual
   * - Superadmin (gerencia/developer): Ve todos los usuarios del tenant
@@ -916,11 +962,19 @@ export class AttendanceService {
    * Respeta la jerarquía de acceso
    */
   async getHierarchyAttendanceRange(
-    currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean },
+    currentUser: {
+      id: number;
+      departmentId: number;
+      permissions?: string[];
+      isSuperAdmin?: boolean;
+      roleKey?: string | null;
+      email?: string | null;
+    },
     from?: string,
     to?: string,
     targetDepartmentId?: number,
     companyId?: number | null,
+    scope?: 'subtree',
   ) {
     if (!from || !to) {
       throw new BadRequestException('Rango incompleto');
@@ -964,6 +1018,12 @@ export class AttendanceService {
       accessibleUsers = accessibleUsers.filter(
         (u) => u.departmentId === targetDepartmentId,
       );
+    }
+
+    // scope=subtree: manager + descendientes por managerId (CEO/plataforma conserva company-wide)
+    if (scope === 'subtree' && !this.isCompanyWideAttendanceViewer(currentUser)) {
+      const treeIds = await this.getManagerSubtreeIds(currentUser.id, companyId);
+      accessibleUsers = accessibleUsers.filter((u) => treeIds.has(u.id));
     }
 
     // Instantes para filtrar por `timestamp`; valores de columna para `date`.
