@@ -9,19 +9,20 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — CommandPalette Core-only
+## Este turno — Pizarra: encargados ven sus actividades
 
 ### Hecho
 
-- Acciones CRM/OPS/multi-panel sacadas a `CommandPalette.legacy-actions.ts` (código reciclable, no cableado en Core).
-- Con `CORE_SURFACE_ONLY`: solo **Nuevo cliente**, tema, logout + módulos ola1. Sin lead/cotización/ticket ni “Ir a panel”.
-- Entidades de búsqueda Core: solo `sales-client` / `activity`; URLs vía `/erp/clientes` y `/erp/pizarra`.
-- `searchResultUrlLegacy` conserva el mapa CRM/OPS completo.
+- Causa: `TeamBoardService.resolveScope` excluía al propio viewer → David solo veía reportes.
+- Subtree (encargados): ahora **incluye al viewer** (tarjeta propia + actividades asignadas).
+- Company-wide (CEO/developer): sigue sin auto-tarjeta; Christian sigue oculto en todas las pizarras.
+- UI: tarjeta «Tú» destacada primero; en detalle propio no se muestra «Asignar actividad».
 
 ### Verificar
 
-- Hard refresh → ⌘K: sin Crear lead / cotización / ticket / Ir a Core.
-- Debe verse Nuevo cliente → `/erp/clientes/nuevo`.
+1. Reiniciar API (cambio en Nest).
+2. Login como David → Actividades: debe aparecer su tarjeta + las de su equipo.
+3. Actividades que Christian le asignó deben verse al tocar su tarjeta.
 
 ## A medias
 

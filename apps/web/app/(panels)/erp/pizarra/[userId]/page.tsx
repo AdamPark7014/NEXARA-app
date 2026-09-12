@@ -50,8 +50,9 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 export default function PizarraPersonaPage() {
   const params = useParams();
   const router = useRouter();
-  const { token } = useUser();
+  const { token, user: me } = useUser();
   const userId = Number(params?.userId);
+  const isSelf = me?.id != null && me.id === userId;
   const [user, setUser] = useState<TeamBoardUser | null>(null);
   const [history, setHistory] = useState<TeamBoardHistoryItem[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -354,20 +355,22 @@ export default function PizarraPersonaPage() {
       </section>
 
       <div style={{ display: "grid", gap: 10 }}>
-        <Link
-          href={`/erp/pizarra/${user.id}/asignar`}
-          style={{
-            textAlign: "center",
-            padding: "14px 12px",
-            borderRadius: 14,
-            background: "var(--primary)",
-            color: "#fff",
-            fontWeight: 750,
-            textDecoration: "none",
-          }}
-        >
-          Asignar actividad
-        </Link>
+        {!isSelf ? (
+          <Link
+            href={`/erp/pizarra/${user.id}/asignar`}
+            style={{
+              textAlign: "center",
+              padding: "14px 12px",
+              borderRadius: 14,
+              background: "var(--primary)",
+              color: "#fff",
+              fontWeight: 750,
+              textDecoration: "none",
+            }}
+          >
+            Asignar actividad
+          </Link>
+        ) : null}
       </div>
     </div>
   );
