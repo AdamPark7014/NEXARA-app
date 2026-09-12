@@ -18,6 +18,8 @@ type Props = {
     exitLongitude?: unknown;
   }[];
   hasCheckIn?: boolean;
+  viewerUserId?: number;
+  canViewOwnTrajectory?: boolean;
 };
 
 type TrajectoryPoint = {
@@ -27,7 +29,7 @@ type TrajectoryPoint = {
   ultimaActualizacion?: string;
 };
 
-export default function AttendanceGpsDayPanel({ token, userId, date, attendances, hasCheckIn }: Props) {
+export default function AttendanceGpsDayPanel({ token, userId, date, attendances, hasCheckIn, viewerUserId, canViewOwnTrajectory = false }: Props) {
   const [open, setOpen] = useState(false);
   const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,6 +40,7 @@ export default function AttendanceGpsDayPanel({ token, userId, date, attendances
     setLoading(true);
     try {
       const res = await fetch(buildApiUrl(`gps/trajectory?userId=${userId}&date=${date}`), {
+        credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -60,6 +63,8 @@ export default function AttendanceGpsDayPanel({ token, userId, date, attendances
   const exitUrl = attendanceMapUrl(attendances, "salida", trajectory);
 
   if (!hasCheckIn && !entryUrl && !exitUrl) return null;
+
+  if (viewerUserId != null && userId === viewerUserId && !canViewOwnTrajectory) return null;
 
   return (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>

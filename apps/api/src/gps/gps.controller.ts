@@ -45,6 +45,7 @@ export class GpsController {
     anyPermissions: [
       PERMISSIONS.GPS_VIEW,
       PERMISSIONS.GPS_MANAGE,
+      PERMISSIONS.ATTENDANCE_MANAGE,
       PERMISSIONS.CONSOLE_ADMIN,
     ],
   })

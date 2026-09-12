@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import GpsTrajectoryPreview from "@/components/GpsTrajectoryPreview";
+import SessionImage from "@/components/SessionImage";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, getSocketBaseUrl, parseResponseJson } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -202,8 +203,10 @@ export default function ErpAsistenciasPage() {
   const attCfg = useMemo(() => getAttendanceSectionConfig(user), [user]);
   const isManager = attCfg.canManageTeam;
   const canRegister = attCfg.canRegisterSelf;
-  // GPS en vivo (gps/team): solo dirección / GPS_MANAGE. Encargados ven checadas.
+  // GPS en vivo (gps/team) + propio trayecto: solo dirección / GPS_MANAGE.
+  // Encargados: checadas + trayecto de subordinados (no el propio).
   const canLiveGps = Boolean(user?.isSuperAdmin || hasPermission(user, PERMISSIONS.GPS_MANAGE));
+  const canSeeOwnTrajectory = canLiveGps;
 
   const [tab, setTab] = useState<TabId>("equipo");
   const [dateFilter, setDateFilter] = useState(todayIso());
@@ -287,12 +290,17 @@ export default function ErpAsistenciasPage() {
       } else {
         setTeamGps([]);
       }
-      const [pts, hist] = await Promise.all([
-        apiFetch<TrajectoryPoint[]>(`gps/trajectory?date=${dateFilter}`, token),
-        apiFetch<typeof dayAttendances>(`attendance/history?date=${dateFilter}`, token).catch(() => []),
-      ]);
-      setTrajectory(Array.isArray(pts) ? pts : []);
-      setDayAttendances(Array.isArray(hist) ? hist : []);
+      if (canSeeOwnTrajectory) {
+        const [pts, hist] = await Promise.all([
+          apiFetch<TrajectoryPoint[]>(`gps/trajectory?date=${dateFilter}`, token),
+          apiFetch<typeof dayAttendances>(`attendance/history?date=${dateFilter}`, token).catch(() => []),
+        ]);
+        setTrajectory(Array.isArray(pts) ? pts : []);
+        setDayAttendances(Array.isArray(hist) ? hist : []);
+      } else {
+        setTrajectory([]);
+        setDayAttendances([]);
+      }
     } catch (e) {
       setTeamGps([]);
       setTrajectory([]);
@@ -300,7 +308,7 @@ export default function ErpAsistenciasPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, dateFilter, canLiveGps]);
+  }, [token, dateFilter, canLiveGps, canSeeOwnTrajectory]);
 
   useEffect(() => {
     if (tab === "equipo") void loadEquipo();
@@ -827,16 +835,14 @@ export default function ErpAsistenciasPage() {
                           {(entryPhoto?.photoUrl || exitPhoto?.photoUrl) && (
                             <div style={{ display: "flex", gap: 8 }}>
                               {entryPhoto?.photoUrl && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
+                                <SessionImage
                                   src={resolveAssetUrl(entryPhoto.photoUrl)}
                                   alt="Entrada"
                                   style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10 }}
                                 />
                               )}
                               {exitPhoto?.photoUrl && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
+                                <SessionImage
                                   src={resolveAssetUrl(exitPhoto.photoUrl)}
                                   alt="Salida"
                                   style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10 }}
@@ -867,6 +873,8 @@ export default function ErpAsistenciasPage() {
                               date={dateFilter}
                               attendances={m.attendances}
                               hasCheckIn={Boolean(m.checkIn)}
+                              viewerUserId={user?.id}
+                              canViewOwnTrajectory={canSeeOwnTrajectory}
                             />
                           )}
                         </article>
@@ -988,13 +996,21 @@ export default function ErpAsistenciasPage() {
               )}
             </Section>
           )}
-          <Section title={`Mi trayecto · ${trajectory.length} puntos`} subtitle="Entrada, GPS y salida del día.">
-            {loading ? (
-              <EmptyState icon="⏳" title="Cargando trayecto…" description="" />
-            ) : (
-              <GpsTrajectoryPreview trajectory={trajectory} attendances={dayAttendances} />
-            )}
-          </Section>
+          {canSeeOwnTrajectory ? (
+            <Section title={`Mi trayecto · ${trajectory.length} puntos`} subtitle="Entrada, GPS y salida del día.">
+              {loading ? (
+                <EmptyState icon="⏳" title="Cargando trayecto…" description="" />
+              ) : (
+                <GpsTrajectoryPreview trajectory={trajectory} attendances={dayAttendances} />
+              )}
+            </Section>
+          ) : (
+            <EmptyState
+              icon="📍"
+              title="Sin trayecto propio"
+              description="Los encargados ven el GPS del día en las tarjetas de sus subordinados (pestaña Equipo), no el suyo."
+            />
+          )}
         </>
       )}
     </>
