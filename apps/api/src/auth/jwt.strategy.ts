@@ -98,6 +98,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       isSuperAdmin,
       roleKey: effectiveRoleKey,
       orgRoleKey: user.role?.orgRoleKey ?? payload.orgRoleKey ?? null,
+      // Necesario para isCompanyWideAttendanceViewer (gerencia@ / developer@).
+      email: user.email,
       clientId: payload.clientId,
       isClient: false,
       jti: payload.jti ?? null,

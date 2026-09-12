@@ -12,11 +12,12 @@ import Button from "@/components/ui/Button";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import GpsTrajectoryPreview from "@/components/GpsTrajectoryPreview";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
+import { buildApiUrl, getSocketBaseUrl, parseResponseJson } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { attendanceMapUrl } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { erpFetch } from "@/lib/erp-api";
+import { createRealtimeSocket } from "@/lib/realtime-socket";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 type TabId = "equipo" | "comidas" | "trayectoria";
@@ -211,30 +212,43 @@ export default function ErpAsistenciasPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [equipoTick, setEquipoTick] = useState(0);
 
-  const loadEquipo = useCallback(async () => {
-    if (!token) return;
-    if (!isManager) {
-      setMembers([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const raw = await erpFetch<{ users?: ApiAttendanceUser[] } | ApiAttendanceUser[]>(
-        `attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}&scope=subtree`,
-        token,
-      );
-      setMembers(Array.isArray(raw) ? raw : (raw?.users ?? []));
-    } catch (e) {
-      setMembers([]);
-      setError(e instanceof Error ? e.message : "No se pudo cargar el equipo");
-    } finally {
-      setLoading(false);
-    }
-  }, [token, dateFilter, isManager, equipoTick]);
+  // CEO / plataforma: company-wide (sin scope=subtree). Encargados: árbol managerId.
+  const companyWideViewer = Boolean(
+    user?.isSuperAdmin ||
+      user?.roleKey === "ceo" ||
+      (user?.email || "").toLowerCase() === "gerencia@nexara.com.mx" ||
+      (user?.email || "").toLowerCase() === "developer@nexara.com.mx",
+  );
+
+  const loadEquipo = useCallback(
+    async (quiet = false) => {
+      if (!token) return;
+      if (!isManager) {
+        setMembers([]);
+        setLoading(false);
+        return;
+      }
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        const scopeQs = companyWideViewer ? "" : "&scope=subtree";
+        const raw = await erpFetch<{ users?: ApiAttendanceUser[] } | ApiAttendanceUser[]>(
+          `attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}${scopeQs}`,
+          token,
+        );
+        setMembers(Array.isArray(raw) ? raw : (raw?.users ?? []));
+      } catch (e) {
+        setMembers([]);
+        if (!quiet) setError(e instanceof Error ? e.message : "No se pudo cargar el equipo");
+      } finally {
+        if (!quiet) setLoading(false);
+      }
+    },
+    [token, dateFilter, isManager, companyWideViewer],
+  );
 
   const loadComidas = useCallback(async () => {
     if (!token) return;
@@ -285,25 +299,35 @@ export default function ErpAsistenciasPage() {
     else void loadTrayectoria();
   }, [tab, loadEquipo, loadComidas, loadTrayectoria]);
 
-  // Tras checar, al volver a la pestaña refrescar el equipo (GPS/foto pueden tardar).
+  // Live: CEO (manage-only) también debe ver checadas ajenas al instante.
+  // Antes el poll/socket exigía canRegister → Christian nunca refrescaba.
   useEffect(() => {
-    if (!canRegister || !isManager) return;
-    const bump = () => setEquipoTick((n) => n + 1);
+    if (!isManager || !token || tab !== "equipo") return;
+    const bump = () => void loadEquipo(true);
     const onVis = () => {
       if (document.visibilityState === "visible") bump();
     };
-    const onAtt = () => bump();
     window.addEventListener("focus", bump);
-    window.addEventListener("attendance:updated", onAtt);
+    window.addEventListener("attendance:updated", bump);
     document.addEventListener("visibilitychange", onVis);
-    const id = window.setInterval(bump, 45_000);
+
+    const socket = createRealtimeSocket(getSocketBaseUrl(), {
+      transports: ["polling", "websocket"],
+    });
+    socket.on("attendance:updated", bump);
+    socket.on("entity:updated", (payload: { model?: string }) => {
+      if (payload?.model === "Attendance" || payload?.model === "AttendanceDay") bump();
+    });
+
+    const id = window.setInterval(bump, 15_000);
     return () => {
       window.removeEventListener("focus", bump);
-      window.removeEventListener("attendance:updated", onAtt);
+      window.removeEventListener("attendance:updated", bump);
       document.removeEventListener("visibilitychange", onVis);
       window.clearInterval(id);
+      socket.disconnect();
     };
-  }, [canRegister, isManager]);
+  }, [isManager, token, tab, loadEquipo]);
 
   const mapped = useMemo(() => {
     const meId = user?.id;
