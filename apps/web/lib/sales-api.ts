@@ -175,6 +175,9 @@ export type SalesClient = {
   website?: string | null;
   status?: string | null;
   notes?: string | null;
+  ownerId?: number | null;
+  owner?: { id: number; nombre: string; email?: string | null } | null;
+  sectors?: Array<{ id: number; sector: "PROYECTO" | "CORPORATIVO" | "COMERCIAL" }>;
   serviceClientId?: number | null;
   serviceClient?: ServiceClientLink | null;
   documents?: SalesClientDocument[];
@@ -913,9 +916,13 @@ export const linkSalesQuoteToOpportunity = async (
   );
 };
 
-export const listSalesClients = async (token: string, filters?: { ownerId?: number }) => {
+export const listSalesClients = async (
+  token: string,
+  filters?: { ownerId?: number; sector?: "PROYECTO" | "CORPORATIVO" | "COMERCIAL" },
+) => {
   const search = new URLSearchParams();
   if (filters?.ownerId) search.set("ownerId", String(filters.ownerId));
+  if (filters?.sector) search.set("sector", filters.sector);
   const path = `ventas/clientes${search.toString() ? `?${search.toString()}` : ""}`;
   const data = await apiRequest<unknown>(path, { token, method: "GET" }, "No se pudieron cargar los clientes");
   return Array.isArray(data) ? (data as SalesClient[]) : [];
@@ -925,15 +932,18 @@ export const createSalesClient = async (
   token: string,
   payload: {
     name: string;
-    legalName: string;
+    legalName?: string;
     taxId?: string;
     fiscalAddress?: string;
-    billingEmail: string;
-    billingPhone: string;
-    industry: string;
-    website: string;
+    fiscalZipCode?: string;
+    fiscalRegime?: string;
+    billingEmail?: string;
+    billingPhone?: string;
+    industry?: string;
+    website?: string;
     status?: string;
     notes?: string;
+    sectors?: Array<"PROYECTO" | "CORPORATIVO" | "COMERCIAL">;
   },
 ) => {
   return apiRequest<SalesClient>(
@@ -945,6 +955,35 @@ export const createSalesClient = async (
       body: JSON.stringify(payload),
     },
     "No se pudo crear el cliente",
+  );
+};
+
+export const addSalesClientSector = async (
+  token: string,
+  id: number,
+  sector: "PROYECTO" | "CORPORATIVO" | "COMERCIAL",
+) => {
+  return apiRequest<SalesClient>(
+    `ventas/clientes/${id}/sectors`,
+    {
+      token,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sector }),
+    },
+    "No se pudo agregar el sector",
+  );
+};
+
+export const removeSalesClientSector = async (
+  token: string,
+  id: number,
+  sector: "PROYECTO" | "CORPORATIVO" | "COMERCIAL",
+) => {
+  return apiRequest<SalesClient>(
+    `ventas/clientes/${id}/sectors/${sector}`,
+    { token, method: "DELETE" },
+    "No se pudo quitar el sector",
   );
 };
 

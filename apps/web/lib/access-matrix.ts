@@ -202,6 +202,7 @@ export type ModuleId =
   | "chat"
   | "pizarra"
   | "asistencias"
+  | "erp-clients"
   | "activities-daily"
   | "activities-projects"
   | "activities-services"
@@ -392,6 +393,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "asistencias", panel: PANELS.ERP, path: "/asistencias",
     label: "Asistencias", description: "Check-in, comidas y presencia",
     icon: "🗓️", allowedRoles: ANY_INTERNAL,
+    group: "Hoy", visible: true,
+  },
+  "erp-clients": {
+    id: "erp-clients", panel: PANELS.ERP, path: "/clientes",
+    label: "Clientes", description: "Proyecto, corporativo y comercial",
+    icon: "🤝", allowedRoles: ANY_INTERNAL,
     group: "Hoy", visible: true,
   },
   "activities-daily": {

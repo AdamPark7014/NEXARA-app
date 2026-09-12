@@ -8,6 +8,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { CreateSalesClientDto } from './dto/create-sales-client.dto.js';
 import { UpdateSalesClientDto } from './dto/update-sales-client.dto.js';
+import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
 import { CreateSalesLeadDto } from './dto/create-sales-lead.dto.js';
 import { UpdateSalesLeadDto } from './dto/update-sales-lead.dto.js';
 import { CreateSalesOpportunityDto } from './dto/create-sales-opportunity.dto.js';
@@ -27,6 +28,13 @@ import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCom
 import { appUrls } from '../common/app-urls.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
+import {
+  canSeeClientesModule,
+  clientSectorsForEmail,
+  isClientSector,
+  needsOpsProvision,
+  type ClientSectorCode,
+} from './client-sectors.js';
 
 @Injectable()
 export class VentasService {
@@ -73,7 +81,55 @@ export class VentasService {
     if (!ownerId) return true;
     if (this.isSuperAdminUser(user)) return true;
     if (this.isConsoleAdminUser(user)) return true;
+    if (this.isSalesTeamManager(user)) return true;
+    if (canSeeClientesModule(user?.email)) return true;
     return user?.id === ownerId;
+  }
+
+  private clientInclude() {
+    return {
+      documents: true,
+      opportunities: true,
+      sectors: true,
+      owner: { select: { id: true, nombre: true, email: true } },
+      serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } },
+    } as const;
+  }
+
+  private assertCanUseSectors(user: any, sectors: ClientSectorCode[]) {
+    if (this.isSuperAdminUser(user) || this.isSalesTeamManager(user)) return;
+    const allowed = clientSectorsForEmail(user?.email);
+    if (!allowed.length) {
+      throw new ForbiddenException('No tienes acceso al módulo de clientes');
+    }
+    for (const s of sectors) {
+      if (!allowed.includes(s)) {
+        throw new ForbiddenException(`No puedes usar el sector ${s}`);
+      }
+    }
+  }
+
+  private requireFiscalForSectors(dto: CreateSalesClientDto) {
+    const missing: string[] = [];
+    if (!String(dto.legalName || '').trim()) missing.push('razón social');
+    if (!String(dto.taxId || '').trim()) missing.push('RFC');
+    if (!String(dto.fiscalAddress || '').trim()) missing.push('dirección fiscal');
+    if (!String(dto.fiscalZipCode || '').trim()) missing.push('CP fiscal');
+    if (!String(dto.fiscalRegime || '').trim()) missing.push('régimen fiscal');
+    if (!String(dto.billingEmail || '').trim()) missing.push('email de facturación');
+    if (missing.length) {
+      throw new BadRequestException(`Datos fiscales incompletos: ${missing.join(', ')}`);
+    }
+  }
+
+  private normalizeIncomingSectors(raw?: string[]): ClientSectorCode[] {
+    if (!raw?.length) return ['COMERCIAL'];
+    const out: ClientSectorCode[] = [];
+    for (const s of raw) {
+      if (!isClientSector(s)) throw new BadRequestException(`Sector inválido: ${s}`);
+      if (!out.includes(s)) out.push(s);
+    }
+    return out;
   }
 
   private assertOwnerAccess(ownerId: number | null | undefined, user: any, resource = 'recurso') {
@@ -300,6 +356,14 @@ export class VentasService {
   async createClient(dto: CreateSalesClientDto, user?: any, companyId?: number | null) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
+    const sectors = this.normalizeIncomingSectors(dto.sectors);
+    if (dto.sectors?.length) {
+      this.assertCanUseSectors(user, sectors);
+      this.requireFiscalForSectors(dto);
+    } else if (canSeeClientesModule(user?.email) && !this.isSuperAdminUser(user) && !this.isSalesTeamManager(user)) {
+      this.assertCanUseSectors(user, sectors);
+    }
+
     const created = await this.prisma.salesClient.create({
       data: {
         name: dto.name,
@@ -317,8 +381,14 @@ export class VentasService {
         ownerId,
         serviceClientId: dto.serviceClientId ?? null,
         companyId: resolvedCompanyId,
+        sectors: {
+          create: sectors.map((sector) => ({
+            sector,
+            companyId: resolvedCompanyId,
+          })),
+        },
       },
-      include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
+      include: this.clientInclude(),
     });
     if (user?.id) {
       const actorName = String(user.nombre || 'Usuario').trim() || 'Usuario';
@@ -337,32 +407,54 @@ export class VentasService {
         status: created.status,
         ownerId: created.ownerId,
         serviceClientId: created.serviceClientId,
+        sectors,
       },
     });
 
-    // P0-E: todo cliente comercial queda vinculado a operación/portal
-    if (!created.serviceClientId) {
+    // Legacy CRM (sin sectors en body): sigue provisionando OPS. Core solo si PROYECTO/CORPORATIVO.
+    if (!created.serviceClientId && (needsOpsProvision(sectors) || !dto.sectors?.length)) {
       try {
         const provisioned = await this.provisionServiceClient(created.id, user, resolvedCompanyId);
         return provisioned.salesClient;
       } catch {
-        // No bloquear alta comercial si falla OPS; se puede provisionar después
         return created;
       }
     }
     return created;
   }
 
-  async listClients(user?: any, ownerId?: number, query?: PaginationQueryDto, companyId?: number | null) {
-    const where = { ...this.buildScopedOwnerWhere(user, ownerId), ...companyWhere(companyId ?? null) };
-    const include = {
-      documents: true,
-      opportunities: true,
-      serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } },
-    };
+  async listClients(
+    user?: any,
+    ownerId?: number,
+    query?: SalesPaginationQueryDto,
+    companyId?: number | null,
+  ) {
+    const sector = query?.sector;
+    const include = this.clientInclude();
+    let where: Record<string, unknown> = { ...companyWhere(companyId ?? null) };
+
+    if (sector) {
+      if (!canSeeClientesModule(user?.email) && !this.isSuperAdminUser(user) && !this.isSalesTeamManager(user)) {
+        throw new ForbiddenException('No tienes acceso al módulo de clientes');
+      }
+      this.assertCanUseSectors(user, [sector as ClientSectorCode]);
+      where = {
+        ...where,
+        sectors: { some: { sector } },
+      };
+    } else {
+      where = { ...where, ...this.buildScopedOwnerWhere(user, ownerId) };
+    }
+
     if (query?.limit) {
       const [data, total] = await Promise.all([
-        this.prisma.salesClient.findMany({ where, orderBy: { updatedAt: 'desc' }, include, skip: query.skip, take: query.take }),
+        this.prisma.salesClient.findMany({
+          where,
+          orderBy: { updatedAt: 'desc' },
+          include,
+          skip: query.skip,
+          take: query.take,
+        }),
         this.prisma.salesClient.count({ where }),
       ]);
       return buildPaginatedResponse(data, total, query);
@@ -378,11 +470,60 @@ export class VentasService {
     const tenantId = requireCompanyId(companyId);
     const client = await this.prisma.salesClient.findFirst({
       where: { id, ...companyWhere(tenantId) },
-      include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
+      include: this.clientInclude(),
     });
     assertCompanyAccess(client, tenantId, 'Cliente');
     this.assertOwnerAccess(client!.ownerId, user, 'cliente');
+    if (canSeeClientesModule(user?.email) && !this.isSuperAdminUser(user) && !this.isSalesTeamManager(user)) {
+      const allowed = clientSectorsForEmail(user?.email);
+      const clientSectors = (client!.sectors ?? []).map((s) => s.sector as ClientSectorCode);
+      if (!clientSectors.some((s) => allowed.includes(s))) {
+        throw new ForbiddenException('No tienes acceso a este cliente');
+      }
+    }
     return client!;
+  }
+
+  async addClientSector(id: number, sector: string, user?: any, companyId?: number | null) {
+    if (!isClientSector(sector)) throw new BadRequestException('Sector inválido');
+    this.assertCanUseSectors(user, [sector]);
+    const client = await this.getClient(id, user, companyId);
+    const existing = (client.sectors ?? []).map((s: { sector: string }) => s.sector);
+    if (existing.includes(sector)) return client;
+
+    await this.prisma.salesClientSector.create({
+      data: {
+        salesClientId: id,
+        sector,
+        companyId: client.companyId,
+      },
+    });
+
+    if (needsOpsProvision([sector]) && !client.serviceClientId) {
+      try {
+        await this.provisionServiceClient(id, user, companyId);
+      } catch {
+        /* ignore */
+      }
+    }
+    return this.getClient(id, user, companyId);
+  }
+
+  async removeClientSector(id: number, sector: string, user?: any, companyId?: number | null) {
+    if (!isClientSector(sector)) throw new BadRequestException('Sector inválido');
+    this.assertCanUseSectors(user, [sector]);
+    const client = await this.getClient(id, user, companyId);
+    const existing = client.sectors ?? [];
+    if (existing.length <= 1) {
+      throw new BadRequestException('El cliente debe conservar al menos un sector');
+    }
+    if (!existing.some((s: { sector: string }) => s.sector === sector)) {
+      return client;
+    }
+    await this.prisma.salesClientSector.deleteMany({
+      where: { salesClientId: id, sector },
+    });
+    return this.getClient(id, user, companyId);
   }
 
   /** Facturas CFDI vinculadas al cliente comercial (ERP ↔ CRM). */
@@ -479,7 +620,7 @@ export class VentasService {
         ownerId,
         serviceClientId: dto.serviceClientId,
       },
-      include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
+      include: this.clientInclude(),
     });
 
     this.domainEvents.publishEntityLifecycle('updated', {
@@ -533,11 +674,7 @@ export class VentasService {
     const updated = await this.prisma.salesClient.update({
       where: { id },
       data: { serviceClientId: serviceClient.id },
-      include: {
-        documents: true,
-        opportunities: true,
-        serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } },
-      },
+      include: this.clientInclude(),
     });
 
     this.domainEvents.publishEntityLifecycle('updated', {

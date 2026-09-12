@@ -1948,6 +1948,12 @@ enum SalesProjectStatus {
   ON_HOLD
 }
 
+enum ClientSector {
+  PROYECTO
+  CORPORATIVO
+  COMERCIAL
+}
+
 model SalesClient {
   id              Int                   @id @default(autoincrement())
   name            String                @db.VarChar(200)
@@ -1971,6 +1977,7 @@ model SalesClient {
   leads           SalesLead[]
   opportunities   SalesOpportunity[]
   cotizaciones    Cotizacion[]
+  sectors         SalesClientSector[]
   owner           User?                 @relation("SalesClientOwner", fields: [ownerId], references: [id])
   serviceClient   ServiceClient?        @relation(fields: [serviceClientId], references: [id])
   company         CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -1980,6 +1987,23 @@ model SalesClient {
 
   @@index([companyId])
   @@map("sales_clients")
+}
+
+/// Membresía multi-sector Core: un SalesClient puede estar en proyecto, corporativo y/o comercial.
+model SalesClientSector {
+  id            Int          @id @default(autoincrement())
+  salesClientId Int
+  sector        ClientSector
+  companyId     Int
+  createdAt     DateTime     @default(now())
+
+  salesClient SalesClient    @relation(fields: [salesClientId], references: [id], onDelete: Cascade)
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([salesClientId, sector])
+  @@index([companyId, sector])
+  @@index([sector])
+  @@map("sales_client_sectors")
 }
 
 model SalesClientDocument {
@@ -4946,6 +4970,7 @@ model CompanyProfile {
   serviceClients            ServiceClient[]
   operationalProjects       OperationalProject[]
   salesClients              SalesClient[]
+  salesClientSectors        SalesClientSector[]
   salesLeads                SalesLead[]
   cotizaciones              Cotizacion[]
   supplierPurchaseOrders    SupplierPurchaseOrder[]

@@ -7,22 +7,20 @@
 
 ## Objetivo
 
-Flujo evidencia multi-persona Core: indicaciones, N fotos, form por tipo, PDF solo servicio, barras, historial.
+Módulo Clientes Core: 3 sectores, fiscal, matriz encargados, proyectos por cliente, pickers en actividades.
 
 ## Criterios de éxito
 
-- [x] Evidence por (activityId, userId); cierre cuando todos COMPLETED
-- [x] Asignar: generales, notas por persona, stepper 2–8, coreKind
-- [x] PDF solo servicio; helpers + UI
-- [x] Barras % en Actividades; finalizadas de días previos ocultas
-- [x] Historial embebido en perfil
-- [x] tests: evidence-flow.helpers.spec.ts
-- [x] verificación: migrate deploy OK
+- [x] Prisma ClientSector + SalesClientSector + migración/backfill
+- [x] API list/create/sectors + fiscal + filtro matriz
+- [x] Sidebar erp-clients ola1 + RBAC + canSeeClientesModule
+- [x] Hub + 3 listas + nuevo + detalle (+ proyectos)
+- [x] OpsActivityForm pickers servicio/comercial + filtro proyectos
 
 ## Pasos
 
-1–6 hechos en este turno.
+Hechos en este turno.
 
 ## Handoff
 
-Completado. Siguiente agente: smoke manual en UI si API reiniciada (prisma generate EPERM si nest tiene el DLL).
+Reiniciar API (`prisma generate` EPERM si nest tiene el DLL). Hard refresh Core → Clientes.

@@ -29,6 +29,12 @@ import {
   type ClientTicketRequestRow,
   type OperationalProjectRow,
 } from "@/lib/ops-activities-api";
+import { listSalesClients } from "@/lib/sales-api";
+import {
+  clientSectorsForActivityKind,
+  type ClientSector,
+} from "@/lib/client-sectors";
+import type { ActivityKind } from "@/lib/activity-kinds";
 
 type Props = {
   activityId?: number;
@@ -109,11 +115,19 @@ export default function OpsActivityForm({
   const [success, setSuccess] = useState<string | null>(null);
   const [showOtroModal, setShowOtroModal] = useState(false);
   const [otroInput, setOtroInput] = useState("");
+  const [sectorClients, setSectorClients] = useState<
+    Array<{ serviceClientId: number; name: string; salesClientId: number }>
+  >([]);
 
-  const activeProjects = useMemo(
-    () => projects.filter((p) => p.status === "ACTIVE"),
-    [projects],
-  );
+  const needsClientPicker = coreKind === "servicio" || coreKind === "comercial";
+  const filtersProjectsBySector = coreKind === "proyecto" || coreKind === "obra";
+
+  const activeProjects = useMemo(() => {
+    const active = projects.filter((p) => p.status === "ACTIVE");
+    if (!filtersProjectsBySector || sectorClients.length === 0) return active;
+    const ok = new Set(sectorClients.map((c) => c.serviceClientId));
+    return active.filter((p) => ok.has(p.client.id));
+  }, [projects, filtersProjectsBySector, sectorClients]);
 
   const loadMeta = useCallback(async () => {
     if (!token) return;
@@ -131,10 +145,31 @@ export default function OpsActivityForm({
       setNextAn(typeof next?.next === "string" ? next.next : "");
       setNextAnLoaded(true);
       setTicketRequests(Array.isArray(tickets) ? tickets : []);
+
+      if (coreKind && ["proyecto", "obra", "servicio", "comercial"].includes(coreKind)) {
+        const sectors = clientSectorsForActivityKind(coreKind as ActivityKind, user?.email);
+        if (sectors.length) {
+          const batches = await Promise.all(
+            sectors.map((s: ClientSector) => listSalesClients(token, { sector: s })),
+          );
+          const byId = new Map<number, { serviceClientId: number; name: string; salesClientId: number }>();
+          for (const row of batches.flat()) {
+            if (!row.serviceClientId) continue;
+            byId.set(row.id, {
+              salesClientId: row.id,
+              serviceClientId: row.serviceClientId,
+              name: row.legalName || row.name,
+            });
+          }
+          setSectorClients([...byId.values()]);
+        } else {
+          setSectorClients([]);
+        }
+      }
     } catch {
       setNextAnLoaded(true);
     }
-  }, [token, canAssign, isEdit, user]);
+  }, [token, canAssign, isEdit, user, coreKind]);
 
   useEffect(() => {
     void loadMeta();
@@ -500,10 +535,29 @@ export default function OpsActivityForm({
             />
           </>
         ) : (
-          <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-secondary)" }}>
-            {tone === "core"
-              ? "Trabajo del día sin proyecto. Si es servicio, elige cliente más abajo cuando aplique."
-              : "Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo."}
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+              {tone === "core"
+                ? needsClientPicker
+                  ? "Elige el cliente de este padrón."
+                  : "Trabajo del día sin proyecto."
+                : "Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo."}
+            </div>
+            {needsClientPicker ? (
+              <select
+                className="input"
+                value={form.clientId}
+                onChange={(e) => setForm({ ...form, clientId: e.target.value })}
+                required
+              >
+                <option value="">Seleccionar cliente…</option>
+                {sectorClients.map((c) => (
+                  <option key={c.salesClientId} value={c.serviceClientId}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
           </div>
         )}
         {!(tone === "core" && forcedTicketType) && (

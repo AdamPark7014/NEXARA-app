@@ -47,6 +47,8 @@ export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
   '/erp/actividades/servicios',
   '/erp/actividades/servicios/**',
   '/erp/my-profile',
+  '/erp/clientes',
+  '/erp/clientes/**',
 ];
 
 /**
