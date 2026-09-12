@@ -48,10 +48,10 @@ export function evidenceProgressPct(
   status: string | null | undefined,
   coreKind?: string | null,
 ): number {
-  const steps = evidenceStepsForKind(coreKind).filter((s) => s !== 'COMPLETED');
+  const steps: string[] = evidenceStepsForKind(coreKind).filter((s) => s !== 'COMPLETED');
   if (!status || status === 'ENTRY_PHOTO') return 0;
   if (status === 'COMPLETED') return 100;
-  const idx = steps.indexOf(status as EvidenceStep);
+  const idx = steps.indexOf(status);
   if (idx < 0) return 0;
   return Math.round((idx / steps.length) * 100);
 }
