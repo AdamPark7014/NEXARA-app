@@ -292,11 +292,14 @@ export default function ErpAsistenciasPage() {
     const onVis = () => {
       if (document.visibilityState === "visible") bump();
     };
+    const onAtt = () => bump();
     window.addEventListener("focus", bump);
+    window.addEventListener("attendance:updated", onAtt);
     document.addEventListener("visibilitychange", onVis);
     const id = window.setInterval(bump, 45_000);
     return () => {
       window.removeEventListener("focus", bump);
+      window.removeEventListener("attendance:updated", onAtt);
       document.removeEventListener("visibilitychange", onVis);
       window.clearInterval(id);
     };
@@ -423,10 +426,12 @@ export default function ErpAsistenciasPage() {
         <>
           {canRegister ? (
             <Section
+              dense
+              tone="accent"
               title="Mi jornada"
-              subtitle="Entrada / salida con foto y GPS (igual que el checador de campo)"
+              subtitle="Entrada o salida · foto + GPS"
             >
-              <AttendanceForm />
+              <AttendanceForm compact />
             </Section>
           ) : null}
 
