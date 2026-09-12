@@ -1,0 +1,396 @@
+{
+  "rangeStart": "2026-09-12",
+  "rangeEnd": "2026-09-13",
+  "totalUsers": 11,
+  "totalMinutesAll": 138,
+  "avgMinutesPerUser": 13,
+  "users": [
+    {
+      "userId": 15,
+      "userName": "Alejandro González Bustamante",
+      "email": "alejandro.gonzalez@nexara.com.mx",
+      "employeeNumber": "NX-407",
+      "department": "Sistemas",
+      "roleName": "Ingeniero de Soporte",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 13,
+      "userName": "Carolina Juárez Álvarez",
+      "email": "soporte@nexara.com.mx",
+      "employeeNumber": "NX-405",
+      "department": "Sistemas",
+      "roleName": "Ingeniero de Soporte",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 19,
+      "userName": "Daniela Hernández",
+      "email": "daniela.hernandez@nexara.com.mx",
+      "employeeNumber": "NX-103",
+      "department": "Administración",
+      "roleName": "Administrativo",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 8,
+      "userName": "David Morales Zenón",
+      "email": "operaciones@nexara.com.mx",
+      "employeeNumber": "NX-302",
+      "department": "Operaciones",
+      "roleName": "Coordinador de Operaciones",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 138,
+      "workDays": 1,
+      "avgMinutesPerDay": 138,
+      "days": [
+        {
+          "date": "2026-09-12",
+          "totalMinutes": 138,
+          "isOpen": true
+        }
+      ],
+      "attendances": [
+        {
+          "type": "entrada",
+          "timestamp": "2026-09-12T19:17:19.576Z",
+          "deviceInfo": "Escritorio · Windows · Chrome",
+          "photoUrl": "/uploads/attendance/1789240640561-s9rxke6e5.jpg"
+        }
+      ],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 16,
+      "userName": "Israel Ramos Lima",
+      "email": "israel.ramos@nexara.com.mx",
+      "employeeNumber": "NX-408",
+      "department": "Ingeniería",
+      "roleName": "Ingeniero de Campo",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 12,
+      "userName": "Joan Sebastián Sánchez Espinoza",
+      "email": "joan.sanchez@nexara.com.mx",
+      "employeeNumber": "NX-404",
+      "department": "Ingeniería",
+      "roleName": "Ingeniero de Campo",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 18,
+      "userName": "José Antonio Ramírez",
+      "email": "jose.ramirez@nexara.com.mx",
+      "employeeNumber": "NX-303",
+      "department": "Sistemas",
+      "roleName": "Ingeniero de Soporte",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 3,
+      "userName": "Josué Teodulo Cervantes Arellano",
+      "email": "infraestructura@nexara.com.mx",
+      "employeeNumber": "NX-003",
+      "department": "Obra",
+      "roleName": "Arquitecto",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 20,
+      "userName": "Juan José González",
+      "email": "juan.gonzalez@nexara.com.mx",
+      "employeeNumber": "NX-409",
+      "department": "Ingeniería",
+      "roleName": "Ingeniero de Campo",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 7,
+      "userName": "Luis Joel Aguilar Castillo",
+      "email": "direccion.operaciones@nexara.com.mx",
+      "employeeNumber": "NX-301",
+      "department": "Servicios",
+      "roleName": "Coordinador de Operaciones",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    },
+    {
+      "userId": 5,
+      "userName": "Mónica García Guzmán",
+      "email": "soluciones@nexara.com.mx",
+      "employeeNumber": "NX-102",
+      "department": "Administración",
+      "roleName": "Administrativo",
+      "roleFlags": {
+        "accesoConsole": false,
+        "accesoConsoleAdmin": false,
+        "accesoGestionUsuarios": false,
+        "accesoGestionTienda": false,
+        "accesoGestionWeb": false,
+        "accesoContabilidad": false
+      },
+      "isSuperAdmin": false,
+      "totalMinutes": 0,
+      "workDays": 0,
+      "avgMinutesPerDay": 0,
+      "days": [],
+      "attendances": [],
+      "activities": [],
+      "productivity": {
+        "avgScore": 0,
+        "level": "Sin datos",
+        "counts": {
+          "alta": 0,
+          "media": 0,
+          "baja": 0
+        },
+        "reviewed": 0,
+        "notes": []
+      }
+    }
+  ]
+}

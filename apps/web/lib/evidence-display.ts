@@ -43,7 +43,6 @@ export function resolveAssetUrl(url?: string | null): string {
     }
   }
 
-  const base = getApiAssetOrigin();
   let normalizedPath = raw.replace(/\\+/g, "/").replace(/^https?:\/\/[^/]+/i, "");
   normalizedPath = `${normalizedPath.startsWith("/") ? "" : "/"}${normalizedPath}`;
 
@@ -55,6 +54,18 @@ export function resolveAssetUrl(url?: string | null): string {
     normalizedPath = `/uploads${normalizedPath}`;
   }
 
+  if (normalizedPath.startsWith("/api/uploads/")) {
+    normalizedPath = normalizedPath.replace(/^\/api/, "");
+  }
+
+  // Protected uploads must stay same-origin relative so <img> sends nexara_token
+  // through the Next /uploads rewrite. Prefixing API origin (esp. SSR → :3001)
+  // is cross-origin without cookie → 401 → broken entry/exit photos.
+  if (normalizedPath.startsWith("/uploads/")) {
+    return normalizedPath;
+  }
+
+  const base = getApiAssetOrigin();
   return `${base}${normalizedPath}`;
 }
 
