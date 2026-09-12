@@ -9,19 +9,19 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Fix metaForKind
+## Este turno — Semáforo prioridad + UI amigable
 
 ### Hecho
 
-- `activity-kinds.ts` había perdido `metaForKind` y `servicioShouldGoToBridge` (crash en Asignar).
-- Funciones restauradas al final del módulo.
+- Nuevo `PrioritySemaforo` (verde/ámbar/rojo = Baja/Media/Alta).
+- `OpsActivityForm` (Core + OPS nueva): prioridad visual; copy más clara; CTA primary en Core.
+- Detalle OPS actividad: mismo semáforo.
 
 ### Verificar
 
-- Hard refresh `/erp/pizarra/*/asignar` — ya no debe salir TypeError metaForKind.
+- Asignar actividad → chips de prioridad en vez del select “Media”.
+- Hard refresh.
 
 ## No tocar
 
 Puente NAS. Plan file.
-
-

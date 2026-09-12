@@ -12,10 +12,10 @@ import {
   buildActivityPayload,
   EMPTY_ACTIVITY_FORM,
   formFromActivityRecord,
-  PRIORIDAD_LIST,
   type ActivityFormState,
   type ActivityProjectMode,
 } from "@/lib/ops-activity-form";
+import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
 import {
   assignTicketRequest,
   createActivity,
@@ -341,8 +341,8 @@ export default function OpsActivityForm({
       subtitle={
         tone === "core"
           ? form.projectMode === "with_project"
-            ? "El cliente sale del proyecto seleccionado."
-            : "Sin proyecto operativo."
+            ? "Elige proyecto, prioridad y agenda. El cliente sale del proyecto."
+            : "Título, prioridad semáforo y lo esencial — sin jerga técnica."
           : form.projectMode === "with_project"
             ? "OT con proyecto operativo: el cliente sale del proyecto."
             : "OT sin proyecto: trabajo interno o ad-hoc; no pide proyecto."
@@ -548,13 +548,10 @@ export default function OpsActivityForm({
           ))}
         </select>
         )}
-        <select
-          className="input"
-          value={form.prioridad}
-          onChange={(e) => setForm({ ...form, prioridad: e.target.value })}
-        >
-          {PRIORIDAD_LIST.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
+        <PrioritySemaforo
+          value={form.prioridad || "Media"}
+          onChange={(prioridad) => setForm({ ...form, prioridad })}
+        />
         <div>
           <label style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}>
             {requireSchedule || tone === "core" ? "Día" : "Fecha"}
@@ -585,7 +582,7 @@ export default function OpsActivityForm({
           className="input"
           type="number"
           min={0}
-          placeholder="Tiempo esperado (min)"
+          placeholder={tone === "core" ? "¿Cuántos minutos esperas que tome?" : "Tiempo esperado (min)"}
           value={form.tiempoEstimadoMin}
           onChange={(e) => setForm({ ...form, tiempoEstimadoMin: e.target.value })}
         />
@@ -593,7 +590,7 @@ export default function OpsActivityForm({
           className="input"
           type="number"
           min={0}
-          placeholder="Tiempo máximo (min)"
+          placeholder={tone === "core" ? "Tope máximo (min)" : "Tiempo máximo (min)"}
           value={form.tiempoMaximoMin}
           onChange={(e) => setForm({ ...form, tiempoMaximoMin: e.target.value })}
         />
@@ -675,7 +672,12 @@ export default function OpsActivityForm({
         {onCancel && (
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
         )}
-        <Button size="sm" onClick={() => void handleSubmit()} disabled={saving}>
+        <Button
+          size="sm"
+          variant={tone === "core" ? "primary" : undefined}
+          onClick={() => void handleSubmit()}
+          disabled={saving}
+        >
           {saving ? "Guardando…" : activitySubmitLabel(form, isEdit, tone)}
         </Button>
         {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}

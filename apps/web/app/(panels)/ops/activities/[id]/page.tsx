@@ -18,6 +18,7 @@ import { countEvidenceFiles } from "@/lib/evidence-display";
 import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
 import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
+import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
 
 const STATUSES = [
   "Pendiente",
@@ -28,7 +29,6 @@ const STATUSES = [
   "Rechazada",
   "Cancelada",
 ];
-const PRIORITIES = ["Baja", "Media", "Alta", "Urgente"];
 
 function workTypeLabel(workType?: string | null): string {
   if (workType === "PREVENTIVE_INVENTORY") return "Inventario preventivo";
@@ -369,13 +369,14 @@ export default function ActivityDetailPage() {
                   {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Prioridad</span>
-                <select value={form.prioridad} onChange={(e) => setForm((f) => ({ ...f, prioridad: e.target.value }))} style={inp}>
-                  <option value="">— Sin prioridad —</option>
-                  {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </label>
+              <div style={{ display: "grid", gap: 4 }}>
+                <PrioritySemaforo
+                  compact
+                  allowEmpty
+                  value={form.prioridad === "Urgente" ? "Alta" : form.prioridad}
+                  onChange={(prioridad) => setForm((f) => ({ ...f, prioridad }))}
+                />
+              </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
