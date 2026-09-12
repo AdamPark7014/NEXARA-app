@@ -9,20 +9,19 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — UI Asistencias más intuitiva
+## Este turno — Cronómetro vivo Asistencias
 
 ### Hecho
 
-1. Cards estilo Pizarra: avatar iniciales + punto de estado + badge (En jornada / Completó / Ausente).
-2. Bloque Entrada / Salida / Tiempo legible.
-3. Chips + KPIs clickables para filtrar.
-4. Orden: presentes → completos → ausentes; link a pizarra persona.
-5. Comidas con pill y borde de estado.
+1. Tiempo por persona en `H:MM:SS` (con segundos).
+2. Jornada abierta: label **En vivo**, tick cada 1s desde la entrada.
+3. Completó: duración fija entrada→salida con segundos.
+4. Banner **Productividad del día** = suma de todas las jornadas, actualiza en vivo.
 
 ### Verificar
 
-- `/erp/asistencias` → filtrar por Ausentes / En jornada.
-- Click nombre → pizarra.
+- Filtrar “En jornada” con alguien checado → ver segundos subir.
+- Ausentes muestran "—".
 
 ## No tocar
 
