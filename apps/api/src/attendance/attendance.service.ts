@@ -899,13 +899,11 @@ export class AttendanceService {
   }
 
   /**
-  * Obtiene usuarios accesibles según la jerarquía del usuario actual
-  * - Superadmin (gerencia/developer): Ve todos los usuarios del tenant
-    * - Console admin (CONSOLE_ADMIN): Ve todos los usuarios del tenant
-    * - Usuario con ATTENDANCE_MANAGE sin CONSOLE_ADMIN: Solo su propio usuario
-    * - Otros: No tiene acceso a esta funcion
-   * 
-    * NOTA: El filtrado final por tipo de usuario se hace en getHierarchyAttendanceRange
+   * Usuarios visibles en jerarquía de asistencia.
+   * - Superadmin / CONSOLE_ADMIN: todos los activos del tenant
+   * - ATTENDANCE_MANAGE (encargados): todos los activos del tenant;
+   *   el recorte real es scope=subtree por managerId (no por departamento:
+   *   los de campo suelen estar en otro depto. que su coordinador).
    */
   private async getAccessibleUsers(
     currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean },
@@ -915,7 +913,10 @@ export class AttendanceService {
       throw new BadRequestException('Usuario no autenticado');
     }
     const tenantId = requireCompanyId(companyId);
-    const membership = { companyMemberships: { some: { companyId: tenantId } } };
+    const membership = {
+      isActive: true,
+      companyMemberships: { some: { companyId: tenantId } },
+    };
     const isSuperAdmin = Boolean(currentUser.isSuperAdmin);
     const isConsoleAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
     const canManageAttendance = Boolean(currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE));
@@ -926,23 +927,9 @@ export class AttendanceService {
       );
     }
 
-    if (isSuperAdmin || isConsoleAdmin) {
+    if (isSuperAdmin || isConsoleAdmin || canManageAttendance) {
       return this.prisma.user.findMany({
         where: membership,
-        include: { role: true, department: true },
-        orderBy: { nombre: 'asc' },
-      });
-    }
-
-    // v2 OPS managers have ATTENDANCE_MANAGE but not CONSOLE_ADMIN —
-    // give them department-level scope (same as console admin, filtered later).
-    if (canManageAttendance) {
-      return this.prisma.user.findMany({
-        where: {
-          ...membership,
-          departmentId: currentUser.departmentId,
-          role: { accesoConsoleAdmin: false },
-        },
         include: { role: true, department: true },
         orderBy: { nombre: 'asc' },
       });
@@ -954,7 +941,6 @@ export class AttendanceService {
       include: { role: true, department: true },
       orderBy: { nombre: 'asc' },
     });
-
   }
 
   /**
@@ -993,9 +979,9 @@ export class AttendanceService {
     let accessibleUsers = await this.getAccessibleUsers(currentUser, companyId);
 
     // Filtrar según el tipo de usuario:
-    // - Superadmin: Ve todos EXCEPTO otros superadmins
-    // - Admin consola (no superadmin): Ve solo a él mismo + usuarios normales (sin permisos de admin)
-    // - Usuario normal: Solo ve su propia información (manejado por getAccessibleUsers)
+    // - Superadmin: Ve todos EXCEPTO otros superadmins (y a sí mismo vía email plataforma)
+    // - Admin consola / managers: él mismo + usuarios normales (sin permisos de admin de consola)
+    // - scope=subtree (abajo) recorta encargados a su árbol managerId
     if (currentUser.isSuperAdmin) {
       // Superadmin: excluir otros superadmins
       accessibleUsers = accessibleUsers.filter(
@@ -1005,12 +991,17 @@ export class AttendanceService {
       currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
       currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE)
     ) {
-      // Admin consola o v2 manager: solo él mismo + usuarios normales sin permisos de admin
+      // Admin consola o manager: sin otros admins de consola / plataforma
       accessibleUsers = accessibleUsers.filter(
         (user) =>
           user.id === currentUser.id ||
           (!user.role?.accesoConsoleAdmin && !this.isSuperAdminEmail(user.email)),
       );
+    }
+
+    // Company-wide (CEO/developer): no listar la propia tarjeta — es tablero del equipo.
+    if (this.isCompanyWideAttendanceViewer(currentUser)) {
+      accessibleUsers = accessibleUsers.filter((u) => u.id !== currentUser.id);
     }
 
     // Filtrar por departamento si se proporciona
