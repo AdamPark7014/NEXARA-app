@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
 
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
 export type BoardUserStatus = 'activo' | 'inactivo' | 'atrasado' | 'sin_actividad';
@@ -13,6 +14,17 @@ export type TeamBoardActivity = {
   bucket: BoardActivityBucket;
 };
 
+export type TeamBoardOpenActivity = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  evidenceStatus: string;
+  progressPct: number;
+  coreKind: string | null;
+  fechaFinalizacion: Date | null;
+};
+
 export type TeamBoardUser = {
   id: number;
   nombre: string;
@@ -21,6 +33,7 @@ export type TeamBoardUser = {
   puesto: string | null;
   status: BoardUserStatus;
   currentActivity: TeamBoardActivity | null;
+  openActivities: TeamBoardOpenActivity[];
   clockInAt: Date | null;
   workedMinutes: number | null;
   activityStartedAt: Date | null;
@@ -30,6 +43,25 @@ export type TeamBoardUser = {
 export type TeamBoardResponse = {
   scope: 'company' | 'subtree';
   users: TeamBoardUser[];
+};
+
+export type TeamBoardHistoryItem = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  coreKind: string | null;
+  fechaAsignacion: Date;
+  fechaFinalizacion: Date | null;
+  evidence: {
+    status: string;
+    progressPct: number;
+    entryPhotoUrl: string | null;
+    evidencePhotos: string[];
+    exitPhotoUrl: string | null;
+    serviceSheetPdfUrl: string | null;
+    serviceSheetData: unknown;
+  } | null;
 };
 
 type Viewer = {
@@ -72,6 +104,89 @@ export class TeamBoardService {
     if (!target) throw new NotFoundException('Usuario fuera de tu alcance');
     const [card] = await this.buildCards([target], [userId], companyId, now);
     return card;
+  }
+
+  /** Historial de actividades del usuario (assignee o responsable), con evidencia propia. */
+  async getUserHistory(
+    viewer: Viewer,
+    companyId: number | null,
+    userId: number,
+    take = 40,
+  ): Promise<TeamBoardHistoryItem[]> {
+    const { scoped } = await this.resolveScope(viewer, companyId);
+    if (!scoped.some((u) => u.id === userId)) {
+      throw new NotFoundException('Usuario fuera de tu alcance');
+    }
+    const assignees = await this.prisma.activityAssignee.findMany({
+      where: {
+        userId,
+        retiradoAt: null,
+        ...(companyId != null ? { companyId } : {}),
+      },
+      select: { activityId: true },
+    });
+    const ids = new Set(assignees.map((a) => a.activityId));
+    const asLead = await this.prisma.activity.findMany({
+      where: {
+        responsableId: userId,
+        deletedAt: null,
+        ...(companyId != null ? { companyId } : {}),
+      },
+      select: { id: true },
+      take: 80,
+    });
+    for (const a of asLead) ids.add(a.id);
+
+    const activities = await this.prisma.activity.findMany({
+      where: { id: { in: [...ids] }, deletedAt: null },
+      select: {
+        id: true,
+        anNumber: true,
+        titulo: true,
+        estatus: true,
+        coreKind: true,
+        fechaAsignacion: true,
+        fechaFinalizacion: true,
+        activityEvidences: {
+          where: { userId },
+          select: {
+            status: true,
+            entryPhotoUrl: true,
+            evidencePhotos: true,
+            exitPhotoUrl: true,
+            serviceSheetPdfUrl: true,
+            serviceSheetData: true,
+          },
+          take: 1,
+        },
+      },
+      orderBy: { fechaAsignacion: 'desc' },
+      take: Math.min(100, Math.max(1, take)),
+    });
+
+    return activities.map((a) => {
+      const ev = a.activityEvidences[0] ?? null;
+      return {
+        id: a.id,
+        anNumber: a.anNumber,
+        titulo: a.titulo,
+        estatus: a.estatus,
+        coreKind: a.coreKind,
+        fechaAsignacion: a.fechaAsignacion,
+        fechaFinalizacion: a.fechaFinalizacion,
+        evidence: ev
+          ? {
+              status: ev.status,
+              progressPct: evidenceProgressPct(ev.status, a.coreKind),
+              entryPhotoUrl: ev.entryPhotoUrl,
+              evidencePhotos: ev.evidencePhotos ?? [],
+              exitPhotoUrl: ev.exitPhotoUrl,
+              serviceSheetPdfUrl: ev.serviceSheetPdfUrl,
+              serviceSheetData: ev.serviceSheetData,
+            }
+          : null,
+      };
+    });
   }
 
   private async resolveScope(viewer: Viewer, companyId: number | null) {
@@ -125,33 +240,47 @@ export class TeamBoardService {
     const dayEnd = new Date(`${today}T23:59:59.999`);
     const gpsSince = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
-    const [activities, attendances, locationTrackings] = await Promise.all([
-      this.prisma.activity.findMany({
+    const closed = (estatus: string) => {
+      const s = (estatus || '').toLowerCase();
+      return (
+        s.includes('finalizada') ||
+        s.includes('completada') ||
+        s.includes('cancelada') ||
+        s.includes('aprobada')
+      );
+    };
+
+    const [assigneeRows, attendances, locationTrackings] = await Promise.all([
+      this.prisma.activityAssignee.findMany({
         where: {
-          responsableId: { in: userIds },
-          deletedAt: null,
+          userId: { in: userIds },
+          retiradoAt: null,
           ...(companyId != null ? { companyId } : {}),
-          NOT: {
-            OR: [
-              { estatus: { contains: 'finalizada', mode: 'insensitive' } },
-              { estatus: { contains: 'completada', mode: 'insensitive' } },
-              { estatus: { contains: 'cancelada', mode: 'insensitive' } },
-            ],
-          },
         },
         select: {
-          id: true,
-          anNumber: true,
-          titulo: true,
-          estatus: true,
-          fechaMaxima: true,
-          projectId: true,
-          clientId: true,
-          responsableId: true,
-          fechaAsignacion: true,
-          fechaInicio: true,
+          userId: true,
+          activity: {
+            select: {
+              id: true,
+              anNumber: true,
+              titulo: true,
+              estatus: true,
+              fechaMaxima: true,
+              projectId: true,
+              clientId: true,
+              responsableId: true,
+              fechaAsignacion: true,
+              fechaInicio: true,
+              fechaFinalizacion: true,
+              coreKind: true,
+              deletedAt: true,
+              activityEvidences: {
+                where: { userId: { in: userIds } },
+                select: { userId: true, status: true },
+              },
+            },
+          },
         },
-        orderBy: { fechaAsignacion: 'desc' },
       }),
       this.prisma.attendance.findMany({
         where: {
@@ -181,13 +310,43 @@ export class TeamBoardService {
       ...clockInByUser.keys(),
       ...locationTrackings.map((lt) => lt.usuarioId),
     ]);
-    const activityByUser = new Map<number, (typeof activities)[number]>();
-    for (const a of activities) {
-      if (!activityByUser.has(a.responsableId)) activityByUser.set(a.responsableId, a);
+
+    const openByUser = new Map<number, TeamBoardOpenActivity[]>();
+    for (const row of assigneeRows) {
+      const act = row.activity;
+      if (!act || act.deletedAt) continue;
+      const isClosed = closed(act.estatus);
+      const finishedBeforeToday =
+        isClosed &&
+        act.fechaFinalizacion != null &&
+        act.fechaFinalizacion.getTime() < dayStart.getTime();
+      if (finishedBeforeToday) continue;
+
+      const myEv =
+        act.activityEvidences.find((e) => e.userId === row.userId) ??
+        act.activityEvidences[0];
+      const evidenceStatus = myEv?.status ?? 'ENTRY_PHOTO';
+      const item: TeamBoardOpenActivity = {
+        id: act.id,
+        anNumber: act.anNumber,
+        titulo: act.titulo,
+        estatus: act.estatus,
+        evidenceStatus,
+        progressPct: evidenceProgressPct(evidenceStatus, act.coreKind),
+        coreKind: act.coreKind,
+        fechaFinalizacion: act.fechaFinalizacion,
+      };
+      const list = openByUser.get(row.userId) ?? [];
+      if (!list.some((x) => x.id === item.id)) list.push(item);
+      openByUser.set(row.userId, list);
     }
 
     return scoped.map((u) => {
-      const act = activityByUser.get(u.id) ?? null;
+      const openActivities = (openByUser.get(u.id) ?? []).slice(0, 5);
+      const act = openActivities[0]
+        ? assigneeRows.find((r) => r.userId === u.id && r.activity?.id === openActivities[0].id)
+            ?.activity
+        : null;
       let status: BoardUserStatus = 'sin_actividad';
       let currentActivity: TeamBoardActivity | null = null;
       let activityStartedAt: Date | null = null;
@@ -228,6 +387,7 @@ export class TeamBoardService {
         puesto: u.puesto,
         status,
         currentActivity,
+        openActivities,
         clockInAt,
         workedMinutes,
         activityStartedAt,

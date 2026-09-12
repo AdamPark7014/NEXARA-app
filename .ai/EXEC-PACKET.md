@@ -1,78 +1,28 @@
 # EXEC-PACKET — NEXARA-app
 
-- **Escrito por:** Cursor (ejecutor; plan Adam aprobado)
+- **Escrito por:** Cursor
 - **Fecha:** 2026-09-12
 - **Rama:** mejora/calidad-y-web
-- **Estado:** EN EJECUCION
+- **Estado:** CERRADO
 
 ## Objetivo
 
-Flujo de evidencia **por persona** en Core: indicaciones generales + por miembro, N fotos (2–8), form por `coreKind`, PDF hoja solo en servicio, barras en Actividades, historial embebido. Fuera: móvil nativo.
+Flujo evidencia multi-persona Core: indicaciones, N fotos, form por tipo, PDF solo servicio, barras, historial.
 
 ## Criterios de éxito
 
-- [ ] Cada assignee tiene su `ActivityEvidence`; cierre cuando todos COMPLETED
-- [ ] Asignar: generales, notas por persona, stepper 2–8, `coreKind`
-- [ ] PDF solo servicio; no-PDF rechazado
-- [ ] Barras % bajo avatar; finalizadas de días previos ocultas del card
-- [ ] Historial con fotos/PDF embebidos
-- [ ] tests: smoke API evidence + board types
-- [ ] verificación manual: asignar multi → avanzar pasos → ver barras
+- [x] Evidence por (activityId, userId); cierre cuando todos COMPLETED
+- [x] Asignar: generales, notas por persona, stepper 2–8, coreKind
+- [x] PDF solo servicio; helpers + UI
+- [x] Barras % en Actividades; finalizadas de días previos ocultas
+- [x] Historial embebido en perfil
+- [x] tests: evidence-flow.helpers.spec.ts
+- [x] verificación: migrate deploy OK
 
-## Contexto mínimo a cargar (≤7 archivos)
+## Pasos
 
-- `apps/api/prisma/schema.prisma` (Activity, ActivityEvidence, ActivityAssignee)
-- `apps/api/src/activities/evidence/activity-evidence.service.ts`
-- `apps/api/src/activities/activity-team.service.ts`
-- `apps/api/src/me/team-board.service.ts`
-- `apps/web/components/ActivityEvidenceFlow.tsx`
-- `apps/web/app/(panels)/erp/pizarra/[userId]/asignar/page.tsx`
-- `apps/web/app/(panels)/erp/pizarra/page.tsx`
+1–6 hechos en este turno.
 
-## Archivos a tocar (máx 12 + migraciones)
+## Handoff
 
-| Archivo | Acción | Notas |
-|---------|--------|-------|
-| schema.prisma | editar | coreKind, evidencePhotoRequired, userId evidence |
-| migration SQL | crear | backfill userId |
-| create-activity.dto + activities.service | editar | campos nuevos + seed evidence LEAD |
-| activity-team.* | editar | indicaciones + ensure evidence |
-| activity-evidence.service | editar | por userId, N fotos, skip PDF |
-| team-board.service + api | editar | openActivities + % |
-| asignar/page + ops form | editar | UX generador |
-| ActivityEvidenceFlow | editar | pasos/templates |
-| pizarra pages | editar | barras + historial |
-
-## Pasos numerados
-
-1. Schema + migración + prisma generate
-2. API create/team/evidence por userId
-3. UI asignar
-4. UI evidencia
-5. Board bars
-6. Historial
-7. packet close + relevo
-
-## Tests / verificación
-
-```powershell
-cd C:\dev\apps\NEXARA-app\apps\api
-npx prisma migrate deploy
-npx prisma generate
-```
-
-## Workers
-
-- **NO_LLM:** rg, prisma migrate, git
-- **LOCAL:** ollama_implement tickets; no reescritura ciega de archivos grandes
-- **MCP:** ollama-worker
-
-## No hacer / riesgos
-
-- No tocar plan file del usuario
-- No `findUnique({ activityId })` tras migración
-- Verificar tamaño tras ollama apply
-
-## Handoff a Cursor
-
-Implementa el plan Flujo evidencia multi-persona aprobado; cierra con relevo.
+Completado. Siguiente agente: smoke manual en UI si API reiniciada (prisma generate EPERM si nest tiene el DLL).

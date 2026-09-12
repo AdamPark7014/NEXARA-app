@@ -61,6 +61,7 @@ function Avatar({ url, name, size = 80 }: { url: string | null; name: string; si
 function PersonCard({ user }: { user: TeamBoardUser }) {
   const color = STATUS_COLORS[user.status];
   const act = user.currentActivity;
+  const open = user.openActivities ?? [];
   return (
     <Link
       href={`/erp/pizarra/${user.id}`}
@@ -119,43 +120,64 @@ function PersonCard({ user }: { user: TeamBoardUser }) {
           {STATUS_LABELS[user.status]}
         </div>
       </div>
-      <div
-        style={{
-          width: "100%",
-          minHeight: 44,
-          paddingTop: 10,
-          borderTop: "1px solid var(--border)",
-          fontSize: 12,
-          lineHeight: 1.35,
-          color: "var(--text-secondary)",
-          textAlign: "center",
-        }}
-      >
-        {act ? (
-          <>
-            <div style={{ fontWeight: 700, color: "var(--foreground)", fontSize: 11 }}>{act.anNumber}</div>
-            <div
-              style={{
-                marginTop: 2,
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-                color: "var(--foreground)",
-              }}
-            >
-              {act.titulo}
+      {open.length > 0 ? (
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
+          {open.slice(0, 3).map((a) => (
+            <div key={a.id} title={`${a.anNumber} · ${a.titulo}`}>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 650,
+                  color: "var(--text-secondary)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  marginBottom: 2,
+                }}
+              >
+                {a.titulo}
+              </div>
+              <div
+                style={{
+                  height: 6,
+                  borderRadius: 999,
+                  background: "color-mix(in srgb, var(--border) 80%, transparent)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${Math.min(100, Math.max(0, a.progressPct))}%`,
+                    borderRadius: 999,
+                    background:
+                      a.progressPct >= 100
+                        ? "#16a34a"
+                        : a.progressPct > 0
+                          ? "var(--primary)"
+                          : "transparent",
+                  }}
+                />
+              </div>
             </div>
-            {user.activityElapsedMinutes != null ? (
-              <div style={{ marginTop: 4, fontSize: 11 }}>{formatMinutes(user.activityElapsedMinutes)}</div>
-            ) : null}
-          </>
-        ) : user.clockInAt ? (
-          <span>En sitio · {formatMinutes(user.workedMinutes)}</span>
-        ) : (
-          <span style={{ opacity: 0.75 }}>—</span>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div
+          style={{
+            width: "100%",
+            minHeight: 44,
+            paddingTop: 10,
+            borderTop: "1px solid var(--border)",
+            fontSize: 12,
+            lineHeight: 1.35,
+            color: "var(--text-secondary)",
+            textAlign: "center",
+          }}
+        >
+          {act ? act.titulo : "Sin actividad abierta"}
+        </div>
+      )}
     </Link>
   );
 }
