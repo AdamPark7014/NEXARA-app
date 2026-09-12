@@ -47,6 +47,7 @@ export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
   { path: '/api/gps', methods: ['POST'], scope: 'write' },
   { path: '/api/gps/consent', methods: ['PATCH'], scope: 'write' },
   { path: '/api/gps/me', methods: ['GET'], scope: 'read' },
+  { path: '/api/gps/trajectory', methods: ['GET'], scope: 'read' },
   { path: '/api/gps/heartbeat', methods: ['POST'], scope: 'write' },
 ];
 
@@ -448,7 +449,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/maintenance/**', scope: 'write' },
     { path: '/api/maintenance-contracts/**', scope: 'write' },
     { path: '/api/vehicles/**', scope: 'approve' },
-    { path: '/api/gps/**', scope: 'read' },
+    // Sin /api/gps/** amplio: live team es GPS_MANAGE (dirección). Self vía SELF_ATTENDANCE.
     { path: '/api/service-sheets/**', scope: 'write' },
     { path: '/api/tool-requests/**', methods: ['GET', 'POST', 'PUT', 'PATCH'], scope: 'write' },
     // PAGE_MATRIX ya da `/ops/**` (incl. viáticos de equipo). Sin estas reglas
@@ -507,6 +508,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_SOPORTE]: [
     ...MEETINGS_STAFF_URL_RULES,
+    ...CORE_OLA1_URL_RULES,
+    ...SELF_ATTENDANCE_URL_RULES,
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
     { path: '/ops/chat', scope: 'write' },
@@ -549,7 +552,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/kb/**', scope: 'write' },
     { path: '/api/attendance/**', methods: ['GET', 'POST'], scope: 'write' },
     { path: '/api/lunch-breaks/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
-    { path: '/api/gps/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    // GPS propio al fichar (SELF_ATTENDANCE); sin /api/gps/** amplio → no live team.
     { path: '/api/viaticos/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/viatics/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/integra/**', scope: 'write' },

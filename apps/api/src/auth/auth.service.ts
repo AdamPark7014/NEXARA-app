@@ -531,15 +531,21 @@ export class AuthService {
       set.add(PERMISSIONS.VIATICS_VIEW);
       set.add(PERMISSIONS.ATTENDANCE_MANAGE);
       set.add(PERMISSIONS.ATTENDANCE_VIEW);
-      // GPS_VIEW: consent + POST propia ubicación tras checada (endpoints
-      // exigen view; GPS_MANAGE solo alcanza team/trajectory anyPermissions).
+      // GPS_VIEW: fichar propio (consent + POST). GPS en vivo del equipo
+      // (gps/team) es GPS_MANAGE — solo dirección, no coordinadores de campo.
       set.add(PERMISSIONS.GPS_VIEW);
-      set.add(PERMISSIONS.GPS_MANAGE);
       set.add(PERMISSIONS.MAINTENANCE_VIEW);
       set.add(PERMISSIONS.MAINTENANCE_MANAGE);
       set.add(PERMISSIONS.ASSETS_VIEW);
       set.add(PERMISSIONS.ASSETS_MANAGE);
       set.add(PERMISSIONS.NOC_VIEW);
+    }
+
+    // GPS en vivo (mapa del equipo / trayectoria ajena): dueño y dirección.
+    // Coordinadores ven checadas (entrada/salida + punto al fichar), no telemetría.
+    const V2_GPS_LIVE_ROLES = new Set(['ceo', 'dir_admin', 'dir_operaciones']);
+    if (V2_GPS_LIVE_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.GPS_MANAGE);
     }
 
     // ── Personal administrativo (operación día a día ERP) ─────────────
@@ -600,6 +606,8 @@ export class AuthService {
       set.add(PERMISSIONS.VEHICLES_REQUEST);
       set.add(PERMISSIONS.SUPPORT_VIEW);
       set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      // Ve subtree (entrada/salida / en sitio al fichar); sin GPS_MANAGE en vivo.
+      set.add(PERMISSIONS.ATTENDANCE_MANAGE);
       set.add(PERMISSIONS.GPS_VIEW);
       set.add(PERMISSIONS.KB_VIEW);
       set.add(PERMISSIONS.DOCUMENTS_VIEW);
