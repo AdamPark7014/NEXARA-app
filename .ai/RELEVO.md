@@ -9,21 +9,20 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Fix GPS tras entrada (David)
+## Este turno — CEO ve checadas en vivo
 
 ### Hecho
 
-- Causa: entrada OK; fallaba `PATCH /gps/consent` + `POST /gps` porque exigían `GPS_VIEW` y `coord_operaciones` solo tenía `GPS_MANAGE`.
-- `auth.service.ts`: ops managers también reciben `GPS_VIEW`.
-- `gps.controller.ts`: create / me / consent aceptan `GPS_VIEW` **o** `GPS_MANAGE`.
-- `SELF_ATTENDANCE_URL_RULES`: POST/PATCH GPS propio + heartbeat.
-- `AttendanceForm`: soft-fail GPS si la checada ya quedó.
+- Causa: la entrada de David **sí** está en BD (`Attendance` + `AttendanceDay` abiertos 2026-09-12).
+- Bug UI: en `/erp/asistencias` el refresh (poll + `attendance:updated`) solo corría si `canRegister && isManager`. Christian es `manage` (sin checador propio) → **nunca** refrescaba el equipo.
+- Fix: socket realtime + poll 15s + focus/visibility para **todo** `isManager`.
+- CEO/plataforma ya no mandan `scope=subtree` (company-wide).
+- `jwt.strategy`: adjunta `email` al user (defensa company-wide).
 
 ### Verificar
 
-1. Reiniciar API si hace falta.
-2. **Cerrar sesión y volver a entrar** como David (`operaciones@…`) — el JWT cachea permisos.
-3. Entrada → verde sin «No tienes permisos»; ubicación compartida.
+1. Hard refresh como Christian en Asistencias → David debe salir **En jornada** (entrada ~13:17).
+2. Con Christian abierto: otra ventana David checa → el KPI/lista de Christian se actualiza sin F5.
 
 ## A medias
 
