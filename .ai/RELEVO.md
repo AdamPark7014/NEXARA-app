@@ -9,19 +9,27 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Semáforo prioridad + UI amigable
+## Este turno — Indicaciones del responsable (LEAD)
 
 ### Hecho
 
-- Nuevo `PrioritySemaforo` (verde/ámbar/rojo = Baja/Media/Alta).
-- `OpsActivityForm` (Core + OPS nueva): prioridad visual; copy más clara; CTA primary en Core.
-- Detalle OPS actividad: mismo semáforo.
+- En `/erp/pizarra/[userId]/asignar`: textarea **Indicaciones para {responsable}** siempre visible (sección 2), no solo para extras.
+- Tras crear la actividad, si hay notas del LEAD se hace `POST …/team` con `rol: "LEAD"` + `indicaciones` (sin degradar a TECNICO).
+- Extras siguen con sus textareas personales.
 
 ### Verificar
 
-- Asignar actividad → chips de prioridad en vez del select “Media”.
-- Hard refresh.
+- Asignar a alguien → escribir indicaciones del responsable (sin sumar extras) → crear → en evidencia/historial deben verse esas notas en el assignee LEAD.
+- Hard refresh del form de asignar.
+
+## A medias
+
+Nada.
+
+## Siguiente
+
+Lo que Adam diga (probar en UI local).
 
 ## No tocar
 
-Puente NAS. Plan file.
+Puente NAS. Plan file bajo `.cursor/plans/`.

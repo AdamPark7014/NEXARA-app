@@ -42,6 +42,7 @@ async function addTeamMember(
   activityId: number,
   userId: number,
   indicaciones?: string,
+  rol: "LEAD" | "TECNICO" | "APOYO" = "TECNICO",
 ) {
   const res = await fetch(buildApiUrl(`activities/${activityId}/team`), {
     method: "POST",
@@ -52,7 +53,7 @@ async function addTeamMember(
     },
     body: JSON.stringify({
       userId,
-      rol: "TECNICO",
+      rol,
       ...(indicaciones?.trim() ? { indicaciones: indicaciones.trim() } : {}),
     }),
   });
@@ -74,6 +75,8 @@ export default function AsignarActividadPage() {
   const [boardUsers, setBoardUsers] = useState<TeamBoardUser[]>([]);
   const [extraIds, setExtraIds] = useState<number[]>([]);
   const [extraNotes, setExtraNotes] = useState<Record<number, string>>({});
+  /** Indicaciones personales del responsable (primer asignado de /asignar). */
+  const [leadNotes, setLeadNotes] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
 
@@ -372,7 +375,34 @@ export default function AsignarActividadPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-              2 · Equipo extra (opcional)
+              2 · Indicaciones y equipo
+            </div>
+            <label style={{ display: "block", fontSize: 12, marginBottom: 14 }}>
+              <span style={{ fontWeight: 650, color: "var(--text-secondary)" }}>
+                Indicaciones para {displayName.split(/\s+/).slice(0, 2).join(" ")} (responsable,
+                opcional)
+              </span>
+              <textarea
+                value={leadNotes}
+                onChange={(e) => setLeadNotes(e.target.value)}
+                rows={2}
+                style={{
+                  width: "100%",
+                  marginTop: 4,
+                  padding: 8,
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  resize: "vertical",
+                  background: "var(--bg)",
+                  color: "inherit",
+                }}
+                placeholder={`Qué debe hacer ${displayName.split(/\s+/).slice(0, 2).join(" ")}…`}
+              />
+            </label>
+            <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 8, color: "var(--text-secondary)" }}>
+              Equipo extra (opcional)
             </div>
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
               {kind === "servicio" && isServicioBridgeEmail(person?.email)
