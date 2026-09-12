@@ -14,7 +14,7 @@ export class GpsController {
 
   @Post()
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.GPS_VIEW, PERMISSIONS.GPS_MANAGE] })
   create(
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
@@ -34,7 +34,7 @@ export class GpsController {
 
   @Get('me')
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.GPS_VIEW, PERMISSIONS.GPS_MANAGE] })
   findMe(@CurrentUser() user: any) {
     return this.gpsService.findMe(user.id);
   }
@@ -71,7 +71,7 @@ export class GpsController {
 
   @Patch('consent')
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.GPS_VIEW, PERMISSIONS.GPS_MANAGE] })
   updateConsent(@CurrentUser() user: any, @Body() body: { enabled?: boolean }) {
     return this.gpsService.updateConsent(user.id, Boolean(body.enabled));
   }

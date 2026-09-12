@@ -43,6 +43,11 @@ export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
   { path: '/erp/hr/lunch-breaks', scope: 'write' },
   { path: '/api/attendance/**', methods: ['GET', 'POST'], scope: 'write' },
   { path: '/api/lunch-breaks/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
+  // Tras checada: consent + punto GPS propio (campo / self-attendance).
+  { path: '/api/gps', methods: ['POST'], scope: 'write' },
+  { path: '/api/gps/consent', methods: ['PATCH'], scope: 'write' },
+  { path: '/api/gps/me', methods: ['GET'], scope: 'read' },
+  { path: '/api/gps/heartbeat', methods: ['POST'], scope: 'write' },
 ];
 
 /**

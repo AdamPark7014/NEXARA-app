@@ -238,7 +238,7 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
     const now = Date.now();
     if (now - gpsLastSentRef.current < 4000) return;
     gpsLastSentRef.current = now;
-    await fetch(buildApiUrl('gps'), {
+    const res = await fetch(buildApiUrl('gps'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -250,6 +250,11 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
         ultimaActualizacion: new Date().toISOString(),
       }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const msg = Array.isArray(data.message) ? data.message.join(' ') : data.message;
+      throw new Error(msg || 'No se pudo enviar la ubicación GPS');
+    }
   };
 
   const updateGpsConsent = async (enabled: boolean) => {
@@ -500,7 +505,9 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
           startGpsTracking();
           dispatchGpsConsent(true);
         } catch (gpsErr) {
-          setError(gpsErr instanceof Error ? gpsErr.message : 'No se pudo activar el GPS');
+          // La checada ya quedó; no asustar con el mismo tono que un fallo de entrada.
+          const detail = gpsErr instanceof Error ? gpsErr.message : 'permisos o red';
+          setError(`Entrada registrada; GPS no se activó (${detail}).`);
         }
       } else {
         setStatus('✓ Salida registrada correctamente. Se detuvo el compartir ubicación.');
@@ -509,7 +516,8 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
           await updateGpsConsent(false);
           dispatchGpsConsent(false);
         } catch (gpsErr) {
-          setError(gpsErr instanceof Error ? gpsErr.message : 'No se pudo desactivar el GPS');
+          const detail = gpsErr instanceof Error ? gpsErr.message : 'permisos o red';
+          setError(`Salida registrada; GPS no se desactivó (${detail}).`);
         }
       }
 

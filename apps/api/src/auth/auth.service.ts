@@ -531,6 +531,9 @@ export class AuthService {
       set.add(PERMISSIONS.VIATICS_VIEW);
       set.add(PERMISSIONS.ATTENDANCE_MANAGE);
       set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      // GPS_VIEW: consent + POST propia ubicación tras checada (endpoints
+      // exigen view; GPS_MANAGE solo alcanza team/trajectory anyPermissions).
+      set.add(PERMISSIONS.GPS_VIEW);
       set.add(PERMISSIONS.GPS_MANAGE);
       set.add(PERMISSIONS.MAINTENANCE_VIEW);
       set.add(PERMISSIONS.MAINTENANCE_MANAGE);
