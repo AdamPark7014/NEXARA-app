@@ -7,8 +7,12 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import {
   ACTIVITY_KINDS,
+  isServicioBridgeEmail,
   kindsForCreator,
   metaForKind,
+  ORG_EMAILS,
+  servicioDelegateEmails,
+  servicioShouldGoToBridge,
   type ActivityKind,
 } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
@@ -57,6 +61,7 @@ export default function AsignarActividadPage() {
   const [kind, setKind] = useState<ActivityKind | null>(null);
   const [person, setPerson] = useState<TeamBoardUser | null>(null);
   const [roster, setRoster] = useState<TeamBoardUser[]>([]);
+  const [boardUsers, setBoardUsers] = useState<TeamBoardUser[]>([]);
   const [extraIds, setExtraIds] = useState<number[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
@@ -74,6 +79,26 @@ export default function AsignarActividadPage() {
 
   const kindMeta = kind ? metaForKind(kind) : null;
 
+  const bridgeNeeded =
+    kind === "servicio" &&
+    servicioShouldGoToBridge({
+      creatorEmail: user?.email,
+      targetEmail: person?.email,
+    });
+
+  const antonioOnBoard = useMemo(
+    () => boardUsers.find((u) => u.email?.toLowerCase() === ORG_EMAILS.antonio) ?? null,
+    [boardUsers],
+  );
+
+  const teamForExtras = useMemo(() => {
+    if (kind === "servicio" && isServicioBridgeEmail(person?.email)) {
+      const allow = new Set(servicioDelegateEmails());
+      return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
+    }
+    return roster;
+  }, [kind, person?.email, roster]);
+
   const load = useCallback(async () => {
     if (!token || !Number.isFinite(userId)) return;
     try {
@@ -82,7 +107,9 @@ export default function AsignarActividadPage() {
         fetchTeamBoard(token).catch(() => null),
       ]);
       setPerson(p);
-      setRoster((board?.users ?? []).filter((u) => u.id !== userId));
+      const users = board?.users ?? [];
+      setBoardUsers(users);
+      setRoster(users.filter((u) => u.id !== userId));
       setLoadError(null);
     } catch (e) {
       setLoadError(formatApiError(e, "No se pudo cargar a la persona"));
@@ -254,12 +281,54 @@ export default function AsignarActividadPage() {
           })}
         </div>
         <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
-          Christian puede asignar a David o directo a un instalador. David solo ve Tarea, Proyecto y Obra;
-          luego puede sumar gente al equipo o reasignar.
+          Christian → cualquiera. David → instaladores (tarea/proyecto/obra). Luis → servicios a Antonio.
+          Antonio → Carolina / Alejandro con día y hora.
         </p>
       </section>
 
-      {kindMeta ? (
+      {bridgeNeeded && (
+        <div
+          role="status"
+          style={{
+            padding: "12px 14px",
+            borderRadius: 14,
+            border: "1px solid color-mix(in srgb, #d97706 40%, var(--border))",
+            background: "color-mix(in srgb, #d97706 10%, var(--surface))",
+            fontSize: 13,
+            lineHeight: 1.45,
+          }}
+        >
+          <strong>Servicios van primero a Antonio</strong> (puente de sistemas). Él agenda día/hora a
+          Carolina o Alejandro.
+          {antonioOnBoard ? (
+            <div style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                onClick={() => router.push(`/erp/pizarra/${antonioOnBoard.id}/asignar`)}
+                style={{
+                  border: "none",
+                  background: "var(--primary)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Ir a asignar a {antonioOnBoard.nombre.split(/\s+/).slice(0, 2).join(" ")} →
+              </button>
+            </div>
+          ) : (
+            <p style={{ margin: "8px 0 0", fontSize: 12 }}>
+              No aparece Antonio en el tablero; revisa el seed / jerarquía.
+            </p>
+          )}
+        </div>
+      )}
+
+      {kindMeta && !bridgeNeeded ? (
         <>
           <section
             style={{
@@ -273,15 +342,17 @@ export default function AsignarActividadPage() {
               2 · Equipo extra (opcional)
             </div>
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
-              El responsable es {displayName}. Puedes sumar técnicos de apoyo.
+              {kind === "servicio" && isServicioBridgeEmail(person?.email)
+                ? "Como puente, suma a Carolina o Alejandro (día/hora ya van en el formulario)."
+                : `El responsable es ${displayName}. Puedes sumar apoyo.`}
             </p>
-            {roster.length === 0 ? (
+            {teamForExtras.length === 0 ? (
               <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
                 No hay más personas en el tablero para sumar ahora.
               </p>
             ) : (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {roster.map((u) => {
+                {teamForExtras.map((u) => {
                   const on = extraIds.includes(u.id);
                   const src = u.avatarUrl ? resolveAssetUrl(u.avatarUrl) : null;
                   return (
@@ -370,6 +441,7 @@ export default function AsignarActividadPage() {
               hideProjectModePicker
               forcedTicketType={kindMeta.ticketType}
               forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
+              requireSchedule={Boolean(kindMeta.requiresSchedule)}
               onCancel={() => router.push(`/erp/pizarra/${userId}`)}
               onSuccess={(id) => void handleSuccess(id)}
             />

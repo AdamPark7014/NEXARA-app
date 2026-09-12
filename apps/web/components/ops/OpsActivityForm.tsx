@@ -48,6 +48,8 @@ type Props = {
   /** Prefija ticketType al montar (obra → INSTALACION, etc.) */
   forcedTicketType?: string;
   forcedTicketTypeCustom?: string;
+  /** Exige día + hora (servicio / obra). */
+  requireSchedule?: boolean;
   onSuccess?: (id: number) => void;
   onCancel?: () => void;
 };
@@ -69,6 +71,7 @@ export default function OpsActivityForm({
   hideResponsableSelect = false,
   forcedTicketType,
   forcedTicketTypeCustom,
+  requireSchedule = false,
   onSuccess,
   onCancel,
 }: Props) {
@@ -240,6 +243,10 @@ export default function OpsActivityForm({
     }
     if (form.projectMode === "with_project" && !form.projectId) {
       setError("Selecciona un proyecto");
+      return;
+    }
+    if (requireSchedule && (!form.fecha || !form.hora)) {
+      setError("Indica día y hora de la agenda");
       return;
     }
 
@@ -539,14 +546,31 @@ export default function OpsActivityForm({
           {PRIORIDAD_LIST.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <div>
-          <label style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}>Fecha</label>
+          <label style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}>
+            {requireSchedule || tone === "core" ? "Día" : "Fecha"}
+          </label>
           <input
             className="input"
             type="date"
             value={form.fecha}
             onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+            required={requireSchedule}
           />
         </div>
+        {(requireSchedule || tone === "core") && (
+          <div>
+            <label style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}>
+              Hora
+            </label>
+            <input
+              className="input"
+              type="time"
+              value={form.hora || "09:00"}
+              onChange={(e) => setForm({ ...form, hora: e.target.value })}
+              required={requireSchedule}
+            />
+          </div>
+        )}
         <input
           className="input"
           type="number"

@@ -1,6 +1,10 @@
 /**
- * Seed Core-only ola1 — roster CEO/David + blank managers.
+ * Seed Core-only ola1 — roster + jerarquía operativa.
  * Idempotente. Run: npm run prisma:seed --workspace=apps/api
+ *
+ * Flujo servicios: Luis (coord servicios) → Antonio (puente sistemas)
+ * → Carolina / Alejandro (soporte). Christian puede asignar a cualquiera.
+ * David: instaladores (Joan, Israel, Juan José) · Tarea/Proyecto/Obra.
  */
 import { PrismaClient } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
@@ -59,6 +63,35 @@ const FIELD_MIN: ModuleAccessMap = {
   'activities-services': 'off',
 };
 
+/** Luis: coordina servicios (+ tareas generales). */
+const LUIS_OLA1: ModuleAccessMap = {
+  pizarra: 'on',
+  asistencias: 'on',
+  chat: 'on',
+  'activities-daily': 'on',
+  'activities-projects': 'off',
+  'activities-services': 'on',
+};
+
+/** Antonio: tarea + proyecto (de Christian) + servicio como puente. */
+const ANTONIO_OLA1: ModuleAccessMap = {
+  pizarra: 'on',
+  asistencias: 'on',
+  chat: 'on',
+  'activities-daily': 'on',
+  'activities-projects': 'on',
+  'activities-services': 'on',
+};
+
+const SOPORTE_MIN: ModuleAccessMap = {
+  pizarra: 'on',
+  asistencias: 'on',
+  chat: 'on',
+  'activities-daily': 'on',
+  'activities-projects': 'off',
+  'activities-services': 'off',
+};
+
 const ACTIVE_ROSTER: RosterUser[] = [
   {
     nombre: 'Christian Eduardo Del Pozo Sánchez',
@@ -100,24 +133,48 @@ const ACTIVE_ROSTER: RosterUser[] = [
     nombre: 'Luis Joel Aguilar Castillo',
     email: 'direccion.operaciones@nexara.com.mx',
     roleKey: 'coord_operaciones',
-    departmentName: 'Operaciones',
+    departmentName: 'Servicios',
     employeeNumber: 'NX-301',
-    puesto: 'Coordinador de Operaciones',
+    puesto: 'Coordinador de Servicios',
     password: 'Nexara!NX301',
     managerEmail: 'gerencia@nexara.com.mx',
-    moduleAccess: BLANK_OLA1,
+    moduleAccess: LUIS_OLA1,
     isActive: true,
   },
   {
     nombre: 'José Antonio Ramírez',
     email: 'jose.ramirez@nexara.com.mx',
-    roleKey: 'coord_operaciones',
-    departmentName: 'Operaciones',
+    roleKey: 'ing_soporte',
+    departmentName: 'Sistemas',
     employeeNumber: 'NX-303',
-    puesto: 'Coordinador de Operaciones',
+    puesto: 'Líder de Sistemas',
     password: 'Nexara!NX303',
     managerEmail: 'gerencia@nexara.com.mx',
-    moduleAccess: BLANK_OLA1,
+    moduleAccess: ANTONIO_OLA1,
+    isActive: true,
+  },
+  {
+    nombre: 'Carolina Juárez Álvarez',
+    email: 'soporte@nexara.com.mx',
+    roleKey: 'ing_soporte',
+    departmentName: 'Sistemas',
+    employeeNumber: 'NX-405',
+    puesto: 'Ingeniera de Soporte',
+    password: 'Nexara!NX405',
+    managerEmail: 'jose.ramirez@nexara.com.mx',
+    moduleAccess: SOPORTE_MIN,
+    isActive: true,
+  },
+  {
+    nombre: 'Alejandro González Bustamante',
+    email: 'alejandro.gonzalez@nexara.com.mx',
+    roleKey: 'ing_soporte',
+    departmentName: 'Sistemas',
+    employeeNumber: 'NX-407',
+    puesto: 'Ingeniero de Sistemas',
+    password: 'Nexara!NX407',
+    managerEmail: 'jose.ramirez@nexara.com.mx',
+    moduleAccess: SOPORTE_MIN,
     isActive: true,
   },
   {
@@ -201,9 +258,7 @@ const DEACTIVATE_EMAILS = [
   'ivan.tapia@nexara.com.mx',
   'administracion.ventas@nexara.com.mx',
   'isaias.garcia@nexara.com.mx',
-  'soporte@nexara.com.mx',
   'ariadna.sierra@nexara.com.mx',
-  'alejandro.gonzalez@nexara.com.mx',
 ];
 
 const ORG_ROLE_KEY_BY_V2: Record<string, string> = {
