@@ -196,16 +196,22 @@ export function metaForKind(kind: ActivityKind): ActivityKindMeta {
 export function servicioShouldGoToBridge(opts: {
   creatorEmail?: string | null;
   targetEmail?: string | null;
+  isSuperAdmin?: boolean;
+  isCeo?: boolean;
 }): boolean {
+  // Christian / superadmin: asignan servicio directo a cualquiera.
+  if (opts.isSuperAdmin || opts.isCeo) return false;
   const creator = norm(opts.creatorEmail);
   const target = norm(opts.targetEmail);
   if (!creator || !target) return false;
+  if (
+    creator === ORG_EMAILS.ceo ||
+    creator === ORG_EMAILS.developer
+  ) {
+    return false;
+  }
   if (creator === ORG_EMAILS.antonio) return false;
   if (target === ORG_EMAILS.antonio) return false;
-  // Solo tiene sentido si el creador puede mandar servicio y el target no es el puente
-  const canSend =
-    creator === ORG_EMAILS.luis ||
-    creator === ORG_EMAILS.ceo ||
-    creator === ORG_EMAILS.developer;
-  return canSend;
+  // Luis (coord servicios) debe pasar primero por Antonio.
+  return creator === ORG_EMAILS.luis;
 }
