@@ -166,8 +166,8 @@ export default function AsignarActividadPage() {
     }
     setTeamError(null);
     try {
-      // Actualiza indicaciones del LEAD (el create ya lo upserta sin notas personales).
-      if (leadNotes.trim()) {
+      // Solo si hay equipo extra: notas del LEAD + extras (sin degradar a TECNICO).
+      if (extraIds.length > 0 && leadNotes.trim()) {
         await addTeamMember(token, activityId, userId, leadNotes, "LEAD");
       }
       for (const id of extraIds) {
@@ -375,34 +375,7 @@ export default function AsignarActividadPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-              2 · Indicaciones y equipo
-            </div>
-            <label style={{ display: "block", fontSize: 12, marginBottom: 14 }}>
-              <span style={{ fontWeight: 650, color: "var(--text-secondary)" }}>
-                Indicaciones para {displayName.split(/\s+/).slice(0, 2).join(" ")} (responsable,
-                opcional)
-              </span>
-              <textarea
-                value={leadNotes}
-                onChange={(e) => setLeadNotes(e.target.value)}
-                rows={2}
-                style={{
-                  width: "100%",
-                  marginTop: 4,
-                  padding: 8,
-                  borderRadius: 10,
-                  border: "1px solid var(--border)",
-                  fontFamily: "inherit",
-                  fontSize: 13,
-                  resize: "vertical",
-                  background: "var(--bg)",
-                  color: "inherit",
-                }}
-                placeholder={`Qué debe hacer ${displayName.split(/\s+/).slice(0, 2).join(" ")}…`}
-              />
-            </label>
-            <div style={{ fontSize: 12, fontWeight: 650, marginBottom: 8, color: "var(--text-secondary)" }}>
-              Equipo extra (opcional)
+              2 · Equipo extra (opcional)
             </div>
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
               {kind === "servicio" && isServicioBridgeEmail(person?.email)
@@ -490,6 +463,30 @@ export default function AsignarActividadPage() {
               </div>
               {extraIds.length > 0 ? (
                 <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <label style={{ display: "block", fontSize: 12 }}>
+                    <span style={{ fontWeight: 650, color: "var(--text-secondary)" }}>
+                      Indicaciones para {displayName.split(/\s+/).slice(0, 2).join(" ")}{" "}
+                      (responsable, opcional)
+                    </span>
+                    <textarea
+                      value={leadNotes}
+                      onChange={(e) => setLeadNotes(e.target.value)}
+                      rows={2}
+                      style={{
+                        width: "100%",
+                        marginTop: 4,
+                        padding: 8,
+                        borderRadius: 10,
+                        border: "1px solid var(--border)",
+                        fontFamily: "inherit",
+                        fontSize: 13,
+                        resize: "vertical",
+                        background: "var(--surface)",
+                        color: "inherit",
+                      }}
+                      placeholder={`Qué debe hacer ${displayName.split(/\s+/).slice(0, 2).join(" ")}…`}
+                    />
+                  </label>
                   {extraIds.map((id) => {
                     const u = teamForExtras.find((x) => x.id === id);
                     if (!u) return null;

@@ -9,18 +9,19 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Indicaciones del responsable (LEAD)
+## Este turno — Indicaciones LEAD solo con extras
 
 ### Hecho
 
-- En `/erp/pizarra/[userId]/asignar`: textarea **Indicaciones para {responsable}** siempre visible (sección 2), no solo para extras.
-- Tras crear la actividad, si hay notas del LEAD se hace `POST …/team` con `rol: "LEAD"` + `indicaciones` (sin degradar a TECNICO).
-- Extras siguen con sus textareas personales.
+- Textarea del responsable **solo aparece si `extraIds.length > 0`** (junto a las de cada extra).
+- Sin equipo extra: no hay campos personales (solo indicaciones generales del form).
+- POST LEAD notes solo cuando hay extras seleccionados.
 
 ### Verificar
 
-- Asignar a alguien → escribir indicaciones del responsable (sin sumar extras) → crear → en evidencia/historial deben verse esas notas en el assignee LEAD.
-- Hard refresh del form de asignar.
+- Asignar Proyecto a Carolina → sin chips: no hay textarea del responsable.
+- Seleccionar un extra → aparecen indicaciones de Carolina + del extra.
+- Hard refresh.
 
 ## A medias
 
@@ -28,7 +29,7 @@ Nada.
 
 ## Siguiente
 
-Lo que Adam diga (probar en UI local).
+Lo que Adam diga.
 
 ## No tocar
 
