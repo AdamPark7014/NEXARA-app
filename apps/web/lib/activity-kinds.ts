@@ -1,12 +1,12 @@
 /**
  * Tipos de actividad Core (hub Actividades / pizarra).
- * No hay módulos sidebar Tareas/Proyectos: el tipo decide el payload.
  *
- * Org (emails canónicos seed):
- * - Christian (gerencia@) → todos los tipos → cualquiera
- * - David (operaciones@) → tarea/proyecto/obra → instaladores
- * - Luis (direccion.operaciones@) → tarea/servicio → servicios van a Antonio
- * - Antonio (jose.ramirez@) → tarea/proyecto + servicio (puente) → Carolina/Alejandro
+ * Tipos visibles al asignar = intersección:
+ *   lo que el CREADOR puede crear × lo que el DESTINATARIO puede recibir.
+ *
+ * Encargados de área (+ comercial): Christian, David, Luis, Antonio, Daniela, Mónica.
+ * Campo David (Joan/Israel/Juan): solo reciben tarea/proyecto/obra.
+ * Soporte Antonio (Carolina/Alejandro): solo reciben tarea/proyecto/servicio.
  */
 import { ROLES, type RoleKey } from '@/lib/rbac/roles';
 import type { ActivityProjectMode } from '@/lib/ops-activity-form';
@@ -22,7 +22,6 @@ export type ActivityKindMeta = {
   ticketType?: string;
   ticketTypeCustom?: string;
   needsServiceClient?: boolean;
-  /** Servicio/obra: pedir día + hora de agenda. */
   requiresSchedule?: boolean;
 };
 
@@ -34,13 +33,18 @@ export const ORG_EMAILS = {
   antonio: 'jose.ramirez@nexara.com.mx',
   carolina: 'soporte@nexara.com.mx',
   alejandro: 'alejandro.gonzalez@nexara.com.mx',
+  daniela: 'daniela.hernandez@nexara.com.mx',
+  monica: 'soluciones@nexara.com.mx',
+  joan: 'joan.sanchez@nexara.com.mx',
+  israel: 'israel.ramos@nexara.com.mx',
+  juan: 'juan.gonzalez@nexara.com.mx',
 } as const;
 
 export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
   tarea: {
     id: 'tarea',
     title: 'Tarea',
-    help: 'Del día, sin proyecto ni cliente. (Todos)',
+    help: 'Del día, sin proyecto ni cliente.',
     emoji: '✅',
     projectMode: 'without_project',
     ticketType: 'PREVENTIVO',
@@ -73,7 +77,7 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
   comercial: {
     id: 'comercial',
     title: 'Comercial',
-    help: 'Seguimiento o compromiso comercial.',
+    help: 'Solo encargados de área.',
     emoji: '💼',
     projectMode: 'without_project',
     ticketType: 'OTRO',
@@ -82,39 +86,70 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
 };
 
 const ALL: ActivityKind[] = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial'];
+const ORDER = ALL;
 
-/** Matriz por email (prioridad sobre rol genérico). */
-const KINDS_BY_EMAIL: Record<string, ActivityKind[]> = {
+function norm(email?: string | null): string {
+  return (email || '').trim().toLowerCase();
+}
+
+function intersect(a: ActivityKind[], b: ActivityKind[]): ActivityKind[] {
+  const setB = new Set(b);
+  return ORDER.filter((k) => a.includes(k) && setB.has(k));
+}
+
+/** Qué puede crear / mandar el logueado. */
+const CREATE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.ceo]: ALL,
   [ORG_EMAILS.developer]: ALL,
-  [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra'],
-  [ORG_EMAILS.luis]: ['tarea', 'servicio'],
-  [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio'],
+  [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra', 'comercial'],
+  [ORG_EMAILS.luis]: ['tarea', 'servicio', 'comercial'],
+  [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial'],
+  [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
+  [ORG_EMAILS.monica]: ['tarea', 'comercial'],
+  [ORG_EMAILS.joan]: ['tarea'],
+  [ORG_EMAILS.israel]: ['tarea'],
+  [ORG_EMAILS.juan]: ['tarea'],
   [ORG_EMAILS.carolina]: ['tarea'],
   [ORG_EMAILS.alejandro]: ['tarea'],
 };
 
-/** A quién deben llegar los servicios primero (puente). */
+/** Qué se le puede asignar a esa persona. */
+const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
+  [ORG_EMAILS.ceo]: ALL,
+  [ORG_EMAILS.developer]: ALL,
+  [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra', 'comercial'],
+  [ORG_EMAILS.luis]: ['tarea', 'servicio', 'comercial'],
+  [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial'],
+  // Campo de David
+  [ORG_EMAILS.joan]: ['tarea', 'proyecto', 'obra'],
+  [ORG_EMAILS.israel]: ['tarea', 'proyecto', 'obra'],
+  [ORG_EMAILS.juan]: ['tarea', 'proyecto', 'obra'],
+  // Soporte de Antonio
+  [ORG_EMAILS.carolina]: ['tarea', 'proyecto', 'servicio'],
+  [ORG_EMAILS.alejandro]: ['tarea', 'proyecto', 'servicio'],
+  // Comercial / admin
+  [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
+  [ORG_EMAILS.monica]: ['tarea', 'comercial'],
+};
+
 export function servicioBridgeEmail(): string {
   return ORG_EMAILS.antonio;
 }
 
 export function isServicioBridgeEmail(email?: string | null): boolean {
-  return (email || '').toLowerCase() === ORG_EMAILS.antonio;
+  return norm(email) === ORG_EMAILS.antonio;
 }
 
-/** Subordinados de Antonio para delegar servicios. */
 export function servicioDelegateEmails(): string[] {
   return [ORG_EMAILS.carolina, ORG_EMAILS.alejandro];
 }
 
 export function canCreateServicio(email?: string | null, v2?: RoleKey | null, isSuperAdmin?: boolean): boolean {
   if (isSuperAdmin || v2 === ROLES.CEO || v2 === ROLES.SUPER_ADMIN) return true;
-  const e = (email || '').toLowerCase();
+  const e = norm(email);
   return e === ORG_EMAILS.luis || e === ORG_EMAILS.antonio || e === ORG_EMAILS.ceo;
 }
 
-/** Qué tipos puede crear el usuario logueado. */
 export function kindsForCreator(opts: {
   v2Role: RoleKey | null | undefined;
   email?: string | null;
@@ -123,32 +158,54 @@ export function kindsForCreator(opts: {
   if (opts.isSuperAdmin || opts.v2Role === ROLES.CEO || opts.v2Role === ROLES.SUPER_ADMIN) {
     return ALL;
   }
-  const email = (opts.email || '').toLowerCase();
-  if (KINDS_BY_EMAIL[email]) return KINDS_BY_EMAIL[email];
-  if (opts.v2Role === ROLES.COORD_OPERACIONES) {
-    // fallback genérico coords: no asumir David
-    return ['tarea', 'proyecto'];
-  }
+  const email = norm(opts.email);
+  if (CREATE_BY_EMAIL[email]) return CREATE_BY_EMAIL[email];
   return ['tarea'];
+}
+
+export function kindsForTarget(email?: string | null): ActivityKind[] {
+  const e = norm(email);
+  if (!e) return ['tarea'];
+  if (RECEIVE_BY_EMAIL[e]) return RECEIVE_BY_EMAIL[e];
+  return ['tarea'];
+}
+
+/**
+ * Tipos que se muestran al asignar A targetEmail siendo creatorEmail.
+ * CEO puede crear todos, pero solo ve los que el destinatario puede recibir.
+ */
+export function kindsForAssignment(opts: {
+  creatorEmail?: string | null;
+  targetEmail?: string | null;
+  v2Role?: RoleKey | null;
+  isSuperAdmin?: boolean;
+}): ActivityKind[] {
+  const create = kindsForCreator({
+    v2Role: opts.v2Role,
+    email: opts.creatorEmail,
+    isSuperAdmin: opts.isSuperAdmin,
+  });
+  if (!opts.targetEmail) return create;
+  return intersect(create, kindsForTarget(opts.targetEmail));
 }
 
 export function metaForKind(kind: ActivityKind): ActivityKindMeta {
   return ACTIVITY_KINDS[kind];
 }
 
-/**
- * Si el creador manda un servicio a alguien que no es el puente,
- * la UI debe avisar / redirigir a Antonio.
- */
 export function servicioShouldGoToBridge(opts: {
   creatorEmail?: string | null;
   targetEmail?: string | null;
 }): boolean {
-  const creator = (opts.creatorEmail || '').toLowerCase();
-  const target = (opts.targetEmail || '').toLowerCase();
+  const creator = norm(opts.creatorEmail);
+  const target = norm(opts.targetEmail);
   if (!creator || !target) return false;
-  // Luis (y en general quien crea servicio que no es Antonio) debe apuntar al puente
   if (creator === ORG_EMAILS.antonio) return false;
   if (target === ORG_EMAILS.antonio) return false;
-  return creator === ORG_EMAILS.luis || creator === ORG_EMAILS.ceo || creator === ORG_EMAILS.developer;
+  // Solo tiene sentido si el creador puede mandar servicio y el target no es el puente
+  const canSend =
+    creator === ORG_EMAILS.luis ||
+    creator === ORG_EMAILS.ceo ||
+    creator === ORG_EMAILS.developer;
+  return canSend;
 }

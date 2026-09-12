@@ -9,34 +9,31 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Flujo Luis → Antonio → Carolina/Alejandro
+## Este turno — Tipos = creador ∩ destinatario
 
-### Modelo (confirmado)
+### Matriz recibir
 
-```
-Christian ──► cualquiera (tarea/proyecto/obra/servicio/comercial)
-     │
-     ├─ David (instaladores) · tarea/proyecto/obra → Joan/Israel/Juan José
-     ├─ Luis (servicios) · tarea/servicio ──► Antonio (puente)
-     └─ Antonio (sistemas) · tarea/proyecto + servicio-puente
-              └─ Carolina (soporte) · Alejandro (sistemas)
-```
+| Quién | Tipos que puede recibir |
+|-------|-------------------------|
+| Campo David (Joan/Israel/Juan) | tarea, proyecto, obra |
+| Soporte Antonio (Carolina/Alejandro) | tarea, proyecto, servicio |
+| Daniela / Mónica | tarea, comercial |
+| Encargados (David/Luis/Antonio) | su especialidad + comercial |
+| Christian | todos |
 
-Servicio: Luis/Christian ponen **día+hora** → Antonio → delega a Carolina/Alejandro (misma agenda o la edita).
+Christian asignando a Israel → solo tarea/proyecto/obra (ya no salen servicio/comercial).
 
 ### Hecho
 
-1. Seed: Luis servicios, Antonio sistemas, Carolina+Alejandro activos bajo Antonio.
-2. `activity-kinds.ts` matriz por email + puente servicio.
-3. Asignar: si servicio no va a Antonio → banner “Ir a Antonio”.
-4. Form Core: día + hora obligatorios en servicio/obra.
-5. Seed ejecutado (13 activos).
+1. `kindsForAssignment` intersección real.
+2. Seed Daniela/Mónica con acceso Core (tarea+comercial).
+3. Copy UI actualizado.
 
 ### Verificar
 
-- Login Luis → solo Tarea/Servicio; al asignar servicio a otro → aviso puente.
-- Login Antonio → Tarea/Proyecto/Servicio; equipo Carolina/Alejandro.
-- Christian sigue viendo los 5 tipos.
+- Asignar a Israel → 3 cards.
+- Asignar a Daniela → tarea + comercial.
+- Asignar a Carolina → tarea/proyecto/servicio.
 
 ## No tocar
 
