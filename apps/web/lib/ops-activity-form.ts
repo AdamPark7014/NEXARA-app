@@ -24,6 +24,7 @@ export const EMPTY_ACTIVITY_FORM = {
   projectMode: 'with_project' as ActivityProjectMode,
   evidencePhotoRequired: "4",
   coreKind: "",
+  assignmentCharge: "",
 };
 
 export type ActivityFormState = typeof EMPTY_ACTIVITY_FORM;
@@ -88,6 +89,7 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     projectMode: record.projectId ? "with_project" : "without_project",
     evidencePhotoRequired: record.evidencePhotoRequired != null ? String(record.evidencePhotoRequired) : "4",
     coreKind: String(record.coreKind ?? ""),
+    assignmentCharge: String(record.assignmentCharge ?? ""),
   };
 }
 
@@ -129,6 +131,7 @@ export function buildActivityPayload(
       return Math.min(8, Math.max(2, n));
     })(),
     coreKind: form.coreKind || undefined,
+    assignmentCharge: form.assignmentCharge || undefined,
   };
 
   if (!options.isEdit) {

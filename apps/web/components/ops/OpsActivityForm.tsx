@@ -58,6 +58,8 @@ type Props = {
   requireSchedule?: boolean;
   /** Tipo Core (tarea|proyecto|obra|servicio|comercial). */
   coreKind?: string;
+  /** Encargo: ejecucion | despacho */
+  assignmentCharge?: string;
   /** Fotos de evidencia 2–8 (default 4). */
   evidencePhotoRequired?: number;
   onSuccess?: (id: number) => void;
@@ -83,6 +85,7 @@ export default function OpsActivityForm({
   forcedTicketTypeCustom,
   requireSchedule = false,
   coreKind,
+  assignmentCharge,
   evidencePhotoRequired = 4,
   onSuccess,
   onCancel,
@@ -99,6 +102,7 @@ export default function OpsActivityForm({
     projectMode: forcedProjectMode ?? EMPTY_ACTIVITY_FORM.projectMode,
     responsableId: initialResponsableId ? String(initialResponsableId) : "",
     coreKind: coreKind ?? "",
+    assignmentCharge: assignmentCharge ?? "",
     evidencePhotoRequired: String(
       Math.min(8, Math.max(2, Math.round(Number(evidencePhotoRequired)) || 4)),
     ),
@@ -187,6 +191,11 @@ export default function OpsActivityForm({
     if (!initialResponsableId || isEdit) return;
     setForm((prev) => ({ ...prev, responsableId: String(initialResponsableId) }));
   }, [initialResponsableId, isEdit]);
+
+  useEffect(() => {
+    if (isEdit || !assignmentCharge) return;
+    setForm((prev) => ({ ...prev, assignmentCharge }));
+  }, [assignmentCharge, isEdit]);
 
   useEffect(() => {
     if (!forcedProjectMode || isEdit) return;

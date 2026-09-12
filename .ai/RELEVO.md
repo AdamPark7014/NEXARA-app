@@ -9,32 +9,28 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — GPS live vs checadas
+## Este turno — Encargo: Ejecución directa vs Despacho
 
 ### Hecho
 
-Separación de permisos:
+Al asignar a David / Antonio / Luis / Josué (encargados), Christian elige:
 
-| Quién | ATTENDANCE | GPS_VIEW (fichar) | GPS_MANAGE (vivo) |
-|-------|------------|-------------------|-------------------|
-| Christian (ceo) / dir | manage | sí | **sí** live team |
-| David (coord_ops) | manage + checa | sí | **no** |
-| Antonio (ing_soporte) | manage subtree + checa | sí | **no** |
+1. **Ejecución directa** — la hace él personalmente.
+2. **Despacho a equipo** — él coordina y la asigna a subordinados.
 
-- Encargados ven equipo: hora entrada/salida + mapa del **punto al fichar** (en sitio).
-- Sin bloque «GPS del equipo» ni `gps/team` / trayectoria ajena.
-- Christian sí ve GPS en vivo.
-- Re-login obligatorio (JWT cachea permisos).
+- Campo `Activity.assignmentCharge` (`ejecucion` | `despacho`) + migración.
+- Paso «2 · Encargo» en `/erp/pizarra/[id]/asignar`.
+- Badge en historial / tarjetas de pizarra.
 
 ### Verificar
 
-1. David/Antonio: Equipo del día OK; pestaña Trayectoria **sin** GPS del equipo; 403 en `gps/team`.
-2. Christian: sí ve GPS del equipo en vivo.
-3. Re-login en las 3 cuentas.
+1. **Reiniciar API** (`prisma generate` falló EPERM mientras nest tiene el DLL).
+2. Como Christian → asignar a David → elegir Ejecución o Despacho → crear.
+3. Ver badge en perfil / pizarra.
 
 ## A medias
 
-Nada.
+Nada (salvo reinicio API para Prisma client).
 
 ## Siguiente
 

@@ -157,6 +157,58 @@ export function fieldInstallerEmails(): string[] {
   return [ORG_EMAILS.joan, ORG_EMAILS.israel, ORG_EMAILS.juan];
 }
 
+/** Encargo al responsable (encargados con gente a cargo). */
+export type AssignmentCharge = 'ejecucion' | 'despacho';
+
+export type AssignmentChargeMeta = {
+  id: AssignmentCharge;
+  title: string;
+  help: string;
+  badge: string;
+};
+
+export const ASSIGNMENT_CHARGES: Record<AssignmentCharge, AssignmentChargeMeta> = {
+  ejecucion: {
+    id: 'ejecucion',
+    title: 'Ejecución directa',
+    help: 'Queda a su cargo personal: la realiza él mismo.',
+    badge: 'Ejecución',
+  },
+  despacho: {
+    id: 'despacho',
+    title: 'Despacho a equipo',
+    help: 'Queda a su cargo coordinar: la asigna a alguien de su subordinación.',
+    badge: 'Despacho',
+  },
+};
+
+/** Encargados a quienes Christian/dirección puede elegir ejecución vs despacho. */
+const CHARGE_MANAGER_EMAILS = new Set([
+  ORG_EMAILS.david,
+  ORG_EMAILS.luis,
+  ORG_EMAILS.antonio,
+  ORG_EMAILS.josue,
+]);
+
+export function canOfferAssignmentCharge(email?: string | null): boolean {
+  return CHARGE_MANAGER_EMAILS.has(norm(email));
+}
+
+/** Pool típico de subordinados para despacho (por email del encargado). */
+export function dispatchPoolEmails(managerEmail?: string | null): string[] {
+  const e = norm(managerEmail);
+  if (e === ORG_EMAILS.david) return fieldInstallerEmails();
+  if (e === ORG_EMAILS.antonio) return servicioDelegateEmails();
+  if (e === ORG_EMAILS.josue) return fieldInstallerEmails();
+  if (e === ORG_EMAILS.luis) return [ORG_EMAILS.antonio, ...servicioDelegateEmails()];
+  return [];
+}
+
+export function labelForAssignmentCharge(charge?: string | null): AssignmentChargeMeta | null {
+  if (charge === 'ejecucion' || charge === 'despacho') return ASSIGNMENT_CHARGES[charge];
+  return null;
+}
+
 export function extrasEmailsForKind(kind: ActivityKind | null | undefined): string[] | null {
   if (kind === 'servicio') return soporteTeamEmails();
   if (kind === 'obra') return fieldInstallerEmails();

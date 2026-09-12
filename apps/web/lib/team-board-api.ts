@@ -20,6 +20,7 @@ export type TeamBoardOpenActivity = {
   evidenceStatus: string;
   progressPct: number;
   coreKind: string | null;
+  assignmentCharge?: string | null;
   fechaFinalizacion: string | null;
 };
 
@@ -44,6 +45,7 @@ export type TeamBoardHistoryItem = {
   titulo: string;
   estatus: string;
   coreKind: string | null;
+  assignmentCharge?: string | null;
   fechaAsignacion: string;
   fechaFinalizacion: string | null;
   evidence: {
