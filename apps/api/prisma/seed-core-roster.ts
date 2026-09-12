@@ -83,6 +83,15 @@ const ANTONIO_OLA1: ModuleAccessMap = {
   'activities-services': 'on',
 };
 
+const ADMIN_COMERCIAL: ModuleAccessMap = {
+  pizarra: 'on',
+  asistencias: 'on',
+  chat: 'on',
+  'activities-daily': 'on',
+  'activities-projects': 'off',
+  'activities-services': 'off',
+};
+
 const SOPORTE_MIN: ModuleAccessMap = {
   pizarra: 'on',
   asistencias: 'on',
@@ -183,10 +192,10 @@ const ACTIVE_ROSTER: RosterUser[] = [
     roleKey: 'administrativo',
     departmentName: 'Administración',
     employeeNumber: 'NX-103',
-    puesto: 'Ejecutiva Administrativa',
+    puesto: 'Ejecutiva Administrativa / Comercial',
     password: 'Nexara!NX103',
     managerEmail: 'gerencia@nexara.com.mx',
-    moduleAccess: BLANK_OLA1,
+    moduleAccess: ADMIN_COMERCIAL,
     isActive: true,
   },
   {
@@ -207,10 +216,10 @@ const ACTIVE_ROSTER: RosterUser[] = [
     roleKey: 'administrativo',
     departmentName: 'Administración',
     employeeNumber: 'NX-102',
-    puesto: 'Ejecutiva Administrativa',
+    puesto: 'Ejecutiva Administrativa / Comercial',
     password: 'Nexara!NX102',
     managerEmail: 'gerencia@nexara.com.mx',
-    moduleAccess: BLANK_OLA1,
+    moduleAccess: ADMIN_COMERCIAL,
     isActive: true,
   },
   {

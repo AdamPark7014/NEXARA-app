@@ -8,7 +8,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import {
   ACTIVITY_KINDS,
   isServicioBridgeEmail,
-  kindsForCreator,
+  kindsForAssignment,
   metaForKind,
   ORG_EMAILS,
   servicioDelegateEmails,
@@ -69,12 +69,13 @@ export default function AsignarActividadPage() {
   const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
   const allowedKinds = useMemo(
     () =>
-      kindsForCreator({
+      kindsForAssignment({
+        creatorEmail: user?.email,
+        targetEmail: person?.email,
         v2Role: v2,
-        email: user?.email,
         isSuperAdmin: user?.isSuperAdmin,
       }),
-    [v2, user?.email, user?.isSuperAdmin],
+    [v2, user?.email, user?.isSuperAdmin, person?.email],
   );
 
   const kindMeta = kind ? metaForKind(kind) : null;
@@ -122,7 +123,8 @@ export default function AsignarActividadPage() {
 
   useEffect(() => {
     if (allowedKinds.length === 1) setKind(allowedKinds[0]);
-  }, [allowedKinds]);
+    else if (kind && !allowedKinds.includes(kind)) setKind(null);
+  }, [allowedKinds, kind]);
 
   const toggleExtra = (id: number) => {
     setExtraIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -281,8 +283,8 @@ export default function AsignarActividadPage() {
           })}
         </div>
         <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
-          Christian → cualquiera. David → instaladores (tarea/proyecto/obra). Luis → servicios a Antonio.
-          Antonio → Carolina / Alejandro con día y hora.
+          Solo se muestran tipos válidos para {displayName}. Campo David: tarea/proyecto/obra · Soporte
+          Antonio: tarea/proyecto/servicio · Daniela/Mónica: tarea/comercial · Encargados: + comercial.
         </p>
       </section>
 
