@@ -9,19 +9,18 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Pizarra limpia + fix logout
+## Este turno — Pizarra: sin CEO + submódulo persona
 
 ### Hecho
 
-1. **Logout loop:** `auth/profile` + notifs + `apiRequest` con `credentials: include`.
-2. **Guía basura:** `ModuleGuideBanner` oculto si `CORE_SURFACE_ONLY`.
-3. **Pizarra limpia:** grid fotos + semáforo + OT; click → drawer (entrada, tiempos, asignar).
-4. **Board API:** `clockInAt`, `workedMinutes`, `activityStartedAt`, `activityElapsedMinutes` + `GET me/board/:userId`.
+1. Board API excluye `gerencia@` (Christian) y al viewer de la lista de gestión.
+2. Click perfil → `/erp/pizarra/[userId]` (página completa, no drawer).
+3. Grid más limpio (semáforo + OT o tiempo en sitio).
 
 ### Verificar
 
-- Hard refresh `http://127.0.0.1:3000` → login → pizarra sin bloque "Guía · no producción".
-- Click persona → drawer; no kick a login cada segundos.
+- Login gerencia → pizarra sin tarjeta de Christian.
+- Click Adam/David/instalador → página detalle con tiempos y asignar.
 
 ## No tocar
 
