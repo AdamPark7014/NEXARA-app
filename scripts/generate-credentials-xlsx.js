@@ -10,7 +10,7 @@ const USERS = [
   ['Claudia Bernal', 'claudia.bernal@nexara.com.mx', 'Nexara!NX010', 'Director General', 'Dirección General'],
   ['Christian Eduardo Del Pozo Sánchez', 'gerencia@nexara.com.mx', 'Nexara!NX001', 'Director General', 'Dirección General'],
   ['Adam Del Pozo', 'developer@nexara.com.mx', 'Nexara!NX002', 'Developer / Super Admin', 'Dirección General'],
-  ['Josué Teodulo Cervantes Arellano', 'infraestructura@nexara.com.mx', 'Nexara!NX003', 'Arquitecto / Director Técnico', 'Arquitectura'],
+  ['Josué Teodulo Cervantes Arellano', 'infraestructura@nexara.com.mx', 'Nexara!NX003', 'Encargado de Obra', 'Obra'],
   ['Karen Elizalde Sarmiento', 'ventas@nexara.com.mx', 'Nexara!NX101', 'Coordinadora Administrativa', 'Administración'],
   ['Mónica García Guzmán', 'soluciones@nexara.com.mx', 'Nexara!NX102', 'Ejecutiva Administrativa', 'Administración'],
   ['Daniela Galindo Almazán', 'redes@nexara.com.mx', 'Nexara!NX201', 'Líder de Área Creativa', 'Área Creativa'],

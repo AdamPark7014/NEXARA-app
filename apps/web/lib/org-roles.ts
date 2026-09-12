@@ -168,9 +168,9 @@ export const ORG_ROLE_META: Record<OrgRoleKey, OrgRoleMeta> = {
   },
   [ORG_ROLE_KEYS.ARQUITECTO]: {
     orgRoleKey: ORG_ROLE_KEYS.ARQUITECTO,
-    label: 'Arquitecto',
-    description: 'Diseño técnico de proyectos e ingeniería de soluciones.',
-    missionStatement: 'Garantizar que cada proyecto tenga un diseño técnico sólido y viable antes de ejecutarse.',
+    label: 'Encargado de Obra',
+    description: 'Obra, proyectos e instalación en sitio (sin servicios de soporte).',
+    missionStatement: 'Coordinar obra y validar entrega técnica en campo antes de cierre.',
     dailyActions: [
       'Revisar y validar levantamientos técnicos de campo',
       'Diseñar propuestas de ingeniería para cotizaciones complejas',

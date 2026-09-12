@@ -20,7 +20,7 @@
 export const ROLES = {
   SUPER_ADMIN:        'super_admin',        // Desarrollo · bypass total
   CEO:                'ceo',                // Dirección general · lectura total
-  ARQUITECTO:         'arquitecto',         // Arquitecto / Director Técnico · valida trabajos
+  ARQUITECTO:         'arquitecto',         // Encargado de Obra · Josué
   DIR_OPERACIONES:    'dir_operaciones',    // Director de Operaciones
   DIR_ADMIN:          'dir_admin',          // Director Administrativo
   COORD_ADMIN:        'coord_admin',        // Coordinador Administrativo (mid-senior)
@@ -110,7 +110,7 @@ export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
 export const ROLE_LABELS: Record<RoleKey, { es: string; en: string; departamento: string }> = {
   super_admin:       { es: 'Super Administrador',  en: 'Super Admin',           departamento: 'Sistemas' },
   ceo:               { es: 'CEO',                  en: 'CEO',                   departamento: 'Dirección' },
-  arquitecto:        { es: 'Arquitecto / Dir. Técnico', en: 'Technical Director', departamento: 'Operaciones' },
+  arquitecto:        { es: 'Encargado de Obra', en: 'Site Lead', departamento: 'Obra' },
   dir_operaciones:   { es: 'Director de Operaciones', en: 'Operations Director', departamento: 'Operaciones' },
   dir_admin:         { es: 'Director Administrativo', en: 'Admin Director',     departamento: 'Administración' },
   coord_admin:       { es: 'Coordinador Administrativo', en: 'Admin Coordinator', departamento: 'Administración' },

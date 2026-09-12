@@ -67,7 +67,7 @@ const DEMO_USERS: DemoUser[] = [
     roleKey: 'arquitecto',
     departmentName: 'Arquitectura',
     employeeNumber: 'NX-003',
-    puesto: 'Arquitecto / Director Técnico',
+    puesto: 'Encargado de Obra',
     password: 'Nexara!NX003',
   },
   {

@@ -286,7 +286,8 @@ export default function AsignarActividadPage() {
         </div>
         <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
           Solo se muestran tipos válidos para {displayName}. Campo David: tarea/proyecto/obra · Soporte
-          Antonio: tarea/proyecto/servicio · Daniela/Mónica: tarea/comercial · Encargados: + comercial.
+          Antonio: tarea/proyecto/servicio · Josué (obra): todo menos servicio · Daniela/Mónica:
+          tarea/comercial · Encargados: + comercial.
         </p>
       </section>
 
