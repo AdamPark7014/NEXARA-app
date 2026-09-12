@@ -1,7 +1,7 @@
 # RELEVO
 
 - **Último turno:** cursor
-- **Fecha:** 2026-09-11
+- **Fecha:** 2026-09-12
 - **Rama:** mejora/calidad-y-web
 - **HEAD:** (cerrar)
 
@@ -9,28 +9,34 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Asignación dinámica por tipo + equipo
+## Este turno — Flujo Luis → Antonio → Carolina/Alejandro
 
-### Cómo queda el modelo (ola1)
+### Modelo (confirmado)
 
-- **No** módulos sidebar Tareas/Proyectos/Servicios: el hub es **Actividades** (pizarra).
-- Tipos: Tarea · Proyecto · Obra · Servicio · Comercial (`activity-kinds.ts`).
-- Christian (CEO): los 5. David (`operaciones@` / coord_ops): Tarea, Proyecto, Obra.
-- Flujo: asignas a una persona (responsable). Opcional: sumas equipo (`POST /activities/:id/team`).
-- David puede recibir y luego reasignar (`/reasignar` ya existe en API). Christian puede ir directo a un instalador.
-- Formulario Core sin jerga OT (`tone="core"`).
+```
+Christian ──► cualquiera (tarea/proyecto/obra/servicio/comercial)
+     │
+     ├─ David (instaladores) · tarea/proyecto/obra → Joan/Israel/Juan José
+     ├─ Luis (servicios) · tarea/servicio ──► Antonio (puente)
+     └─ Antonio (sistemas) · tarea/proyecto + servicio-puente
+              └─ Carolina (soporte) · Alejandro (sistemas)
+```
+
+Servicio: Luis/Christian ponen **día+hora** → Antonio → delega a Carolina/Alejandro (misma agenda o la edita).
 
 ### Hecho
 
-1. `lib/activity-kinds.ts` + matriz por rol.
-2. Asignar: avatar + tipos + chips de equipo extra + form limpio.
-3. OpsActivityForm: tone core, hide responsable, forced ticket types.
+1. Seed: Luis servicios, Antonio sistemas, Carolina+Alejandro activos bajo Antonio.
+2. `activity-kinds.ts` matriz por email + puente servicio.
+3. Asignar: si servicio no va a Antonio → banner “Ir a Antonio”.
+4. Form Core: día + hora obligatorios en servicio/obra.
+5. Seed ejecutado (13 activos).
 
-### Pendiente / siguiente
+### Verificar
 
-- Selector de **cliente de servicio** cuando tipo = Servicio.
-- UI de reasignación/delegación en el perfil de la persona.
-- Hard refresh si el menú viejo “Tareas/Proyectos” sigue visible.
+- Login Luis → solo Tarea/Servicio; al asignar servicio a otro → aviso puente.
+- Login Antonio → Tarea/Proyecto/Servicio; equipo Carolina/Alejandro.
+- Christian sigue viendo los 5 tipos.
 
 ## No tocar
 

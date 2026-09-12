@@ -10,6 +10,7 @@ export const EMPTY_ACTIVITY_FORM = {
   tiempoEstimadoMin: "",
   tiempoMaximoMin: "",
   fecha: "",
+  hora: "09:00",
   clientId: "",
   projectId: "",
   ticketType: "PREVENTIVO",
@@ -62,6 +63,16 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     fecha: toDateInputValue(
       (record.fechaInicio as string) ?? (record.fechaEntregaEsperada as string) ?? (record.fechaMaxima as string),
     ),
+    hora: (() => {
+      const raw =
+        (record.fechaInicio as string) ??
+        (record.fechaEntregaEsperada as string) ??
+        (record.fechaMaxima as string);
+      if (!raw) return "09:00";
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return "09:00";
+      return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    })(),
     clientId: record.clientId ? String(record.clientId) : client?.id ? String(client.id) : "",
     projectId,
     ticketType: String(record.ticketType ?? "PREVENTIVO"),
@@ -99,7 +110,15 @@ export function buildActivityPayload(
     responsableId: Number(form.responsableId),
     tiempoEstimadoMin: form.tiempoEstimadoMin ? Number(form.tiempoEstimadoMin) : undefined,
     tiempoMaximoMin: form.tiempoMaximoMin ? Number(form.tiempoMaximoMin) : undefined,
-    fechaInicio: form.fecha ? new Date(`${form.fecha}T08:00:00`).toISOString() : undefined,
+    fechaInicio: form.fecha
+      ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString()
+      : undefined,
+    fechaEntregaEsperada: form.fecha
+      ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString()
+      : undefined,
+    fechaMaxima: form.fecha
+      ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString()
+      : undefined,
   };
 
   if (!options.isEdit) {
