@@ -15,7 +15,7 @@ import { ROLES } from "@/lib/rbac/roles";
 const OpsActivitiesBoard = dynamic(() => import("@/components/ops/OpsActivitiesBoard"), { ssr: false });
 
 const RAIL = [
-  { id: "diarias", label: "Tareas", href: "/erp/actividades/diarias" },
+  { id: "tareas", label: "Tareas", href: "/erp/actividades/tareas" },
   { id: "proyectos", label: "Proyectos", href: "/erp/actividades/proyectos" },
   { id: "servicios", label: "Servicios", href: "/erp/actividades/servicios" },
 ] as const;
@@ -31,7 +31,7 @@ export default function ErpActividadesServiciosPage() {
 
   useEffect(() => {
     if (user && !canSeeServices) {
-      router.replace("/erp/actividades/diarias");
+      router.replace("/erp/actividades/tareas");
     }
   }, [user, canSeeServices, router]);
 
