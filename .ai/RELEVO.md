@@ -9,27 +9,33 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Indicaciones LEAD solo con extras
+## Este turno — Módulo Clientes Core
 
 ### Hecho
 
-- Textarea del responsable **solo aparece si `extraIds.length > 0`** (junto a las de cada extra).
-- Sin equipo extra: no hay campos personales (solo indicaciones generales del form).
-- POST LEAD notes solo cuando hay extras seleccionados.
+- Sectores `PROYECTO|CORPORATIVO|COMERCIAL` en `SalesClientSector` + migración aplicada.
+- Sidebar **Clientes** (`erp-clients`) en Core ola1; visible solo CEO + encargados (matriz email).
+- Hub `/erp/clientes` + listas + alta fiscal + ficha (añadir sector, proyectos N).
+- API `?sector=` / POST sectors; permisos ACTIVITIES_* en ventas/clientes.
+- Asignar: picker cliente en servicio/comercial; proyectos filtrados por sector PROYECTO.
+
+### Matriz
+
+- Christian/Antonio: 3 · Luis: CORPORATIVO · David/Josué/Mónica: PROYECTO+COMERCIAL · Daniela: COMERCIAL
 
 ### Verificar
 
-- Asignar Proyecto a Carolina → sin chips: no hay textarea del responsable.
-- Seleccionar un extra → aparecen indicaciones de Carolina + del extra.
-- Hard refresh.
+- Login Christian → sidebar Clientes → 3 cards → crear con fiscal → proyectos en cliente de proyecto.
+- Luis solo ve corporativo; Joan no ve el módulo.
+- Reiniciar API si `prisma generate` falló por EPERM.
 
-## A medias
+### A medias
 
-Nada.
+Nada crítico. `prisma generate` puede requerir parar nest y regenerar.
 
 ## Siguiente
 
-Lo que Adam diga.
+Smoke UI + reinicio API si hace falta.
 
 ## No tocar
 

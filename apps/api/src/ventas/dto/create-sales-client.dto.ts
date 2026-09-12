@@ -1,4 +1,6 @@
-import { IsInt, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, IsString, ArrayMinSize } from 'class-validator';
+
+const SECTORS = ['PROYECTO', 'CORPORATIVO', 'COMERCIAL'] as const;
 
 export class CreateSalesClientDto {
   @IsString()
@@ -55,4 +57,11 @@ export class CreateSalesClientDto {
   @IsOptional()
   @IsInt()
   serviceClientId?: number;
+
+  /** Sectores Core. Si viene, fiscal es obligatorio. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsIn(SECTORS, { each: true })
+  sectors?: Array<(typeof SECTORS)[number]>;
 }

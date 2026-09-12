@@ -18,6 +18,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { VentasService } from './ventas.service.js';
 import { CreateSalesClientDto } from './dto/create-sales-client.dto.js';
 import { UpdateSalesClientDto } from './dto/update-sales-client.dto.js';
+import { AddClientSectorDto } from './dto/add-client-sector.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -25,8 +26,17 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 
-const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
-const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
+const SALES_VIEW_ACCESS = [
+  PERMISSIONS.SALES_VIEW,
+  PERMISSIONS.PANEL_VENTAS,
+  PERMISSIONS.ACTIVITIES_VIEW,
+  PERMISSIONS.ACTIVITIES_MANAGE,
+];
+const SALES_MANAGE_ACCESS = [
+  PERMISSIONS.SALES_MANAGE,
+  PERMISSIONS.PANEL_VENTAS,
+  PERMISSIONS.ACTIVITIES_MANAGE,
+];
 
 @Controller('ventas/clientes')
 export class VentasClientesController {
@@ -164,6 +174,31 @@ export class VentasClientesController {
       },
     });
     return result;
+  }
+
+  @Post(':id/sectors')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async addSector(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: AddClientSectorDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.addClientSector(id, body.sector, user, companyId);
+  }
+
+  @Delete(':id/sectors/:sector')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async removeSector(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('sector') sectorRaw: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const sector = sectorRaw.toUpperCase();
+    return this.ventasService.removeClientSector(id, sector, user, companyId);
   }
 
   @Post(':id/documentos')

@@ -9,6 +9,7 @@ import { canOpenPage } from '@/lib/rbac/page-matrix';
 import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac/roles';
 import { resolveV2RoleKey, type UserAccessInput } from '@/lib/rbac/role-mapping';
 import { isAdvancedOnlyModuleId, isNavAdvanced } from '@/lib/nav-mode';
+import { canSeeClientesModule } from '@/lib/client-sectors';
 
 export type SectionViewMode = 'manage' | 'execute' | 'manage_execute';
 
@@ -235,6 +236,8 @@ export function shouldShowModuleInSidebar(
   }
 
   switch (module.id as ModuleId) {
+    case 'erp-clients':
+      return canSeeClientesModule(user?.email);
     case 'ops-activities': {
       const ov = user?.moduleAccess?.['ops-activities'];
       if (ov === 'both') return true;
