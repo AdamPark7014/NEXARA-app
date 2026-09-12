@@ -13,6 +13,7 @@ import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import EmptyState from "@/components/ui/EmptyState";
+import PhoneField from "@/components/PhoneField";
 import {
   createSalesClient,
   listSalesClients,
@@ -239,7 +240,6 @@ export default function ClientsPage() {
             { label: "Razón social", key: "legalName", ph: "Empresa S.A. de C.V.", span: true },
             { label: "RFC", key: "taxId", ph: "ABC123456XYZ" },
             { label: "Email facturación", key: "billingEmail", ph: "facturacion@empresa.com" },
-            { label: "Teléfono", key: "billingPhone", ph: "222 555 1234" },
             { label: "Sitio web", key: "website", ph: "https://..." },
           ].map(({ label, key, ph, span }) => (
             <div key={key} className={span ? chrome.formFull : undefined}>
@@ -252,6 +252,15 @@ export default function ClientsPage() {
               />
             </div>
           ))}
+          <div>
+            <label className={chrome.fieldLabel}>Teléfono</label>
+            <PhoneField
+              value={form.billingPhone}
+              onChange={(billingPhone) => setForm((f) => ({ ...f, billingPhone }))}
+              placeholder="+52 222 555 1234"
+              className={chrome.fieldInput}
+            />
+          </div>
           <div className={chrome.formFull}>
             <label className={chrome.fieldLabel}>Dirección fiscal</label>
             <input

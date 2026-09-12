@@ -14,6 +14,7 @@ import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import PhoneField from "@/components/PhoneField";
 
 interface OrderTemplate {
   id: number;
@@ -385,8 +386,12 @@ export default function TemplatesPage() {
                 </label>
                 <label style={{ display: "grid", gap: 4 }}>
                   {lbl("Teléfono")}
-                  <input type="tel" value={form.companyPhone} onChange={(e) => setForm((f) => ({ ...f, companyPhone: e.target.value }))}
-                    placeholder="+52 55 1234 5678" style={inp} />
+                  <PhoneField
+                    value={form.companyPhone}
+                    onChange={(companyPhone) => setForm((f) => ({ ...f, companyPhone }))}
+                    placeholder="+52 55 1234 5678"
+                    style={inp}
+                  />
                 </label>
               </div>
 

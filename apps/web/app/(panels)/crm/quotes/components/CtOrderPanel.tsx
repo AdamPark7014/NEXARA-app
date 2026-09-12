@@ -12,6 +12,7 @@ import {
   type SupplierPurchaseOrderRow,
 } from "@/lib/smart-quote-api";
 import styles from "./quote-supplier.module.css";
+import PhoneField from "@/components/PhoneField";
 
 type Props = {
   token: string;
@@ -284,7 +285,11 @@ export default function CtOrderPanel({ token, cotizacionId, quoteStatus, canMana
                 </label>
                 <label>
                   Teléfono
-                  <input className={styles.input} value={envio.telefono} onChange={(e) => patchEnvio("telefono", e.target.value)} />
+                  <PhoneField
+                    className={styles.input}
+                    value={envio.telefono}
+                    onChange={(telefono) => patchEnvio("telefono", telefono)}
+                  />
                 </label>
                 <label className={styles.span2}>
                   Dirección

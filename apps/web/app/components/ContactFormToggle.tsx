@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from "react";
 import styles from "../page.module.css";
 import { buildApiUrl } from "@/lib/api-base";
+import PhoneField from "@/components/PhoneField";
 
 export default function ContactFormToggle() {
   const [open, setOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [phone, setPhone] = useState("");
 
   // Allow other components (FAQ) to request opening this panel
   useEffect(() => {
@@ -33,7 +35,7 @@ export default function ContactFormToggle() {
     const payload = {
       name: String(data.name || ""),
       email: String(data.email || ""),
-      phone: data.phone ? String(data.phone) : undefined,
+      phone: phone.trim() || undefined,
       company: data.company ? String(data.company) : undefined,
       category: String(data.category || "VENTAS"),
       message: String(data.message || "Solicitud de contacto desde landing"),
@@ -106,7 +108,7 @@ export default function ContactFormToggle() {
               </div>
               <div className={styles.formField}>
                 <label htmlFor="phone">Teléfono</label>
-                <input id="phone" name="phone" type="tel" placeholder="(+52) 55 0000 0000" disabled={loading} />
+                <PhoneField id="phone" value={phone} onChange={setPhone} disabled={loading} placeholder="+52 55 0000 0000" />
               </div>
             </div>
             <div className={styles.formField}>

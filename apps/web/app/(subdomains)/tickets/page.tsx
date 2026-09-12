@@ -16,6 +16,7 @@ import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import styles from "./tickets.module.css";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import { getIntegraUrl } from "@/lib/panel-urls";
+import PhoneField from "@/components/PhoneField";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -1750,7 +1751,12 @@ export default function ClientTicketsPage() {
                 <div className={styles.grid200}>
                   <input className="input" placeholder="Contacto" value={profileDraft.contactName} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactName: e.target.value }))} />
                   <input className="input" placeholder="Correo electrónico" value={profileDraft.contactEmail} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactEmail: e.target.value }))} />
-                  <input className="input" placeholder="Teléfono" value={profileDraft.contactPhone} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactPhone: e.target.value }))} />
+                  <PhoneField
+                    className="input"
+                    placeholder="Teléfono"
+                    value={profileDraft.contactPhone}
+                    onChange={(contactPhone) => setProfileDraft((prev) => ({ ...prev, contactPhone }))}
+                  />
                   <input className="input" placeholder="Dirección" value={profileDraft.address} onChange={(e) => setProfileDraft((prev) => ({ ...prev, address: e.target.value }))} />
                   <input className="input" placeholder="Ciudad" value={profileDraft.city} onChange={(e) => setProfileDraft((prev) => ({ ...prev, city: e.target.value }))} />
                   <input className="input" placeholder="Estado" value={profileDraft.state} onChange={(e) => setProfileDraft((prev) => ({ ...prev, state: e.target.value }))} />
