@@ -9,15 +9,19 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Ocultar CompanySwitcher en Core
+## Este turno — CommandPalette Core-only
 
 ### Hecho
 
-- Con `CORE_SURFACE_ONLY`, el header ya no muestra “Cambiar empresa activa” (NEXARA / Demo).
+- Acciones CRM/OPS/multi-panel sacadas a `CommandPalette.legacy-actions.ts` (código reciclable, no cableado en Core).
+- Con `CORE_SURFACE_ONLY`: solo **Nuevo cliente**, tema, logout + módulos ola1. Sin lead/cotización/ticket ni “Ir a panel”.
+- Entidades de búsqueda Core: solo `sales-client` / `activity`; URLs vía `/erp/clientes` y `/erp/pizarra`.
+- `searchResultUrlLegacy` conserva el mapa CRM/OPS completo.
 
 ### Verificar
 
-- Hard refresh → topbar sin dropdown N / NEXARA.
+- Hard refresh → ⌘K: sin Crear lead / cotización / ticket / Ir a Core.
+- Debe verse Nuevo cliente → `/erp/clientes/nuevo`.
 
 ## A medias
 
@@ -30,5 +34,3 @@ Lo que Adam diga.
 ## No tocar
 
 Puente NAS. Plan file.
-
-

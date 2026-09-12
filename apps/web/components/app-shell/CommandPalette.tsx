@@ -7,9 +7,10 @@
  * Paleta global de navegación rápida. Consume el access-matrix como única
  * fuente de verdad:
  *  - Solo lista módulos a los que el rol del usuario tiene acceso real.
- *  - Atajos a acciones globales (modo oscuro, panel switcher, logout).
- *  - Búsqueda fuzzy por label, descripción, panel y palabras del negocio
- *    (ej. "cotización" encuentra `/crm/quotes`).
+ *  - Atajos a acciones globales (modo oscuro, logout; en Core: Nuevo cliente).
+ *  - Acciones CRM/OPS/multi-panel viven en CommandPalette.legacy-actions.ts
+ *    (código reciclable, desconectado si CORE_SURFACE_ONLY).
+ *  - Búsqueda fuzzy por label, descripción, panel y sinónimos.
  *
  * Se monta una sola vez dentro de AppShell y escucha ⌘K / Ctrl+K en window.
  */
@@ -23,11 +24,9 @@ import {
 } from "@/lib/access-matrix";
 import {
   getUserAllowedModules,
-  getUserAllowedPanels,
   getModuleEntryUrl,
-  getUserPanelSwitchPath,
 } from "@/lib/user-access";
-import { buildCrossPanelUrl, resolveCrossPanelHref, isCrossPanelHref, detectCurrentPanelId, panelIdFromInternalPath } from "@/lib/cross-panel-handoff";
+import { resolveCrossPanelHref, isCrossPanelHref, detectCurrentPanelId, panelIdFromInternalPath } from "@/lib/cross-panel-handoff";
 import type { UserAccessInput } from "@/lib/user-access";
 import { fetchGlobalSearch, type GlobalSearchResult } from "@/lib/search-api";
 import {
@@ -39,6 +38,14 @@ import {
   filterModulesByNavigation,
   type MeNavigation,
 } from "@/lib/me-navigation";
+import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
+import {
+  buildLegacyCreateActions,
+  buildLegacyPanelJumpActions,
+} from "./CommandPalette.legacy-actions";
+
+/** Tipos de entidad con superficie en Core ola1. */
+const CORE_SEARCH_ENTITY_TYPES = new Set(["sales-client", "activity"]);
 
 type Action = {
   id: string;
@@ -275,34 +282,7 @@ export default function CommandPalette({
     const userJson = user ? JSON.stringify(user) : null;
     const current = detectCurrentPanelId();
     const toUrl = (path: string) => resolveCrossPanelHref(path, userJson, current);
-    const acc: Action[] = [
-      {
-        id: "act:create-lead",
-        label: "Crear lead",
-        description: "Nuevo prospecto en CRM",
-        icon: "🌱",
-        group: "Crear",
-        url: toUrl("/crm/leads"),
-        keywords: ["nuevo", "prospecto", "lead"],
-      },
-      {
-        id: "act:create-quote",
-        label: "Crear cotización",
-        description: "Nueva cotización comercial",
-        icon: "📄",
-        group: "Crear",
-        url: toUrl("/crm/quotes"),
-        keywords: ["cotizacion", "quote", "nuevo"],
-      },
-      {
-        id: "act:create-ticket",
-        label: "Crear ticket de soporte",
-        description: "Bandeja OPS · soporte",
-        icon: "🎫",
-        group: "Crear",
-        url: toUrl("/ops/support"),
-        keywords: ["ticket", "soporte", "incidencia"],
-      },
+    const shared: Action[] = [
       {
         id: "act:dark",
         label: "Cambiar tema (claro / oscuro)",
@@ -322,39 +302,53 @@ export default function CommandPalette({
         keywords: ["salir", "logout", "exit"],
       },
     ];
-    getUserAllowedPanels(user).forEach((p) => {
-      acc.push({
-        id: `panel:${p.id}`,
-        label: `Ir a ${p.name}`,
-        description: p.tagline,
-        icon: p.icon,
-        group: "Saltar a panel",
-        panel: p.id,
-        url: buildCrossPanelUrl(p.id, getUserPanelSwitchPath(user, p.id), userJson),
-        keywords: [p.id, p.publicSubdomain],
-      });
-    });
-    return acc;
+
+    // CRM/OPS/multi-panel viven en CommandPalette.legacy-actions.ts (reciclables).
+    if (CORE_SURFACE_ONLY) {
+      return [
+        {
+          id: "act:create-client",
+          label: "Nuevo cliente",
+          description: "Alta en Clientes Core",
+          icon: "🏢",
+          group: "Crear",
+          url: toUrl("/erp/clientes/nuevo"),
+          keywords: ["nuevo", "cliente", "clientes"],
+        },
+        ...shared,
+      ];
+    }
+
+    return [
+      ...(buildLegacyCreateActions(user) as Action[]),
+      ...shared,
+      ...(buildLegacyPanelJumpActions(user) as Action[]),
+    ];
   }, [onToggleDark, onLogout, user]);
 
   const entityActions = useMemo<Action[]>(() => {
     const userJson = user ? JSON.stringify(user) : null;
     const current = detectCurrentPanelId();
-    return entityResults.map((r) => {
-      const raw = searchResultUrl(r);
-      const url = raw ? resolveCrossPanelHref(raw, userJson, current) : undefined;
-      return {
-        id: `entity:${r.type}:${r.id}`,
-        label: r.title,
-        description: r.subtitle
-          ? `${searchResultTypeLabel(r.type)} · ${r.subtitle}`
-          : searchResultTypeLabel(r.type),
-        icon: searchResultIcon(r.type),
-        group: "Entidades",
-        url,
-        keywords: [r.type, r.recommendation ?? ""],
-      };
-    });
+    const rows = CORE_SURFACE_ONLY
+      ? entityResults.filter((r) => CORE_SEARCH_ENTITY_TYPES.has(r.type))
+      : entityResults;
+    return rows
+      .map((r) => {
+        const raw = searchResultUrl(r);
+        if (!raw) return null;
+        return {
+          id: `entity:${r.type}:${r.id}`,
+          label: r.title,
+          description: r.subtitle
+            ? `${searchResultTypeLabel(r.type)} · ${r.subtitle}`
+            : searchResultTypeLabel(r.type),
+          icon: searchResultIcon(r.type),
+          group: "Entidades",
+          url: resolveCrossPanelHref(raw, userJson, current),
+          keywords: [r.type, r.recommendation ?? ""],
+        } satisfies Action;
+      })
+      .filter((a): a is Action => a != null);
   }, [entityResults, user]);
 
   const allActions = useMemo<Action[]>(
@@ -573,7 +567,7 @@ export default function CommandPalette({
         >
           {entityLoading && query.trim().length >= 2 && (
             <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-tertiary)" }}>
-              Buscando en toda la plataforma…
+              {CORE_SURFACE_ONLY ? "Buscando…" : "Buscando en toda la plataforma…"}
             </div>
           )}
           {entityHint && !entityLoading && entityResults.length > 0 && (
@@ -592,7 +586,17 @@ export default function CommandPalette({
             >
               No hay coincidencias para <strong style={{ color: "var(--text-secondary)" }}>{query}</strong>.
               <div style={{ marginTop: 8, fontSize: 12 }}>
-                Prueba con: <em>cotizaciones</em>, <em>viáticos</em>, <em>almacén</em>, <em>aprobaciones</em>.
+                {CORE_SURFACE_ONLY ? (
+                  <>
+                    Prueba con: <em>clientes</em>, <em>actividades</em>, <em>asistencias</em>,{" "}
+                    <em>chat</em>.
+                  </>
+                ) : (
+                  <>
+                    Prueba con: <em>cotizaciones</em>, <em>viáticos</em>, <em>almacén</em>,{" "}
+                    <em>aprobaciones</em>.
+                  </>
+                )}
               </div>
             </div>
           )}
