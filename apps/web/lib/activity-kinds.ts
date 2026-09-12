@@ -216,3 +216,27 @@ export function kindsForAssignment(opts: {
   if (!opts.targetEmail) return create;
   return intersect(create, kindsForTarget(opts.targetEmail));
 }
+
+export function metaForKind(kind: ActivityKind): ActivityKindMeta {
+  return ACTIVITY_KINDS[kind];
+}
+
+export function servicioShouldGoToBridge(opts: {
+  creatorEmail?: string | null;
+  targetEmail?: string | null;
+  isSuperAdmin?: boolean;
+  isCeo?: boolean;
+}): boolean {
+  // Christian / superadmin: asignan servicio directo a cualquiera.
+  if (opts.isSuperAdmin || opts.isCeo) return false;
+  const creator = norm(opts.creatorEmail);
+  const target = norm(opts.targetEmail);
+  if (!creator || !target) return false;
+  if (creator === ORG_EMAILS.ceo || creator === ORG_EMAILS.developer) {
+    return false;
+  }
+  if (creator === ORG_EMAILS.antonio) return false;
+  if (target === ORG_EMAILS.antonio) return false;
+  // Luis (coord servicios) debe pasar primero por Antonio.
+  return creator === ORG_EMAILS.luis;
+}
