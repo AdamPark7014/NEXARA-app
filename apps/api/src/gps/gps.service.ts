@@ -204,13 +204,12 @@ export class GpsService {
     date?: string,
     companyId?: number | null,
   ) {
-    const canManage =
+    const canSeeOthersLive =
       requester.isSuperAdmin ||
       requester.permissions?.includes(PERMISSIONS.GPS_MANAGE) ||
-      requester.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE) ||
       requester.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
 
-    if (targetUserId !== requester.id && !canManage) {
+    if (targetUserId !== requester.id && !canSeeOthersLive) {
       throw new ForbiddenException('No tienes permisos para ver el trayecto de otro usuario');
     }
 

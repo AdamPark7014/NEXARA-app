@@ -18,6 +18,7 @@ import { attendanceMapUrl } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { erpFetch } from "@/lib/erp-api";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
+import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 type TabId = "equipo" | "comidas" | "trayectoria";
@@ -201,6 +202,8 @@ export default function ErpAsistenciasPage() {
   const attCfg = useMemo(() => getAttendanceSectionConfig(user), [user]);
   const isManager = attCfg.canManageTeam;
   const canRegister = attCfg.canRegisterSelf;
+  // GPS en vivo (gps/team): solo dirección / GPS_MANAGE. Encargados ven checadas.
+  const canLiveGps = Boolean(user?.isSuperAdmin || hasPermission(user, PERMISSIONS.GPS_MANAGE));
 
   const [tab, setTab] = useState<TabId>("equipo");
   const [dateFilter, setDateFilter] = useState(todayIso());
@@ -278,9 +281,11 @@ export default function ErpAsistenciasPage() {
     setLoading(true);
     setError(null);
     try {
-      if (isManager) {
+      if (canLiveGps) {
         const team = await apiFetch<LocationRecord[]>("gps/team", token);
         setTeamGps(Array.isArray(team) ? team : []);
+      } else {
+        setTeamGps([]);
       }
       const [pts, hist] = await Promise.all([
         apiFetch<TrajectoryPoint[]>(`gps/trajectory?date=${dateFilter}`, token),
@@ -295,7 +300,7 @@ export default function ErpAsistenciasPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, dateFilter, isManager]);
+  }, [token, dateFilter, canLiveGps]);
 
   useEffect(() => {
     if (tab === "equipo") void loadEquipo();
@@ -942,7 +947,7 @@ export default function ErpAsistenciasPage() {
 
       {tab === "trayectoria" && (
         <>
-          {isManager && (
+          {canLiveGps && (
             <Section title="GPS del equipo" subtitle="Unidades con jornada abierta (gps/team).">
               {loading && <EmptyState icon="⏳" title="Cargando…" description="Telemetría del equipo." />}
               {!loading && teamGps.length === 0 && (
