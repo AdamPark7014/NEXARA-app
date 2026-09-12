@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
@@ -21,6 +21,10 @@ export type TeamBoardUser = {
   puesto: string | null;
   status: BoardUserStatus;
   currentActivity: TeamBoardActivity | null;
+  clockInAt: Date | null;
+  workedMinutes: number | null;
+  activityStartedAt: Date | null;
+  activityElapsedMinutes: number | null;
 };
 
 export type TeamBoardResponse = {
@@ -35,11 +39,42 @@ type Viewer = {
   isSuperAdmin?: boolean;
 };
 
+type ScopedUser = {
+  id: number;
+  nombre: string;
+  email: string;
+  avatarUrl: string | null;
+  puesto: string | null;
+  managerId: number | null;
+};
+
 @Injectable()
 export class TeamBoardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getBoard(viewer: Viewer, companyId: number | null): Promise<TeamBoardResponse> {
+    const { companyWide, scoped, now } = await this.resolveScope(viewer, companyId);
+    const userIds = scoped.map((u) => u.id);
+    if (userIds.length === 0) {
+      return { scope: companyWide ? 'company' : 'subtree', users: [] };
+    }
+    const users = await this.buildCards(scoped, userIds, companyId, now);
+    return { scope: companyWide ? 'company' : 'subtree', users };
+  }
+
+  async getBoardUser(
+    viewer: Viewer,
+    companyId: number | null,
+    userId: number,
+  ): Promise<TeamBoardUser> {
+    const { scoped, now } = await this.resolveScope(viewer, companyId);
+    const target = scoped.find((u) => u.id === userId);
+    if (!target) throw new NotFoundException('Usuario fuera de tu alcance');
+    const [card] = await this.buildCards([target], [userId], companyId, now);
+    return card;
+  }
+
+  private async resolveScope(viewer: Viewer, companyId: number | null) {
     let email = viewer.email ?? null;
     if (!email && !viewer.isSuperAdmin && viewer.roleKey !== 'ceo') {
       const row = await this.prisma.user.findUnique({
@@ -49,11 +84,9 @@ export class TeamBoardService {
       email = row?.email ?? null;
     }
     const viewerResolved: Viewer = { ...viewer, email };
-
     const companyScope = companyId
       ? { companyMemberships: { some: { companyId } } }
       : {};
-
     const allActive = await this.prisma.user.findMany({
       where: { isActive: true, ...companyScope },
       select: {
@@ -66,22 +99,23 @@ export class TeamBoardService {
       },
       orderBy: { nombre: 'asc' },
     });
-
     const companyWide = this.isCompanyWide(viewerResolved);
-    const scoped = companyWide
+    const scoped: ScopedUser[] = companyWide
       ? allActive
       : allActive.filter((u) => this.subtreeIds(viewer.id, allActive).has(u.id));
+    return { companyWide, scoped, now: new Date() };
+  }
 
-    const now = new Date();
-    const today = now.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+  private async buildCards(
+    scoped: ScopedUser[],
+    userIds: number[],
+    companyId: number | null,
+    now: Date,
+  ): Promise<TeamBoardUser[]> {
+    const today = now.toLocaleDateString('sv-SE');
     const dayStart = new Date(`${today}T00:00:00`);
     const dayEnd = new Date(`${today}T23:59:59.999`);
     const gpsSince = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-
-    const userIds = scoped.map((u) => u.id);
-    if (userIds.length === 0) {
-      return { scope: companyWide ? 'company' : 'subtree', users: [] };
-    }
 
     const [activities, attendances, locationTrackings] = await Promise.all([
       this.prisma.activity.findMany({
@@ -107,6 +141,7 @@ export class TeamBoardService {
           clientId: true,
           responsableId: true,
           fechaAsignacion: true,
+          fechaInicio: true,
         },
         orderBy: { fechaAsignacion: 'desc' },
       }),
@@ -117,7 +152,8 @@ export class TeamBoardService {
           timestamp: { gte: dayStart, lte: dayEnd },
           ...(companyId != null ? { companyId } : {}),
         },
-        select: { userId: true },
+        select: { userId: true, timestamp: true },
+        orderBy: { timestamp: 'asc' },
       }),
       this.prisma.locationTracking.findMany({
         where: {
@@ -129,8 +165,12 @@ export class TeamBoardService {
       }),
     ]);
 
+    const clockInByUser = new Map<number, Date>();
+    for (const a of attendances) {
+      if (!clockInByUser.has(a.userId)) clockInByUser.set(a.userId, a.timestamp);
+    }
     const present = new Set<number>([
-      ...attendances.map((a) => a.userId),
+      ...clockInByUser.keys(),
       ...locationTrackings.map((lt) => lt.usuarioId),
     ]);
     const activityByUser = new Map<number, (typeof activities)[number]>();
@@ -138,10 +178,12 @@ export class TeamBoardService {
       if (!activityByUser.has(a.responsableId)) activityByUser.set(a.responsableId, a);
     }
 
-    const users: TeamBoardUser[] = scoped.map((u) => {
+    return scoped.map((u) => {
       const act = activityByUser.get(u.id) ?? null;
       let status: BoardUserStatus = 'sin_actividad';
       let currentActivity: TeamBoardActivity | null = null;
+      let activityStartedAt: Date | null = null;
+      let activityElapsedMinutes: number | null = null;
 
       if (act) {
         const overdue = act.fechaMaxima != null && act.fechaMaxima.getTime() < now.getTime();
@@ -154,9 +196,21 @@ export class TeamBoardService {
           fechaMaxima: act.fechaMaxima,
           bucket: act.projectId ? 'projects' : act.clientId ? 'services' : 'daily',
         };
+        activityStartedAt = act.fechaInicio ?? act.fechaAsignacion ?? null;
+        if (activityStartedAt) {
+          activityElapsedMinutes = Math.max(
+            0,
+            Math.floor((now.getTime() - activityStartedAt.getTime()) / 60_000),
+          );
+        }
       } else if (!present.has(u.id)) {
         status = 'inactivo';
       }
+
+      const clockInAt = clockInByUser.get(u.id) ?? null;
+      const workedMinutes = clockInAt
+        ? Math.max(0, Math.floor((now.getTime() - clockInAt.getTime()) / 60_000))
+        : null;
 
       return {
         id: u.id,
@@ -166,10 +220,12 @@ export class TeamBoardService {
         puesto: u.puesto,
         status,
         currentActivity,
+        clockInAt,
+        workedMinutes,
+        activityStartedAt,
+        activityElapsedMinutes,
       };
     });
-
-    return { scope: companyWide ? 'company' : 'subtree', users };
   }
 
   private isCompanyWide(viewer: Viewer): boolean {
@@ -179,7 +235,6 @@ export class TeamBoardService {
     return email === 'gerencia@nexara.com.mx' || email === 'developer@nexara.com.mx';
   }
 
-  /** Viewer + todos los descendientes por managerId. */
   private subtreeIds(
     rootId: number,
     users: Array<{ id: number; managerId: number | null }>,

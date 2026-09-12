@@ -366,6 +366,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		const syncProfile = async (storedUser: User) => {
 			try {
 				const response = await fetch(buildApiUrl('auth/profile'), {
+					credentials: 'include',
 					headers: { Authorization: `Bearer ${storedUser.token}` },
 					cache: 'no-store',
 				});

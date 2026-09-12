@@ -3,10 +3,12 @@
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { MODULES } from "@/lib/access-matrix";
+import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
 import { getModuleGuide, resolveModuleIdFromPath } from "@/lib/module-guides";
 
 /**
  * Guía detallada del módulo actual — solo fuera de producción (capacitación).
+ * Oculta en Core ola1: la pizarra y menú deben verse limpios.
  */
 export default function ModuleGuideBanner() {
   const pathname = usePathname();
@@ -19,6 +21,7 @@ export default function ModuleGuideBanner() {
   const guide = moduleId ? getModuleGuide(moduleId) : null;
   const entry = moduleId ? MODULES[moduleId] : null;
 
+  if (CORE_SURFACE_ONLY) return null;
   if (process.env.NODE_ENV === "production") return null;
   if (!moduleId || !guide || !entry) return null;
 
