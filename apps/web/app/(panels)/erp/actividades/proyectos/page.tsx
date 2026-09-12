@@ -11,6 +11,12 @@ import { getActivitiesSectionConfig } from "@/lib/section-views";
 
 const OpsActivitiesBoard = dynamic(() => import("@/components/ops/OpsActivitiesBoard"), { ssr: false });
 
+const RAIL = [
+  { id: "diarias", label: "Tareas", href: "/erp/actividades/diarias" },
+  { id: "proyectos", label: "Proyectos", href: "/erp/actividades/proyectos" },
+  { id: "servicios", label: "Servicios", href: "/erp/actividades/servicios" },
+] as const;
+
 export default function ErpActividadesProyectosPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getActivitiesSectionConfig(user), [user]);
@@ -18,28 +24,24 @@ export default function ErpActividadesProyectosPage() {
   return (
     <>
       <ContextRail
-        ariaLabel="Buckets de actividades"
-        items={[
-          { id: "diarias", label: "Diarias", href: "/erp/actividades/diarias" },
-          { id: "proyectos", label: "Proyectos", href: "/erp/actividades/proyectos", active: true },
-          { id: "servicios", label: "Servicios", href: "/erp/actividades/servicios" },
-        ]}
+        ariaLabel="Tipos de actividad"
+        items={RAIL.map((i) => ({ ...i, active: i.id === "proyectos" }))}
       />
       <PageHeader
         eyebrow="ERP · Actividades"
-        title="Actividades de proyectos"
-        subtitle="OT ligadas a un projectId — misma bandeja OPS filtrada por bucket."
+        title="Proyectos"
+        subtitle="Actividades ligadas a un proyecto."
         actions={
           cfg.canCreate ? (
-            <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
+            <Link href="/ops/activities/new?mode=proyecto" style={{ textDecoration: "none" }}>
               <Button variant="primary" size="sm">
-                Nueva OT
+                Nueva de proyecto
               </Button>
             </Link>
           ) : undefined
         }
       />
-      <OpsActivitiesBoard bucket="projects" hideProjectSegments newHref="/ops/activities/new" />
+      <OpsActivitiesBoard bucket="projects" hideProjectSegments newHref="/ops/activities/new?mode=proyecto" />
     </>
   );
 }

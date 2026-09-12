@@ -35,6 +35,12 @@ type Props = {
   requestId?: number;
   /** Prefill service-client filter when creating from client detail */
   initialClientId?: number;
+  /** Prefill encargado (pizarra → asignar) */
+  initialResponsableId?: number;
+  /** Fija el tipo: tarea = sin proyecto, proyecto = con proyecto */
+  forcedProjectMode?: ActivityProjectMode;
+  /** Oculta el selector Con/Sin proyecto (cuando forcedProjectMode) */
+  hideProjectModePicker?: boolean;
   onSuccess?: (id: number) => void;
   onCancel?: () => void;
 };
@@ -45,7 +51,16 @@ const gridStyle: CSSProperties = {
   gap: 12,
 };
 
-export default function OpsActivityForm({ activityId, requestId, initialClientId, onSuccess, onCancel }: Props) {
+export default function OpsActivityForm({
+  activityId,
+  requestId,
+  initialClientId,
+  initialResponsableId,
+  forcedProjectMode,
+  hideProjectModePicker,
+  onSuccess,
+  onCancel,
+}: Props) {
   const { user } = useUser();
   const token = user?.token ?? "";
   const actCfg = getActivitiesSectionConfig(user);
@@ -53,7 +68,11 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
     hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
   const isEdit = activityId != null && activityId > 0;
 
-  const [form, setForm] = useState<ActivityFormState>({ ...EMPTY_ACTIVITY_FORM });
+  const [form, setForm] = useState<ActivityFormState>({
+    ...EMPTY_ACTIVITY_FORM,
+    projectMode: forcedProjectMode ?? EMPTY_ACTIVITY_FORM.projectMode,
+    responsableId: initialResponsableId ? String(initialResponsableId) : "",
+  });
   const [projects, setProjects] = useState<OperationalProjectRow[]>([]);
   const [users, setUsers] = useState<Awaited<ReturnType<typeof listAssignableUsers>>>([]);
   const [ticketRequests, setTicketRequests] = useState<ClientTicketRequestRow[]>([]);
@@ -104,6 +123,21 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
       return { ...prev, clientId: String(initialClientId) };
     });
   }, [initialClientId, isEdit, requestId]);
+
+  useEffect(() => {
+    if (!initialResponsableId || isEdit) return;
+    setForm((prev) => ({ ...prev, responsableId: String(initialResponsableId) }));
+  }, [initialResponsableId, isEdit]);
+
+  useEffect(() => {
+    if (!forcedProjectMode || isEdit) return;
+    setForm((prev) => ({
+      ...prev,
+      projectMode: forcedProjectMode,
+      projectId: forcedProjectMode === "without_project" ? "" : prev.projectId,
+      clientId: forcedProjectMode === "without_project" ? "" : prev.clientId,
+    }));
+  }, [forcedProjectMode, isEdit]);
 
   useEffect(() => {
     if (!initialClientId || isEdit || requestId || !activeProjects.length) return;
@@ -305,7 +339,7 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
         </div>
       )}
 
-      {(
+      {!(hideProjectModePicker || forcedProjectMode) && (
         <div
           style={{
             display: "grid",
@@ -318,13 +352,13 @@ export default function OpsActivityForm({ activityId, requestId, initialClientId
             [
               {
                 mode: "with_project" as ActivityProjectMode,
-                title: "Con proyecto",
-                help: "OT ligada a un proyecto operativo; el cliente sale del proyecto.",
+                title: "Proyecto",
+                help: "Actividad ligada a un proyecto; el cliente sale del proyecto.",
               },
               {
                 mode: "without_project" as ActivityProjectMode,
-                title: "Sin proyecto",
-                help: "OT interna o ad-hoc; no pide proyecto.",
+                title: "Tarea",
+                help: "Tarea del día sin proyecto ni cliente de servicio.",
               },
             ] as const
           ).map((opt) => {

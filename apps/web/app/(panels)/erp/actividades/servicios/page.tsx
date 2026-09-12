@@ -14,6 +14,12 @@ import { ROLES } from "@/lib/rbac/roles";
 
 const OpsActivitiesBoard = dynamic(() => import("@/components/ops/OpsActivitiesBoard"), { ssr: false });
 
+const RAIL = [
+  { id: "diarias", label: "Tareas", href: "/erp/actividades/diarias" },
+  { id: "proyectos", label: "Proyectos", href: "/erp/actividades/proyectos" },
+  { id: "servicios", label: "Servicios", href: "/erp/actividades/servicios" },
+] as const;
+
 export default function ErpActividadesServiciosPage() {
   const { user } = useUser();
   const router = useRouter();
@@ -34,22 +40,18 @@ export default function ErpActividadesServiciosPage() {
   return (
     <>
       <ContextRail
-        ariaLabel="Buckets de actividades"
-        items={[
-          { id: "diarias", label: "Diarias", href: "/erp/actividades/diarias" },
-          { id: "proyectos", label: "Proyectos", href: "/erp/actividades/proyectos" },
-          { id: "servicios", label: "Servicios", href: "/erp/actividades/servicios", active: true },
-        ]}
+        ariaLabel="Tipos de actividad"
+        items={RAIL.map((i) => ({ ...i, active: i.id === "servicios" }))}
       />
       <PageHeader
         eyebrow="ERP · Actividades"
-        title="Actividades de servicios"
-        subtitle="OT con cliente de servicio (sin proyecto). Visible para CEO; sidebar la oculta para David vía moduleAccess."
+        title="Servicios"
+        subtitle="Con cliente corporativo (sin proyecto)."
         actions={
           cfg.canCreate ? (
             <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
               <Button variant="primary" size="sm">
-                Nueva OT
+                Nueva de servicio
               </Button>
             </Link>
           ) : undefined

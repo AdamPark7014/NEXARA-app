@@ -396,7 +396,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "activities-daily": {
     id: "activities-daily", panel: PANELS.ERP, path: "/actividades/diarias",
-    label: "Diarias", description: "Actividades del día",
+    label: "Tareas", description: "Tareas del día sin proyecto",
     icon: "✅", allowedRoles: ANY_INTERNAL,
     group: "Actividades", visible: true,
   },

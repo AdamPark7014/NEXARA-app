@@ -11,6 +11,12 @@ import { getActivitiesSectionConfig } from "@/lib/section-views";
 
 const OpsActivitiesBoard = dynamic(() => import("@/components/ops/OpsActivitiesBoard"), { ssr: false });
 
+const RAIL = [
+  { id: "diarias", label: "Tareas", href: "/erp/actividades/diarias" },
+  { id: "proyectos", label: "Proyectos", href: "/erp/actividades/proyectos" },
+  { id: "servicios", label: "Servicios", href: "/erp/actividades/servicios" },
+] as const;
+
 export default function ErpActividadesDiariasPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getActivitiesSectionConfig(user), [user]);
@@ -18,28 +24,24 @@ export default function ErpActividadesDiariasPage() {
   return (
     <>
       <ContextRail
-        ariaLabel="Buckets de actividades"
-        items={[
-          { id: "diarias", label: "Diarias", href: "/erp/actividades/diarias", active: true },
-          { id: "proyectos", label: "Proyectos", href: "/erp/actividades/proyectos" },
-          { id: "servicios", label: "Servicios", href: "/erp/actividades/servicios" },
-        ]}
+        ariaLabel="Tipos de actividad"
+        items={RAIL.map((i) => ({ ...i, active: i.id === "diarias" }))}
       />
       <PageHeader
         eyebrow="ERP · Actividades"
-        title="Actividades diarias"
-        subtitle="OT sin proyecto ni cliente de servicio — alcance David (subtree) vía API."
+        title="Tareas"
+        subtitle="Sin proyecto ni cliente de servicio."
         actions={
           cfg.canCreate ? (
-            <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
+            <Link href="/ops/activities/new?mode=tarea" style={{ textDecoration: "none" }}>
               <Button variant="primary" size="sm">
-                Nueva OT
+                Nueva tarea
               </Button>
             </Link>
           ) : undefined
         }
       />
-      <OpsActivitiesBoard bucket="daily" hideProjectSegments newHref="/ops/activities/new" />
+      <OpsActivitiesBoard bucket="daily" hideProjectSegments newHref="/ops/activities/new?mode=tarea" />
     </>
   );
 }

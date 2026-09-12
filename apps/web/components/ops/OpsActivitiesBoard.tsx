@@ -153,8 +153,8 @@ export default function OpsActivitiesBoard({
   const emptyCopy = useMemo(() => {
     if (bucket === "daily") {
       return {
-        title: "Sin actividades diarias",
-        description: "No hay OT sin proyecto ni cliente de servicio con estos filtros.",
+        title: "Sin tareas",
+        description: "No hay tareas con estos filtros.",
       };
     }
     if (bucket === "projects") {
