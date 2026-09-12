@@ -9,20 +9,19 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — UI Clientes + sidebar
+## Este turno — Fix redirect Clientes → CRM
 
 ### Hecho
 
-- `/crm/clients` redirige a `/erp/clientes` bajo `CORE_SURFACE_ONLY` (el CRM vacío era el “sidebar desaparecido”).
-- Clientes Core rediseñado: una pantalla con tabs de sector + lista densa + un solo CTA Nuevo.
-- Nuevo / detalle más compactos (CSS module).
-- Rutas `/proyecto|corporativo|comercial` → `?sector=`.
+- Causa: `legacy-path-remap` mandaba `/erp/clientes` → `/crm/clients` (bucle con el redirect).
+- `/erp/clientes` queda canónico (como asistencias/actividades).
+- `/erp/clients` → `/erp/clientes`.
+- Tests remap OK. CRM page usa `location.replace` de respaldo.
 
 ### Verificar
 
-- Ir a Core → Clientes (no CRM). Sidebar: Chat, Actividades, Asistencias, Clientes.
-- Tabs cambian lista sin páginas extra.
-- Hard refresh.
+- Hard refresh → Core → Clientes → URL `/erp/clientes` (Nexara CORE, no CRM).
+- Sidebar con Chat / Actividades / Asistencias / Clientes.
 
 ## A medias
 
@@ -30,7 +29,7 @@ Nada.
 
 ## Siguiente
 
-Smoke con Christian.
+Smoke UI.
 
 ## No tocar
 

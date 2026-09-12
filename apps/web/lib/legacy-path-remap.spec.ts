@@ -23,7 +23,10 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     // la whitelist del rol `cliente` no reconoce.
     expect(normalizeLegacyPath('/panel/tickets/9')).toBe('/tickets/9');
     expect(normalizeLegacyPath('/panel/tickets')).toBe('/tickets');
-    expect(normalizeLegacyPath('/erp/clientes/3')).toBe('/crm/clients/3');
+    expect(normalizeLegacyPath('/erp/clientes/3')).toBe('/erp/clientes/3');
+    expect(normalizeLegacyPath('/erp/clientes')).toBe('/erp/clientes');
+    expect(normalizeLegacyPath('/erp/clients')).toBe('/erp/clientes');
+    expect(normalizeLegacyPath('/erp/clients/3')).toBe('/erp/clientes/3');
   });
 
   it('lleva los módulos de RH a su subárbol', () => {
