@@ -92,7 +92,7 @@ export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
 export const ROLE_LABELS: Record<RoleKey, string> = {
   super_admin: 'Super Administrador',
   ceo: 'CEO',
-  arquitecto: 'Arquitecto / Dir. Técnico',
+  arquitecto: 'Encargado de Obra',
   dir_operaciones: 'Director de Operaciones',
   dir_admin: 'Director Administrativo',
   coord_admin: 'Coordinador Administrativo',

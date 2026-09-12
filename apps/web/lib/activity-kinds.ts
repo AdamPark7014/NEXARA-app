@@ -7,6 +7,7 @@
  * Encargados de área (+ comercial): Christian, David, Luis, Antonio, Daniela, Mónica.
  * Campo David (Joan/Israel/Juan): solo reciben tarea/proyecto/obra.
  * Soporte Antonio (Carolina/Alejandro): solo reciben tarea/proyecto/servicio.
+ * Josué Encargado de Obra: todo menos servicio
  */
 import { ROLES, type RoleKey } from '@/lib/rbac/roles';
 import type { ActivityProjectMode } from '@/lib/ops-activity-form';
@@ -38,6 +39,7 @@ export const ORG_EMAILS = {
   joan: 'joan.sanchez@nexara.com.mx',
   israel: 'israel.ramos@nexara.com.mx',
   juan: 'juan.gonzalez@nexara.com.mx',
+  josue: 'infraestructura@nexara.com.mx',
 } as const;
 
 export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
@@ -111,6 +113,7 @@ const CREATE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.juan]: ['tarea'],
   [ORG_EMAILS.carolina]: ['tarea'],
   [ORG_EMAILS.alejandro]: ['tarea'],
+  [ORG_EMAILS.josue]: ['tarea', 'proyecto', 'obra', 'comercial'],
 };
 
 /** Qué se le puede asignar a esa persona. */
@@ -130,6 +133,8 @@ const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
   // Comercial / admin
   [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
   [ORG_EMAILS.monica]: ['tarea', 'comercial'],
+  // Josué Encargado de Obra
+  [ORG_EMAILS.josue]: ['tarea', 'proyecto', 'obra', 'comercial'], // Encargado de obra (Josué): todo menos servicio
 };
 
 export function servicioBridgeEmail(): string {
@@ -187,31 +192,4 @@ export function kindsForAssignment(opts: {
   });
   if (!opts.targetEmail) return create;
   return intersect(create, kindsForTarget(opts.targetEmail));
-}
-
-export function metaForKind(kind: ActivityKind): ActivityKindMeta {
-  return ACTIVITY_KINDS[kind];
-}
-
-export function servicioShouldGoToBridge(opts: {
-  creatorEmail?: string | null;
-  targetEmail?: string | null;
-  isSuperAdmin?: boolean;
-  isCeo?: boolean;
-}): boolean {
-  // Christian / superadmin: asignan servicio directo a cualquiera.
-  if (opts.isSuperAdmin || opts.isCeo) return false;
-  const creator = norm(opts.creatorEmail);
-  const target = norm(opts.targetEmail);
-  if (!creator || !target) return false;
-  if (
-    creator === ORG_EMAILS.ceo ||
-    creator === ORG_EMAILS.developer
-  ) {
-    return false;
-  }
-  if (creator === ORG_EMAILS.antonio) return false;
-  if (target === ORG_EMAILS.antonio) return false;
-  // Luis (coord servicios) debe pasar primero por Antonio.
-  return creator === ORG_EMAILS.luis;
 }
