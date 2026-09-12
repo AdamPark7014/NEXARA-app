@@ -27,6 +27,7 @@ import { useTheme } from "@/components/ThemeContext";
 import CompanySwitcher from "@/components/CompanySwitcher";
 import ModuleGuideBanner from "@/components/ModuleGuideBanner";
 import { NEXARA_LOGO_MARK } from "@/lib/brand";
+import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
 import {
   MODULES,
   PANEL_META,
@@ -824,8 +825,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
         <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
 
         <div className={styles.topbarActions}>
-          <CompanySwitcher compact />
-
+          {/* Core ola1: solo NEXARA — sin selector multi-empresa (Demo). */}
+          {!CORE_SURFACE_ONLY ? <CompanySwitcher compact /> : null}
 
           {(isSuperAdmin || orgRoleKey) && (
             <div
