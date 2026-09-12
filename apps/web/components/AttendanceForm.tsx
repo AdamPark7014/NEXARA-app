@@ -122,11 +122,13 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
     return `${hours}:${minutes}:${seconds}`;
   };
 
-  // Formato HH:mm para total diario
+  // Formato HH:mm:ss (también para totales en minutos → segundos en :00)
   const formatTotal = (minutes: number) => {
-    const hours = Math.floor(minutes / 60).toString().padStart(2, '0');
-    const mins = Math.floor(minutes % 60).toString().padStart(2, '0');
-    return `${hours}:${mins}`;
+    const totalSeconds = Math.max(0, Math.floor(minutes * 60));
+    const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    const secs = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${hours}:${mins}:${secs}`;
   };
 
   const formatTime = (iso: string) => {
@@ -713,7 +715,8 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
         )}
         {(totalMinutes > 0 || startTime) && (
           <div className={styles.totalDay}>
-            Total hoy: {formatTotal(totalMinutes + Math.floor(elapsed / 60000))}
+            Total hoy:{' '}
+            {formatElapsed(totalMinutes * 60_000 + (startTime ? elapsed : 0))}
           </div>
         )}
         {status && <p className={styles.statusText}>{status}</p>}

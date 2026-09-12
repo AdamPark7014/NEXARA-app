@@ -96,7 +96,11 @@ function todayIso() {
 
 function fmtTime(iso?: string | null) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function pad2(n: number) {
