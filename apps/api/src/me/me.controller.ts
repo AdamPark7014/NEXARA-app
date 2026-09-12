@@ -43,6 +43,27 @@ export class MeController {
   }
 
   /** Detalle de una persona en la pizarra (mismo scope que board). */
+  @Get('board/:userId/history')
+  boardUserHistory(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('userId', ParseIntPipe) userId: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.teamBoard.getUserHistory(
+      {
+        id: Number(user.id),
+        roleKey: user.roleKey ?? null,
+        email: user.email ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+      },
+      companyId,
+      userId,
+    );
+  }
+
   @Get('board/:userId')
   boardUser(
     @CurrentUser() user: any,

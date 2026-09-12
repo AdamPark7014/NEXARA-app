@@ -12,6 +12,17 @@ export type TeamBoardActivity = {
   bucket: BoardActivityBucket;
 };
 
+export type TeamBoardOpenActivity = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  evidenceStatus: string;
+  progressPct: number;
+  coreKind: string | null;
+  fechaFinalizacion: string | null;
+};
+
 export type TeamBoardUser = {
   id: number;
   nombre: string;
@@ -20,10 +31,30 @@ export type TeamBoardUser = {
   puesto: string | null;
   status: BoardUserStatus;
   currentActivity: TeamBoardActivity | null;
+  openActivities?: TeamBoardOpenActivity[];
   clockInAt: string | null;
   workedMinutes: number | null;
   activityStartedAt: string | null;
   activityElapsedMinutes: number | null;
+};
+
+export type TeamBoardHistoryItem = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  coreKind: string | null;
+  fechaAsignacion: string;
+  fechaFinalizacion: string | null;
+  evidence: {
+    status: string;
+    progressPct: number;
+    entryPhotoUrl: string | null;
+    evidencePhotos: string[];
+    exitPhotoUrl: string | null;
+    serviceSheetPdfUrl: string | null;
+    serviceSheetData: unknown;
+  } | null;
 };
 
 export type TeamBoardResponse = {
@@ -66,4 +97,11 @@ export function fetchTeamBoard(token: string): Promise<TeamBoardResponse> {
 
 export function fetchTeamBoardUser(token: string, userId: number): Promise<TeamBoardUser> {
   return erpFetch<TeamBoardUser>(`me/board/${userId}`, token);
+}
+
+export function fetchTeamBoardHistory(
+  token: string,
+  userId: number,
+): Promise<TeamBoardHistoryItem[]> {
+  return erpFetch<TeamBoardHistoryItem[]>(`me/board/${userId}/history`, token);
 }

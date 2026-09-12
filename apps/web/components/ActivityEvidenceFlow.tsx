@@ -2,12 +2,29 @@
 import { toast } from '@/components/Toast';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
 import { evidenceStepLabel, isEvidenceLocked, rejectedStepsList } from '@/lib/evidence-lock';
+import {
+  digitalFormLabels,
+  emptyDigitalForm,
+  evidenceStepsForKind,
+  isPdfUrl,
+  requiresServiceSheetPdf,
+  type DigitalFormFields,
+  type EvidenceStep,
+} from '@/lib/evidence-flow-helpers';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
 import { Socket } from 'socket.io-client';
 import ConfirmDialog, { type ConfirmState } from '@/components/ui/ConfirmDialog';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+
+type EvidenceBootstrap = {
+  status?: string;
+  reviewStatus?: string;
+  rejectedStep?: string | null;
+  rejectedSteps?: string[] | null;
+  userId?: number;
+};
 
 interface ActivityOption {
   id: number;
@@ -17,13 +34,32 @@ interface ActivityOption {
   responsableId?: number;
   responsable?: { id?: number };
   workType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
-  activityEvidence?: {
-    status?: string;
-    reviewStatus?: string;
-    rejectedStep?: string | null;
-    rejectedSteps?: string[] | null;
-  } | null;
+  coreKind?: string;
+  indicaciones?: string | null;
+  activityEvidence?: EvidenceBootstrap | null;
+  activityEvidences?: EvidenceBootstrap[] | null;
 }
+
+const pickActivityEvidence = (
+  activity: ActivityOption,
+  userId?: number | string | null,
+): EvidenceBootstrap | null | undefined => {
+  const list = activity.activityEvidences;
+  if (Array.isArray(list) && list.length > 0) {
+    const uid = Number(userId);
+    const mine = Number.isFinite(uid) ? list.find((e) => Number(e.userId) === uid) : undefined;
+    return mine ?? list[0];
+  }
+  return activity.activityEvidence;
+};
+
+const EVIDENCE_STEP_LABELS: Record<Exclude<EvidenceStep, 'COMPLETED'>, string> = {
+  ENTRY_PHOTO: 'Entrada',
+  EVIDENCE_PHOTOS: 'Evidencias',
+  SERVICE_SHEET_PDF: 'PDF',
+  SERVICE_SHEET_DATA: 'Formulario',
+  EXIT_PHOTO: 'Salida',
+};
 
 const normalizeActivitiesPayload = (data: unknown): ActivityOption[] => {
   if (Array.isArray(data)) return data as ActivityOption[];
@@ -55,6 +91,12 @@ interface EvidenceFlowData {
   exitPhotoUrl?: string;
   exitLatitude?: number;
   exitLongitude?: number;
+  coreKind?: string;
+  evidencePhotoRequired?: number;
+  indicaciones?: string | null;
+  assigneeIndicaciones?: string | null;
+  progressPct?: number;
+  stepsForKind?: EvidenceStep[];
 }
 
 interface InventoryDraftItem {
@@ -145,6 +187,23 @@ const ActivityEvidenceFlow = () => {
       exitLatitude: saved.exitLatitude != null ? Number(saved.exitLatitude) : flowData.exitLatitude,
       exitLongitude:
         saved.exitLongitude != null ? Number(saved.exitLongitude) : flowData.exitLongitude,
+      coreKind:
+        (saved.coreKind as string | undefined) ??
+        ((saved.activity as { coreKind?: string } | undefined)?.coreKind) ??
+        flowData.coreKind,
+      evidencePhotoRequired:
+        saved.evidencePhotoRequired != null
+          ? Number(saved.evidencePhotoRequired)
+          : flowData.evidencePhotoRequired,
+      indicaciones:
+        (saved.indicaciones as string | null | undefined) ?? flowData.indicaciones,
+      assigneeIndicaciones:
+        (saved.assigneeIndicaciones as string | null | undefined) ?? flowData.assigneeIndicaciones,
+      progressPct:
+        saved.progressPct != null ? Number(saved.progressPct) : flowData.progressPct,
+      stepsForKind: Array.isArray(saved.stepsForKind)
+        ? (saved.stepsForKind as EvidenceStep[])
+        : flowData.stepsForKind,
     });
   };
 
@@ -161,6 +220,13 @@ const ActivityEvidenceFlow = () => {
     (activity) => activity.id === Number(selectedActivityId || flowData?.activityId),
   );
   const isInventoryFlow = selectedActivity?.workType === 'PREVENTIVE_INVENTORY';
+  const photoRequired = Math.max(1, Number(flowData?.evidencePhotoRequired) || 4);
+  const needsServiceSheetPdf = requiresServiceSheetPdf(flowData?.coreKind);
+  const visibleSteps = (
+    Array.isArray(flowData?.stepsForKind) && flowData.stepsForKind.length > 0
+      ? flowData.stepsForKind
+      : evidenceStepsForKind(flowData?.coreKind)
+  ).filter((step): step is Exclude<EvidenceStep, 'COMPLETED'> => step !== 'COMPLETED');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -207,7 +273,7 @@ const ActivityEvidenceFlow = () => {
         const available = rows.filter((activity: ActivityOption) => {
           const status = (activity?.estatus || '').trim().toLowerCase();
           if (status === 'aprobada') return false;
-          const ev = activity.activityEvidence;
+          const ev = pickActivityEvidence(activity, user?.id);
           if (ev?.status === 'COMPLETED' && ev?.reviewStatus !== 'REJECTED') return false;
           return true;
         });
@@ -245,6 +311,9 @@ const ActivityEvidenceFlow = () => {
       if (res.ok) {
         const data = await res.json();
         const currentActivity = actividades.find((activity) => activity.id === activityId);
+        const coreKind =
+          data.coreKind || data.activity?.coreKind || currentActivity?.coreKind || undefined;
+        const evidencePhotoRequired = Number(data.evidencePhotoRequired) || 4;
         setFlowData({
           activityId,
           step: data.status,
@@ -261,6 +330,12 @@ const ActivityEvidenceFlow = () => {
           exitPhotoUrl: data.exitPhotoUrl,
           exitLatitude: data.exitLatitude,
           exitLongitude: data.exitLongitude,
+          coreKind,
+          evidencePhotoRequired,
+          indicaciones: data.indicaciones ?? data.activity?.indicaciones ?? null,
+          assigneeIndicaciones: data.assigneeIndicaciones ?? null,
+          progressPct: data.progressPct != null ? Number(data.progressPct) : undefined,
+          stepsForKind: Array.isArray(data.stepsForKind) ? data.stepsForKind : undefined,
         });
 
         if ((data.activity?.workType || currentActivity?.workType) === 'PREVENTIVE_INVENTORY') {
@@ -308,10 +383,14 @@ const ActivityEvidenceFlow = () => {
         }
       } else {
         // Crear nuevo flujo
+        const currentActivity = actividades.find((activity) => activity.id === activityId);
         setFlowData({
           activityId,
           step: 'ENTRY_PHOTO',
           evidencePhotos: [],
+          coreKind: currentActivity?.coreKind,
+          evidencePhotoRequired: 4,
+          indicaciones: currentActivity?.indicaciones ?? null,
         });
         setInventoryItems([]);
         setInventoryNotes('');
@@ -521,7 +600,7 @@ const ActivityEvidenceFlow = () => {
         setSuccessMsg(
           isCorrection
             ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-            : '✅ Foto de entrada guardada. Siguiente: Tomar evidencias (4-8 fotos)',
+            : `✅ Foto de entrada guardada. Siguiente: Tomar evidencias (${photoRequired} fotos)`,
         );
         setCameraActive(false);
       } else {
@@ -547,9 +626,9 @@ const ActivityEvidenceFlow = () => {
       setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
 
       if (updatedPhotos.length === 1) {
-        setSuccessMsg(`📷 Foto agregada (1/${updatedPhotos.length})`);
+        setSuccessMsg(`📷 Foto agregada (1/${photoRequired})`);
       } else {
-        setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de 4-8)`);
+        setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al capturar foto');
@@ -569,8 +648,10 @@ const ActivityEvidenceFlow = () => {
   // Guardar todas las fotos de evidencia y avanzar
   const handleSaveEvidencePhotos = async () => {
     if (!flowData) return;
-    if (!isInventoryFlow && flowData.evidencePhotos.length < 4) {
-      setError(`Mínimo 4 fotos requeridas (tienes ${flowData?.evidencePhotos.length || 0})`);
+    if (!isInventoryFlow && flowData.evidencePhotos.length < photoRequired) {
+      setError(
+        `Se requieren ${photoRequired} fotos (tienes ${flowData?.evidencePhotos.length || 0})`,
+      );
       return;
     }
     if (isInventoryFlow && flowData.evidencePhotos.length < 1) {
@@ -649,7 +730,9 @@ const ActivityEvidenceFlow = () => {
         setSuccessMsg(
           isCorrection
             ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
-            : '✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF',
+            : needsServiceSheetPdf
+              ? '✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF'
+              : '✅ Evidencias guardadas. Siguiente: Completa el formulario',
         );
       } else {
         const errorData = await res.json();
@@ -671,7 +754,7 @@ const ActivityEvidenceFlow = () => {
   const handleServiceSheetPdfFile = async (file?: File | null) => {
     if (!file || !flowData) return;
     if (file.type !== 'application/pdf') {
-      setError('Solo se permite archivo PDF');
+      setError('Solo se permite PDF');
       return;
     }
 
@@ -683,6 +766,11 @@ const ActivityEvidenceFlow = () => {
       const reader = new FileReader();
       reader.onload = async () => {
         const pdfUrl = reader.result as string;
+        if (!isPdfUrl(pdfUrl)) {
+          setError('Solo se permite PDF');
+          setLoading(false);
+          return;
+        }
 
         const endpoint = isCorrection
           ? `activity-evidence/${flowData.activityId}/resubmit`
@@ -890,6 +978,31 @@ const ActivityEvidenceFlow = () => {
 
       {successMsg && <div className={styles.alertSuccess}>{successMsg}</div>}
 
+      {(flowData.indicaciones || flowData.assigneeIndicaciones) && (
+        <div className={styles.stepCard} style={{ marginBottom: 12 }}>
+          {flowData.indicaciones ? (
+            <div style={{ marginBottom: flowData.assigneeIndicaciones ? 10 : 0 }}>
+              <strong className={styles.stepTitle} style={{ fontSize: 14 }}>
+                Indicaciones generales
+              </strong>
+              <p className={styles.stepDescription} style={{ marginBottom: 0 }}>
+                {flowData.indicaciones}
+              </p>
+            </div>
+          ) : null}
+          {flowData.assigneeIndicaciones ? (
+            <div>
+              <strong className={styles.stepTitle} style={{ fontSize: 14 }}>
+                Indicaciones para ti
+              </strong>
+              <p className={styles.stepDescription} style={{ marginBottom: 0 }}>
+                {flowData.assigneeIndicaciones}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* Banner de Rechazo */}
       {flowData.reviewStatus === 'REJECTED' &&
         (rejectedList.length > 0 || flowData.reviewNotes) && (
@@ -928,42 +1041,34 @@ const ActivityEvidenceFlow = () => {
         <div className={styles.progressMeta}>
           Actividad:{' '}
           <strong>{actividades.find((a) => a.id === flowData.activityId)?.anNumber}</strong>
+          {flowData.progressPct != null ? (
+            <span style={{ marginLeft: 8, color: '#6b7280' }}>{flowData.progressPct}%</span>
+          ) : null}
         </div>
         <div className={styles.progressRow}>
-          <ProgressStep
-            step={1}
-            active={flowData.step === 'ENTRY_PHOTO'}
-            completed={flowData.entryPhotoUrl ? true : false}
-            label="Entrada"
-          />
-          <div className={styles.progressDivider} />
-          <ProgressStep
-            step={2}
-            active={flowData.step === 'EVIDENCE_PHOTOS'}
-            completed={flowData.evidencePhotos.length > 0}
-            label="Evidencias"
-          />
-          <div className={styles.progressDivider} />
-          <ProgressStep
-            step={3}
-            active={flowData.step === 'SERVICE_SHEET_PDF'}
-            completed={flowData.serviceSheetPdfUrl ? true : false}
-            label="PDF"
-          />
-          <div className={styles.progressDivider} />
-          <ProgressStep
-            step={4}
-            active={flowData.step === 'SERVICE_SHEET_DATA'}
-            completed={flowData.serviceSheetData ? true : false}
-            label="Plantilla"
-          />
-          <div className={styles.progressDivider} />
-          <ProgressStep
-            step={5}
-            active={flowData.step === 'EXIT_PHOTO'}
-            completed={flowData.exitPhotoUrl ? true : false}
-            label="Salida"
-          />
+          {visibleSteps.map((stepKey, index) => {
+            const completed =
+              stepKey === 'ENTRY_PHOTO'
+                ? Boolean(flowData.entryPhotoUrl)
+                : stepKey === 'EVIDENCE_PHOTOS'
+                  ? flowData.evidencePhotos.length > 0
+                  : stepKey === 'SERVICE_SHEET_PDF'
+                    ? Boolean(flowData.serviceSheetPdfUrl)
+                    : stepKey === 'SERVICE_SHEET_DATA'
+                      ? Boolean(flowData.serviceSheetData)
+                      : Boolean(flowData.exitPhotoUrl);
+            return (
+              <React.Fragment key={stepKey}>
+                {index > 0 ? <div className={styles.progressDivider} /> : null}
+                <ProgressStep
+                  step={index + 1}
+                  active={flowData.step === stepKey}
+                  completed={completed}
+                  label={EVIDENCE_STEP_LABELS[stepKey]}
+                />
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
 
@@ -1001,12 +1106,12 @@ const ActivityEvidenceFlow = () => {
           <h3 className={styles.stepTitle}>
             {isInventoryFlow
               ? `🗂️ Paso 2: Inventario comparativo + evidencias (${flowData.evidencePhotos.length} foto${flowData.evidencePhotos.length === 1 ? '' : 's'})`
-              : `📷 Paso 2: Evidencias (${flowData.evidencePhotos.length}/4-8)`}
+              : `📷 Paso 2: Evidencias (${flowData.evidencePhotos.length}/${photoRequired})`}
           </h3>
           <p className={styles.stepDescription}>
             {isInventoryFlow
               ? 'Actualiza equipos por grupo, serie, modelo y al menos una foto de evidencia/sticker por mantenimiento.'
-              : 'Toma fotos de evidencia. Mínimo 4, máximo 8 fotos.'}
+              : `Toma ${photoRequired} fotos de evidencia.`}
           </p>
 
           {isInventoryFlow && (
@@ -1320,7 +1425,7 @@ const ActivityEvidenceFlow = () => {
             <button
               className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionEvidence}`}
               onClick={handleAddEvidencePhoto}
-              disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8)}
+              disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= photoRequired)}
             >
               {loading ? '⏳ Capturando...' : '📷 Agregar'}
             </button>
@@ -1335,7 +1440,7 @@ const ActivityEvidenceFlow = () => {
             </button>
             {(isInventoryFlow
               ? flowData.evidencePhotos.length >= 1
-              : flowData.evidencePhotos.length >= 4) && (
+              : flowData.evidencePhotos.length >= photoRequired) && (
               <button
                 className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionSuccess}`}
                 onClick={handleSaveEvidencePhotos}
@@ -1348,12 +1453,12 @@ const ActivityEvidenceFlow = () => {
         </div>
       )}
 
-      {/* PASO 3: PDF */}
-      {flowData.step === 'SERVICE_SHEET_PDF' && !isFlowLocked && (
+      {/* PASO 3: PDF (solo servicio) */}
+      {flowData.step === 'SERVICE_SHEET_PDF' && needsServiceSheetPdf && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepPdf}`}>
-          <h3 className={styles.stepTitle}>📄 Paso 3: Hoja de Servicio (PDF)</h3>
+          <h3 className={styles.stepTitle}>📄 Paso: Hoja de Servicio (PDF)</h3>
           <p className={styles.stepDescription}>
-            Carga el PDF de la hoja de servicio con arrastrar y soltar o selección manual.
+            Carga el PDF de la hoja de servicio con arrastrar y soltar o selección manual. Solo PDF.
           </p>
           <div
             onDragOver={(event) => {
@@ -1380,7 +1485,7 @@ const ActivityEvidenceFlow = () => {
                 if (ref) (window as any).pdfInputRef = ref;
               }}
               type="file"
-              accept=".pdf,application/pdf"
+              accept="application/pdf"
               onChange={handleServiceSheetPdfUpload}
               disabled={loading}
               style={{
@@ -1463,14 +1568,15 @@ const ActivityEvidenceFlow = () => {
         </div>
       )}
 
-      {/* PASO 4: Plantilla Interna */}
+      {/* PASO: Formulario digital por coreKind */}
       {flowData.step === 'SERVICE_SHEET_DATA' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepData}`}>
-          <h3 className={styles.stepTitle}>📝 Paso 4: Plantilla Interna</h3>
+          <h3 className={styles.stepTitle}>📝 Paso: Formulario</h3>
           <p className={styles.stepDescription}>
-            Completa los datos requeridos de la hoja de servicio.
+            Completa los datos requeridos para esta actividad.
           </p>
-          <ServiceSheetForm
+          <DigitalEvidenceForm
+            coreKind={flowData.coreKind}
             onSubmit={handleServiceSheetFormSubmit}
             loading={loading}
             initialData={flowData.serviceSheetData}
@@ -1523,8 +1629,8 @@ const ActivityEvidenceFlow = () => {
           </h2>
           <p className={styles.completedText}>
             {isFlowLocked
-              ? 'Los 5 pasos están guardados. Un administrador debe aprobar o rechazar antes de que puedas modificar algo.'
-              : 'Todos los pasos han sido completados correctamente. Los 5 pasos se encuentran guardados en el sistema.'}
+              ? 'Los pasos están guardados. Un administrador debe aprobar o rechazar antes de que puedas modificar algo.'
+              : 'Todos los pasos han sido completados correctamente y se encuentran guardados en el sistema.'}
           </p>
           {!isFlowLocked && (
             <button
@@ -1566,7 +1672,106 @@ const ProgressStep = ({
   </div>
 );
 
-// Formulario de plantilla interna
+// Formulario digital por coreKind (serviceSheetData JSON)
+const buildInitialDigitalForm = (
+  coreKind?: string | null,
+  initialData?: Record<string, unknown> | null,
+): DigitalFormFields => {
+  const base = emptyDigitalForm(coreKind);
+  if (!initialData || typeof initialData !== 'object' || Array.isArray(initialData)) {
+    return base;
+  }
+  const merged = { ...base };
+  for (const key of Object.keys(base)) {
+    const value = initialData[key];
+    if (typeof value === 'string') merged[key] = value;
+    else if (value != null) merged[key] = String(value);
+  }
+  return merged;
+};
+
+const DigitalEvidenceForm = ({
+  coreKind,
+  onSubmit,
+  loading,
+  initialData,
+}: {
+  coreKind?: string | null;
+  onSubmit: (data: DigitalFormFields) => void;
+  loading: boolean;
+  initialData?: Record<string, unknown> | null;
+}) => {
+  const fields = digitalFormLabels(coreKind);
+  const [data, setData] = useState<DigitalFormFields>(() =>
+    buildInitialDigitalForm(coreKind, initialData),
+  );
+
+  useEffect(() => {
+    setData(buildInitialDigitalForm(coreKind, initialData));
+  }, [coreKind, initialData]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(data);
+  };
+
+  const inp: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    border: '1.5px solid #d1d5db',
+    fontSize: '14px',
+    background: '#fff',
+    outline: 'none',
+    boxSizing: 'border-box',
+    marginBottom: '10px',
+  };
+  const lbl: React.CSSProperties = {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginBottom: '4px',
+    display: 'block',
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className={styles.serviceForm}>
+      {fields.map(({ key, label }) => {
+        const multiline = /que|observ|hiciste|hizo/i.test(key) || /observ/i.test(label);
+        return (
+          <div key={key}>
+            <label style={lbl}>{label}</label>
+            {multiline ? (
+              <textarea
+                style={{ ...inp, minHeight: '90px', resize: 'vertical' } as React.CSSProperties}
+                value={data[key] || ''}
+                onChange={(e) => setData((prev) => ({ ...prev, [key]: e.target.value }))}
+                required
+                disabled={loading}
+              />
+            ) : (
+              <input
+                type="text"
+                style={inp}
+                value={data[key] || ''}
+                onChange={(e) => setData((prev) => ({ ...prev, [key]: e.target.value }))}
+                required
+                disabled={loading}
+              />
+            )}
+          </div>
+        );
+      })}
+      <button type="submit" className={`button-primary ${styles.serviceSubmit}`} disabled={loading}>
+        {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
+      </button>
+    </form>
+  );
+};
+
+// Formulario legacy de plantilla interna (conservado; UI usa DigitalEvidenceForm)
 // Pad de firma digital (mouse + touch + stylus)
 const SignaturePad = ({
   onSignature,
