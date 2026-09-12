@@ -2,6 +2,7 @@
  * Rutas web canónicas para resultados de búsqueda global.
  */
 import type { GlobalSearchResult } from "@/lib/search-api";
+import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
 
 const TYPE_LABELS: Record<string, string> = {
   user: "Usuario",
@@ -33,7 +34,8 @@ export function searchResultIcon(type: string): string {
   return TYPE_ICONS[type] ?? "🔎";
 }
 
-export function searchResultUrl(result: GlobalSearchResult): string | null {
+/** Catálogo CRM/OPS/ERP completo — reciclable cuando se reabra multi-panel. */
+export function searchResultUrlLegacy(result: GlobalSearchResult): string | null {
   const { type, id } = result;
   switch (type) {
     case "user":
@@ -53,6 +55,23 @@ export function searchResultUrl(result: GlobalSearchResult): string | null {
     case "vehicle":
       return `/ops/vehicles?highlight=${id}`;
     default:
+      return null;
+  }
+}
+
+export function searchResultUrl(result: GlobalSearchResult): string | null {
+  if (!CORE_SURFACE_ONLY) {
+    return searchResultUrlLegacy(result);
+  }
+
+  const { type, id } = result;
+  switch (type) {
+    case "sales-client":
+      return `/erp/clientes/${id}`;
+    case "activity":
+      return `/erp/pizarra?highlight=${id}`;
+    default:
+      // user / sales-project / OPS / finance: sin superficie Core → no conectar
       return null;
   }
 }
