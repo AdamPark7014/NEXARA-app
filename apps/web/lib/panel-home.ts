@@ -16,6 +16,7 @@
 
 import { hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
 import { PANEL_META, type PanelId } from "@/lib/access-matrix";
+import { CORE_SURFACE_ONLY, CORE_HOME_PATH, CORE_PANEL_ID } from "@/lib/core-surface";
 import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
 import { getUserHomePanel, getUserHomePath } from "@/lib/user-access";
 
@@ -34,6 +35,10 @@ export function getUserHome(
   user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null; roleKey?: string | null }) | null | undefined,
 ): PanelHome {
   if (!user) return { panel: "erp", path: "/login" };
+
+  if (CORE_SURFACE_ONLY) {
+    return { panel: CORE_PANEL_ID, path: CORE_HOME_PATH };
+  }
 
   const isSuperAdmin = Boolean(user.isSuperAdmin);
 
