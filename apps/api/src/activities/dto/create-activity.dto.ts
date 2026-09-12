@@ -120,4 +120,14 @@ export class CreateActivityDto {
   @IsOptional()
   @IsDateString()
   fechaFinalizacion?: string;
+
+  /** Tipo Core: tarea|proyecto|obra|servicio|comercial */
+  @IsOptional()
+  @IsString()
+  coreKind?: string;
+
+  /** Fotos de evidencia exigidas (2–8). */
+  @IsOptional()
+  @IsInt()
+  evidencePhotoRequired?: number;
 }

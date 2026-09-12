@@ -73,9 +73,45 @@ export class ActivitiesService {
     const trimmed = createActivityDto.anNumber?.trim();
     const anNumber = trimmed ? trimmed : await this.generateNextAnNumber(resolvedCompanyId);
 
+    const evidencePhotoRequired = Math.min(
+      8,
+      Math.max(2, Math.round(Number(createActivityDto.evidencePhotoRequired ?? 4)) || 4),
+    );
+    const { evidencePhotoRequired: _drop, ...rest } = createActivityDto as CreateActivityDto & {
+      evidencePhotoRequired?: number;
+    };
+
     const activity = await this.prisma['activity'].create({
-      data: { ...createActivityDto, anNumber, companyId: resolvedCompanyId },
+      data: {
+        ...rest,
+        anNumber,
+        companyId: resolvedCompanyId,
+        evidencePhotoRequired,
+        coreKind: createActivityDto.coreKind?.trim() || null,
+      },
       include: { responsable: { select: { nombre: true, id: true } }, creador: { select: { nombre: true } } },
+    });
+
+    // Responsable = LEAD en equipo + su evidencia personal
+    await this.prisma.activityAssignee.upsert({
+      where: { activityId_userId: { activityId: activity.id, userId: activity.responsableId } },
+      create: {
+        activityId: activity.id,
+        userId: activity.responsableId,
+        rol: 'LEAD',
+        companyId: resolvedCompanyId,
+      },
+      update: { retiradoAt: null, rol: 'LEAD' },
+    });
+    await this.prisma.activityEvidence.upsert({
+      where: { activityId_userId: { activityId: activity.id, userId: activity.responsableId } },
+      create: {
+        activityId: activity.id,
+        userId: activity.responsableId,
+        companyId: resolvedCompanyId,
+        status: 'ENTRY_PHOTO',
+      },
+      update: {},
     });
 
     // Notify the assigned user about new activity
@@ -118,7 +154,7 @@ export class ActivitiesService {
       client: true,
       project: { select: { id: true, title: true } },
       serviceSheet: true,
-      activityEvidence: {
+      activityEvidences: {
         include: {
           reviewedBy: {
             select: {
@@ -210,7 +246,7 @@ export class ActivitiesService {
         responsable: true,
         client: true,
         serviceSheet: true,
-        activityEvidence: {
+        activityEvidences: {
           include: {
             reviewedBy: {
               select: {
@@ -232,7 +268,7 @@ export class ActivitiesService {
         responsable: true,
         client: true,
         serviceSheet: true,
-        activityEvidence: {
+        activityEvidences: {
           include: {
             reviewedBy: {
               select: {
@@ -259,7 +295,7 @@ export class ActivitiesService {
         client: true,
         project: { select: { id: true, title: true } },
         serviceSheet: true,
-        activityEvidence: {
+        activityEvidences: {
           include: {
             reviewedBy: {
               select: {
@@ -356,7 +392,7 @@ export class ActivitiesService {
             items: { orderBy: [{ groupName: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] },
           },
         },
-        activityEvidence: {
+        activityEvidences: {
           include: {
             reviewedBy: {
               select: {
@@ -565,7 +601,7 @@ export class ActivitiesService {
         responsable: true,
         serviceSheet: true,
         evidencias: true,
-        activityEvidence: {
+        activityEvidences: {
           include: {
             reviewedBy: {
               select: {
@@ -610,7 +646,9 @@ export class ActivitiesService {
       return `/uploads/${normalized}`.replace(/\/uploads\/+/, '/uploads/');
     };
 
-    const flowEvidence = activity.activityEvidence;
+    const flowEvidence =
+      activity.activityEvidences?.find((e: { userId: number }) => e.userId === activity.responsableId) ??
+      activity.activityEvidences?.[0];
     const flowItems = [
       flowEvidence?.entryPhotoUrl
         ? {

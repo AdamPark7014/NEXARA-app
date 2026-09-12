@@ -56,7 +56,12 @@ export class ActivityTeamService {
    */
   async addMember(
     activityId: number,
-    input: { userId: number; rol?: AssigneeRole; horasPlan?: number | null },
+    input: {
+      userId: number;
+      rol?: AssigneeRole;
+      horasPlan?: number | null;
+      indicaciones?: string | null;
+    },
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
@@ -76,28 +81,47 @@ export class ActivityTeamService {
       where: { activityId, userId: input.userId, ...companyWhere(tenantId) },
     });
 
+    const notes =
+      input.indicaciones != null ? String(input.indicaciones).trim() || null : undefined;
+
+    let member;
     if (existing) {
-      return this.prisma.activityAssignee.update({
+      member = await this.prisma.activityAssignee.update({
         where: { id: existing.id },
         data: {
           retiradoAt: null,
           rol: input.rol ?? existing.rol,
           horasPlan: input.horasPlan ?? existing.horasPlan,
+          ...(notes !== undefined ? { indicaciones: notes } : {}),
+        },
+        include: { user: { select: { id: true, nombre: true, email: true } } },
+      });
+    } else {
+      member = await this.prisma.activityAssignee.create({
+        data: {
+          activityId,
+          userId: input.userId,
+          rol: input.rol ?? 'TECNICO',
+          horasPlan: input.horasPlan ?? null,
+          indicaciones: notes ?? null,
+          companyId: tenantId,
         },
         include: { user: { select: { id: true, nombre: true, email: true } } },
       });
     }
 
-    return this.prisma.activityAssignee.create({
-      data: {
+    await this.prisma.activityEvidence.upsert({
+      where: { activityId_userId: { activityId, userId: input.userId } },
+      create: {
         activityId,
         userId: input.userId,
-        rol: input.rol ?? 'TECNICO',
-        horasPlan: input.horasPlan ?? null,
         companyId: tenantId,
+        status: 'ENTRY_PHOTO',
       },
-      include: { user: { select: { id: true, nombre: true, email: true } } },
+      update: {},
     });
+
+    return member;
   }
 
   /**

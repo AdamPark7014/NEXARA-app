@@ -43,7 +43,7 @@ export class ActivityTeamController {
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
   add(
     @Param('id', ParseIntPipe) activityId: number,
-    @Body() body: { userId: number; rol?: AssigneeRole; horasPlan?: number },
+    @Body() body: { userId: number; rol?: AssigneeRole; horasPlan?: number; indicaciones?: string },
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.service.addMember(activityId, body, companyId);

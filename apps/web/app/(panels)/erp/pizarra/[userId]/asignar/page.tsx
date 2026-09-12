@@ -37,7 +37,12 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-async function addTeamMember(token: string, activityId: number, userId: number) {
+async function addTeamMember(
+  token: string,
+  activityId: number,
+  userId: number,
+  indicaciones?: string,
+) {
   const res = await fetch(buildApiUrl(`activities/${activityId}/team`), {
     method: "POST",
     credentials: "include",
@@ -45,7 +50,11 @@ async function addTeamMember(token: string, activityId: number, userId: number) 
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ userId, rol: "TECNICO" }),
+    body: JSON.stringify({
+      userId,
+      rol: "TECNICO",
+      ...(indicaciones?.trim() ? { indicaciones: indicaciones.trim() } : {}),
+    }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -64,6 +73,7 @@ export default function AsignarActividadPage() {
   const [roster, setRoster] = useState<TeamBoardUser[]>([]);
   const [boardUsers, setBoardUsers] = useState<TeamBoardUser[]>([]);
   const [extraIds, setExtraIds] = useState<number[]>([]);
+  const [extraNotes, setExtraNotes] = useState<Record<number, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
 
@@ -154,7 +164,7 @@ export default function AsignarActividadPage() {
     setTeamError(null);
     try {
       for (const id of extraIds) {
-        await addTeamMember(token, activityId, id);
+        await addTeamMember(token, activityId, id, extraNotes[id]);
       }
     } catch (e) {
       setTeamError(
@@ -376,6 +386,7 @@ export default function AsignarActividadPage() {
                 No hay más personas en el tablero para sumar ahora.
               </p>
             ) : (
+              <>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {teamForExtras.map((u) => {
                   const on = extraIds.includes(u.id);
@@ -443,6 +454,42 @@ export default function AsignarActividadPage() {
                   );
                 })}
               </div>
+              {extraIds.length > 0 ? (
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {extraIds.map((id) => {
+                    const u = teamForExtras.find((x) => x.id === id);
+                    if (!u) return null;
+                    return (
+                      <label key={id} style={{ display: "block", fontSize: 12 }}>
+                        <span style={{ fontWeight: 650, color: "var(--text-secondary)" }}>
+                          Indicaciones para {u.nombre.split(/\s+/).slice(0, 2).join(" ")} (opcional)
+                        </span>
+                        <textarea
+                          value={extraNotes[id] ?? ""}
+                          onChange={(e) =>
+                            setExtraNotes((prev) => ({ ...prev, [id]: e.target.value }))
+                          }
+                          rows={2}
+                          style={{
+                            width: "100%",
+                            marginTop: 4,
+                            padding: 8,
+                            borderRadius: 10,
+                            border: "1px solid var(--border)",
+                            fontFamily: "inherit",
+                            fontSize: 13,
+                            resize: "vertical",
+                            background: "var(--surface)",
+                            color: "inherit",
+                          }}
+                          placeholder="Qué debe hacer esta persona…"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
+              </>
             )}
           </section>
 
@@ -460,6 +507,7 @@ export default function AsignarActividadPage() {
             <OpsActivityForm
               key={kind}
               tone="core"
+              coreKind={kind ?? undefined}
               initialResponsableId={userId}
               hideResponsableSelect
               forcedProjectMode={kindMeta.projectMode}

@@ -22,6 +22,8 @@ export const EMPTY_ACTIVITY_FORM = {
   branchState: "",
   branchAddress: "",
   projectMode: 'with_project' as ActivityProjectMode,
+  evidencePhotoRequired: "4",
+  coreKind: "",
 };
 
 export type ActivityFormState = typeof EMPTY_ACTIVITY_FORM;
@@ -84,6 +86,8 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     branchState: String(record.branchState ?? ""),
     branchAddress: String(record.branchAddress ?? ""),
     projectMode: record.projectId ? "with_project" : "without_project",
+    evidencePhotoRequired: record.evidencePhotoRequired != null ? String(record.evidencePhotoRequired) : "4",
+    coreKind: String(record.coreKind ?? ""),
   };
 }
 
@@ -119,6 +123,12 @@ export function buildActivityPayload(
     fechaMaxima: form.fecha
       ? new Date(`${form.fecha}T${form.hora || "09:00"}:00`).toISOString()
       : undefined,
+    evidencePhotoRequired: (() => {
+      const n = Math.round(Number(form.evidencePhotoRequired || 4));
+      if (!Number.isFinite(n)) return 4;
+      return Math.min(8, Math.max(2, n));
+    })(),
+    coreKind: form.coreKind || undefined,
   };
 
   if (!options.isEdit) {

@@ -50,6 +50,10 @@ type Props = {
   forcedTicketTypeCustom?: string;
   /** Exige día + hora (servicio / obra). */
   requireSchedule?: boolean;
+  /** Tipo Core (tarea|proyecto|obra|servicio|comercial). */
+  coreKind?: string;
+  /** Fotos de evidencia 2–8 (default 4). */
+  evidencePhotoRequired?: number;
   onSuccess?: (id: number) => void;
   onCancel?: () => void;
 };
@@ -72,6 +76,8 @@ export default function OpsActivityForm({
   forcedTicketType,
   forcedTicketTypeCustom,
   requireSchedule = false,
+  coreKind,
+  evidencePhotoRequired = 4,
   onSuccess,
   onCancel,
 }: Props) {
@@ -86,6 +92,10 @@ export default function OpsActivityForm({
     ...EMPTY_ACTIVITY_FORM,
     projectMode: forcedProjectMode ?? EMPTY_ACTIVITY_FORM.projectMode,
     responsableId: initialResponsableId ? String(initialResponsableId) : "",
+    coreKind: coreKind ?? "",
+    evidencePhotoRequired: String(
+      Math.min(8, Math.max(2, Math.round(Number(evidencePhotoRequired)) || 4)),
+    ),
   });
   const [projects, setProjects] = useState<OperationalProjectRow[]>([]);
   const [users, setUsers] = useState<Awaited<ReturnType<typeof listAssignableUsers>>>([]);
@@ -598,11 +608,67 @@ export default function OpsActivityForm({
         )}
         <input
           className="input"
-          placeholder="Indicaciones para el responsable"
+          placeholder={
+            tone === "core"
+              ? "Indicaciones generales (para todo el equipo)"
+              : "Indicaciones para el responsable"
+          }
           value={form.indicaciones}
           onChange={(e) => setForm({ ...form, indicaciones: e.target.value })}
           style={{ gridColumn: "1 / -1" }}
         />
+        {tone === "core" ? (
+          <label
+            style={{
+              gridColumn: "1 / -1",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 10,
+              fontSize: 13,
+              fontWeight: 650,
+              color: "var(--text-secondary)",
+            }}
+          >
+            Fotos de evidencia por persona
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <button
+                type="button"
+                className="btn"
+                style={{ minWidth: 36, padding: "4px 10px" }}
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    evidencePhotoRequired: String(
+                      Math.max(2, Number(prev.evidencePhotoRequired || 4) - 1),
+                    ),
+                  }))
+                }
+              >
+                −
+              </button>
+              <strong style={{ minWidth: 24, textAlign: "center", color: "var(--text)" }}>
+                {form.evidencePhotoRequired}
+              </strong>
+              <button
+                type="button"
+                className="btn"
+                style={{ minWidth: 36, padding: "4px 10px" }}
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    evidencePhotoRequired: String(
+                      Math.min(8, Number(prev.evidencePhotoRequired || 4) + 1),
+                    ),
+                  }))
+                }
+              >
+                +
+              </button>
+            </span>
+            <span style={{ fontWeight: 500, fontSize: 12 }}>(2–8)</span>
+          </label>
+        ) : null}
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginTop: 16 }}>
