@@ -257,6 +257,7 @@ export class ActivitiesService {
         creador: true,
         responsable: true,
         client: true,
+        project: { select: { id: true, title: true } },
         serviceSheet: true,
         activityEvidence: {
           include: {
@@ -272,6 +273,63 @@ export class ActivitiesService {
       orderBy: { fechaAsignacion: 'desc' },
       take: DEFAULT_LIST_TAKE,
     });
+  }
+
+  /** CEO / plataforma: company-wide. Managers: árbol managerId (subtree). */
+  async findAllScoped(
+    viewer: { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean },
+    companyId?: number | null,
+    query?: PaginationQueryDto,
+  ) {
+    if (this.isCompanyWideViewer(viewer)) {
+      return this.findAll(query, companyId);
+    }
+    const ids = await this.getSubtreeUserIds(viewer.id, companyId);
+    return this.findByAllowedUsers(ids, companyId);
+  }
+
+  private isCompanyWideViewer(viewer: {
+    roleKey?: string | null;
+    email?: string | null;
+    isSuperAdmin?: boolean;
+  }): boolean {
+    if (viewer.isSuperAdmin) return true;
+    if (viewer.roleKey === 'ceo') return true;
+    const email = (viewer.email || '').toLowerCase();
+    return email === 'gerencia@nexara.com.mx' || email === 'developer@nexara.com.mx';
+  }
+
+  private async getSubtreeUserIds(
+    rootId: number,
+    companyId?: number | null,
+  ): Promise<number[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        ...(companyId != null
+          ? { companyMemberships: { some: { companyId } } }
+          : {}),
+      },
+      select: { id: true, managerId: true },
+    });
+    const children = new Map<number, number[]>();
+    for (const u of users) {
+      if (u.managerId == null) continue;
+      const list = children.get(u.managerId) ?? [];
+      list.push(u.id);
+      children.set(u.managerId, list);
+    }
+    const out = new Set<number>([rootId]);
+    const queue = [rootId];
+    while (queue.length) {
+      const id = queue.shift()!;
+      for (const child of children.get(id) ?? []) {
+        if (out.has(child)) continue;
+        out.add(child);
+        queue.push(child);
+      }
+    }
+    return Array.from(out);
   }
 
   async findOne(id: number, companyId?: number | null) {
@@ -780,11 +838,39 @@ export class ActivitiesService {
   ) {
     const prev = await this.prisma['activity'].findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
-      select: { estatus: true, responsableId: true, anNumber: true, titulo: true, companyId: true },
+      select: {
+        estatus: true,
+        responsableId: true,
+        anNumber: true,
+        titulo: true,
+        companyId: true,
+        fechaInicio: true,
+        fechaMaxima: true,
+      },
     });
     assertCompanyAccess(prev, companyId, 'Actividad');
 
-    
+    if (updateActivityDto.fechaInicio != null && updateActivityDto.fechaInicio !== '') {
+      const start = new Date(updateActivityDto.fechaInicio);
+      if (Number.isNaN(start.getTime())) {
+        throw new BadRequestException('fechaInicio inválida');
+      }
+      const effectiveMax = updateActivityDto.fechaMaxima
+        ? new Date(updateActivityDto.fechaMaxima)
+        : prev?.fechaMaxima
+          ? new Date(prev.fechaMaxima)
+          : null;
+      if (effectiveMax && !Number.isNaN(effectiveMax.getTime()) && start.getTime() > effectiveMax.getTime()) {
+        throw new BadRequestException('fechaInicio no puede ser posterior a fechaMaxima');
+      }
+      const startOfYesterday = new Date();
+      startOfYesterday.setHours(0, 0, 0, 0);
+      startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+      if (start.getTime() < startOfYesterday.getTime()) {
+        throw new BadRequestException('fechaInicio está fuera de la ventana permitida');
+      }
+    }
+
     // Armor: gate de evidencias mínimas antes de Finalizada
     if (updateActivityDto.estatus !== undefined) {
       const next = String(updateActivityDto.estatus);
