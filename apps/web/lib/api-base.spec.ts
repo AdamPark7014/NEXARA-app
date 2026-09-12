@@ -39,6 +39,11 @@ describe('getApiBase · a qué backend apunta la web', () => {
     expect(getApiBase()).toBe('http://localhost:3000/api');
   });
 
+  it('en 127.0.0.1 también usa same-origin (no localhost:3001 del .env)', () => {
+    setLocation('http://127.0.0.1:3000/erp/pizarra');
+    expect(getApiBase()).toBe('http://127.0.0.1:3000/api');
+  });
+
   it('buildApiUrl no duplica ni se come las barras', () => {
     setLocation('https://core.nexara.com.mx/');
     expect(buildApiUrl('company/mine')).toBe('https://core.nexara.com.mx/api/company/mine');

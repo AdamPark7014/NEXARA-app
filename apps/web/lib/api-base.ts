@@ -52,32 +52,29 @@ export const getApiBase = () => {
       originHost.endsWith(".localhost");
     const allowCrossOriginApi = process.env.NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API === 'true';
 
+    // Local: siempre same-origin `/api` (rewrite Next → :3001).
+    // `localhost` y `127.0.0.1` son jars de cookie distintos; si el .env apunta
+    // a uno y la página está en el otro, la cookie HttpOnly nunca viaja → 401.
+    if (isLocalOrigin) {
+      return `${currentOrigin}/api`;
+    }
+
     if (envBase && envBase.trim()) {
       const normalizedEnvBase = ensureApiBase(envBase);
-      const lowerEnvBase = normalizedEnvBase.toLowerCase();
-      const pointsToLocalhost =
-        lowerEnvBase.includes("//localhost") ||
-        lowerEnvBase.includes("//127.0.0.1") ||
-        lowerEnvBase.includes(".localhost");
+      try {
+        const envUrl = new URL(normalizedEnvBase);
+        const isSameOriginApi = envUrl.origin === currentOrigin;
+        const isMixedContent = pageProtocol === "https:" && envUrl.protocol === "http:";
 
-      if (pointsToLocalhost) {
-        if (isLocalOrigin) return normalizedEnvBase;
-      } else {
-        try {
-          const envUrl = new URL(normalizedEnvBase);
-          const isSameOriginApi = envUrl.origin === currentOrigin;
-          const isMixedContent = pageProtocol === "https:" && envUrl.protocol === "http:";
-
-          if (isMixedContent) {
-            // Evita bloqueo del navegador (HTTPS → HTTP) que parece "sin conexión".
-          } else if (isSameOriginApi) {
-            return normalizedEnvBase;
-          } else if (allowCrossOriginApi) {
-            return normalizedEnvBase;
-          }
-        } catch {
-          // Keep fallback to same-origin /api when parsing fails.
+        if (isMixedContent) {
+          // Evita bloqueo del navegador (HTTPS → HTTP) que parece "sin conexión".
+        } else if (isSameOriginApi) {
+          return normalizedEnvBase;
+        } else if (allowCrossOriginApi) {
+          return normalizedEnvBase;
         }
+      } catch {
+        // Keep fallback to same-origin /api when parsing fails.
       }
     }
 
