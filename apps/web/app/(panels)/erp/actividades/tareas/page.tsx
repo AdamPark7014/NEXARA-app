@@ -2,15 +2,12 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import ContextRail from "@/components/ui/ContextRail";
 import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
-import { resolveV2RoleKey } from "@/lib/user-access";
-import { ROLES } from "@/lib/rbac/roles";
 
 const OpsActivitiesBoard = dynamic(() => import("@/components/ops/OpsActivitiesBoard"), { ssr: false });
 
@@ -20,44 +17,31 @@ const RAIL = [
   { id: "servicios", label: "Servicios", href: "/erp/actividades/servicios" },
 ] as const;
 
-export default function ErpActividadesServiciosPage() {
+export default function ErpActividadesTareasPage() {
   const { user } = useUser();
-  const router = useRouter();
   const cfg = useMemo(() => getActivitiesSectionConfig(user), [user]);
-  const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
-  const canSeeServices = Boolean(
-    user?.isSuperAdmin || v2 === ROLES.CEO || v2 === ROLES.SUPER_ADMIN,
-  );
-
-  useEffect(() => {
-    if (user && !canSeeServices) {
-      router.replace("/erp/actividades/tareas");
-    }
-  }, [user, canSeeServices, router]);
-
-  if (user && !canSeeServices) return null;
 
   return (
     <>
       <ContextRail
         ariaLabel="Tipos de actividad"
-        items={RAIL.map((i) => ({ ...i, active: i.id === "servicios" }))}
+        items={RAIL.map((i) => ({ ...i, active: i.id === "tareas" }))}
       />
       <PageHeader
         eyebrow="ERP · Actividades"
-        title="Servicios"
-        subtitle="Con cliente corporativo (sin proyecto)."
+        title="Tareas"
+        subtitle="Sin proyecto ni cliente de servicio."
         actions={
           cfg.canCreate ? (
-            <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
+            <Link href="/ops/activities/new?mode=tarea" style={{ textDecoration: "none" }}>
               <Button variant="primary" size="sm">
-                Nueva de servicio
+                Nueva tarea
               </Button>
             </Link>
           ) : undefined
         }
       />
-      <OpsActivitiesBoard bucket="services" hideProjectSegments newHref="/ops/activities/new" />
+      <OpsActivitiesBoard bucket="daily" hideProjectSegments newHref="/ops/activities/new?mode=tarea" />
     </>
   );
 }
