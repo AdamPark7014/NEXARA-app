@@ -103,6 +103,7 @@ export default function OpsActivitiesBoard({
     setError(null);
     try {
       const res = await fetch(buildApiUrl("activities"), {
+        credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(await res.text().catch(() => "Error al cargar"));

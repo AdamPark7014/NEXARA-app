@@ -9,32 +9,24 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Core ola1 A+B+C+D (completo)
+## Este turno — Fix 401 pizarra / Core fetches
 
 ### Hecho
 
-1. **Fase A:** Core-only shell, menú ola1, home `/erp/pizarra`, seed `seed-core-roster.ts`, middleware NON_CORE → core.
-2. **Fase B:** `GET /api/me/board` + `/erp/pizarra` (semáforo company/subtree).
-3. **Fase C:** `/erp/asistencias` Equipo|Comidas|Trayectoria; attendance `scope=subtree`.
-4. **Fase D:** `/erp/actividades/{diarias|proyectos|servicios}`; `findAllScoped`; `fechaInicio <= fechaMaxima`.
-5. Merges A/B/CD → `mejora/calidad-y-web`. Seed OK (11 activos, 9 desactivados). `module-guides` tipado. `tsc` web+api OK. `npm run dev` arrancado.
-
-### Logins
-
-- CEO: `gerencia@nexara.com.mx` / `Nexara!NX001`
-- David: `operaciones@nexara.com.mx` / `Nexara!NX302`
-- Break-glass: `developer@nexara.com.mx` / `Nexara!NX002`
+1. Causa: cliente enviaba `Bearer session-cookie` (sentinel) **sin** `credentials: "include"` → la cookie HttpOnly `nexara_token` no viajaba a `:3001` → JWT guard 401.
+2. Fix: `credentials: "include"` en `erp-api.ts`, `ops-activities-api.ts`, `OpsActivitiesBoard.tsx`, `asistencias/page.tsx`.
+3. Pizarra: `formatApiError` en vez de JSON crudo.
 
 ### Verificar
 
-- http://127.0.0.1:3000/erp/pizarra · /erp/asistencias · /erp/actividades/diarias
-- David: sin servicios; subtree en board/asistencias
+- Hard refresh `/erp/pizarra` logueado como gerencia → grid semáforo (no 401).
+- Asistencias + actividades igual.
 
 ### A medias / siguiente
 
-- Ola E: módulos de otros encargados + instaladores campo
-- Borrar worktrees `C:\dev\apps\_worktrees\nexara-core-*` cuando Adam confirme
+- Ola E encargados/instaladores.
+- Worktrees core-* pendientes de borrar.
 
 ## No tocar
 
-Puente NAS. Credenciales. Plan file. No borrar código OPS/CRM.
+Puente NAS. Credenciales. Plan file.

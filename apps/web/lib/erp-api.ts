@@ -34,6 +34,8 @@ export async function erpFetch<T = unknown>(
 ): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
     ...init,
+    // Cookie HttpOnly `nexara_token` (Bearer suele ser sentinel `session-cookie`).
+    credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
