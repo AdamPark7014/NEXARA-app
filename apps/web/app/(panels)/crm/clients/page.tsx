@@ -1,19 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
 import CrmClientsPageLegacy from "./clients-legacy";
 
 /** En Core ola1 el panel CRM no tiene menú — la entrada oficial es /erp/clientes. */
 export default function CrmClientsPage() {
-  const router = useRouter();
-
   useEffect(() => {
-    if (CORE_SURFACE_ONLY) {
-      router.replace("/erp/clientes");
-    }
-  }, [router]);
+    if (!CORE_SURFACE_ONLY) return;
+    // Hard navigation: evita bucles si algún remap legacy interfiere con router.replace.
+    window.location.replace("/erp/clientes");
+  }, []);
 
   if (CORE_SURFACE_ONLY) {
     return (

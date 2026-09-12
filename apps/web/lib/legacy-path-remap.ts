@@ -182,8 +182,8 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/erp\/dashboard\/dashboard(\/?.*)$/, '/erp/dashboard'],
   [/^\/erp\/newsletter(\/?.*)$/, '/erp/news'],
   [/^\/erp\/warehouse\/stock(\/?.*)$/, '/erp/warehouse'],
-  [/^\/erp\/clients(\/.*)?$/, '/crm/clients'],
-  [/^\/erp\/clientes(\/.*)?$/, '/crm/clients'],
+  // Inglés legacy → Core Clientes (ya no mandar a CRM).
+  [/^\/erp\/clients(\/.*)?$/, '/erp/clientes'],
   [/^\/erp\/empleados(\/?.*)$/, '/erp/hr'],
 ];
 
@@ -197,11 +197,15 @@ function joinRemapTarget(target: string, rest: string): string {
  * `apps/web/app/(panels)/*`.
  */
 export function remapLegacySlugs(pathname: string): string {
-  // Core ola1 canónicas en ES — evaluar ANTES de CROSS_PANEL (asistencia vs asistencias).
+  // Core ola1 canónicas en ES — evaluar ANTES de CROSS_PANEL / SEGMENT_ALIASES.
   if (pathname === '/erp/asistencias' || pathname.startsWith('/erp/asistencias/')) {
     return pathname;
   }
   if (pathname === '/erp/actividades' || pathname.startsWith('/erp/actividades/')) {
+    return pathname;
+  }
+  // Clientes Core: no traducir "clientes"→"clients" ni mandar a /crm/clients.
+  if (pathname === '/erp/clientes' || pathname.startsWith('/erp/clientes/')) {
     return pathname;
   }
 
