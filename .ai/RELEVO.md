@@ -2,37 +2,32 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-11
-- **Rama:** mejora/calidad-y-web
+- **Rama:** cursor/core-ola1-b
 - **HEAD:** (cerrar)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Local up (migrate + seed + dev)
+## Este turno — Fase B: pizarra + team board API
 
 ### Hecho
 
-1. **Postgres local:** servicio Windows `postgresql-x64-17` en `localhost:5432` / db `nexara_db` (Docker Desktop NO necesario; daemon down).
-2. **Migrate:** `prisma migrate deploy` aplicó `20260911190000_user_module_access` (171 migraciones OK).
-3. **Seed:** `prisma db seed` (demo-users) — 17 usuarios actualizados; login OK gerencia/soporte/etc.
-4. **Dev stack:** `npm run dev` (turbo api+web) corriendo en background.
-   - API `http://127.0.0.1:3001` — `/api/health/live` + `/api/health/ready` 200 (DB up).
-   - Web `http://127.0.0.1:3000` — `/` y `/login` 200.
-5. Demo: `gerencia@nexara.com.mx` / `Nexara!NX001`
+1. **TeamBoardService** (`apps/api/src/me/team-board.service.ts`): scope company (CEO/superAdmin/roleKey ceo / emails gerencia|developer) vs subtree por `managerId`; status semáforo desde Activity abierta + Attendance hoy + GPS (`LocationTracking`) reciente; `currentActivity` con AN/bucket.
+2. **Nest:** `MeModule` registra servicio + PrismaModule; `GET me/board` en `MeController` (JWT + companyId).
+3. **Web:** `apps/web/app/(panels)/erp/pizarra/page.tsx` grid semáforo + `apps/web/lib/team-board-api.ts`.
+4. No se tocó access-matrix (Agent A). No se crearon páginas asistencias/actividades.
 
-### Verificar (manual Adam)
+### Verificar
 
-- `/erp/users` → editar Juanito → cambiar Actividades a Entrega → guardar → re-login y ver menú OPS.
-- Rol sigue siendo techo.
+- `GET /api/me/board` con Bearer JWT (gerencia = scope company).
+- Web: `/erp/pizarra` (ruta; menú lo registra Agent A).
 
 ### A medias / siguiente
 
-- Opcional: mismo árbol al editar plantillas de rol (ola 2).
-- Ampliar privilegios por encima del rol = no en esta ola.
-- `/api/health` full puede 500 en local si Redis/disk fallan; usar `/live` + `/ready`.
+- Agent A: registrar módulo/ruta pizarra en shell/access-matrix si aún no.
+- Merge de olas cuando A/B/CD listos.
 
 ## No tocar
 
-Puente NAS. Credenciales. Plan acomodado. No fingir EN VIVO.
-Docker Desktop opcional (Postgres Windows ya cubre local).
+Puente NAS. Credenciales. Worktrees A/CD. Plan acomodado. No fingir EN VIVO.
