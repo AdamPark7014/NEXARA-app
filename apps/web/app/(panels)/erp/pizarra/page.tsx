@@ -58,7 +58,7 @@ function Avatar({ url, name, size = 80 }: { url: string | null; name: string; si
   );
 }
 
-function PersonCard({ user }: { user: TeamBoardUser }) {
+function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean }) {
   const color = STATUS_COLORS[user.status];
   const act = user.currentActivity;
   const open = user.openActivities ?? [];
@@ -72,8 +72,12 @@ function PersonCard({ user }: { user: TeamBoardUser }) {
         gap: 12,
         padding: "22px 14px 16px",
         borderRadius: 20,
-        border: "1px solid var(--border)",
-        background: "var(--surface)",
+        border: isSelf
+          ? "2px solid color-mix(in srgb, var(--primary) 55%, var(--border))"
+          : "1px solid var(--border)",
+        background: isSelf
+          ? "color-mix(in srgb, var(--primary) 6%, var(--surface))"
+          : "var(--surface)",
         textDecoration: "none",
         color: "inherit",
         boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
@@ -109,6 +113,20 @@ function PersonCard({ user }: { user: TeamBoardUser }) {
         >
           {user.nombre}
         </div>
+        {isSelf ? (
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: 11,
+              fontWeight: 750,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: "var(--primary)",
+            }}
+          >
+            Tú
+          </div>
+        ) : null}
         <div
           style={{
             marginTop: 4,
@@ -183,7 +201,7 @@ function PersonCard({ user }: { user: TeamBoardUser }) {
 }
 
 export default function PizarraPage() {
-  const { token } = useUser();
+  const { token, user } = useUser();
   const [data, setData] = useState<TeamBoardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,7 +234,16 @@ export default function PizarraPage() {
     return () => window.clearInterval(id);
   }, [token, load]);
 
-  const users = data?.users ?? [];
+  const users = useMemo(() => {
+    const list = data?.users ?? [];
+    const me = user?.id;
+    if (me == null) return list;
+    return [...list].sort((a, b) => {
+      if (a.id === me) return -1;
+      if (b.id === me) return 1;
+      return 0;
+    });
+  }, [data?.users, user?.id]);
   const counts = useMemo(() => {
     const acc: Partial<Record<BoardUserStatus, number>> = {};
     for (const u of users) acc[u.status] = (acc[u.status] ?? 0) + 1;
@@ -229,7 +256,7 @@ export default function PizarraPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>Actividades</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            Toca a alguien para ver su día o asignarle trabajo
+            Tú y tu equipo — toca a alguien para ver su día o asignarle trabajo
           </p>
         </div>
         <button
@@ -288,7 +315,7 @@ export default function PizarraPage() {
           }}
         >
           {users.map((u) => (
-            <PersonCard key={u.id} user={u} />
+            <PersonCard key={u.id} user={u} isSelf={u.id === user?.id} />
           ))}
         </div>
       )}

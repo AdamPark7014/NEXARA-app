@@ -219,12 +219,19 @@ export class TeamBoardService {
       ? allActive
       : allActive.filter((u) => this.subtreeIds(viewer.id, allActive).has(u.id));
 
-    // Pizarra = gestión del equipo: no mostrar al CEO Christian ni al propio viewer.
-    scoped = scoped.filter(
-      (u) =>
-        u.id !== viewer.id &&
-        u.email.toLowerCase() !== 'gerencia@nexara.com.mx',
-    );
+    // Nunca mostrar al CEO Christian en la pizarra de nadie.
+    scoped = scoped.filter((u) => u.email.toLowerCase() !== 'gerencia@nexara.com.mx');
+
+    // Company-wide (CEO/developer): pizarra = equipo ajeno.
+    // Encargados/subtree: SÍ incluir al viewer para ver lo que Christian (u otros) les asignan.
+    if (companyWide) {
+      scoped = scoped.filter((u) => u.id !== viewer.id);
+    } else {
+      scoped = [
+        ...scoped.filter((u) => u.id === viewer.id),
+        ...scoped.filter((u) => u.id !== viewer.id),
+      ];
+    }
 
     return { companyWide, scoped, now: new Date() };
   }
