@@ -9,33 +9,30 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Encargo: Ejecución directa vs Despacho
+## Este turno — Foto de entrada rota (Equipo del día)
 
 ### Hecho
 
-Al asignar a David / Antonio / Luis / Josué (encargados), Christian elige:
+Causa: `resolveAssetUrl` → `getApiAssetOrigin()` en local caía a `NEXT_PUBLIC_API_URL` (`:3001`). El `<img>` pedía la foto cross-origin sin cookie de sesión → **401** → icono roto. El archivo en disco sí existía (`uploads/attendance/...`).
 
-1. **Ejecución directa** — la hace él personalmente.
-2. **Despacho a equipo** — él coordina y la asigna a subordinados.
+Fix: en local (`localhost` / `127.0.0.1` / `*.localhost`) `getApiAssetOrigin()` usa `window.location.origin` (same-origin → rewrite Next `/uploads` → API con cookie).
 
-- Campo `Activity.assignmentCharge` (`ejecucion` | `despacho`) + migración.
-- Paso «2 · Encargo» en `/erp/pizarra/[id]/asignar`.
-- Badge en historial / tarjetas de pizarra.
+Archivo: `apps/web/lib/api-base.ts`.
 
 ### Verificar
 
-1. **Reiniciar API** (`prisma generate` falló EPERM mientras nest tiene el DLL).
-2. Como Christian → asignar a David → elegir Ejecución o Despacho → crear.
-3. Ver badge en perfil / pizarra.
+1. Hard refresh `/erp/asistencias` (sesión abierta).
+2. En la tarjeta de quien tiene entrada, la miniatura debe verse (no icono roto).
+3. Network: request a `http://localhost:3000/uploads/attendance/...` → **200**, no a `:3001`.
 
 ## A medias
 
-Nada (salvo reinicio API para Prisma client).
+Nada.
 
 ## Siguiente
 
-Lo que Adam diga.
+Lo que Adam diga. (Pendiente previo: reinicio API si Prisma client no tiene `assignmentCharge`.)
 
 ## No tocar
 
-Puente NAS. Plan file.
+Puente NAS. Plan files bajo `.cursor/plans/`.

@@ -136,6 +136,12 @@ export const getApiAssetOrigin = () => {
       return `${protocol}//${host}:${WEB_API_PORT}`;
     }
 
+    // Local: same-origin so <img src="/uploads/..."> hits Next rewrite with session cookie.
+    // Pointing at :3001 (NEXT_PUBLIC_API_URL) is cross-origin → cookie missing → 401 → broken photo.
+    if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost")) {
+      return window.location.origin;
+    }
+
     if (
       host === "nexara.com.mx" ||
       host === "www.nexara.com.mx" ||
