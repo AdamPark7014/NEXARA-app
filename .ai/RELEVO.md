@@ -9,20 +9,18 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Tareas: fix 404 Diarias
+## Este turno — Fix 400 Asistencias
 
 ### Hecho
 
-1. Página canónica **Tareas**: `/erp/actividades/tareas` (sidebar label Tareas).
-2. Redirects legacy: `actividades/diarias`, `activities/diarias`, `activities/tareas`, `activities/projects`, `activities/servicios`.
-3. **Bug raíz:** `legacy-path-remap` traducía `actividades→activities` y `proyectos→projects` → 404. Ahora `/erp/actividades/*` se preserva.
-4. page-matrix + url-matrix incluyen aliases EN.
+1. Bug: regex `/erp/asistencia(\/?.*)` matcheaba **asistencias** → `/erp/hr/attendances`.
+2. Esa URL caía en `hr/[id]` con id=`attendances` → API `/users/attendances` → 400.
+3. Fix: preservar `/erp/asistencias`; regex `asistencia(\/.*)?`; redirect `/erp/hr/attendances` → Core.
 
 ### Verificar
 
-- Hard refresh (Ctrl+Shift+R) — el 308 viejo puede estar cacheado en Chrome.
-- Menú Actividades → **Tareas** → debe cargar board (no 404).
-- URL canónica: `http://127.0.0.1:3000/erp/actividades/tareas`
+- Hard refresh → menú **Asistencias** → `http://127.0.0.1:3000/erp/asistencias` (tabs Equipo/Comidas/Trayectoria).
+- No debe aparecer breadcrumb RRHH/Attendances ni sidebar vacío.
 
 ## No tocar
 

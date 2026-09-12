@@ -71,7 +71,8 @@ const SEGMENT_ALIASES: Record<string, string> = {
 
 const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   // ── /panel/* (portal legacy) ───────────────────────────────────────────
-  [/^\/panel\/asistencia(\/?.*)$/, '/erp/hr/attendance'],
+  // (\ /.*)? — NO (\ /?.*) : evita que /asistencias (plural Core) matchee /asistencia + "s"
+  [/^\/panel\/asistencia(\/.*)?$/, '/erp/hr/attendance'],
   [/^\/panel\/vehiculos(\/?.*)$/, '/ops/vehicles'],
   [/^\/panel\/herramientas(\/?.*)$/, '/ops/tools'],
   [/^\/panel\/actividades(\/?.*)$/, '/ops/activities'],
@@ -102,7 +103,7 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/core\/catalogo(\/?.*)$/, '/crm/products'],
   [/^\/core\/empleados(\/?.*)$/, '/erp/hr'],
   [/^\/core\/nomina(\/?.*)$/, '/erp/finance/employee-payments'],
-  [/^\/core\/asistencia(\/?.*)$/, '/erp/hr/attendance'],
+  [/^\/core\/asistencia(\/.*)?$/, '/erp/hr/attendance'],
   [/^\/core\/cvs(\/?.*)$/, '/ops/recruiting'],
   [/^\/core\/sanciones(\/?.*)$/, '/erp/hr/fines'],
   [/^\/core\/usuarios(\/?.*)$/, '/erp/users'],
@@ -136,7 +137,7 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/ops\/evidencias(\/?.*)$/, '/ops/activities?tab=evidencias'],
   [/^\/ops\/mis-evidencias(\/?.*)$/, '/ops/my-activities?tab=evidencias'],
   [/^\/ops\/mis-viaticos(\/?.*)$/, '/ops/my-viatics'],
-  [/^\/ops\/asistencia(\/?.*)$/, '/erp/hr/attendance'],
+  [/^\/ops\/asistencia(\/.*)?$/, '/erp/hr/attendance'],
   [/^\/ops\/mis-vehiculos(\/?.*)$/, '/ops/my-vehicles'],
   [/^\/ops\/soporte(\/?.*)$/, '/ops/support'],
   [/^\/ops\/mantenimiento(\/?.*)$/, '/ops/maintenance'],
@@ -152,8 +153,10 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/erp\/multas(\/?.*)$/, '/erp/hr/fines'],
   [/^\/erp\/fines(\/?.*)$/, '/erp/hr/fines'],
   [/^\/erp\/sanciones(\/?.*)$/, '/erp/hr/fines'],
-  [/^\/erp\/asistencia(\/?.*)$/, '/erp/hr/attendance'],
-  [/^\/erp\/attendance(\/?.*)$/, '/erp/hr/attendance'],
+  [/^\/erp\/asistencia(\/.*)?$/, '/erp/hr/attendance'],
+  [/^\/erp\/attendance(\/.*)?$/, '/erp/hr/attendance'],
+  // Typo/caché 308: plural mal formado por el regex viejo
+  [/^\/erp\/hr\/attendances(\/.*)?$/, '/erp/asistencias'],
   [/^\/erp\/lunch-breaks(\/?.*)$/, '/erp/hr/lunch-breaks'],
   [/^\/erp\/my-lunch-breaks(\/?.*)$/, '/erp/hr/lunch-breaks'],
   [/^\/erp\/my-vacation(\/?.*)$/, '/erp/hr/attendance'],
@@ -194,17 +197,19 @@ function joinRemapTarget(target: string, rest: string): string {
  * `apps/web/app/(panels)/*`.
  */
 export function remapLegacySlugs(pathname: string): string {
+  // Core ola1 canónicas en ES — evaluar ANTES de CROSS_PANEL (asistencia vs asistencias).
+  if (pathname === '/erp/asistencias' || pathname.startsWith('/erp/asistencias/')) {
+    return pathname;
+  }
+  if (pathname === '/erp/actividades' || pathname.startsWith('/erp/actividades/')) {
+    return pathname;
+  }
+
   for (const [pattern, target] of CROSS_PANEL_REMAPS) {
     const match = pathname.match(pattern);
     if (!match) continue;
     const rest = match[1] || '';
     return joinRemapTarget(target, rest);
-  }
-
-  // Core ola1: buckets viven en ES (/erp/actividades/tareas|proyectos|servicios).
-  // El alias actividades→activities / proyectos→projects los manda a 404.
-  if (pathname === '/erp/actividades' || pathname.startsWith('/erp/actividades/')) {
-    return pathname;
   }
 
   const segments = pathname.split('/').filter(Boolean);
