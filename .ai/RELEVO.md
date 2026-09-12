@@ -9,25 +9,27 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Foto entrada sigue rota
+## Este turno — Trayecto GPS jerárquico + fotos
 
 ### Hecho
 
-Causa real (tras el fix parcial de `getApiAssetOrigin`):
+1. **Sin trayecto de David hoy (dato real):** su entrada tiene `entryLatitude/Longitude = null` y 0 filas en `locationTracking`. No es un bug de UI: la checada no guardó GPS. Mensaje clarificado en `GpsTrajectoryPreview`.
 
-1. `/uploads` + cookie vía rewrite Next → API **sí funciona** (probado 200).
-2. Archivo existe: `/uploads/attendance/1789240640561-s9rxke6e5.jpg`.
-3. En **SSR**, `getApiAssetOrigin()` no ve `window` y cae a `NEXT_PUBLIC_API_URL` → `http://localhost:3001`. El `<img>` arranca cross-origin **sin cookie** → 401.
+2. **Quién ve trayecto**
+   - Dirección (`GPS_MANAGE`: Christian / dirs): propio + cualquiera.
+   - Encargados (`ATTENDANCE_MANAGE` sin `GPS_MANAGE`): **solo subordinados** (`managerId` subtree). **No** ven el propio.
+   - Campo (`GPS_VIEW` sin manage): solo el propio.
 
-Fix: `resolveAssetUrl()` para rutas `/uploads/...` devuelve **path relativo** (nunca origen API). Misma estrategia que el historial del checador.
+3. **UI:** panel «GPS del día» oculto en tarjeta propia de encargados; pestaña Trayectoria sin «Mi trayecto» para ellos. `SessionImage` carga fotos `/uploads` con `credentials: include` (cookie HttpOnly).
 
-Archivos: `apps/web/lib/evidence-display.ts` (+ `api-base.ts` local same-origin del turno anterior).
+Archivos: `gps.service.ts`, `gps.controller.ts`, `asistencias/page.tsx`, `AttendanceGpsDayPanel.tsx`, `SessionImage.tsx`, `GpsTrajectoryPreview.tsx`, `attendance.service.ts` (`??` coords).
 
 ### Verificar
 
-1. **Hard refresh** (Ctrl+Shift+R) en `/erp/asistencias`.
-2. Miniatura de entrada en tarjeta de David debe verse.
-3. Network: `GET /uploads/attendance/...` en origen `:3000` → **200**.
+1. **Reiniciar API** (Nest) para cargar `gps.service`.
+2. Hard refresh Asistencias.
+3. Como Christian: foto de entrada de David vía SessionImage; GPS del día explica si no hay coords.
+4. Como David: sin «Mi trayecto»; sí puede abrir GPS del día en subordinados (cuando tengan puntos).
 
 ## A medias
 
@@ -35,7 +37,7 @@ Nada.
 
 ## Siguiente
 
-Lo que Adam diga.
+Si quieren trayecto real: al fichar hay que conceder ubicación (coords en la entrada). Consentimiento de rastreo continuo es aparte (`PATCH /gps/consent`).
 
 ## No tocar
 

@@ -45,7 +45,7 @@ export default function GpsTrajectoryPreview({ trajectory, attendances, compact 
   if (trajectory.length === 0 && routePoints.length === 0) {
     return (
       <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", padding: "8px 0" }}>
-        Sin puntos GPS registrados este día.
+        Sin trayecto: la checada no guardó GPS (permiso denegado o ubicación apagada) y no hay puntos de recorrido del día.
       </div>
     );
   }

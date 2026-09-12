@@ -193,6 +193,39 @@ export class GpsService {
     });
   }
 
+  /** Viewer + descendientes por managerId (mismo criterio que asistencia subtree). */
+  private async getManagerSubtreeIds(
+    rootId: number,
+    companyId?: number | null,
+  ): Promise<Set<number>> {
+    const tenantId = requireCompanyId(companyId);
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        companyMemberships: { some: { companyId: tenantId } },
+      },
+      select: { id: true, managerId: true },
+    });
+    const children = new Map<number, number[]>();
+    for (const u of users) {
+      if (u.managerId == null) continue;
+      const list = children.get(u.managerId) ?? [];
+      list.push(u.id);
+      children.set(u.managerId, list);
+    }
+    const out = new Set<number>([rootId]);
+    const queue = [rootId];
+    while (queue.length) {
+      const id = queue.shift()!;
+      for (const child of children.get(id) ?? []) {
+        if (out.has(child)) continue;
+        out.add(child);
+        queue.push(child);
+      }
+    }
+    return out;
+  }
+
   async getTrajectoryForUser(
     requester: {
       id: number;
@@ -204,33 +237,36 @@ export class GpsService {
     date?: string,
     companyId?: number | null,
   ) {
-    const canSeeOthersLive =
-      requester.isSuperAdmin ||
-      requester.permissions?.includes(PERMISSIONS.GPS_MANAGE) ||
-      requester.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+    const perms = requester.permissions ?? [];
+    const isDirGps =
+      Boolean(requester.isSuperAdmin) ||
+      perms.includes(PERMISSIONS.GPS_MANAGE) ||
+      perms.includes(PERMISSIONS.CONSOLE_ADMIN);
+    const isTeamManager = perms.includes(PERMISSIONS.ATTENDANCE_MANAGE);
+    const hasGpsView = perms.includes(PERMISSIONS.GPS_VIEW);
+    const isSelf = targetUserId === requester.id;
 
-    if (targetUserId !== requester.id && !canSeeOthersLive) {
-      throw new ForbiddenException('No tienes permisos para ver el trayecto de otro usuario');
+    // Propio trayecto: dirección sí; campo (GPS_VIEW sin manage) sí; encargados no.
+    if (isSelf) {
+      if (isDirGps || (hasGpsView && !isTeamManager)) {
+        return this.getMyTrajectory(targetUserId, date, companyId);
+      }
+      throw new ForbiddenException('Los encargados no pueden ver su propio trayecto GPS');
     }
 
-    if (targetUserId !== requester.id) {
-      const target = await this.prisma.user.findUnique({
-        where: { id: targetUserId },
-        select: { id: true, departmentId: true, locationConsent: true },
-      });
-      if (!target) return [];
-      if (
-        !requester.isSuperAdmin &&
-        !requester.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) &&
-        !requester.permissions?.includes(PERMISSIONS.GPS_MANAGE) &&
-        requester.departmentId &&
-        target.departmentId !== requester.departmentId
-      ) {
-        throw new ForbiddenException('No puedes ver usuarios de otro departamento');
+    // Ajenos: dirección company-wide; encargados solo subordinados (managerId).
+    if (isDirGps) {
+      return this.getMyTrajectory(targetUserId, date, companyId);
+    }
+
+    if (isTeamManager) {
+      const tree = await this.getManagerSubtreeIds(requester.id, companyId);
+      if (tree.has(targetUserId)) {
+        return this.getMyTrajectory(targetUserId, date, companyId);
       }
     }
 
-    return this.getMyTrajectory(targetUserId, date, companyId);
+    throw new ForbiddenException('No tienes permisos para ver el trayecto de este usuario');
   }
 
   /**
