@@ -9,18 +9,20 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Fix 400 Asistencias
+## Este turno — UI Asistencias más intuitiva
 
 ### Hecho
 
-1. Bug: regex `/erp/asistencia(\/?.*)` matcheaba **asistencias** → `/erp/hr/attendances`.
-2. Esa URL caía en `hr/[id]` con id=`attendances` → API `/users/attendances` → 400.
-3. Fix: preservar `/erp/asistencias`; regex `asistencia(\/.*)?`; redirect `/erp/hr/attendances` → Core.
+1. Cards estilo Pizarra: avatar iniciales + punto de estado + badge (En jornada / Completó / Ausente).
+2. Bloque Entrada / Salida / Tiempo legible.
+3. Chips + KPIs clickables para filtrar.
+4. Orden: presentes → completos → ausentes; link a pizarra persona.
+5. Comidas con pill y borde de estado.
 
 ### Verificar
 
-- Hard refresh → menú **Asistencias** → `http://127.0.0.1:3000/erp/asistencias` (tabs Equipo/Comidas/Trayectoria).
-- No debe aparecer breadcrumb RRHH/Attendances ni sidebar vacío.
+- `/erp/asistencias` → filtrar por Ausentes / En jornada.
+- Click nombre → pizarra.
 
 ## No tocar
 
