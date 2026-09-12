@@ -40,6 +40,16 @@ export class TeamBoardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getBoard(viewer: Viewer, companyId: number | null): Promise<TeamBoardResponse> {
+    let email = viewer.email ?? null;
+    if (!email && !viewer.isSuperAdmin && viewer.roleKey !== 'ceo') {
+      const row = await this.prisma.user.findUnique({
+        where: { id: viewer.id },
+        select: { email: true },
+      });
+      email = row?.email ?? null;
+    }
+    const viewerResolved: Viewer = { ...viewer, email };
+
     const companyScope = companyId
       ? { companyMemberships: { some: { companyId } } }
       : {};
@@ -57,7 +67,7 @@ export class TeamBoardService {
       orderBy: { nombre: 'asc' },
     });
 
-    const companyWide = this.isCompanyWide(viewer);
+    const companyWide = this.isCompanyWide(viewerResolved);
     const scoped = companyWide
       ? allActive
       : allActive.filter((u) => this.subtreeIds(viewer.id, allActive).has(u.id));
@@ -66,9 +76,14 @@ export class TeamBoardService {
     const today = now.toLocaleDateString('sv-SE'); // YYYY-MM-DD
     const dayStart = new Date(`${today}T00:00:00`);
     const dayEnd = new Date(`${today}T23:59:59.999`);
+    const gpsSince = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
     const userIds = scoped.map((u) => u.id);
-    const [activities, attendances] = await Promise.all([
+    if (userIds.length === 0) {
+      return { scope: companyWide ? 'company' : 'subtree', users: [] };
+    }
+
+    const [activities, attendances, locationTrackings] = await Promise.all([
       this.prisma.activity.findMany({
         where: {
           responsableId: { in: userIds },
@@ -104,9 +119,20 @@ export class TeamBoardService {
         },
         select: { userId: true },
       }),
+      this.prisma.locationTracking.findMany({
+        where: {
+          usuarioId: { in: userIds },
+          OR: [{ estaActivo: true }, { ultimaActualizacion: { gte: gpsSince } }],
+          ...(companyId != null ? { companyId } : {}),
+        },
+        select: { usuarioId: true },
+      }),
     ]);
 
-    const checkedIn = new Set(attendances.map((a) => a.userId));
+    const present = new Set<number>([
+      ...attendances.map((a) => a.userId),
+      ...locationTrackings.map((lt) => lt.usuarioId),
+    ]);
     const activityByUser = new Map<number, (typeof activities)[number]>();
     for (const a of activities) {
       if (!activityByUser.has(a.responsableId)) activityByUser.set(a.responsableId, a);
@@ -126,13 +152,9 @@ export class TeamBoardService {
           titulo: act.titulo,
           estatus: act.estatus,
           fechaMaxima: act.fechaMaxima,
-          bucket: act.projectId
-            ? 'projects'
-            : act.clientId
-              ? 'services'
-              : 'daily',
+          bucket: act.projectId ? 'projects' : act.clientId ? 'services' : 'daily',
         };
-      } else if (!checkedIn.has(u.id)) {
+      } else if (!present.has(u.id)) {
         status = 'inactivo';
       }
 
