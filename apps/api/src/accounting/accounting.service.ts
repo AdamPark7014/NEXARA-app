@@ -2840,6 +2840,10 @@ export class AccountingService {
     return this.satService.validateRfc(rfc);
   }
 
+  lookupFiscalByRfc(rfc: string) {
+    return this.satService.lookupFiscalByRfc(rfc);
+  }
+
   /** Consulta estatus de un CFDI en el SAT (API REST pública). */
   async queryCfdiStatus(invoiceId: number, companyId?: number | null) {
     const invoice = await this.prisma.invoice.findFirst({

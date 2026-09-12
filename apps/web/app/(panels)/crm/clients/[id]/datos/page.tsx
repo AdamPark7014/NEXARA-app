@@ -12,6 +12,7 @@ import { DetailError, DetailField, DetailFieldGrid, DetailSection } from "@/comp
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { toast } from "@/components/Toast";
 import PhoneField from "@/components/PhoneField";
+import FiscalRfcLookup from "@/components/FiscalRfcLookup";
 
 const INDUSTRIES = ["Corporativo", "Gobierno", "PyME", "Hogar", "Retail", "Industrial", "Educación", "Salud", "Otro"];
 const ESTADOS = ["Activo", "Inactivo", "Prospecto"];
@@ -84,9 +85,7 @@ export default function ClientDatosPage() {
           {([
             { label: "Nombre comercial *", key: "name", ph: "Marca o alias", span: true },
             { label: "Razón social", key: "legalName", ph: "Empresa S.A. de C.V.", span: true },
-            { label: "RFC", key: "taxId", ph: "ABC123456XYZ0" },
             { label: "CP fiscal (CFDI)", key: "fiscalZipCode", ph: "64000" },
-            { label: "Régimen fiscal", key: "fiscalRegime", ph: "601" },
             { label: "Sitio web", key: "website", ph: "https://www.empresa.com" },
             { label: "Email facturación", key: "billingEmail", ph: "facturación@empresa.com" },
             { label: "Dirección fiscal", key: "fiscalAddress", ph: "Calle, Col., CP, Estado", span: true },
@@ -96,6 +95,24 @@ export default function ClientDatosPage() {
               <input value={(form as Record<string, string>)[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} placeholder={ph} style={inp} />
             </div>
           ))}
+          <div style={{ gridColumn: "1 / -1" }}>
+            <FiscalRfcLookup
+              token={token}
+              rfc={form.taxId}
+              onRfcChange={(taxId) => setForm((f) => ({ ...f, taxId }))}
+              fiscalRegime={form.fiscalRegime}
+              onRegimeChange={(fiscalRegime) => setForm((f) => ({ ...f, fiscalRegime }))}
+              disabled={saving}
+              onApply={(data) =>
+                setForm((f) => ({
+                  ...f,
+                  legalName: data.legalName?.trim() ? data.legalName : f.legalName,
+                  fiscalZipCode: data.fiscalZipCode?.trim() ? data.fiscalZipCode : f.fiscalZipCode,
+                  fiscalRegime: data.fiscalRegime || f.fiscalRegime,
+                }))
+              }
+            />
+          </div>
           <div>
             <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Teléfono</label>
             <PhoneField value={form.billingPhone} onChange={(billingPhone) => setForm((f) => ({ ...f, billingPhone }))} placeholder="+52 222 555 1234" style={inp} />
