@@ -126,6 +126,11 @@ export class CreateActivityDto {
   @IsString()
   coreKind?: string;
 
+  /** Encargo: ejecucion (la hace el responsable) | despacho (la reparte a su equipo) */
+  @IsOptional()
+  @IsString()
+  assignmentCharge?: string;
+
   /** Fotos de evidencia exigidas (2–8). */
   @IsOptional()
   @IsInt()

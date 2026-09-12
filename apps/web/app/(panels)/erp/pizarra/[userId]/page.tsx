@@ -17,6 +17,7 @@ import {
   type TeamBoardUser,
 } from "@/lib/team-board-api";
 import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
+import { labelForAssignmentCharge } from "@/lib/activity-kinds";
 
 function initials(name: string): string {
   return name
@@ -254,6 +255,7 @@ export default function PizarraPersonaPage() {
             const open = expandedId === h.id;
             const ev = h.evidence;
             const labels = digitalFormLabels(h.coreKind);
+            const chargeLabel = labelForAssignmentCharge(h.assignmentCharge);
             const formData =
               ev?.serviceSheetData && typeof ev.serviceSheetData === "object"
                 ? (ev.serviceSheetData as Record<string, string>)
@@ -289,6 +291,7 @@ export default function PizarraPersonaPage() {
                     {h.estatus}
                     {ev ? ` · avance ${ev.progressPct}%` : ""}
                     {h.coreKind ? ` · ${h.coreKind}` : ""}
+                    {chargeLabel ? ` · ${chargeLabel.badge}` : ""}
                   </div>
                 </button>
                 {open && ev ? (

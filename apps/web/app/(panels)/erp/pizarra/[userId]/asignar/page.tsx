@@ -7,6 +7,9 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import {
   ACTIVITY_KINDS,
+  ASSIGNMENT_CHARGES,
+  canOfferAssignmentCharge,
+  dispatchPoolEmails,
   extrasEmailsForKind,
   isServicioBridgeEmail,
   kindsForAssignment,
@@ -15,6 +18,7 @@ import {
   servicioDelegateEmails,
   servicioShouldGoToBridge,
   type ActivityKind,
+  type AssignmentCharge,
 } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -70,6 +74,7 @@ export default function AsignarActividadPage() {
   const userId = Number(params?.userId);
 
   const [kind, setKind] = useState<ActivityKind | null>(null);
+  const [charge, setCharge] = useState<AssignmentCharge | null>(null);
   const [person, setPerson] = useState<TeamBoardUser | null>(null);
   const [roster, setRoster] = useState<TeamBoardUser[]>([]);
   const [boardUsers, setBoardUsers] = useState<TeamBoardUser[]>([]);
@@ -93,6 +98,9 @@ export default function AsignarActividadPage() {
   );
 
   const kindMeta = kind ? metaForKind(kind) : null;
+  const offerCharge = canOfferAssignmentCharge(person?.email);
+  const chargeReady = !offerCharge || charge != null;
+  const chargeMeta = charge ? ASSIGNMENT_CHARGES[charge] : null;
 
   const bridgeNeeded =
     kind === "servicio" &&
@@ -114,12 +122,28 @@ export default function AsignarActividadPage() {
       const allow = new Set(servicioDelegateEmails());
       return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
     }
+    // Despacho: solo subordinados típicos del encargado.
+    if (charge === "despacho") {
+      const pool = dispatchPoolEmails(person?.email);
+      if (pool.length) {
+        const allow = new Set(pool.map((e) => e.toLowerCase()));
+        return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
+      }
+    }
     // Servicio → soporte · Obra → instaladores · Proyecto → ambos · resto → todos.
     const pool = extrasEmailsForKind(kind);
     if (!pool) return roster;
     const allow = new Set(pool.map((e) => e.toLowerCase()));
     return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
-  }, [kind, person?.email, roster]);
+  }, [kind, person?.email, roster, charge]);
+
+  useEffect(() => {
+    setCharge(null);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!offerCharge) setCharge(null);
+  }, [offerCharge]);
 
   const load = useCallback(async () => {
     if (!token || !Number.isFinite(userId)) return;
@@ -322,6 +346,56 @@ export default function AsignarActividadPage() {
         </p>
       </section>
 
+      {kind && offerCharge && !bridgeNeeded ? (
+        <section>
+          <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
+            2 · Encargo a {displayName.split(/\s+/).slice(0, 2).join(" ")}
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {(Object.keys(ASSIGNMENT_CHARGES) as AssignmentCharge[]).map((id) => {
+              const opt = ASSIGNMENT_CHARGES[id];
+              const selected = charge === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setCharge(id)}
+                  style={{
+                    textAlign: "left",
+                    padding: "14px 14px",
+                    borderRadius: 16,
+                    border: selected ? "2px solid var(--primary)" : "1px solid var(--border)",
+                    background: selected
+                      ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
+                      : "var(--surface)",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    color: "inherit",
+                    minHeight: 96,
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{opt.title}</div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                    {opt.help}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+            <strong>Ejecución directa</strong>: la hace él. <strong>Despacho a equipo</strong>: él la
+            coordina y la asigna a alguien de su subordinación (puedes dejarla pendiente o sumar ya al
+            ejecutor abajo).
+          </p>
+        </section>
+      ) : null}
+
       {bridgeNeeded && (
         <div
           role="status"
@@ -364,7 +438,7 @@ export default function AsignarActividadPage() {
         </div>
       )}
 
-      {kindMeta && !bridgeNeeded ? (
+      {kindMeta && !bridgeNeeded && chargeReady ? (
         <>
           <section
             style={{
@@ -375,10 +449,13 @@ export default function AsignarActividadPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-              2 · Equipo extra (opcional)
+              {offerCharge ? "3" : "2"} · Equipo{" "}
+              {charge === "despacho" ? "(ejecutor / apoyo)" : "extra (opcional)"}
             </div>
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
-              {kind === "servicio" && isServicioBridgeEmail(person?.email)
+              {charge === "despacho"
+                ? `Como despacho, suma a quien debe ejecutarla bajo ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Si no eliges a nadie, queda pendiente de que él la asigne.`
+                : kind === "servicio" && isServicioBridgeEmail(person?.email)
                 ? "Como puente, suma a Carolina o Alejandro (día/hora ya van en el formulario)."
                 : kind === "servicio"
                   ? "Solo soporte (Antonio, Carolina, Alejandro)."
@@ -386,7 +463,9 @@ export default function AsignarActividadPage() {
                     ? "Solo instaladores de campo (Joan, Israel, Juan José)."
                     : kind === "proyecto"
                       ? "Soporte e instaladores pueden colaborar en el proyecto."
-                      : `El responsable es ${displayName}. Puedes sumar apoyo.`}
+                      : charge === "ejecucion"
+                        ? `Ejecución directa de ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Puedes sumar apoyo opcional.`
+                        : `El responsable es ${displayName}. Puedes sumar apoyo.`}
             </p>
             {teamForExtras.length === 0 ? (
               <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
@@ -533,12 +612,14 @@ export default function AsignarActividadPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 12, color: "var(--text-secondary)" }}>
-              3 · {kindMeta.emoji} {kindMeta.title}
+              {offerCharge ? "4" : "3"} · {kindMeta.emoji} {kindMeta.title}
+              {chargeMeta ? ` · ${chargeMeta.badge}` : ""}
             </div>
             <OpsActivityForm
-              key={kind}
+              key={`${kind}-${charge ?? "none"}`}
               tone="core"
               coreKind={kind ?? undefined}
+              assignmentCharge={charge ?? undefined}
               initialResponsableId={userId}
               hideResponsableSelect
               forcedProjectMode={kindMeta.projectMode}
@@ -551,6 +632,10 @@ export default function AsignarActividadPage() {
             />
           </section>
         </>
+      ) : kindMeta && !bridgeNeeded && offerCharge && !charge ? (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+          Elige el encargo (ejecución directa o despacho a equipo) para continuar.
+        </p>
       ) : (
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
           Elige un tipo para continuar.

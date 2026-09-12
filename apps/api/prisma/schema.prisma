@@ -861,6 +861,8 @@ model Activity {
   ticketReportGeneratedAt DateTime?
   /// Tipo Core (hub Actividades): tarea|proyecto|obra|servicio|comercial
   coreKind                String?                  @db.VarChar(20)
+  /// Encargo al responsable: ejecucion (la hace él) | despacho (la reparte a su equipo)
+  assignmentCharge        String?                  @db.VarChar(20)
   /// Fotos de evidencia exigidas por persona (2–8), fijadas al asignar.
   evidencePhotoRequired   Int                      @default(4)
   creador                 User                     @relation("CreadorActividades", fields: [creadoPorId], references: [id])

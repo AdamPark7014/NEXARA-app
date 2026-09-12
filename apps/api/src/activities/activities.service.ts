@@ -77,8 +77,9 @@ export class ActivitiesService {
       8,
       Math.max(2, Math.round(Number(createActivityDto.evidencePhotoRequired ?? 4)) || 4),
     );
-    const { evidencePhotoRequired: _drop, ...rest } = createActivityDto as CreateActivityDto & {
+    const { evidencePhotoRequired: _drop, assignmentCharge: _charge, ...rest } = createActivityDto as CreateActivityDto & {
       evidencePhotoRequired?: number;
+      assignmentCharge?: string;
     };
 
     const activity = await this.prisma['activity'].create({
@@ -88,6 +89,10 @@ export class ActivitiesService {
         companyId: resolvedCompanyId,
         evidencePhotoRequired,
         coreKind: createActivityDto.coreKind?.trim() || null,
+        assignmentCharge: (() => {
+          const c = createActivityDto.assignmentCharge?.trim().toLowerCase();
+          return c === 'ejecucion' || c === 'despacho' ? c : null;
+        })(),
       },
       include: { responsable: { select: { nombre: true, id: true } }, creador: { select: { nombre: true } } },
     });

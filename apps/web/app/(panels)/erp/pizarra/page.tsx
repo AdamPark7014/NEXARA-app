@@ -154,6 +154,11 @@ function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean })
                 }}
               >
                 {a.titulo}
+                {a.assignmentCharge === "despacho"
+                  ? " · Despacho"
+                  : a.assignmentCharge === "ejecucion"
+                    ? " · Ejecución"
+                    : ""}
               </div>
               <div
                 style={{

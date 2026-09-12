@@ -22,6 +22,7 @@ export type TeamBoardOpenActivity = {
   evidenceStatus: string;
   progressPct: number;
   coreKind: string | null;
+  assignmentCharge: string | null;
   fechaFinalizacion: Date | null;
 };
 
@@ -51,6 +52,7 @@ export type TeamBoardHistoryItem = {
   titulo: string;
   estatus: string;
   coreKind: string | null;
+  assignmentCharge: string | null;
   fechaAsignacion: Date;
   fechaFinalizacion: Date | null;
   evidence: {
@@ -145,6 +147,7 @@ export class TeamBoardService {
         titulo: true,
         estatus: true,
         coreKind: true,
+        assignmentCharge: true,
         fechaAsignacion: true,
         fechaFinalizacion: true,
         activityEvidences: {
@@ -172,6 +175,7 @@ export class TeamBoardService {
         titulo: a.titulo,
         estatus: a.estatus,
         coreKind: a.coreKind,
+        assignmentCharge: a.assignmentCharge,
         fechaAsignacion: a.fechaAsignacion,
         fechaFinalizacion: a.fechaFinalizacion,
         evidence: ev
@@ -280,6 +284,7 @@ export class TeamBoardService {
               fechaInicio: true,
               fechaFinalizacion: true,
               coreKind: true,
+              assignmentCharge: true,
               deletedAt: true,
               activityEvidences: {
                 where: { userId: { in: userIds } },
@@ -341,6 +346,7 @@ export class TeamBoardService {
         evidenceStatus,
         progressPct: evidenceProgressPct(evidenceStatus, act.coreKind),
         coreKind: act.coreKind,
+        assignmentCharge: act.assignmentCharge,
         fechaFinalizacion: act.fechaFinalizacion,
       };
       const list = openByUser.get(row.userId) ?? [];
