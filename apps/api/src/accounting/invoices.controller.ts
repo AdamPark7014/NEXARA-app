@@ -109,6 +109,13 @@ export class InvoicesController {
     return this.service.validateRfc(rfc);
   }
 
+  @Get('sat/fiscal-lookup/:rfc')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
+  fiscalLookup(@Param('rfc') rfc: string) {
+    return this.service.lookupFiscalByRfc(rfc);
+  }
+
   @Post('payments/:paymentId/stamp-complement')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })

@@ -13,6 +13,7 @@ import {
 } from "@/lib/client-sectors";
 import { createSalesClient } from "@/lib/sales-api";
 import PhoneField, { isValidNexaraPhone } from "@/components/PhoneField";
+import FiscalRfcLookup from "@/components/FiscalRfcLookup";
 import styles from "../clientes-core.module.css";
 
 const empty = {
@@ -132,13 +133,24 @@ function NuevoClienteForm() {
             />
           </div>
           <div className={styles.field}>
-            <label htmlFor="taxId">RFC *</label>
-            <input
-              id="taxId"
-              className={styles.input}
+            <FiscalRfcLookup
+              token={token}
+              rfc={form.taxId}
+              onRfcChange={(taxId) => setForm((f) => ({ ...f, taxId }))}
+              fiscalRegime={form.fiscalRegime}
+              onRegimeChange={(fiscalRegime) => setForm((f) => ({ ...f, fiscalRegime }))}
+              inputClassName={styles.input}
+              selectClassName={styles.input}
               required
-              value={form.taxId}
-              onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value.toUpperCase() }))}
+              disabled={saving}
+              onApply={(data) =>
+                setForm((f) => ({
+                  ...f,
+                  legalName: data.legalName?.trim() ? data.legalName : f.legalName,
+                  fiscalZipCode: data.fiscalZipCode?.trim() ? data.fiscalZipCode : f.fiscalZipCode,
+                  fiscalRegime: data.fiscalRegime || f.fiscalRegime,
+                }))
+              }
             />
           </div>
         </div>
@@ -161,17 +173,6 @@ function NuevoClienteForm() {
               required
               value={form.fiscalZipCode}
               onChange={(e) => setForm((f) => ({ ...f, fiscalZipCode: e.target.value }))}
-            />
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="fiscalRegime">Régimen SAT *</label>
-            <input
-              id="fiscalRegime"
-              className={styles.input}
-              required
-              placeholder="ej. 601"
-              value={form.fiscalRegime}
-              onChange={(e) => setForm((f) => ({ ...f, fiscalRegime: e.target.value }))}
             />
           </div>
         </div>

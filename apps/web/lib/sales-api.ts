@@ -958,6 +958,27 @@ export const createSalesClient = async (
   );
 };
 
+export type FiscalLookupResult = {
+  validation: {
+    rfc: string;
+    valid: boolean;
+    type: "MORAL" | "FISICA" | "GENERICO" | "EXTRANJERO" | "UNKNOWN";
+    errors: string[];
+  };
+  regimes: Array<{ code: string; name: string }>;
+  suggestedRegime: string | null;
+  satStatus: { formatoCorrecto: boolean; activo: boolean; localizado: boolean } | null;
+  legalName: string | null;
+  fiscalZipCode: string | null;
+  source: "local" | "facturama" | "sat_datos";
+  message: string;
+};
+
+export const lookupSalesFiscalByRfc = async (token: string, rfc: string) => {
+  const path = `ventas/clientes/fiscal-lookup?rfc=${encodeURIComponent(rfc.trim().toUpperCase())}`;
+  return apiRequest<FiscalLookupResult>(path, { token, method: "GET" }, "No se pudo consultar el RFC");
+};
+
 export const addSalesClientSector = async (
   token: string,
   id: number,

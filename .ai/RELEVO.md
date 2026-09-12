@@ -9,27 +9,22 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — PhoneField profesional (+52 / bandera)
+## Este turno — Lookup fiscal SAT (RFC / régimen)
 
 ### Hecho
 
-1. Componente `apps/web/components/PhoneField.tsx` + CSS: bandera, prefijo país, default **MX (+52)**, máscara/dígitos por país (`react-phone-number-input`), valor E.164.
-2. Helpers `isValidNexaraPhone` / `toE164Phone`.
-3. Cableado en creación/edición de teléfonos:
-   - ERP: clientes/nuevo, my-profile, ClientCreationForm, MyProfileForm
-   - CRM: leads, clients datos/legacy, quotes edit, CtOrderPanel, templates
-   - OPS: service-clients
-   - INTEGRA: visitors
-   - Público: contacto, FloatingContactForm, ContactFormToggle
-   - Tickets portal, ActivityEvidenceFlow, OrderTemplatesManager
-4. Dep: `react-phone-number-input` en `apps/web`.
+1. **Realidad SAT:** no hay API pública gratuita de Constancia (razón social + régimen inscrito). Solo validador web (RFC/nombre/CP).
+2. **`SatService.lookupFiscalByRfc`**: validación local (formato + checksum) + catálogo `c_RegimenFiscal` filtrado PF/PM; si hay `FACTURAMA_*` valida existencia; si hay `SAT_DATOS_FISCALES_URL` + `API_KEY` intenta razón social/CP/régimenes.
+3. Endpoints: `GET ventas/clientes/fiscal-lookup?rfc=` y `GET …/invoices/sat/fiscal-lookup/:rfc`.
+4. UI: `FiscalRfcLookup` en **Nuevo cliente** y **CRM datos**; botón «Consultar SAT» + select de régimen (ya no texto libre tipo 503).
+5. `.env.example` documenta vars opcionales.
 
 ### Verificar
 
-1. Hard refresh → `/erp/clientes/nuevo?sector=proyecto`
-2. Campo Teléfono: bandera MX, `+52`, solo dígitos válidos para el país.
-3. Cambiar a US/otro → cambia prefijo y longitud.
-4. Crear cliente / lead / perfil con teléfono → se guarda E.164.
+1. Reiniciar API → `/erp/clientes/nuevo`
+2. RFC moral 12 chars → régimenes 601…; «Consultar SAT» → mensaje + select.
+3. Con Facturama en `.env` → status localizado/activo.
+4. Razón social auto solo si `SAT_DATOS_FISCALES_*` está configurado.
 
 ### A medias
 
@@ -37,8 +32,8 @@ Nada.
 
 ### Siguiente
 
-Lo que Adam diga.
+Si Adam quiere razón social 100% auto: dar API key de API Market/Singula/Paladins → se pega en env y ya.
 
 ### No tocar
 
-Puente NAS. Plan files.
+Puente NAS. Credenciales PAC en repo.

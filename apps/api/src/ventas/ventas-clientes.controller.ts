@@ -25,6 +25,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { SatService } from '../pac/sat.service.js';
 
 const SALES_VIEW_ACCESS = [
   PERMISSIONS.SALES_VIEW,
@@ -40,7 +41,20 @@ const SALES_MANAGE_ACCESS = [
 
 @Controller('ventas/clientes')
 export class VentasClientesController {
-  constructor(private readonly ventasService: VentasService) {}
+  constructor(
+    private readonly ventasService: VentasService,
+    private readonly satService: SatService,
+  ) {}
+
+  @Get('fiscal-lookup')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
+  fiscalLookup(@Query('rfc') rfc?: string) {
+    if (!rfc?.trim()) {
+      throw new BadRequestException('Query rfc es requerido');
+    }
+    return this.satService.lookupFiscalByRfc(rfc);
+  }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
