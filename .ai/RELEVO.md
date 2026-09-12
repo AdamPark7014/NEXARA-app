@@ -9,19 +9,21 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Cronómetro vivo Asistencias
+## Este turno — Actividades = ex-Pizarra (sin menú Tareas/OT)
 
 ### Hecho
 
-1. Tiempo por persona en `H:MM:SS` (con segundos).
-2. Jornada abierta: label **En vivo**, tick cada 1s desde la entrada.
-3. Completó: duración fija entrada→salida con segundos.
-4. Banner **Productividad del día** = suma de todas las jornadas, actualiza en vivo.
+1. Sidebar Core: quitados Tareas / Proyectos / Servicios (ruido OT).
+2. **Pizarra → label Actividades** (ruta sigue `/erp/pizarra`).
+3. Listas `/erp/actividades/*` y aliases EN → redirect a pizarra.
+4. Asignar: foto de la persona + tipos según permiso (Tarea del día / Proyecto / Servicio CEO) sin decir “OT”.
+5. Copy perfil: “En actividad” en vez de “En la OT”.
 
 ### Verificar
 
-- Filtrar “En jornada” con alguien checado → ver segundos subir.
-- Ausentes muestran "—".
+- Sidebar HOY: Chat, Actividades, Asistencias (sin grupo Actividades).
+- Actividades → persona → Asignar → opciones amigables.
+- Hard refresh si el menú viejo sigue cacheado.
 
 ## No tocar
 

@@ -384,7 +384,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   pizarra: {
     id: "pizarra", panel: PANELS.ERP, path: "/pizarra",
-    label: "Pizarra", description: "Tablero del equipo y prioridades del día",
+    label: "Actividades", description: "Equipo del día: ver y asignar actividades",
     icon: "📋", allowedRoles: ANY_INTERNAL,
     group: "Hoy", visible: true,
   },
@@ -398,19 +398,19 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "activities-daily", panel: PANELS.ERP, path: "/actividades/tareas",
     label: "Tareas", description: "Tareas del día sin proyecto",
     icon: "✅", allowedRoles: ANY_INTERNAL,
-    group: "Actividades", visible: true,
+    group: "Actividades", visible: false,
   },
   "activities-projects": {
     id: "activities-projects", panel: PANELS.ERP, path: "/actividades/proyectos",
     label: "Proyectos", description: "Actividades de proyectos",
     icon: "📁", allowedRoles: ANY_INTERNAL,
-    group: "Actividades", visible: true,
+    group: "Actividades", visible: false,
   },
   "activities-services": {
     id: "activities-services", panel: PANELS.ERP, path: "/actividades/servicios",
     label: "Servicios", description: "Actividades de servicios",
     icon: "🛠️", allowedRoles: ANY_INTERNAL,
-    group: "Actividades", visible: true,
+    group: "Actividades", visible: false,
   },
   reuniones: {
     id: "reuniones", panel: PANELS.ERP, path: "/reuniones",

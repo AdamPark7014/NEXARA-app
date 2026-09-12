@@ -36,12 +36,12 @@ const FULL_ACCESS_TREE: AccessTreePanel[] = [
     id: 'core',
     label: 'NEXARA Core',
     modules: [
-      toggle('pizarra', 'Pizarra'),
+      toggle('pizarra', 'Actividades'),
       toggle('asistencias', 'Asistencias'),
       toggle('chat', 'Chat'),
-      toggle('activities-daily', 'Tareas'),
-      toggle('activities-projects', 'Proyectos'),
-      toggle('activities-services', 'Servicios'),
+      toggle('activities-daily', 'Tareas (legacy)'),
+      toggle('activities-projects', 'Proyectos (legacy)'),
+      toggle('activities-services', 'Servicios (legacy)'),
     ],
   },
   {
