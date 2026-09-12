@@ -1,4 +1,4 @@
-import { Controller, Get, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
@@ -39,6 +39,28 @@ export class MeController {
         isSuperAdmin: Boolean(user.isSuperAdmin),
       },
       companyId,
+    );
+  }
+
+  /** Detalle de una persona en la pizarra (mismo scope que board). */
+  @Get('board/:userId')
+  boardUser(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('userId', ParseIntPipe) userId: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.teamBoard.getBoardUser(
+      {
+        id: Number(user.id),
+        roleKey: user.roleKey ?? null,
+        email: user.email ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+      },
+      companyId,
+      userId,
     );
   }
 }

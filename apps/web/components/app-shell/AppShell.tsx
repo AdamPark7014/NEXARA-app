@@ -154,6 +154,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
     const loadUnread = async () => {
       try {
         const res = await fetch(buildApiUrl("notifications/count/unread"), {
+          credentials: "include",
           headers: { Authorization: `Bearer ${user.token}` },
         });
         if (!res.ok) return;
@@ -187,6 +188,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
     setNotifLoading(true);
     try {
       const res = await fetch(buildApiUrl("notifications?limit=8"), {
+        credentials: "include",
         headers: { Authorization: `Bearer ${user.token}` },
         cache: "no-store",
       });
@@ -206,6 +208,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
       try {
         await fetch(buildApiUrl(`notifications/${n.id}/read`), {
           method: "PATCH",
+          credentials: "include",
           headers: { Authorization: `Bearer ${user.token}` },
         });
         setNotifPreview((prev) =>

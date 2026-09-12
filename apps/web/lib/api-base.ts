@@ -107,7 +107,7 @@ export async function apiRequest(path: string, init: RequestInit = {}): Promise<
     const id = raw ? parseInt(raw, 10) : NaN;
     if (Number.isFinite(id)) headers.set("X-Company-Id", String(id));
   }
-  return fetch(buildApiUrl(path), { ...init, headers });
+  return fetch(buildApiUrl(path), { ...init, credentials: init.credentials ?? "include", headers });
 }
 
 /** Nest may respond 200 with an empty body when the handler returns null. */

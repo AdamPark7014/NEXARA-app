@@ -20,6 +20,10 @@ export type TeamBoardUser = {
   puesto: string | null;
   status: BoardUserStatus;
   currentActivity: TeamBoardActivity | null;
+  clockInAt: string | null;
+  workedMinutes: number | null;
+  activityStartedAt: string | null;
+  activityElapsedMinutes: number | null;
 };
 
 export type TeamBoardResponse = {
@@ -35,12 +39,31 @@ export const STATUS_LABELS: Record<BoardUserStatus, string> = {
 };
 
 export const STATUS_COLORS: Record<BoardUserStatus, string> = {
-  activo: "#22c55e",
-  atrasado: "#ef4444",
+  activo: "#16a34a",
+  atrasado: "#dc2626",
   inactivo: "#94a3b8",
-  sin_actividad: "#3b82f6",
+  sin_actividad: "#2563eb",
 };
+
+export function formatMinutes(mins: number | null | undefined): string {
+  if (mins == null || !Number.isFinite(mins)) return "—";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h <= 0) return `${m} min`;
+  return `${h} h ${m.toString().padStart(2, "0")} min`;
+}
+
+export function formatClock(iso: string | null | undefined): string {
+  if (!iso) return "Sin entrada";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Sin entrada";
+  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+}
 
 export function fetchTeamBoard(token: string): Promise<TeamBoardResponse> {
   return erpFetch<TeamBoardResponse>("me/board", token);
+}
+
+export function fetchTeamBoardUser(token: string, userId: number): Promise<TeamBoardUser> {
+  return erpFetch<TeamBoardUser>(`me/board/${userId}`, token);
 }
