@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import PanelTabs from "@/components/ui/PanelTabs";
@@ -16,6 +17,8 @@ import { attendanceMapUrl } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 
 type TabId = "equipo" | "comidas" | "trayectoria";
+type Estado = "PRESENTE" | "COMPLETO" | "AUSENTE";
+type FilterEstado = "TODOS" | Estado;
 
 interface ApiAttendanceUser {
   userId: number;
@@ -66,6 +69,14 @@ interface TrajectoryPoint {
   ultimaActualizacion?: string;
 }
 
+const ESTADO_META: Record<Estado, { label: string; color: string }> = {
+  PRESENTE: { label: "En jornada", color: "#16a34a" },
+  COMPLETO: { label: "Completó", color: "#2563eb" },
+  AUSENTE: { label: "Ausente", color: "#94a3b8" },
+};
+
+const ESTADO_ORDER: Record<Estado, number> = { PRESENTE: 0, COMPLETO: 1, AUSENTE: 2 };
+
 async function apiFetch<T>(path: string, token: string): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
     credentials: "include",
@@ -91,6 +102,16 @@ function fmtMinutes(m?: number) {
   return h > 0 ? `${h}h${min > 0 ? ` ${min}m` : ""}` : `${min}m`;
 }
 
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0] ?? "")
+    .join("")
+    .toUpperCase();
+}
+
 function latestByType(
   list: ApiAttendanceUser["attendances"],
   type: "entrada" | "salida",
@@ -98,6 +119,52 @@ function latestByType(
   const filtered = (list ?? []).filter((a) => a.type === type);
   if (!filtered.length) return undefined;
   return filtered.reduce((max, a) => (a.timestamp > max.timestamp ? a : max)).timestamp;
+}
+
+function FilterChip({
+  active,
+  label,
+  count,
+  color,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  count: number;
+  color?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 12px",
+        borderRadius: 999,
+        border: active ? `1.5px solid ${color ?? "var(--primary)"}` : "1px solid var(--border)",
+        background: active
+          ? `color-mix(in srgb, ${color ?? "var(--primary)"} 12%, var(--surface))`
+          : "var(--surface)",
+        color: active ? color ?? "var(--primary)" : "var(--text-secondary)",
+        fontSize: 12,
+        fontWeight: active ? 700 : 550,
+        cursor: "pointer",
+        fontFamily: "inherit",
+      }}
+    >
+      {color ? (
+        <span
+          aria-hidden
+          style={{ width: 8, height: 8, borderRadius: "50%", background: color }}
+        />
+      ) : null}
+      {label}
+      <span style={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>{count}</span>
+    </button>
+  );
 }
 
 export default function ErpAsistenciasPage() {
@@ -108,6 +175,7 @@ export default function ErpAsistenciasPage() {
 
   const [tab, setTab] = useState<TabId>("equipo");
   const [dateFilter, setDateFilter] = useState(todayIso());
+  const [filterEstado, setFilterEstado] = useState<FilterEstado>("TODOS");
 
   const [members, setMembers] = useState<ApiAttendanceUser[]>([]);
   const [lunches, setLunches] = useState<LunchBreak[]>([]);
@@ -192,40 +260,52 @@ export default function ErpAsistenciasPage() {
   }, [tab, loadEquipo, loadComidas, loadTrayectoria]);
 
   const mapped = useMemo(() => {
-    return members.map((raw) => {
-      const checkIn = latestByType(raw.attendances, "entrada");
-      const checkOut = latestByType(raw.attendances, "salida");
-      const dayInfo = raw.days?.find((d) => d.date === dateFilter);
-      const estado = dayInfo?.isOpen
-        ? "PRESENTE"
-        : checkIn && checkOut
-          ? "COMPLETO"
-          : checkIn
-            ? "PRESENTE"
-            : "AUSENTE";
-      return {
-        ...raw,
-        checkIn,
-        checkOut,
-        estado,
-        entryMapUrl: attendanceMapUrl(raw.attendances, "entrada"),
-        exitMapUrl: attendanceMapUrl(raw.attendances, "salida"),
-        totalMinutes: dayInfo?.totalMinutes ?? raw.totalMinutes ?? 0,
-        nombre: raw.userName?.trim() || raw.email || `Usuario #${raw.userId}`,
-      };
-    });
+    return members
+      .map((raw) => {
+        const checkIn = latestByType(raw.attendances, "entrada");
+        const checkOut = latestByType(raw.attendances, "salida");
+        const dayInfo = raw.days?.find((d) => d.date === dateFilter);
+        const estado: Estado = dayInfo?.isOpen
+          ? "PRESENTE"
+          : checkIn && checkOut
+            ? "COMPLETO"
+            : checkIn
+              ? "PRESENTE"
+              : "AUSENTE";
+        return {
+          ...raw,
+          checkIn,
+          checkOut,
+          estado,
+          entryMapUrl: attendanceMapUrl(raw.attendances, "entrada"),
+          exitMapUrl: attendanceMapUrl(raw.attendances, "salida"),
+          totalMinutes: dayInfo?.totalMinutes ?? raw.totalMinutes ?? 0,
+          nombre: raw.userName?.trim() || raw.email || `Usuario #${raw.userId}`,
+        };
+      })
+      .sort((a, b) => ESTADO_ORDER[a.estado] - ESTADO_ORDER[b.estado] || a.nombre.localeCompare(b.nombre, "es"));
   }, [members, dateFilter]);
 
   const presentes = mapped.filter((m) => m.estado === "PRESENTE").length;
   const completos = mapped.filter((m) => m.estado === "COMPLETO").length;
   const ausentes = mapped.filter((m) => m.estado === "AUSENTE").length;
 
+  const filtered = useMemo(
+    () => (filterEstado === "TODOS" ? mapped : mapped.filter((m) => m.estado === filterEstado)),
+    [mapped, filterEstado],
+  );
+
+  const sectionTitle =
+    filterEstado === "TODOS"
+      ? `Equipo del día (${filtered.length})`
+      : `${ESTADO_META[filterEstado].label} (${filtered.length})`;
+
   return (
     <>
       <PageHeader
         eyebrow="ERP · Personas"
         title="Asistencias"
-        subtitle="Equipo del día, comidas y trayectoria GPS — alcance CEO o subtree del manager."
+        subtitle="Checadas del equipo · comidas · GPS"
         actions={
           <input
             type="date"
@@ -257,7 +337,17 @@ export default function ErpAsistenciasPage() {
       />
 
       {error && (
-        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13 }}>
+        <div
+          role="alert"
+          style={{
+            marginBottom: 12,
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "1px solid var(--danger)",
+            color: "var(--danger)",
+            fontSize: 13,
+          }}
+        >
           {error}
         </div>
       )}
@@ -277,65 +367,262 @@ export default function ErpAsistenciasPage() {
             />
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
-                <KpiCard label="Total equipo" value={mapped.length} />
-                <KpiCard label="En jornada" value={presentes} variant={presentes > 0 ? "accent" : "default"} />
-                <KpiCard label="Completaron" value={completos} variant={completos > 0 ? "positive" : "default"} />
-                <KpiCard label="Ausentes" value={ausentes} variant={ausentes > 0 ? "danger" : "positive"} />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                  gap: 10,
+                  marginBottom: 12,
+                }}
+              >
+                <KpiCard
+                  label="Total equipo"
+                  value={mapped.length}
+                  onClick={() => setFilterEstado("TODOS")}
+                />
+                <KpiCard
+                  label="En jornada"
+                  value={presentes}
+                  variant={presentes > 0 ? "accent" : "default"}
+                  onClick={() => setFilterEstado("PRESENTE")}
+                />
+                <KpiCard
+                  label="Completaron"
+                  value={completos}
+                  variant={completos > 0 ? "positive" : "default"}
+                  onClick={() => setFilterEstado("COMPLETO")}
+                />
+                <KpiCard
+                  label="Ausentes"
+                  value={ausentes}
+                  variant={ausentes > 0 ? "danger" : "positive"}
+                  onClick={() => setFilterEstado("AUSENTE")}
+                />
               </div>
-              <Section title="Equipo del día" subtitle={attCfg.visibilityHint ?? "scope=subtree"}>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                <FilterChip
+                  active={filterEstado === "TODOS"}
+                  label="Todos"
+                  count={mapped.length}
+                  onClick={() => setFilterEstado("TODOS")}
+                />
+                <FilterChip
+                  active={filterEstado === "PRESENTE"}
+                  label="En jornada"
+                  count={presentes}
+                  color={ESTADO_META.PRESENTE.color}
+                  onClick={() => setFilterEstado("PRESENTE")}
+                />
+                <FilterChip
+                  active={filterEstado === "COMPLETO"}
+                  label="Completó"
+                  count={completos}
+                  color={ESTADO_META.COMPLETO.color}
+                  onClick={() => setFilterEstado("COMPLETO")}
+                />
+                <FilterChip
+                  active={filterEstado === "AUSENTE"}
+                  label="Ausente"
+                  count={ausentes}
+                  color={ESTADO_META.AUSENTE.color}
+                  onClick={() => setFilterEstado("AUSENTE")}
+                />
+              </div>
+
+              <Section title={sectionTitle} subtitle="Toca una tarjeta para abrir la pizarra de la persona.">
                 {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando asistencia del subtree." />}
-                {!loading && mapped.length === 0 && (
-                  <EmptyState icon="👥" title="Sin registros" description="Nadie en el alcance para esta fecha." />
+                {!loading && filtered.length === 0 && (
+                  <EmptyState
+                    icon="👥"
+                    title={mapped.length === 0 ? "Sin registros" : "Nadie en este filtro"}
+                    description={
+                      mapped.length === 0
+                        ? "Nadie en el alcance para esta fecha."
+                        : "Prueba otro chip o el KPI de arriba."
+                    }
+                  />
                 )}
-                {!loading && mapped.length > 0 && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-                    {mapped.map((m) => {
-                      const entryPhoto = [...(m.attendances ?? [])].filter((a) => a.type === "entrada" && a.photoUrl).pop();
-                      const exitPhoto = [...(m.attendances ?? [])].filter((a) => a.type === "salida" && a.photoUrl).pop();
+                {!loading && filtered.length > 0 && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                      gap: 12,
+                    }}
+                  >
+                    {filtered.map((m) => {
+                      const meta = ESTADO_META[m.estado];
+                      const entryPhoto = [...(m.attendances ?? [])]
+                        .filter((a) => a.type === "entrada" && a.photoUrl)
+                        .pop();
+                      const exitPhoto = [...(m.attendances ?? [])]
+                        .filter((a) => a.type === "salida" && a.photoUrl)
+                        .pop();
                       return (
                         <article
                           key={m.userId}
                           style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
                             background: "var(--surface)",
                             border: "1px solid var(--border)",
-                            borderRadius: 12,
+                            borderLeft: `3px solid ${meta.color}`,
+                            borderRadius: 16,
                             padding: "14px 16px",
+                            boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
+                            opacity: m.estado === "AUSENTE" ? 0.88 : 1,
                           }}
                         >
-                          <div style={{ fontWeight: 700, fontSize: 13 }}>{m.nombre}</div>
-                          <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 8 }}>
-                            {[m.roleName, m.department].filter(Boolean).join(" · ") || "—"}
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ position: "relative", flexShrink: 0 }}>
+                              <div
+                                aria-hidden
+                                style={{
+                                  width: 48,
+                                  height: 48,
+                                  borderRadius: "50%",
+                                  display: "grid",
+                                  placeItems: "center",
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                  color: "var(--primary)",
+                                  background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
+                                }}
+                              >
+                                {initials(m.nombre)}
+                              </div>
+                              <span
+                                title={meta.label}
+                                style={{
+                                  position: "absolute",
+                                  right: 0,
+                                  bottom: 0,
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  background: meta.color,
+                                  border: "2px solid var(--surface)",
+                                  boxShadow: `0 0 0 2px color-mix(in srgb, ${meta.color} 25%, transparent)`,
+                                }}
+                              />
+                            </div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <Link
+                                href={`/erp/pizarra/${m.userId}`}
+                                style={{
+                                  fontWeight: 750,
+                                  fontSize: 14,
+                                  color: "inherit",
+                                  textDecoration: "none",
+                                  display: "block",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {m.nombre}
+                              </Link>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "var(--text-tertiary)",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {[m.roleName, m.department].filter(Boolean).join(" · ") || "—"}
+                              </div>
+                            </div>
+                            <span
+                              style={{
+                                flexShrink: 0,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: meta.color,
+                                background: `color-mix(in srgb, ${meta.color} 12%, var(--surface))`,
+                                padding: "4px 8px",
+                                borderRadius: 999,
+                              }}
+                            >
+                              {meta.label}
+                            </span>
                           </div>
-                          <div style={{ display: "flex", gap: 14, fontSize: 12, marginBottom: 8 }}>
-                            <span>↓ {fmtTime(m.checkIn)}</span>
-                            <span>↑ {fmtTime(m.checkOut)}</span>
-                            <span style={{ marginLeft: "auto", color: "var(--text-tertiary)" }}>{fmtMinutes(m.totalMinutes)}</span>
+
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr auto",
+                              gap: 10,
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              background: "var(--surface-2, color-mix(in srgb, var(--border) 35%, var(--surface)))",
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                                Entrada
+                              </div>
+                              <div style={{ fontSize: 16, fontWeight: 750, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+                                {fmtTime(m.checkIn)}
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-tertiary)", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                                Salida
+                              </div>
+                              <div style={{ fontSize: 16, fontWeight: 750, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+                                {fmtTime(m.checkOut)}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: "right", alignSelf: "center" }}>
+                              <div style={{ fontSize: 10, fontWeight: 650, color: "var(--text-tertiary)", textTransform: "uppercase" }}>
+                                Tiempo
+                              </div>
+                              <div style={{ fontSize: 15, fontWeight: 750, fontVariantNumeric: "tabular-nums", marginTop: 2 }}>
+                                {fmtMinutes(m.totalMinutes)}
+                              </div>
+                            </div>
                           </div>
+
                           {(entryPhoto?.photoUrl || exitPhoto?.photoUrl) && (
-                            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                            <div style={{ display: "flex", gap: 8 }}>
                               {entryPhoto?.photoUrl && (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={resolveAssetUrl(entryPhoto.photoUrl)} alt="Entrada" style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 8 }} />
+                                <img
+                                  src={resolveAssetUrl(entryPhoto.photoUrl)}
+                                  alt="Entrada"
+                                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10 }}
+                                />
                               )}
                               {exitPhoto?.photoUrl && (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={resolveAssetUrl(exitPhoto.photoUrl)} alt="Salida" style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 8 }} />
+                                <img
+                                  src={resolveAssetUrl(exitPhoto.photoUrl)}
+                                  alt="Salida"
+                                  style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10 }}
+                                />
                               )}
                             </div>
                           )}
-                          <div style={{ display: "flex", gap: 10, fontSize: 11, marginBottom: 6 }}>
-                            {m.entryMapUrl && (
-                              <a href={m.entryMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>
-                                Geo entrada
-                              </a>
-                            )}
-                            {m.exitMapUrl && (
-                              <a href={m.exitMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>
-                                Geo salida
-                              </a>
-                            )}
-                          </div>
+
+                          {(m.entryMapUrl || m.exitMapUrl) && (
+                            <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
+                              {m.entryMapUrl && (
+                                <a href={m.entryMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>
+                                  Mapa entrada
+                                </a>
+                              )}
+                              {m.exitMapUrl && (
+                                <a href={m.exitMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)", fontWeight: 600 }}>
+                                  Mapa salida
+                                </a>
+                              )}
+                            </div>
+                          )}
+
                           {(m.estado === "PRESENTE" || m.estado === "COMPLETO") && (
                             <AttendanceGpsDayPanel
                               token={token}
@@ -371,25 +658,51 @@ export default function ErpAsistenciasPage() {
             <EmptyState icon="🍽️" title="Sin registros" description="Nadie registró comida en esta fecha." />
           )}
           {!loading && lunches.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-              {lunches.map((b) => (
-                <article
-                  key={b.id}
-                  style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{b.user?.nombre ?? "—"}</div>
-                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 8 }}>
-                    {b.user?.department?.nombre ?? ""}
-                  </div>
-                  <div style={{ fontSize: 12 }}>
-                    {fmtTime(b.checkinTime)}
-                    {b.checkoutTime ? ` → ${fmtTime(b.checkoutTime)}` : " → en curso"}
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 6, color: b.status === "IN_PROGRESS" ? "var(--warning)" : "var(--success)" }}>
-                    {b.status === "IN_PROGRESS" ? "En comida" : "Completada"}
-                  </div>
-                </article>
-              ))}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+              {lunches.map((b) => {
+                const enCurso = b.status === "IN_PROGRESS";
+                const color = enCurso ? "#d97706" : "#16a34a";
+                return (
+                  <article
+                    key={b.id}
+                    style={{
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      borderLeft: `3px solid ${color}`,
+                      borderRadius: 16,
+                      padding: 14,
+                      boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 750, fontSize: 13 }}>{b.user?.nombre ?? "—"}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                          {b.user?.department?.nombre ?? ""}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color,
+                          background: `color-mix(in srgb, ${color} 12%, var(--surface))`,
+                          padding: "4px 8px",
+                          borderRadius: 999,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {enCurso ? "En comida" : "Completada"}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 12, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                      {fmtTime(b.checkinTime)}
+                      <span style={{ opacity: 0.45, margin: "0 6px" }}>→</span>
+                      {b.checkoutTime ? fmtTime(b.checkoutTime) : "en curso"}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </Section>
@@ -404,18 +717,26 @@ export default function ErpAsistenciasPage() {
                 <EmptyState icon="📡" title="Sin ubicaciones" description="Nadie comparte GPS ahora." />
               )}
               {!loading && teamGps.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12, marginBottom: 16 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                    gap: 12,
+                    marginBottom: 16,
+                  }}
+                >
                   {teamGps.map((item) => (
                     <article
                       key={item.id}
                       style={{
                         background: "var(--surface)",
                         border: `1.5px solid ${item.estaActivo ? "#3b82f6" : "var(--border)"}`,
-                        borderRadius: 12,
+                        borderRadius: 16,
                         padding: 14,
+                        boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
                       }}
                     >
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{item.usuario?.nombre ?? "—"}</div>
+                      <div style={{ fontWeight: 750, fontSize: 13 }}>{item.usuario?.nombre ?? "—"}</div>
                       <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
                         {item.usuario?.role?.nombre ?? item.usuario?.department?.nombre ?? ""}
                       </div>
