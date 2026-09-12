@@ -9,20 +9,17 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — CEO ve checadas en vivo
+## Este turno — Tiempos con segundos
 
 ### Hecho
 
-- Causa: la entrada de David **sí** está en BD (`Attendance` + `AttendanceDay` abiertos 2026-09-12).
-- Bug UI: en `/erp/asistencias` el refresh (poll + `attendance:updated`) solo corría si `canRegister && isManager`. Christian es `manage` (sin checador propio) → **nunca** refrescaba el equipo.
-- Fix: socket realtime + poll 15s + focus/visibility para **todo** `isManager`.
-- CEO/plataforma ya no mandan `scope=subtree` (company-wide).
-- `jwt.strategy`: adjunta `email` al user (defensa company-wide).
+- `AttendanceForm`: «Total hoy» vive en HH:MM:SS (suma minutos cerrados + elapsed).
+- `formatTotal` (resumen semana/mes y días) también HH:MM:SS.
+- Equipo del día: hora de entrada/salida con segundos (`fmtTime`).
 
 ### Verificar
 
-1. Hard refresh como Christian en Asistencias → David debe salir **En jornada** (entrada ~13:17).
-2. Con Christian abierto: otra ventana David checa → el KPI/lista de Christian se actualiza sin F5.
+Hard refresh David → Total hoy ticks `00:0x:yy` con segundos como el chip de estado.
 
 ## A medias
 
