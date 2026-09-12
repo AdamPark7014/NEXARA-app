@@ -90,7 +90,7 @@ export default function PizarraPersonaPage() {
       <div style={{ display: "grid", gap: 12, maxWidth: 480 }}>
         <p style={{ color: "#dc2626", margin: 0 }}>{error || "No encontrado"}</p>
         <Link href="/erp/pizarra" style={{ fontWeight: 700, color: "var(--primary)" }}>
-          ← Volver a la pizarra
+          ← Volver a Actividades
         </Link>
       </div>
     );
@@ -187,9 +187,9 @@ export default function PizarraPersonaPage() {
         <Stat label="Entrada hoy" value={formatClock(user.clockInAt)} hint={user.clockInAt ? "Check-in" : "Sin registro"} />
         <Stat label="Tiempo en sitio" value={formatMinutes(user.workedMinutes)} hint="Desde la entrada" />
         <Stat
-          label="En la OT"
+          label="En actividad"
           value={formatMinutes(user.activityElapsedMinutes)}
-          hint={user.activityStartedAt ? `Desde ${formatClock(user.activityStartedAt)}` : "Sin OT"}
+          hint={user.activityStartedAt ? `Desde ${formatClock(user.activityStartedAt)}` : "Sin actividad"}
         />
       </div>
 
@@ -219,7 +219,7 @@ export default function PizarraPersonaPage() {
             </Link>
           </>
         ) : (
-          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Sin OT abierta en este momento.</div>
+          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Sin actividad abierta en este momento.</div>
         )}
       </section>
 

@@ -169,7 +169,7 @@ export default function PizarraPage() {
   const load = useCallback(async () => {
     if (!token) {
       setLoading(false);
-      setError("Inicia sesión para ver la pizarra.");
+      setError("Inicia sesión para ver Actividades.");
       return;
     }
     setLoading(true);
@@ -177,7 +177,7 @@ export default function PizarraPage() {
     try {
       setData(await fetchTeamBoard(token));
     } catch (e) {
-      setError(formatApiError(e, "No se pudo cargar la pizarra"));
+      setError(formatApiError(e, "No se pudo cargar Actividades"));
       setData(null);
     } finally {
       setLoading(false);
@@ -205,9 +205,9 @@ export default function PizarraPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 1100, margin: "0 auto" }}>
       <header style={{ display: "flex", gap: 12, alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>Equipo</h1>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>Actividades</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            Toca un perfil para ver su día
+            Toca a alguien para ver su día o asignarle trabajo
           </p>
         </div>
         <button
