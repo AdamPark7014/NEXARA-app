@@ -9,14 +9,14 @@ import {
   ACTIVITY_KINDS,
   ASSIGNMENT_CHARGES,
   canOfferAssignmentCharge,
-  dispatchPoolEmails,
-  extrasEmailsForKind,
   isServicioBridgeEmail,
   kindsForAssignment,
   metaForKind,
   ORG_EMAILS,
+  peerCoordinatorEmails,
   servicioDelegateEmails,
   servicioShouldGoToBridge,
+  teamPoolEmailsForAssignment,
   type ActivityKind,
   type AssignmentCharge,
 } from "@/lib/activity-kinds";
@@ -122,20 +122,34 @@ export default function AsignarActividadPage() {
       const allow = new Set(servicioDelegateEmails());
       return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
     }
-    // Despacho: solo subordinados típicos del encargado.
-    if (charge === "despacho") {
-      const pool = dispatchPoolEmails(person?.email);
-      if (pool.length) {
-        const allow = new Set(pool.map((e) => e.toLowerCase()));
-        return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
-      }
+    // Despacho / tipo: pool unido (p. ej. Proyecto = instaladores + soporte).
+    const pool = teamPoolEmailsForAssignment({
+      managerEmail: person?.email,
+      kind,
+      charge,
+    });
+    if (pool.length) {
+      const allow = new Set(pool.map((e) => e.toLowerCase()));
+      return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
     }
-    // Servicio → soporte · Obra → instaladores · Proyecto → ambos · resto → todos.
-    const pool = extrasEmailsForKind(kind);
-    if (!pool) return roster;
-    const allow = new Set(pool.map((e) => e.toLowerCase()));
-    return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
+    return roster;
   }, [kind, person?.email, roster, charge]);
+
+  const autoPeerCoordinators = useMemo(() => {
+    const selectedEmails = extraIds
+      .map((id) => {
+        const u = teamForExtras.find((x) => x.id === id) ?? boardUsers.find((x) => x.id === id);
+        return (u?.email || "").toLowerCase();
+      })
+      .filter(Boolean);
+    const peerEmails = peerCoordinatorEmails({
+      primaryEmail: person?.email,
+      memberEmails: selectedEmails,
+    });
+    return peerEmails
+      .map((email) => boardUsers.find((u) => (u.email || "").toLowerCase() === email) ?? null)
+      .filter((u): u is TeamBoardUser => Boolean(u));
+  }, [extraIds, teamForExtras, boardUsers, person?.email]);
 
   useEffect(() => {
     setCharge(null);
@@ -190,19 +204,44 @@ export default function AsignarActividadPage() {
     }
     setTeamError(null);
     try {
-      // Solo si hay equipo extra: notas del LEAD + extras (sin degradar a TECNICO).
-      if (extraIds.length > 0 && leadNotes.trim()) {
-        await addTeamMember(token, activityId, userId, leadNotes, "LEAD");
+      const needPrimaryLead =
+        Boolean(leadNotes.trim()) ||
+        autoPeerCoordinators.length > 0 ||
+        (charge === "despacho" && extraIds.length > 0);
+
+      if (needPrimaryLead) {
+        await addTeamMember(
+          token,
+          activityId,
+          userId,
+          leadNotes.trim() ||
+            (autoPeerCoordinators.length
+              ? "Coordinación de su equipo en esta actividad."
+              : undefined),
+          "LEAD",
+        );
       }
+
+      const peerIds = new Set(autoPeerCoordinators.map((u) => u.id));
+      for (const peer of autoPeerCoordinators) {
+        if (peer.id === userId) continue;
+        // Si también está en extras, ya se suma abajo como LEAD con sus notas.
+        if (extraIds.includes(peer.id)) continue;
+        await addTeamMember(
+          token,
+          activityId,
+          peer.id,
+          "Coordinación de su equipo en esta actividad cruzada (instalación / soporte).",
+          "LEAD",
+        );
+      }
+
       for (const id of extraIds) {
-        await addTeamMember(token, activityId, id, extraNotes[id]);
+        const rol = peerIds.has(id) || id === userId ? "LEAD" : "TECNICO";
+        await addTeamMember(token, activityId, id, extraNotes[id], rol);
       }
     } catch (e) {
-      setTeamError(
-        e instanceof Error
-          ? `Actividad creada, pero el equipo / indicaciones falló: ${e.message}`
-          : "Actividad creada; no se pudo guardar equipo o indicaciones",
-      );
+      setTeamError(formatApiError(e, "Actividad creada, pero falló al sumar el equipo"));
       return;
     }
     router.push(`/erp/pizarra/${userId}`);
@@ -454,7 +493,9 @@ export default function AsignarActividadPage() {
             </div>
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
               {charge === "despacho"
-                ? `Como despacho, suma a quien debe ejecutarla bajo ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Si no eliges a nadie, queda pendiente de que él la asigne.`
+                ? kind === "proyecto"
+                  ? `Despacho: puedes sumar instaladores y soporte. Si mezclas ambos, se asigna también al otro coordinador (p. ej. Antonio) además de ${displayName.split(/\s+/).slice(0, 2).join(" ")} y a los subordinados elegidos.`
+                  : `Como despacho, suma a quien debe ejecutarla bajo ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Si no eliges a nadie, queda pendiente de que él la asigne.`
                 : kind === "servicio" && isServicioBridgeEmail(person?.email)
                 ? "Como puente, suma a Carolina o Alejandro (día/hora ya van en el formulario)."
                 : kind === "servicio"
@@ -462,11 +503,29 @@ export default function AsignarActividadPage() {
                   : kind === "obra"
                     ? "Solo instaladores de campo (Joan, Israel, Juan José)."
                     : kind === "proyecto"
-                      ? "Soporte e instaladores pueden colaborar en el proyecto."
+                      ? "Soporte e instaladores pueden colaborar en el proyecto. Si hay ambos lados, se suman ambos coordinadores."
                       : charge === "ejecucion"
                         ? `Ejecución directa de ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Puedes sumar apoyo opcional.`
                         : `El responsable es ${displayName}. Puedes sumar apoyo.`}
             </p>
+            {autoPeerCoordinators.length > 0 ? (
+              <div
+                role="status"
+                style={{
+                  marginBottom: 10,
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid color-mix(in srgb, #16a34a 35%, var(--border))",
+                  background: "color-mix(in srgb, #16a34a 10%, var(--surface))",
+                  fontSize: 12.5,
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong>Coordinadores automáticos:</strong> además del responsable, se asignará como LEAD a{" "}
+                {autoPeerCoordinators.map((u) => u.nombre.split(/\s+/).slice(0, 2).join(" ")).join(", ")}{" "}
+                (por el equipo cruzado instaladores / soporte).
+              </div>
+            ) : null}
             {teamForExtras.length === 0 ? (
               <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
                 No hay más personas en el tablero para sumar ahora.
