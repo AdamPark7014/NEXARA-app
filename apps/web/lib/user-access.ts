@@ -15,6 +15,12 @@ import {
   type PanelId,
   type SidebarGroup,
 } from '@/lib/access-matrix';
+import {
+  CORE_SURFACE_ONLY,
+  CORE_HOME_PATH,
+  CORE_PANEL_ID,
+  isCoreOla1ModuleId,
+} from '@/lib/core-surface';
 import { sortSidebarGroups } from '@/lib/nav-mode';
 import { resolveOrgRoleKey, type OrgRoleKey } from '@/lib/org-roles';
 import {
@@ -139,6 +145,8 @@ export function buildUserSidebar(
 
     for (const module of Object.values(MODULES)) {
       if (module.panel !== panel) continue;
+      if (CORE_SURFACE_ONLY && !isCoreOla1ModuleId(module.id)) continue;
+      if (user.moduleAccess?.[module.id] === 'off') continue;
       if (!canUserAccessModule(user, module)) continue;
       if (!shouldShowModuleInSidebar(user, module)) continue;
 
@@ -173,7 +181,11 @@ export function getUserAllowedModules(user: UserAccessInput | null | undefined):
 
   const seenPaths = new Set<string>();
   return Object.values(MODULES)
-    .filter((m) => canUserAccessModule(user, m) && shouldShowModuleInSidebar(user, m))
+    .filter((m) => {
+      if (CORE_SURFACE_ONLY && !isCoreOla1ModuleId(m.id)) return false;
+      if (user.moduleAccess?.[m.id] === 'off') return false;
+      return canUserAccessModule(user, m) && shouldShowModuleInSidebar(user, m);
+    })
     .map((m) => adaptModulePresentation(user, m))
     .filter((m) => {
       if (seenPaths.has(m.path)) return false;
@@ -211,6 +223,9 @@ export function getUserPanelEntryPath(
   panel: PanelId,
 ): string | null {
   if (!user) return null;
+  if (CORE_SURFACE_ONLY && panel === CORE_PANEL_ID) {
+    if (canUserAccessPath(user, CORE_HOME_PATH) || user.isSuperAdmin) return CORE_HOME_PATH;
+  }
   if (user.isSuperAdmin) {
     const meta = PANEL_META[panel];
     const entry = meta.entryPath || '/';
@@ -283,6 +298,9 @@ export function getUserPanelSwitchPath(
 /** Paneles visibles en el switcher — solo si hay rutas reales en ese panel. */
 export function getUserAllowedPanels(user: UserAccessInput | null | undefined) {
   if (!user) return [];
+  if (CORE_SURFACE_ONLY) {
+    return Object.values(PANEL_META).filter((p) => p.id === CORE_PANEL_ID);
+  }
   if (user.isSuperAdmin) return Object.values(PANEL_META);
 
   return Object.values(PANEL_META).filter((p) => canUserAccessPanel(user, p.id));
@@ -291,6 +309,7 @@ export function getUserAllowedPanels(user: UserAccessInput | null | undefined) {
 /** Panel HOME canónico del usuario. */
 export function getUserHomePanel(user: UserAccessInput | null | undefined): PanelId {
   if (!user) return 'erp';
+  if (CORE_SURFACE_ONLY) return CORE_PANEL_ID;
   if (isTechnicalSuperAdmin(user)) return 'lab';
   if (user.isSuperAdmin || resolveIsPlatformOwner(user)) return 'erp';
 
@@ -309,6 +328,7 @@ export function getUserHomePanel(user: UserAccessInput | null | undefined): Pane
 /** Ruta HOME post-login. */
 export function getUserHomePath(user: UserAccessInput | null | undefined): string {
   if (!user) return '/login';
+  if (CORE_SURFACE_ONLY) return CORE_HOME_PATH;
   if (isTechnicalSuperAdmin(user)) return '/lab';
   if (resolveIsPlatformOwner(user)) return '/erp/executive';
   if (user.isSuperAdmin) return '/erp/executive';

@@ -1,3 +1,5 @@
+import { CORE_SURFACE_ONLY } from '@/lib/core-surface';
+
 export type AccessMode = 'off' | 'on' | 'supervise' | 'deliver' | 'both';
 export type AccessModeKind = 'toggle' | 'pair';
 
@@ -29,16 +31,17 @@ function pair(key: string, label: string, team: string, self: string): AccessTre
 }
 
 /** Árbol editable en Usuarios: subplataforma → módulos → modo. */
-export const ACCESS_TREE: AccessTreePanel[] = [
+const FULL_ACCESS_TREE: AccessTreePanel[] = [
   {
     id: 'core',
     label: 'NEXARA Core',
     modules: [
-      toggle('reuniones', 'Reuniones'),
-      toggle('approvals', 'Aprobaciones'),
-      toggle('warehouse', 'Inventario'),
-      toggle('procurement', 'Compras'),
-      toggle('documents', 'Documentos'),
+      toggle('pizarra', 'Pizarra'),
+      toggle('asistencias', 'Asistencias'),
+      toggle('chat', 'Chat'),
+      toggle('activities-daily', 'Actividades diarias'),
+      toggle('activities-projects', 'Actividades proyectos'),
+      toggle('activities-services', 'Actividades servicios'),
     ],
   },
   {
@@ -109,6 +112,10 @@ export const ACCESS_TREE: AccessTreePanel[] = [
     ],
   },
 ];
+
+export const ACCESS_TREE: AccessTreePanel[] = CORE_SURFACE_ONLY
+  ? FULL_ACCESS_TREE.filter((p) => p.id === 'core')
+  : FULL_ACCESS_TREE;
 
 const MODE_SET = new Set<AccessMode>(['off', 'on', 'supervise', 'deliver', 'both']);
 

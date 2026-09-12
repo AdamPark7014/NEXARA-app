@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeLegacyPath, remapLegacySlugs } from '@/lib/legacy-path-remap';
+import { CORE_SURFACE_ONLY, NON_CORE_SUBDOMAINS, CORE_HOME_PATH } from '@/lib/core-surface';
 
 /**
  * Middleware para manejar subdominios dinámicos
@@ -263,6 +264,24 @@ export function middleware(request: NextRequest) {
 
   const hostWithoutPort = hostname.split(':')[0];
   const requestPathname = request.nextUrl.pathname;
+
+  // Core-only: subdominios no-core → core.nexara.com.mx (soft redirect)
+  if (
+    CORE_SURFACE_ONLY &&
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    hostWithoutPort.endsWith('.nexara.com.mx')
+  ) {
+    const sub = hostWithoutPort.split('.')[0];
+    if (sub && NON_CORE_SUBDOMAINS.includes(sub)) {
+      const url = request.nextUrl.clone();
+      url.hostname = 'core.nexara.com.mx';
+      url.port = '';
+      if (!requestPathname.startsWith('/erp') && requestPathname !== '/login') {
+        url.pathname = CORE_HOME_PATH;
+      }
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+  }
 
   // ════════════════════════════════════════════════════════════════════
   //  Auth gate de panel (server-side, antes del render)

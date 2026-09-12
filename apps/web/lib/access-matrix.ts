@@ -25,6 +25,12 @@
 
 import { ORG_ROLE_KEYS, type OrgRoleKey } from "@/lib/org-roles";
 import { ROLES, type RoleKey } from "@/lib/rbac/roles";
+import {
+  CORE_SURFACE_ONLY,
+  CORE_HOME_PATH,
+  CORE_PANEL_ID,
+  isCoreOla1ModuleId,
+} from "@/lib/core-surface";
 
 // ─────────────────────────────────────────────────────────────────────
 // 8 PANELES CONSOLIDADOS
@@ -67,7 +73,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
     tagline: "Gobierno, inventario y operación administrativa",
     accent: "#0ea5e9",
     icon: "⚙️",
-    entryPath: "/executive",
+    entryPath: "/pizarra",
   },
   [PANELS.FINANCE]: {
     id: PANELS.FINANCE,
@@ -194,6 +200,11 @@ export type ModuleId =
   | "procurement"
   | "documents"
   | "chat"
+  | "pizarra"
+  | "asistencias"
+  | "activities-daily"
+  | "activities-projects"
+  | "activities-services"
   | "reuniones"
   | "bi"
   | "architecture"
@@ -370,6 +381,36 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     label: "Chat", description: "Canales, DMs y colaboración en tiempo real",
     icon: "💬", allowedRoles: ANY_INTERNAL,
     group: "Hoy", visible: true,
+  },
+  pizarra: {
+    id: "pizarra", panel: PANELS.ERP, path: "/pizarra",
+    label: "Pizarra", description: "Tablero del equipo y prioridades del día",
+    icon: "📋", allowedRoles: ANY_INTERNAL,
+    group: "Hoy", visible: true,
+  },
+  asistencias: {
+    id: "asistencias", panel: PANELS.ERP, path: "/asistencias",
+    label: "Asistencias", description: "Check-in, comidas y presencia",
+    icon: "🗓️", allowedRoles: ANY_INTERNAL,
+    group: "Hoy", visible: true,
+  },
+  "activities-daily": {
+    id: "activities-daily", panel: PANELS.ERP, path: "/actividades/diarias",
+    label: "Diarias", description: "Actividades del día",
+    icon: "✅", allowedRoles: ANY_INTERNAL,
+    group: "Actividades", visible: true,
+  },
+  "activities-projects": {
+    id: "activities-projects", panel: PANELS.ERP, path: "/actividades/proyectos",
+    label: "Proyectos", description: "Actividades de proyectos",
+    icon: "📁", allowedRoles: ANY_INTERNAL,
+    group: "Actividades", visible: true,
+  },
+  "activities-services": {
+    id: "activities-services", panel: PANELS.ERP, path: "/actividades/servicios",
+    label: "Servicios", description: "Actividades de servicios",
+    icon: "🛠️", allowedRoles: ANY_INTERNAL,
+    group: "Actividades", visible: true,
   },
   reuniones: {
     id: "reuniones", panel: PANELS.ERP, path: "/reuniones",
@@ -1029,6 +1070,11 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
 // API DE LA MATRIZ
 // ─────────────────────────────────────────────────────────────────────
 
+function applyCoreSurfaceFilter(modules: ModuleEntry[]): ModuleEntry[] {
+  if (!CORE_SURFACE_ONLY) return modules;
+  return modules.filter((m) => isCoreOla1ModuleId(m.id));
+}
+
 /** URL absoluta canónica de un módulo: `/erp/dashboard`, `/crm/leads`, etc. */
 export function getModuleUrl(moduleId: ModuleId): string {
   const m = MODULES[moduleId];
@@ -1066,13 +1112,17 @@ export function getAllowedModules(
   isSuperAdmin = false,
   opts?: { v2Role?: RoleKey | null },
 ): ModuleEntry[] {
-  if (isSuperAdmin) return Object.values(MODULES);
-  if (opts?.v2Role === ROLES.CLIENTE) {
+  let modules: ModuleEntry[];
+  if (isSuperAdmin) modules = Object.values(MODULES);
+  else if (opts?.v2Role === ROLES.CLIENTE) {
     const allow = new Set(CLIENTE_INTEGRA_MODULE_IDS);
-    return Object.values(MODULES).filter((m) => allow.has(m.id));
+    modules = Object.values(MODULES).filter((m) => allow.has(m.id));
+  } else if (!role) {
+    modules = [];
+  } else {
+    modules = Object.values(MODULES).filter((m) => m.allowedRoles.includes(role));
   }
-  if (!role) return [];
-  return Object.values(MODULES).filter((m) => m.allowedRoles.includes(role));
+  return applyCoreSurfaceFilter(modules);
 }
 
 /** Módulos visibles a un rol dentro de un panel. */
@@ -1086,6 +1136,7 @@ export function getModulesByPanel(
 
 /** Lista de paneles a los que un rol puede entrar (alguno de sus módulos). */
 export function getAllowedPanels(role: OrgRoleKey | null, isSuperAdmin = false): PanelMeta[] {
+  if (CORE_SURFACE_ONLY) return [PANEL_META[CORE_PANEL_ID]];
   if (isSuperAdmin) return Object.values(PANEL_META);
   if (!role) return [];
   const allowed = new Set<PanelId>();
@@ -1197,6 +1248,7 @@ const ORG_ROLE_HOME_PATH: Partial<Record<OrgRoleKey, string>> = {
 };
 
 export function getHomePanel(role: OrgRoleKey | null, isSuperAdmin = false, isPlatformOwner = false, isDeveloperSuperAdmin = false): PanelId {
+  if (CORE_SURFACE_ONLY) return PANELS.ERP;
   if (isDeveloperSuperAdmin) return PANELS.LAB;
   if (isPlatformOwner || isSuperAdmin) return PANELS.ERP;
   if (!role) return PANELS.ERP;
@@ -1210,6 +1262,7 @@ export function getHomeUrl(
   isPlatformOwner = false,
   isDeveloperSuperAdmin = false,
 ): string {
+  if (CORE_SURFACE_ONLY) return CORE_HOME_PATH;
   if (isDeveloperSuperAdmin) return "/lab";
   if (isPlatformOwner || isSuperAdmin) return "/erp/executive";
   if (!role) return "/erp/dashboard";
@@ -1219,7 +1272,7 @@ export function getHomeUrl(
 
   const panel = getHomePanel(role, isSuperAdmin, isPlatformOwner, isDeveloperSuperAdmin);
   if (panel === PANELS.LAB) return "/lab";
-  // PANEL_META.erp.entryPath es /executive (branding subdominio); home operativo = dashboard.
+  // PANEL_META.erp.entryPath es /pizarra (Core ola1); home operativo ERP = dashboard salvo entry.
   if (panel === PANELS.ERP) return "/erp/dashboard";
 
   const entry = PANEL_META[panel].entryPath;

@@ -22,6 +22,23 @@ import { normalizeLegacyPath } from '@/lib/legacy-path-remap';
 
 export type PageRule = string; // path con comodines: /erp/**, /crm/quotes/*, /erp/users/:id
 
+/** Core ola1 — Pizarra / Asistencias / Chat / Actividades (paths canónicos ERP). */
+export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
+  '/erp/pizarra',
+  '/erp/pizarra/**',
+  '/erp/asistencias',
+  '/erp/asistencias/**',
+  '/erp/chat',
+  '/erp/chat/**',
+  '/erp/actividades/diarias',
+  '/erp/actividades/diarias/**',
+  '/erp/actividades/proyectos',
+  '/erp/actividades/proyectos/**',
+  '/erp/actividades/servicios',
+  '/erp/actividades/servicios/**',
+  '/erp/my-profile',
+];
+
 /**
  * Mapeo legacy documentado en `lib/legacy-path-remap.ts`.
  */
@@ -52,6 +69,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── ARQUITECTO — OPS supervisor + ERP parcial ────────────────────────
   [ROLES.ARQUITECTO]: [
     '/ops/**',
+    ...CORE_OLA1_PAGE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
@@ -191,6 +209,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ADMINISTRATIVO]: [
     '/erp',
     '/erp/dashboard',
+    ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
     '/erp/reuniones',
     '/erp/approvals',
@@ -225,6 +244,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_OPERACIONES]: [
     '/ops/**',
     '/ops/chat',
+    ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
     '/erp/reuniones',
     '/erp/calendar',
@@ -248,6 +268,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ING_CAMPO]: [
     '/ops/**',
     '/ops/chat',
+    ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
     '/erp/reuniones',
     '/erp/notifications-center',
@@ -274,6 +295,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/ops/support/**',
     '/ops/noc',
     '/ops/noc/**',
+    ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
     '/erp/reuniones',
     '/erp/notifications-center',

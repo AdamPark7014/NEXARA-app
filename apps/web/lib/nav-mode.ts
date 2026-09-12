@@ -32,6 +32,7 @@ export function isAdvancedOnlyModuleId(id: string): boolean {
 /** Orden de grupos del sidebar ERP (operativo). */
 export const ERP_GROUP_ORDER = [
   'Hoy',
+  'Actividades',
   'Gobierno',
   'Inventario',
   'Sistema',

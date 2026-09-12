@@ -67,6 +67,24 @@ export const MEETINGS_LEAD_URL_RULES: UrlRule[] = [
   { path: '/api/reuniones', scope: 'write' },
 ];
 
+/** Core ola1 — páginas shell (Pizarra / Asistencias / Chat / Actividades). */
+export const CORE_OLA1_URL_RULES: UrlRule[] = [
+  { path: '/erp/pizarra', scope: 'write' },
+  { path: '/erp/pizarra/**', scope: 'write' },
+  { path: '/erp/asistencias', scope: 'write' },
+  { path: '/erp/asistencias/**', scope: 'write' },
+  { path: '/erp/chat', scope: 'write' },
+  { path: '/erp/chat/**', scope: 'write' },
+  { path: '/erp/actividades/diarias', scope: 'write' },
+  { path: '/erp/actividades/diarias/**', scope: 'write' },
+  { path: '/erp/actividades/proyectos', scope: 'write' },
+  { path: '/erp/actividades/proyectos/**', scope: 'write' },
+  { path: '/erp/actividades/servicios', scope: 'write' },
+  { path: '/erp/actividades/servicios/**', scope: 'write' },
+  { path: '/api/chat/**', scope: 'write' },
+  { path: '/api/me/**', methods: ['GET'], scope: 'read' },
+];
+
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
 export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', scope: 'write' },
@@ -130,6 +148,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
     ...MEETINGS_LEAD_URL_RULES,
+    ...CORE_OLA1_URL_RULES,
     // OPS — lectura total + aprobación de actividades y evidencias
     { path: '/ops/**',                      scope: 'approve' },
     { path: '/api/activities/**',           scope: 'approve' },
@@ -325,6 +344,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
     ...MEETINGS_STAFF_URL_RULES,
+    ...CORE_OLA1_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/approvals', methods: ['GET'], scope: 'read' },
@@ -380,6 +400,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
     ...MEETINGS_LEAD_URL_RULES,
+    ...CORE_OLA1_URL_RULES,
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
     { path: '/ops/activities/**', scope: 'approve' },
@@ -433,6 +454,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
     ...MEETINGS_STAFF_URL_RULES,
+    ...CORE_OLA1_URL_RULES,
     // Páginas frontend
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
