@@ -9,20 +9,17 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Asistencias: checada GPS + equipo de David
+## Este turno — Asistencias UI densa
 
 ### Hecho
 
-- En `/erp/asistencias`, si `canRegisterSelf` (David / encargados): sección **Mi jornada** con `AttendanceForm` (foto + GPS + entrada/salida).
-- Equipo sigue debajo (subtree); carga con `erpFetch`; refresco al focus/intervalo.
-- Tarjeta propia primero en la lista.
+- `AttendanceForm` con `compact`: barra de estado, CTA primaria según fase (Entrada → Salida), hint corto, resumen semana/mes colapsado.
+- Cámara: copy «Capturar + GPS».
+- `/erp/asistencias`: Section `dense` + `<AttendanceForm compact />`; refresco equipo en `attendance:updated`.
 
 ### Verificar
 
-1. Hard refresh como David.
-2. Arriba: checador con cámara/GPS.
-3. Abajo: David + Israel + Joan + Juan José (si API reiniciada del fix anterior).
-4. Tras checar: su tarjeta pasa a En jornada.
+Hard refresh David → Mi jornada compacta; Entrada resaltada si no hay checada; Salida solo cuando hay jornada abierta.
 
 ## A medias
 

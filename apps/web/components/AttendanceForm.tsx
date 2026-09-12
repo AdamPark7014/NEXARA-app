@@ -8,7 +8,7 @@ import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 
-const AttendanceForm = () => {
+const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
   const { user } = useUser();
   const toLocalDateInput = (date: Date) => date.toLocaleDateString('sv-SE');
   const getWeekRange = () => {
@@ -559,21 +559,36 @@ const AttendanceForm = () => {
   const hasExitToday = history.some((h) => h.type === 'salida');
   const canRegisterEntry = isToday(selectedDate) && !hasEntryToday && !openSession;
   const canRegisterExit = isToday(selectedDate) && Boolean(openSession);
+  const jornadaDone = isToday(selectedDate) && hasEntryToday && hasExitToday;
   const openSessionFromPriorDay = Boolean(
     openSession?.lastEntryAt && !isToday(toLocalDateKey(new Date(openSession.lastEntryAt))),
   );
 
+  const statusLabel = jornadaDone
+    ? 'Completada'
+    : openSession
+      ? openSessionFromPriorDay
+        ? 'Abierta (día anterior)'
+        : 'En jornada'
+      : 'Sin checada';
+  const statusTone = jornadaDone ? 'ok' : openSession ? 'live' : 'idle';
+  const primaryAction: 'entrada' | 'salida' | null = canRegisterEntry
+    ? 'entrada'
+    : canRegisterExit
+      ? 'salida'
+      : null;
+
   return (
-    <div className={styles.root}>
+    <div className={`${styles.root} ${compact ? styles.rootCompact : ''}`}>
       {/* Modal de Cámara */}
       {cameraOpen && typeof window !== 'undefined' && createPortal(
         <div className={styles.modalOverlay}>
           <div className={styles.modalHeader}>
             <p className={styles.modalTitle}>
-              Toma foto de tu {cameraType === 'entrada' ? 'entrada' : 'salida'}
+              Foto de {cameraType === 'entrada' ? 'entrada' : 'salida'}
             </p>
             <p className={styles.modalSubtitle}>
-              Ajuste móvil optimizado para captura rápida y táctil
+              Se captura ubicación GPS al confirmar
             </p>
           </div>
           <div className={styles.videoWrap}>
@@ -591,104 +606,123 @@ const AttendanceForm = () => {
               className={`button-secondary ${styles.cameraButton}`}
               onClick={flipCamera}
             >
-              🔄 Voltear
+              Voltear
             </button>
             <button
               className={`button-primary ${styles.cameraButton} ${styles.captureButton}`}
               onClick={capturePhoto}
             >
-              📸 Capturar
+              Capturar + GPS
             </button>
             <button
               className={`button-secondary ${styles.cameraButton}`}
               onClick={closeCamera}
             >
-              ✕ Cancelar
+              Cancelar
             </button>
           </div>
         </div>,
         document.body
       )}
 
-      {/* Formulario Principal */}
-      <div className={`card ${styles.card}`}>
-        <h2 className={styles.title}>Registro de Entrada/Salida</h2>
-        <div className={styles.fieldBlock}>
-          <label className={styles.label}>Dia</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            disabled={isToday(selectedDate)}
-            max={toLocalDateInput(new Date())}
-            className={`${styles.dateInput} ${isToday(selectedDate) ? styles.dateInputDisabled : ''}`}
-            title={isToday(selectedDate) ? 'No puedes cambiar la fecha de hoy' : ''}
-          />
+      <div className={`${compact ? styles.cardCompact : `card ${styles.card}`}`}>
+        {!compact && <h2 className={styles.title}>Registro de Entrada/Salida</h2>}
+
+        <div className={styles.statusBar} data-tone={statusTone}>
+          <div>
+            <div className={styles.statusEyebrow}>Estado hoy</div>
+            <div className={styles.statusValue}>{statusLabel}</div>
+          </div>
+          <div className={styles.statusMeta}>
+            {(startTime || openSession) && (
+              <span className={styles.timerChip}>
+                {formatElapsed(elapsed || (openSession?.lastEntryAt
+                  ? Date.now() - new Date(openSession.lastEntryAt).getTime()
+                  : 0))}
+              </span>
+            )}
+            <span className={styles.gpsChip}>Foto + GPS</span>
+          </div>
         </div>
-        <div className={`${styles.actionsRow} ${isMobile ? styles.actionsRowMobile : ''}`}>
-          {/* Botón entrada - deshabilitado si ya hay entrada o si no es hoy */}
-          <button 
-            className={`button-secondary ${styles.flexGrow} ${(loading || !canRegisterEntry) ? styles.btnDisabledVisual : ''}`} 
-            onClick={() => openCamera('entrada')} 
-            disabled={loading || !canRegisterEntry}
-            title={hasEntryToday ? 'Ya has registrado entrada hoy' : (openSession ? 'Cierra la jornada abierta primero' : '')}
-          >
-            Registrar Entrada del Día
-          </button>
-          <button 
-            className={`button-primary ${styles.flexGrow} ${(loading || !canRegisterExit) ? styles.btnDisabledVisual : ''}`} 
-            onClick={() => openCamera('salida')} 
-            disabled={loading || !canRegisterExit}
-            title={!openSession ? 'Debes tener una entrada abierta' : ''}
-          >
-            Registrar Salida del Día
-          </button>
-        </div>
-        {startTime && (
-          <div className={styles.elapsed}>
-            <strong>Tiempo transcurrido:</strong> {formatElapsed(elapsed)}
+
+        {!compact && (
+          <div className={styles.fieldBlock}>
+            <label className={styles.label}>Día</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              disabled={isToday(selectedDate)}
+              max={toLocalDateInput(new Date())}
+              className={`${styles.dateInput} ${isToday(selectedDate) ? styles.dateInputDisabled : ''}`}
+              title={isToday(selectedDate) ? 'No puedes cambiar la fecha de hoy' : ''}
+            />
           </div>
         )}
+
+        <div className={`${styles.actionsRow} ${isMobile ? styles.actionsRowMobile : ''}`}>
+          <button
+            type="button"
+            className={`${primaryAction === 'entrada' ? 'button-primary' : 'button-secondary'} ${styles.flexGrow} ${(loading || !canRegisterEntry) ? styles.btnDisabledVisual : ''}`}
+            onClick={() => openCamera('entrada')}
+            disabled={loading || !canRegisterEntry}
+            title={hasEntryToday ? 'Ya registraste entrada hoy' : (openSession ? 'Cierra la jornada abierta primero' : 'Abre cámara y captura GPS')}
+          >
+            {loading && primaryAction === 'entrada' ? 'Preparando…' : 'Entrada'}
+          </button>
+          <button
+            type="button"
+            className={`${primaryAction === 'salida' ? 'button-primary' : 'button-secondary'} ${styles.flexGrow} ${(loading || !canRegisterExit) ? styles.btnDisabledVisual : ''}`}
+            onClick={() => openCamera('salida')}
+            disabled={loading || !canRegisterExit}
+            title={!openSession ? 'Primero registra entrada' : 'Cierra jornada con foto + GPS'}
+          >
+            {loading && primaryAction === 'salida' ? 'Preparando…' : 'Salida'}
+          </button>
+        </div>
+
+        {compact && primaryAction && (
+          <p className={styles.hintLine}>
+            {primaryAction === 'entrada'
+              ? 'Toca Entrada → foto → se guarda con GPS.'
+              : 'Toca Salida → foto → cierra la jornada con GPS.'}
+          </p>
+        )}
+
         {isToday(selectedDate) && openSession && (
           <div className={styles.infoAlert}>
             {openSessionFromPriorDay ? (
-              <>
-                ⚠️ <strong>Jornada abierta desde el día anterior.</strong> Registra salida para cerrarla.
-              </>
+              <>Jornada abierta desde ayer — registra <strong>Salida</strong> para cerrarla.</>
             ) : (
-              <>
-                ✓ <strong>Jornada abierta.</strong> Estás dentro. Registra salida para cerrar.
-              </>
+              <>En jornada desde {formatTime(openSession.lastEntryAt)}.</>
             )}
           </div>
         )}
-        {isToday(selectedDate) && history.some(h => h.type === 'entrada') && history.some(h => h.type === 'salida') && (
+        {jornadaDone && (
           <div className={styles.successAlert}>
-            ✓ <strong>Jornada completada.</strong> Entrada y salida registradas. No puedes registrar más.
+            Jornada completada. Entrada y salida registradas.
           </div>
         )}
         {(totalMinutes > 0 || startTime) && (
           <div className={styles.totalDay}>
-            <strong>Total del dia:</strong> {formatTotal(totalMinutes + Math.floor(elapsed / 60000))}
+            Total hoy: {formatTotal(totalMinutes + Math.floor(elapsed / 60000))}
           </div>
         )}
         {status && <p className={styles.statusText}>{status}</p>}
         {error && <p className={styles.errorText}>{error}</p>}
+
         {history.length > 0 && (
           <div className={styles.historySection}>
-            <div className={styles.sectionLabel}><strong>Historial del dia</strong></div>
+            <div className={styles.sectionLabel}><strong>Hoy</strong></div>
             <div className={styles.historyList}>
               {history.map((item, index) => (
                 <div key={`${item.type}-${item.timestamp}-${index}`} className={styles.historyItem}>
                   <span className={styles.historyType}>{item.type}</span>
-                  <span className={styles.deviceInfo}>
-                    {item.deviceInfo || 'Dispositivo no disponible'}
-                  </span>
                   <span className={styles.mutedText}>{formatTime(item.timestamp)}</span>
                   {item.photoUrl && (
-                    <img 
-                      src={item.photoUrl} 
-                      alt="foto" 
+                    <img
+                      src={item.photoUrl}
+                      alt=""
                       className={styles.historyPhoto}
                     />
                   )}
@@ -697,40 +731,42 @@ const AttendanceForm = () => {
             </div>
           </div>
         )}
-        <div className={styles.rangeSection}>
-          <div className={styles.sectionLabel}><strong>Resumen por rango</strong></div>
-          <div className={styles.quickRangeButtons}>
-            <button className="button-secondary" type="button" onClick={() => { const r = getWeekRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Semana actual</button>
-            <button className="button-secondary" type="button" onClick={() => { const r = getMonthRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Mes actual</button>
-          </div>
-          <div className={`${styles.rangeGrid} ${isMobile ? styles.rangeGridMobile : ''}`}>
-            <input
-              type="date"
-              value={rangeFrom}
-              onChange={(e) => setRangeFrom(e.target.value)}
-              className={styles.rangeInput}
-            />
-            <input
-              type="date"
-              value={rangeTo}
-              onChange={(e) => setRangeTo(e.target.value)}
-              className={styles.rangeInput}
-            />
-          </div>
-          <div className={`${styles.mutedText} ${styles.fieldBlock}`}>
-            <strong>Total rango:</strong> {formatTotal(rangeTotalMinutes)}
-          </div>
-          {rangeDays.length > 0 && (
-            <div className={styles.rangeDaysList}>
-              {rangeDays.map((day) => (
-                <div key={day.date} className={styles.rangeDayItem}>
-                  <span>{formatDate(day.date)}</span>
-                  <span className={styles.mutedText}>{formatTotal(day.totalMinutes)}</span>
-                </div>
-              ))}
+
+        <details className={styles.rangeDetails} open={!compact}>
+          <summary className={styles.rangeSummary}>
+            Resumen semana / mes · {formatTotal(rangeTotalMinutes)}
+          </summary>
+          <div className={styles.rangeSectionInner}>
+            <div className={styles.quickRangeButtons}>
+              <button className="button-secondary" type="button" onClick={() => { const r = getWeekRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Semana</button>
+              <button className="button-secondary" type="button" onClick={() => { const r = getMonthRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Mes</button>
             </div>
-          )}
-        </div>
+            <div className={`${styles.rangeGrid} ${isMobile ? styles.rangeGridMobile : ''}`}>
+              <input
+                type="date"
+                value={rangeFrom}
+                onChange={(e) => setRangeFrom(e.target.value)}
+                className={styles.rangeInput}
+              />
+              <input
+                type="date"
+                value={rangeTo}
+                onChange={(e) => setRangeTo(e.target.value)}
+                className={styles.rangeInput}
+              />
+            </div>
+            {rangeDays.length > 0 && (
+              <div className={styles.rangeDaysList}>
+                {rangeDays.map((day) => (
+                  <div key={day.date} className={styles.rangeDayItem}>
+                    <span>{formatDate(day.date)}</span>
+                    <span className={styles.mutedText}>{formatTotal(day.totalMinutes)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </details>
       </div>
     </div>
   );
