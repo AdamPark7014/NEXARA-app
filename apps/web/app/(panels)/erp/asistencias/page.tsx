@@ -72,7 +72,7 @@ interface TrajectoryPoint {
 const ESTADO_META: Record<Estado, { label: string; color: string }> = {
   PRESENTE: { label: "En jornada", color: "#16a34a" },
   COMPLETO: { label: "Completó", color: "#2563eb" },
-  AUSENTE: { label: "Ausente", color: "#94a3b8" },
+  AUSENTE: { label: "Sin checada", color: "#94a3b8" },
 };
 
 const ESTADO_ORDER: Record<Estado, number> = { PRESENTE: 0, COMPLETO: 1, AUSENTE: 2 };
@@ -431,7 +431,7 @@ export default function ErpAsistenciasPage() {
                   onClick={() => setFilterEstado("COMPLETO")}
                 />
                 <KpiCard
-                  label="Ausentes"
+                  label="Sin checada"
                   value={ausentes}
                   variant={ausentes > 0 ? "danger" : "positive"}
                   onClick={() => setFilterEstado("AUSENTE")}
@@ -504,7 +504,7 @@ export default function ErpAsistenciasPage() {
                 />
                 <FilterChip
                   active={filterEstado === "AUSENTE"}
-                  label="Ausente"
+                  label="Sin checada"
                   count={ausentes}
                   color={ESTADO_META.AUSENTE.color}
                   onClick={() => setFilterEstado("AUSENTE")}
