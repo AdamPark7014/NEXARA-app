@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import PanelTabs from "@/components/ui/PanelTabs";
@@ -15,7 +16,9 @@ import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { attendanceMapUrl } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
+import { erpFetch } from "@/lib/erp-api";
 
+const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 type TabId = "equipo" | "comidas" | "trayectoria";
 type Estado = "PRESENTE" | "COMPLETO" | "AUSENTE";
 type FilterEstado = "TODOS" | Estado;
@@ -192,6 +195,7 @@ export default function ErpAsistenciasPage() {
   const token = user?.token ?? "";
   const attCfg = useMemo(() => getAttendanceSectionConfig(user), [user]);
   const isManager = attCfg.canManageTeam;
+  const canRegister = attCfg.canRegisterSelf;
 
   const [tab, setTab] = useState<TabId>("equipo");
   const [dateFilter, setDateFilter] = useState(todayIso());
@@ -207,6 +211,7 @@ export default function ErpAsistenciasPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [equipoTick, setEquipoTick] = useState(0);
 
   const loadEquipo = useCallback(async () => {
     if (!token) return;
@@ -218,18 +223,18 @@ export default function ErpAsistenciasPage() {
     setLoading(true);
     setError(null);
     try {
-      const raw = await apiFetch<{ users?: ApiAttendanceUser[] } | ApiAttendanceUser[]>(
+      const raw = await erpFetch<{ users?: ApiAttendanceUser[] } | ApiAttendanceUser[]>(
         `attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}&scope=subtree`,
         token,
       );
-      setMembers(Array.isArray(raw) ? raw : (raw.users ?? []));
+      setMembers(Array.isArray(raw) ? raw : (raw?.users ?? []));
     } catch (e) {
       setMembers([]);
       setError(e instanceof Error ? e.message : "No se pudo cargar el equipo");
     } finally {
       setLoading(false);
     }
-  }, [token, dateFilter, isManager]);
+  }, [token, dateFilter, isManager, equipoTick]);
 
   const loadComidas = useCallback(async () => {
     if (!token) return;
@@ -280,12 +285,30 @@ export default function ErpAsistenciasPage() {
     else void loadTrayectoria();
   }, [tab, loadEquipo, loadComidas, loadTrayectoria]);
 
+  // Tras checar, al volver a la pestaña refrescar el equipo (GPS/foto pueden tardar).
+  useEffect(() => {
+    if (!canRegister || !isManager) return;
+    const bump = () => setEquipoTick((n) => n + 1);
+    const onVis = () => {
+      if (document.visibilityState === "visible") bump();
+    };
+    window.addEventListener("focus", bump);
+    document.addEventListener("visibilitychange", onVis);
+    const id = window.setInterval(bump, 45_000);
+    return () => {
+      window.removeEventListener("focus", bump);
+      document.removeEventListener("visibilitychange", onVis);
+      window.clearInterval(id);
+    };
+  }, [canRegister, isManager]);
+
   const mapped = useMemo(() => {
+    const meId = user?.id;
     return members
       .map((raw) => {
         const checkIn = latestByType(raw.attendances, "entrada");
         const checkOut = latestByType(raw.attendances, "salida");
-        const dayInfo = raw.days?.find((d) => d.date === dateFilter);
+        const dayInfo = raw.days?.find((d) => d.date === dateFilter || d.date?.startsWith(dateFilter));
         const estado: Estado = dayInfo?.isOpen
           ? "PRESENTE"
           : checkIn && checkOut
@@ -304,8 +327,14 @@ export default function ErpAsistenciasPage() {
           nombre: raw.userName?.trim() || raw.email || `Usuario #${raw.userId}`,
         };
       })
-      .sort((a, b) => ESTADO_ORDER[a.estado] - ESTADO_ORDER[b.estado] || a.nombre.localeCompare(b.nombre, "es"));
-  }, [members, dateFilter]);
+      .sort((a, b) => {
+        if (meId != null) {
+          if (a.userId === meId) return -1;
+          if (b.userId === meId) return 1;
+        }
+        return ESTADO_ORDER[a.estado] - ESTADO_ORDER[b.estado] || a.nombre.localeCompare(b.nombre, "es");
+      });
+  }, [members, dateFilter, user?.id]);
 
   const presentes = mapped.filter((m) => m.estado === "PRESENTE").length;
   const completos = mapped.filter((m) => m.estado === "COMPLETO").length;
@@ -343,7 +372,7 @@ export default function ErpAsistenciasPage() {
       <PageHeader
         eyebrow="ERP · Personas"
         title="Asistencias"
-        subtitle="Checadas del equipo · comidas · GPS"
+        subtitle="Tu checada (foto + GPS) · equipo · comidas · trayectoria"
         actions={
           <input
             type="date"
@@ -392,17 +421,23 @@ export default function ErpAsistenciasPage() {
 
       {tab === "equipo" && (
         <>
+          {canRegister ? (
+            <Section
+              title="Mi jornada"
+              subtitle="Entrada / salida con foto y GPS (igual que el checador de campo)"
+            >
+              <AttendanceForm />
+            </Section>
+          ) : null}
+
           {!isManager ? (
-            <EmptyState
-              icon="👥"
-              title="Vista de equipo"
-              description="Disponible para managers (CEO / subtree). Tu checador personal sigue en RRHH → Asistencia."
-              action={
-                <a href="/erp/hr/attendance" style={{ color: "var(--primary)", fontWeight: 600, fontSize: 13 }}>
-                  Ir a mi asistencia →
-                </a>
-              }
-            />
+            canRegister ? null : (
+              <EmptyState
+                icon="👥"
+                title="Vista de equipo"
+                description="Disponible para managers (CEO / subtree)."
+              />
+            )
           ) : (
             <>
               <div
@@ -411,6 +446,7 @@ export default function ErpAsistenciasPage() {
                   gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
                   gap: 10,
                   marginBottom: 12,
+                  marginTop: canRegister ? 16 : 0,
                 }}
               >
                 <KpiCard

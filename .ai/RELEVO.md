@@ -9,21 +9,20 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Asistencias: roster por jerarquía
+## Este turno — Asistencias: checada GPS + equipo de David
 
 ### Hecho
 
-- Causa: `getAccessibleUsers` filtraba por **departamento**. Encargados (David en Operaciones) no veían a campo (Ingeniería) → solo ellos mismos como «Ausente» sin checada.
-- Ahora: activos del tenant + `scope=subtree` por `managerId` (igual espíritu que pizarra).
-- CEO/company-wide: ~11 activos (sin Christian, sin cuentas apagadas).
-- David: él + 3 instaladores.
-- UI: etiqueta **Sin checada** (ya no «Ausente» engañoso).
+- En `/erp/asistencias`, si `canRegisterSelf` (David / encargados): sección **Mi jornada** con `AttendanceForm` (foto + GPS + entrada/salida).
+- Equipo sigue debajo (subtree); carga con `erpFetch`; refresco al focus/intervalo.
+- Tarjeta propia primero en la lista.
 
 ### Verificar
 
-1. Reiniciar/recargar API si hace falta.
-2. Christian → Asistencias: lista completa del equipo, no solo David.
-3. David → Asistencias: David + Israel + Joan + Juan José.
+1. Hard refresh como David.
+2. Arriba: checador con cámara/GPS.
+3. Abajo: David + Israel + Joan + Juan José (si API reiniciada del fix anterior).
+4. Tras checar: su tarjeta pasa a En jornada.
 
 ## A medias
 
