@@ -11,16 +11,13 @@ import {
   clientSectorsForEmail,
   type ClientSector,
 } from "@/lib/client-sectors";
-import {
-  addSalesClientSector,
-  getSalesClient,
-  type SalesClient,
-} from "@/lib/sales-api";
+import { addSalesClientSector, getSalesClient, type SalesClient } from "@/lib/sales-api";
 import {
   createOperationalProject,
   listOperationalProjects,
   type OperationalProject,
 } from "@/lib/ops-operational-api";
+import styles from "../clientes-core.module.css";
 
 export default function ClienteDetallePage() {
   const params = useParams();
@@ -52,8 +49,12 @@ export default function ClienteDetallePage() {
       const c = await getSalesClient(token, id);
       setClient(c);
       if (c.serviceClientId) {
-        const all = await listOperationalProjects(token);
-        setProjects(all.filter((p) => p.client?.id === c.serviceClientId));
+        try {
+          const all = await listOperationalProjects(token);
+          setProjects(all.filter((p) => p.client?.id === c.serviceClientId));
+        } catch {
+          setProjects([]);
+        }
       } else {
         setProjects([]);
       }
@@ -75,8 +76,7 @@ export default function ClienteDetallePage() {
     setBusy(true);
     setError(null);
     try {
-      const updated = await addSalesClientSector(token, id, sector);
-      setClient(updated);
+      setClient(await addSalesClientSector(token, id, sector));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo agregar sector");
     } finally {
@@ -88,7 +88,7 @@ export default function ClienteDetallePage() {
     e.preventDefault();
     if (!token || !client?.serviceClientId || !user?.id) return;
     if (projectTitle.trim().length < 3) {
-      setError("Título del proyecto muy corto");
+      setError("Título muy corto");
       return;
     }
     setBusy(true);
@@ -110,122 +110,64 @@ export default function ClienteDetallePage() {
     }
   };
 
-  if (!Number.isFinite(id)) return <p style={{ color: "#dc2626" }}>Cliente no válido.</p>;
-  if (!client && !error) return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
-  if (!client) return <p style={{ color: "#dc2626" }}>{error}</p>;
+  if (!Number.isFinite(id)) return <p className={styles.error}>Cliente no válido.</p>;
+  if (!client && !error) return <p className={styles.sub}>Cargando…</p>;
+  if (!client) return <p className={styles.error}>{error}</p>;
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 }}>
-      <button
-        type="button"
-        onClick={() => router.push("/erp/clientes")}
-        style={{
-          alignSelf: "flex-start",
-          border: "none",
-          background: "transparent",
-          color: "var(--primary)",
-          fontWeight: 650,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          padding: 0,
-        }}
-      >
+    <div className={styles.wrap}>
+      <button type="button" className={styles.ghostBtn} onClick={() => router.push("/erp/clientes")}>
         ← Clientes
       </button>
 
-      <div>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{client.name}</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-          Encargado: {client.owner?.nombre || "—"}
-        </p>
+      <div className={styles.top}>
+        <div>
+          <h1 className={styles.title}>{client.name}</h1>
+          <p className={styles.sub}>Encargado: {client.owner?.nombre || "—"}</p>
+        </div>
       </div>
 
-      <section
-        style={{
-          padding: 14,
-          borderRadius: 16,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-          Datos fiscales
-        </div>
-        <dl
-          style={{
-            margin: 0,
-            display: "grid",
-            gridTemplateColumns: "140px 1fr",
-            gap: "8px 12px",
-            fontSize: 13.5,
-          }}
-        >
-          <dt style={{ color: "var(--text-secondary)" }}>Razón social</dt>
-          <dd style={{ margin: 0 }}>{client.legalName || "—"}</dd>
-          <dt style={{ color: "var(--text-secondary)" }}>RFC</dt>
-          <dd style={{ margin: 0 }}>{client.taxId || "—"}</dd>
-          <dt style={{ color: "var(--text-secondary)" }}>Dirección</dt>
-          <dd style={{ margin: 0 }}>{client.fiscalAddress || "—"}</dd>
-          <dt style={{ color: "var(--text-secondary)" }}>CP</dt>
-          <dd style={{ margin: 0 }}>{client.fiscalZipCode || "—"}</dd>
-          <dt style={{ color: "var(--text-secondary)" }}>Régimen</dt>
-          <dd style={{ margin: 0 }}>{client.fiscalRegime || "—"}</dd>
-          <dt style={{ color: "var(--text-secondary)" }}>Email fiscal</dt>
-          <dd style={{ margin: 0 }}>{client.billingEmail || "—"}</dd>
-          <dt style={{ color: "var(--text-secondary)" }}>Teléfono</dt>
-          <dd style={{ margin: 0 }}>{client.billingPhone || "—"}</dd>
+      <section className={styles.panel}>
+        <div className={styles.fieldLabel}>Fiscal</div>
+        <dl className={styles.dl}>
+          <dt>Razón social</dt>
+          <dd>{client.legalName || "—"}</dd>
+          <dt>RFC</dt>
+          <dd>{client.taxId || "—"}</dd>
+          <dt>Dirección</dt>
+          <dd>{client.fiscalAddress || "—"}</dd>
+          <dt>CP / régimen</dt>
+          <dd>
+            {[client.fiscalZipCode, client.fiscalRegime].filter(Boolean).join(" · ") || "—"}
+          </dd>
+          <dt>Contacto</dt>
+          <dd>
+            {[client.billingEmail, client.billingPhone].filter(Boolean).join(" · ") || "—"}
+          </dd>
         </dl>
       </section>
 
-      <section
-        style={{
-          padding: 14,
-          borderRadius: 16,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-          Sectores
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+      <section className={styles.panel}>
+        <div className={styles.fieldLabel}>Sectores</div>
+        <div className={styles.sectorPick}>
           {clientSectors.map((s) => (
-            <span
-              key={s}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 999,
-                border: "1px solid var(--border)",
-                fontSize: 12.5,
-                fontWeight: 650,
-              }}
-            >
-              {CLIENT_SECTOR_META[s].emoji} {CLIENT_SECTOR_META[s].title}
+            <span key={s} className={styles.chip}>
+              {CLIENT_SECTOR_META[s].emoji}{" "}
+              {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
             </span>
           ))}
         </div>
         {addable.length > 0 ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Añadir a:</span>
+          <div className={styles.sectorPick}>
             {addable.map((s) => (
               <button
                 key={s}
                 type="button"
                 disabled={busy}
+                className={styles.sectorPickBtn}
                 onClick={() => void addSector(s)}
-                style={{
-                  border: "1px solid var(--primary)",
-                  background: "transparent",
-                  color: "var(--primary)",
-                  borderRadius: 999,
-                  padding: "6px 10px",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
               >
-                + {CLIENT_SECTOR_META[s].title}
+                + {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
               </button>
             ))}
           </div>
@@ -233,78 +175,52 @@ export default function ClienteDetallePage() {
       </section>
 
       {hasProyecto ? (
-        <section
-          style={{
-            padding: 14,
-            borderRadius: 16,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
-            Proyectos ({projects.length})
-          </div>
+        <section className={styles.panel}>
+          <div className={styles.fieldLabel}>Proyectos ({projects.length})</div>
           {!client.serviceClientId ? (
-            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-              Falta puente operativo (ServiceClient). Vuelve a abrir o contacta a sistemas.
+            <p className={styles.sub} style={{ margin: 0 }}>
+              Falta puente operativo.
             </p>
           ) : (
             <>
-              <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: 13.5 }}>
-                {projects.length === 0 ? (
-                  <li style={{ color: "var(--text-secondary)" }}>Aún no hay proyectos.</li>
-                ) : (
-                  projects.map((p) => (
-                    <li key={p.id}>
-                      {p.title} · {p.status}
-                    </li>
-                  ))
-                )}
-              </ul>
+              {projects.length === 0 ? (
+                <p className={styles.sub} style={{ margin: 0 }}>
+                  Sin proyectos aún.
+                </p>
+              ) : (
+                <div className={styles.list}>
+                  {projects.map((p) => (
+                    <div key={p.id} className={styles.row} style={{ cursor: "default" }}>
+                      <div>
+                        <div className={styles.rowName}>{p.title}</div>
+                        <div className={styles.rowSub}>{p.status}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {canSeeClientSector(user?.email, "PROYECTO") ? (
-                <form onSubmit={(e) => void onCreateProject(e)} style={{ display: "grid", gap: 8 }}>
+                <form
+                  onSubmit={(e) => void onCreateProject(e)}
+                  style={{ display: "grid", gap: 8, marginTop: 4 }}
+                >
                   <input
+                    className={styles.input}
                     value={projectTitle}
                     onChange={(e) => setProjectTitle(e.target.value)}
-                    placeholder="Nombre del nuevo proyecto"
-                    style={{
-                      padding: "9px 10px",
-                      borderRadius: 10,
-                      border: "1px solid var(--border)",
-                      background: "var(--bg)",
-                      color: "inherit",
-                      fontFamily: "inherit",
-                    }}
+                    placeholder="Nombre del proyecto"
                   />
-                  <input
-                    type="date"
-                    value={projectStart}
-                    onChange={(e) => setProjectStart(e.target.value)}
-                    style={{
-                      padding: "9px 10px",
-                      borderRadius: 10,
-                      border: "1px solid var(--border)",
-                      background: "var(--bg)",
-                      color: "inherit",
-                      fontFamily: "inherit",
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    style={{
-                      border: "none",
-                      background: "var(--primary)",
-                      color: "#fff",
-                      fontWeight: 700,
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    Crear proyecto
-                  </button>
+                  <div className={styles.grid2}>
+                    <input
+                      type="date"
+                      className={styles.input}
+                      value={projectStart}
+                      onChange={(e) => setProjectStart(e.target.value)}
+                    />
+                    <button type="submit" className={styles.primaryBtn} disabled={busy}>
+                      Crear proyecto
+                    </button>
+                  </div>
                 </form>
               ) : null}
             </>
@@ -312,7 +228,7 @@ export default function ClienteDetallePage() {
         </section>
       ) : null}
 
-      {error ? <p style={{ color: "#dc2626", margin: 0 }}>{error}</p> : null}
+      {error ? <p className={styles.error}>{error}</p> : null}
     </div>
   );
 }

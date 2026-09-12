@@ -9,34 +9,29 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Módulo Clientes Core
+## Este turno — UI Clientes + sidebar
 
 ### Hecho
 
-- Sectores `PROYECTO|CORPORATIVO|COMERCIAL` en `SalesClientSector` + migración aplicada.
-- Sidebar **Clientes** (`erp-clients`) en Core ola1; visible solo CEO + encargados (matriz email).
-- Hub `/erp/clientes` + listas + alta fiscal + ficha (añadir sector, proyectos N).
-- API `?sector=` / POST sectors; permisos ACTIVITIES_* en ventas/clientes.
-- Asignar: picker cliente en servicio/comercial; proyectos filtrados por sector PROYECTO.
-
-### Matriz
-
-- Christian/Antonio: 3 · Luis: CORPORATIVO · David/Josué/Mónica: PROYECTO+COMERCIAL · Daniela: COMERCIAL
+- `/crm/clients` redirige a `/erp/clientes` bajo `CORE_SURFACE_ONLY` (el CRM vacío era el “sidebar desaparecido”).
+- Clientes Core rediseñado: una pantalla con tabs de sector + lista densa + un solo CTA Nuevo.
+- Nuevo / detalle más compactos (CSS module).
+- Rutas `/proyecto|corporativo|comercial` → `?sector=`.
 
 ### Verificar
 
-- Login Christian → sidebar Clientes → 3 cards → crear con fiscal → proyectos en cliente de proyecto.
-- Luis solo ve corporativo; Joan no ve el módulo.
-- Reiniciar API si `prisma generate` falló por EPERM.
+- Ir a Core → Clientes (no CRM). Sidebar: Chat, Actividades, Asistencias, Clientes.
+- Tabs cambian lista sin páginas extra.
+- Hard refresh.
 
-### A medias
+## A medias
 
-Nada crítico. `prisma generate` puede requerir parar nest y regenerar.
+Nada.
 
 ## Siguiente
 
-Smoke UI + reinicio API si hace falta.
+Smoke con Christian.
 
 ## No tocar
 
-Puente NAS. Plan file bajo `.cursor/plans/`.
+Puente NAS. Plan file.
