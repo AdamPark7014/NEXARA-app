@@ -27,6 +27,8 @@ export type TeamBoardOpenActivity = {
   indicaciones?: string | null;
   /** Emails del equipo activo: dice si un despacho ya se repartió. */
   teamEmails: string[];
+  /** En despacho esta persona (LEAD) solo reparte: no es su trabajo en campo. */
+  reparte: boolean;
 };
 
 export type TeamBoardUser = {
@@ -292,6 +294,7 @@ export class TeamBoardService {
         },
         select: {
           userId: true,
+          rol: true,
           indicaciones: true,
           activity: {
             select: {
@@ -379,6 +382,7 @@ export class TeamBoardService {
         teamEmails: act.assignees
           .map((m) => (m.user?.email || '').trim().toLowerCase())
           .filter(Boolean),
+        reparte: act.assignmentCharge === 'despacho' && String(row.rol) === 'LEAD',
       };
       const list = openByUser.get(row.userId) ?? [];
       if (!list.some((x) => x.id === item.id)) list.push(item);
@@ -386,10 +390,12 @@ export class TeamBoardService {
     }
 
     return scoped.map((u) => {
-      const openActivities = (openByUser.get(u.id) ?? []).slice(0, 5);
-      const act = openActivities[0]
-        ? assigneeRows.find((r) => r.userId === u.id && r.activity?.id === openActivities[0].id)
-            ?.activity
+      const allOpen = openByUser.get(u.id) ?? [];
+      const openActivities = allOpen.slice(0, 5);
+      // «En curso» = lo que ejecuta; un despacho que solo reparte no cuenta como su trabajo.
+      const propia = allOpen.find((o) => !o.reparte);
+      const act = propia
+        ? assigneeRows.find((r) => r.userId === u.id && r.activity?.id === propia.id)?.activity
         : null;
       let status: BoardUserStatus = 'sin_actividad';
       let currentActivity: TeamBoardActivity | null = null;
