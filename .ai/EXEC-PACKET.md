@@ -139,6 +139,7 @@ Checks manuales (DevTools 375×812 y escritorio; claro y oscuro), sesión de un 
 - No cambiar reglas en `lib/activity-kinds.ts` (`forcesDespachoOnly`, `forcesEjecucionOnly`, `servicioShouldGoToBridge`, `kindsForAssignment`, `TAREA_TIPOS`, `AREA_MANAGER_EMAILS`).
 - No cambiar el flujo de datos de asignar (equipo se suma tras crear). Riesgo conocido: reintentar tras `teamError` duplica la actividad → **anotar en RELEVO como siguiente**, no arreglar aquí.
 - No tocar `/ops/*`, `components/ui/*` (salvo usar), ni la app móvil.
+- **Nunca enlazar a rutas fuera de `/erp`** (petición de Adam 13-09). El detalle de actividad en Core es `/erp/actividades/:id` y `/erp/actividades/:id/evidencias` (reutilizan las páginas de OPS vía `ActivityDetailShell core`). El middleware redirige `/ops/**`, `/crm/**`, etc. con `coreSurfaceRedirect` (`lib/core-surface.ts`), pero los enlaces nuevos deben ir directo a `/erp`.
 - No usar `useSearchParams` en páginas nuevas/editadas (error de Suspense en `next build`).
 - Colores: preferir `var(--success)`/`var(--danger)` en código nuevo; no hace falta migrar los existentes.
 - `next start` en Docker sirve el build horneado: sin `docker compose up -d --build web` no verás cambios.

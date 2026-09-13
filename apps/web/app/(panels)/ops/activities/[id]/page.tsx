@@ -80,7 +80,7 @@ type EditForm = {
 };
 
 export default function ActivityDetailPage() {
-  const { activity, error, reload, id } = useActivityDetail();
+  const { activity, error, reload, id, hrefs, core } = useActivityDetail();
   const { user } = useUser();
   const token = user?.token ?? "";
   const v2 = resolveV2RoleKey(user);
@@ -206,7 +206,7 @@ export default function ActivityDetailPage() {
               <li key={m}>{m}</li>
             ))}
           </ul>
-          <Link href={`/ops/activities/${id}/evidences`} style={{ textDecoration: "none" }}>
+          <Link href={hrefs.evidences} style={{ textDecoration: "none" }}>
             <Button size="sm" variant="primary" iconLeft="📸">Subir evidencias</Button>
           </Link>
         </div>
@@ -227,7 +227,9 @@ export default function ActivityDetailPage() {
           <DetailField
             label="Proyecto"
             value={
-              activity.project?.id ? (
+              activity.project?.id && core ? (
+                activity.project.title
+              ) : activity.project?.id ? (
                 <Link href={`/ops/projects/${activity.project.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
                   {activity.project.title} →
                 </Link>
@@ -294,7 +296,7 @@ export default function ActivityDetailPage() {
         {!editing ? (
           <>
             <DetailFieldGrid>
-              <DetailField label="Cliente" value={activity.client?.id ? (
+              <DetailField label="Cliente" value={activity.client?.id && !core ? (
                 <CrossPanelLink
                   href={
                     activity.client.salesClients?.[0]?.id
@@ -431,7 +433,7 @@ export default function ActivityDetailPage() {
             <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)" }}>
               {countEvidenceFiles(activity.activityEvidence)} archivo(s) en el paquete de evidencias.
               {" "}
-              <Link href={`/ops/activities/${id}/evidences`} style={{ color: "var(--primary)", fontWeight: 600 }}>
+              <Link href={hrefs.evidences} style={{ color: "var(--primary)", fontWeight: 600 }}>
                 Ver pestaña Evidencias →
               </Link>
             </p>
@@ -440,7 +442,7 @@ export default function ActivityDetailPage() {
         ) : (
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>
             Aún no hay fotos ni documentos cargados para esta actividad.{" "}
-            <Link href={`/ops/activities/${id}/evidences`} style={{ color: "var(--primary)", fontWeight: 600 }}>
+            <Link href={hrefs.evidences} style={{ color: "var(--primary)", fontWeight: 600 }}>
               Ir a Evidencias
             </Link>{" "}
             para capturar entrada, fotos en sitio y salida.

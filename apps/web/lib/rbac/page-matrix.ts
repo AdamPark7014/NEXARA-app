@@ -26,6 +26,8 @@ export type PageRule = string; // path con comodines: /erp/**, /crm/quotes/*, /e
 export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
   '/erp/mis-actividades',
   '/erp/mis-actividades/**',
+  '/erp/actividades',
+  '/erp/actividades/**',
   '/erp/pizarra',
   '/erp/pizarra/**',
   '/erp/asistencias',

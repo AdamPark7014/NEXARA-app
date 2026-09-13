@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeLegacyPath, remapLegacySlugs } from '@/lib/legacy-path-remap';
-import { CORE_SURFACE_ONLY, NON_CORE_SUBDOMAINS, CORE_HOME_PATH } from '@/lib/core-surface';
+import {
+  CORE_SURFACE_ONLY,
+  NON_CORE_SUBDOMAINS,
+  CORE_HOME_PATH,
+  coreSurfaceRedirect,
+} from '@/lib/core-surface';
 
 /**
  * Middleware para manejar subdominios dinámicos
@@ -280,6 +285,17 @@ export function middleware(request: NextRequest) {
         url.pathname = CORE_HOME_PATH;
       }
       return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+  }
+
+  // Core-only: ninguna ruta fuera de /erp en ningún host (notificaciones viejas,
+  // push, chat, favoritos). Detalle/evidencias de actividad conservan el id.
+  if (CORE_SURFACE_ONLY && (request.method === 'GET' || request.method === 'HEAD')) {
+    const coreTarget = coreSurfaceRedirect(requestPathname, request.nextUrl.searchParams);
+    if (coreTarget) {
+      const url = request.nextUrl.clone();
+      url.pathname = coreTarget;
+      return applySecurityHeaders(NextResponse.redirect(url, 307));
     }
   }
 
