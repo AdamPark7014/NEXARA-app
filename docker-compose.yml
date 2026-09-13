@@ -15,7 +15,7 @@ services:
     networks:
       - nexara-dev
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexara"]
+      test: ["CMD-SHELL", "pg_isready -U nexara_user -d nexara_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -68,7 +68,11 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - nexara-dev
+      nexara-dev:
+        # El rewrite de Next se bakea en build hacia `nexara-api` (prod).
+        # Alias para que localhost Docker resuelva igual que el compose de deploy.
+        aliases:
+          - nexara-api
     volumes:
       - ./apps/api/src:/app/apps/api/src
       - ./apps/api/uploads:/app/apps/api/uploads
