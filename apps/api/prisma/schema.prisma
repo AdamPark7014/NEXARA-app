@@ -5438,6 +5438,11 @@ model ActivityAssignee {
   asignadoAt  DateTime             @default(now())
   /// Fecha de salida del equipo; null mientras sigue asignado.
   retiradoAt  DateTime?
+  /// Posición en la cola personal de ejecución (Mis actividades). null = sin ordenar.
+  ordenEjecucion     Int?
+  /// Por qué el encargado la puso en esa posición (obligatorio al reordenar).
+  ordenJustificacion String?   @db.VarChar(500)
+  ordenActualizadoAt DateTime?
   /// Check-in ACS de esta persona en la OT (Acceso General).
   acsEnteredAt DateTime?
   acsExitedAt  DateTime?

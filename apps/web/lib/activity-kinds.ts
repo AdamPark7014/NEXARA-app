@@ -221,6 +221,29 @@ const CHARGE_MANAGER_EMAILS = new Set<string>([
   ORG_EMAILS.josue,
 ]);
 
+/**
+ * Encargados de área: se auto-asignan (solo a sí mismos) y ordenan su cola en
+ * Mis actividades con justificación. Espejo de AREA_MANAGER_EMAILS en la API
+ * (apps/api/src/me/my-activities.service.ts).
+ */
+const AREA_MANAGER_EMAILS = new Set<string>([
+  ORG_EMAILS.developer,
+  ORG_EMAILS.david,
+  ORG_EMAILS.luis,
+  ORG_EMAILS.antonio,
+  ORG_EMAILS.josue,
+  ORG_EMAILS.daniela,
+  ORG_EMAILS.monica,
+]);
+
+export function isAreaManagerEmail(email?: string | null): boolean {
+  return AREA_MANAGER_EMAILS.has(norm(email));
+}
+
+export function isCeoEmail(email?: string | null): boolean {
+  return norm(email) === ORG_EMAILS.ceo;
+}
+
 export function canOfferAssignmentCharge(email?: string | null): boolean {
   return CHARGE_MANAGER_EMAILS.has(norm(email));
 }

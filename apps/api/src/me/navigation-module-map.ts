@@ -15,6 +15,7 @@ export const PATH_MODULE_HINTS: PathModuleHint[] = [
   { match: /\/my-profile|\/users\/profile/, android: ['my-profile'], web: ['my-profile'] },
   { match: /user-preferences|my-preferences/, android: ['my-preferences'], web: ['my-preferences'] },
   { match: /\/calendar/, android: ['calendar'], web: ['calendar'] },
+  { match: /\/mis-actividades/, android: ['mis-actividades'], web: ['mis-actividades'] },
   { match: /\/pizarra/, android: ['pizarra'], web: ['pizarra'] },
   { match: /\/asistencias/, android: ['asistencias'], web: ['asistencias'] },
   { match: /\/clientes/, android: ['erp-clients'], web: ['erp-clients'] },

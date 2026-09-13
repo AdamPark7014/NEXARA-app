@@ -24,6 +24,8 @@ export type PageRule = string; // path con comodines: /erp/**, /crm/quotes/*, /e
 
 /** Core ola1 — Pizarra / Asistencias / Chat / Actividades (paths canónicos ERP). */
 export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
+  '/erp/mis-actividades',
+  '/erp/mis-actividades/**',
   '/erp/pizarra',
   '/erp/pizarra/**',
   '/erp/asistencias',

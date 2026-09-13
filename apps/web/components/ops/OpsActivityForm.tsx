@@ -35,6 +35,7 @@ import {
   type ClientSector,
 } from "@/lib/client-sectors";
 import { TAREA_TIPOS, type ActivityKind } from "@/lib/activity-kinds";
+import { createMyActivity } from "@/lib/my-activities-api";
 
 type Props = {
   activityId?: number;
@@ -62,6 +63,8 @@ type Props = {
   assignmentCharge?: string;
   /** Fotos de evidencia 2–8 (default 4). */
   evidencePhotoRequired?: number;
+  /** Auto-asignación de encargado: crea vía POST /me/activities (responsable = uno mismo). */
+  selfAssign?: boolean;
   onSuccess?: (id: number) => void;
   onCancel?: () => void;
 };
@@ -87,6 +90,7 @@ export default function OpsActivityForm({
   coreKind,
   assignmentCharge,
   evidencePhotoRequired = 4,
+  selfAssign = false,
   onSuccess,
   onCancel,
 }: Props) {
@@ -94,7 +98,8 @@ export default function OpsActivityForm({
   const token = user?.token ?? "";
   const actCfg = getActivitiesSectionConfig(user);
   const canAssign =
-    hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
+    selfAssign ||
+    (hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign);
   const isEdit = activityId != null && activityId > 0;
 
   const [form, setForm] = useState<ActivityFormState>({
@@ -146,9 +151,14 @@ export default function OpsActivityForm({
     if (!token) return;
     try {
       const [projs, assignable, next, tickets] = await Promise.all([
-        listOperationalProjects(token),
-        canAssign ? listAssignableUsers(token) : Promise.resolve([]),
-        canAssign && !isEdit ? fetchNextAnNumber(token) : Promise.resolve({ next: "" }),
+        // Auto-asignación: el encargado puede no tener permisos de OT; un 403 aquí no tumba el formulario.
+        selfAssign ? listOperationalProjects(token).catch(() => []) : listOperationalProjects(token),
+        canAssign && !selfAssign ? listAssignableUsers(token) : Promise.resolve([]),
+        canAssign && !isEdit
+          ? selfAssign
+            ? fetchNextAnNumber(token).catch(() => ({ next: "" }))
+            : fetchNextAnNumber(token)
+          : Promise.resolve({ next: "" }),
         hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)
           ? listApprovedTicketRequests(token)
           : Promise.resolve([]),
@@ -182,7 +192,7 @@ export default function OpsActivityForm({
     } catch {
       setNextAnLoaded(true);
     }
-  }, [token, canAssign, isEdit, user, coreKind]);
+  }, [token, canAssign, isEdit, user, coreKind, selfAssign]);
 
   useEffect(() => {
     void loadMeta();
@@ -334,7 +344,9 @@ export default function OpsActivityForm({
         setSuccess(tone === "core" ? "Actividad actualizada" : "OT actualizada");
         onSuccess?.(activityId);
       } else {
-        const created = await createActivity(token, payload);
+        const created = selfAssign
+          ? await createMyActivity(token, payload)
+          : await createActivity(token, payload);
         const newId = Number(created?.id);
         if (pendingRequestId && newId > 0) {
           try {
