@@ -125,6 +125,17 @@ export function listActivityTeam(token: string, activityId: number) {
   return apiFetch<ActivityTeamMember[]>(`activities/${activityId}/team`, token);
 }
 
+export function addActivityTeamMember(
+  token: string,
+  activityId: number,
+  body: { userId: number; rol?: "LEAD" | "TECNICO" | "APOYO"; indicaciones?: string },
+) {
+  return apiFetch<ActivityTeamMember>(`activities/${activityId}/team`, token, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export function listActivityMaterials(token: string, activityId: number) {
   return apiFetch<{ movimientos: ActivityMaterialRow[]; costoTotal: number }>(
     `activities/${activityId}/materiales`,

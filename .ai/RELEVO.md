@@ -9,24 +9,23 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Pizarra Luis ve a Antonio
+## Este turno — Despacho pendiente → asignar al equipo
 
 ### Hecho
 
-**Causa:** la pizarra filtra por árbol `managerId`. En el seed, Antonio (`jose.ramirez@…`) reporta a Christian, no a Luis → Luis solo se veía a sí mismo y no podía asignarle.
+**Causa:** a Luis le dejaron una actividad en **Despacho**, pero en su propia ficha no había UI para elegir a quién (solo «Asignar actividad» en fichas ajenas).
 
-**Fix:** `TeamBoardService.boardExtraEmails` — Luis además ve a Antonio + Carolina + Alejandro (peers operativos). Antonio ve a Carolina/Alejandro aunque falle managerId.
-
-Archivo: `apps/api/src/me/team-board.service.ts`.
-
-Flujo esperado: Luis → toca Antonio → Despacho → suma Carolina/Alejandro (o Servicio con puente a Antonio).
+**Fix:**
+1. `DespachoPendingPanel` en `/erp/pizarra/[userId]` cuando es **tu** perfil: lista despachos abiertos → «Despachar al equipo» → checkboxes del pool (`dispatchPoolEmails`) → POST team TECNICO.
+2. Misma UI sirve para **Antonio** y **David** cuando tengan despacho pendiente.
+3. `boardExtraEmails` también fuerza instaladores de **David** (Joan/Israel/Juan).
 
 ### Verificar
 
-1. Reiniciar / hot-reload API.
-2. Login Luis (`direccion.operaciones@nexara.com.mx`) → `/erp/pizarra`.
-3. Deben verse Antonio (+ soporte).
-4. Tocar Antonio → Asignar → Despacho o Servicio.
+1. Hard refresh → Luis toca **TÚ**.
+2. Bloque naranja «Pendiente de despacho» → Despachar al equipo → Antonio/Carolina/Alejandro → Asignar.
+3. Login David → debe ver instaladores; si tiene despacho, mismo panel.
+4. Login Antonio → Carolina/Alejandro + panel si hay despacho.
 
 ### A medias
 
@@ -38,4 +37,4 @@ Lo que Adam diga.
 
 ### No tocar
 
-Puente NAS. Plan files.
+Puente NAS.

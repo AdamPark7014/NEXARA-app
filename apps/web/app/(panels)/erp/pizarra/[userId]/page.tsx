@@ -18,6 +18,7 @@ import {
 } from "@/lib/team-board-api";
 import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
 import { labelForAssignmentCharge } from "@/lib/activity-kinds";
+import DespachoPendingPanel from "@/components/pizarra/DespachoPendingPanel";
 
 function initials(name: string): string {
   return name
@@ -234,6 +235,16 @@ export default function PizarraPersonaPage() {
           <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Sin actividad abierta en este momento.</div>
         )}
       </section>
+
+      {isSelf && token ? (
+        <DespachoPendingPanel
+          token={token}
+          managerEmail={me?.email ?? user.email}
+          managerUserId={user.id}
+          pending={user.openActivities ?? []}
+          onDone={() => void load()}
+        />
+      ) : null}
 
       <section
         style={{
