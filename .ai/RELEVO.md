@@ -9,40 +9,37 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Mis actividades + auto-asignación de encargados
+## Este turno — Arreglo: despachar a una 2.ª persona daba 409
 
 ### Hecho
 
-1. Módulo Core **Mis actividades** (`/erp/mis-actividades`) para todos menos Christian (CEO): cola personal numerada con prioridad, tipo (+subtipo de tarea), estatus en español, día/hora, tiempo estimado y tope, cliente/proyecto, quién la asignó o «Auto-asignada», y «Hechas hoy».
-2. **Encargados de área** (David, Luis, Antonio, Josué, Daniela, Mónica + developer) pueden: a) **auto-asignarse** actividades solo a sí mismos en `/erp/mis-actividades/nueva` (tipos que ya tienen, con día, hora y tiempo); b) **ordenar su cola** con Subir/Bajar/Hacerla primero, y cada cambio pide **justificación obligatoria** (mín. 10 caracteres) que se muestra en la tarjeta. Técnicos solo ven su lista.
-3. API: `GET /me/activities`, `PATCH /me/activities/order` y `POST /me/activities` (fuerza responsable y creador = uno mismo, ejecución directa; no requiere ACTIVITIES_MANAGE porque Antonio/Daniela/Mónica no lo tienen) en `apps/api/src/me/my-activities.service.ts`. Orden: orden personal → prioridad (Alta/Urgente, Media, Baja) → fecha → asignación.
-4. Migración `20260913170000_assignee_execution_order`: `activity_assignees.ordenEjecucion`, `ordenJustificacion` (500), `ordenActualizadoAt`.
-5. Registro del módulo: `access-matrix.ts`, `core-surface.ts`, `page-matrix.ts` y `url-matrix.ts` (CORE_OLA1), `navigation-module-map.ts`, `section-views.ts` (oculto a gerencia@), `module-guides.ts`, `legacy-path-remap.ts` (no traducir `mis-actividades`→`my-activities`).
-6. `OpsActivityForm` acepta `selfAssign` (usa POST /me/activities y tolera 403 de proyectos/AN). Espejo de encargados en web: `isAreaManagerEmail` / `isCeoEmail` en `lib/activity-kinds.ts`.
-7. EXEC-PACKET listo para Cursor: pasada de usabilidad de Actividades (pizarra, ficha, asignar, formulario) y Asistencias.
+1. Síntoma: Luis despachaba AN-0001 a Antonio y salía `{"statusCode":409,"errorCode":"DUPLICATE"...,"path":"/api/activities/1/team"}`.
+2. Causa: la migración `20260912010000_evidence_per_user_core_kind` solo borraba *constraints* únicos, pero Prisma había creado la unicidad vieja como *índice* `activity_evidences_activityId_key`. Sobrevivió junto al nuevo `(activityId, userId)`, así que el `activityEvidence.upsert` de `ActivityTeamService.addMember` fallaba (P2002) al sumar a cualquier 2.ª persona a un equipo. La fila de assignee sí se creaba; la evidencia no.
+3. Arreglo: migración nueva `20260913180000_drop_evidence_activity_unique_index` (DROP INDEX + barrido de índices únicos solo por activityId). Aplicada en Docker. Único dato afectado: actividad 1 / Antonio (assignee sin evidencia); se corrige solo al reintentar «Asignar al equipo».
+4. «Pendiente de despacho» ya no se queda pegado: la API manda `teamEmails` en `openActivities` (`team-board.service.ts`) y `DespachoPendingPanel` solo lo muestra si nadie del grupo del encargado está asignado (Luis → Antonio; Antonio → Carolina/Alejandro; David → instaladores). Antes Antonio nunca lo veía como pendiente y Luis lo veía para siempre.
+5. Checkbox gigante en el panel de despacho: estilo propio 20×20 (el input global ocupa 100% de ancho).
+6. Sigue vigente el turno anterior (commit 2e5732c2): Mis actividades + auto-asignación; EXEC-PACKET de usabilidad LISTO PARA CURSOR (no empezado).
 
 ### Verificado
 
-- `tsc --noEmit` API: limpio (tras `prisma generate`).
+- `prisma migrate deploy` aplicó `20260913180000_drop_evidence_activity_unique_index`; en `activity_evidences` ya solo queda el único `(activityId, userId)`.
+- `tsc --noEmit` API: limpio.
 - `tsc --noEmit` web: sin errores nuevos; siguen 4 previos y ajenos.
-- `vitest lib/rbac/role-modules.spec.ts`: 25 fallos en HEAD y los mismos 25 ahora (0 nuevos; la spec ya estaba desactualizada).
-- Docker 17:45 UTC: `build api web` + `prisma migrate deploy` (aplicó `20260913170000_assignee_execution_order`; columnas `orden*` presentes) + `up -d`. API arrancó sin errores; `GET`/`POST /api/me/activities` y `PATCH /api/me/activities/order` → 401 sin sesión (rutas vivas); `/erp/mis-actividades` 200 y el bundle trae «Auto-asignarme» y «Te la regresaron».
+- Docker 18:04 UTC: `build api web` + `up -d`. API arrancó sin errores; `dist/me/team-board.service.js` trae `teamEmails` y la imagen incluye la migración nueva; el bundle de `pizarra/[userId]` trae el filtro; `/api/me/board` y `/api/activities/1/team` → 401 sin sesión; `/erp/pizarra/7` 200.
 
 ### Falta probar a mano
 
-1. Entrar como David: menú «Mis actividades», «＋ Auto-asignarme», crear Tarea con tipo, ver la tarjeta resaltada.
-2. Subir/Bajar pide motivo; el motivo aparece en la tarjeta.
-3. Entrar como Carolina o Joan: ve su lista sin botones de ordenar ni auto-asignarse.
-4. Christian no ve el módulo en el menú.
-5. Antonio / Daniela / Mónica pueden auto-asignarse (antes el formulario los bloqueaba).
+1. Luis → su ficha → «Pendiente de despacho» → AN-0001 → Antonio → «Asignar al equipo»: sin error y desaparece del panel de Luis.
+2. Antonio → su ficha: AN-0001 aparece en su «Pendiente de despacho»; elige Carolina o Alejandro y desaparece.
+3. Checkbox del panel de tamaño normal.
 
 ### A medias
 
-Nada de este turno. Pasada de usabilidad → EXEC-PACKET para Cursor (`.ai/EXEC-PACKET.md`, Estado LISTO PARA CURSOR).
+Nada.
 
 ### Siguiente
 
-Cursor ejecuta el EXEC-PACKET. Pendiente conocido: reintentar tras error de equipo en asignar duplica la actividad.
+Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad Actividades + Asistencias). Al desplegar a producción, la migración `20260913180000_drop_evidence_activity_unique_index` debe ir junto con `20260912010000`, o el 409 aparecerá allá también.
 
 ### No tocar
 

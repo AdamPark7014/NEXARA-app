@@ -15,6 +15,7 @@ export type DespachoPendingItem = {
   titulo: string;
   assignmentCharge?: string | null;
   indicaciones?: string | null;
+  teamEmails?: string[];
 };
 
 type Props = {
@@ -32,10 +33,19 @@ export default function DespachoPendingPanel({
   pending,
   onDone,
 }: Props) {
-  const despachos = useMemo(
-    () => pending.filter((p) => (p.assignmentCharge || "").toLowerCase() === "despacho"),
-    [pending],
-  );
+  // Pendiente = despacho que aún no tiene a nadie del grupo de este encargado
+  // (Luis → Antonio; Antonio → Carolina/Alejandro; David → instaladores).
+  const despachos = useMemo(() => {
+    const pool = new Set(dispatchPoolEmails(managerEmail).map((e) => e.toLowerCase()));
+    const self = (managerEmail || "").trim().toLowerCase();
+    return pending.filter((p) => {
+      if ((p.assignmentCharge || "").toLowerCase() !== "despacho") return false;
+      if (!p.teamEmails) return true; // API sin teamEmails: comportamiento anterior
+      const team = p.teamEmails.map((e) => e.toLowerCase());
+      if (pool.size) return !team.some((e) => pool.has(e));
+      return !team.some((e) => e !== self);
+    });
+  }, [pending, managerEmail]);
 
   const [roster, setRoster] = useState<TeamBoardUser[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -198,6 +208,8 @@ export default function DespachoPendingPanel({
                             checked={checked}
                             onChange={() => toggle(u.id)}
                             disabled={saving}
+                            // El input global ocupa 100% de ancho: sin esto el checkbox sale gigante.
+                            style={{ width: 20, height: 20, minWidth: 20, flex: "0 0 auto", margin: 0 }}
                           />
                           <span style={{ fontWeight: 650 }}>{u.nombre}</span>
                         </label>

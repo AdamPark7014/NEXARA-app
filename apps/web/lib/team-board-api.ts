@@ -24,6 +24,8 @@ export type TeamBoardOpenActivity = {
   fechaFinalizacion: string | null;
   /** Indicaciones del assignee (p. ej. Cupo: N personas). */
   indicaciones?: string | null;
+  /** Emails del equipo activo: dice si un despacho ya se repartió. */
+  teamEmails?: string[];
 };
 
 export type TeamBoardUser = {
