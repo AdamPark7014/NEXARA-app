@@ -1,7 +1,7 @@
 # RELEVO
 
 - **Último turno:** cursor
-- **Fecha:** 2026-09-12
+- **Fecha:** 2026-09-13
 - **Rama:** mejora/calidad-y-web
 - **HEAD:** (cerrar)
 
@@ -9,22 +9,24 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Lookup fiscal SAT (RFC / régimen)
+## Este turno — Pizarra Luis ve a Antonio
 
 ### Hecho
 
-1. **Realidad SAT:** no hay API pública gratuita de Constancia (razón social + régimen inscrito). Solo validador web (RFC/nombre/CP).
-2. **`SatService.lookupFiscalByRfc`**: validación local (formato + checksum) + catálogo `c_RegimenFiscal` filtrado PF/PM; si hay `FACTURAMA_*` valida existencia; si hay `SAT_DATOS_FISCALES_URL` + `API_KEY` intenta razón social/CP/régimenes.
-3. Endpoints: `GET ventas/clientes/fiscal-lookup?rfc=` y `GET …/invoices/sat/fiscal-lookup/:rfc`.
-4. UI: `FiscalRfcLookup` en **Nuevo cliente** y **CRM datos**; botón «Consultar SAT» + select de régimen (ya no texto libre tipo 503).
-5. `.env.example` documenta vars opcionales.
+**Causa:** la pizarra filtra por árbol `managerId`. En el seed, Antonio (`jose.ramirez@…`) reporta a Christian, no a Luis → Luis solo se veía a sí mismo y no podía asignarle.
+
+**Fix:** `TeamBoardService.boardExtraEmails` — Luis además ve a Antonio + Carolina + Alejandro (peers operativos). Antonio ve a Carolina/Alejandro aunque falle managerId.
+
+Archivo: `apps/api/src/me/team-board.service.ts`.
+
+Flujo esperado: Luis → toca Antonio → Despacho → suma Carolina/Alejandro (o Servicio con puente a Antonio).
 
 ### Verificar
 
-1. Reiniciar API → `/erp/clientes/nuevo`
-2. RFC moral 12 chars → régimenes 601…; «Consultar SAT» → mensaje + select.
-3. Con Facturama en `.env` → status localizado/activo.
-4. Razón social auto solo si `SAT_DATOS_FISCALES_*` está configurado.
+1. Reiniciar / hot-reload API.
+2. Login Luis (`direccion.operaciones@nexara.com.mx`) → `/erp/pizarra`.
+3. Deben verse Antonio (+ soporte).
+4. Tocar Antonio → Asignar → Despacho o Servicio.
 
 ### A medias
 
@@ -32,8 +34,8 @@ Nada.
 
 ### Siguiente
 
-Si Adam quiere razón social 100% auto: dar API key de API Market/Singula/Paladins → se pega en env y ya.
+Lo que Adam diga.
 
 ### No tocar
 
-Puente NAS. Credenciales PAC en repo.
+Puente NAS. Plan files.

@@ -223,6 +223,21 @@ export class TeamBoardService {
       ? allActive
       : allActive.filter((u) => this.subtreeIds(viewer.id, allActive).has(u.id));
 
+    // Peers operativos por email (no solo managerId): Luis despacha a Antonio
+    // aunque Antonio reporte a Christian en el organigrama.
+    if (!companyWide) {
+      const extras = this.boardExtraEmails(viewerResolved.email);
+      if (extras.length) {
+        const have = new Set(scoped.map((u) => u.id));
+        for (const u of allActive) {
+          if (have.has(u.id)) continue;
+          if (!extras.includes(u.email.toLowerCase())) continue;
+          scoped.push(u);
+          have.add(u.id);
+        }
+      }
+    }
+
     // Nunca mostrar al CEO Christian en la pizarra de nadie.
     scoped = scoped.filter((u) => u.email.toLowerCase() !== 'gerencia@nexara.com.mx');
 
@@ -414,6 +429,25 @@ export class TeamBoardService {
     if (viewer.roleKey === 'ceo') return true;
     const email = (viewer.email || '').toLowerCase();
     return email === 'gerencia@nexara.com.mx' || email === 'developer@nexara.com.mx';
+  }
+
+  /**
+   * Gente que debe verse en pizarra aunque managerId no los cuelgue del viewer.
+   * Luis (coord. servicios) → Antonio + soporte; Antonio → Carolina/Alejandro.
+   */
+  private boardExtraEmails(viewerEmail?: string | null): string[] {
+    const email = (viewerEmail || '').trim().toLowerCase();
+    if (email === 'direccion.operaciones@nexara.com.mx') {
+      return [
+        'jose.ramirez@nexara.com.mx',
+        'soporte@nexara.com.mx',
+        'alejandro.gonzalez@nexara.com.mx',
+      ];
+    }
+    if (email === 'jose.ramirez@nexara.com.mx') {
+      return ['soporte@nexara.com.mx', 'alejandro.gonzalez@nexara.com.mx'];
+    }
+    return [];
   }
 
   private subtreeIds(
