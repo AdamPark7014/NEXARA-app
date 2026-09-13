@@ -447,6 +447,14 @@ export class TeamBoardService {
     if (email === 'jose.ramirez@nexara.com.mx') {
       return ['soporte@nexara.com.mx', 'alejandro.gonzalez@nexara.com.mx'];
     }
+    // David: instaladores de campo (por si managerId local no coincide con el seed)
+    if (email === 'operaciones@nexara.com.mx') {
+      return [
+        'joan.sanchez@nexara.com.mx',
+        'israel.ramos@nexara.com.mx',
+        'juan.gonzalez@nexara.com.mx',
+      ];
+    }
     return [];
   }
 
