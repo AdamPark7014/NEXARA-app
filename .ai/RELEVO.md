@@ -3,7 +3,7 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-13
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** (cerrar)
+- **HEAD:** 9fe0cb49
 
 ## Puente — no cambiar
 
