@@ -53,6 +53,8 @@ export type TeamBoardHistoryItem = {
   titulo: string;
   estatus: string;
   coreKind: string | null;
+  /** Subtipo de tarea (Levantamiento, Junta…) o texto libre de «Otro». */
+  ticketTypeCustom: string | null;
   assignmentCharge: string | null;
   fechaAsignacion: Date;
   fechaFinalizacion: Date | null;
@@ -148,6 +150,7 @@ export class TeamBoardService {
         titulo: true,
         estatus: true,
         coreKind: true,
+        ticketTypeCustom: true,
         assignmentCharge: true,
         fechaAsignacion: true,
         fechaFinalizacion: true,
@@ -176,6 +179,7 @@ export class TeamBoardService {
         titulo: a.titulo,
         estatus: a.estatus,
         coreKind: a.coreKind,
+        ticketTypeCustom: a.ticketTypeCustom,
         assignmentCharge: a.assignmentCharge,
         fechaAsignacion: a.fechaAsignacion,
         fechaFinalizacion: a.fechaFinalizacion,

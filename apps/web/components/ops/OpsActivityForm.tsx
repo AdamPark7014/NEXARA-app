@@ -34,7 +34,7 @@ import {
   clientSectorsForActivityKind,
   type ClientSector,
 } from "@/lib/client-sectors";
-import type { ActivityKind } from "@/lib/activity-kinds";
+import { TAREA_TIPOS, type ActivityKind } from "@/lib/activity-kinds";
 
 type Props = {
   activityId?: number;
@@ -123,8 +123,17 @@ export default function OpsActivityForm({
     Array<{ serviceClientId: number; name: string; salesClientId: number }>
   >([]);
 
+  const [tareaOtroOpen, setTareaOtroOpen] = useState(false);
+
   const needsClientPicker = coreKind === "servicio" || coreKind === "comercial";
   const filtersProjectsBySector = coreKind === "proyecto" || coreKind === "obra";
+
+  // Tarea Core: subtipo obligatorio (Levantamiento, Junta… u Otro con texto libre).
+  const isTareaCore = tone === "core" && coreKind === "tarea";
+  const tareaPreset = TAREA_TIPOS.find((t) => t.id !== "otro" && t.label === form.ticketTypeCustom);
+  const tareaTipo = tareaOtroOpen
+    ? "otro"
+    : tareaPreset?.id ?? (form.ticketType === "OTRO" && form.ticketTypeCustom.trim() ? "otro" : "");
 
   const activeProjects = useMemo(() => {
     const active = projects.filter((p) => p.status === "ACTIVE");
@@ -295,6 +304,14 @@ export default function OpsActivityForm({
       setError("Título y responsable son obligatorios");
       return;
     }
+    if (isTareaCore && !tareaTipo) {
+      setError("Elige el tipo de tarea");
+      return;
+    }
+    if (isTareaCore && tareaTipo === "otro" && !form.ticketTypeCustom.trim()) {
+      setError("Especifica el tipo de tarea");
+      return;
+    }
     if (form.projectMode === "with_project" && !form.projectId) {
       setError("Selecciona un proyecto");
       return;
@@ -338,6 +355,7 @@ export default function OpsActivityForm({
               : "OT creada",
         );
         setForm({ ...EMPTY_ACTIVITY_FORM });
+        setTareaOtroOpen(false);
         const next = await fetchNextAnNumber(token);
         setNextAn(typeof next?.next === "string" ? next.next : "");
         if (newId > 0) onSuccess?.(newId);
@@ -552,6 +570,67 @@ export default function OpsActivityForm({
                   : "Trabajo del día sin proyecto."
                 : "Sin proyecto: trabajo interno o ad-hoc. No se pide proyecto operativo."}
             </div>
+            {isTareaCore ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 650 }}>Tipo de tarea *</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {TAREA_TIPOS.map((t) => {
+                    const on = tareaTipo === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          const isOtro = t.id === "otro";
+                          setTareaOtroOpen(isOtro);
+                          setForm((prev) => ({
+                            ...prev,
+                            ticketType: "OTRO",
+                            ticketTypeCustom: isOtro
+                              ? tareaTipo === "otro"
+                                ? prev.ticketTypeCustom
+                                : ""
+                              : t.label,
+                            workType: "ISSUE",
+                          }));
+                        }}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "7px 12px",
+                          borderRadius: 999,
+                          border: on ? "1.5px solid var(--primary)" : "1px solid var(--border)",
+                          background: on
+                            ? "color-mix(in srgb, var(--primary) 12%, var(--surface))"
+                            : "var(--surface)",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          color: "inherit",
+                          fontSize: 12.5,
+                          fontWeight: on ? 750 : 600,
+                        }}
+                      >
+                        <span aria-hidden>{t.emoji}</span>
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {tareaTipo === "otro" ? (
+                  <input
+                    className="input"
+                    autoFocus
+                    maxLength={120}
+                    placeholder="Especifica el tipo (ej. Visita a proveedor)"
+                    value={form.ticketTypeCustom}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, ticketType: "OTRO", ticketTypeCustom: e.target.value }))
+                    }
+                  />
+                ) : null}
+              </div>
+            ) : null}
             {needsClientPicker ? (
               <select
                 className="input"

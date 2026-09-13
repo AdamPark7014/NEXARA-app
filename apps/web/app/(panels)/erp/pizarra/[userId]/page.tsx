@@ -302,6 +302,7 @@ export default function PizarraPersonaPage() {
                     {h.estatus}
                     {ev ? ` · avance ${ev.progressPct}%` : ""}
                     {h.coreKind ? ` · ${h.coreKind}` : ""}
+                    {h.coreKind === "tarea" && h.ticketTypeCustom ? ` · ${h.ticketTypeCustom}` : ""}
                     {chargeLabel ? ` · ${chargeLabel.badge}` : ""}
                   </div>
                 </button>
