@@ -336,6 +336,7 @@ export class ActivityTeamService {
       where: { id: activityId, ...companyWhere(tenantId) },
       select: {
         assignmentCharge: true,
+        estatus: true,
         fechaAsignacion: true,
         fechaInicio: true,
         fechaFinalizacion: true,
@@ -437,12 +438,14 @@ export class ActivityTeamService {
       });
     }
     if (activity.fechaInicio) {
+      // fechaInicio se llena al programar (día/hora del formulario): solo es «inicio» si ya arrancó.
+      const arranco = /proceso|validar|finaliz|complet|aprob|rechaz/i.test(activity.estatus || '');
       events.push({
         id: 'started',
         at: new Date(activity.fechaInicio).toISOString(),
-        kind: 'estado',
-        title: 'Inicio en campo',
-        icon: '🚀',
+        kind: arranco ? 'estado' : 'agenda',
+        title: arranco ? 'Inicio en campo' : 'Programada',
+        icon: arranco ? '🚀' : '📅',
       });
     }
     if (activity.acsEnteredAt) {

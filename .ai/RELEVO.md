@@ -9,30 +9,25 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Despacho sin evidencia, registro y avisos a Luis + Christian
+## Este turno — Despacho ya no se muestra como trabajo propio de quien reparte
 
 ### Hecho
 
-1. Petición de Adam: en actividades de despacho quien reparte (Luis, Antonio) no adjunta evidencia, solo la pasa a quien debe y queda un registro; cuando llega al ingeniero de soporte, el seguimiento y estatus es de Luis; todos los avisos conectados también a Christian; lo repartido pasa a «En seguimiento».
-2. Regla: en `assignmentCharge = despacho`, el LEAD (incluido el responsable) solo reparte. API: `ActivitiesService.create` y `ActivityTeamService.addMember` ya no crean su `ActivityEvidence`; `getOrCreateActivityEvidence` le responde 403; `maybeFinalizeActivity` ya no le exige evidencia para el cierre automático (antes Luis y Antonio bloqueaban el cierre).
-3. Registro de despacho: `ActivityAssignee.asignadoPorId` (migración `20260913190000_assignee_dispatch_log`, con backfill del responsable = creador y borrado de evidencias vacías de quienes reparten). `POST /activities/:id/team` guarda quién asignó. `GET /activities/:id/timeline` agrega eventos `despacho` («Luis la pasó a Antonio», «Antonio la asignó a Carolina», con cupo/indicaciones).
-4. Avisos (`notification-hierarchy.service.ts`): helper `getCeoUserIds` (gerencia@). Asignación, despacho (`notifyActivityDispatched`: a quien recibe, al responsable y a Christian), inicio, evidencias enviadas (ahora con el técnico real como autor + responsable + Christian), aprobación/rechazo (responsable + dueño de la evidencia + Christian) y cierre automático (`notifyActivityAutoCompleted`: responsable + Christian).
-5. Mis actividades: API devuelve `seguimiento` (despachador que ya la pasó), `porRepartir` y `pasadaA` (cadena con avance del ejecutor). Web: sección «👀 En seguimiento» con «Pasada a Antonio → Carolina», avance del ejecutor y «Ver registro»; en «Por hacer», chip «Te toca repartirla» + botón «Repartir →» a su ficha de pizarra.
-6. Detalle Core: pestaña «Historial» (`/erp/actividades/:id/historial`, reusa OPS). En Evidencias, quien reparte ve «Tú repartes esta actividad» y no puede capturar.
-7. `DespachoPendingPanel`: el cupo viaja a quien recibe (indicaciones).
+1. Síntoma (Adam): AN-0001 se asignó como despacho a equipo y en la actividad/pizarra salía como si fuera trabajo de Luis.
+2. Historial (`ActivityTeamService.buildTimeline`): `fechaInicio` se llena al programar (día/hora del formulario); si la actividad no ha arrancado se muestra «📅 Programada» (kind `agenda`) en vez de «Inicio en campo». `historial/page.tsx`: tiempos futuros dicen «En 40 min» en lugar de «Justo ahora».
+3. Detalle (`ops/activities/[id]/page.tsx`, usado también en `/erp/actividades/:id`): si `assignmentCharge = despacho` muestra etiqueta «Despacho a equipo», campo «Encargo», KPI «Ejecuta» (no LEAD del equipo o «Por asignar») con nota «coordina <responsable>», y en Información general «Coordina (despacho)» (LEAD en cadena) + «Ejecuta» en lugar de «Responsable».
+4. Pizarra (`team-board.service.ts`): cada actividad abierta trae `reparte` (LEAD en despacho). «Actividad en curso» y estado activo/atrasado salen solo de lo que la persona ejecuta; la lista de abiertas se conserva para el panel de despacho.
 
 ### Verificado
 
-- `prisma generate` + `tsc --noEmit` API: limpio.
-- `tsc --noEmit` web: sin errores nuevos; siguen 4 previos y ajenos.
-- Docker 19:07 UTC: `build api web` + `prisma migrate deploy` (aplicó `20260913190000_assignee_dispatch_log`) + `up -d`; API arrancó sin errores. BD: en AN-0001 Luis quedó `asignadoPorId` = Christian y sin evidencia (borrada por la migración); Antonio sin evidencia y `asignadoPorId` = Luis (relleno manual local: su despacho previo al campo, confirmado en el log del 409). `/api/me/activities` y `/api/activities/1/timeline` → 401 sin sesión; `/erp/actividades/1/historial` 200; el bundle trae «En seguimiento», «Te toca repartirla» y la nota de Evidencias para quien reparte.
+- `tsc --noEmit` API: limpio. Web: sin errores nuevos; siguen 4 previos y ajenos.
+- Docker 19:28 UTC `build api web` + `up -d`; API arrancó sin errores. `dist/activities/activity-team.service.js` trae «Programada» y `dist/me/team-board.service.js` trae `reparte`; el bundle web trae «Despacho a equipo», «Encargo» y «Coordina (despacho)»; `/erp/actividades/1` 200; `/api/me/board` 401 sin sesión.
 
 ### Falta probar a mano
 
-1. Luis → Mis actividades: AN-0001 aparece «Por hacer» con «Te toca repartirla» (o «En seguimiento» si ya la pasó a Antonio).
-2. Luis despacha a Antonio → Antonio recibe aviso; Luis y Christian reciben «Despacho registrado»; en la actividad, pestaña Historial muestra «Luis la pasó a Antonio».
-3. Antonio asigna a Carolina → Carolina recibe «Nueva actividad asignada»; Evidencias: Antonio no puede capturar, Carolina sí.
-4. Carolina termina su evidencia → la actividad se cierra sola y Luis + Christian reciben «Actividad terminada».
+1. Luis → ficha en pizarra: AN-0001 ya no sale como «Actividad en curso».
+2. `/erp/actividades/1`: «Despacho a equipo», «Ejecuta: Por asignar», «Coordina: Luis → José Antonio».
+3. Historial de AN-0001: «📅 Programada» con «En …» si la hora es futura.
 
 ### A medias
 

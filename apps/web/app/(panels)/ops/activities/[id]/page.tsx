@@ -191,6 +191,13 @@ export default function ActivityDetailPage() {
   const activeFlowIdx = Math.max(0, activityFlow.findIndex((s) => s.key === activeFlowKey));
   const priorityDisplay = normalizePriorityDisplay(activity.prioridad) || activity.prioridad || "—";
   const hasProject = Boolean(activity.projectId || activity.project?.id);
+  // Despacho a equipo: el responsable (y los LEAD) coordinan; ejecuta el resto del equipo.
+  const despacho = activity.assignmentCharge === "despacho";
+  const nombres = (rows: NonNullable<typeof activity.assignees>) =>
+    rows.map((m) => m.user?.nombre).filter((n): n is string => Boolean(n));
+  const coordinan = nombres((activity.assignees ?? []).filter((m) => m.rol === "LEAD"));
+  const ejecutores = nombres((activity.assignees ?? []).filter((m) => m.rol !== "LEAD"));
+  const ejecutaLabel = ejecutores.length ? ejecutores.join(", ") : "Por asignar";
 
   return (
     <>
@@ -215,7 +222,16 @@ export default function ActivityDetailPage() {
         <KpiCard label="Estado" value={activity.estatus.replace(/_/g, " ")} variant={activityStatusVariant(activity.estatus)} icon="📋" />
         <KpiCard label="Prioridad" value={priorityDisplay} variant={/urgente|alta/i.test(priorityDisplay) ? (/urgente/i.test(priorityDisplay) ? "danger" : "warning") : "default"} icon="⚡" />
         <KpiCard label="Evidencias" value={evidenceCount} icon="📎" hint="Archivos adjuntos" />
-        <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon="👷" />
+        {despacho ? (
+          <KpiCard
+            label="Ejecuta"
+            value={ejecutaLabel}
+            icon="👷"
+            hint={`Despacho · coordina ${activity.responsable?.nombre ?? "—"}`}
+          />
+        ) : (
+          <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon="👷" />
+        )}
       </div>
 
       <DetailSection title="Contexto de la OT">
@@ -223,6 +239,16 @@ export default function ActivityDetailPage() {
           <DetailField
             label="Modo"
             value={hasProject ? "Con proyecto" : "Sin proyecto"}
+          />
+          <DetailField
+            label="Encargo"
+            value={
+              despacho
+                ? "Despacho a equipo"
+                : activity.assignmentCharge === "ejecucion"
+                  ? "Ejecución directa"
+                  : "—"
+            }
           />
           <DetailField
             label="Proyecto"
@@ -286,6 +312,7 @@ export default function ActivityDetailPage() {
             <Tag variant={activityStatusVariant(activity.estatus)}>{activity.estatus.replace(/_/g, " ")}</Tag>
             {priorityDisplay !== "—" && <Tag variant="warning">{priorityDisplay}</Tag>}
             {activity.ticketType && <Tag variant="neutral">{activity.ticketType}</Tag>}
+            {despacho && <Tag variant="accent">Despacho a equipo</Tag>}
             <Tag variant={hasProject ? "accent" : "neutral"}>{hasProject ? "Con proyecto" : "Sin proyecto"}</Tag>
           </div>
           {canEdit && !editing && (
@@ -309,7 +336,17 @@ export default function ActivityDetailPage() {
                 </CrossPanelLink>
               ) : (activity.client?.name ?? "—")} />
               <DetailField label="Sucursal" value={branch || activity.branchAddress} />
-              <DetailField label="Responsable" value={activity.responsable?.nombre} />
+              {despacho ? (
+                <>
+                  <DetailField
+                    label="Coordina (despacho)"
+                    value={coordinan.join(" → ") || activity.responsable?.nombre}
+                  />
+                  <DetailField label="Ejecuta" value={ejecutaLabel} />
+                </>
+              ) : (
+                <DetailField label="Responsable" value={activity.responsable?.nombre} />
+              )}
               <DetailField label="Creador" value={activity.creador?.nombre} />
               <DetailField label="Asignación" value={formatDateTime(activity.fechaAsignacion)} />
               <DetailField label="Inicio" value={formatDateTime(activity.fechaInicio)} />

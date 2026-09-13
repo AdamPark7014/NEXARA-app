@@ -12,12 +12,14 @@ import { listActivityTimeline, type ActivityTimelineEvent } from "@/lib/ops-acti
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diff / 60000);
+  const mins = Math.round(Math.abs(diff) / 60000);
   if (mins < 2) return "Justo ahora";
-  if (mins < 60) return `Hace ${mins} min`;
+  // Eventos programados (fecha futura): «En 40 min», no «Justo ahora».
+  const fmt = (v: string) => (diff < 0 ? `En ${v}` : `Hace ${v}`);
+  if (mins < 60) return fmt(`${mins} min`);
   const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `Hace ${hrs}h`;
-  return `Hace ${Math.round(hrs / 24)}d`;
+  if (hrs < 24) return fmt(`${hrs}h`);
+  return fmt(`${Math.round(hrs / 24)}d`);
 }
 
 export default function ActivityHistoryPage() {
