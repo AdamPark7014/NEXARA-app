@@ -10,6 +10,7 @@ import {
   ASSIGNMENT_CHARGES,
   canOfferAssignmentCharge,
   forcesDespachoOnly,
+  forcesEjecucionOnly,
   formatDispatchHeadcountNote,
   isServicioBridgeEmail,
   kindsForAssignment,
@@ -101,10 +102,22 @@ export default function AsignarActividadPage() {
   );
 
   const kindMeta = kind ? metaForKind(kind) : null;
-  const despachoOnly = forcesDespachoOnly(person?.email);
-  const offerCharge = canOfferAssignmentCharge(person?.email) && !despachoOnly;
-  const chargeReady = despachoOnly || !canOfferAssignmentCharge(person?.email) || charge != null;
-  const effectiveCharge: AssignmentCharge | null = despachoOnly ? "despacho" : charge;
+  // Solo Luis: servicio → despacho+cupo; tarea/proyecto/comercial → ejecución directa.
+  // David/Antonio/Josué: eligen ejecución vs despacho.
+  const despachoOnly = forcesDespachoOnly(person?.email, kind);
+  const ejecucionOnly = forcesEjecucionOnly(person?.email, kind);
+  const offerCharge =
+    canOfferAssignmentCharge(person?.email) && !despachoOnly && !ejecucionOnly;
+  const chargeReady =
+    despachoOnly ||
+    ejecucionOnly ||
+    !canOfferAssignmentCharge(person?.email) ||
+    charge != null;
+  const effectiveCharge: AssignmentCharge | null = despachoOnly
+    ? "despacho"
+    : ejecucionOnly
+      ? "ejecucion"
+      : charge;
   const chargeMeta = effectiveCharge ? ASSIGNMENT_CHARGES[effectiveCharge] : null;
 
   const bridgeNeeded =
@@ -164,9 +177,16 @@ export default function AsignarActividadPage() {
   }, [userId]);
 
   useEffect(() => {
+    setCharge(null);
+    setHeadcount(1);
+    setExtraIds([]);
+  }, [kind]);
+
+  useEffect(() => {
     if (despachoOnly) setCharge("despacho");
+    else if (ejecucionOnly) setCharge("ejecucion");
     else if (!offerCharge) setCharge(null);
-  }, [despachoOnly, offerCharge]);
+  }, [despachoOnly, ejecucionOnly, offerCharge]);
 
   const load = useCallback(async () => {
     if (!token || !Number.isFinite(userId)) return;
@@ -213,7 +233,7 @@ export default function AsignarActividadPage() {
     }
     setTeamError(null);
     try {
-      // Encargados (Luis/David/Antonio/Josué): solo despacho + cupo; ellos reparten después.
+      // Luis + servicio: despacho + cupo; él reparte después (a Antonio).
       if (despachoOnly) {
         await addTeamMember(
           token,
@@ -222,6 +242,15 @@ export default function AsignarActividadPage() {
           formatDispatchHeadcountNote(headcount, leadNotes),
           "LEAD",
         );
+        router.push(`/erp/pizarra/${userId}`);
+        return;
+      }
+
+      // Luis + tarea/proyecto/comercial: ejecución personal, sin equipo.
+      if (ejecucionOnly) {
+        if (leadNotes.trim()) {
+          await addTeamMember(token, activityId, userId, leadNotes.trim(), "LEAD");
+        }
         router.push(`/erp/pizarra/${userId}`);
         return;
       }
@@ -423,16 +452,8 @@ export default function AsignarActividadPage() {
             </div>
             <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 800 }}>Despacho a equipo</p>
             <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-              Solo aparece {displayName.split(/\s+/).slice(0, 2).join(" ")}. Le dejas la actividad y cuántas
-              personas ocupas; él la reparte a su gente
-              {person?.email?.toLowerCase() === ORG_EMAILS.luis
-                ? " (manda a Antonio; Antonio elige al soporte)"
-                : person?.email?.toLowerCase() === ORG_EMAILS.antonio
-                  ? " (Carolina / Alejandro)"
-                  : person?.email?.toLowerCase() === ORG_EMAILS.david
-                    ? " (instaladores de campo)"
-                    : ""}
-              .
+              Solo en servicios: le dejas la actividad y cuántas personas ocupas; él manda a Antonio y
+              Antonio elige al soporte.
             </p>
           </div>
           <label style={{ display: "grid", gap: 4, maxWidth: 220 }}>
@@ -466,6 +487,51 @@ export default function AsignarActividadPage() {
               onChange={(e) => setLeadNotes(e.target.value)}
               rows={2}
               placeholder="Qué debe coordinar / contexto…"
+              style={{
+                width: "100%",
+                padding: 8,
+                borderRadius: 10,
+                border: "1px solid var(--border)",
+                fontFamily: "inherit",
+                fontSize: 13,
+                resize: "vertical",
+                background: "var(--surface)",
+                color: "inherit",
+              }}
+            />
+          </label>
+        </section>
+      ) : null}
+
+      {kind && ejecucionOnly && !bridgeNeeded ? (
+        <section
+          style={{
+            padding: 14,
+            borderRadius: 16,
+            border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
+            background: "color-mix(in srgb, var(--primary) 8%, var(--surface))",
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 750, color: "var(--text-secondary)" }}>
+              2 · Encargo a {displayName.split(/\s+/).slice(0, 2).join(" ")}
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 800 }}>Ejecución directa</p>
+            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+              Actividad personal suya: la hace él, sin despacho a equipo.
+            </p>
+          </div>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
+              Indicaciones (opcional)
+            </span>
+            <textarea
+              value={leadNotes}
+              onChange={(e) => setLeadNotes(e.target.value)}
+              rows={2}
+              placeholder="Qué debe hacer…"
               style={{
                 width: "100%",
                 padding: 8,
@@ -571,7 +637,7 @@ export default function AsignarActividadPage() {
 
       {kindMeta && !bridgeNeeded && chargeReady ? (
         <>
-          {!despachoOnly ? (
+          {!despachoOnly && !ejecucionOnly ? (
           <section
             style={{
               padding: 14,
@@ -765,7 +831,8 @@ export default function AsignarActividadPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 12, color: "var(--text-secondary)" }}>
-              {despachoOnly ? "3" : offerCharge ? "4" : "3"} · {kindMeta.emoji} {kindMeta.title}
+              {despachoOnly || ejecucionOnly ? "3" : offerCharge ? "4" : "3"} · {kindMeta.emoji}{" "}
+              {kindMeta.title}
               {chargeMeta ? ` · ${chargeMeta.badge}` : ""}
               {despachoOnly ? ` · ${headcount} persona${headcount === 1 ? "" : "s"}` : ""}
             </div>
