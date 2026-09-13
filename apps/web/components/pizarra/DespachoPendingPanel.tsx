@@ -100,6 +100,8 @@ export default function DespachoPendingPanel({
     setSaving(true);
     setMsg(null);
     try {
+      // El cupo viaja con la actividad a quien la recibe.
+      const cupoNota = despachos.find((d) => d.id === activeId)?.indicaciones || undefined;
       for (const userId of selected) {
         // Luis → Antonio como LEAD (él decide el soporte). Resto: TECNICO.
         const email = (candidates.find((c) => c.id === userId)?.email || "").toLowerCase();
@@ -107,7 +109,11 @@ export default function DespachoPendingPanel({
           isLuis && email === ORG_EMAILS.antonio
             ? "LEAD"
             : "TECNICO";
-        await addActivityTeamMember(token, activeId, { userId, rol });
+        await addActivityTeamMember(token, activeId, {
+          userId,
+          rol,
+          ...(cupoNota ? { indicaciones: cupoNota } : {}),
+        });
       }
       setMsg(`Asignado a ${selected.length} persona(s)`);
       setActiveId(null);

@@ -28,6 +28,18 @@ export type MyActivityItem = {
   orden: number | null;
   ordenJustificacion: string | null;
   ordenActualizadoAt: string | null;
+  /** En despacho, este usuario solo reparte (no sube evidencia). */
+  despachador: boolean;
+  /** Despachador que todavía no la pasa a nadie. */
+  porRepartir: boolean;
+  /** Registro de despacho: a quién se pasó después de este usuario. */
+  pasadaA: Array<{
+    nombre: string;
+    rol: string;
+    at: string;
+    por: string | null;
+    evidenceStatus: string | null;
+  }>;
 };
 
 export type MyActivitiesResponse = {
@@ -36,6 +48,8 @@ export type MyActivitiesResponse = {
   /** Encargados de área: pueden auto-asignarse actividades. */
   canSelfAssign: boolean;
   open: MyActivityItem[];
+  /** Ya repartidas por este usuario: da seguimiento. */
+  seguimiento: MyActivityItem[];
   doneToday: MyActivityItem[];
 };
 

@@ -45,8 +45,9 @@ export class ActivityTeamController {
     @Param('id', ParseIntPipe) activityId: number,
     @Body() body: { userId: number; rol?: AssigneeRole; horasPlan?: number; indicaciones?: string },
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
   ) {
-    return this.service.addMember(activityId, body, companyId);
+    return this.service.addMember(activityId, body, companyId, Number(user?.id) || null);
   }
 
   @Delete(':userId')

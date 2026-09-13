@@ -607,6 +607,7 @@ model User {
   cvsSuperadminReviewed     CvCandidate[]              @relation("CvSuperadminReviewedBy")
   companyMemberships        UserCompany[]
   participacionesActividad  ActivityAssignee[]         @relation("ActivityAssignedUser")
+  asignacionesDespachadas   ActivityAssignee[]         @relation("ActivityAssignedBy")
   reasignacionesDesde       ActivityReassignment[]     @relation("ActivityReassignFrom")
   reasignacionesHacia       ActivityReassignment[]     @relation("ActivityReassignTo")
   reasignacionesHechas      ActivityReassignment[]     @relation("ActivityReassignBy")
@@ -5436,6 +5437,8 @@ model ActivityAssignee {
   /// Indicaciones específicas para esta persona (opcionales).
   indicaciones String?
   asignadoAt  DateTime             @default(now())
+  /// Quién sumó a esta persona (registro de despacho: «Luis la pasó a Antonio»).
+  asignadoPorId Int?
   /// Fecha de salida del equipo; null mientras sigue asignado.
   retiradoAt  DateTime?
   /// Posición en la cola personal de ejecución (Mis actividades). null = sin ordenar.
@@ -5452,6 +5455,7 @@ model ActivityAssignee {
 
   activity Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
   user     User           @relation("ActivityAssignedUser", fields: [userId], references: [id])
+  asignadoPor User?       @relation("ActivityAssignedBy", fields: [asignadoPorId], references: [id], onDelete: SetNull)
   company  CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([activityId, userId])

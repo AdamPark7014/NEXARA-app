@@ -20,9 +20,12 @@ export default function ActivityEvidencesPage() {
   const { activity, error, reload, core } = useActivityDetail();
   const { user } = useUser();
   const v2 = resolveV2RoleKey(user);
+  // En despacho, el LEAD solo reparte: no sube evidencias.
+  const myRow = activity?.assignees?.find((m) => m.user?.id === user?.id);
+  const reparte = activity?.assignmentCharge === "despacho" && myRow?.rol === "LEAD";
   // Core: quien tiene la actividad captura sus evidencias (la API valida); el CEO solo revisa.
   const canUpload = core
-    ? !isCeoEmail(user?.email)
+    ? !isCeoEmail(user?.email) && !reparte
     : v2 === ROLES.ING_CAMPO || v2 === ROLES.ING_SOPORTE || user?.isSuperAdmin;
 
   useEffect(() => {
@@ -51,6 +54,14 @@ export default function ActivityEvidencesPage() {
         <KpiCard label="Revisión" value={(reviewStatus ?? "Pendiente").replace(/_/g, " ")} icon="🔍" variant={reviewVariant} />
         <KpiCard label="Puede cargar" value={canUpload ? "Sí" : "No"} icon="⬆️" variant={canUpload ? "positive" : "default"} />
       </div>
+      {reparte && (
+        <DetailSection title="Tú repartes esta actividad">
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            En despacho tu parte es pasarla a quien la ejecuta; no subes evidencias. El registro de a quién se la
+            pasaste está en la pestaña Historial.
+          </p>
+        </DetailSection>
+      )}
       {review && (
         <ActivityEvidenceReviewPanel activity={activity} showHeader={false} />
       )}
