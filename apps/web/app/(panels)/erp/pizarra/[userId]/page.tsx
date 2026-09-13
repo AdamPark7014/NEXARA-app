@@ -225,7 +225,7 @@ export default function PizarraPersonaPage() {
             <div style={{ fontSize: 16, lineHeight: 1.4 }}>{act.titulo}</div>
             <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Estatus: {act.estatus}</div>
             <Link
-              href={`/ops/activities/${act.id}`}
+              href={`/erp/actividades/${act.id}`}
               style={{ marginTop: 4, fontWeight: 700, color: "var(--primary)", width: "fit-content" }}
             >
               Abrir actividad →
@@ -358,7 +358,7 @@ export default function PizarraPersonaPage() {
                         </a>
                       </object>
                     ) : null}
-                    <Link href={`/ops/activities/${h.id}`} style={{ fontWeight: 700, color: "var(--primary)" }}>
+                    <Link href={`/erp/actividades/${h.id}`} style={{ fontWeight: 700, color: "var(--primary)" }}>
                       Abrir actividad →
                     </Link>
                   </div>

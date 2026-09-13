@@ -15,6 +15,9 @@ type Ctx = {
   loading: boolean;
   error: string | null;
   reload: () => void;
+  /** Montado en Core (/erp/actividades): enlaces y pestañas no salen de /erp. */
+  core: boolean;
+  hrefs: { detail: string; evidences: string; back: string };
 };
 
 const ActivityDetailContext = createContext<Ctx | null>(null);
@@ -25,7 +28,15 @@ export function useActivityDetail() {
   return ctx;
 }
 
-export default function ActivityDetailShell({ id, children }: { id: string; children: ReactNode }) {
+export default function ActivityDetailShell({
+  id,
+  children,
+  core = false,
+}: {
+  id: string;
+  children: ReactNode;
+  core?: boolean;
+}) {
   const numericId = Number(id);
   const { user } = useUser();
   const token = user?.token ?? "";
@@ -52,12 +63,18 @@ export default function ActivityDetailShell({ id, children }: { id: string; chil
     void load();
   }, [load]);
 
-  const base = `/ops/activities/${id}`;
+  const base = core ? `/erp/actividades/${id}` : `/ops/activities/${id}`;
+  const evidencesHref = core ? `${base}/evidencias` : `${base}/evidences`;
   const tabs: TabItem[] = useMemo(
-    () => [
+    () => core
+      ? [
+          { id: "detalle", label: "Detalle", href: base },
+          { id: "evidences", label: "Evidencias", href: evidencesHref },
+        ]
+      : [
       { id: "detalle", label: "Detalle", href: base },
       { id: "operacion", label: "Operación", href: `${base}/operacion` },
-      { id: "evidences", label: "Evidencias", href: `${base}/evidences` },
+      { id: "evidences", label: "Evidencias", href: evidencesHref },
       { id: "team", label: "Equipo", href: `${base}/team` },
       { id: "materials", label: "Materiales", href: `${base}/materials` },
       {
@@ -74,23 +91,39 @@ export default function ActivityDetailShell({ id, children }: { id: string; chil
       },
       { id: "historial", label: "Historial", href: `${base}/historial` },
     ],
-    [base],
+    [base, core, evidencesHref],
+  );
+
+  const backHref = useMemo(
+    () => (core ? "/erp/mis-actividades" : getActivitiesCanonicalPath(user)),
+    [core, user],
   );
 
   const ctx = useMemo(
-    () => ({ id: numericId, activity, loading, error, reload: load }),
-    [numericId, activity, loading, error, load],
+    () => ({
+      id: numericId,
+      activity,
+      loading,
+      error,
+      reload: load,
+      core,
+      hrefs: { detail: base, evidences: evidencesHref, back: backHref },
+    }),
+    [numericId, activity, loading, error, load, core, base, evidencesHref, backHref],
   );
 
-  const title = activity ? `${activity.anNumber} · ${activity.titulo}` : `Actividad #${id}`;
-  const backHref = useMemo(() => getActivitiesCanonicalPath(user), [user]);
+  const title = activity
+    ? core
+      ? activity.titulo
+      : `${activity.anNumber} · ${activity.titulo}`
+    : `Actividad #${id}`;
 
   return (
     <ActivityDetailContext.Provider value={ctx}>
       <div style={{ padding: "24px 32px", maxWidth: 1200, margin: "0 auto" }}>
         <header style={{ marginBottom: 16 }}>
           <Link href={backHref} style={{ fontSize: 13, color: "var(--text-secondary, #64748b)", textDecoration: "none" }}>
-            ← Actividades
+            {core ? "← Mis actividades" : "← Actividades"}
           </Link>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: "6px 0 0" }}>
             {loading ? `Actividad #${id}` : title}

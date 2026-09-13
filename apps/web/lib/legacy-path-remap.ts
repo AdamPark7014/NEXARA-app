@@ -3,6 +3,8 @@
  * Single source of truth para middleware, page-matrix y redirects cliente.
  */
 
+import { CORE_SURFACE_ONLY, coreSurfaceRedirect } from './core-surface';
+
 const SEGMENT_ALIASES: Record<string, string> = {
   cotizaciones: 'quotes',
   plantillas: 'templates',
@@ -291,6 +293,9 @@ export function normalizeLegacyRelatedUrl(fullUrl: string): string {
   new URLSearchParams(originalSearch).forEach((value, key) => {
     params.set(key, value);
   });
+  // Core-only: notificaciones/feeds guardados con rutas de OPS/CRM abren su equivalente /erp.
+  const coreTarget = CORE_SURFACE_ONLY ? coreSurfaceRedirect(basePath, params) : null;
+  if (coreTarget) return coreTarget;
   const qs = params.toString();
   return qs ? `${basePath}?${qs}` : basePath;
 }

@@ -9,29 +9,31 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Arreglo: despachar a una 2.ª persona daba 409
+## Este turno — Core-only: ninguna ruta fuera de /erp
 
 ### Hecho
 
-1. Síntoma: Luis despachaba AN-0001 a Antonio y salía `{"statusCode":409,"errorCode":"DUPLICATE"...,"path":"/api/activities/1/team"}`.
-2. Causa: la migración `20260912010000_evidence_per_user_core_kind` solo borraba *constraints* únicos, pero Prisma había creado la unicidad vieja como *índice* `activity_evidences_activityId_key`. Sobrevivió junto al nuevo `(activityId, userId)`, así que el `activityEvidence.upsert` de `ActivityTeamService.addMember` fallaba (P2002) al sumar a cualquier 2.ª persona a un equipo. La fila de assignee sí se creaba; la evidencia no.
-3. Arreglo: migración nueva `20260913180000_drop_evidence_activity_unique_index` (DROP INDEX + barrido de índices únicos solo por activityId). Aplicada en Docker. Único dato afectado: actividad 1 / Antonio (assignee sin evidencia); se corrige solo al reintentar «Asignar al equipo».
-4. «Pendiente de despacho» ya no se queda pegado: la API manda `teamEmails` en `openActivities` (`team-board.service.ts`) y `DespachoPendingPanel` solo lo muestra si nadie del grupo del encargado está asignado (Luis → Antonio; Antonio → Carolina/Alejandro; David → instaladores). Antes Antonio nunca lo veía como pendiente y Luis lo veía para siempre.
-5. Checkbox gigante en el panel de despacho: estilo propio 20×20 (el input global ocupa 100% de ancho).
-6. Sigue vigente el turno anterior (commit 2e5732c2): Mis actividades + auto-asignación; EXEC-PACKET de usabilidad LISTO PARA CURSOR (no empezado).
+1. Síntoma: Luis (coord_operaciones) acabó en `/ops/dashboard` («No hay secciones disponibles en este panel para tu rol»). Adam: ya no debe existir ninguna ruta que no sea de erp.
+2. Causa: la notificación «Nueva actividad asignada» (y otras de la API: `common/app-urls.ts`, `notification-hierarchy.service.ts`, SLA, chat, push) guarda `/ops/activities/:id`; la web no la traducía; dentro de OPS el breadcrumb lleva a `/ops/dashboard`. El middleware solo corregía subdominios de producción, no paths en localhost/apex. Además la ficha de la pizarra y Mis actividades enlazaban a `/ops/activities/:id`.
+3. Detalle de actividad en Core: `/erp/actividades/:id` y `/erp/actividades/:id/evidencias`. Reutilizan las páginas de OPS (re-export) con `ActivityDetailShell core`: pestañas Detalle + Evidencias, enlaces a /erp, «← Mis actividades», proyecto y cliente como texto, y en Core puede capturar evidencias cualquiera menos el CEO (la API valida). `/erp/actividades` redirige a la pizarra.
+4. `coreSurfaceRedirect` en `lib/core-surface.ts`: `/ops/activities/:id(/evidences)` → `/erp/actividades/:id(/evidencias)`; `/ops/my-evidences?activityId=` → evidencias; `*/my-profile` → `/erp/my-profile`; `/ops/my-activities` → `/erp/mis-actividades`; cualquier otro panel (ops, crm, studio, lab, integra, finance, hr, sales, console, contabilidad, people, operacion, noc, support, ventas) → `/erp/pizarra`.
+5. Se aplica en `middleware.ts` (307, cualquier host, GET/HEAD, antes del auth gate) y en `normalizeLegacyRelatedUrl` (clic en campana y centro de notificaciones).
+6. Enlaces de Core directos a `/erp/actividades/:id`: `erp/mis-actividades/page.tsx` y `erp/pizarra/[userId]/page.tsx`. `/erp` ya no manda a `/erp/dashboard` sino a la pizarra.
+7. RBAC: `/erp/actividades` y `/**` en `CORE_OLA1_PAGE_PATHS` (web) y `CORE_OLA1_URL_RULES` (api).
+8. EXEC-PACKET (Cursor): añadida regla «nunca enlazar fuera de /erp».
 
 ### Verificado
 
-- `prisma migrate deploy` aplicó `20260913180000_drop_evidence_activity_unique_index`; en `activity_evidences` ya solo queda el único `(activityId, userId)`.
 - `tsc --noEmit` API: limpio.
 - `tsc --noEmit` web: sin errores nuevos; siguen 4 previos y ajenos.
-- Docker 18:04 UTC: `build api web` + `up -d`. API arrancó sin errores; `dist/me/team-board.service.js` trae `teamEmails` y la imagen incluye la migración nueva; el bundle de `pizarra/[userId]` trae el filtro; `/api/me/board` y `/api/activities/1/team` → 401 sin sesión; `/erp/pizarra/7` 200.
+- `vitest lib/legacy-path-remap.spec.ts lib/rbac/page-matrix.spec.ts`: 24/24.
+- Docker 18:37 UTC `build api web` + `up -d`, API arrancó sin errores. Sin sesión (curl): `/ops/dashboard` y `/crm/dashboard` → 307 `/erp/pizarra`; `/ops/activities/1` → `/erp/actividades/1`; `/ops/activities/1/evidences` y `/ops/my-evidences?activityId=1` → `/erp/actividades/1/evidencias`; `/ops/my-profile` → `/erp/my-profile`; `/ops/my-activities` → `/erp/mis-actividades`; `/erp/actividades/1` y `/evidencias` → 200.
 
 ### Falta probar a mano
 
-1. Luis → su ficha → «Pendiente de despacho» → AN-0001 → Antonio → «Asignar al equipo»: sin error y desaparece del panel de Luis.
-2. Antonio → su ficha: AN-0001 aparece en su «Pendiente de despacho»; elige Carolina o Alejandro y desaparece.
-3. Checkbox del panel de tamaño normal.
+1. Como Luis: campana → «Nueva actividad asignada» abre `/erp/actividades/1` (no /ops).
+2. Escribir `localhost:3000/ops/dashboard` en la barra → termina en `/erp/pizarra`.
+3. «Abrir actividad →» en la ficha y «Abrir →» en Mis actividades abren `/erp/actividades/:id`; pestaña Evidencias permite capturar.
 
 ### A medias
 
@@ -39,7 +41,7 @@ Nada.
 
 ### Siguiente
 
-Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad Actividades + Asistencias). Al desplegar a producción, la migración `20260913180000_drop_evidence_activity_unique_index` debe ir junto con `20260912010000`, o el 409 aparecerá allá también.
+Cursor ejecuta `.ai/EXEC-PACKET.md`. Opcional: que la API genere `/erp/actividades/:id` en `common/app-urls.ts` y en los strings de `notification-hierarchy.service.ts` (hoy lo corrige el middleware). Al desplegar a producción: la migración `20260913180000_drop_evidence_activity_unique_index` debe ir junto con `20260912010000`.
 
 ### No tocar
 

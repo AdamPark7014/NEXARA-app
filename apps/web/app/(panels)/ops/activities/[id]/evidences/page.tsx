@@ -11,15 +11,19 @@ import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
+import { isCeoEmail } from "@/lib/activity-kinds";
 import KpiCard from "@/components/ui/KpiCard";
 
 const ActivityEvidenceFlow = dynamic(() => import("@/components/ActivityEvidenceFlow"), { ssr: false });
 
 export default function ActivityEvidencesPage() {
-  const { activity, error, reload } = useActivityDetail();
+  const { activity, error, reload, core } = useActivityDetail();
   const { user } = useUser();
   const v2 = resolveV2RoleKey(user);
-  const canUpload = v2 === ROLES.ING_CAMPO || v2 === ROLES.ING_SOPORTE || user?.isSuperAdmin;
+  // Core: quien tiene la actividad captura sus evidencias (la API valida); el CEO solo revisa.
+  const canUpload = core
+    ? !isCeoEmail(user?.email)
+    : v2 === ROLES.ING_CAMPO || v2 === ROLES.ING_SOPORTE || user?.isSuperAdmin;
 
   useEffect(() => {
     if (typeof window === "undefined" || !activity?.id) return;

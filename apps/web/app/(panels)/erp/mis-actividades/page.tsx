@@ -411,7 +411,7 @@ export default function MisActividadesPage() {
                       Folio {a.anNumber}
                     </div>
                   </div>
-                  <Link href={`/ops/activities/${a.id}`} style={btnSecondary}>
+                  <Link href={`/erp/actividades/${a.id}`} style={btnSecondary}>
                     Abrir →
                   </Link>
                 </div>
@@ -508,7 +508,7 @@ export default function MisActividadesPage() {
             ? done.map((a) => (
                 <Link
                   key={a.id}
-                  href={`/ops/activities/${a.id}`}
+                  href={`/erp/actividades/${a.id}`}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
