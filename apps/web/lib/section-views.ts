@@ -236,6 +236,9 @@ export function shouldShowModuleInSidebar(
   }
 
   switch (module.id as ModuleId) {
+    case 'mis-actividades':
+      // Todo el equipo menos el CEO (Christian): él ve a todos en Actividades.
+      return (user?.email || '').trim().toLowerCase() !== 'gerencia@nexara.com.mx' && v2 !== 'ceo';
     case 'erp-clients':
       return canSeeClientesModule(user?.email);
     case 'ops-activities': {

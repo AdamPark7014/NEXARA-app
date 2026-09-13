@@ -75,6 +75,8 @@ export const MEETINGS_LEAD_URL_RULES: UrlRule[] = [
 
 /** Core ola1 — páginas shell (Pizarra / Asistencias / Chat / Actividades). */
 export const CORE_OLA1_URL_RULES: UrlRule[] = [
+  { path: '/erp/mis-actividades', scope: 'write' },
+  { path: '/erp/mis-actividades/**', scope: 'write' },
   { path: '/erp/pizarra', scope: 'write' },
   { path: '/erp/pizarra/**', scope: 'write' },
   { path: '/erp/asistencias', scope: 'write' },

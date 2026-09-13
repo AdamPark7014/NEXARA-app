@@ -62,6 +62,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `asistencias, activities-daily, activities-projects, activities-services, chat`,
   },
+  'mis-actividades': {
+    id: 'mis-actividades',
+    summary: `Tu cola personal: lo que te toca hacer hoy, en orden.`,
+    audience: `Todo el equipo menos el CEO. Los encargados de área además se auto-asignan y ordenan su cola.`,
+    how: `Lista tus actividades abiertas (asignadas o auto-asignadas) desde GET /me/activities, ordenadas por tu orden personal, luego prioridad y fecha. Los encargados reordenan con subir/bajar y cada cambio exige un motivo (PATCH /me/activities/order).`,
+    steps: [
+      `Abre /erp/mis-actividades y empieza por la #1.`,
+      `Encargado: usa «Auto-asignarme» para crear una actividad solo para ti, con tipo, día, hora y tiempo.`,
+      `Encargado: sube o baja una actividad y escribe por qué la harás en ese lugar.`,
+    ],
+    connects: `pizarra, activities, activity-evidence`,
+  },
   'asistencias': {
     id: 'asistencias',
     summary: `Asistencias del día unificadas: entradas, comidas y trayectoria GPS.`,

@@ -208,6 +208,10 @@ export function remapLegacySlugs(pathname: string): string {
   if (pathname === '/erp/clientes' || pathname.startsWith('/erp/clientes/')) {
     return pathname;
   }
+  // Mis actividades Core: no traducir "mis-actividades"→"my-activities" (eso es OPS).
+  if (pathname === '/erp/mis-actividades' || pathname.startsWith('/erp/mis-actividades/')) {
+    return pathname;
+  }
 
   for (const [pattern, target] of CROSS_PANEL_REMAPS) {
     const match = pathname.match(pattern);

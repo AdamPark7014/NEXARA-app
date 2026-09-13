@@ -172,6 +172,7 @@ export function resolvePanelFromLegacy(legacy: string): PanelId {
 
 export type ModuleId =
   // ERP
+  | "mis-actividades"
   | "executive"
   | "dashboard"
   | "users"
@@ -381,6 +382,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "chat", panel: PANELS.ERP, path: "/chat",
     label: "Chat", description: "Canales, DMs y colaboración en tiempo real",
     icon: "💬", allowedRoles: ANY_INTERNAL,
+    group: "Hoy", visible: true,
+  },
+  "mis-actividades": {
+    id: "mis-actividades", panel: PANELS.ERP, path: "/mis-actividades",
+    label: "Mis actividades", description: "Tu cola del día, en orden",
+    icon: "✅", allowedRoles: ANY_INTERNAL,
     group: "Hoy", visible: true,
   },
   pizarra: {
