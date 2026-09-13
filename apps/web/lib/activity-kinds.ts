@@ -104,7 +104,7 @@ const CREATE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.ceo]: ALL,
   [ORG_EMAILS.developer]: ALL,
   [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra', 'comercial'],
-  [ORG_EMAILS.luis]: ['tarea', 'servicio', 'comercial'],
+  [ORG_EMAILS.luis]: ['tarea', 'proyecto', 'servicio', 'comercial'],
   [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial'],
   [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
   [ORG_EMAILS.monica]: ['tarea', 'comercial'],
@@ -121,7 +121,7 @@ const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.ceo]: ALL,
   [ORG_EMAILS.developer]: ALL,
   [ORG_EMAILS.david]: ['tarea', 'proyecto', 'obra', 'comercial'],
-  [ORG_EMAILS.luis]: ['tarea', 'servicio', 'comercial'],
+  [ORG_EMAILS.luis]: ['tarea', 'proyecto', 'servicio', 'comercial'],
   [ORG_EMAILS.antonio]: ['tarea', 'proyecto', 'servicio', 'comercial'],
   // Campo de David
   [ORG_EMAILS.joan]: ['tarea', 'proyecto', 'obra'],
@@ -194,9 +194,27 @@ export function canOfferAssignmentCharge(email?: string | null): boolean {
   return CHARGE_MANAGER_EMAILS.has(norm(email));
 }
 
-/** Luis / David / Antonio / Josué: al asignarles solo existe «Despacho a equipo». */
-export function forcesDespachoOnly(email?: string | null): boolean {
-  return canOfferAssignmentCharge(email);
+/**
+ * Solo Luis + Servicio: al asignarle no hay elección — siempre «Despacho a equipo» + cupo.
+ * David / Antonio / Josué siguen eligiendo con canOfferAssignmentCharge.
+ */
+export function forcesDespachoOnly(
+  email?: string | null,
+  kind?: ActivityKind | null,
+): boolean {
+  return norm(email) === ORG_EMAILS.luis && kind === 'servicio';
+}
+
+/**
+ * Solo Luis + Tarea / Proyecto / Comercial: ejecución directa (actividad personal),
+ * sin paso de despacho ni picker de equipo.
+ */
+export function forcesEjecucionOnly(
+  email?: string | null,
+  kind?: ActivityKind | null,
+): boolean {
+  if (norm(email) !== ORG_EMAILS.luis || !kind) return false;
+  return kind === 'tarea' || kind === 'proyecto' || kind === 'comercial';
 }
 
 /** Prefijo en indicaciones LEAD para el cupo de personas del despacho. */
