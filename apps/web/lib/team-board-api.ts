@@ -47,6 +47,8 @@ export type TeamBoardHistoryItem = {
   titulo: string;
   estatus: string;
   coreKind: string | null;
+  /** Subtipo de tarea (Levantamiento, Junta…) o texto libre de «Otro». */
+  ticketTypeCustom?: string | null;
   assignmentCharge?: string | null;
   fechaAsignacion: string;
   fechaFinalizacion: string | null;

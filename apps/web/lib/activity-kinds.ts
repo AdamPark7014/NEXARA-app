@@ -49,7 +49,8 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
     help: 'Del día, sin proyecto ni cliente.',
     emoji: '✅',
     projectMode: 'without_project',
-    ticketType: 'PREVENTIVO',
+    // El subtipo (Levantamiento, Junta…) viaja en ticketTypeCustom; ver TAREA_TIPOS.
+    ticketType: 'OTRO',
   },
   proyecto: {
     id: 'proyecto',
@@ -86,6 +87,36 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
     ticketTypeCustom: 'COMERCIAL',
   },
 };
+
+/**
+ * Subtipos de Tarea. Se guardan como ticketType OTRO + ticketTypeCustom = label
+ * (o el texto libre de «Otro»). Servicio, proyecto, obra y comercial no van aquí:
+ * ya tienen su propio tipo.
+ */
+export type TareaTipoId =
+  | 'levantamiento'
+  | 'recoleccion'
+  | 'entrega'
+  | 'junta'
+  | 'compra'
+  | 'preparacion'
+  | 'tramite'
+  | 'capacitacion'
+  | 'documentacion'
+  | 'otro';
+
+export const TAREA_TIPOS: ReadonlyArray<{ id: TareaTipoId; label: string; emoji: string }> = [
+  { id: 'levantamiento', label: 'Levantamiento', emoji: '📐' },
+  { id: 'recoleccion', label: 'Recolección', emoji: '📦' },
+  { id: 'entrega', label: 'Entrega', emoji: '🚚' },
+  { id: 'junta', label: 'Junta', emoji: '🤝' },
+  { id: 'compra', label: 'Compra de material', emoji: '🛒' },
+  { id: 'preparacion', label: 'Preparación de equipo', emoji: '🔧' },
+  { id: 'tramite', label: 'Trámite', emoji: '📄' },
+  { id: 'capacitacion', label: 'Capacitación', emoji: '🎓' },
+  { id: 'documentacion', label: 'Reporte / documentación', emoji: '📝' },
+  { id: 'otro', label: 'Otro', emoji: '✏️' },
+];
 
 const ALL: ActivityKind[] = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial'];
 const ORDER = ALL;
