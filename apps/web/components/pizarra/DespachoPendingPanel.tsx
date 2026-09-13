@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { dispatchPoolEmails } from "@/lib/activity-kinds";
+import {
+  dispatchPoolEmails,
+  ORG_EMAILS,
+  parseDispatchHeadcount,
+} from "@/lib/activity-kinds";
 import { addActivityTeamMember } from "@/lib/ops-activities-api";
 import { fetchTeamBoard, type TeamBoardUser } from "@/lib/team-board-api";
 
@@ -10,6 +14,7 @@ export type DespachoPendingItem = {
   anNumber: string;
   titulo: string;
   assignmentCharge?: string | null;
+  indicaciones?: string | null;
 };
 
 type Props = {
@@ -38,6 +43,8 @@ export default function DespachoPendingPanel({
   const [selected, setSelected] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  const isLuis = (managerEmail || "").trim().toLowerCase() === ORG_EMAILS.luis;
 
   const loadRoster = useCallback(async () => {
     try {
@@ -84,7 +91,13 @@ export default function DespachoPendingPanel({
     setMsg(null);
     try {
       for (const userId of selected) {
-        await addActivityTeamMember(token, activeId, { userId, rol: "TECNICO" });
+        // Luis → Antonio como LEAD (él decide el soporte). Resto: TECNICO.
+        const email = (candidates.find((c) => c.id === userId)?.email || "").toLowerCase();
+        const rol =
+          isLuis && email === ORG_EMAILS.antonio
+            ? "LEAD"
+            : "TECNICO";
+        await addActivityTeamMember(token, activeId, { userId, rol });
       }
       setMsg(`Asignado a ${selected.length} persona(s)`);
       setActiveId(null);
@@ -113,137 +126,150 @@ export default function DespachoPendingPanel({
           PENDIENTE DE DESPACHO
         </div>
         <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-          Te dejaron estas actividades para que las asignes a tu gente. Elige a quién ejecuta.
+          {isLuis
+            ? "Mándala a Antonio; él elige a quién del soporte."
+            : "Elige a quién de tu equipo ejecuta."}
         </p>
       </div>
 
       {loadError ? <p style={{ margin: 0, color: "#b91c1c", fontSize: 13 }}>{loadError}</p> : null}
 
-      {despachos.map((a) => (
-        <div
-          key={a.id}
-          style={{
-            border: "1px solid var(--border)",
-            borderRadius: 14,
-            padding: 12,
-            background: "var(--surface)",
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14 }}>
-              {a.anNumber} · {a.titulo}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>Despacho</div>
-          </div>
-
-          {activeId === a.id ? (
-            <>
-              {candidates.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-                  No hay gente de tu equipo en el tablero. Actualiza o revisa la jerarquía.
-                </p>
-              ) : (
-                <div style={{ display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
-                    Elige a quién asignas
-                  </div>
-                  {candidates.map((u) => {
-                    const checked = selected.includes(u.id);
-                    return (
-                      <label
-                        key={u.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          padding: "8px 10px",
-                          borderRadius: 10,
-                          border: `1px solid ${checked ? "var(--primary)" : "var(--border)"}`,
-                          background: checked
-                            ? "color-mix(in srgb, var(--primary) 8%, var(--surface))"
-                            : "var(--surface)",
-                          cursor: "pointer",
-                          fontSize: 13,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggle(u.id)}
-                          disabled={saving}
-                        />
-                        <span style={{ fontWeight: 650 }}>{u.nombre}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  onClick={() => void submit()}
-                  disabled={saving || candidates.length === 0}
-                  style={{
-                    border: "none",
-                    background: "var(--primary)",
-                    color: "#fff",
-                    fontWeight: 750,
-                    fontSize: 13,
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    cursor: saving ? "wait" : "pointer",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  {saving ? "Asignando…" : "Asignar al equipo"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveId(null);
-                    setSelected([]);
-                    setMsg(null);
-                  }}
-                  disabled={saving}
-                  style={{
-                    border: "1px solid var(--border)",
-                    background: "var(--surface)",
-                    fontWeight: 650,
-                    fontSize: 13,
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Cancelar
-                </button>
+      {despachos.map((a) => {
+        const cupo = parseDispatchHeadcount(a.indicaciones);
+        return (
+          <div
+            key={a.id}
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 14,
+              padding: 12,
+              background: "var(--surface)",
+              display: "grid",
+              gap: 10,
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>
+                {a.anNumber} · {a.titulo}
               </div>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={() => start(a.id)}
-              style={{
-                justifySelf: "start",
-                border: "none",
-                background: "var(--primary)",
-                color: "#fff",
-                fontWeight: 750,
-                fontSize: 13,
-                padding: "10px 14px",
-                borderRadius: 10,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              Despachar al equipo
-            </button>
-          )}
-        </div>
-      ))}
+              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                Despacho
+                {cupo != null ? ` · se ocupan ${cupo} persona${cupo === 1 ? "" : "s"}` : ""}
+              </div>
+              {a.indicaciones ? (
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, lineHeight: 1.35 }}>
+                  {a.indicaciones}
+                </div>
+              ) : null}
+            </div>
+
+            {activeId === a.id ? (
+              <>
+                {candidates.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+                    No hay gente de tu equipo en el tablero. Actualiza o revisa la jerarquía.
+                  </p>
+                ) : (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
+                      {isLuis ? "Elige a Antonio" : "Elige a quién asignas"}
+                    </div>
+                    {candidates.map((u) => {
+                      const checked = selected.includes(u.id);
+                      return (
+                        <label
+                          key={u.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "8px 10px",
+                            borderRadius: 10,
+                            border: `1px solid ${checked ? "var(--primary)" : "var(--border)"}`,
+                            background: checked
+                              ? "color-mix(in srgb, var(--primary) 8%, var(--surface))"
+                              : "var(--surface)",
+                            cursor: "pointer",
+                            fontSize: 13,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggle(u.id)}
+                            disabled={saving}
+                          />
+                          <span style={{ fontWeight: 650 }}>{u.nombre}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => void submit()}
+                    disabled={saving || candidates.length === 0}
+                    style={{
+                      border: "none",
+                      background: "var(--primary)",
+                      color: "#fff",
+                      fontWeight: 750,
+                      fontSize: 13,
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      cursor: saving ? "wait" : "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {saving ? "Asignando…" : "Asignar al equipo"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveId(null);
+                      setSelected([]);
+                      setMsg(null);
+                    }}
+                    disabled={saving}
+                    style={{
+                      border: "1px solid var(--border)",
+                      background: "var(--surface)",
+                      fontWeight: 650,
+                      fontSize: 13,
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => start(a.id)}
+                style={{
+                  justifySelf: "start",
+                  border: "none",
+                  background: "var(--primary)",
+                  color: "#fff",
+                  fontWeight: 750,
+                  fontSize: 13,
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Despachar al equipo
+              </button>
+            )}
+          </div>
+        );
+      })}
 
       {msg ? (
         <p style={{ margin: 0, fontSize: 13, color: msg.includes("Asignado") ? "#15803d" : "#b91c1c" }}>

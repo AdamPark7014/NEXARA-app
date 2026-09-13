@@ -24,6 +24,7 @@ export type TeamBoardOpenActivity = {
   coreKind: string | null;
   assignmentCharge: string | null;
   fechaFinalizacion: Date | null;
+  indicaciones?: string | null;
 };
 
 export type TeamBoardUser = {
@@ -285,6 +286,7 @@ export class TeamBoardService {
         },
         select: {
           userId: true,
+          indicaciones: true,
           activity: {
             select: {
               id: true,
@@ -363,6 +365,7 @@ export class TeamBoardService {
         coreKind: act.coreKind,
         assignmentCharge: act.assignmentCharge,
         fechaFinalizacion: act.fechaFinalizacion,
+        indicaciones: row.indicaciones ?? null,
       };
       const list = openByUser.get(row.userId) ?? [];
       if (!list.some((x) => x.id === item.id)) list.push(item);
