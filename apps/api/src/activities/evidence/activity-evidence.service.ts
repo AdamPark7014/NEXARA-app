@@ -37,19 +37,27 @@ export class ActivityEvidenceService {
     private notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  private async notifyEvidenceReadyForReview(activityId: number) {
+  private async notifyEvidenceReadyForReview(activityId: number, submitterId?: number | null) {
     try {
       const activity = await this.prisma.activity.findUnique({
         where: { id: activityId },
         include: { responsable: { select: { id: true, nombre: true } } },
       });
       if (!activity?.responsable) return;
+      // Autor real = quien subió la evidencia (antes se reportaba al responsable).
+      const submitter = submitterId
+        ? await this.prisma.user.findUnique({
+            where: { id: submitterId },
+            select: { id: true, nombre: true },
+          })
+        : null;
       await this.notificationHierarchy.notifyEvidenceSubmitted(
-        activity.responsableId,
+        submitter?.id ?? activity.responsableId,
         activityId,
         activity.titulo || '',
-        activity.responsable.nombre || 'Usuario',
+        submitter?.nombre || activity.responsable.nombre || 'Usuario',
         activity.anNumber,
+        activity.responsableId,
       );
     } catch {
       /* no bloquear flujo de evidencias */
@@ -327,6 +335,22 @@ export class ActivityEvidenceService {
     }
 
     if (!evidence) {
+      // En despacho, el LEAD solo reparte: la evidencia la sube quien la ejecuta.
+      const reparte = await this.prisma.activityAssignee.findFirst({
+        where: {
+          activityId,
+          userId,
+          retiradoAt: null,
+          rol: 'LEAD',
+          activity: { assignmentCharge: 'despacho' },
+        },
+        select: { id: true },
+      });
+      if (reparte) {
+        throw new ForbiddenException(
+          'En despacho solo repartes la actividad: la evidencia la sube quien la ejecuta',
+        );
+      }
       evidence = await this.prisma.activityEvidence.create({
         data: {
           activityId,
@@ -340,16 +364,33 @@ export class ActivityEvidenceService {
     return evidence;
   }
 
-  /** Cierra la actividad solo cuando todos los assignees activos + responsable tienen evidencia COMPLETED. */
-  private async maybeFinalizeActivity(activityId: number, companyId?: number | null) {
+  /**
+   * Cierra la actividad solo cuando todos los assignees activos + responsable tienen evidencia COMPLETED.
+   * En despacho, quien reparte (LEAD, incluido el responsable) no ejecuta: no se le exige evidencia.
+   */
+  private async maybeFinalizeActivity(
+    activityId: number,
+    companyId?: number | null,
+    lastUserId?: number | null,
+  ) {
     const activity = await this.loadActivityForTenant(activityId, companyId);
+    const meta = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { assignmentCharge: true, titulo: true, anNumber: true },
+    });
+    const despacho = meta?.assignmentCharge === 'despacho';
     const assignees = await this.prisma.activityAssignee.findMany({
       where: { activityId, retiradoAt: null },
-      select: { userId: true },
+      select: { userId: true, rol: true },
     });
+    const reparten = new Set<number>(
+      despacho
+        ? [activity.responsableId, ...assignees.filter((a) => a.rol === 'LEAD').map((a) => a.userId)]
+        : [],
+    );
     const requiredUserIds = Array.from(
       new Set([...assignees.map((a) => a.userId), activity.responsableId].filter(Boolean)),
-    );
+    ).filter((id) => !reparten.has(id));
     if (requiredUserIds.length === 0) return;
 
     const completed = await this.prisma.activityEvidence.findMany({
@@ -371,6 +412,14 @@ export class ActivityEvidenceService {
         fechaFinalizacion: new Date(),
       },
     });
+
+    // Luis (responsable) y Christian se enteran del cierre.
+    void this.notificationHierarchy.notifyActivityAutoCompleted(
+      activityId,
+      meta?.titulo || meta?.anNumber || `Actividad ${activityId}`,
+      activity.responsableId,
+      lastUserId ?? null,
+    );
   }
 
   /**
@@ -531,8 +580,8 @@ export class ActivityEvidenceService {
       },
     });
 
-    await this.maybeFinalizeActivity(activityId, companyId);
-    void this.notifyEvidenceReadyForReview(activityId);
+    await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
+    void this.notifyEvidenceReadyForReview(activityId, updated.userId);
 
     return updated;
   }
@@ -1279,6 +1328,9 @@ export class ActivityEvidenceService {
           activity.titulo || '',
           'approved',
           reviewerUser.nombre,
+          undefined,
+          [userId],
+          reviewerId,
         );
       }
     } catch {
@@ -1336,7 +1388,7 @@ export class ActivityEvidenceService {
         data: { estatus: 'En Proceso' },
       });
 
-      await this.notifyReject(activityId, reviewerId, notes);
+      await this.notifyReject(activityId, reviewerId, notes, userId);
       return updated;
     }
 
@@ -1376,11 +1428,11 @@ export class ActivityEvidenceService {
       data: { estatus: 'Rechazada' },
     });
 
-    await this.notifyReject(activityId, reviewerId, notes);
+    await this.notifyReject(activityId, reviewerId, notes, userId);
     return updated;
   }
 
-  private async notifyReject(activityId: number, reviewerId: number, notes: string) {
+  private async notifyReject(activityId: number, reviewerId: number, notes: string, ownerId?: number) {
     try {
       const activity = await this.prisma.activity.findUnique({
         where: { id: activityId },
@@ -1398,6 +1450,8 @@ export class ActivityEvidenceService {
           'rejected',
           reviewer.nombre,
           notes,
+          ownerId ? [ownerId] : [],
+          reviewerId,
         );
       }
     } catch {
@@ -1519,8 +1573,8 @@ export class ActivityEvidenceService {
     });
 
     if (transition.status === 'COMPLETED') {
-      await this.maybeFinalizeActivity(activityId, companyId);
-      void this.notifyEvidenceReadyForReview(activityId);
+      await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
+      void this.notifyEvidenceReadyForReview(activityId, updated.userId);
     } else {
       await this.prisma.activity.update({
         where: { id: activityId },

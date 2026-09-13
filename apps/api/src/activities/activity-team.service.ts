@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 /**
  * Equipo de una actividad y su historial de reasignaciones.
@@ -21,12 +22,22 @@ export type AssigneeRole = 'LEAD' | 'TECNICO' | 'APOYO';
 export class ActivityTeamService {
   private readonly logger = new Logger(ActivityTeamService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   private async loadActivity(activityId: number, companyId: number) {
     const activity = await this.prisma.activity.findFirst({
       where: { id: activityId, ...companyWhere(companyId) },
-      select: { id: true, companyId: true, responsableId: true, anNumber: true },
+      select: {
+        id: true,
+        companyId: true,
+        responsableId: true,
+        anNumber: true,
+        titulo: true,
+        assignmentCharge: true,
+      },
     });
     assertCompanyAccess(activity, companyId, 'Actividad');
     return activity!;
@@ -63,9 +74,11 @@ export class ActivityTeamService {
       indicaciones?: string | null;
     },
     companyId?: number | null,
+    /** Quien suma a la persona: queda en el registro de despacho. */
+    actorId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
-    await this.loadActivity(activityId, tenantId);
+    const activity = await this.loadActivity(activityId, tenantId);
 
     if (!Number.isInteger(input.userId) || input.userId <= 0) {
       throw new BadRequestException('Usuario inválido');
@@ -83,6 +96,7 @@ export class ActivityTeamService {
 
     const notes =
       input.indicaciones != null ? String(input.indicaciones).trim() || null : undefined;
+    const byId = actorId && actorId > 0 ? actorId : null;
 
     let member;
     if (existing) {
@@ -93,6 +107,12 @@ export class ActivityTeamService {
           rol: input.rol ?? existing.rol,
           horasPlan: input.horasPlan ?? existing.horasPlan,
           ...(notes !== undefined ? { indicaciones: notes } : {}),
+          // Registro de despacho: volver al equipo cuenta como una entrega nueva.
+          ...(existing.retiradoAt
+            ? { asignadoAt: new Date(), asignadoPorId: byId ?? existing.asignadoPorId }
+            : existing.asignadoPorId == null && byId
+              ? { asignadoPorId: byId }
+              : {}),
         },
         include: { user: { select: { id: true, nombre: true, email: true } } },
       });
@@ -105,20 +125,35 @@ export class ActivityTeamService {
           horasPlan: input.horasPlan ?? null,
           indicaciones: notes ?? null,
           companyId: tenantId,
+          asignadoPorId: byId,
         },
         include: { user: { select: { id: true, nombre: true, email: true } } },
       });
     }
 
-    await this.prisma.activityEvidence.upsert({
-      where: { activityId_userId: { activityId, userId: input.userId } },
-      create: {
-        activityId,
-        userId: input.userId,
-        companyId: tenantId,
-        status: 'ENTRY_PHOTO',
-      },
-      update: {},
+    // En despacho, el LEAD solo reparte: no sube evidencia ni bloquea el cierre.
+    const reparte = activity.assignmentCharge === 'despacho' && member.rol === 'LEAD';
+    if (!reparte) {
+      await this.prisma.activityEvidence.upsert({
+        where: { activityId_userId: { activityId, userId: input.userId } },
+        create: {
+          activityId,
+          userId: input.userId,
+          companyId: tenantId,
+          status: 'ENTRY_PHOTO',
+        },
+        update: {},
+      });
+    }
+
+    void this.notificationHierarchy.notifyActivityDispatched({
+      activityId,
+      label: activity.titulo || activity.anNumber || `Actividad ${activityId}`,
+      actorId: byId,
+      memberId: member.userId,
+      memberName: member.user?.nombre ?? 'alguien del equipo',
+      responsableId: activity.responsableId,
+      reparte,
     });
 
     return member;
@@ -300,6 +335,7 @@ export class ActivityTeamService {
     const activity = await this.prisma.activity.findFirst({
       where: { id: activityId, ...companyWhere(tenantId) },
       select: {
+        assignmentCharge: true,
         fechaAsignacion: true,
         fechaInicio: true,
         fechaFinalizacion: true,
@@ -312,7 +348,7 @@ export class ActivityTeamService {
     });
     if (!activity) throw new NotFoundException('Actividad no encontrada');
 
-    const [reassignments, incidents, recommendations, movements, evidence] = await Promise.all([
+    const [reassignments, incidents, recommendations, movements, evidence, team] = await Promise.all([
       this.prisma.activityReassignment.findMany({
         where: { activityId, ...companyWhere(tenantId) },
         include: {
@@ -363,6 +399,20 @@ export class ActivityTeamService {
           exitPhotoUploadedAt: true,
           reviewedBy: { select: { nombre: true } },
         },
+      }),
+      // Registro de despacho: quién sumó a quién y cuándo.
+      this.prisma.activityAssignee.findMany({
+        where: { activityId, ...companyWhere(tenantId) },
+        select: {
+          id: true,
+          rol: true,
+          indicaciones: true,
+          asignadoAt: true,
+          retiradoAt: true,
+          user: { select: { nombre: true } },
+          asignadoPor: { select: { nombre: true } },
+        },
+        orderBy: { asignadoAt: 'asc' },
       }),
     ]);
 
@@ -426,6 +476,34 @@ export class ActivityTeamService {
         subtitle: r.motivo ?? (r.deUsuario ? `Desde ${r.deUsuario.nombre}` : undefined),
         icon: '👤',
       });
+    }
+
+    const despacho = activity.assignmentCharge === 'despacho';
+    for (const m of team) {
+      const quien = m.user?.nombre ?? 'Alguien';
+      const por = m.asignadoPor?.nombre;
+      const reparte = despacho && m.rol === 'LEAD';
+      const papel = reparte ? 'La reparte' : m.rol === 'LEAD' ? 'Responsable' : m.rol === 'TECNICO' ? 'La ejecuta' : 'Apoyo';
+      events.push({
+        id: `team-${m.id}`,
+        at: new Date(m.asignadoAt).toISOString(),
+        kind: 'despacho',
+        title:
+          por && por !== quien
+            ? `${por} ${reparte ? 'la pasó a' : 'la asignó a'} ${quien}`
+            : `${quien} quedó a cargo`,
+        subtitle: [papel, m.indicaciones].filter(Boolean).join(' · '),
+        icon: reparte ? '📨' : '👷',
+      });
+      if (m.retiradoAt) {
+        events.push({
+          id: `team-out-${m.id}`,
+          at: new Date(m.retiradoAt).toISOString(),
+          kind: 'despacho',
+          title: `${quien} salió del equipo`,
+          icon: '↩️',
+        });
+      }
     }
 
     for (const inc of incidents) {

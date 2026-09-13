@@ -98,6 +98,19 @@ export class NotificationHierarchyService {
     }
   }
 
+  /** Christian (CEO): todo aviso de actividades le llega también a él. */
+  private async getCeoUserIds(): Promise<number[]> {
+    try {
+      const rows = await this.prisma.user.findMany({
+        where: { email: 'gerencia@nexara.com.mx', isActive: true },
+        select: { id: true },
+      });
+      return rows.map((r) => r.id);
+    } catch {
+      return [];
+    }
+  }
+
   /**
    * Notificar entrada/salida de usuario a su supervisor
    * Usuario entra -> Notificar al admin del depto
@@ -201,6 +214,9 @@ export class NotificationHierarchyService {
       const targets = new Set<number>();
       for (const s of supervisors) targets.add(s.id);
       if (responsableId && responsableId !== actorId) targets.add(responsableId);
+      for (const ceoId of await this.getCeoUserIds()) {
+        if (ceoId !== actorId) targets.add(ceoId);
+      }
 
       for (const userId of targets) {
         await this.notificationsService.createNotification({
@@ -409,6 +425,7 @@ export class NotificationHierarchyService {
     activityId: number,
     activityTitle: string,
     assignedByName: string,
+    assignedById?: number | null,
   ) {
     try {
       // Notificar al usuario asignado
@@ -436,6 +453,22 @@ export class NotificationHierarchyService {
           relatedEntityId: activityId,
           entityType: 'Activity',
           relatedUrl: appUrls.opsActivity(activityId),
+        });
+      }
+
+      // Christian ve toda asignación (salvo que él mismo la hizo o ya la recibió).
+      const already = new Set([userId, ...supervisors.map((s) => s.id)]);
+      for (const ceoId of await this.getCeoUserIds()) {
+        if (already.has(ceoId) || ceoId === assignedById) continue;
+        await this.notificationsService.createNotification({
+          userId: ceoId,
+          type: 'ACTIVITY_ASSIGNED',
+          category: 'activities',
+          title: 'Actividad asignada',
+          message: `${assignedByName} asignó "${activityTitle}".`,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activityId}`,
         });
       }
     } catch (error) {
@@ -507,6 +540,8 @@ export class NotificationHierarchyService {
     activityTitle: string,
     submitterName: string,
     anNumber?: string | null,
+    /** Responsable (p. ej. Luis) que da seguimiento aunque no revise evidencias. */
+    responsableId?: number | null,
   ) {
     try {
       const ref = (anNumber && String(anNumber).trim()) || `ID ${activityId}`;
@@ -516,6 +551,10 @@ export class NotificationHierarchyService {
       const recipientIds = new Set(await this.getEvidenceReviewerUserIds(submitterUserId));
       for (const sup of await this.getSupervisors(submitterUserId)) {
         recipientIds.add(sup.id);
+      }
+      if (responsableId && responsableId !== submitterUserId) recipientIds.add(responsableId);
+      for (const ceoId of await this.getCeoUserIds()) {
+        if (ceoId !== submitterUserId) recipientIds.add(ceoId);
       }
 
       for (const uid of recipientIds) {
@@ -547,6 +586,9 @@ export class NotificationHierarchyService {
     status: 'approved' | 'rejected',
     reviewerName: string,
     notes?: string,
+    /** Además del responsable: quien subió la evidencia (y Christian se agrega solo). */
+    alsoNotify: number[] = [],
+    reviewerId?: number | null,
   ) {
     try {
       const type = status === 'approved' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED';
@@ -557,19 +599,117 @@ export class NotificationHierarchyService {
           ? `${reviewerName} aprobó la evidencia de "${base}".`
           : `${reviewerName} rechazó la evidencia de "${base}".${notes ? ` Observaciones: ${notes}` : ''}`;
 
-      await this.notificationsService.createNotification({
-        userId: responsableUserId,
-        type,
-        category: 'evidences',
-        title,
-        message,
-        relatedEntityId: activityId,
-        entityType: 'Activity',
-        relatedUrl: `/ops/my-evidences?activityId=${activityId}`,
-        priority: status === 'rejected' ? 'high' : 'normal',
-      });
+      const recipients = new Set<number>([responsableUserId, ...alsoNotify]);
+      for (const ceoId of await this.getCeoUserIds()) recipients.add(ceoId);
+      if (reviewerId) recipients.delete(reviewerId);
+      for (const uid of recipients) {
+        if (!uid) continue;
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type,
+          category: 'evidences',
+          title,
+          message,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activityId}/evidencias`,
+          priority: status === 'rejected' ? 'high' : 'normal',
+          dedupeSeconds: 0,
+        });
+      }
     } catch (error) {
       this.logger.error(`Error notifying evidence review:`, error);
+    }
+  }
+
+  /**
+   * Despacho / asignación a equipo: avisa a quien recibe, al responsable (Luis) y a Christian.
+   */
+  async notifyActivityDispatched(params: {
+    activityId: number;
+    label: string;
+    actorId: number | null;
+    memberId: number;
+    memberName: string;
+    responsableId: number | null;
+    /** En despacho el que recibe como LEAD solo reparte. */
+    reparte: boolean;
+  }) {
+    try {
+      const { activityId, label, actorId, memberId, memberName, responsableId, reparte } = params;
+      const actorName = actorId ? await this.resolveActorName(actorId) : 'Dirección';
+      const url = `/erp/actividades/${activityId}`;
+
+      if (memberId !== actorId) {
+        await this.notificationsService.createNotification({
+          userId: memberId,
+          type: 'ACTIVITY_ASSIGNED',
+          category: 'activities',
+          title: reparte ? '📨 Te pasaron una actividad para repartir' : '✨ Nueva actividad asignada',
+          message: reparte
+            ? `${actorName} te pasó «${label}». Repártela a tu equipo.`
+            : `${actorName} te asignó «${label}». Tú la ejecutas.`,
+          triggerUserId: actorId ?? undefined,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: url,
+          priority: 'high',
+          dedupeSeconds: 0,
+        });
+      }
+
+      const seguimiento = new Set<number>(await this.getCeoUserIds());
+      if (responsableId) seguimiento.add(responsableId);
+      seguimiento.delete(memberId);
+      if (actorId) seguimiento.delete(actorId);
+      for (const uid of seguimiento) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'ACTIVITY_ASSIGNED',
+          category: 'activities',
+          title: 'Despacho registrado',
+          message: `${actorName} pasó «${label}» a ${memberName}.`,
+          triggerUserId: actorId ?? undefined,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: url,
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityDispatched', error);
+    }
+  }
+
+  /** Cierre automático (todo el equipo subió su evidencia): responsable y Christian. */
+  async notifyActivityAutoCompleted(
+    activityId: number,
+    label: string,
+    responsableId: number | null,
+    lastUserId?: number | null,
+  ) {
+    try {
+      const targets = new Set<number>(await this.getCeoUserIds());
+      if (responsableId) targets.add(responsableId);
+      const who = lastUserId ? await this.resolveActorName(lastUserId) : null;
+      for (const uid of targets) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'ACTIVITY_COMPLETED',
+          category: 'activities',
+          title: '✅ Actividad terminada',
+          message: who
+            ? `«${label}» quedó terminada. La última evidencia la subió ${who}.`
+            : `«${label}» quedó terminada: el equipo subió todas sus evidencias.`,
+          triggerUserId: lastUserId ?? undefined,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activityId}`,
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityAutoCompleted', error);
     }
   }
 

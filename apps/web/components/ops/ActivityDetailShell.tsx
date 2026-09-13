@@ -70,6 +70,7 @@ export default function ActivityDetailShell({
       ? [
           { id: "detalle", label: "Detalle", href: base },
           { id: "evidences", label: "Evidencias", href: evidencesHref },
+          { id: "historial", label: "Historial", href: `${base}/historial` },
         ]
       : [
       { id: "detalle", label: "Detalle", href: base },

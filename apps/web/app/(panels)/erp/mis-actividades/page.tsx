@@ -36,6 +36,23 @@ function estatusUi(estatus: string): { label: string; color?: string } {
   return { label: "Por empezar" };
 }
 
+/** Avance de quien ejecuta, según su evidencia. */
+function avanceUi(status?: string | null): { label: string; color?: string } {
+  switch (status) {
+    case "COMPLETED":
+      return { label: "Evidencia lista", color: "#16a34a" };
+    case "EXIT_PHOTO":
+      return { label: "Por cerrar", color: "#2563eb" };
+    case "SERVICE_SHEET_PDF":
+    case "SERVICE_SHEET_DATA":
+      return { label: "Llenando hoja", color: "#2563eb" };
+    case "EVIDENCE_PHOTOS":
+      return { label: "Trabajando en sitio", color: "#2563eb" };
+    default:
+      return { label: "Sin empezar" };
+  }
+}
+
 function priorityUi(p?: string | null) {
   return PRIORITY_UI[(p || "media").toLowerCase()] ?? PRIORITY_UI.media;
 }
@@ -155,6 +172,7 @@ export default function MisActividadesPage() {
   const [showDone, setShowDone] = useState(false);
 
   const isCeo = isCeoEmail(user?.email);
+  const myId = user?.id;
   const firstName = ((user as { nombre?: string | null } | null)?.nombre || "").split(/\s+/)[0];
 
   const load = useCallback(async () => {
@@ -181,6 +199,7 @@ export default function MisActividadesPage() {
 
   const open = data?.open ?? [];
   const done = data?.doneToday ?? [];
+  const seguimiento = data?.seguimiento ?? [];
   const urgentes = open.filter((a) => priorityUi(a.prioridad).label === "Urgente").length;
   const canReorder = Boolean(data?.canReorder) && open.length > 1;
 
@@ -284,10 +303,11 @@ export default function MisActividadesPage() {
         </div>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
         <Stat label="Por hacer" value={open.length} />
         <Stat label="Urgentes" value={urgentes} color={urgentes ? "#dc2626" : undefined} />
         <Stat label="Hechas hoy" value={done.length} color={done.length ? "#16a34a" : undefined} />
+        {seguimiento.length ? <Stat label="En seguimiento" value={seguimiento.length} /> : null}
       </div>
 
       {error ? <p style={{ margin: 0, color: "#dc2626", fontSize: 13 }}>{error}</p> : null}
@@ -411,11 +431,19 @@ export default function MisActividadesPage() {
                       Folio {a.anNumber}
                     </div>
                   </div>
-                  <Link href={`/erp/actividades/${a.id}`} style={btnSecondary}>
-                    Abrir →
-                  </Link>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {a.porRepartir && myId ? (
+                      <Link href={`/erp/pizarra/${myId}`} style={{ ...btnPrimary, textDecoration: "none" }}>
+                        Repartir →
+                      </Link>
+                    ) : null}
+                    <Link href={`/erp/actividades/${a.id}`} style={btnSecondary}>
+                      Abrir →
+                    </Link>
+                  </div>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {a.porRepartir ? <Chip color="#d97706">📨 Te toca repartirla</Chip> : null}
                   <Chip color={estatusUi(a.estatus).color}>{estatusUi(a.estatus).label}</Chip>
                   <Chip color={pr.color}>● {pr.label}</Chip>
                   <Chip>{kindLabel(a)}</Chip>
@@ -494,6 +522,69 @@ export default function MisActividadesPage() {
           );
         })}
       </div>
+
+      {seguimiento.length ? (
+        <section style={{ display: "grid", gap: 10 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>👀 En seguimiento ({seguimiento.length})</h2>
+            <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+              Ya las repartiste: aquí ves a quién se las pasaste y cómo va quien las ejecuta.
+            </p>
+          </div>
+          {seguimiento.map((s) => {
+            const est = estatusUi(s.estatus);
+            const ejecutor = [...s.pasadaA].reverse().find((p) => p.rol !== "LEAD") ?? null;
+            const avance = ejecutor ? avanceUi(ejecutor.evidenceStatus) : null;
+            const primera = s.pasadaA[0];
+            return (
+              <article
+                key={s.id}
+                style={{
+                  padding: 14,
+                  borderRadius: 16,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.3 }}>{s.titulo}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>Folio {s.anNumber}</div>
+                  </div>
+                  <Link href={`/erp/actividades/${s.id}/historial`} style={btnSecondary}>
+                    Ver registro →
+                  </Link>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <Chip color={est.color}>{est.label}</Chip>
+                  <Chip>{kindLabel(s)}</Chip>
+                  {avance ? (
+                    <Chip color={avance.color}>
+                      {shortName(ejecutor?.nombre)}: {avance.label}
+                    </Chip>
+                  ) : (
+                    <Chip color="#d97706">Falta que la asignen</Chip>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                  📨 Pasada a {s.pasadaA.map((p) => shortName(p.nombre)).join(" → ")}
+                  {primera ? ` · ${formatWhen(primera.at) ?? ""}` : ""}
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      ) : null}
 
       {done.length ? (
         <section style={{ display: "grid", gap: 8 }}>

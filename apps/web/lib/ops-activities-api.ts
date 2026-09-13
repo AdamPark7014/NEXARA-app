@@ -13,6 +13,10 @@ export type ActivityDetail = {
   ticketType?: string | null;
   ticketTypeCustom?: string | null;
   workType?: string | null;
+  /** Tipo Core (tarea|proyecto|obra|servicio|comercial). */
+  coreKind?: string | null;
+  /** Encargo: ejecucion | despacho (en despacho el LEAD solo reparte). */
+  assignmentCharge?: string | null;
   projectId?: number | null;
   project?: { id: number; title: string } | null;
   branchName?: string | null;

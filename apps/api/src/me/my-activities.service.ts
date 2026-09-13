@@ -45,12 +45,26 @@ export type MyActivityItem = {
   orden: number | null;
   ordenJustificacion: string | null;
   ordenActualizadoAt: Date | null;
+  /** En despacho, este usuario solo reparte (no sube evidencia). */
+  despachador: boolean;
+  /** Despachador que todavía no la pasa a nadie. */
+  porRepartir: boolean;
+  /** Registro de despacho: a quién se pasó después de este usuario. */
+  pasadaA: Array<{
+    nombre: string;
+    rol: string;
+    at: Date;
+    por: string | null;
+    evidenceStatus: string | null;
+  }>;
 };
 
 export type MyActivitiesResponse = {
   canReorder: boolean;
   canSelfAssign: boolean;
   open: MyActivityItem[];
+  /** Despachadas por este usuario: ya hizo su parte, da seguimiento. */
+  seguimiento: MyActivityItem[];
   doneToday: MyActivityItem[];
 };
 
@@ -129,6 +143,7 @@ export class MyActivitiesService {
       },
       select: {
         rol: true,
+        asignadoAt: true,
         indicaciones: true,
         ordenEjecucion: true,
         ordenJustificacion: true,
@@ -154,7 +169,18 @@ export class MyActivitiesService {
             creador: { select: { id: true, nombre: true } },
             project: { select: { title: true } },
             client: { select: { name: true } },
-            activityEvidences: { where: { userId: viewer.id }, select: { status: true }, take: 1 },
+            activityEvidences: { select: { userId: true, status: true } },
+            assignees: {
+              where: { retiradoAt: null },
+              select: {
+                userId: true,
+                rol: true,
+                asignadoAt: true,
+                user: { select: { nombre: true } },
+                asignadoPor: { select: { nombre: true } },
+              },
+              orderBy: { asignadoAt: 'asc' },
+            },
           },
         },
       },
@@ -164,6 +190,17 @@ export class MyActivitiesService {
     const dayStart = new Date(`${new Date().toLocaleDateString('sv-SE')}T00:00:00`);
     const items: MyActivityItem[] = rows.map((row) => {
       const a = row.activity;
+      const despachador = a.assignmentCharge === 'despacho' && String(row.rol) === 'LEAD';
+      const statusByUser = new Map(a.activityEvidences.map((e) => [e.userId, e.status]));
+      const pasadaA = a.assignees
+        .filter((m) => m.userId !== viewer.id && m.asignadoAt.getTime() > row.asignadoAt.getTime())
+        .map((m) => ({
+          nombre: m.user?.nombre ?? '—',
+          rol: String(m.rol),
+          at: m.asignadoAt,
+          por: m.asignadoPor?.nombre ?? null,
+          evidenceStatus: statusByUser.get(m.userId) ?? null,
+        }));
       return {
         id: a.id,
         anNumber: a.anNumber,
@@ -186,14 +223,22 @@ export class MyActivitiesService {
         autoAsignada: a.creadoPorId === viewer.id,
         proyecto: a.project?.title ?? null,
         cliente: a.client?.name ?? null,
-        evidenceStatus: a.activityEvidences[0]?.status ?? null,
+        evidenceStatus: statusByUser.get(viewer.id) ?? null,
         orden: row.ordenEjecucion,
         ordenJustificacion: row.ordenJustificacion,
         ordenActualizadoAt: row.ordenActualizadoAt,
+        despachador,
+        porRepartir: despachador && pasadaA.length === 0,
+        pasadaA,
       };
     });
 
-    const open = items.filter((item) => !isClosed(item.estatus));
+    // Lo ya repartido sale de «Por hacer» y queda en seguimiento.
+    const repartida = (item: MyActivityItem) => item.despachador && item.pasadaA.length > 0;
+    const open = items.filter((item) => !isClosed(item.estatus) && !repartida(item));
+    const seguimiento = items
+      .filter((item) => !isClosed(item.estatus) && repartida(item))
+      .sort((a, b) => a.fechaAsignacion.getTime() - b.fechaAsignacion.getTime());
     // Orden personal → prioridad → fecha programada → fecha de asignación.
     open.sort(
       (a, b) =>
@@ -213,7 +258,7 @@ export class MyActivitiesService {
       .sort((a, b) => (b.fechaFinalizacion?.getTime() ?? 0) - (a.fechaFinalizacion?.getTime() ?? 0));
 
     const manager = this.isAreaManager(viewer.email);
-    return { canReorder: manager, canSelfAssign: manager, open, doneToday };
+    return { canReorder: manager, canSelfAssign: manager, open, seguimiento, doneToday };
   }
 
   async reorder(

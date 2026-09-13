@@ -97,7 +97,7 @@ export class ActivitiesService {
       include: { responsable: { select: { nombre: true, id: true } }, creador: { select: { nombre: true } } },
     });
 
-    // Responsable = LEAD en equipo + su evidencia personal
+    // Responsable = LEAD en equipo (+ su evidencia personal si la ejecuta él)
     await this.prisma.activityAssignee.upsert({
       where: { activityId_userId: { activityId: activity.id, userId: activity.responsableId } },
       create: {
@@ -105,19 +105,23 @@ export class ActivitiesService {
         userId: activity.responsableId,
         rol: 'LEAD',
         companyId: resolvedCompanyId,
+        asignadoPorId: activity.creadoPorId,
       },
       update: { retiradoAt: null, rol: 'LEAD' },
     });
-    await this.prisma.activityEvidence.upsert({
-      where: { activityId_userId: { activityId: activity.id, userId: activity.responsableId } },
-      create: {
-        activityId: activity.id,
-        userId: activity.responsableId,
-        companyId: resolvedCompanyId,
-        status: 'ENTRY_PHOTO',
-      },
-      update: {},
-    });
+    // En despacho el responsable solo reparte: la evidencia la sube quien la ejecuta.
+    if (activity.assignmentCharge !== 'despacho') {
+      await this.prisma.activityEvidence.upsert({
+        where: { activityId_userId: { activityId: activity.id, userId: activity.responsableId } },
+        create: {
+          activityId: activity.id,
+          userId: activity.responsableId,
+          companyId: resolvedCompanyId,
+          status: 'ENTRY_PHOTO',
+        },
+        update: {},
+      });
+    }
 
     // Notify the assigned user about new activity
     if (activity.responsableId && activity.responsable) {
@@ -126,6 +130,7 @@ export class ActivitiesService {
         activity.id,
         activity.anNumber || 'Nueva actividad',
         activity.creador?.nombre || 'Sistema',
+        activity.creadoPorId,
       );
     }
 
