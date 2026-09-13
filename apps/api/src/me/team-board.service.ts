@@ -25,6 +25,8 @@ export type TeamBoardOpenActivity = {
   assignmentCharge: string | null;
   fechaFinalizacion: Date | null;
   indicaciones?: string | null;
+  /** Emails del equipo activo: dice si un despacho ya se repartió. */
+  teamEmails: string[];
 };
 
 export type TeamBoardUser = {
@@ -307,6 +309,10 @@ export class TeamBoardService {
               coreKind: true,
               assignmentCharge: true,
               deletedAt: true,
+              assignees: {
+                where: { retiradoAt: null },
+                select: { user: { select: { email: true } } },
+              },
               activityEvidences: {
                 where: { userId: { in: userIds } },
                 select: { userId: true, status: true },
@@ -370,6 +376,9 @@ export class TeamBoardService {
         assignmentCharge: act.assignmentCharge,
         fechaFinalizacion: act.fechaFinalizacion,
         indicaciones: row.indicaciones ?? null,
+        teamEmails: act.assignees
+          .map((m) => (m.user?.email || '').trim().toLowerCase())
+          .filter(Boolean),
       };
       const list = openByUser.get(row.userId) ?? [];
       if (!list.some((x) => x.id === item.id)) list.push(item);
