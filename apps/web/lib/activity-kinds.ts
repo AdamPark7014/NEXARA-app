@@ -182,7 +182,7 @@ export const ASSIGNMENT_CHARGES: Record<AssignmentCharge, AssignmentChargeMeta> 
   },
 };
 
-/** Encargados a quienes Christian/dirección puede elegir ejecución vs despacho. */
+/** Encargados a quienes dirección asigna como despacho (siempre coordinan, no ejecutan). */
 const CHARGE_MANAGER_EMAILS = new Set<string>([
   ORG_EMAILS.david,
   ORG_EMAILS.luis,
@@ -194,13 +194,35 @@ export function canOfferAssignmentCharge(email?: string | null): boolean {
   return CHARGE_MANAGER_EMAILS.has(norm(email));
 }
 
+/** Luis / David / Antonio / Josué: al asignarles solo existe «Despacho a equipo». */
+export function forcesDespachoOnly(email?: string | null): boolean {
+  return canOfferAssignmentCharge(email);
+}
+
+/** Prefijo en indicaciones LEAD para el cupo de personas del despacho. */
+export function formatDispatchHeadcountNote(n: number, extra?: string): string {
+  const cupo = Math.max(1, Math.min(50, Math.round(Number(n) || 1)));
+  const base = `Cupo: ${cupo} persona${cupo === 1 ? '' : 's'}.`;
+  const more = (extra || '').trim();
+  return more ? `${base} ${more}` : base;
+}
+
+export function parseDispatchHeadcount(text?: string | null): number | null {
+  if (!text) return null;
+  const m = text.match(/Cupo:\s*(\d+)\s*persona/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 /** Pool típico de subordinados para despacho (por email del encargado). */
 export function dispatchPoolEmails(managerEmail?: string | null): string[] {
   const e = norm(managerEmail);
   if (e === ORG_EMAILS.david) return fieldInstallerEmails();
   if (e === ORG_EMAILS.antonio) return servicioDelegateEmails();
   if (e === ORG_EMAILS.josue) return fieldInstallerEmails();
-  if (e === ORG_EMAILS.luis) return [ORG_EMAILS.antonio, ...servicioDelegateEmails()];
+  // Luis solo manda a Antonio; Antonio decide el soporte.
+  if (e === ORG_EMAILS.luis) return [ORG_EMAILS.antonio];
   return [];
 }
 

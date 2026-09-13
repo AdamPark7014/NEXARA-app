@@ -9,6 +9,8 @@ import {
   ACTIVITY_KINDS,
   ASSIGNMENT_CHARGES,
   canOfferAssignmentCharge,
+  forcesDespachoOnly,
+  formatDispatchHeadcountNote,
   isServicioBridgeEmail,
   kindsForAssignment,
   metaForKind,
@@ -82,6 +84,7 @@ export default function AsignarActividadPage() {
   const [extraNotes, setExtraNotes] = useState<Record<number, string>>({});
   /** Indicaciones personales del responsable (primer asignado de /asignar). */
   const [leadNotes, setLeadNotes] = useState("");
+  const [headcount, setHeadcount] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
 
@@ -98,9 +101,11 @@ export default function AsignarActividadPage() {
   );
 
   const kindMeta = kind ? metaForKind(kind) : null;
-  const offerCharge = canOfferAssignmentCharge(person?.email);
-  const chargeReady = !offerCharge || charge != null;
-  const chargeMeta = charge ? ASSIGNMENT_CHARGES[charge] : null;
+  const despachoOnly = forcesDespachoOnly(person?.email);
+  const offerCharge = canOfferAssignmentCharge(person?.email) && !despachoOnly;
+  const chargeReady = despachoOnly || !canOfferAssignmentCharge(person?.email) || charge != null;
+  const effectiveCharge: AssignmentCharge | null = despachoOnly ? "despacho" : charge;
+  const chargeMeta = effectiveCharge ? ASSIGNMENT_CHARGES[effectiveCharge] : null;
 
   const bridgeNeeded =
     kind === "servicio" &&
@@ -126,14 +131,14 @@ export default function AsignarActividadPage() {
     const pool = teamPoolEmailsForAssignment({
       managerEmail: person?.email,
       kind,
-      charge,
+      charge: effectiveCharge,
     });
     if (pool.length) {
       const allow = new Set(pool.map((e) => e.toLowerCase()));
       return roster.filter((u) => allow.has((u.email || "").toLowerCase()));
     }
     return roster;
-  }, [kind, person?.email, roster, charge]);
+  }, [kind, person?.email, roster, effectiveCharge]);
 
   const autoPeerCoordinators = useMemo(() => {
     const selectedEmails = extraIds
@@ -153,11 +158,15 @@ export default function AsignarActividadPage() {
 
   useEffect(() => {
     setCharge(null);
+    setHeadcount(1);
+    setLeadNotes("");
+    setExtraIds([]);
   }, [userId]);
 
   useEffect(() => {
-    if (!offerCharge) setCharge(null);
-  }, [offerCharge]);
+    if (despachoOnly) setCharge("despacho");
+    else if (!offerCharge) setCharge(null);
+  }, [despachoOnly, offerCharge]);
 
   const load = useCallback(async () => {
     if (!token || !Number.isFinite(userId)) return;
@@ -204,10 +213,23 @@ export default function AsignarActividadPage() {
     }
     setTeamError(null);
     try {
+      // Encargados (Luis/David/Antonio/Josué): solo despacho + cupo; ellos reparten después.
+      if (despachoOnly) {
+        await addTeamMember(
+          token,
+          activityId,
+          userId,
+          formatDispatchHeadcountNote(headcount, leadNotes),
+          "LEAD",
+        );
+        router.push(`/erp/pizarra/${userId}`);
+        return;
+      }
+
       const needPrimaryLead =
         Boolean(leadNotes.trim()) ||
         autoPeerCoordinators.length > 0 ||
-        (charge === "despacho" && extraIds.length > 0);
+        (effectiveCharge === "despacho" && extraIds.length > 0);
 
       if (needPrimaryLead) {
         await addTeamMember(
@@ -225,7 +247,6 @@ export default function AsignarActividadPage() {
       const peerIds = new Set(autoPeerCoordinators.map((u) => u.id));
       for (const peer of autoPeerCoordinators) {
         if (peer.id === userId) continue;
-        // Si también está en extras, ya se suma abajo como LEAD con sus notas.
         if (extraIds.includes(peer.id)) continue;
         await addTeamMember(
           token,
@@ -385,6 +406,82 @@ export default function AsignarActividadPage() {
         </p>
       </section>
 
+      {kind && despachoOnly && !bridgeNeeded ? (
+        <section
+          style={{
+            padding: 14,
+            borderRadius: 16,
+            border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
+            background: "color-mix(in srgb, var(--primary) 8%, var(--surface))",
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 750, color: "var(--text-secondary)" }}>
+              2 · Encargo a {displayName.split(/\s+/).slice(0, 2).join(" ")}
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 800 }}>Despacho a equipo</p>
+            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+              Solo aparece {displayName.split(/\s+/).slice(0, 2).join(" ")}. Le dejas la actividad y cuántas
+              personas ocupas; él la reparte a su gente
+              {person?.email?.toLowerCase() === ORG_EMAILS.luis
+                ? " (manda a Antonio; Antonio elige al soporte)"
+                : person?.email?.toLowerCase() === ORG_EMAILS.antonio
+                  ? " (Carolina / Alejandro)"
+                  : person?.email?.toLowerCase() === ORG_EMAILS.david
+                    ? " (instaladores de campo)"
+                    : ""}
+              .
+            </p>
+          </div>
+          <label style={{ display: "grid", gap: 4, maxWidth: 220 }}>
+            <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
+              Personas que se ocupan *
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={headcount}
+              onChange={(e) => setHeadcount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid var(--border)",
+                font: "inherit",
+                fontSize: 15,
+                fontWeight: 700,
+                background: "var(--surface)",
+                color: "inherit",
+              }}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>
+              Indicaciones para {displayName.split(/\s+/).slice(0, 2).join(" ")} (opcional)
+            </span>
+            <textarea
+              value={leadNotes}
+              onChange={(e) => setLeadNotes(e.target.value)}
+              rows={2}
+              placeholder="Qué debe coordinar / contexto…"
+              style={{
+                width: "100%",
+                padding: 8,
+                borderRadius: 10,
+                border: "1px solid var(--border)",
+                fontFamily: "inherit",
+                fontSize: 13,
+                resize: "vertical",
+                background: "var(--surface)",
+                color: "inherit",
+              }}
+            />
+          </label>
+        </section>
+      ) : null}
+
       {kind && offerCharge && !bridgeNeeded ? (
         <section>
           <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
@@ -427,11 +524,6 @@ export default function AsignarActividadPage() {
               );
             })}
           </div>
-          <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.4 }}>
-            <strong>Ejecución directa</strong>: la hace él. <strong>Despacho a equipo</strong>: él la
-            coordina y la asigna a alguien de su subordinación (puedes dejarla pendiente o sumar ya al
-            ejecutor abajo).
-          </p>
         </section>
       ) : null}
 
@@ -479,6 +571,7 @@ export default function AsignarActividadPage() {
 
       {kindMeta && !bridgeNeeded && chargeReady ? (
         <>
+          {!despachoOnly ? (
           <section
             style={{
               padding: 14,
@@ -489,10 +582,10 @@ export default function AsignarActividadPage() {
           >
             <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 10, color: "var(--text-secondary)" }}>
               {offerCharge ? "3" : "2"} · Equipo{" "}
-              {charge === "despacho" ? "(ejecutor / apoyo)" : "extra (opcional)"}
+              {effectiveCharge === "despacho" ? "(ejecutor / apoyo)" : "extra (opcional)"}
             </div>
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
-              {charge === "despacho"
+              {effectiveCharge === "despacho"
                 ? kind === "proyecto"
                   ? `Despacho: puedes sumar instaladores y soporte. Si mezclas ambos, se asigna también al otro coordinador (p. ej. Antonio) además de ${displayName.split(/\s+/).slice(0, 2).join(" ")} y a los subordinados elegidos.`
                   : `Como despacho, suma a quien debe ejecutarla bajo ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Si no eliges a nadie, queda pendiente de que él la asigne.`
@@ -504,7 +597,7 @@ export default function AsignarActividadPage() {
                     ? "Solo instaladores de campo (Joan, Israel, Juan José)."
                     : kind === "proyecto"
                       ? "Soporte e instaladores pueden colaborar en el proyecto. Si hay ambos lados, se suman ambos coordinadores."
-                      : charge === "ejecucion"
+                      : effectiveCharge === "ejecucion"
                         ? `Ejecución directa de ${displayName.split(/\s+/).slice(0, 2).join(" ")}. Puedes sumar apoyo opcional.`
                         : `El responsable es ${displayName}. Puedes sumar apoyo.`}
             </p>
@@ -661,6 +754,7 @@ export default function AsignarActividadPage() {
               </>
             )}
           </section>
+          ) : null}
 
           <section
             style={{
@@ -671,14 +765,15 @@ export default function AsignarActividadPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 12, color: "var(--text-secondary)" }}>
-              {offerCharge ? "4" : "3"} · {kindMeta.emoji} {kindMeta.title}
+              {despachoOnly ? "3" : offerCharge ? "4" : "3"} · {kindMeta.emoji} {kindMeta.title}
               {chargeMeta ? ` · ${chargeMeta.badge}` : ""}
+              {despachoOnly ? ` · ${headcount} persona${headcount === 1 ? "" : "s"}` : ""}
             </div>
             <OpsActivityForm
-              key={`${kind}-${charge ?? "none"}`}
+              key={`${kind}-${effectiveCharge ?? "none"}-${despachoOnly ? headcount : "x"}`}
               tone="core"
               coreKind={kind ?? undefined}
-              assignmentCharge={charge ?? undefined}
+              assignmentCharge={effectiveCharge ?? undefined}
               initialResponsableId={userId}
               hideResponsableSelect
               forcedProjectMode={kindMeta.projectMode}

@@ -22,6 +22,8 @@ export type TeamBoardOpenActivity = {
   coreKind: string | null;
   assignmentCharge?: string | null;
   fechaFinalizacion: string | null;
+  /** Indicaciones del assignee (p. ej. Cupo: N personas). */
+  indicaciones?: string | null;
 };
 
 export type TeamBoardUser = {
