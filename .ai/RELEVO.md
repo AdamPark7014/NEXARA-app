@@ -9,23 +9,25 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Despacho pendiente → asignar al equipo
+## Este turno — Solo despacho + cupo a Luis/David/Antonio
 
 ### Hecho
 
-**Causa:** a Luis le dejaron una actividad en **Despacho**, pero en su propia ficha no había UI para elegir a quién (solo «Asignar actividad» en fichas ajenas).
+Al asignar a **Luis / David / Antonio / Josué** ya no hay elección Ejecución vs Despacho:
 
-**Fix:**
-1. `DespachoPendingPanel` en `/erp/pizarra/[userId]` cuando es **tu** perfil: lista despachos abiertos → «Despachar al equipo» → checkboxes del pool (`dispatchPoolEmails`) → POST team TECNICO.
-2. Misma UI sirve para **Antonio** y **David** cuando tengan despacho pendiente.
-3. `boardExtraEmails` también fuerza instaladores de **David** (Joan/Israel/Juan).
+1. **UI asignar** (`forcesDespachoOnly`): solo «Despacho a equipo» + **Personas que se ocupan** + indicaciones opcionales. Sin chips de equipo.
+2. Cupo se guarda en indicaciones LEAD como `Cupo: N personas.` (`formatDispatchHeadcountNote` / `parseDispatchHeadcount`).
+3. **Luis** al despachar solo ve a **Antonio** (pool) y lo suma como **LEAD**; Antonio elige soporte.
+4. **David** → instaladores; **Antonio** → Carolina/Alejandro (igual que antes).
+5. API team-board expone `indicaciones` en actividades abiertas; panel pendiente muestra el cupo.
+6. Rebuild Docker `web` (+ api) porque `next start` sirve `.next` bakeado (mounts de fuente no bastan).
 
 ### Verificar
 
-1. Hard refresh → Luis toca **TÚ**.
-2. Bloque naranja «Pendiente de despacho» → Despachar al equipo → Antonio/Carolina/Alejandro → Asignar.
-3. Login David → debe ver instaladores; si tiene despacho, mismo panel.
-4. Login Antonio → Carolina/Alejandro + panel si hay despacho.
+1. Hard refresh → asignar a Luis: **solo** Despacho + campo «Personas que se ocupan» (sin Ejecución directa ni chips AG/CJ/JA).
+2. Tras crear, Luis en su ficha ve «Pendiente de despacho» con cupo → solo Antonio → Asignar.
+3. Antonio ve el despacho y elige Carolina/Alejandro.
+4. Mismo patrón David (instaladores) y Antonio directo.
 
 ### A medias
 
