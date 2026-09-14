@@ -12,6 +12,7 @@ import Button from "@/components/ui/Button";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import GpsTrajectoryPreview from "@/components/GpsTrajectoryPreview";
 import SessionImage from "@/components/SessionImage";
+import ComidasPanel from "@/components/asistencias/ComidasPanel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, getSocketBaseUrl, parseResponseJson } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -209,11 +210,15 @@ export default function ErpAsistenciasPage() {
   const canSeeOwnTrajectory = canLiveGps;
 
   const [tab, setTab] = useState<TabId>("equipo");
+  // Los avisos de comida abren /erp/asistencias?tab=comidas.
+  useEffect(() => {
+    const inicial = new URLSearchParams(window.location.search).get("tab");
+    if (inicial === "comidas" || inicial === "trayectoria" || inicial === "equipo") setTab(inicial);
+  }, []);
   const [dateFilter, setDateFilter] = useState(todayIso());
   const [filterEstado, setFilterEstado] = useState<FilterEstado>("TODOS");
 
   const [members, setMembers] = useState<ApiAttendanceUser[]>([]);
-  const [lunches, setLunches] = useState<LunchBreak[]>([]);
   const [teamGps, setTeamGps] = useState<LocationRecord[]>([]);
   const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
   const [dayAttendances, setDayAttendances] = useState<
@@ -260,25 +265,6 @@ export default function ErpAsistenciasPage() {
     [token, dateFilter, isManager, companyWideViewer],
   );
 
-  const loadComidas = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const endpoint =
-        dateFilter === todayIso()
-          ? "lunch-breaks/today"
-          : `lunch-breaks?startDate=${dateFilter}&endDate=${dateFilter}`;
-      const data = await apiFetch<LunchBreak[]>(endpoint, token);
-      setLunches(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setLunches([]);
-      setError(e instanceof Error ? e.message : "No se pudo cargar comidas");
-    } finally {
-      setLoading(false);
-    }
-  }, [token, dateFilter]);
-
   const loadTrayectoria = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -311,10 +297,10 @@ export default function ErpAsistenciasPage() {
   }, [token, dateFilter, canLiveGps, canSeeOwnTrajectory]);
 
   useEffect(() => {
+    // Comidas carga lo suyo en ComidasPanel (lunch-breaks/today exigía ATTENDANCE_MANAGE).
     if (tab === "equipo") void loadEquipo();
-    else if (tab === "comidas") void loadComidas();
-    else void loadTrayectoria();
-  }, [tab, loadEquipo, loadComidas, loadTrayectoria]);
+    else if (tab === "trayectoria") void loadTrayectoria();
+  }, [tab, loadEquipo, loadTrayectoria]);
 
   // Live: CEO (manage-only) también debe ver checadas ajenas al instante.
   // Antes el poll/socket exigía canRegister → Christian nunca refrescaba.
@@ -888,70 +874,7 @@ export default function ErpAsistenciasPage() {
         </>
       )}
 
-      {tab === "comidas" && (
-        <Section
-          title="Comidas del equipo"
-          subtitle="Registros de lunch-breaks (misma API que RRHH)."
-          actions={
-            <Button size="sm" variant="ghost" onClick={() => void loadComidas()}>
-              Actualizar
-            </Button>
-          }
-        >
-          {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando comidas." />}
-          {!loading && lunches.length === 0 && (
-            <EmptyState icon="🍽️" title="Sin registros" description="Nadie registró comida en esta fecha." />
-          )}
-          {!loading && lunches.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
-              {lunches.map((b) => {
-                const enCurso = b.status === "IN_PROGRESS";
-                const color = enCurso ? "#d97706" : "#16a34a";
-                return (
-                  <article
-                    key={b.id}
-                    style={{
-                      background: "var(--surface)",
-                      border: "1px solid var(--border)",
-                      borderLeft: `3px solid ${color}`,
-                      borderRadius: 16,
-                      padding: 14,
-                      boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 750, fontSize: 13 }}>{b.user?.nombre ?? "—"}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                          {b.user?.department?.nombre ?? ""}
-                        </div>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color,
-                          background: `color-mix(in srgb, ${color} 12%, var(--surface))`,
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {enCurso ? "En comida" : "Completada"}
-                      </span>
-                    </div>
-                    <div style={{ marginTop: 12, fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                      {fmtTime(b.checkinTime)}
-                      <span style={{ opacity: 0.45, margin: "0 6px" }}>→</span>
-                      {b.checkoutTime ? fmtTime(b.checkoutTime) : "en curso"}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </Section>
-      )}
+      {tab === "comidas" && <ComidasPanel fecha={dateFilter} />}
 
       {tab === "trayectoria" && (
         <>

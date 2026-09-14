@@ -69,7 +69,7 @@ describe('el día de la comida es el día de México', () => {
 
     await service.createCheckin(
       3,
-      { checkinTime: MX_1900.toISOString(), checkinPhotoUrl: 'foto.jpg' } as any,
+      { checkinTime: MX_1900.toISOString(), checkinPhotoUrl: 'foto.jpg', justificacion: 'Visita con cliente' } as any,
       7,
     );
 
@@ -83,7 +83,7 @@ describe('el día de la comida es el día de México', () => {
 
     await service.createCheckin(
       3,
-      { checkinTime: MX_1900.toISOString(), checkinPhotoUrl: 'foto.jpg' } as any,
+      { checkinTime: MX_1900.toISOString(), checkinPhotoUrl: 'foto.jpg', justificacion: 'Visita con cliente' } as any,
       7,
     );
     await service.getTodayLunchBreaks(7);
@@ -112,7 +112,7 @@ describe('la ventana de comida son las 15:00–16:00 de México', () => {
 
     await service.createCheckin(
       3,
-      { checkinTime: MX_1530.toISOString(), checkinPhotoUrl: 'foto.jpg' } as any,
+      { checkinTime: MX_1530.toISOString(), checkinPhotoUrl: 'foto.jpg', justificacion: 'Visita con cliente' } as any,
       7,
     );
 
@@ -137,7 +137,7 @@ describe('la ventana de comida son las 15:00–16:00 de México', () => {
 
     await service.createCheckin(
       3,
-      { checkinTime: mx1430.toISOString(), checkinPhotoUrl: 'foto.jpg' } as any,
+      { checkinTime: mx1430.toISOString(), checkinPhotoUrl: 'foto.jpg', justificacion: 'Visita con cliente' } as any,
       7,
     );
 
@@ -155,7 +155,7 @@ describe('la ventana de comida son las 15:00–16:00 de México', () => {
 
     await service.createCheckin(
       3,
-      { checkinTime: mx1630.toISOString(), checkinPhotoUrl: 'foto.jpg' } as any,
+      { checkinTime: mx1630.toISOString(), checkinPhotoUrl: 'foto.jpg', justificacion: 'Visita con cliente' } as any,
       7,
     );
 
@@ -178,7 +178,7 @@ describe('las notas de la comida no inventan texto', () => {
 
     await service.createCheckout(
       3,
-      { checkoutTime: mx1600.toISOString(), checkoutPhotoUrl: 'foto.jpg' } as any,
+      { checkoutTime: mx1600.toISOString(), checkoutPhotoUrl: 'foto.jpg', justificacion: 'Visita con cliente' } as any,
       7,
     );
 
@@ -221,5 +221,55 @@ describe('nadie vuelve a meter setHours', () => {
     for (const cron of crons) {
       expect(cron).toMatch(/timeZone/);
     }
+  });
+});
+
+describe('comida a destiempo: justificación y revisión del superior', () => {
+  const MX_1700 = new Date('2026-09-08T23:00:00Z');
+
+  it('fuera de 3 a 4 p.m. sin justificación no se registra', async () => {
+    jest.useFakeTimers().setSystemTime(MX_1700);
+    const { service, prisma } = build();
+
+    await expect(
+      service.createCheckin(3, { checkinTime: MX_1700.toISOString(), checkinPhotoUrl: 'foto.jpg' } as any, 7),
+    ).rejects.toThrow('fuera del horario de comida');
+    expect(prisma.lunchBreak.create).not.toHaveBeenCalled();
+  });
+
+  it('con justificación queda pendiente de que un superior la apruebe', async () => {
+    jest.useFakeTimers().setSystemTime(MX_1700);
+    const { service, prisma } = build();
+
+    await service.createCheckin(
+      3,
+      { checkinTime: MX_1700.toISOString(), checkinPhotoUrl: 'foto.jpg', justificacion: 'Estaba en sitio con el cliente' } as any,
+      7,
+    );
+
+    const data = prisma.lunchBreak.create.mock.calls[0][0].data;
+    expect(data.isCheckinLate).toBe(true);
+    expect(data.revisionEstado).toBe('PENDIENTE');
+    expect(data.checkinJustificacion).toBe('Estaba en sitio con el cliente');
+  });
+
+  it('a tiempo no pide justificación ni revisión', async () => {
+    jest.useFakeTimers().setSystemTime(MX_1530);
+    const { service, prisma } = build();
+
+    await service.createCheckin(3, { checkinTime: MX_1530.toISOString(), checkinPhotoUrl: 'foto.jpg' } as any, 7);
+
+    const data = prisma.lunchBreak.create.mock.calls[0][0].data;
+    expect(data.revisionEstado).toBeNull();
+    expect(data.checkinJustificacion).toBeNull();
+  });
+
+  it('una hora de teléfono dentro de la ventana no esquiva la regla: manda la del servidor', async () => {
+    jest.useFakeTimers().setSystemTime(MX_1700);
+    const { service } = build();
+
+    await expect(
+      service.createCheckin(3, { checkinTime: MX_1530.toISOString(), checkinPhotoUrl: 'foto.jpg' } as any, 7),
+    ).rejects.toThrow('fuera del horario de comida');
   });
 });

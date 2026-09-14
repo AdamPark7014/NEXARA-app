@@ -76,6 +76,5 @@ export const appUrls = {
   erpApprovals: (instanceId: number) => `/erp/approvals?highlight=${instanceId}`,
   erpFinanceViatics: (id?: number) =>
     id ? `/erp/finance/viatics?highlight=${id}` : `/erp/finance/viatics`,
-  erpLunchBreaks: (highlightId?: number) =>
-    highlightId ? `/erp/hr/lunch-breaks?highlight=${highlightId}` : `/erp/hr/lunch-breaks`,
+  erpLunchBreaks: (_highlightId?: number) => `/erp/asistencias?tab=comidas`,
 };

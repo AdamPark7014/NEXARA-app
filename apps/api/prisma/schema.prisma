@@ -1456,22 +1456,31 @@ model AttendanceDay {
 }
 
 model LunchBreak {
-  id               Int            @id @default(autoincrement())
-  userId           Int
-  date             DateTime       @db.Date
-  checkinTime      DateTime
-  checkoutTime     DateTime?
-  checkinPhotoUrl  String // Foto obligatoria al entrar a comida
-  checkoutPhotoUrl String? // Foto opcional al volver
-  status           String         @default("IN_PROGRESS") // PENDING, IN_PROGRESS, COMPLETED
-  isCheckinLate    Boolean        @default(false) // Si checkin fue fuera de 15:00-16:00
-  isCheckoutLate   Boolean        @default(false) // Si checkout fue fuera de horario esperado
-  notes            String? // Comentario si se pasó de hora
-  companyId        Int
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  user             User           @relation(fields: [userId], references: [id])
-  company          CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id                    Int            @id @default(autoincrement())
+  userId                Int
+  date                  DateTime       @db.Date
+  checkinTime           DateTime
+  checkoutTime          DateTime?
+  checkinPhotoUrl       String // Foto obligatoria al entrar a comida
+  checkoutPhotoUrl      String? // Foto opcional al volver
+  status                String         @default("IN_PROGRESS") // PENDING, IN_PROGRESS, COMPLETED
+  isCheckinLate         Boolean        @default(false) // Si checkin fue fuera de 15:00-16:00
+  isCheckoutLate        Boolean        @default(false) // Si checkout fue fuera de horario esperado
+  notes                 String? // Comentario si se pasó de hora
+  /// Motivo cuando sale a comer fuera de 15:00–16:00 (obligatorio en ese caso).
+  checkinJustificacion  String?        @db.Text
+  /// Motivo cuando regresa después de las 16:05 (obligatorio en ese caso).
+  checkoutJustificacion String?        @db.Text
+  /// null = a tiempo; PENDIENTE | APROBADA | RECHAZADA cuando fue a destiempo.
+  revisionEstado        String?        @db.VarChar(20)
+  revisionNotas         String?        @db.Text
+  revisadoPorId         Int?
+  revisadoAt            DateTime?
+  companyId             Int
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  user                  User           @relation(fields: [userId], references: [id])
+  company               CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, userId, date])
   @@index([companyId])

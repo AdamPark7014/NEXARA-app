@@ -1,9 +1,27 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import type { LunchBreak } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
-import { CreateLunchBreakDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
+import { CreateLunchBreakDto, RevisarComidaDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
 import { companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { parseWorkDate, workDateColumn, workDayAtClock } from '../../common/time/workday.js';
+
+/** Christian supervisa y developer es cuenta de plataforma: no registran comida. */
+const SIN_COMIDA = new Set(['gerencia@nexara.com.mx', 'developer@nexara.com.mx']);
+const JUSTIFICACION_MIN = 5;
+/** Desfase aceptado entre la hora del teléfono y la del servidor. */
+const DESFASE_MAX_MS = 10 * 60_000;
+
+const norm = (email?: string | null) => (email || '').trim().toLowerCase();
+
+/** Quien consulta o revisa comidas. */
+export type LunchViewer = {
+  id: number;
+  email?: string | null;
+  isSuperAdmin?: boolean;
+  roleKey?: string | null;
+  permissions?: string[] | null;
+};
 
 @Injectable()
 export class LunchBreaksService {
@@ -55,11 +73,21 @@ export class LunchBreaksService {
       throw new BadRequestException('Ya completaste tu hora de comida hoy');
     }
 
-    const checkinTime = new Date(data.checkinTime);
+    const checkinTime = this.horaRegistro(data.checkinTime, now);
     const lunchStartHour = workDayAtClock(now, 15, 0);
     const lunchEndHour = workDayAtClock(now, 16, 0);
 
     const isLate = checkinTime < lunchStartHour || checkinTime > lunchEndHour;
+    // Fuera de 3–4 p.m. hay que decir por qué; queda pendiente de que un superior lo apruebe.
+    const justificacion = (data.justificacion ?? '').trim();
+    if (isLate && justificacion.length < JUSTIFICACION_MIN) {
+      throw new BadRequestException(
+        'Estás fuera del horario de comida (3:00 a 4:00 p.m.): escribe por qué sales a comer a esta hora.',
+      );
+    }
+    const revision = isLate
+      ? { revisionEstado: 'PENDIENTE', revisionNotas: null, revisadoPorId: null, revisadoAt: null }
+      : { revisionEstado: null, revisionNotas: null, revisadoPorId: null, revisadoAt: null };
     let notes = '';
     if (checkinTime < lunchStartHour) {
       notes = `Entraste a comida ${this.getMinutesDiff(checkinTime, lunchStartHour)} minutos antes`;
@@ -80,6 +108,8 @@ export class LunchBreaksService {
           checkinTime,
           checkinPhotoUrl: data.checkinPhotoUrl,
           isCheckinLate: isLate,
+          checkinJustificacion: isLate ? justificacion : null,
+          ...revision,
           notes,
           status: 'IN_PROGRESS',
           updatedAt: new Date(),
@@ -95,6 +125,8 @@ export class LunchBreaksService {
           checkinTime,
           checkinPhotoUrl: data.checkinPhotoUrl,
           isCheckinLate: isLate,
+          checkinJustificacion: isLate ? justificacion : null,
+          ...revision,
           notes,
           status: 'IN_PROGRESS',
           companyId: tenantId,
@@ -109,6 +141,16 @@ export class LunchBreaksService {
       'LUNCH_CHECKIN',
       lunchBreak.user.nombre || 'Usuario',
     );
+    if (isLate) {
+      void this.notificationHierarchy.notifyLunchLate?.({
+        userId: usuarioId,
+        userName: lunchBreak.user.nombre || 'Usuario',
+        momento: 'salida',
+        hora: checkinTime,
+        justificacion,
+        lunchId: lunchBreak.id,
+      });
+    }
 
     return lunchBreak;
   }
@@ -134,10 +176,16 @@ export class LunchBreaksService {
       throw new BadRequestException('Ya registraste tu salida de comida');
     }
 
-    const checkoutTime = new Date(data.checkoutTime);
+    const checkoutTime = this.horaRegistro(data.checkoutTime, now);
     const lunchEndHour = workDayAtClock(now, 16, 5);
 
     const isLate = checkoutTime > lunchEndHour;
+    const justificacion = (data.justificacion ?? '').trim();
+    if (isLate && justificacion.length < JUSTIFICACION_MIN) {
+      throw new BadRequestException(
+        'Ya pasó la hora de regreso de comida (4:00 p.m.): escribe por qué regresas a esta hora.',
+      );
+    }
     // `lunch.notes` es nullable: sin el `?? ''`, concatenar dejaba en la base
     // notas que empezaban literalmente por "null".
     let notes = lunch.notes ?? '';
@@ -154,6 +202,9 @@ export class LunchBreaksService {
         checkoutTime,
         checkoutPhotoUrl: data.checkoutPhotoUrl,
         isCheckoutLate: isLate,
+        checkoutJustificacion: isLate ? justificacion : null,
+        // Regreso tarde: vuelve a pendiente aunque la salida ya se hubiera aprobado.
+        ...(isLate ? { revisionEstado: 'PENDIENTE', revisionNotas: null, revisadoPorId: null, revisadoAt: null } : {}),
         notes,
         status: 'COMPLETED',
         updatedAt: new Date(),
@@ -167,8 +218,220 @@ export class LunchBreaksService {
       'LUNCH_CHECKOUT',
       lunchBreak.user.nombre || 'Usuario',
     );
+    if (isLate) {
+      void this.notificationHierarchy.notifyLunchLate?.({
+        userId: usuarioId,
+        userName: lunchBreak.user.nombre || 'Usuario',
+        momento: 'regreso',
+        hora: checkoutTime,
+        justificacion,
+        lunchId: lunchBreak.id,
+      });
+    }
 
     return lunchBreak;
+  }
+
+  /** Mi comida de hoy: qué sigue (salir o regresar), si ya es a destiempo y mi registro. */
+  async miDia(viewer: LunchViewer, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const now = new Date();
+    const debeRegistrar = this.debeRegistrar(viewer);
+    const registro = debeRegistrar
+      ? await this.prisma.lunchBreak.findFirst({
+          where: { userId: viewer.id, date: this.dayColumn(now), ...companyWhere(tenantId) },
+        })
+      : null;
+    const inicio = workDayAtClock(now, 15, 0);
+    const fin = workDayAtClock(now, 16, 0);
+    const regresoLimite = workDayAtClock(now, 16, 5);
+    const siguiente = !debeRegistrar
+      ? 'no_aplica'
+      : !registro
+        ? 'salida'
+        : !registro.checkoutTime
+          ? 'regreso'
+          : 'listo';
+    const [mapped] = registro ? await this.mapRegistros([registro]) : [null];
+    return {
+      debeRegistrar,
+      ahora: now,
+      ventana: { inicio, fin, regresoLimite, texto: '3:00 a 4:00 p.m.' },
+      salidaADestiempo: now < inicio || now > fin,
+      regresoADestiempo: now > regresoLimite,
+      siguiente,
+      registro: mapped,
+    };
+  }
+
+  /**
+   * Comidas del día de mi gente. Christian (y plataforma) ve a todos; cada jefe ve su organigrama
+   * (managerId hacia abajo). Incluye a quien no ha registrado y quién puede aprobar cada una.
+   */
+  async equipo(viewer: LunchViewer, fecha: string | undefined, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const dia = fecha ? workDateColumn(parseWorkDate(fecha)) : this.dayColumn();
+    const usuarios = await this.prisma.user.findMany({
+      where: { isActive: true, companyMemberships: { some: { companyId: tenantId } } },
+      select: { id: true, nombre: true, email: true, avatarUrl: true, puesto: true, managerId: true },
+      orderBy: { nombre: 'asc' },
+    });
+    const todo = this.esSupervisorGeneral(viewer);
+    const jefes = this.cadenaJefes(usuarios);
+    const visibles = usuarios.filter(
+      (u) =>
+        u.id !== viewer.id &&
+        !SIN_COMIDA.has(norm(u.email)) &&
+        (todo || Boolean(jefes.get(u.id)?.has(viewer.id))),
+    );
+    const registros = visibles.length
+      ? await this.prisma.lunchBreak.findMany({
+          where: { date: dia, userId: { in: visibles.map((u) => u.id) }, ...companyWhere(tenantId) },
+        })
+      : [];
+    const mapped = await this.mapRegistros(registros);
+    const porUsuario = new Map(mapped.map((r) => [r.userId, r]));
+    const peso = (r: (typeof mapped)[number] | null) =>
+      !r ? 2 : r.revisionEstado === 'PENDIENTE' ? 0 : !r.checkoutTime ? 1 : 3;
+    const filas = visibles
+      .map((u) => {
+        const registro = porUsuario.get(u.id) ?? null;
+        return {
+          userId: u.id,
+          nombre: u.nombre,
+          puesto: u.puesto,
+          avatarUrl: u.avatarUrl,
+          registro,
+          // Solo se listan subordinados (o todos para Christian): puede revisar lo que fue a destiempo.
+          puedoRevisar: Boolean(registro?.revisionEstado),
+        };
+      })
+      .sort((a, b) => peso(a.registro) - peso(b.registro) || a.nombre.localeCompare(b.nombre));
+    return {
+      fecha: dia,
+      alcance: todo ? 'todo' : filas.length ? 'equipo' : 'propio',
+      filas,
+      resumen: {
+        total: filas.length,
+        registraron: filas.filter((f) => f.registro).length,
+        enComida: filas.filter((f) => f.registro && !f.registro.checkoutTime).length,
+        aDestiempo: filas.filter((f) => f.registro?.revisionEstado).length,
+        pendientes: filas.filter((f) => f.registro?.revisionEstado === 'PENDIENTE').length,
+      },
+    };
+  }
+
+  /** Superior (jefe por organigrama o Christian) aprueba o rechaza una comida a destiempo. */
+  async revisar(viewer: LunchViewer, lunchId: number, dto: RevisarComidaDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const row = await this.prisma.lunchBreak.findFirst({ where: { id: lunchId, ...companyWhere(tenantId) } });
+    if (!row) throw new NotFoundException('Registro de comida no encontrado');
+    if (!row.revisionEstado) {
+      throw new BadRequestException('Esta comida fue a tiempo: no requiere aprobación');
+    }
+    if (row.userId === viewer.id) {
+      throw new ForbiddenException('No puedes aprobar tu propia comida');
+    }
+    if (!this.esSupervisorGeneral(viewer) && !(await this.esJefeDe(viewer.id, row.userId))) {
+      throw new ForbiddenException('Solo sus superiores pueden aprobar o rechazar esta comida');
+    }
+    const aprobada = dto.decision === 'aprobar';
+    const notas = (dto.notas ?? '').trim();
+    if (!aprobada && notas.length < JUSTIFICACION_MIN) {
+      throw new BadRequestException('Escribe por qué rechazas la justificación');
+    }
+    const updated = await this.prisma.lunchBreak.update({
+      where: { id: row.id },
+      data: {
+        revisionEstado: aprobada ? 'APROBADA' : 'RECHAZADA',
+        revisionNotas: notas || null,
+        revisadoPorId: viewer.id,
+        revisadoAt: new Date(),
+      },
+    });
+    void this.notificationHierarchy.notifyLunchReviewed?.({
+      userId: row.userId,
+      reviewerId: viewer.id,
+      aprobada,
+      notas: notas || null,
+      lunchId: row.id,
+    });
+    const [mapped] = await this.mapRegistros([updated]);
+    return mapped;
+  }
+
+  private debeRegistrar(viewer: LunchViewer) {
+    return !viewer.isSuperAdmin && viewer.roleKey !== 'ceo' && !SIN_COMIDA.has(norm(viewer.email));
+  }
+
+  /** Christian y cuentas de plataforma supervisan a toda la empresa. */
+  private esSupervisorGeneral(viewer: LunchViewer) {
+    return (
+      Boolean(viewer.isSuperAdmin) ||
+      viewer.roleKey === 'ceo' ||
+      SIN_COMIDA.has(norm(viewer.email)) ||
+      (viewer.permissions ?? []).includes('console.admin')
+    );
+  }
+
+  private cadenaJefes(users: Array<{ id: number; managerId: number | null }>) {
+    const jefeDe = new Map(users.map((u) => [u.id, u.managerId]));
+    const out = new Map<number, Set<number>>();
+    for (const u of users) {
+      const jefes = new Set<number>();
+      let cur = u.managerId;
+      while (cur != null && cur !== u.id && !jefes.has(cur)) {
+        jefes.add(cur);
+        cur = jefeDe.get(cur) ?? null;
+      }
+      out.set(u.id, jefes);
+    }
+    return out;
+  }
+
+  private async esJefeDe(jefeId: number, userId: number) {
+    const vistos = new Set<number>([userId]);
+    let cur = (await this.prisma.user.findUnique({ where: { id: userId }, select: { managerId: true } }))?.managerId;
+    while (cur != null && !vistos.has(cur)) {
+      if (cur === jefeId) return true;
+      vistos.add(cur);
+      cur = (await this.prisma.user.findUnique({ where: { id: cur }, select: { managerId: true } }))?.managerId;
+    }
+    return false;
+  }
+
+  /** Hora del registro: la del teléfono si no se aleja más de 10 min de la del servidor. */
+  private horaRegistro(valor: string, now: Date): Date {
+    const t = new Date(valor);
+    if (Number.isNaN(t.getTime())) return now;
+    return Math.abs(t.getTime() - now.getTime()) <= DESFASE_MAX_MS ? t : now;
+  }
+
+  private async mapRegistros(rows: LunchBreak[]) {
+    const ids = [...new Set(rows.map((r) => r.revisadoPorId).filter((v): v is number => v != null))];
+    const revisores = ids.length
+      ? await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true } })
+      : [];
+    const nombre = new Map(revisores.map((u) => [u.id, u.nombre]));
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      date: r.date,
+      status: r.status,
+      checkinTime: r.checkinTime,
+      checkoutTime: r.checkoutTime,
+      checkinPhotoUrl: r.checkinPhotoUrl,
+      checkoutPhotoUrl: r.checkoutPhotoUrl,
+      isCheckinLate: r.isCheckinLate,
+      isCheckoutLate: r.isCheckoutLate,
+      checkinJustificacion: r.checkinJustificacion,
+      checkoutJustificacion: r.checkoutJustificacion,
+      revisionEstado: r.revisionEstado,
+      revisionNotas: r.revisionNotas,
+      revisadoPor: r.revisadoPorId != null ? (nombre.get(r.revisadoPorId) ?? null) : null,
+      revisadoAt: r.revisadoAt,
+      minutos: r.checkoutTime ? this.getMinutesDiff(r.checkinTime, r.checkoutTime) : null,
+    }));
   }
 
   async getUserLunchBreaks(

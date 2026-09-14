@@ -32,6 +32,11 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 10. **Archivos que se borraban en Docker (reporte de Adam 12:24: fotos en negro y PDF vacío en AN-0001).** La API guarda en `/app/uploads` (raíz del proyecto en el contenedor) y el compose de desarrollo solo montaba `./apps/api/uploads`: cada `docker compose build api` + `up -d` borraba todo lo subido. Las fotos, el PDF y la salida de Alejandro en AN-0001 (13–14 sep) se perdieron en los rebuilds de hoy (11:28 y 12:01) y no se pueden recuperar; en BD siguen las rutas (la API responde 404). `docker-compose.yml` ahora monta `./uploads:/app/uploads` como `deploy/docker-compose.nexara.yml` (producción ya lo tenía). Para AN-0001 un superior debe «Devolver → Toda la actividad» para que Alejandro vuelva a subir.
 11. **Visor en `EquipoEvidencias`:** fotos, avatar y visor grande descargan con la sesión y, si el archivo no existe, muestran «Esta foto ya no está en el servidor» (antes cuadro negro). El PDF se descarga con la sesión y se dibuja con `components/PDFViewer.tsx` (pdf.js, `/pdf.worker.min.js`): `<object>` nunca iba a verse porque la CSP trae `object-src 'none'`.
 
+12. **Hora de comida con justificación y aprobación (pedido de Adam 12:38).** En `/erp/asistencias` → Comidas no se podía registrar. Ahora:
+   - API `lunch-breaks`: `GET mi-dia` (qué sigue: salida/regreso/listo, si ya es a destiempo), `POST checkin` / `PUT checkout` aceptan `justificacion`; fuera de 15:00–16:00 (regreso después de 16:05) sin justificación ≥5 → 400; con ella queda `revisionEstado` PENDIENTE y avisa a sus jefes por organigrama + Christian (`notifyLunchLate`). La hora del teléfono solo se acepta a ±10 min de la del servidor. `GET equipo?fecha=` (Christian/plataforma: todos; jefes: su organigrama; incluye «sin registrar»). `PATCH :id/revision` aprobar/rechazar (rechazar exige motivo; nadie se aprueba a sí mismo) → avisa a quien comió. Christian (gerencia@) ya no puede registrar (403). Migración `20260914190000_lunch_break_review` (columnas en `lunch_breaks`). `appUrls.erpLunchBreaks` → `/erp/asistencias?tab=comidas`.
+   - Web `components/asistencias/ComidasPanel.tsx`: tarjeta «Tu hora de comida» (Salir a comer / Ya regresé, cámara en vivo → vista previa → justificación si es a destiempo), lista del equipo con filtros (Por aprobar, A destiempo, En comida, Sin registrar), fotos, justificaciones y Aprobar/Rechazar. La página ya no llama `lunch-breaks/today` (exigía ATTENDANCE_MANAGE) y abre la pestaña con `?tab=comidas`.
+   - Spec `lunch-ventana-mexico`: las entradas fuera de ventana llevan justificación; 4 pruebas nuevas (sin justificación rechaza, con ella queda PENDIENTE, a tiempo sin revisión, hora de teléfono no esquiva la regla).
+
 ### Verificado
 
 - `prisma generate` + `tsc --noEmit` API limpio. Web: sin errores nuevos (siguen los 4 previos: CommandPalette ×2, evidence-flow-helpers, module-guides).
@@ -54,7 +59,7 @@ App móvil (Android + iOS) al día con Core solo-ERP: pedido de Adam en el mismo
 
 ### Siguiente
 
-App móvil. Luego Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad Actividades/Asistencia). Al desplegar a producción subir juntas `20260913180000_drop_evidence_activity_unique_index`, `20260913190000_assignee_dispatch_log`, `20260914050000_activity_schedule_changes`, `20260914100000_evidence_photos_geo` y `20260914160000_evidence_reviews`.
+App móvil. Luego Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad Actividades/Asistencia). Al desplegar a producción subir juntas `20260913180000_drop_evidence_activity_unique_index`, `20260913190000_assignee_dispatch_log`, `20260914050000_activity_schedule_changes`, `20260914100000_evidence_photos_geo`, `20260914160000_evidence_reviews` y `20260914190000_lunch_break_review`.
 
 ### No tocar
 
