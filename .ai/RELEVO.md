@@ -27,11 +27,15 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 6. **Historial**: eventos «Aprobada por…», «Devuelta para corregir por…», «Devuelta completa por…» con estrellas; «Cumplida» usa la hora de la última evidencia enviada (la aprobación llega después).
 7. **Web `components/ops/EquipoEvidencias.tsx`**: tarjeta por persona (reparte/ejecuta, recibió de quién y cuándo, a quién la pasó, avance por paso con hora), fotos en visor grande (anterior/siguiente, teclado, «Ver en mapa»), PDF embebido + «Abrir PDF», formulario con etiquetas por tipo; barra «Aprobar / Devolver» para quien puede revisar; «↩️ Devolver este paso» en cada sección; ventana de revisión (aprobar/devolver, pasos o toda la actividad, estrellas con texto, observaciones obligatorias); historial con «Ver lo que se devolvió». Pestaña Evidencias: flujo de captura (solo si la ejecutas) + equipo. Pestaña Detalle: resumen compacto (reemplaza `ActivityEvidenceReviewPanel`, que leía `activity.activityEvidence` inexistente y nunca mostraba nada).
 8. Web evidencias: `canUpload` en Core exige ser del equipo o responsable (antes cualquier superior veía el flujo y la API le creaba una evidencia vacía); el responsable de un despacho sin fila cuenta como «reparte».
+9. **Push que faltaba (commit aparte):** entrada/salida propias, entrada sugerida por ACS y aviso a admins (`AttendanceService.avisar`), hora de comida próxima/vencida y aviso a admins (`LunchBreaksCronService.pushAll`) y «Nuevo acceso detectado» (`AuthService`, resuelve `NotificationsService` con `ModuleRef` porque NotificationsModule importa AuthModule) se escribían con `prisma.notification.create/createMany`: quedaban en la campana sin push ni socket. Ahora pasan por `NotificationsService.createNotification` con `relatedUrl` `/erp/asistencias` o `/erp/my-profile`. En pruebas sin el servicio, asistencia cae al `create` de antes.
 
 ### Verificado
 
 - `prisma generate` + `tsc --noEmit` API limpio. Web: sin errores nuevos (siguen los 4 previos: CommandPalette ×2, evidence-flow-helpers, module-guides).
 - Docker: `build api` + `prisma migrate deploy` («All migrations have been successfully applied») + `up -d api`; «Nest application successfully started»; `activity_evidence_reviews` existe (0 filas). `GET …/evidencias` y `POST …/revision` → 401 sin sesión.
+- Web: `build web` + `up -d`; `/erp/actividades/1/evidencias` 200; el bundle trae «Devolver este paso» y «Ver lo que se devolvió».
+- Cadena real AN-0001 en BD: Luis (responsable, LEAD) → Antonio (LEAD) → Alejandro (TECNICO); jefe de Alejandro y Carolina = Antonio. Con las reglas: Antonio ve y revisa a Alejandro, no ve a Luis. AN-0001 quedó «Finalizada» por el cierre automático viejo con evidencia sin aprobar: no se migraron datos; la pestaña la muestra «Por revisar».
+- Push: `tsc` API limpio; `jest src/attendance src/auth` 6 suites / 49 pruebas OK; `build api` + `up -d` arrancó sin errores de dependencias.
 
 ### Falta probar a mano
 

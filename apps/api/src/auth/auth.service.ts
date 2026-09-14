@@ -1,3 +1,5 @@
+import { ModuleRef } from '@nestjs/core';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { JwtService } from '@nestjs/jwt';
@@ -56,6 +58,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     @Optional() private readonly domainEvents?: DomainEventBusService,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
 
   private isSuperAdmin(email: string) {
@@ -725,6 +728,15 @@ export class AuthService {
     };
   }
 
+  /** NotificationsModule importa AuthModule: se resuelve en tiempo de ejecución para no crear un ciclo. */
+  private resolveNotificationsService(): NotificationsService | null {
+    try {
+      return this.moduleRef?.get(NotificationsService, { strict: false }) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   private async createLoginNotification(userId: number, detectedDevice: string) {
     const baseData = {
       userId,
@@ -734,6 +746,22 @@ export class AuthService {
       entityType: 'auth',
       priority: 'normal' as const,
     };
+
+    // Con push (NotificationsService); si no se puede resolver, queda solo en la campana como antes.
+    const notifications = this.resolveNotificationsService();
+    if (notifications) {
+      try {
+        await notifications.createNotification({
+          ...baseData,
+          type: NotificationType.ATTENDANCE_CHECKIN,
+          relatedUrl: '/erp/my-profile',
+          dedupeSeconds: 0,
+        });
+        return;
+      } catch (error) {
+        this.logger.debug(error instanceof Error ? error.message : String(error));
+      }
+    }
 
     try {
       await this.prisma.notification.create({
