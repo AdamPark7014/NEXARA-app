@@ -9,28 +9,34 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Reprogramar despacho (registro de 3 tipos) y Mis actividades dentro de Actividades
+## Este turno — Reprogramar despacho, Actividades unificado y fotos con vista previa + GPS
+
+El trabajo sin commitear del turno anterior (reprogramar + pestañas) se rescató en `656d4ba2` al abrir sesión; este cierre lo completa.
 
 ### Hecho
 
-1. Petición de Adam: quien reparte un despacho debe poder cambiar día y hora; el registro debe mostrar con día y hora: cuándo se envió, cuándo el encargado la reprogramó y cuándo se cumplió.
-2. BD: tabla `activity_schedule_changes` (modelo `ActivityScheduleChange`: activityId, companyId, cambiadoPorId, fechaAnterior, fechaNueva, motivo, createdAt) y valor `ACTIVITY_RESCHEDULED` en `NotificationType`. Migración `20260914050000_activity_schedule_changes`.
-3. API: `PATCH /me/activities/:id/reprogramar` (`MyActivitiesService.reprogram`): solo el LEAD activo del despacho, actividad abierta, fecha no pasada; delega en `ActivityTeamService.reschedule`, que actualiza fechaInicio = fechaEntregaEsperada = fechaMaxima, guarda el cambio (de → a, quién, motivo) y avisa (`notifyActivityRescheduled`) al responsable, al equipo y a Christian.
-4. Historial (`buildTimeline`): tipo 1 «enviada» (hora de envío + «Programada: …» vigente en ese momento), tipo 2 «reprogramada» («X la reprogramó», «De … a …», motivo), tipo 3 «cumplida» (hora de cierre + programada + «a tiempo» o «N min/h tarde»).
-5. Web: componente `components/pizarra/ReprogramarDespacho.tsx` («📅 Programada: … · Cambiar fecha y hora», día, hora, motivo opcional). Se usa en `DespachoPendingPanel` y en «En seguimiento» de Mis actividades (que muestra «Enviada a …» y «🕑 Reprogramada por …»). Team-board expone `fechaInicio` en abiertas; Mis actividades expone `ultimaReprogramacion`.
-6. Petición de Adam: Mis actividades va dentro de Actividades, y para quien solo ve lo suyo (Alejandro) la pizarra de una persona es redundante. `/erp/pizarra`: Christian ve solo el tablero (solo asigna, no tiene propias); quien tiene gente a su cargo en su tablero (hoy David, Luis y Antonio) ve pestañas «✅ Mis actividades» / «👥 Mi equipo» (recuerda la última en localStorage `nx-actividades-vista`, o `?vista=`); todos los demás (técnicos, Daniela, Mónica) ven directo su lista. La decisión sale del tablero (`otros > 0`), no de la lista de encargados, para que nadie vea una pestaña de equipo vacía; mientras carga muestra «Cargando actividades…». La vista se movió a `components/pizarra/MisActividadesView.tsx` (`git mv`); `/erp/mis-actividades` redirige a `/erp/pizarra?vista=mias`; el módulo ya no aparece suelto en el menú (`section-views`); auto-asignarse y «← Actividades» del detalle vuelven a `/erp/pizarra`.
-7. Pizarra: «En actividad N h» ya no cuenta desde la hora programada; solo si la actividad está En Proceso / Por Validar (a Alejandro le salía 8 h 28 min con la actividad Pendiente).
+1. **Reprogramar despacho (registro de 3 tipos).** Tabla `activity_schedule_changes` + valor `ACTIVITY_RESCHEDULED` (migración `20260914050000_activity_schedule_changes`). `PATCH /me/activities/:id/reprogramar` (solo LEAD activo del despacho, actividad abierta, fecha no pasada) → `ActivityTeamService.reschedule` (fechaInicio = entrega = máximo, guarda de → a, quién, motivo; avisa a responsable, equipo y Christian). Historial: «enviada» (hora de envío + programada vigente), «reprogramada» (de → a, motivo), «cumplida» (hora de cierre vs programada: a tiempo / N tarde). Web: `components/pizarra/ReprogramarDespacho.tsx` en `DespachoPendingPanel` y en «En seguimiento».
+2. **Mis actividades dentro de Actividades.** Vista movida a `components/pizarra/MisActividadesView.tsx`. `/erp/pizarra`: Christian solo tablero; quien tiene gente a su cargo en su tablero (hoy David, Luis, Antonio) ve pestañas «✅ Mis actividades» / «👥 Mi equipo» (recuerda la última, o `?vista=`); todos los demás ven directo su lista. La decisión sale del tablero (`otros > 0`), no de la lista de encargados. `/erp/mis-actividades` redirige a `?vista=mias`; ya no aparece suelto en el menú.
+3. **Pizarra:** «En actividad N h» solo cuenta si la actividad está En Proceso / Por Validar (antes contaba desde la hora programada).
+4. **Fotos con vista previa (entrada, evidencias, salida).** `ActivityEvidenceFlow`: tomar foto ya no la envía; abre «Tu foto de …» con la imagen, «📍 Ubicación capturada … · Ver en mapa», y botones «✓ Enviar/Usar esta foto», «📷 Tomar otra», «Cancelar». Foto y GPS se capturan juntos (`captureWithLocation`); entrada/salida envían esas mismas coordenadas; sin GPS muestra «activa el GPS y da permiso».
+5. **GPS por foto de evidencia.** Columna `activity_evidences.evidencePhotosGeo` (JSONB, migración `20260914100000_evidence_photos_geo`). `POST activity-evidence/:id/evidence-photos` y el `resubmit` de EVIDENCE_PHOTOS aceptan `photoGeo` (opcional para clientes viejos); `sanitizePhotoGeo` alinea al número de fotos y descarta coordenadas inválidas.
+6. **Paso de evidencias:** el error se repite junto a «Siguiente Paso» (con 4 fotos el aviso de arriba quedaba fuera de vista y parecía que el botón no hacía nada).
+7. **Causa real de «no me deja ir al siguiente paso» (Alejandro, AN-0001):** la API respondió 400 «Se requieren exactamente 2 fotos de evidencia» (la actividad pide 2) pero la web exigía 4: `ActivityEvidenceFlow` leía `data.evidencePhotoRequired` y la API lo manda en `data.activity.evidencePhotoRequired`, así que caía en 4. Web ya lo lee de la actividad; la API ahora acepta **al menos** las requeridas (`saveEvidencePhotos` y `resubmit`).
+8. **Docker Desktop no arrancaba** al abrir sesión: no podía borrar el socket viejo `%LOCALAPPDATA%\Docker\run\sailor-ingest.sock` y ofrecía «Reset to factory defaults» (NO usar: borra volúmenes y la BD). Se cerraron sus procesos y se reinició; arrancó aunque el socket siguió sin poder borrarse.
 
 ### Verificado
 
-- VERIFICACION_PENDIENTE
+- `prisma generate` + `tsc --noEmit` API: limpio. Web: sin errores nuevos; siguen 4 previos y ajenos.
+- BD: existen `activity_schedule_changes`, la columna `activity_evidences.evidencePhotosGeo` y el valor `ACTIVITY_RESCHEDULED`; AN-0001 pide 2 fotos (confirma la causa del bloqueo).
+- Log del intento de Alejandro (contenedor previo): tres 400 «Se requieren exactamente 2 fotos de evidencia» en `POST /api/activity-evidence/1/evidence-photos`.
+- Docker (10:16 UTC-6): `build api web` + `prisma migrate deploy` + `up -d`; API arrancó sin errores. `dist` de evidencias trae «al menos» y `evidencePhotosGeo`; la ruta de reprogramar y `evidence-photos` → 401 sin sesión. Bundle web trae «Tomar otra», «Ver en mapa», «Mi equipo», «Cambiar fecha y hora», «Cargando actividades»; `/erp/mis-actividades` redirige (NEXT_REDIRECT 307) a `/erp/pizarra?vista=mias`.
 
 ### Falta probar a mano
 
-1. Antonio → Actividades → «Pendiente de despacho» → «Cambiar fecha y hora» con motivo: la programada cambia; Luis y Christian reciben «Actividad reprogramada»; Historial muestra «reprogramada» con de → a.
-2. Alejandro → Actividades: ve directo su lista (sin pizarra); ya no dice «En actividad 8 h» si no ha arrancado.
-3. Luis → Actividades: pestañas «Mis actividades» / «Mi equipo»; el menú ya no trae «Mis actividades» suelto.
-4. Christian → Actividades: solo el tablero del equipo.
+1. Alejandro → AN-0001 → Evidencias: cada foto abre la vista previa con ubicación; «Tomar otra» repite; al completar 4, «Siguiente Paso» avanza o muestra el motivo junto al botón.
+2. Foto de salida: vista previa con ubicación antes de enviar.
+3. Antonio → Actividades → «Pendiente de despacho» → «Cambiar fecha y hora»: Historial muestra «reprogramada»; Luis y Christian reciben el aviso.
+4. Alejandro → Actividades: directo su lista. Luis/David/Antonio: pestañas. Christian: tablero.
 
 ### A medias
 
@@ -38,7 +44,7 @@ Nada.
 
 ### Siguiente
 
-Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad; ojo: Mis actividades ahora es `components/pizarra/MisActividadesView.tsx` y vive en la pestaña de `/erp/pizarra`). Al desplegar a producción subir juntas `20260913180000_drop_evidence_activity_unique_index`, `20260913190000_assignee_dispatch_log` y `20260914050000_activity_schedule_changes`.
+Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad; Mis actividades vive en `components/pizarra/MisActividadesView.tsx`). Mostrar la ubicación de cada foto en la revisión de evidencias (hoy solo se guarda). Al desplegar a producción subir juntas `20260913180000_drop_evidence_activity_unique_index`, `20260913190000_assignee_dispatch_log`, `20260914050000_activity_schedule_changes` y `20260914100000_evidence_photos_geo`.
 
 ### No tocar
 
