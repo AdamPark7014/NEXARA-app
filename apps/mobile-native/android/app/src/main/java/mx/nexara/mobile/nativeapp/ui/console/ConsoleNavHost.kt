@@ -50,6 +50,8 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.ui.console.activities.ConsoleActivityDetailByIdScreen
+import mx.nexara.mobile.nativeapp.ui.console.activities.ActividadesScreen
+import mx.nexara.mobile.nativeapp.ui.console.activities.BoardPersonScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleActivitiesScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.OpsNewActivityScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
@@ -73,6 +75,7 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
 import mx.nexara.mobile.nativeapp.access.ModulePanelMap
 import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
+import mx.nexara.mobile.nativeapp.access.toCoreSurface
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTealTopAppBarColors
@@ -101,7 +104,9 @@ private object ConsoleRoutes {
     const val More = "console/more"
     const val MyProfile = "console/my-profile"
     const val ActivityDetail = "console/activity/{id}?tab={tab}"
-    const val NewActivity = "console/activities/new?requestId={requestId}"
+    const val NewActivity = "console/activities/new?requestId={requestId}&self={self}"
+    /** El día de una persona del equipo (/erp/pizarra/:userId). */
+    const val BoardPerson = "console/board/{userId}"
     const val ModulePattern = "console/m/{key}"
     fun module(key: String) = "console/m/$key"
 }
@@ -190,6 +195,8 @@ fun ConsoleNavHost(
     var chatChannelId by remember { mutableStateOf<Long?>(null) }
     var chatMessageId by remember { mutableStateOf<Long?>(null) }
     var viaticHighlightId by remember { mutableStateOf<Long?>(null) }
+    /** `?vista=mias|equipo` que llegó por deep link a Actividades. */
+    var actividadesVista by remember { mutableStateOf<String?>(null) }
 
     val deepLinkSignal by PendingDeepLink.signal.collectAsState()
     LaunchedEffect(panelId, deepLinkSignal) {
@@ -199,9 +206,21 @@ fun ConsoleNavHost(
             chatMessageId = DeepLinkNavigation.chatMessageId(link)
         }
         viaticHighlightId = DeepLinkNavigation.viaticHighlightId(link)
+        DeepLinkNavigation.actividadesVista(link)?.let { actividadesVista = it }
         val entityRoute = DeepLinkNavigation.consoleRoute(link)
         val target = entityRoute ?: routeForModuleKey(DeepLinkNavigation.consoleModuleKey(link))
         navController.navigate(target) { launchSingleTop = true }
+    }
+
+    val openActivity: (Long, String?) -> Unit = { id, tab ->
+        val route = if (tab.isNullOrBlank()) "console/activity/$id" else "console/activity/$id?tab=$tab"
+        navController.navigate(route) { launchSingleTop = true }
+    }
+    val openPerson: (Long) -> Unit = { personId ->
+        navController.navigate("console/board/$personId") { launchSingleTop = true }
+    }
+    val openSelfAssign: () -> Unit = {
+        navController.navigate("console/activities/new?requestId=-1&self=true") { launchSingleTop = true }
     }
 
     if (showContabilidad) {
@@ -233,15 +252,20 @@ fun ConsoleNavHost(
             }
 
             if (isAdministrativo) {
+                if (isVisible(ConsoleRoutes.MyActivities)) {
+                    add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Actividades", Icons.Default.Assignment))
+                } else if (isVisible(ConsoleRoutes.Activities)) {
+                    add(ConsoleNavItem(ConsoleRoutes.Activities, "Actividades", Icons.Default.Assignment))
+                }
                 if (isVisible(ConsoleRoutes.Attendance)) {
                     add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", Icons.Default.Schedule))
                 }
             } else if (isSuperAdmin || isAdmin) {
-                if (isVisible(ConsoleRoutes.Activities)) add(ConsoleNavItem(ConsoleRoutes.Activities, "Operación", Icons.Default.Folder))
+                if (isVisible(ConsoleRoutes.Activities)) add(ConsoleNavItem(ConsoleRoutes.Activities, "Actividades", Icons.Default.Folder))
                 if (isVisible(ConsoleRoutes.Evidences)) add(ConsoleNavItem(ConsoleRoutes.Evidences, "Evidencias", Icons.Default.PhotoCamera))
                 if (isVisible(ConsoleRoutes.Attendance)) add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", Icons.Default.Schedule))
             } else if (isIngeniero) {
-                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", Icons.Default.Assignment))
+                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Actividades", Icons.Default.Assignment))
                 if (isVisible(ConsoleRoutes.MyEvidences)) add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Mis evid.", Icons.Default.PhotoCamera))
                 if (isVisible(ConsoleRoutes.Attendance)) {
                     add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", Icons.Default.Schedule))
@@ -249,7 +273,7 @@ fun ConsoleNavHost(
                     add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", Icons.Default.Map))
                 }
             } else {
-                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", Icons.Default.Assignment))
+                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Actividades", Icons.Default.Assignment))
                 if (isVisible(ConsoleRoutes.MyEvidences)) add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Mis evid.", Icons.Default.PhotoCamera))
                 if (isVisible(ConsoleRoutes.Attendance)) {
                     add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", Icons.Default.Schedule))
@@ -273,8 +297,8 @@ fun ConsoleNavHost(
     val currentTitle = remember(currentDestination?.route) {
         when (currentDestination?.route) {
             ConsoleRoutes.Dashboard -> "Resumen ejecutivo"
-            ConsoleRoutes.Activities -> "Operación de actividades"
-            ConsoleRoutes.MyActivities -> "Mis actividades"
+            ConsoleRoutes.Activities -> "Actividades"
+            ConsoleRoutes.MyActivities -> "Actividades"
             ConsoleRoutes.Evidences -> "Evidencias"
             ConsoleRoutes.MyEvidences -> "Mis evidencias"
             ConsoleRoutes.Viatics -> "Viáticos"
@@ -294,6 +318,8 @@ fun ConsoleNavHost(
             ConsoleRoutes.Clients -> "Clientes"
             ConsoleRoutes.Projects -> "Proyectos"
             ConsoleRoutes.ActivityDetail -> "Detalle de actividad"
+            ConsoleRoutes.BoardPerson -> "Equipo"
+            ConsoleRoutes.NewActivity -> "Nueva actividad"
             ConsoleRoutes.ModulePattern -> {
                 val key = backStackEntry?.arguments?.getString("key").orEmpty()
                 ModuleCatalog.console.firstOrNull { it.key == key }?.label ?: "Módulo"
@@ -370,15 +396,20 @@ fun ConsoleNavHost(
                 )
             }
             nxComposable(ConsoleRoutes.Activities) {
-                ConsoleActivitiesScreen(
-                    title = "Actividades",
-                    onNewOt = { navController.navigate("console/activities/new?requestId=-1") { launchSingleTop = true } },
+                // Core (/erp/pizarra): CEO → pizarra; con equipo → pestañas; resto → lo suyo.
+                ActividadesScreen(
+                    initialVista = actividadesVista,
+                    onOpenActivity = openActivity,
+                    onOpenPerson = openPerson,
+                    onSelfAssign = openSelfAssign,
                 )
             }
             nxComposable(ConsoleRoutes.NewActivity, style = NxNavAnimStyle.Modal) { entry ->
                 val rid = entry.arguments?.getString("requestId")?.toLongOrNull()
+                val self = entry.arguments?.getString("self") == "true"
                 OpsNewActivityScreen(
                     requestId = if (rid != null && rid > 0) rid else null,
+                    selfAssign = self,
                     onBack = { navController.popBackStack() },
                     onCreated = { id ->
                         navController.navigate("console/activity/$id") { launchSingleTop = true }
@@ -386,16 +417,20 @@ fun ConsoleNavHost(
                 )
             }
             nxComposable(ConsoleRoutes.MyActivities) {
-                // My-activities route: shows only personal section (non-admin users)
-                ConsoleActivitiesScreen(title = "Mis actividades")
+                ActividadesScreen(
+                    initialVista = actividadesVista ?: "mias",
+                    onOpenActivity = openActivity,
+                    onOpenPerson = openPerson,
+                    onSelfAssign = openSelfAssign,
+                )
             }
             nxComposable(ConsoleRoutes.Evidences) {
                 // Combined view: admins see team review + personal; normal users see only personal
-                ConsoleEvidencesScreen(mode = "combined")
+                ConsoleEvidencesScreen(mode = "combined", onOpenActivity = { id -> openActivity(id, "evidencias") })
             }
             nxComposable(ConsoleRoutes.MyEvidences) {
                 // Dedicated personal evidences route
-                ConsoleEvidencesScreen(mode = "user")
+                ConsoleEvidencesScreen(mode = "user", onOpenActivity = { id -> openActivity(id, "evidencias") })
             }
             nxComposable(ConsoleRoutes.Viatics) {
                 ConsoleViaticsScreen(initialHighlightId = viaticHighlightId)
@@ -490,6 +525,16 @@ fun ConsoleNavHost(
                     },
                 )
             }
+            nxComposable(ConsoleRoutes.BoardPerson, style = NxNavAnimStyle.Push) { entry ->
+                val personId = entry.arguments?.getString("userId")?.toLongOrNull() ?: return@nxComposable
+                BoardPersonScreen(
+                    userId = personId,
+                    onOpenActivity = openActivity,
+                    onAssign = {
+                        navController.navigate("console/activities/new?requestId=-1") { launchSingleTop = true }
+                    },
+                )
+            }
             nxComposable(ConsoleRoutes.ModulePattern, style = NxNavAnimStyle.Push) { backStack ->
                 val key = backStack.arguments?.getString("key").orEmpty()
                 val m = ModuleCatalog.console.firstOrNull { it.key == key }
@@ -503,10 +548,28 @@ fun ConsoleNavHost(
                             },
                         )
                     } }
-                    "activities" -> { { ConsoleActivitiesScreen(title = "Actividades") } }
-                    "my-activities" -> { { ConsoleActivitiesScreen(title = "Mis actividades") } }
-                    "evidences" -> { { ConsoleEvidencesScreen(mode = "combined") } }
-                    "my-evidences" -> { { ConsoleEvidencesScreen(mode = "user") } }
+                    "activities" -> { {
+                        ActividadesScreen(
+                            initialVista = actividadesVista,
+                            onOpenActivity = openActivity,
+                            onOpenPerson = openPerson,
+                            onSelfAssign = openSelfAssign,
+                        )
+                    } }
+                    "my-activities" -> { {
+                        ActividadesScreen(
+                            initialVista = actividadesVista ?: "mias",
+                            onOpenActivity = openActivity,
+                            onOpenPerson = openPerson,
+                            onSelfAssign = openSelfAssign,
+                        )
+                    } }
+                    "evidences" -> { {
+                        ConsoleEvidencesScreen(mode = "combined", onOpenActivity = { id -> openActivity(id, "evidencias") })
+                    } }
+                    "my-evidences" -> { {
+                        ConsoleEvidencesScreen(mode = "user", onOpenActivity = { id -> openActivity(id, "evidencias") })
+                    } }
                     "viatics" -> { { ConsoleViaticsScreen(initialHighlightId = viaticHighlightId) } }
                     "vehicles" -> { { ConsoleVehiclesScreen() } }
                     "gps" -> { { ConsoleGpsScreen() } }
@@ -572,8 +635,9 @@ fun ConsoleNavHost(
                             onOpenDestination = { dest ->
                                 when (dest) {
                                     is mx.nexara.mobile.nativeapp.access.DeepLinkDestination.Module -> {
-                                        if (dest.panel == panelId) {
-                                            navController.navigate(routeForModuleKey(dest.key)) { launchSingleTop = true }
+                                        if (dest.panel.toCoreSurface() == panelId.toCoreSurface()) {
+                                            // El LaunchedEffect del deep link lo consume: abre detalle y pestaña.
+                                            PendingDeepLink.publish(dest)
                                         } else {
                                             PendingDeepLink.destination = dest
                                             onExitToPanels()

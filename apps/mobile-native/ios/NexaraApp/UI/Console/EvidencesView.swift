@@ -372,26 +372,14 @@ struct EvidencesView: View {
                         .foregroundColor(uploadMessage.hasPrefix("❌") ? .red : .green)
                 }
 
-                if uploading { ProgressView("Subiendo…") }
-
-                let steps = workflowSteps(evidence)
-                ForEach(steps, id: \.key) { step in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: step.done ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(step.done ? .green : .secondary)
-                            Text(step.title).font(.subheadline).bold()
-                        }
-                        if !step.done {
-                            MediaPickerBar { media in
-                                Task { await submitStep(step.key, activityId: activityId, media: media) }
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(Color(.secondarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+                // Mismo flujo que Core (cámara en vivo + GPS, formulario real por
+                // tipo y corrección de pasos devueltos). Antes cada paso usaba
+                // MediaPickerBar y el formulario se mandaba vacío.
+                EvidenceCaptureFlowView(
+                    activityId: Int(activityId),
+                    embedded: true,
+                    onChanged: { Task { await reload() } }
+                )
             }
             .padding()
         }

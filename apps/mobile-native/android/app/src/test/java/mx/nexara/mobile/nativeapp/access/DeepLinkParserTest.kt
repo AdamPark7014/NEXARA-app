@@ -1,7 +1,7 @@
 package mx.nexara.mobile.nativeapp.access
 
+import mx.nexara.mobile.nativeapp.navigation.PendingModuleLink
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,17 +33,18 @@ class DeepLinkParserTest {
     }
 
     @Test
-    fun parseWebPath_activityDetail() {
+    fun parseWebPath_legacyOpsActivityDetailLandsInErp() {
+        // Core-only: no hay superficie OPS; el enlace viejo abre el detalle dentro de ERP.
         val dest = DeepLinkParser.parseWebPath("/ops/activities/501") as DeepLinkDestination.Module
-        assertEquals(PanelId.OPS, dest.panel)
+        assertEquals(PanelId.ERP, dest.panel)
         assertEquals("activities", dest.key)
         assertEquals(501L, dest.entityId)
     }
 
     @Test
-    fun parseWebPath_viaticHighlight() {
+    fun parseWebPath_legacyOpsViaticHighlightLandsInErp() {
         val dest = DeepLinkParser.parseWebPath("/ops/viatics?highlight=7") as DeepLinkDestination.Module
-        assertEquals(PanelId.OPS, dest.panel)
+        assertEquals(PanelId.ERP, dest.panel)
         assertEquals("viatics", dest.key)
         assertEquals(7L, dest.entityId)
     }
@@ -84,6 +85,113 @@ class DeepLinkParserTest {
         assertTrue(dest is DeepLinkDestination.PanelHub)
     }
 
+    // ── Core (/erp) ─────────────────────────────────────────────────────────
+
+    @Test
+    fun parseWebPath_erpActividadDetalle() {
+        val dest = DeepLinkParser.parseWebPath("/erp/actividades/12") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("activities", dest.key)
+        assertEquals(12L, dest.entityId)
+        assertNull(dest.params["tab"])
+        assertEquals("console/activity/12", DeepLinkNavigation.consoleRoute(link(dest)))
+    }
+
+    @Test
+    fun parseWebPath_erpActividadEvidencias() {
+        val dest = DeepLinkParser.parseWebPath("/erp/actividades/12/evidencias") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("activities", dest.key)
+        assertEquals(12L, dest.entityId)
+        assertEquals("evidencias", dest.params["tab"])
+        assertEquals("console/activity/12?tab=evidencias", DeepLinkNavigation.consoleRoute(link(dest)))
+    }
+
+    @Test
+    fun parseWebPath_erpActividadHistorial() {
+        val dest = DeepLinkParser.parseWebPath("/erp/actividades/12/historial") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals(12L, dest.entityId)
+        assertEquals("historial", dest.params["tab"])
+    }
+
+    @Test
+    fun parseWebPath_legacyOpsActivityEvidencesKeepsTheTab() {
+        val dest = DeepLinkParser.parseWebPath("/ops/activities/7/evidences") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("activities", dest.key)
+        assertEquals(7L, dest.entityId)
+        assertEquals("evidencias", dest.params["tab"])
+    }
+
+    @Test
+    fun parseWebPath_legacyMyEvidencesWithActivityIdOpensTheEvidencesTab() {
+        // coreSurfaceRedirect: /ops/my-evidences?activityId=N → /erp/actividades/N/evidencias
+        val dest = DeepLinkParser.parseWebPath("/ops/my-evidences?activityId=9") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("activities", dest.key)
+        assertEquals(9L, dest.entityId)
+        assertEquals("evidencias", dest.params["tab"])
+        assertNull("activityId no debe viajar como parámetro suelto", dest.params["activityid"])
+    }
+
+    @Test
+    fun parseWebPath_legacyActivitiesWithActivityIdOpensTheDetail() {
+        val dest = DeepLinkParser.parseWebPath("/ops/activities?activityId=4") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("activities", dest.key)
+        assertEquals(4L, dest.entityId)
+        assertNull(dest.params["tab"])
+    }
+
+    @Test
+    fun parseWebPath_pizarraWithVista() {
+        val dest = DeepLinkParser.parseWebPath("/erp/pizarra?vista=equipo") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("activities", dest.key)
+        assertNull(dest.entityId)
+        assertEquals("equipo", DeepLinkNavigation.actividadesVista(link(dest)))
+        assertNull(DeepLinkNavigation.consoleRoute(link(dest)))
+    }
+
+    @Test
+    fun parseWebPath_pizarraPersonOpensTheirDay() {
+        val dest = DeepLinkParser.parseWebPath("/erp/pizarra/33") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("activities", dest.key)
+        assertEquals("console/board/33", DeepLinkNavigation.consoleRoute(link(dest)))
+    }
+
+    @Test
+    fun parseWebPath_legacyMyActivitiesOpensMine() {
+        val dest = DeepLinkParser.parseWebPath("/ops/my-activities") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("my-activities", dest.key)
+        assertEquals("mias", DeepLinkNavigation.actividadesVista(link(dest)))
+    }
+
+    @Test
+    fun parseWebPath_erpAsistencias() {
+        val dest = DeepLinkParser.parseWebPath("/erp/asistencias") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("attendance", dest.key)
+    }
+
+    @Test
+    fun parseWebPath_noOpsPanelSurvives() {
+        listOf(
+            "/ops/activities/1",
+            "/ops/my-evidences?activityId=1",
+            "/ops/support/1",
+            "/ops/tools?highlight=2",
+            "/operacion/vehicles",
+            "/ops/dashboard",
+        ).forEach { url ->
+            val dest = DeepLinkParser.parseWebPath(url) as DeepLinkDestination.Module
+            assertEquals("$url debe abrir en ERP", PanelId.ERP, dest.panel)
+        }
+    }
+
     @Test
     fun notificationResolver_mapsEntityTypes() {
         val opp = NotificationDeepLinkResolver.resolve(
@@ -111,9 +219,7 @@ class DeepLinkParserTest {
 
     @Test
     fun deepLinkNavigation_buildsVentasRoutes() {
-        val route = DeepLinkNavigation.ventasRoute(
-            mx.nexara.mobile.nativeapp.navigation.PendingModuleLink("oportunidades", 33L),
-        )
+        val route = DeepLinkNavigation.ventasRoute(PendingModuleLink("oportunidades", 33L))
         assertEquals("v/opportunity/33", route)
     }
 
@@ -121,9 +227,7 @@ class DeepLinkParserTest {
     fun deepLinkNavigation_buildsVentasClientRoute() {
         assertEquals(
             "v/client/12",
-            DeepLinkNavigation.ventasRoute(
-                mx.nexara.mobile.nativeapp.navigation.PendingModuleLink("clients", 12L),
-            ),
+            DeepLinkNavigation.ventasRoute(PendingModuleLink("clients", 12L)),
         )
     }
 
@@ -131,15 +235,11 @@ class DeepLinkParserTest {
     fun deepLinkNavigation_buildsConsoleAndTicketsRoutes() {
         assertEquals(
             "console/activity/8",
-            DeepLinkNavigation.consoleRoute(
-                mx.nexara.mobile.nativeapp.navigation.PendingModuleLink("activities", 8L),
-            ),
+            DeepLinkNavigation.consoleRoute(PendingModuleLink("activities", 8L)),
         )
         assertEquals(
             "tickets/tickets/4",
-            DeepLinkNavigation.ticketsRoute(
-                mx.nexara.mobile.nativeapp.navigation.PendingModuleLink("tickets", 4L),
-            ),
+            DeepLinkNavigation.ticketsRoute(PendingModuleLink("tickets", 4L)),
         )
     }
 
@@ -148,6 +248,19 @@ class DeepLinkParserTest {
         assertNull(DeepLinkParser.parseWebPath(""))
         assertNull(DeepLinkParser.parseWebPath("   "))
     }
+
+    @Test
+    fun pendingDeepLink_foldsOpsIntoErp() {
+        mx.nexara.mobile.nativeapp.navigation.PendingDeepLink.publish(
+            DeepLinkDestination.Module(panel = PanelId.OPS, key = "activities", entityId = 5L),
+        )
+        val consumed = mx.nexara.mobile.nativeapp.navigation.PendingDeepLink.consumeModuleDestination(PanelId.ERP)
+        assertEquals("activities", consumed?.key)
+        assertEquals(5L, consumed?.entityId)
+    }
+
+    private fun link(dest: DeepLinkDestination.Module) =
+        PendingModuleLink(key = dest.key, entityId = dest.entityId, params = dest.params)
 
     private fun notification(
         entityType: String? = null,

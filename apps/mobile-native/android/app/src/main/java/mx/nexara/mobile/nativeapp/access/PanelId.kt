@@ -84,3 +84,10 @@ enum class PanelId(
         }
     }
 }
+
+/**
+ * Core-only: OPS ya no es una superficie para nadie (apps/web/lib/core-surface.ts).
+ * Todo lo que llegue como OPS — `me/navigation`, deep links, notificaciones —
+ * se abre dentro de ERP, que incluye sus módulos (ver [ModulePanelMap]).
+ */
+fun PanelId.toCoreSurface(): PanelId = if (this == PanelId.OPS) PanelId.ERP else this

@@ -62,6 +62,8 @@ fun ActivityInfoTab(
     onFechaEntregaChange: (String) -> Unit = {},
     onFechaFinChange: (String) -> Unit = {},
     onSave: () -> Unit = {},
+    /** Bloque extra al final del detalle (p. ej. resumen de evidencias del equipo). */
+    extraContent: (@Composable () -> Unit)? = null,
 ) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
@@ -204,6 +206,9 @@ fun ActivityInfoTab(
                         }
                     }
                 }
+            }
+            if (extraContent != null) {
+                item { extraContent() }
             }
         }
     }

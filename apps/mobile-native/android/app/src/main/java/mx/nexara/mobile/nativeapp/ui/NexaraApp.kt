@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.PanelAccessResolver
 import mx.nexara.mobile.nativeapp.access.PanelId
+import mx.nexara.mobile.nativeapp.access.toCoreSurface
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.onboarding.OnboardingStore
 import mx.nexara.mobile.nativeapp.data.panel.PanelPreferencesStore
@@ -76,11 +77,13 @@ fun NexaraApp() {
         else -> postAuthDestination()
     }
 
-    fun navigateToPanel(panel: PanelId) {
+    fun navigateToPanel(requested: PanelId) {
+        // Core: ya no hay superficie OPS; se abre dentro de ERP.
+        val panel = requested.toCoreSurface()
         scope.launch { panelPrefs.setLastPanel(panel) }
         val route = when (panel) {
             PanelId.ERP -> Routes.Erp
-            PanelId.OPS -> Routes.Ops
+            PanelId.OPS -> Routes.Erp
             PanelId.CRM -> Routes.Crm
             PanelId.STUDIO -> Routes.Studio
             PanelId.LAB -> Routes.Lab
@@ -198,14 +201,10 @@ fun NexaraApp() {
         }
 
         composable(Routes.Ops) {
-            mx.nexara.mobile.nativeapp.ui.console.ConsoleNavHost(
-                panelId = PanelId.OPS,
-                onExitToPanels = { navController.navigate(Routes.Panels) { popUpTo(Routes.Ops) { inclusive = true } } },
-                onLogout = {
-                    repo.logout()
-                    navController.navigate(Routes.Login) { popUpTo(0) { inclusive = true } }
-                },
-            )
+            // Ya no hay superficie OPS: sesiones y enlaces viejos aterrizan en ERP.
+            LaunchedEffect(Unit) {
+                navController.navigate(Routes.Erp) { popUpTo(Routes.Ops) { inclusive = true } }
+            }
         }
 
         composable(Routes.Crm) {

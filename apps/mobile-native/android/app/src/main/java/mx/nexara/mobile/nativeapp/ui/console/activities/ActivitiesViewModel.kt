@@ -138,15 +138,14 @@ class ConsoleActivitiesViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
-fun activityDetailTabIndex(tabKey: String?): Int = when (tabKey?.lowercase()) {
-    "info" -> 0
-    "operacion" -> 1
-    "evidencias" -> 2
-    "viaticos" -> 3
-    "equipo" -> 4
-    "materiales" -> 5
-    "historial" -> 6
-    "incidencias" -> 7
-    "aprobaciones" -> 8
-    else -> 0
+/**
+ * Pestaña de Core para la clave del deep link (`?tab=`). Core solo tiene
+ * Detalle · Evidencias · Historial; las claves de las pestañas viejas de OPS
+ * (operación, equipo, viáticos…) abren Detalle, y aprobaciones cae en
+ * Evidencias, que es donde ahora se aprueba.
+ */
+fun activityDetailTabIndex(tabKey: String?): Int = when (tabKey?.trim()?.lowercase()) {
+    "evidencias", "evidences", "aprobaciones", "approvals" -> ACTIVITY_TAB_EVIDENCIAS
+    "historial", "history" -> ACTIVITY_TAB_HISTORIAL
+    else -> ACTIVITY_TAB_DETALLE
 }

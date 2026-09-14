@@ -184,55 +184,22 @@ enum ConsoleAccessRules {
             ]
         }
 
-        let roleLower = (user.role ?? "").lowercased()
-        let isSuperAdmin = user.isSuperAdmin
-        let isAdmin = !isSuperAdmin && user.permissions.contains(ConsolePermissions.consoleAdmin)
-        let isAdministrativo = isAdministrativoRole(user)
-
         var tabs: [ConsoleBottomTabItem] = []
 
+        // Core (espejo de /erp/pizarra): «Actividades» es la casa de todos. El CEO
+        // ve el tablero; quien tiene equipo, «Mis actividades» / «Mi equipo»; los
+        // demás, su lista. Evidencias se capturan y revisan dentro de cada actividad,
+        // por eso ya no hay pestañas «Operación» ni «Evidencias».
+        if !user.isClient && !user.isBranchUser {
+            tabs.append(ConsoleBottomTabItem(id: "actividades", label: "Actividades", systemImage: "checklist", moduleKey: "my-activities"))
+        }
         if has("dashboard") {
             tabs.append(ConsoleBottomTabItem(id: "dashboard", label: "Inicio", systemImage: "house", moduleKey: "dashboard"))
         }
-
-        if isAdministrativo {
-            if has("attendance") {
-                tabs.append(ConsoleBottomTabItem(id: "attendance", label: "Asistencia", systemImage: "clock", moduleKey: "attendance"))
-            }
-        } else if isSuperAdmin || isAdmin {
-            if has("activities") {
-                tabs.append(ConsoleBottomTabItem(id: "activities", label: "Operación", systemImage: "list.clipboard", moduleKey: "activities"))
-            }
-            if has("evidences") {
-                tabs.append(ConsoleBottomTabItem(id: "evidences", label: "Evidencias", systemImage: "camera", moduleKey: "evidences"))
-            }
-            if has("attendance") {
-                tabs.append(ConsoleBottomTabItem(id: "attendance", label: "Asistencia", systemImage: "clock", moduleKey: "attendance"))
-            }
-        } else if roleLower.contains("ingenier") {
-            if has("my-activities") {
-                tabs.append(ConsoleBottomTabItem(id: "my-activities", label: "Mis act.", systemImage: "person.text.clipboard", moduleKey: "my-activities"))
-            }
-            if has("my-evidences") {
-                tabs.append(ConsoleBottomTabItem(id: "my-evidences", label: "Mis evid.", systemImage: "photo", moduleKey: "my-evidences"))
-            }
-            if has("attendance") {
-                tabs.append(ConsoleBottomTabItem(id: "attendance", label: "Asistencia", systemImage: "clock", moduleKey: "attendance"))
-            } else if has("gps") {
-                tabs.append(ConsoleBottomTabItem(id: "gps", label: "GPS", systemImage: "map", moduleKey: "gps"))
-            }
-        } else {
-            if has("my-activities") {
-                tabs.append(ConsoleBottomTabItem(id: "my-activities", label: "Mis act.", systemImage: "person.text.clipboard", moduleKey: "my-activities"))
-            }
-            if has("my-evidences") {
-                tabs.append(ConsoleBottomTabItem(id: "my-evidences", label: "Mis evid.", systemImage: "photo", moduleKey: "my-evidences"))
-            }
-            if has("attendance") {
-                tabs.append(ConsoleBottomTabItem(id: "attendance", label: "Asistencia", systemImage: "clock", moduleKey: "attendance"))
-            } else if has("gps") {
-                tabs.append(ConsoleBottomTabItem(id: "gps", label: "GPS", systemImage: "map", moduleKey: "gps"))
-            }
+        if has("attendance") {
+            tabs.append(ConsoleBottomTabItem(id: "attendance", label: "Asistencia", systemImage: "clock", moduleKey: "attendance"))
+        } else if has("gps") {
+            tabs.append(ConsoleBottomTabItem(id: "gps", label: "GPS", systemImage: "map", moduleKey: "gps"))
         }
 
         if tabs.isEmpty {
@@ -249,7 +216,8 @@ enum ConsoleAccessRules {
     // MARK: Console / ERP / OPS sidebar
 
     static func consoleSidebarGroupsForMore(user: SessionUser?, panel: PanelId) -> [ConsoleSidebarGroup] {
-        let tabKeys = consoleBottomTabModuleKeys(user: user, panel: panel)
+        // «activities» abre la misma pantalla que la pestaña Actividades.
+        let tabKeys = consoleBottomTabModuleKeys(user: user, panel: panel).union(["activities"])
         return consoleSidebarGroups(user: user, panel: panel)
             .map { ConsoleSidebarGroup(id: $0.id, title: $0.title, modules: $0.modules.filter { !tabKeys.contains($0.key) }) }
             .filter { !$0.modules.isEmpty }

@@ -41,15 +41,22 @@ final class ConsoleRepository {
         try await attendanceCheckInResult(type: type, lat: lat, lng: lng).raw
     }
 
-    func attendanceCheckInResult(type: String, lat: Double? = nil, lng: Double? = nil) async throws -> AttendanceCheckInResult {
+    /// `photoBase64` es obligatoria en el API (`CreateAttendanceDto`): data URL JPEG.
+    func attendanceCheckInResult(
+        type: String,
+        lat: Double? = nil,
+        lng: Double? = nil,
+        photoBase64: String? = nil
+    ) async throws -> AttendanceCheckInResult {
         struct Body: Encodable {
             let type: String
             let timestamp: String
+            let photoBase64: String?
             let latitude: Double?
             let longitude: Double?
         }
         let data = try await api.postJSON("attendance", body: Body(
-            type: type, timestamp: ConsoleHelpers.isoNow(), latitude: lat, longitude: lng
+            type: type, timestamp: ConsoleHelpers.isoNow(), photoBase64: photoBase64, latitude: lat, longitude: lng
         ))
         return AttendanceCheckInResult(raw: ConsoleHelpers.decodeMap(data))
     }
@@ -114,12 +121,13 @@ final class ConsoleRepository {
     }
 
     func activityTimelineEvents(activityId: Int64) async throws -> [[String: Any]] {
-        let map = ConsoleHelpers.decodeMap(try await api.get("activities/\(activityId)/timeline"))
+        // El API la expone bajo `activities/:id/team` (ActivityTeamController).
+        let map = ConsoleHelpers.decodeMap(try await api.get("activities/\(activityId)/team/timeline"))
         return map["events"] as? [[String: Any]] ?? []
     }
 
     func activityMaterials(activityId: Int64) async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("activities/\(activityId)/materiales"))
+        ApiClient.decodeMapList(try await api.get("activities/\(activityId)/team/materiales"))
     }
 
     func activityTeam(activityId: Int64) async throws -> [[String: Any]] {

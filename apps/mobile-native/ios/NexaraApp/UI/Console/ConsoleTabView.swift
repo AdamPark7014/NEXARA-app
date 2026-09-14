@@ -68,12 +68,8 @@ struct ConsoleTabView: View {
                         Button("Paneles", action: onExit)
                     }
                 }
-        case "activities":
-            ActivitiesView()
-                .navigationTitle("Operación")
-        case "my-activities":
-            ActivitiesView(filterForUserId: user?.id)
-                .navigationTitle("Mis actividades")
+        case "activities", "my-activities":
+            ActividadesHomeView()
         case "evidences":
             EvidencesView(reviewMode: true)
                 .navigationTitle("Evidencias")
@@ -102,16 +98,29 @@ struct ConsoleTabView: View {
     }
 
     private func applyDeepLinkIfNeeded() {
-        if let link = deepLink.consumeModuleLink(for: panel) {
-            if (link.key == "activities" || link.key == "my-activities"),
-               let id = link.entityId, id > 0 {
+        guard let link = deepLink.consumeModuleLink(for: panel) else { return }
+        let activityKeys: Set<String> = ["activities", "my-activities", "pizarra"]
+        if activityKeys.contains(link.key) {
+            if let id = link.entityId, id > 0 {
+                // Detalle / Evidencias / Historial de la actividad.
                 activityDeepLinkId = id
                 activityDeepLinkTab = link.params["tab"]
             } else {
-                deepLinkModuleKey = link.key
-                deepLinkModuleParams = link.params
+                if let vista = link.params["vista"], vista == "mias" || vista == "equipo" {
+                    UserDefaults.standard.set(vista, forKey: coreActividadesVistaKey)
+                }
+                if let tab = bottomTabs.first(where: { $0.moduleKey == "my-activities" }) {
+                    selectedTab = tab.id
+                }
             }
+            return
         }
+        if let tab = bottomTabs.first(where: { $0.moduleKey == link.key }) {
+            selectedTab = tab.id
+            return
+        }
+        deepLinkModuleKey = link.key
+        deepLinkModuleParams = link.params
     }
 }
 

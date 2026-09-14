@@ -35,6 +35,11 @@ packages:
   SocketIO:
     url: https://github.com/socketio/socket.io-client-swift
     from: 16.1.1
+  # Solo FirebaseMessaging: el API manda los push con firebase-admin (FCM), que
+  # no acepta tokens APNs crudos. Ver el comentario del final.
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 11.0.0
 
 targets:
   NexaraApp:
@@ -43,9 +48,16 @@ targets:
     sources:
       - path: NexaraApp
       - path: Resources/Assets.xcassets
+      # No se versiona: CI lo escribe desde un secreto. `optional` permite
+      # generar el proyecto sin él (la app arranca, pero sin push FCM).
+      - path: Resources/GoogleService-Info.plist
+        optional: true
+        buildPhase: resources
     dependencies:
       - package: SocketIO
         product: SocketIO
+      - package: Firebase
+        product: FirebaseMessaging
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: mx.nexara.mobile.NexaraApp
@@ -91,11 +103,13 @@ schemes:
     archive:
       config: Release
 
-# Firebase NO se usa. El playbook anterior mandaba añadir firebase-ios-sdk a
-# mano, pero no hay ni un `import Firebase` en los 134 ficheros Swift:
-# `PushManager` manda el token APNs crudo a `POST devices/push-token` con
-# `platform: "ios"`. Añadir el paquete costaría varios minutos de compilación
-# por construcción y no cambiaría nada. Si algún día se cablea, se declara aquí
-# como paquete y se añade `GoogleService-Info.plist` (ya está en .gitignore).
+# Firebase Messaging SÍ se usa (14-09-2026). El API envía con firebase-admin,
+# así que el token que vale es el de FCM: `PushManager` configura Firebase solo
+# si el binario trae `GoogleService-Info.plist` y registra ese token en
+# `POST devices/push-token` con `platform: "ios"`. Sin el plist cae al token
+# APNs crudo (compila y arranca, pero los push no llegan).
+# El plist NO se versiona (.gitignore): el flujo de CI debe escribirlo en
+# `Resources/GoogleService-Info.plist` desde un secreto ANTES de
+# `xcodegen generate`. Además hay que subir la clave APNs (.p8) a Firebase.
 #
 # Google Maps tampoco: `NexaraMapView` usa MapKit, que no lleva clave.

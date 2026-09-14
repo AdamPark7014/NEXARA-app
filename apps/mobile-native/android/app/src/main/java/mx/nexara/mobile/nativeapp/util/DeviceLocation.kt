@@ -42,13 +42,22 @@ object DeviceLocation {
         return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
     }
 
+    /**
+     * @param highAccuracy GPS fino (fotos de evidencia de entrada/salida); el
+     * modo balanceado basta para asistencia y rastreo.
+     */
     @SuppressLint("MissingPermission")
-    suspend fun current(context: Context): DeviceCoords? {
+    suspend fun current(context: Context, highAccuracy: Boolean = false): DeviceCoords? {
         if (!hasPermission(context)) return null
         val fused = LocationServices.getFusedLocationProviderClient(context)
         val cts = CancellationTokenSource()
+        val priority = if (highAccuracy) {
+            Priority.PRIORITY_HIGH_ACCURACY
+        } else {
+            Priority.PRIORITY_BALANCED_POWER_ACCURACY
+        }
         val fresh = awaitTask {
-            fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+            fused.getCurrentLocation(priority, cts.token)
         }
         // Si la lectura fresca no sirve (o es un (0,0) vacío) se prueba la
         // última conocida antes de rendirse.

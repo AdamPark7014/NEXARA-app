@@ -869,46 +869,10 @@ private func actStatusColor(_ status: String) -> Color {
 struct ActivityDetailByIdView: View {
     let activityId: Int64
     var initialTabKey: String? = nil
-    @Environment(\.dismiss) private var dismiss
-    @State private var activity: ActivityItem?
-    @State private var loading = true
-    @State private var error: String?
 
     var body: some View {
-        Group {
-            if loading {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let activity {
-                ActivityDetailView(
-                    activity: activity,
-                    onBack: { dismiss() },
-                    initialTabKey: initialTabKey,
-                )
-            } else {
-                VStack(spacing: 12) {
-                    Button("← Volver") { dismiss() }
-                    Text(error ?? "Actividad no encontrada").foregroundStyle(.red)
-                }
-                .padding()
-            }
-        }
-        .task { await load() }
-    }
-
-    private func load() async {
-        loading = true
-        error = nil
-        do {
-            let data = try await ApiClient.shared.get("activities/\(activityId)")
-            let raw = ConsoleHelpers.decodeMap(data)
-            if ConsoleHelpers.mapInt64(raw, "id") ?? 0 > 0 {
-                activity = ActivityItem(raw: raw)
-            } else {
-                error = "Actividad no encontrada"
-            }
-        } catch {
-            self.error = error.toUserMessage()
-        }
-        loading = false
+        // Core: Detalle / Evidencias / Historial. Las claves viejas del detalle
+        // OPS (`info`, `operacion`, …) abren Detalle.
+        ActivityCoreDetailView(activityId: Int(activityId), initialTab: initialTabKey)
     }
 }

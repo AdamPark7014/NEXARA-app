@@ -63,7 +63,8 @@ enum ModulePanelMap {
     static func consoleKeys(for panel: PanelId) -> Set<String>? {
         switch panel {
         case .ops: return opsKeys
-        case .erp: return erpKeys
+        // Core: los módulos de OPS se abren dentro de ERP.
+        case .erp: return erpKeys.union(opsKeys)
         default: return nil
         }
     }

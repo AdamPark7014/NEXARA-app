@@ -12,6 +12,10 @@ import org.junit.Test
  * a la app por push y por deep link, así que **toda** ruta que el API sepa emitir
  * tiene que aterrizar en un módulo que la app sepa abrir.
  *
+ * Core-only (apps/web/lib/core-surface.ts): las rutas `/ops/...` ya no abren un
+ * panel OPS; aterrizan en ERP, y las de evidencias con `activityId` abren el
+ * detalle de esa actividad.
+ *
  * Cada caso de aquí es una llamada real de `appUrls`. Si añades una función allí,
  * añade su fila aquí: es lo único que evita que una notificación abra la nada.
  *
@@ -43,29 +47,38 @@ class AppUrlsParityTest {
         Case("crmProject", "/crm/projects/1", PanelId.CRM, "proyectos", 1L),
         Case("crmTender", "/crm/tenders?highlight=1", PanelId.CRM, "licitaciones", 1L),
 
-        // ── OPS (appUrls.ops*) ───────────────────────────────────────────────
-        Case("opsActivity", "/ops/activities/1", PanelId.OPS, "activities", 1L),
-        Case("opsActivityEvidences", "/ops/activities/1/evidences", PanelId.OPS, "activities", 1L),
-        Case("opsMyEvidences", "/ops/my-evidences?activityId=1", PanelId.OPS, "my-evidences", 1L),
-        Case("opsEvidencesReview", "/ops/evidences?activityId=1", PanelId.OPS, "evidences", 1L),
-        Case("opsViatic", "/ops/viatics?highlight=1", PanelId.OPS, "viatics", 1L),
-        Case("opsMyViatics", "/ops/my-viatics?highlight=1", PanelId.OPS, "my-viatics", 1L),
-        Case("opsMyVehicles", "/ops/my-vehicles?highlight=1", PanelId.OPS, "my-vehicles", 1L),
-        Case("opsProject", "/ops/projects/1", PanelId.OPS, "projects", 1L),
-        Case("opsMaintenance", "/ops/maintenance?woId=1", PanelId.OPS, "maintenance", 1L),
-        Case("opsTools", "/ops/tools?tab=requests&highlight=1", PanelId.OPS, "tools", 1L),
-        Case("opsToolsRenewals", "/ops/tools?tab=renewals&highlight=1", PanelId.OPS, "tools", 1L),
-        Case("opsVehicles", "/ops/vehicles?tab=requests&highlight=1", PanelId.OPS, "vehicles", 1L),
-        Case("opsActivities", "/ops/activities", PanelId.OPS, "activities", null),
+        // ── OPS legado (appUrls.ops*) → Core ERP ─────────────────────────────
+        Case("opsActivity", "/ops/activities/1", PanelId.ERP, "activities", 1L),
+        Case("opsActivityEvidences", "/ops/activities/1/evidences", PanelId.ERP, "activities", 1L),
+        Case("opsMyEvidences", "/ops/my-evidences?activityId=1", PanelId.ERP, "activities", 1L),
+        Case("opsEvidencesReview", "/ops/evidences?activityId=1", PanelId.ERP, "activities", 1L),
+        Case("opsViatic", "/ops/viatics?highlight=1", PanelId.ERP, "viatics", 1L),
+        Case("opsMyViatics", "/ops/my-viatics?highlight=1", PanelId.ERP, "my-viatics", 1L),
+        Case("opsMyVehicles", "/ops/my-vehicles?highlight=1", PanelId.ERP, "my-vehicles", 1L),
+        Case("opsProject", "/ops/projects/1", PanelId.ERP, "projects", 1L),
+        Case("opsMaintenance", "/ops/maintenance?woId=1", PanelId.ERP, "maintenance", 1L),
+        Case("opsTools", "/ops/tools?tab=requests&highlight=1", PanelId.ERP, "tools", 1L),
+        Case("opsToolsRenewals", "/ops/tools?tab=renewals&highlight=1", PanelId.ERP, "tools", 1L),
+        Case("opsVehicles", "/ops/vehicles?tab=requests&highlight=1", PanelId.ERP, "vehicles", 1L),
+        Case("opsActivities", "/ops/activities", PanelId.ERP, "activities", null),
         Case(
             "opsMaintenanceContracts",
             "/ops/maintenance/contracts?highlight=1",
-            PanelId.OPS,
+            PanelId.ERP,
             "maintenance-contracts",
             1L,
         ),
-        Case("opsSupport", "/ops/support/1", PanelId.OPS, "support", 1L),
-        Case("opsSupportNew", "/ops/support/new?activityId=1", PanelId.OPS, "support", null),
+        Case("opsSupport", "/ops/support/1", PanelId.ERP, "support", 1L),
+        Case("opsSupportNew", "/ops/support/new?activityId=1", PanelId.ERP, "support", null),
+
+        // ── Core (/erp) ──────────────────────────────────────────────────────
+        Case("coreActivity", "/erp/actividades/1", PanelId.ERP, "activities", 1L),
+        Case("coreActivityEvidences", "/erp/actividades/1/evidencias", PanelId.ERP, "activities", 1L),
+        Case("coreActivityHistory", "/erp/actividades/1/historial", PanelId.ERP, "activities", 1L),
+        Case("corePizarra", "/erp/pizarra", PanelId.ERP, "activities", null),
+        Case("coreMisActividades", "/erp/mis-actividades", PanelId.ERP, "my-activities", null),
+        Case("coreAsistencias", "/erp/asistencias", PanelId.ERP, "attendance", null),
+        Case("coreMyProfile", "/erp/my-profile", PanelId.ERP, "my-profile", null),
 
         // ── ERP (appUrls.erp*) ───────────────────────────────────────────────
         Case("erpFines", "/erp/hr/fines?highlight=1", PanelId.ERP, "fines", 1L),

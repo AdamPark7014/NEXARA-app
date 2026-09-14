@@ -87,17 +87,40 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
     private val consoleRepo = ConsoleRepository(app.applicationContext)
     private val opsRepo = OpsRepository(app.applicationContext)
     private val authRepo = AuthRepository(app.applicationContext)
+    private val coreRepo = mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository(app.applicationContext)
     private val _state = MutableStateFlow(OpsNewActivityUiState())
     val state: StateFlow<OpsNewActivityUiState> = _state
 
-    fun load(prefillRequestId: Long? = null) {
+    fun load(prefillRequestId: Long? = null, selfAssign: Boolean = false) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val projects = withContext(Dispatchers.IO) { consoleRepo.operationalProjects() }
-                val users = withContext(Dispatchers.IO) { consoleRepo.usersFetch() }
-                val nextAn = withContext(Dispatchers.IO) { consoleRepo.nextAnNumber() }
-                val tickets = withContext(Dispatchers.IO) { opsRepo.approvedTicketRequests() }
+                // Auto-asignarse no elige responsable ni precarga tickets: si esas
+                // listas no están permitidas para este usuario, el formulario igual abre.
+                val projects = withContext(Dispatchers.IO) {
+                    if (selfAssign) {
+                        runCatching { consoleRepo.operationalProjects() }.getOrDefault(emptyList())
+                    } else {
+                        consoleRepo.operationalProjects()
+                    }
+                }
+                val users = if (selfAssign) {
+                    emptyList()
+                } else {
+                    withContext(Dispatchers.IO) { consoleRepo.usersFetch() }
+                }
+                val nextAn = withContext(Dispatchers.IO) {
+                    if (selfAssign) {
+                        runCatching { consoleRepo.nextAnNumber() }.getOrDefault("")
+                    } else {
+                        consoleRepo.nextAnNumber()
+                    }
+                }
+                val tickets = if (selfAssign) {
+                    emptyList()
+                } else {
+                    withContext(Dispatchers.IO) { opsRepo.approvedTicketRequests() }
+                }
                 _state.update {
                     it.copy(
                         loading = false,
@@ -105,6 +128,7 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
                         users = users,
                         nextAn = nextAn,
                         ticketRequests = tickets,
+                        projectMode = if (selfAssign) "without_project" else it.projectMode,
                     )
                 }
                 if (prefillRequestId != null) {
@@ -176,15 +200,18 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun save(onSuccess: (Long) -> Unit) {
+    /** @param selfAssign encargado de área que se asigna la actividad (POST me/activities). */
+    fun save(onSuccess: (Long) -> Unit, selfAssign: Boolean = false) {
         val s = _state.value
         val userId = authRepo.loadSession()?.id
         if (userId == null) {
             _state.update { it.copy(error = "Sesión inválida") }
             return
         }
-        if (s.titulo.isBlank() || s.responsableId == null) {
-            _state.update { it.copy(error = "Título y responsable son obligatorios") }
+        if (s.titulo.isBlank() || (!selfAssign && s.responsableId == null)) {
+            _state.update {
+                it.copy(error = if (selfAssign) "El título es obligatorio" else "Título y responsable son obligatorios")
+            }
             return
         }
         if (s.projectMode == "with_project" && s.projectId == null) {
@@ -214,16 +241,24 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
                     tiempoEstimadoMin = s.tiempoEstimadoMin.toIntOrNull(),
                     tiempoMaximoMin = s.tiempoMaximoMin.toIntOrNull(),
                     creadoPorId = userId,
-                    responsableId = s.responsableId!!,
+                    responsableId = if (selfAssign) userId else s.responsableId!!,
                     estatus = "Pendiente",
                     fechaInicio = fechaIso,
                 )
-                val newId = withContext(Dispatchers.IO) { consoleRepo.createActivity(body) }
+                val newId = withContext(Dispatchers.IO) {
+                    if (selfAssign) coreRepo.selfAssign(body) else consoleRepo.createActivity(body)
+                }
+                if (newId == null) {
+                    _state.update { it.copy(saving = false, success = "📶 Sin conexión: se creará en cuanto vuelva la red") }
+                    return@launch
+                }
                 val requestId = s.pendingRequestId
                 if (requestId != null) {
                     withContext(Dispatchers.IO) { opsRepo.assignClientTicket(requestId, newId) }
                 }
-                _state.update { it.copy(saving = false, success = "OT asignada") }
+                _state.update {
+                    it.copy(saving = false, success = if (selfAssign) "Actividad auto-asignada" else "OT asignada")
+                }
                 onSuccess(newId)
             } catch (e: Exception) {
                 _state.update {
@@ -241,6 +276,8 @@ class OpsNewActivityViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun OpsNewActivityScreen(
     requestId: Long? = null,
+    /** Encargado de área: «Auto-asignarme» (queda a su nombre, sin elegir responsable). */
+    selfAssign: Boolean = false,
     onBack: () -> Unit,
     onCreated: (Long) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(16.dp),
@@ -250,7 +287,7 @@ fun OpsNewActivityScreen(
   val loaded = remember { mutableStateOf(false) }
     if (!loaded.value) {
         loaded.value = true
-        vm.load(requestId)
+        vm.load(requestId, selfAssign)
     }
 
     Column(
@@ -269,7 +306,7 @@ fun OpsNewActivityScreen(
 
         when {
             state.loading -> NxLoadingBlock("Preparando formulario…")
-            state.error != null && state.projects.isEmpty() -> NxErrorBlock(state.error!!) { vm.load(requestId) }
+            state.error != null && state.projects.isEmpty() -> NxErrorBlock(state.error!!) { vm.load(requestId, selfAssign) }
             else -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (state.ticketRequests.isNotEmpty()) {
@@ -305,7 +342,7 @@ fun OpsNewActivityScreen(
                     item {
                         NxPanelShell {
                             NxSectionHeader(
-                                title = "Nueva OT",
+                                title = if (selfAssign) "Auto-asignarme una actividad" else "Nueva OT",
                                 subtitle = if (state.projectMode == "with_project") {
                                     "OT con proyecto operativo"
                                 } else {
@@ -349,7 +386,15 @@ fun OpsNewActivityScreen(
                                 )
                                 Spacer(Modifier.height(8.dp))
                             }
-                            UserPicker(state, vm::setResponsableId)
+                            if (selfAssign) {
+                                Text(
+                                    "Queda a tu nombre: la haces tú.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = NxColors.Muted,
+                                )
+                            } else {
+                                UserPicker(state, vm::setResponsableId)
+                            }
                             Spacer(Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = state.prioridad,
@@ -399,11 +444,17 @@ fun OpsNewActivityScreen(
                                     Text("Cancelar")
                                 }
                                 Button(
-                                    onClick = { vm.save(onCreated) },
+                                    onClick = { vm.save(onCreated, selfAssign) },
                                     enabled = !state.saving,
                                     modifier = Modifier.weight(1f),
                                 ) {
-                                    Text(if (state.saving) "Guardando…" else "Asignar OT")
+                                    Text(
+                                        when {
+                                            state.saving -> "Guardando…"
+                                            selfAssign -> "Auto-asignarme"
+                                            else -> "Asignar OT"
+                                        },
+                                    )
                                 }
                             }
                         }

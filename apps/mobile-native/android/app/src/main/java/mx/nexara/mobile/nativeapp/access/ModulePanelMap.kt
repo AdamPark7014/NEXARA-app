@@ -76,10 +76,16 @@ object ModulePanelMap {
         "integra-dashboard",
     )
 
+    /**
+     * Core: ERP incluye todo lo de OPS. Quien todavía tenga OPS en
+     * `me/navigation` ve esos módulos dentro de ERP; nadie aterriza en un hub OPS.
+     */
+    private val CORE_ERP_KEYS = ERP_KEYS + OPS_KEYS
+
     /** null = sin filtro (todos los módulos console). */
     fun consoleKeysFor(panel: PanelId): Set<String>? = when (panel) {
         PanelId.OPS -> OPS_KEYS
-        PanelId.ERP -> ERP_KEYS
+        PanelId.ERP -> CORE_ERP_KEYS
         else -> null
     }
 

@@ -1,9 +1,11 @@
 import UIKit
 
-/// AppDelegate solo para recibir callbacks de APNs (SwiftUI App entry sigue siendo NexaraApp.swift).
+/// AppDelegate para APNs/FCM (la entrada SwiftUI sigue siendo NexaraApp.swift).
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ app: UIApplication,
                      didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Firebase se configura aquí, antes de pedir el token, y solo si el
+        // binario trae GoogleService-Info.plist.
         PushManager.shared.configure()
         Task { @MainActor in
             NetworkMonitor.shared.start()
@@ -14,7 +16,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        Task { await PushManager.shared.registerDeviceTokenWithBackend(deviceToken) }
+        PushManager.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
     }
 
     func application(_ application: UIApplication,

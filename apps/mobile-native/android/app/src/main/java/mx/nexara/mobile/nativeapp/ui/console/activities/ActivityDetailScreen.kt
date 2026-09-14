@@ -1,8 +1,25 @@
 package mx.nexara.mobile.nativeapp.ui.console.activities
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -14,31 +31,43 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
-import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceDetailDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
 import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 
+/** Pestañas del detalle en Core (/erp/actividades/:id). */
+const val ACTIVITY_TAB_DETALLE = 0
+const val ACTIVITY_TAB_EVIDENCIAS = 1
+const val ACTIVITY_TAB_HISTORIAL = 2
+
+private val ACTIVITY_TABS = listOf("Detalle", "Evidencias", "Historial")
+
+/**
+ * Detalle de actividad de Core: Detalle · Evidencias · Historial, igual que
+ * ActivityDetailShell en la web con `core`. Operación, viáticos, equipo,
+ * materiales, incidencias y aprobaciones ya no son pestañas de Core.
+ */
 @Composable
 fun ActivityDetailScreen(
     activity: ActivityDto,
     onBack: () -> Unit,
-    onCaptureEvidence: ((Long) -> Unit)? = null,
-    initialTab: Int = 0,
-    onOpenGps: (() -> Unit)? = null,
+    @Suppress("UNUSED_PARAMETER") onCaptureEvidence: ((Long) -> Unit)? = null,
+    initialTab: Int = ACTIVITY_TAB_DETALLE,
+    @Suppress("UNUSED_PARAMETER") onOpenGps: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
     val user = remember { authRepo.loadSession() }
     val repo = remember(context) { ConsoleRepository(context) }
-    var selectedTab by remember { mutableIntStateOf(initialTab.coerceIn(0, 8)) }
-    val tabs = listOf("Info", "Operación", "Evidencias", "Viáticos", "Equipo", "Materiales", "Historial", "Incidencias", "Aprobaciones")
+    var selectedTab by remember(activity.id) {
+        mutableIntStateOf(initialTab.coerceIn(ACTIVITY_TAB_DETALLE, ACTIVITY_TAB_HISTORIAL))
+    }
     var detail by remember(activity.id) { mutableStateOf(activity) }
     var loadingDetail by remember(activity.id) { mutableStateOf(true) }
-    var evidence by remember { mutableStateOf<ActivityEvidenceDetailDto?>(null) }
-    var loadingEv by remember { mutableStateOf(true) }
     var editing by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
@@ -89,7 +118,13 @@ fun ActivityDetailScreen(
                         )
                     }
                 }
-                detail = updated
+                // PATCH no siempre trae el equipo: se conserva el que ya estaba.
+                detail = updated.copy(
+                    assignees = updated.assignees ?: detail.assignees,
+                    coreKind = updated.coreKind ?: detail.coreKind,
+                    assignmentCharge = updated.assignmentCharge ?: detail.assignmentCharge,
+                    evidencePhotoRequired = updated.evidencePhotoRequired ?: detail.evidencePhotoRequired,
+                )
                 editing = false
                 snackbarHostState.showSnackbar("Actividad actualizada")
             } catch (e: Exception) {
@@ -115,113 +150,111 @@ fun ActivityDetailScreen(
         loadingDetail = false
     }
 
-    LaunchedEffect(activity.id) {
-        loadingEv = true
-        evidence = runCatching {
-            withContext(Dispatchers.IO) { repo.evidenceByActivity(activity.id) }
-        }.getOrNull()
-        loadingEv = false
-    }
-
     Scaffold(
         snackbarHost = { NxSnackbarHost(snackbarHostState) },
         modifier = Modifier.fillMaxSize(),
     ) { padding ->
-    Column(Modifier.fillMaxSize().padding(padding)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            TextButton(onClick = onBack) { Text("← Volver") }
-            Text(
-                detail.titulo?.takeIf { it.isNotBlank() }
-                    ?: detail.anNumber?.takeIf { it.isNotBlank() }
-                    ?: "Actividad #${detail.id}",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.weight(1f),
-                maxLines = 2,
-            )
-        }
-
-        if (onCaptureEvidence != null) {
-            Button(
-                onClick = { onCaptureEvidence(detail.id) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            ) { Text("Capturar / continuar evidencias") }
-        }
-
-        TabRow(selectedTabIndex = selectedTab) {
-            tabs.forEachIndexed { i, label ->
-                Tab(selected = selectedTab == i, onClick = { selectedTab = i }, text = { Text(label, fontSize = 12.sp) })
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(onClick = onBack) { Text("← Volver") }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        detail.titulo?.takeIf { it.isNotBlank() }
+                            ?: detail.anNumber?.takeIf { it.isNotBlank() }
+                            ?: "Actividad #${detail.id}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 2,
+                    )
+                    val meta = listOfNotNull(
+                        detail.anNumber?.takeIf { it.isNotBlank() }?.let { "Folio $it" },
+                        detail.coreKind?.let { CoreActivityRules.kindLabel(it, detail.ticketTypeCustom) },
+                    ).joinToString(" · ")
+                    if (meta.isNotBlank()) {
+                        Text(meta, fontSize = 12.sp, color = NxColors.Muted, maxLines = 1)
+                    }
+                }
             }
-        }
 
-        when (selectedTab) {
-            0 -> {
-                if (loadingDetail) {
-                    NxLoadingBlock("Cargando detalle…")
-                } else {
-                    ActivityInfoTab(
-                        a = detail,
-                        statusColor = statusColor,
-                        canEdit = canManage || canExecute,
-                        editing = editing,
-                        saving = saving,
-                        saveError = saveError,
-                        editEstatus = editEstatus,
-                        editPrioridad = editPrioridad,
-                        editDescripcion = editDescripcion,
-                        editIndicaciones = editIndicaciones,
-                        editFechaInicio = editFechaInicio,
-                        editFechaEntrega = editFechaEntrega,
-                        editFechaFin = editFechaFin,
-                        showManagerFields = canManage,
-                        onStartEdit = {
-                            editEstatus = detail.estatus
-                            editPrioridad = detail.prioridad ?: ""
-                            editDescripcion = detail.descripcion ?: ""
-                            editIndicaciones = detail.indicaciones ?: ""
-                            editFechaInicio = detail.fechaInicio?.take(16) ?: ""
-                            editFechaEntrega = detail.fechaEntregaEsperada?.take(10) ?: ""
-                            editFechaFin = detail.fechaFinalizacion?.take(16) ?: ""
-                            saveError = null
-                            editing = true
-                        },
-                        onCancelEdit = { editing = false; saveError = null },
-                        onEstatusChange = { editEstatus = it },
-                        onPrioridadChange = { editPrioridad = it },
-                        onDescripcionChange = { editDescripcion = it },
-                        onIndicacionesChange = { editIndicaciones = it },
-                        onFechaInicioChange = { editFechaInicio = it },
-                        onFechaEntregaChange = { editFechaEntrega = it },
-                        onFechaFinChange = { editFechaFin = it },
-                        onSave = { saveActivityEdits() },
+            TabRow(selectedTabIndex = selectedTab) {
+                ACTIVITY_TABS.forEachIndexed { i, label ->
+                    Tab(
+                        selected = selectedTab == i,
+                        onClick = { selectedTab = i },
+                        text = { Text(label, fontSize = 13.sp) },
                     )
                 }
             }
-            1 -> ActivityOperacionTab(
-                activity = detail,
-                evidence = evidence,
-                onOpenGps = onOpenGps,
-            )
-            2 -> ActivityEvidenceTab(evidence, loadingEv, onCapture = {
-                onCaptureEvidence?.invoke(detail.id)
-            })
-            3 -> ActivityViaticsTab(
-                activityId = detail.id,
-                defaultAssigneeId = detail.responsableId ?: detail.responsable?.id,
-                canAssign = isSuperAdmin || perms.any {
-                    it.contains("viatics.manage") || it.contains("console.admin")
-                },
-                canCreate = !isSuperAdmin && (canExecute || perms.any { it.contains("viatics.create") }),
-            )
-            4 -> ActivityTeamTab(activityId = detail.id)
-            5 -> ActivityMaterialsTab(activityId = detail.id)
-            6 -> ActivityTimelineTab(activityId = detail.id)
-            7 -> ActivityIssuesTab(activityId = detail.id, canManage = canManage)
-            else -> ActivityApprovalsTab(evidence, loadingEv)
+
+            when (selectedTab) {
+                ACTIVITY_TAB_DETALLE -> {
+                    if (loadingDetail) {
+                        NxLoadingBlock("Cargando detalle…")
+                    } else {
+                        ActivityInfoTab(
+                            a = detail,
+                            statusColor = statusColor,
+                            canEdit = canManage || canExecute,
+                            editing = editing,
+                            saving = saving,
+                            saveError = saveError,
+                            editEstatus = editEstatus,
+                            editPrioridad = editPrioridad,
+                            editDescripcion = editDescripcion,
+                            editIndicaciones = editIndicaciones,
+                            editFechaInicio = editFechaInicio,
+                            editFechaEntrega = editFechaEntrega,
+                            editFechaFin = editFechaFin,
+                            showManagerFields = canManage,
+                            onStartEdit = {
+                                editEstatus = detail.estatus
+                                editPrioridad = detail.prioridad ?: ""
+                                editDescripcion = detail.descripcion ?: ""
+                                editIndicaciones = detail.indicaciones ?: ""
+                                editFechaInicio = detail.fechaInicio?.take(16) ?: ""
+                                editFechaEntrega = detail.fechaEntregaEsperada?.take(10) ?: ""
+                                editFechaFin = detail.fechaFinalizacion?.take(16) ?: ""
+                                saveError = null
+                                editing = true
+                            },
+                            onCancelEdit = { editing = false; saveError = null },
+                            onEstatusChange = { editEstatus = it },
+                            onPrioridadChange = { editPrioridad = it },
+                            onDescripcionChange = { editDescripcion = it },
+                            onIndicacionesChange = { editIndicaciones = it },
+                            onFechaInicioChange = { editFechaInicio = it },
+                            onFechaEntregaChange = { editFechaEntrega = it },
+                            onFechaFinChange = { editFechaFin = it },
+                            onSave = { saveActivityEdits() },
+                            extraContent = {
+                                NxPanelShell {
+                                    Text(
+                                        "Evidencias del equipo",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = NxColors.Slate,
+                                    )
+                                    TeamEvidenceSection(
+                                        activityId = detail.id,
+                                        compact = true,
+                                        onOpenFull = { selectedTab = ACTIVITY_TAB_EVIDENCIAS },
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
+                ACTIVITY_TAB_EVIDENCIAS -> {
+                    if (loadingDetail) {
+                        NxLoadingBlock("Cargando evidencias…")
+                    } else {
+                        ActivityEvidenciasTab(activity = detail)
+                    }
+                }
+                else -> ActivityHistorialTab(activity = detail)
+            }
         }
-    }
     }
 }

@@ -33,7 +33,16 @@ enum PanelAccessResolver {
         }
     }
 
+    /// Core: OPS vive dentro de ERP, así que `.ops` se entrega como `.erp` (sin
+    /// duplicar). Nadie ve ni aterriza en un hub OPS aparte.
     static func accessiblePanels(user: SessionUser?) -> [PanelId] {
+        var seen = Set<PanelId>()
+        return resolvePanels(user: user)
+            .map { $0 == .ops ? PanelId.erp : $0 }
+            .filter { seen.insert($0).inserted }
+    }
+
+    private static func resolvePanels(user: SessionUser?) -> [PanelId] {
         guard let user else { return [] }
 
         let canonicalRole = RolePanelMatrix.canonicalRoleKey(

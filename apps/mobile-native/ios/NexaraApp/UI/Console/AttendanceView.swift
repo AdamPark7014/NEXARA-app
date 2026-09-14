@@ -105,6 +105,36 @@ final class AttendanceVM: ObservableObject {
         }
     }
 
+    /// Marca con foto (el API la exige) y la ubicación tomada junto con la foto.
+    /// Devuelve `nil` si se registró; si no, el mensaje para la vista previa.
+    func checkInWithPhoto(_ type: String, photo: CapturedGeoPhoto) async -> String? {
+        checkInLoading = true
+        checkInMessage = nil
+        defer { checkInLoading = false }
+        var coord = photo.coords
+        if coord == nil {
+            coord = await DeviceLocation.shared.current()
+        }
+        do {
+            let res = try await ConsoleRepository.shared.attendanceCheckInResult(
+                type: type,
+                lat: coord?.latitude,
+                lng: coord?.longitude,
+                photoBase64: photo.dataUrl
+            )
+            let base = res.message.isEmpty
+                ? (type == "entrada" ? "Entrada registrada" : "Salida registrada")
+                : res.message
+            let geo = coord.map { String(format: " · GPS %.5f, %.5f", $0.latitude, $0.longitude) }
+                ?? " (sin GPS — activa ubicación)"
+            checkInMessage = base + geo
+            load()
+            return nil
+        } catch {
+            return error.toUserMessage(fallback: "No se pudo registrar la asistencia")
+        }
+    }
+
     /// Consulta el día seleccionado. Se llama al abrir la pantalla y cada vez que
     /// se cambia la fecha; no se cachea porque una jornada abierta cambia sola
     /// según pasan los minutos.
@@ -130,6 +160,8 @@ final class AttendanceVM: ObservableObject {
 struct AttendanceView: View {
     @StateObject private var vm = AttendanceVM()
     @State private var selected: AttendanceEvent?
+    /// Marcaje en curso ("entrada" o "salida"): abre la cámara en vivo.
+    @State private var photoType: String?
 
     var body: some View {
         Group {
@@ -137,6 +169,23 @@ struct AttendanceView: View {
         }
         .navigationTitle(selected == nil ? "Asistencia" : "")
         .task { vm.load() }
+        .fullScreenCover(isPresented: Binding(
+            get: { photoType != nil },
+            set: { if !$0 { photoType = nil } }
+        )) {
+            GeoPhotoCaptureView(
+                title: photoType == "salida" ? "Tu foto de salida" : "Tu foto de entrada",
+                confirmLabel: "✓ Enviar esta foto",
+                requireLocation: false,
+                onConfirm: { photo in
+                    let type = photoType ?? "entrada"
+                    let failure = await vm.checkInWithPhoto(type, photo: photo)
+                    if failure == nil { photoType = nil }
+                    return failure
+                },
+                onCancel: { photoType = nil }
+            )
+        }
         .onChange(of: vm.checkInMessage) { msg in
             if msg != nil {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { vm.checkInMessage = nil }
@@ -273,7 +322,7 @@ struct AttendanceView: View {
                     .foregroundColor(msg.hasPrefix("Error") ? .red : .green)
             }
             HStack(spacing: 12) {
-                Button { vm.checkIn("entrada") } label: {
+                Button { photoType = "entrada" } label: {
                     Label("Entrada", systemImage: "arrow.right.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
@@ -281,7 +330,7 @@ struct AttendanceView: View {
                 .tint(.teal)
                 .disabled(vm.checkInLoading || vm.isCheckedIn)
 
-                Button { vm.checkIn("salida") } label: {
+                Button { photoType = "salida" } label: {
                     Label("Salida", systemImage: "arrow.left.circle.fill")
                         .frame(maxWidth: .infinity)
                 }

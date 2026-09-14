@@ -99,6 +99,30 @@ data class ActivityDto(
     val responsable: SimpleUserDto? = null,
     val client: ActivityClientDto? = null,
     val activityEvidence: ActivityEvidenceSummaryDto? = null,
+    /** Tipo Core: tarea | proyecto | obra | servicio | comercial. */
+    val coreKind: String? = null,
+    /** Encargo: ejecucion | despacho (en despacho el LEAD solo reparte). */
+    val assignmentCharge: String? = null,
+    val ticketTypeCustom: String? = null,
+    /** Fotos de evidencia que pide la actividad (mínimo). */
+    val evidencePhotoRequired: Int? = null,
+    val assignees: List<ActivityAssigneeRefDto>? = null,
+)
+
+/** Fila de equipo de `GET activities/:id` (quién la reparte, quién la ejecuta). */
+data class ActivityAssigneeRefDto(
+    val id: Long? = null,
+    val rol: String? = null,
+    val asignadoAt: String? = null,
+    val retiradoAt: String? = null,
+    val indicaciones: String? = null,
+    val user: ActivityAssigneeUserDto? = null,
+)
+
+data class ActivityAssigneeUserDto(
+    val id: Long? = null,
+    val nombre: String? = null,
+    val email: String? = null,
 )
 
 data class UpdateActivityRequest(

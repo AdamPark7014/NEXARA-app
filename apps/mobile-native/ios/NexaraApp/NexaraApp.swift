@@ -34,7 +34,7 @@ struct NexaraApp: App {
             return
         }
         if case .module(let panel, _, _, _) = dl.pending {
-            appState.route = .portal(panel)
+            appState.route = .portal(panel == .ops ? .erp : panel)
         }
     }
 }
@@ -56,8 +56,32 @@ final class AppState: ObservableObject {
 struct RootView: View {
     @EnvironmentObject var session: SessionStore
     @EnvironmentObject var app: AppState
+    @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
     var body: some View {
+        rootContent
+            .onAppear { routePendingDeepLink() }
+            .onChange(of: deepLink.pending) { _, _ in routePendingDeepLink() }
+    }
+
+    /// Push o bandeja con destino pendiente: abre el panel y el panel abre la pantalla.
+    @MainActor
+    private func routePendingDeepLink() {
+        guard session.currentUser != nil, app.route != .login else { return }
+        let coordinator = DeepLinkCoordinator.shared
+        if coordinator.consumeNotifications() {
+            app.route = .notifications
+            return
+        }
+        if case .module(let panel, _, _, _) = coordinator.pending {
+            let target: PanelId = panel == .ops ? .erp : panel
+            if app.route != .portal(target) {
+                app.route = .portal(target)
+            }
+        }
+    }
+
+    private var rootContent: some View {
         VStack(spacing: 0) {
             OfflineBanner()
             Group {
@@ -87,7 +111,8 @@ struct RootView: View {
             case .portal(let panel):
                 switch panel {
                 case .erp, .ops:
-                    ConsoleTabView(panel: panel, onExit: { app.route = .panels })
+                    // Core: OPS vive dentro de ERP; nunca se abre un hub OPS aparte.
+                    ConsoleTabView(panel: .erp, onExit: { app.route = .panels })
                 case .crm:
                     CrmTabView(onExit: { app.route = .panels })
                 case .portal:
@@ -113,6 +138,6 @@ private func applyDeepLinkAfterLogin(app: AppState) {
         return
     }
     if case .module(let panel, _, _, _) = dl.pending {
-        app.route = .portal(panel)
+        app.route = .portal(panel == .ops ? .erp : panel)
     }
 }

@@ -79,6 +79,9 @@ private fun SessionUser.isVendedorRole(): Boolean {
 /** Módulos ERP permitidos para personal administrativo (Mónica / admin_staff). */
 val ADMINISTRATIVO_ERP_MODULE_KEYS: Set<String> = setOf(
     "dashboard",
+    // Core: Actividades y Mis actividades son de todos (CORE_OLA1_MODULE_IDS en la web).
+    "activities",
+    "my-activities",
     "approvals",
     "companies",
     "calendar",
@@ -345,6 +348,8 @@ fun consoleBottomTabModuleKeys(
                 if (has("attendance")) add("attendance")
             }
             isAdministrativo -> {
+                if (has("my-activities")) add("my-activities")
+                if (has("activities")) add("activities")
                 if (has("attendance")) add("attendance")
             }
             else -> {
