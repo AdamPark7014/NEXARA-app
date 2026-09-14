@@ -1,9 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
+import { workDayBounds } from '../common/time/workday.js';
 
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
-export type BoardUserStatus = 'activo' | 'inactivo' | 'atrasado' | 'sin_actividad';
+/**
+ * activo/atrasado: tiene algo abierto (atrasado = pasó la fecha máxima).
+ * libre: hoy terminó su actividad y no tiene otra abierta. sin_actividad: hoy no tuvo nada.
+ * inactivo: ya no se asigna (clientes viejos).
+ */
+export type BoardUserStatus = 'activo' | 'inactivo' | 'atrasado' | 'libre' | 'sin_actividad';
 
 export type TeamBoardActivity = {
   id: number;
@@ -46,6 +52,22 @@ export type TeamBoardUser = {
   workedMinutes: number | null;
   activityStartedAt: Date | null;
   activityElapsedMinutes: number | null;
+  /** Atrasado: minutos pasados de la fecha máxima de lo que está haciendo. */
+  currentLateMinutes: number | null;
+  /** Libre: desde cuándo no tiene nada abierto. */
+  idleSinceAt: Date | null;
+  /** Libre: última actividad que terminó hoy y con cuánto atraso (null = sin fecha máxima). */
+  lastFinished: {
+    id: number;
+    anNumber: string;
+    titulo: string;
+    finishedAt: Date;
+    lateMinutes: number | null;
+  } | null;
+  /** Actividades suyas entregadas que nadie ha aprobado. */
+  enEsperaAprobacion: number;
+  /** Actividades con evidencia devuelta que está corrigiendo. */
+  enCorreccion: number;
 };
 
 export type TeamBoardResponse = {
@@ -272,9 +294,8 @@ export class TeamBoardService {
     companyId: number | null,
     now: Date,
   ): Promise<TeamBoardUser[]> {
-    const today = now.toLocaleDateString('sv-SE');
-    const dayStart = new Date(`${today}T00:00:00`);
-    const dayEnd = new Date(`${today}T23:59:59.999`);
+    // Día de México: el contenedor corre en UTC y el «hoy» cambiaba a las 18:00.
+    const { start: dayStart, end: dayEnd } = workDayBounds(now);
     const gpsSince = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
     const closed = (estatus: string) => {
@@ -320,7 +341,7 @@ export class TeamBoardService {
               },
               activityEvidences: {
                 where: { userId: { in: userIds } },
-                select: { userId: true, status: true },
+                select: { userId: true, status: true, completedAt: true, reviewStatus: true },
               },
             },
           },
@@ -395,19 +416,55 @@ export class TeamBoardService {
     return scoped.map((u) => {
       const allOpen = openByUser.get(u.id) ?? [];
       const openActivities = allOpen.slice(0, 5);
-      // «En curso» = lo que ejecuta; un despacho que solo reparte no cuenta como su trabajo.
-      const propia = allOpen.find((o) => !o.reparte);
-      const act = propia
-        ? assigneeRows.find((r) => r.userId === u.id && r.activity?.id === propia.id)?.activity
-        : null;
+      const minutos = (ms: number) => Math.max(0, Math.floor(ms / 60_000));
+      // Trabajo propio (un despacho que solo reparte no cuenta) y si esta persona ya lo terminó:
+      // envió su evidencia o la actividad se cerró. Antes lo terminado seguía contando como «en curso»
+      // y salía «Atrasado» aunque ya lo hubiera entregado.
+      const propias = assigneeRows
+        .filter((r) => r.userId === u.id && r.activity && !r.activity.deletedAt)
+        .filter((r) => !(r.activity.assignmentCharge === 'despacho' && String(r.rol) === 'LEAD'))
+        .map((r) => {
+          const a = r.activity;
+          const ev = a.activityEvidences.find((e) => e.userId === u.id) ?? null;
+          const envio = ev?.status === 'COMPLETED';
+          const cerrada = closed(a.estatus);
+          return {
+            a,
+            envio,
+            aprobada: ev?.reviewStatus === 'APPROVED',
+            devuelta: ev?.reviewStatus === 'REJECTED',
+            terminada: envio || cerrada,
+            cancelada: /cancel/i.test(a.estatus || ''),
+            terminoAt: envio ? (ev?.completedAt ?? a.fechaFinalizacion) : cerrada ? a.fechaFinalizacion : null,
+          };
+        });
+      // En curso: primero lo que ya arrancó, luego lo que vence antes.
+      const arranco = (estatus: string) => (/proceso|validar/i.test(estatus || '') ? 0 : 1);
+      const act =
+        propias
+          .filter((p) => !p.terminada)
+          .sort(
+            (x, y) =>
+              arranco(x.a.estatus) - arranco(y.a.estatus) ||
+              (x.a.fechaMaxima?.getTime() ?? Number.MAX_SAFE_INTEGER) -
+                (y.a.fechaMaxima?.getTime() ?? Number.MAX_SAFE_INTEGER),
+          )[0]?.a ?? null;
+      // Entregó y nadie ha aprobado todavía / le devolvieron evidencia y la está corrigiendo.
+      const enEsperaAprobacion = propias.filter((p) => p.envio && !p.aprobada && !p.cancelada).length;
+      const enCorreccion = propias.filter((p) => p.devuelta && !p.terminada && !p.cancelada).length;
       let status: BoardUserStatus = 'sin_actividad';
       let currentActivity: TeamBoardActivity | null = null;
       let activityStartedAt: Date | null = null;
       let activityElapsedMinutes: number | null = null;
+      let currentLateMinutes: number | null = null;
+      let idleSinceAt: Date | null = null;
+      let lastFinished: TeamBoardUser['lastFinished'] = null;
 
       if (act) {
         const overdue = act.fechaMaxima != null && act.fechaMaxima.getTime() < now.getTime();
         status = overdue ? 'atrasado' : 'activo';
+        currentLateMinutes =
+          overdue && act.fechaMaxima ? minutos(now.getTime() - act.fechaMaxima.getTime()) : null;
         currentActivity = {
           id: act.id,
           anNumber: act.anNumber,
@@ -426,9 +483,28 @@ export class TeamBoardService {
             Math.floor((now.getTime() - activityStartedAt.getTime()) / 60_000),
           );
         }
-      } else if (!present.has(u.id)) {
-        status = 'inactivo';
+      } else {
+        // Hoy terminó algo y no tiene nada abierto: «sin actividad desde hace…» y con cuánto atraso.
+        const ultima = propias
+          .filter(
+            (p) => p.terminada && !p.cancelada && p.terminoAt != null && p.terminoAt.getTime() >= dayStart.getTime(),
+          )
+          .sort((x, y) => (y.terminoAt?.getTime() ?? 0) - (x.terminoAt?.getTime() ?? 0))[0];
+        if (ultima?.terminoAt) {
+          status = 'libre';
+          idleSinceAt = ultima.terminoAt;
+          lastFinished = {
+            id: ultima.a.id,
+            anNumber: ultima.a.anNumber,
+            titulo: ultima.a.titulo,
+            finishedAt: ultima.terminoAt,
+            lateMinutes: ultima.a.fechaMaxima
+              ? minutos(ultima.terminoAt.getTime() - ultima.a.fechaMaxima.getTime())
+              : null,
+          };
+        }
       }
+      void present; // la presencia ya no define el estado (se sigue calculando la entrada del día)
 
       const clockInAt = clockInByUser.get(u.id) ?? null;
       const workedMinutes = clockInAt
@@ -448,6 +524,11 @@ export class TeamBoardService {
         workedMinutes,
         activityStartedAt,
         activityElapsedMinutes,
+        currentLateMinutes,
+        idleSinceAt,
+        lastFinished,
+        enEsperaAprobacion,
+        enCorreccion,
       };
     });
   }

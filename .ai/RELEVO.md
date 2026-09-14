@@ -37,6 +37,12 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
    - Web `components/asistencias/ComidasPanel.tsx`: tarjeta «Tu hora de comida» (Salir a comer / Ya regresé, cámara en vivo → vista previa → justificación si es a destiempo), lista del equipo con filtros (Por aprobar, A destiempo, En comida, Sin registrar), fotos, justificaciones y Aprobar/Rechazar. La página ya no llama `lunch-breaks/today` (exigía ATTENDANCE_MANAGE) y abre la pestaña con `?tab=comidas`.
    - Spec `lunch-ventana-mexico`: las entradas fuera de ventana llevan justificación; 4 pruebas nuevas (sin justificación rechaza, con ella queda PENDIENTE, a tiempo sin revisión, hora de teléfono no esquiva la regla).
 
+13. **Pizarra con más detalle (pedido de Adam 14:13).** Alejandro salía «Atrasado» con AN-0001 ya entregada: `team-board.service` tomaba como actividad actual cualquiera de su lista, aunque ya hubiera enviado su evidencia; «Inactivo» solo medía si checó entrada.
+   - Ahora cuenta como en curso solo lo propio sin terminar (quien reparte un despacho no cuenta; terminada = envió su evidencia o la actividad se cerró). Estados: `activo`, `atrasado` (+ `currentLateMinutes`), `libre` (hoy terminó y no tiene nada abierto: `idleSinceAt` + `lastFinished` con `lateMinutes` contra `fechaMaxima`), `sin_actividad` (hoy no tuvo nada). `inactivo` ya no se asigna. Además `enEsperaAprobacion` (entregó y nadie aprueba) y `enCorreccion` (evidencia devuelta).
+   - El «hoy» del tablero usa `workDayBounds` (México): con `toLocaleDateString` en el contenedor UTC cambiaba a las 18:00.
+   - Web `/erp/pizarra`: «Atrasado 1 h 20 min», «Sin actividad desde hace 2 h 05 min» + «Finalizó a las 10:49 con 1 h 20 min de atraso» (rojo) o «a tiempo» (verde), etiquetas chicas «⏳ En espera de aprobación» / «↩️ Corrigiendo evidencia»; «Sin actividades hoy»; filtro «Terminó»; «Inactivo» solo si una API vieja lo manda.
+14. **Reinicio de Docker/sesión (≈14:10):** los rebuilds de API y web de las 13:05 se cortaron (exit 4); se rehicieron con comidas + pizarra. El trabajo a medias de los agentes móviles quedó rescatado por `relevo salvar` en `c64bc09a` (sin compilar ni revisar).
+
 ### Verificado
 
 - `prisma generate` + `tsc --noEmit` API limpio. Web: sin errores nuevos (siguen los 4 previos: CommandPalette ×2, evidence-flow-helpers, module-guides).
@@ -45,6 +51,7 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 - Cadena real AN-0001 en BD: Luis (responsable, LEAD) → Antonio (LEAD) → Alejandro (TECNICO); jefe de Alejandro y Carolina = Antonio. Con las reglas: Antonio ve y revisa a Alejandro, no ve a Luis. AN-0001 quedó «Finalizada» por el cierre automático viejo con evidencia sin aprobar: no se migraron datos; la pestaña la muestra «Por revisar».
 - Push: `tsc` API limpio; `jest src/attendance src/auth` 6 suites / 49 pruebas OK; `build api` + `up -d` arrancó sin errores de dependencias.
 - Archivos (12:30): `up -d api` con `./uploads:/app/uploads` montado (se ven los 11 archivos viejos de `uploads/activities`). `tsc` web sin errores nuevos; `build web` + `up -d`; `/erp/actividades/1/evidencias` 200, `/pdf.worker.min.js` 200 (pdf.js 3.11.174 = `pdfjs-dist`); el bundle trae «Esta foto ya no está en el servidor» y «El PDF ya no está en el servidor».
+- Comidas + pizarra (14:29): `tsc` API limpio, `jest src/me` 3 suites / 39 OK, `tsc` web sin errores nuevos. Docker: `build api` + `migrate deploy` (aplicó `20260914190000_lunch_break_review`; `lunch_breaks` tiene `checkinJustificacion`, `revisionEstado`, `revisadoPorId`) + `up -d api` («Nest application successfully started»); `lunch-breaks/mi-dia`, `lunch-breaks/equipo`, `me/board` → 401 sin sesión. `build web` + `up -d`; `/erp/pizarra` y `/erp/asistencias` 200; bundle con «Sin actividad desde hace», «En espera de aprobación», «Corrigiendo evidencia», «Salir a comer». Dato real AN-0001: fechaMaxima 14-09 02:00, Alejandro envió 10:49 (1249 min) → la tarjeta dirá «Finalizó a las 10:49 con 20 h 49 min de atraso» + «En espera de aprobación».
 
 ### Falta probar a mano
 

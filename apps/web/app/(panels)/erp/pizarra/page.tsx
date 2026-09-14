@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
@@ -64,10 +64,51 @@ function Avatar({ url, name, size = 80 }: { url: string | null; name: string; si
   );
 }
 
+function MiniChip({ children, color }: { children: ReactNode; color: string }) {
+  return (
+    <span
+      style={{
+        fontSize: 10.5,
+        fontWeight: 650,
+        lineHeight: 1.2,
+        padding: "2px 7px",
+        borderRadius: 999,
+        color,
+        background: `color-mix(in srgb, ${color} 10%, var(--surface))`,
+        border: `1px solid color-mix(in srgb, ${color} 30%, var(--border))`,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Estado con detalle: cuánto atraso lleva o desde cuándo terminó su última actividad. */
+function estadoTexto(u: TeamBoardUser, ahora: number): string {
+  if (u.status === "atrasado" && u.currentLateMinutes) {
+    return `Atrasado ${formatMinutes(u.currentLateMinutes)}`;
+  }
+  if (u.status === "libre" && u.idleSinceAt) {
+    const min = Math.max(0, Math.floor((ahora - new Date(u.idleSinceAt).getTime()) / 60_000));
+    return min < 1 ? "Sin actividad desde hace un momento" : `Sin actividad desde hace ${formatMinutes(min)}`;
+  }
+  return STATUS_LABELS[u.status];
+}
+
+function terminoTexto(f: NonNullable<TeamBoardUser["lastFinished"]>): string {
+  const hora = new Date(f.finishedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  if (f.lateMinutes == null) return `Finalizó a las ${hora}`;
+  if (f.lateMinutes <= 0) return `Finalizó a las ${hora}, a tiempo`;
+  return `Finalizó a las ${hora} con ${formatMinutes(f.lateMinutes)} de atraso`;
+}
+
 function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean }) {
   const color = STATUS_COLORS[user.status];
   const act = user.currentActivity;
   const open = user.openActivities ?? [];
+  const ahora = Date.now();
+  const fin = user.lastFinished;
   return (
     <Link
       href={`/erp/pizarra/${user.id}`}
@@ -141,8 +182,33 @@ function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean })
             color,
           }}
         >
-          {STATUS_LABELS[user.status]}
+          {estadoTexto(user, ahora)}
         </div>
+        {user.status === "libre" && fin ? (
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: 11.5,
+              lineHeight: 1.35,
+              fontWeight: 600,
+              color: fin.lateMinutes && fin.lateMinutes > 0 ? "#dc2626" : "#16a34a",
+            }}
+          >
+            {terminoTexto(fin)}
+          </div>
+        ) : null}
+        {user.enCorreccion || user.enEsperaAprobacion ? (
+          <div style={{ marginTop: 6, display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
+            {user.enCorreccion ? (
+              <MiniChip color="#d97706">↩️ Corrigiendo evidencia</MiniChip>
+            ) : null}
+            {user.enEsperaAprobacion ? (
+              <MiniChip color="#7c3aed">
+                ⏳ {user.enEsperaAprobacion > 1 ? `${user.enEsperaAprobacion} en espera de aprobación` : "En espera de aprobación"}
+              </MiniChip>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {open.length > 0 ? (
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -204,7 +270,7 @@ function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean })
             textAlign: "center",
           }}
         >
-          {act ? act.titulo : "Sin actividad abierta"}
+          {act ? act.titulo : fin ? `Última: ${fin.titulo}` : "Sin actividades hoy"}
         </div>
       )}
     </Link>
@@ -390,7 +456,10 @@ export default function PizarraPage() {
       ) : (
       <>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {(Object.keys(STATUS_LABELS) as BoardUserStatus[]).map((key) => (
+        {(Object.keys(STATUS_LABELS) as BoardUserStatus[])
+          // «Inactivo» ya no se asigna; solo aparece si una API vieja lo manda.
+          .filter((key) => key !== "inactivo" || (counts[key] ?? 0) > 0)
+          .map((key) => (
           <span
             key={key}
             style={{
