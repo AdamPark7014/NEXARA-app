@@ -14,6 +14,11 @@ final class DeepLinkCoordinator: ObservableObject {
         pending = DeepLinkParser.parse(url)
     }
 
+    /// Destino ya resuelto (toque en un push o en la bandeja de notificaciones).
+    func ingest(destination: DeepLinkDestination) {
+        pending = destination
+    }
+
     func clear() {
         pending = nil
     }

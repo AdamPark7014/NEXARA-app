@@ -39,6 +39,9 @@ object DeepLinkParser {
         "mis-actividades" to "my-activities",
         "evidencias" to "evidences",
         "mis-evidencias" to "my-evidences",
+        // Core (/erp): «Actividades» es la pizarra y «Asistencias» es asistencia.
+        "pizarra" to "activities",
+        "asistencias" to "attendance",
         "vehiculos" to "vehicles",
         "herramientas" to "tools",
         "asistencia" to "attendance",
@@ -171,7 +174,7 @@ object DeepLinkParser {
         }
 
         val head = segments.first().lowercase()
-        val (panel, moduleParts) = when (head) {
+        val (sourcePanel, moduleParts) = when (head) {
             "erp", "console", "people", "contabilidad" -> ERP to segments.drop(1)
             "ops", "operacion", "noc", "support" -> OPS to segments.drop(1)
             "crm", "ventas" -> CRM to segments.drop(1)
@@ -181,6 +184,10 @@ object DeepLinkParser {
             "portal", "tickets" -> PORTAL to segments.drop(1)
             else -> ERP to segments
         }
+        // Core-only (apps/web/lib/core-surface.ts): no hay superficie OPS; aterriza en ERP.
+        val panel = sourcePanel.toCoreSurface()
+
+        coreSurfaceDestination(sourcePanel, moduleParts, params)?.let { return it }
 
         val activityDetail = parseActivityDetailPath(moduleParts)
         if (activityDetail != null) {
@@ -208,7 +215,7 @@ object DeepLinkParser {
         val rawKey = parts.lastOrNull() ?: "dashboard"
         val rawLower = rawKey.lowercase()
         val globalAlias = segmentAliases[rawLower] ?: rawLower
-        val key = panelKey(panel, rawLower, globalAlias)
+        val key = panelKey(sourcePanel, rawLower, globalAlias)
 
         if (key == "notifications-center") return DeepLinkDestination.Notifications
         if (key == "panels" || key == "paneles") return DeepLinkDestination.PanelHub
@@ -223,6 +230,63 @@ object DeepLinkParser {
             entityId = entityId,
             params = extraParams,
         )
+    }
+
+    /** Parámetro con el id de la persona en `/erp/pizarra/:userId`. */
+    const val BOARD_USER_PARAM = "userid"
+
+    private val EVIDENCE_LIST_SEGMENTS = setOf("my-evidences", "mis-evidencias", "evidences", "evidencias")
+    private val ACTIVITY_LIST_SEGMENTS = setOf("my-activities", "mis-actividades", "activities", "actividades")
+    private val MY_ACTIVITIES_SEGMENTS = setOf("my-activities", "mis-actividades")
+
+    /**
+     * Rutas con significado propio en Core — espejo de `coreSurfaceRedirect`:
+     * - `/erp/pizarra` (`?vista=`) → Actividades; `/erp/pizarra/:userId` → el día de esa persona.
+     * - `/ops|erp/(my-)evidences?activityId=N` → detalle de N en Evidencias.
+     * - `/ops|erp/(my-)activities?activityId=N` → detalle de N.
+     * - `/ops/my-activities`, `/erp/mis-actividades` → Mis actividades.
+     *
+     * El detalle `/…/actividades/:id/<pestaña>` lo resuelve [parseActivityDetailPath].
+     */
+    private fun coreSurfaceDestination(
+        source: PanelId,
+        parts: List<String>,
+        params: Map<String, String>,
+    ): DeepLinkDestination.Module? {
+        if (source != ERP && source != OPS) return null
+        val lower = parts.map { it.lowercase() }
+        val first = lower.firstOrNull() ?: return null
+        val extra = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
+        if (first == "pizarra") {
+            val personId = lower.getOrNull(1)?.toLongOrNull()?.takeIf { it > 0L }
+            return DeepLinkDestination.Module(
+                panel = ERP,
+                key = "activities",
+                params = if (personId != null) extra + (BOARD_USER_PARAM to personId.toString()) else extra,
+            )
+        }
+        if (lower.size != 1) return null
+        val activityId = params.longParam("activityid")
+        return when {
+            first in EVIDENCE_LIST_SEGMENTS && activityId != null -> DeepLinkDestination.Module(
+                panel = ERP,
+                key = "activities",
+                entityId = activityId,
+                params = extra + ("tab" to "evidencias"),
+            )
+            first in ACTIVITY_LIST_SEGMENTS && activityId != null -> DeepLinkDestination.Module(
+                panel = ERP,
+                key = "activities",
+                entityId = activityId,
+                params = extra,
+            )
+            first in MY_ACTIVITIES_SEGMENTS -> DeepLinkDestination.Module(
+                panel = ERP,
+                key = "my-activities",
+                params = extra,
+            )
+            else -> null
+        }
     }
 
     private val CREATION_SUFFIXES = setOf("new", "nueva", "nuevo", "crear")
@@ -383,6 +447,7 @@ object DeepLinkParser {
      */
     private val ACTIVITY_DETAIL_TABS = mapOf(
         "info" to "info",
+        "detalle" to "info",
         "operacion" to "operacion",
         "operation" to "operacion",
         "evidencias" to "evidencias",

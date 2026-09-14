@@ -15,8 +15,10 @@ struct ModuleRouter {
         switch (portal, key) {
         // ── Console ────────────────────────────────────────────────
         case (.console, "activities"),
-             (.console, "my-activities"):
-            ActivitiesView()
+             (.console, "my-activities"),
+             (.console, "pizarra"):
+            // Core: Mis actividades / Mi equipo (la lista OPS vieja sigue en «activities-detailed»).
+            ActividadesHomeView()
         case (.console, "chat"), (.ventas, "chat"), (.contabilidad, "chat"),
              (.lab, "chat"), (.studio, "chat"), (.web, "chat"):
             ChatView(

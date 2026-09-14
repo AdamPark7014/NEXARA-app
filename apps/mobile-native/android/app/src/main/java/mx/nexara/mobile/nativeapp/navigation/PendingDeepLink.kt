@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.PanelId
+import mx.nexara.mobile.nativeapp.access.toCoreSurface
 
 
 /** Destino de módulo pendiente (incluye entidad opcional). */
@@ -33,7 +34,11 @@ object PendingDeepLink {
     val signal: StateFlow<Int> = _signal.asStateFlow()
 
     fun publish(destination: DeepLinkDestination?) {
-        this.destination = destination
+        // Core: un destino OPS se abre en ERP.
+        this.destination = when (destination) {
+            is DeepLinkDestination.Module -> destination.copy(panel = destination.panel.toCoreSurface())
+            else -> destination
+        }
         _signal.update { it + 1 }
     }
 
@@ -63,7 +68,7 @@ object PendingDeepLink {
 
         val d = destination as? DeepLinkDestination.Module ?: return null
 
-        if (d.panel != panel) return null
+        if (d.panel.toCoreSurface() != panel.toCoreSurface()) return null
 
         destination = null
 

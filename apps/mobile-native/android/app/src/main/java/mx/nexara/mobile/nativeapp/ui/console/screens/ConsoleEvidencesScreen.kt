@@ -453,6 +453,8 @@ fun ConsoleEvidencesScreen(
     mode: String = "combined", // "admin" | "user" | "combined"
     contentPadding: PaddingValues = PaddingValues(16.dp),
     initialActivityId: Long? = null,
+    /** Core: abre la actividad en su pestaña Evidencias (captura y revisión viven ahí). */
+    onOpenActivity: ((Long) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
@@ -663,7 +665,20 @@ fun ConsoleEvidencesScreen(
                             }
                         }
 
-                        if (selectedActivity != null) {
+                        if (selectedActivity != null && onOpenActivity != null) {
+                            // Core: la captura vive en la actividad (cámara en vivo y GPS en cada foto).
+                            Text(
+                                "Las evidencias se capturan dentro de la actividad: cámara en vivo y tu ubicación en cada foto.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = EvSub,
+                            )
+                            Button(
+                                onClick = { onOpenActivity(selectedActivity.id) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("📸 Capturar en la actividad")
+                            }
+                        } else if (selectedActivity != null) {
                             val evidence = state.selectedEvidence
                             val currentStep = evidence?.status ?: "ENTRY_PHOTO"
 
@@ -1000,7 +1015,10 @@ fun ConsoleEvidencesScreen(
                         context = context,
                         showOwner = true,
                         canReview = false,
-                        onOpen = { vm.openReviewDetail(r) },
+                        onOpen = {
+                            val aid = r.actividad?.id
+                            if (onOpenActivity != null && aid != null) onOpenActivity(aid) else vm.openReviewDetail(r)
+                        },
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -1069,7 +1087,15 @@ fun ConsoleEvidencesScreen(
                 }
             } else {
                 items(myFiltered.take(100), key = { it.id }) { r ->
-                    EvidenceCard(r, context, showOwner = false, onOpen = { vm.openReviewDetail(r) })
+                    EvidenceCard(
+                        r,
+                        context,
+                        showOwner = false,
+                        onOpen = {
+                            val aid = r.actividad?.id
+                            if (onOpenActivity != null && aid != null) onOpenActivity(aid) else vm.openReviewDetail(r)
+                        },
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             }

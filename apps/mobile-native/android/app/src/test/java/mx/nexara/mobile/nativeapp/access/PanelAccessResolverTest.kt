@@ -12,6 +12,9 @@ import org.junit.Test
  * `PanelAccessResolver` decidía los paneles con `role.contains("rh")` sobre el
  * nombre visible del rol, así que un usuario de «Recursos Humanos» no casaba
  * con nada y aterrizaba en «No hay paneles disponibles para tu cuenta».
+ *
+ * Core (2026-09): OPS ya no es una superficie; en todos los casos se pliega en
+ * ERP, que incluye sus módulos.
  */
 class PanelAccessResolverTest {
 
@@ -49,7 +52,8 @@ class PanelAccessResolverTest {
         val panels = PanelAccessResolver.accessiblePanels(
             user(role = "Recursos Humanos", roleKey = "rh", navPanels = listOf("erp", "ops")),
         )
-        assertEquals(listOf(PanelId.ERP, PanelId.OPS), panels)
+        // OPS se pliega en ERP: un solo panel, sin duplicados.
+        assertEquals(listOf(PanelId.ERP), panels)
     }
 
     @Test
@@ -114,11 +118,11 @@ class PanelAccessResolverTest {
     }
 
     @Test
-    fun fieldEngineerOnlySeesOps() {
-        assertEquals(
-            listOf(PanelId.OPS),
-            PanelAccessResolver.accessiblePanels(user(role = "Ingeniero de Campo", roleKey = "ing_campo")),
-        )
+    fun fieldEngineerLandsInErp() {
+        // Antes solo veía OPS; en Core sus módulos viven dentro de ERP.
+        val engineer = user(role = "Ingeniero de Campo", roleKey = "ing_campo")
+        assertEquals(listOf(PanelId.ERP), PanelAccessResolver.accessiblePanels(engineer))
+        assertEquals("erp", PanelAccessResolver.routeForSinglePanelUser(engineer))
     }
 
     @Test
@@ -137,20 +141,35 @@ class PanelAccessResolverTest {
 
     @Test
     fun serverNavigationWinsOverTheLocalRoleFallback() {
-        // Si la API recorta, la app recorta: nada de ampliar por nuestra cuenta.
+        // Si la API recorta, la app recorta: nada de ampliar por nuestra cuenta
+        // (el rol daría también CRM e INTEGRA). OPS del servidor abre ERP.
         val panels = PanelAccessResolver.accessiblePanels(
             user(role = "Director de Operaciones", roleKey = "dir_operaciones", navPanels = listOf("ops")),
         )
-        assertEquals(listOf(PanelId.OPS), panels)
+        assertEquals(listOf(PanelId.ERP), panels)
     }
 
     @Test
     fun superAdminSeesEveryInternalPanel() {
         val panels = PanelAccessResolver.accessiblePanels(user(role = "Super Administrador", isSuperAdmin = true))
         assertEquals(
-            listOf(PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA),
+            listOf(PanelId.ERP, PanelId.CRM, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA),
             panels,
         )
+    }
+
+    @Test
+    fun opsNeverSurvivesAsAPanel() {
+        listOf(
+            user(roleKey = "ing_soporte"),
+            user(roleKey = "coord_operaciones"),
+            user(roleKey = "arquitecto"),
+            user(roleKey = "ceo", navPanels = listOf("ops", "erp", "crm")),
+            user(role = "Rol Nuevo", permissions = listOf("activities.view")),
+            user(isSuperAdmin = true),
+        ).forEach { u ->
+            assertFalse("OPS no debe aparecer: $u", PanelAccessResolver.accessiblePanels(u).contains(PanelId.OPS))
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -177,7 +196,7 @@ class PanelAccessResolverTest {
             user(role = "Coordinador de Atención a Clientes", roleKey = "coord_operaciones"),
         )
         assertFalse("un interno no cae al portal por cómo se llame su rol", panels.contains(PanelId.PORTAL))
-        assertTrue(panels.contains(PanelId.OPS))
+        assertTrue(panels.contains(PanelId.ERP))
     }
 
     @Test
@@ -185,7 +204,7 @@ class PanelAccessResolverTest {
         val panels = PanelAccessResolver.accessiblePanels(
             user(role = "Ingeniero de Soporte", roleKey = "ing_soporte", navPanels = listOf("ops", "portal")),
         )
-        assertEquals(listOf(PanelId.OPS), panels)
+        assertEquals(listOf(PanelId.ERP), panels)
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -197,7 +216,7 @@ class PanelAccessResolverTest {
         val panels = PanelAccessResolver.accessiblePanels(
             user(role = "CEO", roleKey = "ceo", navPanels = listOf("core", "sales", "operacion", "web")),
         )
-        assertEquals(listOf(PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO), panels)
+        assertEquals(listOf(PanelId.ERP, PanelId.CRM, PanelId.STUDIO), panels)
     }
 
     @Test
@@ -217,7 +236,7 @@ class PanelAccessResolverTest {
         val panels = PanelAccessResolver.accessiblePanels(
             user(role = "Rol Nuevo Sin Mapear", permissions = listOf("panel.ventas", "gps.view")),
         )
-        assertEquals(listOf(PanelId.CRM, PanelId.OPS), panels)
+        assertEquals(listOf(PanelId.CRM, PanelId.ERP), panels)
     }
 
     @Test

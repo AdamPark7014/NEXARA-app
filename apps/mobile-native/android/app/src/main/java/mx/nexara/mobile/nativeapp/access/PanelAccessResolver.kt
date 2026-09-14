@@ -31,8 +31,9 @@ private fun panelFromNavKey(key: String): PanelId? = when (val k = key.trim().lo
 /** Panel mínimo de un usuario interno autenticado — nunca una pantalla muerta. */
 private val BASE_INTERNAL_PANEL = PanelId.ERP
 
+/** Sin OPS: en Core sus módulos viven dentro de ERP. */
 private val ALL_INTERNAL_PANELS = listOf(
-    PanelId.ERP, PanelId.CRM, PanelId.OPS, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA,
+    PanelId.ERP, PanelId.CRM, PanelId.STUDIO, PanelId.LAB, PanelId.INTEGRA,
 )
 
 /**
@@ -67,19 +68,24 @@ object PanelAccessResolver {
         if (user.isSuperAdmin) return ALL_INTERNAL_PANELS
 
         // 3. La API manda cuando responde.
+        // Core: OPS se pliega en ERP en todos los casos (ver toCoreSurface).
         val fromNav = user.navPanels
             ?.mapNotNull { panelFromNavKey(it) }
+            ?.map { it.toCoreSurface() }
             ?.filter { it != PanelId.PORTAL }
             ?.distinct()
             .orEmpty()
         if (fromNav.isNotEmpty()) return fromNav
 
         // 4. Rol canónico — respaldo determinista sin conexión.
-        val fromRole = RolePanelMatrix.panelsForRole(canonicalRole).filter { it != PanelId.PORTAL }
+        val fromRole = RolePanelMatrix.panelsForRole(canonicalRole)
+            .map { it.toCoreSurface() }
+            .filter { it != PanelId.PORTAL }
+            .distinct()
         if (fromRole.isNotEmpty()) return fromRole
 
         // 5. Permisos efectivos.
-        val fromPerms = panelsFromPermissions(user)
+        val fromPerms = panelsFromPermissions(user).map { it.toCoreSurface() }.distinct()
         if (fromPerms.isNotEmpty()) return fromPerms
 
         // 6. Nunca cero paneles con sesión válida.
@@ -136,7 +142,7 @@ object PanelAccessResolver {
     fun routeForPanel(panel: PanelId): String = when (panel) {
         PanelId.ERP -> "erp"
         PanelId.CRM -> "crm"
-        PanelId.OPS -> "ops"
+        PanelId.OPS -> "erp"
         PanelId.STUDIO -> "studio"
         PanelId.LAB -> "lab"
         PanelId.PORTAL -> "portal"

@@ -70,6 +70,8 @@ struct NotificationsCenterView: View {
                 Section("\(unread) sin leer") {
                     ForEach(rows, id: \.notifKey) { n in
                         notificationRow(n)
+                            .contentShape(Rectangle())
+                            .onTapGesture { open(n) }
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
                                     Task { await deleteItem(n) }
@@ -151,6 +153,18 @@ struct NotificationsCenterView: View {
         }
         .padding(.vertical, 4)
         .listRowBackground(isRead ? Color.clear : Color.accentColor.opacity(0.06))
+    }
+
+    /// Toque: abre la pantalla nativa (misma resolución que el push:
+    /// relatedUrl → entityType + relatedEntityId → category).
+    @MainActor
+    private func open(_ n: [String: Any]) {
+        if (n["isRead"] as? Bool) != true {
+            Task { await markRead(n) }
+        }
+        guard let destination = NotificationDeepLinkResolver.resolve(notification: n) else { return }
+        onBack()
+        DeepLinkCoordinator.shared.ingest(destination: destination)
     }
 
     private func load() async {
