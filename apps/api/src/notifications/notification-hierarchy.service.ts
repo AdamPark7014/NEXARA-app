@@ -707,6 +707,85 @@ export class NotificationHierarchyService {
     }
   }
 
+  /** Jefes por organigrama (managerId hacia arriba) y Christian: quienes aprueban comidas a destiempo. */
+  private async lunchReviewerIds(userId: number): Promise<number[]> {
+    const ids = new Set<number>(await this.getCeoUserIds());
+    const vistos = new Set<number>([userId]);
+    let cur = (await this.prisma.user.findUnique({ where: { id: userId }, select: { managerId: true } }))
+      ?.managerId;
+    while (cur != null && !vistos.has(cur)) {
+      ids.add(cur);
+      vistos.add(cur);
+      cur = (await this.prisma.user.findUnique({ where: { id: cur }, select: { managerId: true } }))?.managerId;
+    }
+    ids.delete(userId);
+    return [...ids];
+  }
+
+  /** Comida a destiempo: sus jefes y Christian reciben el motivo para aprobarla o rechazarla. */
+  async notifyLunchLate(params: {
+    userId: number;
+    userName: string;
+    momento: 'salida' | 'regreso';
+    hora: Date;
+    justificacion: string;
+    lunchId: number;
+  }) {
+    try {
+      const hora = params.hora.toLocaleTimeString('es-MX', {
+        timeZone: 'America/Mexico_City',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const accion = params.momento === 'salida' ? 'salió a comer' : 'regresó de comer';
+      for (const uid of await this.lunchReviewerIds(params.userId)) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: params.momento === 'salida' ? 'LUNCH_CHECKIN' : 'LUNCH_CHECKOUT',
+          category: 'lunch_breaks',
+          title: '⏰ Comida a destiempo por aprobar',
+          message: `${params.userName} ${accion} a las ${hora}, fuera de 3 a 4 p.m.: «${params.justificacion}». Apruébala o recházala.`,
+          triggerUserId: params.userId,
+          relatedEntityId: params.lunchId,
+          entityType: 'LunchBreak',
+          relatedUrl: '/erp/asistencias?tab=comidas',
+          priority: 'high',
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyLunchLate', error);
+    }
+  }
+
+  /** Resultado de la revisión de una comida a destiempo, para quien comió. */
+  async notifyLunchReviewed(params: {
+    userId: number;
+    reviewerId: number;
+    aprobada: boolean;
+    notas: string | null;
+    lunchId: number;
+  }) {
+    try {
+      const quien = await this.resolveActorName(params.reviewerId);
+      await this.notificationsService.createNotification({
+        userId: params.userId,
+        type: 'LUNCH_CHECKOUT',
+        category: 'lunch_breaks',
+        title: params.aprobada ? '✅ Aprobaron tu comida a destiempo' : '❌ Rechazaron tu comida a destiempo',
+        message: `${quien} ${params.aprobada ? 'aprobó' : 'rechazó'} tu justificación.${params.notas ? ` «${params.notas}»` : ''}`,
+        triggerUserId: params.reviewerId,
+        relatedEntityId: params.lunchId,
+        entityType: 'LunchBreak',
+        relatedUrl: '/erp/asistencias?tab=comidas',
+        priority: params.aprobada ? 'normal' : 'high',
+        dedupeSeconds: 0,
+      });
+    } catch (error) {
+      this.logger.error('notifyLunchReviewed', error);
+    }
+  }
+
   /** Todo el equipo subió su evidencia (queda Por Validar): responsable y Christian. */
   async notifyActivityAutoCompleted(
     activityId: number,
