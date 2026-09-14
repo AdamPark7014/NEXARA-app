@@ -14,7 +14,11 @@ import { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { MeService } from './me.service.js';
-import { MyActivitiesService, type ReorderMyActivitiesDto } from './my-activities.service.js';
+import {
+  MyActivitiesService,
+  type DispatchMyActivityDto,
+  type ReorderMyActivitiesDto,
+} from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 
 @Controller('me')
@@ -65,6 +69,25 @@ export class MeController {
     return this.myActivities.selfCreate(
       { id: Number(user.id), email: user.email ?? null },
       companyId,
+      body,
+    );
+  }
+
+  /** Quien reparte un despacho lo pasa a su equipo (sin ACTIVITIES_MANAGE). */
+  @Post('activities/:id/despacho')
+  dispatchMyActivity(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: DispatchMyActivityDto,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.dispatch(
+      { id: Number(user.id), email: user.email ?? null },
+      companyId,
+      activityId,
       body,
     );
   }

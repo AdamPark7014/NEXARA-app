@@ -68,6 +68,18 @@ export function createMyActivity(token: string, payload: object): Promise<{ id: 
   });
 }
 
+/** Quien reparte un despacho lo pasa a su equipo (POST /me/activities/:id/despacho). */
+export function dispatchMyActivity(
+  token: string,
+  activityId: number,
+  input: { userIds: number[]; indicaciones?: string },
+): Promise<{ ok: boolean; asignados: number }> {
+  return erpFetch<{ ok: boolean; asignados: number }>(`me/activities/${activityId}/despacho`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function fetchMyActivities(token: string): Promise<MyActivitiesResponse> {
   return erpFetch<MyActivitiesResponse>("me/activities", token);
 }

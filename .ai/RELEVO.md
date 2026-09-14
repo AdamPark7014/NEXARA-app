@@ -9,25 +9,24 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Despacho ya no se muestra como trabajo propio de quien reparte
+## Este turno — Antonio no podía repartir (403 al despachar)
 
 ### Hecho
 
-1. Síntoma (Adam): AN-0001 se asignó como despacho a equipo y en la actividad/pizarra salía como si fuera trabajo de Luis.
-2. Historial (`ActivityTeamService.buildTimeline`): `fechaInicio` se llena al programar (día/hora del formulario); si la actividad no ha arrancado se muestra «📅 Programada» (kind `agenda`) en vez de «Inicio en campo». `historial/page.tsx`: tiempos futuros dicen «En 40 min» en lugar de «Justo ahora».
-3. Detalle (`ops/activities/[id]/page.tsx`, usado también en `/erp/actividades/:id`): si `assignmentCharge = despacho` muestra etiqueta «Despacho a equipo», campo «Encargo», KPI «Ejecuta» (no LEAD del equipo o «Por asignar») con nota «coordina <responsable>», y en Información general «Coordina (despacho)» (LEAD en cadena) + «Ejecuta» en lugar de «Responsable».
-4. Pizarra (`team-board.service.ts`): cada actividad abierta trae `reparte` (LEAD en despacho). «Actividad en curso» y estado activo/atrasado salen solo de lo que la persona ejecuta; la lista de abiertas se conserva para el panel de despacho.
+1. Síntoma: Antonio (ing_soporte) en «Pendiente de despacho» elegía a Alejandro y `POST /api/activities/1/team` respondía 403 «No tienes permisos». Ese endpoint exige ACTIVITIES_MANAGE y ing_soporte no lo tiene.
+2. Endpoint nuevo `POST /me/activities/:id/despacho` (`me.controller.ts` → `MyActivitiesService.dispatch`): solo si el usuario es LEAD activo de ese despacho y solo hacia su grupo (`DISPATCH_POOLS`: Luis → Antonio; Antonio → Carolina/Alejandro; David y Josué → Joan/Israel/Juan). La API decide el rol (si quien recibe también reparte entra como LEAD; si no, TECNICO) y usa `ActivityTeamService.addMember`, así que conserva registro de despacho (`asignadoPorId`) y avisos a Luis y Christian.
+3. `ActivitiesModule` exporta `ActivityTeamService`.
+4. Web: `DespachoPendingPanel` usa `dispatchMyActivity` (`lib/my-activities-api.ts`) en lugar de `addActivityTeamMember`; los errores se muestran con `formatApiError` (antes salía el JSON crudo).
 
 ### Verificado
 
 - `tsc --noEmit` API: limpio. Web: sin errores nuevos; siguen 4 previos y ajenos.
-- Docker 19:28 UTC `build api web` + `up -d`; API arrancó sin errores. `dist/activities/activity-team.service.js` trae «Programada» y `dist/me/team-board.service.js` trae `reparte`; el bundle web trae «Despacho a equipo», «Encargo» y «Coordina (despacho)»; `/erp/actividades/1` 200; `/api/me/board` 401 sin sesión.
+- Docker 04:18 UTC (14-09) `build api web` + `up -d`; API arrancó sin errores de inyección (`MyActivitiesService` usa `ActivityTeamService`). El endpoint de despacho de Mis actividades y `GET /api/me/activities` responden 401 sin sesión (rutas vivas); los bundles de la ficha de pizarra y de Mis actividades ya llaman al endpoint nuevo.
 
 ### Falta probar a mano
 
-1. Luis → ficha en pizarra: AN-0001 ya no sale como «Actividad en curso».
-2. `/erp/actividades/1`: «Despacho a equipo», «Ejecuta: Por asignar», «Coordina: Luis → José Antonio».
-3. Historial de AN-0001: «📅 Programada» con «En …» si la hora es futura.
+1. Antonio → su ficha → «Pendiente de despacho» → AN-0001 → Alejandro → «Asignar al equipo»: sin error; Historial muestra «José Antonio la asignó a Alejandro»; Luis y Christian reciben «Despacho registrado».
+2. Alejandro recibe «Nueva actividad asignada» y puede capturar evidencias.
 
 ### A medias
 
