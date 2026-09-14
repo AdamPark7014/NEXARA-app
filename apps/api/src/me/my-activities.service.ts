@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { ActivitiesService } from '../activities/activities.service.js';
+import { ActivityTeamService, type AssigneeRole } from '../activities/activity-team.service.js';
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -15,6 +16,24 @@ export const AREA_MANAGER_EMAILS = new Set<string>([
   'daniela.hernandez@nexara.com.mx',
   'soluciones@nexara.com.mx',
 ]);
+
+/** A quién puede pasar cada encargado un despacho (espejo de dispatchPoolEmails en web). */
+const DISPATCH_POOLS: Record<string, string[]> = {
+  'direccion.operaciones@nexara.com.mx': ['jose.ramirez@nexara.com.mx'],
+  'jose.ramirez@nexara.com.mx': ['soporte@nexara.com.mx', 'alejandro.gonzalez@nexara.com.mx'],
+  'operaciones@nexara.com.mx': [
+    'joan.sanchez@nexara.com.mx',
+    'israel.ramos@nexara.com.mx',
+    'juan.gonzalez@nexara.com.mx',
+  ],
+  'infraestructura@nexara.com.mx': [
+    'joan.sanchez@nexara.com.mx',
+    'israel.ramos@nexara.com.mx',
+    'juan.gonzalez@nexara.com.mx',
+  ],
+};
+
+export type DispatchMyActivityDto = { userIds: number[]; indicaciones?: string };
 
 export type MyActivitiesViewer = { id: number; email?: string | null };
 
@@ -100,7 +119,60 @@ export class MyActivitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activities: ActivitiesService,
+    private readonly team: ActivityTeamService,
   ) {}
+
+  /**
+   * Quien reparte un despacho lo pasa a su gente sin ACTIVITIES_MANAGE (Antonio es
+   * ingeniero de soporte). Solo si es LEAD activo de ese despacho y solo hacia su
+   * grupo; la API decide el rol y addMember deja registro y avisos.
+   */
+  async dispatch(
+    viewer: MyActivitiesViewer,
+    companyId: number | null,
+    activityId: number,
+    dto: DispatchMyActivityDto,
+  ) {
+    const ids = Array.isArray(dto?.userIds) ? [...new Set(dto.userIds.map(Number))] : [];
+    if (ids.length === 0 || ids.length > 10 || ids.some((n) => !Number.isInteger(n) || n <= 0)) {
+      throw new BadRequestException('Elige al menos a una persona de tu equipo');
+    }
+
+    const lead = await this.prisma.activityAssignee.findFirst({
+      where: {
+        activityId,
+        userId: viewer.id,
+        retiradoAt: null,
+        rol: 'LEAD',
+        ...(companyId != null ? { companyId } : {}),
+        activity: { deletedAt: null, assignmentCharge: 'despacho' },
+      },
+      select: { id: true },
+    });
+    if (!lead) throw new ForbiddenException('Solo quien reparte este despacho puede asignarlo');
+
+    const pool = new Set(DISPATCH_POOLS[norm(viewer.email)] ?? []);
+    const targets = await this.prisma.user.findMany({
+      where: { id: { in: ids }, isActive: true },
+      select: { id: true, email: true },
+    });
+    if (targets.length !== ids.length || targets.some((t) => !pool.has(norm(t.email)))) {
+      throw new ForbiddenException('Solo puedes pasarla a gente de tu equipo');
+    }
+
+    const notas = typeof dto?.indicaciones === 'string' ? dto.indicaciones.trim().slice(0, 500) : '';
+    for (const t of targets) {
+      // Si quien recibe también reparte (Luis → Antonio) entra como LEAD; si no, la ejecuta.
+      const rol: AssigneeRole = DISPATCH_POOLS[norm(t.email)] ? 'LEAD' : 'TECNICO';
+      await this.team.addMember(
+        activityId,
+        { userId: t.id, rol, ...(notas ? { indicaciones: notas } : {}) },
+        companyId,
+        viewer.id,
+      );
+    }
+    return { ok: true, asignados: targets.length };
+  }
 
   isAreaManager(email?: string | null): boolean {
     return AREA_MANAGER_EMAILS.has(norm(email));

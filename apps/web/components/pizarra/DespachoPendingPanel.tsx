@@ -6,7 +6,8 @@ import {
   ORG_EMAILS,
   parseDispatchHeadcount,
 } from "@/lib/activity-kinds";
-import { addActivityTeamMember } from "@/lib/ops-activities-api";
+import { formatApiError } from "@/lib/erp-api";
+import { dispatchMyActivity } from "@/lib/my-activities-api";
 import { fetchTeamBoard, type TeamBoardUser } from "@/lib/team-board-api";
 
 export type DespachoPendingItem = {
@@ -100,27 +101,19 @@ export default function DespachoPendingPanel({
     setSaving(true);
     setMsg(null);
     try {
-      // El cupo viaja con la actividad a quien la recibe.
+      // El cupo viaja con la actividad. La API valida que sea tu equipo y decide el rol
+      // (Luis → Antonio como LEAD; Antonio/David → técnicos). No requiere permisos de OT.
       const cupoNota = despachos.find((d) => d.id === activeId)?.indicaciones || undefined;
-      for (const userId of selected) {
-        // Luis → Antonio como LEAD (él decide el soporte). Resto: TECNICO.
-        const email = (candidates.find((c) => c.id === userId)?.email || "").toLowerCase();
-        const rol =
-          isLuis && email === ORG_EMAILS.antonio
-            ? "LEAD"
-            : "TECNICO";
-        await addActivityTeamMember(token, activeId, {
-          userId,
-          rol,
-          ...(cupoNota ? { indicaciones: cupoNota } : {}),
-        });
-      }
+      await dispatchMyActivity(token, activeId, {
+        userIds: selected,
+        ...(cupoNota ? { indicaciones: cupoNota } : {}),
+      });
       setMsg(`Asignado a ${selected.length} persona(s)`);
       setActiveId(null);
       setSelected([]);
       onDone?.();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "No se pudo asignar");
+      setMsg(formatApiError(e, "No se pudo asignar"));
     } finally {
       setSaving(false);
     }

@@ -40,6 +40,6 @@ import {
     TicketAlertsService,
     ActivityLifecycleService,
   ],
-  exports: [ActivitiesService, ActivityLifecycleService],
+  exports: [ActivitiesService, ActivityLifecycleService, ActivityTeamService],
 })
 export class ActivitiesModule {}
