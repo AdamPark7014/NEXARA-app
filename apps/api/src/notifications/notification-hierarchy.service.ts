@@ -713,6 +713,53 @@ export class NotificationHierarchyService {
     }
   }
 
+  /** Reprogramación de día/hora: responsable, equipo y Christian (menos quien la movió). */
+  async notifyActivityRescheduled(params: {
+    activityId: number;
+    label: string;
+    actorId: number;
+    de: Date | null;
+    a: Date;
+    motivo: string | null;
+    recipientIds: number[];
+  }) {
+    try {
+      const { activityId, label, actorId, de, a, motivo, recipientIds } = params;
+      const actorName = await this.resolveActorName(actorId);
+      const fmt = (d: Date) =>
+        d.toLocaleString('es-MX', {
+          timeZone: 'America/Mexico_City',
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      const targets = new Set<number>([...recipientIds, ...(await this.getCeoUserIds())]);
+      targets.delete(actorId);
+      const message = `${actorName} movió «${label}»${de ? ` del ${fmt(de)}` : ''} al ${fmt(a)}.${
+        motivo ? ` Motivo: ${motivo}` : ''
+      }`;
+      for (const uid of targets) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'ACTIVITY_RESCHEDULED',
+          category: 'activities',
+          title: '🕑 Actividad reprogramada',
+          message,
+          triggerUserId: actorId,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activityId}/historial`,
+          priority: 'high',
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityRescheduled', error);
+    }
+  }
+
   /**
    * Notificar solicitud de viático
    */

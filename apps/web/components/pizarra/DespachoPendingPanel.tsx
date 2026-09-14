@@ -8,6 +8,7 @@ import {
 } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import { dispatchMyActivity } from "@/lib/my-activities-api";
+import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
 import { fetchTeamBoard, type TeamBoardUser } from "@/lib/team-board-api";
 
 export type DespachoPendingItem = {
@@ -17,6 +18,7 @@ export type DespachoPendingItem = {
   assignmentCharge?: string | null;
   indicaciones?: string | null;
   teamEmails?: string[];
+  fechaInicio?: string | null;
 };
 
 type Props = {
@@ -164,6 +166,14 @@ export default function DespachoPendingPanel({
               <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
                 Despacho
                 {cupo != null ? ` · se ocupan ${cupo} persona${cupo === 1 ? "" : "s"}` : ""}
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <ReprogramarDespacho
+                  token={token}
+                  activityId={a.id}
+                  fechaActual={a.fechaInicio ?? null}
+                  onDone={onDone}
+                />
               </div>
               {a.indicaciones ? (
                 <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4, lineHeight: 1.35 }}>

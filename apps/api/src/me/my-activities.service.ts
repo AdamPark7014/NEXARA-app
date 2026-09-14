@@ -35,6 +35,8 @@ const DISPATCH_POOLS: Record<string, string[]> = {
 
 export type DispatchMyActivityDto = { userIds: number[]; indicaciones?: string };
 
+export type ReprogramarDespachoDto = { fecha: string; motivo?: string };
+
 export type MyActivitiesViewer = { id: number; email?: string | null };
 
 export type MyActivityItem = {
@@ -76,6 +78,14 @@ export type MyActivityItem = {
     por: string | null;
     evidenceStatus: string | null;
   }>;
+  /** Última reprogramación de día/hora (quién, cuándo, de → a). */
+  ultimaReprogramacion: {
+    at: Date;
+    por: string | null;
+    de: Date | null;
+    a: Date;
+    motivo: string | null;
+  } | null;
 };
 
 export type MyActivitiesResponse = {
@@ -174,6 +184,41 @@ export class MyActivitiesService {
     return { ok: true, asignados: targets.length };
   }
 
+  /** Quien reparte un despacho cambia su día y hora (queda en el registro de la actividad). */
+  async reprogram(
+    viewer: MyActivitiesViewer,
+    companyId: number | null,
+    activityId: number,
+    dto: ReprogramarDespachoDto,
+  ) {
+    const nueva = new Date(String(dto?.fecha ?? ''));
+    if (Number.isNaN(nueva.getTime())) {
+      throw new BadRequestException('Indica un día y una hora válidos');
+    }
+    if (nueva.getTime() < Date.now() - 60_000) {
+      throw new BadRequestException('La nueva fecha no puede quedar en el pasado');
+    }
+    const motivo = typeof dto?.motivo === 'string' ? dto.motivo.trim().slice(0, 500) : '';
+
+    const lead = await this.prisma.activityAssignee.findFirst({
+      where: {
+        activityId,
+        userId: viewer.id,
+        retiradoAt: null,
+        rol: 'LEAD',
+        ...(companyId != null ? { companyId } : {}),
+        activity: { deletedAt: null, assignmentCharge: 'despacho' },
+      },
+      select: { activity: { select: { estatus: true } } },
+    });
+    if (!lead) throw new ForbiddenException('Solo quien reparte este despacho puede reprogramarlo');
+    if (isClosed(lead.activity.estatus)) {
+      throw new BadRequestException('La actividad ya está cerrada');
+    }
+
+    return this.team.reschedule(activityId, nueva, motivo || null, companyId, viewer.id);
+  }
+
   isAreaManager(email?: string | null): boolean {
     return AREA_MANAGER_EMAILS.has(norm(email));
   }
@@ -242,6 +287,17 @@ export class MyActivitiesService {
             project: { select: { title: true } },
             client: { select: { name: true } },
             activityEvidences: { select: { userId: true, status: true } },
+            scheduleChanges: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: {
+                createdAt: true,
+                fechaAnterior: true,
+                fechaNueva: true,
+                motivo: true,
+                cambiadoPor: { select: { nombre: true } },
+              },
+            },
             assignees: {
               where: { retiradoAt: null },
               select: {
@@ -302,6 +358,15 @@ export class MyActivitiesService {
         despachador,
         porRepartir: despachador && pasadaA.length === 0,
         pasadaA,
+        ultimaReprogramacion: a.scheduleChanges[0]
+          ? {
+              at: a.scheduleChanges[0].createdAt,
+              por: a.scheduleChanges[0].cambiadoPor?.nombre ?? null,
+              de: a.scheduleChanges[0].fechaAnterior,
+              a: a.scheduleChanges[0].fechaNueva,
+              motivo: a.scheduleChanges[0].motivo,
+            }
+          : null,
       };
     });
 

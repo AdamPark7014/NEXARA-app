@@ -39,7 +39,7 @@ export default function AutoAsignarmePage() {
     else if (kind && !allowedKinds.includes(kind)) setKind(null);
   }, [allowedKinds, kind]);
 
-  const back = () => router.push("/erp/mis-actividades");
+  const back = () => router.push("/erp/pizarra?vista=mias");
 
   if (!user) {
     return <p style={{ color: "var(--text-secondary)" }}>Cargando…</p>;
@@ -52,7 +52,7 @@ export default function AutoAsignarmePage() {
         <p style={{ margin: 0, color: "var(--text-secondary)", lineHeight: 1.5 }}>
           Solo los encargados de área pueden auto-asignarse actividades. Tu encargado te las asigna.
         </p>
-        <Link href="/erp/mis-actividades" style={{ color: "var(--primary)", fontWeight: 700 }}>
+        <Link href="/erp/pizarra?vista=mias" style={{ color: "var(--primary)", fontWeight: 700 }}>
           ← Volver a Mis actividades
         </Link>
       </div>
@@ -155,7 +155,7 @@ export default function AutoAsignarmePage() {
             forcedTicketTypeCustom={kindMeta.ticketTypeCustom}
             requireSchedule={Boolean(kindMeta.requiresSchedule)}
             onCancel={back}
-            onSuccess={(id) => router.push(`/erp/mis-actividades?nueva=${id}`)}
+            onSuccess={(id) => router.push(`/erp/pizarra?vista=mias&nueva=${id}`)}
           />
         </section>
       ) : (

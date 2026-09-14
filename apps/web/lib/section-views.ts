@@ -237,8 +237,8 @@ export function shouldShowModuleInSidebar(
 
   switch (module.id as ModuleId) {
     case 'mis-actividades':
-      // Todo el equipo menos el CEO (Christian): él ve a todos en Actividades.
-      return (user?.email || '').trim().toLowerCase() !== 'gerencia@nexara.com.mx' && v2 !== 'ceo';
+      // Vive dentro de Actividades (pestaña «Mis actividades»); no va suelto en el menú.
+      return false;
     case 'erp-clients':
       return canSeeClientesModule(user?.email);
     case 'ops-activities': {

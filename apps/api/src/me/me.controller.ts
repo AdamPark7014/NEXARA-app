@@ -18,6 +18,7 @@ import {
   MyActivitiesService,
   type DispatchMyActivityDto,
   type ReorderMyActivitiesDto,
+  type ReprogramarDespachoDto,
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 
@@ -85,6 +86,25 @@ export class MeController {
       throw new UnauthorizedException('Token de usuario inválido');
     }
     return this.myActivities.dispatch(
+      { id: Number(user.id), email: user.email ?? null },
+      companyId,
+      activityId,
+      body,
+    );
+  }
+
+  /** Quien reparte un despacho cambia su día y hora (queda en el registro). */
+  @Patch('activities/:id/reprogramar')
+  reprogramarDespacho(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: ReprogramarDespachoDto,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.reprogram(
       { id: Number(user.id), email: user.email ?? null },
       companyId,
       activityId,

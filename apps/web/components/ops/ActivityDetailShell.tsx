@@ -96,7 +96,7 @@ export default function ActivityDetailShell({
   );
 
   const backHref = useMemo(
-    () => (core ? "/erp/mis-actividades" : getActivitiesCanonicalPath(user)),
+    () => (core ? "/erp/pizarra" : getActivitiesCanonicalPath(user)),
     [core, user],
   );
 
@@ -124,7 +124,7 @@ export default function ActivityDetailShell({
       <div style={{ padding: "24px 32px", maxWidth: 1200, margin: "0 auto" }}>
         <header style={{ marginBottom: 16 }}>
           <Link href={backHref} style={{ fontSize: 13, color: "var(--text-secondary, #64748b)", textDecoration: "none" }}>
-            {core ? "← Mis actividades" : "← Actividades"}
+            ← Actividades
           </Link>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: "6px 0 0" }}>
             {loading ? `Actividad #${id}` : title}

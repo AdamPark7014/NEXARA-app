@@ -29,6 +29,8 @@ export type TeamBoardOpenActivity = {
   teamEmails: string[];
   /** En despacho esta persona (LEAD) solo reparte: no es su trabajo en campo. */
   reparte: boolean;
+  /** Día/hora programada (reprogramable por quien reparte). */
+  fechaInicio: Date | null;
 };
 
 export type TeamBoardUser = {
@@ -383,6 +385,7 @@ export class TeamBoardService {
           .map((m) => (m.user?.email || '').trim().toLowerCase())
           .filter(Boolean),
         reparte: act.assignmentCharge === 'despacho' && String(row.rol) === 'LEAD',
+        fechaInicio: act.fechaInicio,
       };
       const list = openByUser.get(row.userId) ?? [];
       if (!list.some((x) => x.id === item.id)) list.push(item);
@@ -413,7 +416,10 @@ export class TeamBoardService {
           fechaMaxima: act.fechaMaxima,
           bucket: act.projectId ? 'projects' : act.clientId ? 'services' : 'daily',
         };
-        activityStartedAt = act.fechaInicio ?? act.fechaAsignacion ?? null;
+        // fechaInicio es la hora programada: solo cuenta como «en actividad» si ya arrancó.
+        activityStartedAt = /proceso|validar/i.test(act.estatus || '')
+          ? act.fechaInicio ?? act.fechaAsignacion ?? null
+          : null;
         if (activityStartedAt) {
           activityElapsedMinutes = Math.max(
             0,

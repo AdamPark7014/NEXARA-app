@@ -26,6 +26,8 @@ export type TeamBoardOpenActivity = {
   indicaciones?: string | null;
   /** Emails del equipo activo: dice si un despacho ya se repartió. */
   teamEmails?: string[];
+  /** Día/hora programada (reprogramable por quien reparte). */
+  fechaInicio?: string | null;
 };
 
 export type TeamBoardUser = {
