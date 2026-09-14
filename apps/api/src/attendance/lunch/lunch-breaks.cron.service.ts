@@ -2,13 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { NotificationsService } from '../../notifications/notifications.service.js';
 import { WORKDAY_TIMEZONE, workDateColumn } from '../../common/time/workday.js';
 
 @Injectable()
 export class LunchBreaksCronService {
   private readonly logger = new Logger(LunchBreaksCronService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   // Notificación a las 14:50 (2:50 PM) hora de México - Lunes a Viernes.
   //
@@ -48,9 +52,7 @@ export class LunchBreaksCronService {
         }));
 
       if (notifications.length > 0) {
-        await this.prisma.notification.createMany({
-          data: notifications,
-        });
+        await this.pushAll(notifications);
 
         this.logger.log(`✓ Notificaciones enviadas a ${notifications.length} usuarios`);
       }
@@ -111,9 +113,7 @@ export class LunchBreaksCronService {
         }));
 
       if (notifications.length > 0) {
-        await this.prisma.notification.createMany({
-          data: notifications,
-        });
+        await this.pushAll(notifications);
 
         this.logger.log(`✓ Notificaciones de expiración enviadas a ${notifications.length} usuarios`);
       }
@@ -174,14 +174,45 @@ export class LunchBreaksCronService {
           createdAt: new Date(),
         }));
 
-        await this.prisma.notification.createMany({
-          data: notifications,
-        });
+        await this.pushAll(notifications);
 
         this.broadcastNotification(`lunch_break:${type}`, { user: userData, targetUsers: targetUserIds });
       }
     } catch (error) {
       this.logger.error(`Error notificando admin sobre comida de usuario:`, error);
+    }
+  }
+
+  /** Cada aviso por NotificationsService para que también salga push (createMany solo llenaba la campana). */
+  private async pushAll(
+    notifications: Array<{
+      userId: number;
+      type: NotificationType;
+      category: string;
+      title: string;
+      message: string;
+      entityType: string;
+      priority: string;
+    }>,
+  ) {
+    for (const n of notifications) {
+      await this.notificationsService
+        .createNotification({
+          userId: n.userId,
+          type: n.type,
+          category: n.category,
+          title: n.title,
+          message: n.message,
+          entityType: n.entityType,
+          priority: n.priority === 'high' ? 'high' : 'normal',
+          relatedUrl: '/erp/asistencias',
+          dedupeSeconds: 0,
+        })
+        .catch((error) =>
+          this.logger.warn(
+            `Aviso de comida userId=${n.userId}: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
     }
   }
 

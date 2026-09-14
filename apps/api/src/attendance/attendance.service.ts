@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, ForbiddenException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, ForbiddenException, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service';
+import { NotificationsService, type INotificationPayload } from '../notifications/notifications.service';
 import { PERMISSIONS } from '../common/permissions.js';
 import { detectDeviceFromUserAgent } from '../common/device-detector.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
@@ -14,7 +15,7 @@ import {
   workDayEnd,
   workDayStart,
 } from '../common/time/workday.js';
-import { Prisma } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 import { saveBase64Photo } from '../common/file-upload.util';
 
 @Injectable()
@@ -25,7 +26,18 @@ export class AttendanceService {
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
+
+  /** Aviso con push (NotificationsService); sin él (pruebas) queda solo en la campana como antes. */
+  private async avisar(payload: INotificationPayload) {
+    if (this.notifications) {
+      await this.notifications.createNotification(payload);
+      return;
+    }
+    const { channel: _c, collapseKey: _k, excludeActor: _e, dedupeSeconds: _d, ...data } = payload;
+    await this.prisma.notification.create({ data: { ...data, type: data.type as NotificationType } });
+  }
 
   private persistAttendancePhoto(photoBase64?: string | null): string | null {
     if (!photoBase64 || !photoBase64.trim()) return null;
@@ -489,17 +501,16 @@ export class AttendanceService {
     this.emitAttendanceUpdate(opts.targetUserId, 'entrada', now, attendance.user);
 
     try {
-      await this.prisma.notification.create({
-        data: {
-          userId: opts.targetUserId,
-          type: 'ATTENDANCE_CHECKIN',
-          category: 'attendance',
-          title: 'Entrada sugerida desde ACS',
-          message: `RH aplicó tu entrada desde puerta Integra${doorBit}.`,
-          relatedEntityId: attendance.id,
-          entityType: 'Attendance',
-          priority: 'normal',
-        },
+      await this.avisar({
+        userId: opts.targetUserId,
+        type: 'ATTENDANCE_CHECKIN',
+        category: 'attendance',
+        title: 'Entrada sugerida desde ACS',
+        message: `RH aplicó tu entrada desde puerta Integra${doorBit}.`,
+        relatedEntityId: attendance.id,
+        entityType: 'Attendance',
+        relatedUrl: '/erp/asistencias',
+        priority: 'normal',
       });
     } catch {
       /* notificación best-effort */
@@ -618,17 +629,16 @@ export class AttendanceService {
       this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
 
       try {
-        await this.prisma.notification.create({
-          data: {
-            userId,
-            type: 'ATTENDANCE_CHECKIN',
-            category: 'attendance',
-            title: 'Entrada registrada',
-            message: `Registraste tu entrada desde ${deviceInfo}.`,
-            relatedEntityId: attendance.id,
-            entityType: 'Attendance',
-            priority: 'normal',
-          },
+        await this.avisar({
+          userId,
+          type: 'ATTENDANCE_CHECKIN',
+          category: 'attendance',
+          title: 'Entrada registrada',
+          message: `Registraste tu entrada desde ${deviceInfo}.`,
+          relatedEntityId: attendance.id,
+          entityType: 'Attendance',
+          relatedUrl: '/erp/asistencias',
+          priority: 'normal',
         });
       } catch (selfNotificationError) {
         this.logger.warn(`No se pudo crear notificación propia de entrada para userId=${userId}`);
@@ -716,17 +726,16 @@ export class AttendanceService {
     this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
 
     try {
-      await this.prisma.notification.create({
-        data: {
-          userId,
-          type: 'ATTENDANCE_CHECKOUT',
-          category: 'attendance',
-          title: 'Salida registrada',
-          message: `Registraste tu salida desde ${deviceInfo}.`,
-          relatedEntityId: attendance.id,
-          entityType: 'Attendance',
-          priority: 'normal',
-        },
+      await this.avisar({
+        userId,
+        type: 'ATTENDANCE_CHECKOUT',
+        category: 'attendance',
+        title: 'Salida registrada',
+        message: `Registraste tu salida desde ${deviceInfo}.`,
+        relatedEntityId: attendance.id,
+        entityType: 'Attendance',
+        relatedUrl: '/erp/asistencias',
+        priority: 'normal',
       });
     } catch (selfNotificationError) {
       this.logger.warn(`No se pudo crear notificación propia de salida para userId=${userId}`);
@@ -796,16 +805,16 @@ export class AttendanceService {
         const message = `${user.nombre} (${user.email}) registró ${typeLabel} a las ${timestamp.toLocaleTimeString('es-MX')}`;
 
         try {
-          await this.prisma.notification.create({
-            data: {
-              userId: admin.id,
-              type: type === 'entrada' ? 'ATTENDANCE_CHECKIN' : 'ATTENDANCE_CHECKOUT',
-              category: 'attendance',
-              title,
-              message,
-              relatedEntityId: userId,
-              entityType: 'Attendance',
-            },
+          await this.avisar({
+            userId: admin.id,
+            type: type === 'entrada' ? 'ATTENDANCE_CHECKIN' : 'ATTENDANCE_CHECKOUT',
+            category: 'attendance',
+            title,
+            message,
+            triggerUserId: userId,
+            relatedEntityId: userId,
+            entityType: 'Attendance',
+            relatedUrl: '/erp/asistencias',
           });
 
           // Emitir notificación en tiempo real al admin
