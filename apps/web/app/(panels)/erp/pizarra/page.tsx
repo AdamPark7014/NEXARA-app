@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
+import MisActividadesView from "@/components/pizarra/MisActividadesView";
+import { isCeoEmail } from "@/lib/activity-kinds";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import {
   STATUS_COLORS,
@@ -14,6 +16,10 @@ import {
   type TeamBoardResponse,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
+
+/** Actividades tiene dos vistas: lo mío y mi equipo (se recuerda la última). */
+type Vista = "mias" | "equipo";
+const VISTA_KEY = "nx-actividades-vista";
 
 function initials(name: string): string {
   return name
@@ -210,6 +216,18 @@ export default function PizarraPage() {
   const [data, setData] = useState<TeamBoardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [vista, setVista] = useState<Vista>("mias");
+
+  // ?vista=mias|equipo manda (enlaces viejos de Mis actividades); si no, la última elegida.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("vista");
+      const guardada = window.localStorage.getItem(VISTA_KEY);
+      setVista(q === "mias" || q === "equipo" ? q : guardada === "equipo" ? "equipo" : "mias");
+    } catch {
+      /* sin storage: queda «mias» */
+    }
+  }, []);
 
   const load = useCallback(async () => {
     if (!token) {
@@ -255,15 +273,49 @@ export default function PizarraPage() {
     return acc;
   }, [users]);
 
+  const isCeo = isCeoEmail(user?.email);
+  const otros = users.filter((u) => u.id !== user?.id).length;
+  // Dos vistas solo para quien tiene gente a su cargo (según su tablero). Los demás, directo su lista.
+  const tieneEquipo = otros > 0;
+  const cargandoEquipo = !isCeo && data == null && !error;
+  const sinEquipo = !isCeo && !tieneEquipo && (data != null || Boolean(error));
+  // Christian solo asigna: ve el tablero. Encargados con subordinados eligen lo suyo o su equipo.
+  const conPestanas = !isCeo && tieneEquipo;
+  const verMias = conPestanas && vista === "mias";
+
+  const cambiarVista = (v: Vista) => {
+    setVista(v);
+    try {
+      window.localStorage.setItem(VISTA_KEY, v);
+    } catch {
+      /* sin storage */
+    }
+  };
+
+  if (cargandoEquipo) {
+    return (
+      <p style={{ color: "var(--text-secondary)", fontSize: 14, maxWidth: 1100, margin: "0 auto" }}>
+        Cargando actividades…
+      </p>
+    );
+  }
+
+  if (sinEquipo) {
+    return <MisActividadesView />;
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 1100, margin: "0 auto" }}>
       <header style={{ display: "flex", gap: 12, alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>Actividades</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            Tú y tu equipo — toca a alguien para ver su día o asignarle trabajo
+            {verMias
+              ? "Lo tuyo, en orden. En «Mi equipo» ves a tu gente y le asignas trabajo."
+              : "Tú y tu equipo — toca a alguien para ver su día o asignarle trabajo"}
           </p>
         </div>
+        {verMias ? null : (
         <button
           type="button"
           onClick={() => void load()}
@@ -281,8 +333,62 @@ export default function PizarraPage() {
         >
           Actualizar
         </button>
+        )}
       </header>
 
+      {conPestanas ? (
+        <div
+          role="tablist"
+          aria-label="Vista de actividades"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            padding: 4,
+            alignSelf: "flex-start",
+            borderRadius: 14,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+          }}
+        >
+          {(
+            [
+              ["mias", "✅ Mis actividades"],
+              ["equipo", "👥 Mi equipo"],
+            ] as const
+          ).map(([id, label]) => {
+            const on = vista === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => cambiarVista(id)}
+                style={{
+                  minHeight: 44,
+                  padding: "8px 16px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: on ? "var(--primary)" : "transparent",
+                  color: on ? "#fff" : "inherit",
+                  fontWeight: on ? 750 : 650,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {verMias ? (
+        <MisActividadesView />
+      ) : (
+      <>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {(Object.keys(STATUS_LABELS) as BoardUserStatus[]).map((key) => (
           <span
@@ -323,6 +429,8 @@ export default function PizarraPage() {
             <PersonCard key={u.id} user={u} isSelf={u.id === user?.id} />
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

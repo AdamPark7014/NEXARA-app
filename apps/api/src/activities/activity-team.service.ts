@@ -43,6 +43,61 @@ export class ActivityTeamService {
     return activity!;
   }
 
+  /**
+   * Reprogramar día/hora: actualiza la agenda (inicio = entrega = máximo, como el formulario),
+   * deja registro de → a con quién y por qué, y avisa al responsable, al equipo y a Christian.
+   * El permiso lo valida quien llama (p. ej. MyActivitiesService: solo quien reparte).
+   */
+  async reschedule(
+    activityId: number,
+    nueva: Date,
+    motivo: string | null,
+    companyId: number | null | undefined,
+    actorId: number,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const activity = await this.loadActivity(activityId, tenantId);
+    const actual = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { fechaInicio: true },
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.activity.update({
+        where: { id: activityId },
+        data: { fechaInicio: nueva, fechaEntregaEsperada: nueva, fechaMaxima: nueva },
+      }),
+      this.prisma.activityScheduleChange.create({
+        data: {
+          activityId,
+          companyId: tenantId,
+          cambiadoPorId: actorId,
+          fechaAnterior: actual?.fechaInicio ?? null,
+          fechaNueva: nueva,
+          motivo,
+        },
+      }),
+    ]);
+
+    const team = await this.prisma.activityAssignee.findMany({
+      where: { activityId, retiradoAt: null },
+      select: { userId: true },
+    });
+    void this.notificationHierarchy.notifyActivityRescheduled({
+      activityId,
+      label: activity.titulo || activity.anNumber || `Actividad ${activityId}`,
+      actorId,
+      de: actual?.fechaInicio ?? null,
+      a: nueva,
+      motivo,
+      recipientIds: [activity.responsableId, ...team.map((t) => t.userId)].filter(
+        (id): id is number => Boolean(id),
+      ),
+    });
+
+    return { ok: true, fechaNueva: nueva.toISOString() };
+  }
+
   /** Equipo actual (y quién ya salió, si se pide). */
   async listTeam(activityId: number, companyId?: number | null, includeRemoved = false) {
     const tenantId = requireCompanyId(companyId);
@@ -349,7 +404,7 @@ export class ActivityTeamService {
     });
     if (!activity) throw new NotFoundException('Actividad no encontrada');
 
-    const [reassignments, incidents, recommendations, movements, evidence, team] = await Promise.all([
+    const [reassignments, incidents, recommendations, movements, evidence, team, cambiosAgenda] = await Promise.all([
       this.prisma.activityReassignment.findMany({
         where: { activityId, ...companyWhere(tenantId) },
         include: {
@@ -415,7 +470,42 @@ export class ActivityTeamService {
         },
         orderBy: { asignadoAt: 'asc' },
       }),
+      // Reprogramaciones de día/hora (de → a, quién, por qué).
+      this.prisma.activityScheduleChange.findMany({
+        where: { activityId, ...companyWhere(tenantId) },
+        select: {
+          id: true,
+          createdAt: true,
+          fechaAnterior: true,
+          fechaNueva: true,
+          motivo: true,
+          cambiadoPor: { select: { nombre: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
     ]);
+
+    const fmtAgenda = (d: Date | null | undefined) =>
+      d
+        ? new Date(d).toLocaleString('es-MX', {
+            timeZone: 'America/Mexico_City',
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : null;
+    /** Día/hora que tenía programada la actividad en el instante `t`. */
+    const programadaEn = (t: Date): Date | null => {
+      let valor: Date | null = cambiosAgenda.length
+        ? cambiosAgenda[0].fechaAnterior
+        : activity.fechaInicio ?? null;
+      for (const c of cambiosAgenda) {
+        if (c.createdAt.getTime() <= t.getTime()) valor = c.fechaNueva;
+      }
+      return valor;
+    };
 
     type TimelineEvent = {
       id: string;
@@ -487,15 +577,19 @@ export class ActivityTeamService {
       const por = m.asignadoPor?.nombre;
       const reparte = despacho && m.rol === 'LEAD';
       const papel = reparte ? 'La reparte' : m.rol === 'LEAD' ? 'Responsable' : m.rol === 'TECNICO' ? 'La ejecuta' : 'Apoyo';
+      const prog = programadaEn(new Date(m.asignadoAt));
       events.push({
         id: `team-${m.id}`,
         at: new Date(m.asignadoAt).toISOString(),
-        kind: 'despacho',
+        // Tipo 1 del registro: cuándo se envió (la hora del evento) y para cuándo iba.
+        kind: 'enviada',
         title:
           por && por !== quien
             ? `${por} ${reparte ? 'la pasó a' : 'la asignó a'} ${quien}`
             : `${quien} quedó a cargo`,
-        subtitle: [papel, m.indicaciones].filter(Boolean).join(' · '),
+        subtitle: [papel, prog ? `Programada: ${fmtAgenda(prog)}` : null, m.indicaciones]
+          .filter(Boolean)
+          .join(' · '),
         icon: reparte ? '📨' : '👷',
       });
       if (m.retiradoAt) {
@@ -507,6 +601,23 @@ export class ActivityTeamService {
           icon: '↩️',
         });
       }
+    }
+
+    // Tipo 2 del registro: reprogramaciones (cuándo se movió, quién, de → a).
+    for (const c of cambiosAgenda) {
+      events.push({
+        id: `agenda-${c.id}`,
+        at: new Date(c.createdAt).toISOString(),
+        kind: 'reprogramada',
+        title: `${c.cambiadoPor?.nombre ?? 'Alguien'} la reprogramó`,
+        subtitle: [
+          `De ${fmtAgenda(c.fechaAnterior) ?? 'sin fecha'} a ${fmtAgenda(c.fechaNueva)}`,
+          c.motivo,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        icon: '🕑',
+      });
     }
 
     for (const inc of incidents) {
@@ -590,12 +701,23 @@ export class ActivityTeamService {
       });
     }
 
+    // Tipo 3 del registro: cuándo se cumplió, contra lo programado.
     if (activity.fechaFinalizacion) {
+      const fin = new Date(activity.fechaFinalizacion);
+      const prog = programadaEn(fin);
+      const retrasoMin = prog ? Math.round((fin.getTime() - new Date(prog).getTime()) / 60_000) : null;
+      const puntualidad =
+        retrasoMin == null
+          ? null
+          : retrasoMin > 15
+            ? `${retrasoMin >= 60 ? `${Math.round(retrasoMin / 60)} h` : `${retrasoMin} min`} tarde`
+            : 'a tiempo';
       events.push({
         id: 'completed',
-        at: new Date(activity.fechaFinalizacion).toISOString(),
-        kind: 'estado',
-        title: 'Actividad finalizada',
+        at: fin.toISOString(),
+        kind: 'cumplida',
+        title: 'Cumplida',
+        subtitle: prog ? `Programada: ${fmtAgenda(prog)} · ${puntualidad}` : undefined,
         icon: '✅',
       });
     }

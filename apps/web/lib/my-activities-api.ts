@@ -40,6 +40,14 @@ export type MyActivityItem = {
     por: string | null;
     evidenceStatus: string | null;
   }>;
+  /** Última reprogramación de día/hora (quién, cuándo, de → a). */
+  ultimaReprogramacion: {
+    at: string;
+    por: string | null;
+    de: string | null;
+    a: string;
+    motivo: string | null;
+  } | null;
 };
 
 export type MyActivitiesResponse = {
@@ -76,6 +84,18 @@ export function dispatchMyActivity(
 ): Promise<{ ok: boolean; asignados: number }> {
   return erpFetch<{ ok: boolean; asignados: number }>(`me/activities/${activityId}/despacho`, token, {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Quien reparte un despacho cambia su día y hora (PATCH /me/activities/:id/reprogramar). */
+export function reprogramarDespacho(
+  token: string,
+  activityId: number,
+  input: { fecha: string; motivo?: string },
+): Promise<{ ok: boolean; fechaNueva: string }> {
+  return erpFetch<{ ok: boolean; fechaNueva: string }>(`me/activities/${activityId}/reprogramar`, token, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }

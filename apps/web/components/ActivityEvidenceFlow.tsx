@@ -564,14 +564,36 @@ const ActivityEvidenceFlow = () => {
     }
   };
 
-  // Paso 1: Foto de entrada
+  // Foto recién tomada esperando que el usuario la vea y decida (como en Asistencias).
+  const [pendingPhoto, setPendingPhoto] = useState<{
+    kind: 'entry' | 'evidence' | 'exit';
+    dataUrl: string;
+  } | null>(null);
+
+  const photoErrorText = (err: unknown) =>
+    err instanceof Error ? err.message : typeof err === 'string' ? err : 'Error al capturar foto';
+
+  // Paso 1: Foto de entrada — se toma y se muestra; se envía al confirmar.
   const handleEntryPhoto = async () => {
     if (!flowData) return;
     setLoading(true);
     setError(null);
-
     try {
       const photoUrl = await capturePhoto();
+      setPendingPhoto({ kind: 'entry', dataUrl: photoUrl });
+    } catch (err) {
+      setError(photoErrorText(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendEntryPhoto = async (photoUrl: string): Promise<boolean> => {
+    if (!flowData) return false;
+    setLoading(true);
+    setError(null);
+
+    try {
       const { latitude, longitude } = await getGeolocation();
 
       const endpoint = isCorrection
@@ -604,35 +626,65 @@ const ActivityEvidenceFlow = () => {
             : `✅ Foto de entrada guardada. Siguiente: Tomar evidencias (${photoRequired} fotos)`,
         );
         setCameraActive(false);
-      } else {
-        const errorData = await res.json();
-        setError(errorData.message || 'Error al guardar foto');
+        return true;
       }
+      const errorData = await res.json().catch(() => ({}));
+      setError(errorData.message || 'Error al guardar foto');
+      return false;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al capturar foto');
+      setError(photoErrorText(err));
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
-  // Paso 2: Agregar foto de evidencia
+  // Paso 2: Tomar foto de evidencia — se muestra y se agrega al confirmar.
   const handleAddEvidencePhoto = async () => {
     if (!flowData) return;
     setLoading(true);
     setError(null);
-
     try {
       const photoUrl = await capturePhoto();
-      const updatedPhotos = [...flowData.evidencePhotos, photoUrl];
-      setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
-
-      if (updatedPhotos.length === 1) {
-        setSuccessMsg(`📷 Foto agregada (1/${photoRequired})`);
-      } else {
-        setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
-      }
+      setPendingPhoto({ kind: 'evidence', dataUrl: photoUrl });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al capturar foto');
+      setError(photoErrorText(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addEvidencePhoto = (photoUrl: string) => {
+    if (!flowData) return;
+    const updatedPhotos = [...flowData.evidencePhotos, photoUrl];
+    setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+    setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
+  };
+
+  /** «Enviar/Usar esta foto» en la vista previa. */
+  const confirmPendingPhoto = async () => {
+    if (!pendingPhoto) return;
+    const { kind, dataUrl } = pendingPhoto;
+    if (kind === 'evidence') {
+      addEvidencePhoto(dataUrl);
+      setPendingPhoto(null);
+      return;
+    }
+    const ok = kind === 'entry' ? await sendEntryPhoto(dataUrl) : await sendExitPhoto(dataUrl);
+    if (ok) setPendingPhoto(null);
+  };
+
+  /** «Tomar otra»: repite la captura del mismo paso. */
+  const retakePendingPhoto = async () => {
+    if (!pendingPhoto) return;
+    const kind = pendingPhoto.kind;
+    setLoading(true);
+    setError(null);
+    try {
+      const dataUrl = await capturePhoto();
+      setPendingPhoto({ kind, dataUrl });
+    } catch (err) {
+      setError(photoErrorText(err));
     } finally {
       setLoading(false);
     }
@@ -896,7 +948,23 @@ const ActivityEvidenceFlow = () => {
         }
       }
 
+      // Se toma y se muestra; se envía cuando el usuario confirma en la vista previa.
       const photoUrl = await capturePhoto();
+      setPendingPhoto({ kind: 'exit', dataUrl: photoUrl });
+    } catch (err) {
+      setError(photoErrorText(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Paso 5 (confirmado): enviar la foto de salida que el usuario ya vio.
+  const sendExitPhoto = async (photoUrl: string): Promise<boolean> => {
+    if (!flowData) return false;
+    setLoading(true);
+    setError(null);
+
+    try {
       const { latitude, longitude } = await getGeolocation();
 
       const endpoint = isCorrection
@@ -933,12 +1001,14 @@ const ActivityEvidenceFlow = () => {
           setSuccessMsg(correctionSuccessMessage(saved, '✅ Paso corregido.'));
         }
         setCameraActive(false);
-      } else {
-        const errorData = await res.json();
-        setError(errorData.message || 'Error al guardar foto');
+        return true;
       }
+      const errorData = await res.json().catch(() => ({}));
+      setError(errorData.message || 'Error al guardar foto');
+      return false;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al capturar foto');
+      setError(photoErrorText(err));
+      return false;
     } finally {
       setLoading(false);
     }

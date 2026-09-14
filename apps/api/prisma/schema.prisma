@@ -608,6 +608,7 @@ model User {
   companyMemberships        UserCompany[]
   participacionesActividad  ActivityAssignee[]         @relation("ActivityAssignedUser")
   asignacionesDespachadas   ActivityAssignee[]         @relation("ActivityAssignedBy")
+  reprogramacionesHechas    ActivityScheduleChange[]   @relation("ActivityScheduleChangedBy")
   reasignacionesDesde       ActivityReassignment[]     @relation("ActivityReassignFrom")
   reasignacionesHacia       ActivityReassignment[]     @relation("ActivityReassignTo")
   reasignacionesHechas      ActivityReassignment[]     @relation("ActivityReassignBy")
@@ -882,6 +883,7 @@ model Activity {
   inventorySnapshot       InventorySnapshot?
   /// Equipo asignado. `responsableId` sigue siendo el líder.
   assignees               ActivityAssignee[]
+  scheduleChanges         ActivityScheduleChange[]
   /// Historial de reasignaciones (quién la tenía, quién la movió y por qué).
   reassignments           ActivityReassignment[]
   /// Material consumido en el servicio.
@@ -2346,6 +2348,8 @@ enum NotificationType {
   ACTIVITY_COMPLETED
   // Ingeniero inició OT en campo
   ACTIVITY_STARTED
+  /// Quien reparte un despacho cambió día/hora.
+  ACTIVITY_RESCHEDULED
 
   // Compras / almacén / calidad (ERP)
   PURCHASE_REQUISITION_CREATED
@@ -5072,6 +5076,7 @@ model CompanyProfile {
   maintenanceSchedules      MaintenanceSchedule[]
   payments                  Payment[]
   ActivityAssignee          ActivityAssignee[]
+  ActivityScheduleChange    ActivityScheduleChange[]
   ActivityReassignment      ActivityReassignment[]
   supplierPriceBreaks       SupplierPriceBreak[]
   activityIncidents         ActivityIncident[]
@@ -5462,6 +5467,26 @@ model ActivityAssignee {
   @@index([userId, retiradoAt])
   @@index([companyId])
   @@map("activity_assignees")
+}
+
+/// Reprogramaciones de día/hora de una actividad (registro de despacho: «Antonio la movió de X a Y»).
+model ActivityScheduleChange {
+  id            Int       @id @default(autoincrement())
+  activityId    Int
+  companyId     Int
+  cambiadoPorId Int?
+  fechaAnterior DateTime?
+  fechaNueva    DateTime
+  motivo        String?   @db.VarChar(500)
+  createdAt     DateTime  @default(now())
+
+  activity    Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  cambiadoPor User?          @relation("ActivityScheduleChangedBy", fields: [cambiadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([activityId])
+  @@index([companyId])
+  @@map("activity_schedule_changes")
 }
 
 /// Reasignación de una actividad inconclusa.

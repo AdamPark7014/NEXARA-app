@@ -21,7 +21,7 @@ Hacer **amigables, intuitivos y fáciles** (petición de Adam) los módulos Core
 - [ ] verificación manual: los 8 checks de «Tests / verificación» en 375×812 y en escritorio, claro y oscuro.
 
 ## Contexto mínimo a cargar (≤7 archivos)
-- `apps/web/app/(panels)/erp/mis-actividades/page.tsx` — **referencia de estilo** (Chip, Stat, btnPrimary/btnSecondary, estados vacío/carga, `estatusUi`, `priorityUi`, `kindLabel`, `formatWhen`, `formatMinutes`, banner con `?nueva=`).
+- `apps/web/components/pizarra/MisActividadesView.tsx` — **referencia de estilo** (Chip, Stat, btnPrimary/btnSecondary, estados vacío/carga, `estatusUi`, `priorityUi`, `kindLabel`, `formatWhen`, `formatMinutes`, banner con `?nueva=`).
 - `apps/web/lib/activity-kinds.ts` — `ACTIVITY_KINDS`, `ASSIGNMENT_CHARGES`, `isAreaManagerEmail`, `isCeoEmail`. **No cambiar reglas.**
 - `apps/web/components/ui/Button.tsx` — tamaños sm 30 / md 36 / lg 44px.
 - `apps/web/app/(panels)/erp/pizarra/[userId]/asignar/page.tsx`
@@ -33,7 +33,7 @@ Hacer **amigables, intuitivos y fáciles** (petición de Adam) los módulos Core
 | Archivo | Acción | Notas |
 |---------|--------|-------|
 | `apps/web/lib/activity-labels.ts` | crear | Mover desde mis-actividades: `PRIORITY_UI`/`priorityUi`, `ESTATUS_UI`/`estatusUi`, `kindLabel`, `formatWhen`, `formatMinutes`, `shortName`. Exportar también `initials()` (hoy copiada 4 veces). |
-| `apps/web/app/(panels)/erp/mis-actividades/page.tsx` | editar | Solo importar los helpers de `activity-labels.ts` y borrar los locales. Cero cambios de lógica. |
+| `apps/web/components/pizarra/MisActividadesView.tsx` | editar | Solo importar los helpers de `activity-labels.ts` y borrar los locales. Cero cambios de lógica. |
 | `apps/web/app/(panels)/erp/pizarra/page.tsx` | editar | Paso 3 |
 | `apps/web/app/(panels)/erp/pizarra/[userId]/page.tsx` | editar | Paso 4 |
 | `apps/web/components/pizarra/DespachoPendingPanel.tsx` | editar | Paso 5 |
