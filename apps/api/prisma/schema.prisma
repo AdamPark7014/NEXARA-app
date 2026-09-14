@@ -325,17 +325,17 @@ model ProductCT {
 
 /// Corridas de sync de catálogo mayorista (CT FTP, futuros conectores).
 model SupplierCatalogSyncRun {
-  id             Int       @id @default(autoincrement())
-  supplierCode   String    @db.VarChar(40)
-  source         String    @db.VarChar(20)
-  status         String    @db.VarChar(20)
-  startedAt      DateTime  @default(now())
+  id             Int             @id @default(autoincrement())
+  supplierCode   String          @db.VarChar(40)
+  source         String          @db.VarChar(20)
+  status         String          @db.VarChar(20)
+  startedAt      DateTime        @default(now())
   finishedAt     DateTime?
-  rowsRead       Int       @default(0)
-  rowsUpserted   Int       @default(0)
+  rowsRead       Int             @default(0)
+  rowsUpserted   Int             @default(0)
   error          String?
-  fileModifiedAt String?   @db.VarChar(80)
-  checksum       String?   @db.VarChar(64)
+  fileModifiedAt String?         @db.VarChar(80)
+  checksum       String?         @db.VarChar(64)
   companyId      Int?
   company        CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
@@ -609,6 +609,8 @@ model User {
   participacionesActividad  ActivityAssignee[]         @relation("ActivityAssignedUser")
   asignacionesDespachadas   ActivityAssignee[]         @relation("ActivityAssignedBy")
   reprogramacionesHechas    ActivityScheduleChange[]   @relation("ActivityScheduleChangedBy")
+  evidenceReviewsHechas     ActivityEvidenceReview[]   @relation("EvidenceReviewAuthor")
+  evidenceReviewsRecibidas  ActivityEvidenceReview[]   @relation("EvidenceReviewSubject")
   reasignacionesDesde       ActivityReassignment[]     @relation("ActivityReassignFrom")
   reasignacionesHacia       ActivityReassignment[]     @relation("ActivityReassignTo")
   reasignacionesHechas      ActivityReassignment[]     @relation("ActivityReassignBy")
@@ -884,6 +886,7 @@ model Activity {
   /// Equipo asignado. `responsableId` sigue siendo el líder.
   assignees               ActivityAssignee[]
   scheduleChanges         ActivityScheduleChange[]
+  evidenceReviews         ActivityEvidenceReview[]
   /// Historial de reasignaciones (quién la tenía, quién la movió y por qué).
   reassignments           ActivityReassignment[]
   /// Material consumido en el servicio.
@@ -1224,6 +1227,8 @@ model ActivityEvidence {
   reviewedAt            DateTime?
   reviewedById          Int?
   correctionSubmittedAt DateTime?
+  /// Eficiencia de quien la realizó (1–5) en la última revisión.
+  eficienciaScore       Int?
 
   activity   Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
   user       User           @relation("EvidenceOwner", fields: [userId], references: [id], onDelete: Cascade)
@@ -1759,50 +1764,50 @@ model Cotizacion {
 }
 
 model CotizacionItem {
-  id                Int        @id @default(autoincrement())
-  cotizacionId      Int
-  productId         Int?
-  category          String?    @db.VarChar(120)
-  name              String     @db.VarChar(200)
-  description       String?
-  scope             String?
-  brand             String?    @db.VarChar(120)
-  model             String?    @db.VarChar(120)
-  sku               String?    @db.VarChar(120)
-  partNumber        String?    @db.VarChar(120)
-  batchReference    String?    @db.VarChar(120)
-  unit              String?    @db.VarChar(40)
-  qty               Int        @default(1)
-  unitPrice         Decimal    @default(0) @db.Decimal(12, 2)
+  id                    Int        @id @default(autoincrement())
+  cotizacionId          Int
+  productId             Int?
+  category              String?    @db.VarChar(120)
+  name                  String     @db.VarChar(200)
+  description           String?
+  scope                 String?
+  brand                 String?    @db.VarChar(120)
+  model                 String?    @db.VarChar(120)
+  sku                   String?    @db.VarChar(120)
+  partNumber            String?    @db.VarChar(120)
+  batchReference        String?    @db.VarChar(120)
+  unit                  String?    @db.VarChar(40)
+  qty                   Int        @default(1)
+  unitPrice             Decimal    @default(0) @db.Decimal(12, 2)
   /// Costo proveedor (MXN) al momento de armar la línea — vista interna.
-  unitCost          Decimal?   @db.Decimal(12, 2)
-  supplierId        Int?
-  supplierSku       String?    @db.VarChar(120)
-  productCtId       Int?
+  unitCost              Decimal?   @db.Decimal(12, 2)
+  supplierId            Int?
+  supplierSku           String?    @db.VarChar(120)
+  productCtId           Int?
   /// Código mayorista homologado (CT, SYSCOM, …).
-  supplierCode      String?    @db.VarChar(20)
+  supplierCode          String?    @db.VarChar(20)
   /// Almacén CT API de surtido (14A Puebla, 35A MTY, …).
-  supplierWarehouseCode String?  @db.VarChar(10)
-  marginPercent     Decimal?   @db.Decimal(7, 2)
-  stockSnapshot     Int?
-  leadTimeDays      Int?
-  scoreReason       String?    @db.VarChar(40)
-  optimizationMode  String?    @db.VarChar(20)
-  discount          Int        @default(0)
-  tax               Int        @default(0)
-  ieps              Int        @default(0)
-  retention         Int        @default(0)
-  laborHours        Decimal    @default(0) @db.Decimal(10, 2)
-  laborRate         Decimal    @default(0) @db.Decimal(12, 2)
-  warrantyMonths    Int        @default(0)
-  deliveryTime      String?    @db.VarChar(120)
-  countryOrigin     String?    @db.VarChar(80)
-  notes             String?
-  lineTotal         Decimal    @default(0) @db.Decimal(12, 2)
-  createdAt         DateTime   @default(now())
-  cotizacion        Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-  product           Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
-  supplier          Supplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplierWarehouseCode String?    @db.VarChar(10)
+  marginPercent         Decimal?   @db.Decimal(7, 2)
+  stockSnapshot         Int?
+  leadTimeDays          Int?
+  scoreReason           String?    @db.VarChar(40)
+  optimizationMode      String?    @db.VarChar(20)
+  discount              Int        @default(0)
+  tax                   Int        @default(0)
+  ieps                  Int        @default(0)
+  retention             Int        @default(0)
+  laborHours            Decimal    @default(0) @db.Decimal(10, 2)
+  laborRate             Decimal    @default(0) @db.Decimal(12, 2)
+  warrantyMonths        Int        @default(0)
+  deliveryTime          String?    @db.VarChar(120)
+  countryOrigin         String?    @db.VarChar(80)
+  notes                 String?
+  lineTotal             Decimal    @default(0) @db.Decimal(12, 2)
+  createdAt             DateTime   @default(now())
+  cotizacion            Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  product               Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  supplier              Supplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
 
   @@index([productCtId])
   @@index([supplierId])
@@ -1827,21 +1832,21 @@ model CotizacionVersion {
 
 /// Pedido a mayorista (CT API, etc.) generado desde cotización aprobada.
 model SupplierPurchaseOrder {
-  id              Int       @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
   companyId       Int
   cotizacionId    Int?
-  supplierCode    String    @db.VarChar(40)
+  supplierCode    String         @db.VarChar(40)
   idPedido        Int
-  almacen         String    @db.VarChar(10)
-  status          String    @default("DRAFT") @db.VarChar(40)
-  externalFolio   String?   @db.VarChar(40)
+  almacen         String         @db.VarChar(10)
+  status          String         @default("DRAFT") @db.VarChar(40)
+  externalFolio   String?        @db.VarChar(40)
   confirmedAt     DateTime?
   requestPayload  Json
   responsePayload Json?
   errorMessage    String?
   createdById     Int?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   company         CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
   cotizacion      Cotizacion?    @relation(fields: [cotizacionId], references: [id], onDelete: SetNull)
   createdBy       User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
@@ -1852,24 +1857,24 @@ model SupplierPurchaseOrder {
 }
 
 model LaborRateCard {
-  id              Int            @id @default(autoincrement())
-  companyId       Int
-  code            String         @db.VarChar(40)
-  name            String         @db.VarChar(180)
-  category        String         @db.VarChar(40)
-  unit            String         @default("PIECE") @db.VarChar(20)
-  cost            Decimal        @default(0) @db.Decimal(12, 2)
-  price           Decimal        @default(0) @db.Decimal(12, 2)
-  marginPercent   Decimal?       @db.Decimal(7, 2)
-  defaultHours    Decimal?       @db.Decimal(10, 2)
-  technicians     Int            @default(1)
-  matchCategory   String?        @db.VarChar(120)
-  matchSubcategory String?       @db.VarChar(120)
-  active          Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  company         CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  rules           LaborRule[]
+  id               Int            @id @default(autoincrement())
+  companyId        Int
+  code             String         @db.VarChar(40)
+  name             String         @db.VarChar(180)
+  category         String         @db.VarChar(40)
+  unit             String         @default("PIECE") @db.VarChar(20)
+  cost             Decimal        @default(0) @db.Decimal(12, 2)
+  price            Decimal        @default(0) @db.Decimal(12, 2)
+  marginPercent    Decimal?       @db.Decimal(7, 2)
+  defaultHours     Decimal?       @db.Decimal(10, 2)
+  technicians      Int            @default(1)
+  matchCategory    String?        @db.VarChar(120)
+  matchSubcategory String?        @db.VarChar(120)
+  active           Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  company          CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  rules            LaborRule[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1877,16 +1882,16 @@ model LaborRateCard {
 }
 
 model LaborRule {
-  id           Int           @id @default(autoincrement())
-  companyId    Int
-  rateCardId   Int
-  formula      String        @default("PER_QTY") @db.VarChar(40)
-  params       Json?
-  active       Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  rateCard     LaborRateCard @relation(fields: [rateCardId], references: [id], onDelete: Cascade)
+  id         Int            @id @default(autoincrement())
+  companyId  Int
+  rateCardId Int
+  formula    String         @default("PER_QTY") @db.VarChar(40)
+  params     Json?
+  active     Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  rateCard   LaborRateCard  @relation(fields: [rateCardId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([rateCardId])
@@ -1912,18 +1917,18 @@ model CommercialRule {
 }
 
 model LogisticsZoneRate {
-  id            Int            @id @default(autoincrement())
-  companyId     Int
-  zoneCode      String         @db.VarChar(40)
-  zoneName      String         @db.VarChar(120)
-  baseCost      Decimal        @default(0) @db.Decimal(12, 2)
-  basePrice     Decimal        @default(0) @db.Decimal(12, 2)
-  perKmCost     Decimal?       @db.Decimal(12, 2)
-  perKgCost     Decimal?       @db.Decimal(12, 2)
-  active        Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id        Int            @id @default(autoincrement())
+  companyId Int
+  zoneCode  String         @db.VarChar(40)
+  zoneName  String         @db.VarChar(120)
+  baseCost  Decimal        @default(0) @db.Decimal(12, 2)
+  basePrice Decimal        @default(0) @db.Decimal(12, 2)
+  perKmCost Decimal?       @db.Decimal(12, 2)
+  perKgCost Decimal?       @db.Decimal(12, 2)
+  active    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, zoneCode])
   @@index([companyId])
@@ -4961,151 +4966,152 @@ model CompanyProfile {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  memberships               UserCompany[]
-  invoices                  Invoice[]
-  journalEntries            JournalEntry[]
-  expenses                  Expense[]
-  viaticos                  Viatico[]
-  employeePayments          EmployeePayment[]
-  purchaseOrders            PurchaseOrder[]
-  apiKeys                   CompanyApiKey[]
-  salesOpportunities        SalesOpportunity[]
-  warehouses                Warehouse[]
-  ticketRequests            ClientTicketRequest[]
-  auditLogs                 AuditLog[]
-  usageEvents               CompanyUsageEvent[]
-  products                  Product[]
-  activities                Activity[]
-  serviceClients            ServiceClient[]
-  operationalProjects       OperationalProject[]
-  salesClients              SalesClient[]
-  salesClientSectors        SalesClientSector[]
-  salesLeads                SalesLead[]
-  cotizaciones              Cotizacion[]
-  supplierPurchaseOrders    SupplierPurchaseOrder[]
-  outboundWebhooks          OutboundWebhook[]
-  chatChannels              ChatChannel[]
-  maintenanceContracts      MaintenanceContract[]
-  maintenanceContractVisits MaintenanceContractVisit[]
-  accounts                  Account[]
-  fiscalPeriods             FiscalPeriod[]
-  bankAccounts              BankAccount[]
-  idempotencyKeys           IdempotencyKey[]
-  costCenters               CostCenter[]
-  vehicleAssets             VehicleAsset[]
-  vehicleControls           VehicleControl[]
-  inventorySnapshots        InventorySnapshot[]
-  serviceClientBranches     ServiceClientBranch[]
-  bankTransactions          BankTransaction[]
-  bankReconciliations       BankReconciliation[]
-  chatMessages              ChatMessage[]
-  serviceSheets             ServiceSheet[]
-  activityEvidences         ActivityEvidence[]
-  locationTrackings         LocationTracking[]
-  salesProjectOrders        SalesProjectOrder[]
-  warehouseLocations        WarehouseLocation[]
-  stockLevels               StockLevel[]
-  brands                    Brand[]
-  suppliers                 Supplier[]
-  supplierCatalogSyncRuns   SupplierCatalogSyncRun[]
-  laborRateCards            LaborRateCard[]
-  laborRules                LaborRule[]
-  commercialRules           CommercialRule[]
-  logisticsZoneRates        LogisticsZoneRate[]
-  evidences                 Evidence[]
-  cycleCounts               CycleCount[]
-  stockReservations         StockReservation[]
-  purchaseRfqs              PurchaseRFQ[]
-  assets                    Asset[]
-  maintenanceOrders         MaintenanceOrder[]
-  kpiSnapshots              KpiSnapshot[]
-  notifications             Notification[]
-  leaveRequests             LeaveRequest[]
-  attendances               Attendance[]
-  attendanceDays            AttendanceDay[]
-  lunchBreaks               LunchBreak[]
-  newsPosts                 NewsPost[]
-  pageContents              PageContent[]
-  heroSlides                HeroSlide[]
-  heroVideos                HeroVideo[]
-  performanceReviews        PerformanceReview[]
-  caseStudies               CaseStudy[]
-  featureFlags              FeatureFlag[]
-  socialPosts               SocialPost[]
-  internalComunicados       InternalComunicado[]
-  contactMessages           ContactMessage[]
-  newsletterSubscribers     NewsletterSubscriber[]
-  departments               Department[]
-  clients                   Client[]
-  projects                  Project[]
-  tenders                   Tender[]
-  crmActivities             CrmActivity[]
-  kbCategories              KbCategory[]
-  kbArticles                KbArticle[]
-  workProjects              WorkProject[]
-  cvCandidates              CvCandidate[]
-  pageContentRevisions      PageContentRevision[]
-  salesProjects             SalesProject[]
-  orderTemplates            OrderTemplate[]
-  fines                     Fine[]
-  toolRequests              ToolRequest[]
-  toolInventoryItems        ToolInventoryItem[]
-  documentCategories        DocumentCategory[]
-  managedDocuments          ManagedDocument[]
-  workflowDefinitions       WorkflowDefinition[]
-  workflowInstances         WorkflowInstance[]
-  toolKitAssignments        ToolKitAssignment[]
-  purchaseRequisitions      PurchaseRequisition[]
-  safetyIncidents           SafetyIncident[]
-  workPermits               WorkPermit[]
-  trainingRecords           TrainingRecord[]
-  salesTargets              SalesTarget[]
-  workProjectExpenses       WorkProjectExpense[]
-  workProjectPayroll        WorkProjectPayroll[]
-  workProjectLogs           WorkProjectLog[]
-  toolRenewals              ToolRenewal[]
-  budgets                   Budget[]
-  goodsReceipts             GoodsReceipt[]
-  stockMovements            StockMovement[]
-  lots                      Lot[]
-  supplierEvaluations       SupplierEvaluation[]
-  billsOfMaterials          BillOfMaterials[]
-  workCenters               WorkCenter[]
-  productionOrders          ProductionOrder[]
-  qualityInspections        QualityInspection[]
-  nonConformanceReports     NonConformanceReport[]
-  systemSettings            SystemSetting[]
-  maintenanceSchedules      MaintenanceSchedule[]
-  payments                  Payment[]
-  ActivityAssignee          ActivityAssignee[]
-  ActivityScheduleChange    ActivityScheduleChange[]
-  ActivityReassignment      ActivityReassignment[]
-  supplierPriceBreaks       SupplierPriceBreak[]
-  activityIncidents         ActivityIncident[]
-  activityRecommendations   ActivityRecommendation[]
-  operationalMeetings       OperationalMeeting[]
-  meetingAgreements         MeetingAgreement[]
-  folioCounters             FolioCounter[]
-  integraSites              IntegraSite[]
-  integraCameras            IntegraCamera[]
-  integraDoors              IntegraDoor[]
-  integraPeople             IntegraPerson[]
-  integraPersonCards        IntegraPersonCard[]
+  memberships                UserCompany[]
+  invoices                   Invoice[]
+  journalEntries             JournalEntry[]
+  expenses                   Expense[]
+  viaticos                   Viatico[]
+  employeePayments           EmployeePayment[]
+  purchaseOrders             PurchaseOrder[]
+  apiKeys                    CompanyApiKey[]
+  salesOpportunities         SalesOpportunity[]
+  warehouses                 Warehouse[]
+  ticketRequests             ClientTicketRequest[]
+  auditLogs                  AuditLog[]
+  usageEvents                CompanyUsageEvent[]
+  products                   Product[]
+  activities                 Activity[]
+  serviceClients             ServiceClient[]
+  operationalProjects        OperationalProject[]
+  salesClients               SalesClient[]
+  salesClientSectors         SalesClientSector[]
+  salesLeads                 SalesLead[]
+  cotizaciones               Cotizacion[]
+  supplierPurchaseOrders     SupplierPurchaseOrder[]
+  outboundWebhooks           OutboundWebhook[]
+  chatChannels               ChatChannel[]
+  maintenanceContracts       MaintenanceContract[]
+  maintenanceContractVisits  MaintenanceContractVisit[]
+  accounts                   Account[]
+  fiscalPeriods              FiscalPeriod[]
+  bankAccounts               BankAccount[]
+  idempotencyKeys            IdempotencyKey[]
+  costCenters                CostCenter[]
+  vehicleAssets              VehicleAsset[]
+  vehicleControls            VehicleControl[]
+  inventorySnapshots         InventorySnapshot[]
+  serviceClientBranches      ServiceClientBranch[]
+  bankTransactions           BankTransaction[]
+  bankReconciliations        BankReconciliation[]
+  chatMessages               ChatMessage[]
+  serviceSheets              ServiceSheet[]
+  activityEvidences          ActivityEvidence[]
+  locationTrackings          LocationTracking[]
+  salesProjectOrders         SalesProjectOrder[]
+  warehouseLocations         WarehouseLocation[]
+  stockLevels                StockLevel[]
+  brands                     Brand[]
+  suppliers                  Supplier[]
+  supplierCatalogSyncRuns    SupplierCatalogSyncRun[]
+  laborRateCards             LaborRateCard[]
+  laborRules                 LaborRule[]
+  commercialRules            CommercialRule[]
+  logisticsZoneRates         LogisticsZoneRate[]
+  evidences                  Evidence[]
+  cycleCounts                CycleCount[]
+  stockReservations          StockReservation[]
+  purchaseRfqs               PurchaseRFQ[]
+  assets                     Asset[]
+  maintenanceOrders          MaintenanceOrder[]
+  kpiSnapshots               KpiSnapshot[]
+  notifications              Notification[]
+  leaveRequests              LeaveRequest[]
+  attendances                Attendance[]
+  attendanceDays             AttendanceDay[]
+  lunchBreaks                LunchBreak[]
+  newsPosts                  NewsPost[]
+  pageContents               PageContent[]
+  heroSlides                 HeroSlide[]
+  heroVideos                 HeroVideo[]
+  performanceReviews         PerformanceReview[]
+  caseStudies                CaseStudy[]
+  featureFlags               FeatureFlag[]
+  socialPosts                SocialPost[]
+  internalComunicados        InternalComunicado[]
+  contactMessages            ContactMessage[]
+  newsletterSubscribers      NewsletterSubscriber[]
+  departments                Department[]
+  clients                    Client[]
+  projects                   Project[]
+  tenders                    Tender[]
+  crmActivities              CrmActivity[]
+  kbCategories               KbCategory[]
+  kbArticles                 KbArticle[]
+  workProjects               WorkProject[]
+  cvCandidates               CvCandidate[]
+  pageContentRevisions       PageContentRevision[]
+  salesProjects              SalesProject[]
+  orderTemplates             OrderTemplate[]
+  fines                      Fine[]
+  toolRequests               ToolRequest[]
+  toolInventoryItems         ToolInventoryItem[]
+  documentCategories         DocumentCategory[]
+  managedDocuments           ManagedDocument[]
+  workflowDefinitions        WorkflowDefinition[]
+  workflowInstances          WorkflowInstance[]
+  toolKitAssignments         ToolKitAssignment[]
+  purchaseRequisitions       PurchaseRequisition[]
+  safetyIncidents            SafetyIncident[]
+  workPermits                WorkPermit[]
+  trainingRecords            TrainingRecord[]
+  salesTargets               SalesTarget[]
+  workProjectExpenses        WorkProjectExpense[]
+  workProjectPayroll         WorkProjectPayroll[]
+  workProjectLogs            WorkProjectLog[]
+  toolRenewals               ToolRenewal[]
+  budgets                    Budget[]
+  goodsReceipts              GoodsReceipt[]
+  stockMovements             StockMovement[]
+  lots                       Lot[]
+  supplierEvaluations        SupplierEvaluation[]
+  billsOfMaterials           BillOfMaterials[]
+  workCenters                WorkCenter[]
+  productionOrders           ProductionOrder[]
+  qualityInspections         QualityInspection[]
+  nonConformanceReports      NonConformanceReport[]
+  systemSettings             SystemSetting[]
+  maintenanceSchedules       MaintenanceSchedule[]
+  payments                   Payment[]
+  ActivityAssignee           ActivityAssignee[]
+  ActivityScheduleChange     ActivityScheduleChange[]
+  ActivityEvidenceReview     ActivityEvidenceReview[]
+  ActivityReassignment       ActivityReassignment[]
+  supplierPriceBreaks        SupplierPriceBreak[]
+  activityIncidents          ActivityIncident[]
+  activityRecommendations    ActivityRecommendation[]
+  operationalMeetings        OperationalMeeting[]
+  meetingAgreements          MeetingAgreement[]
+  folioCounters              FolioCounter[]
+  integraSites               IntegraSite[]
+  integraCameras             IntegraCamera[]
+  integraDoors               IntegraDoor[]
+  integraPeople              IntegraPerson[]
+  integraPersonCards         IntegraPersonCard[]
   integraPersonDeletePending IntegraPersonDeletePending[]
-  integraDevices            IntegraDevice[]
-  integraVehicles           IntegraVehicle[]
-  integraRegions            IntegraRegion[]
-  integraSyncRuns           IntegraSyncRun[]
-  integraAlarmAcks          IntegraAlarmAck[]
-  integraSocAlarms          IntegraSocAlarm[]
-  integraFloorplans         IntegraFloorplan[]
-  integraEdgeAgents         IntegraEdgeAgent[]
-  integraPushEvents         IntegraPushEvent[]
-  integraRoomBookings       IntegraRoomBooking[]
-  integraSpacePolicies      IntegraSpacePolicy[]
-  integraRecurringVisitors  IntegraRecurringVisitor[]
-  integraDetectionProfiles  IntegraDetectionProfile[]
-  integraCameraCapabilities IntegraCameraCapability[]
+  integraDevices             IntegraDevice[]
+  integraVehicles            IntegraVehicle[]
+  integraRegions             IntegraRegion[]
+  integraSyncRuns            IntegraSyncRun[]
+  integraAlarmAcks           IntegraAlarmAck[]
+  integraSocAlarms           IntegraSocAlarm[]
+  integraFloorplans          IntegraFloorplan[]
+  integraEdgeAgents          IntegraEdgeAgent[]
+  integraPushEvents          IntegraPushEvent[]
+  integraRoomBookings        IntegraRoomBooking[]
+  integraSpacePolicies       IntegraSpacePolicy[]
+  integraRecurringVisitors   IntegraRecurringVisitor[]
+  integraDetectionProfiles   IntegraDetectionProfile[]
+  integraCameraCapabilities  IntegraCameraCapability[]
 
   @@map("company_profile")
 }
@@ -5433,37 +5439,37 @@ enum ActivityAssigneeRole {
 /// Los viáticos siguen siendo individuales (`Viatico.usuarioId` +
 /// `actividadId`): cada asignado solicita los suyos, no se prorratean.
 model ActivityAssignee {
-  id          Int                  @id @default(autoincrement())
-  activityId  Int
-  userId      Int
-  rol         ActivityAssigneeRole @default(TECNICO)
+  id                 Int                  @id @default(autoincrement())
+  activityId         Int
+  userId             Int
+  rol                ActivityAssigneeRole @default(TECNICO)
   /// Horas previstas para esta persona en esta actividad.
-  horasPlan   Decimal?             @db.Decimal(6, 2)
+  horasPlan          Decimal?             @db.Decimal(6, 2)
   /// Horas realmente dedicadas, para el costo real del servicio.
-  horasReales Decimal?             @db.Decimal(6, 2)
+  horasReales        Decimal?             @db.Decimal(6, 2)
   /// Indicaciones específicas para esta persona (opcionales).
-  indicaciones String?
-  asignadoAt  DateTime             @default(now())
+  indicaciones       String?
+  asignadoAt         DateTime             @default(now())
   /// Quién sumó a esta persona (registro de despacho: «Luis la pasó a Antonio»).
-  asignadoPorId Int?
+  asignadoPorId      Int?
   /// Fecha de salida del equipo; null mientras sigue asignado.
-  retiradoAt  DateTime?
+  retiradoAt         DateTime?
   /// Posición en la cola personal de ejecución (Mis actividades). null = sin ordenar.
   ordenEjecucion     Int?
   /// Por qué el encargado la puso en esa posición (obligatorio al reordenar).
-  ordenJustificacion String?   @db.VarChar(500)
+  ordenJustificacion String?              @db.VarChar(500)
   ordenActualizadoAt DateTime?
   /// Check-in ACS de esta persona en la OT (Acceso General).
-  acsEnteredAt DateTime?
-  acsExitedAt  DateTime?
-  acsLeftSite  Boolean   @default(false)
-  acsEntryDoor String?   @db.VarChar(120)
-  companyId   Int
+  acsEnteredAt       DateTime?
+  acsExitedAt        DateTime?
+  acsLeftSite        Boolean              @default(false)
+  acsEntryDoor       String?              @db.VarChar(120)
+  companyId          Int
 
-  activity Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  user     User           @relation("ActivityAssignedUser", fields: [userId], references: [id])
-  asignadoPor User?       @relation("ActivityAssignedBy", fields: [asignadoPorId], references: [id], onDelete: SetNull)
-  company  CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  activity    Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user        User           @relation("ActivityAssignedUser", fields: [userId], references: [id])
+  asignadoPor User?          @relation("ActivityAssignedBy", fields: [asignadoPorId], references: [id], onDelete: SetNull)
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([activityId, userId])
   @@index([userId, retiradoAt])
@@ -5489,6 +5495,35 @@ model ActivityScheduleChange {
   @@index([activityId])
   @@index([companyId])
   @@map("activity_schedule_changes")
+}
+
+/// Revisiones de evidencia por persona: quién aprobó o devolvió, qué pasos, por qué y con qué calificación.
+model ActivityEvidenceReview {
+  id             Int      @id @default(autoincrement())
+  activityId     Int
+  companyId      Int
+  /// Dueño de la evidencia revisada.
+  evidenceUserId Int
+  reviewerId     Int?
+  /// APROBADA | DEVUELTA_PASOS | DEVUELTA_TODO
+  decision       String   @db.VarChar(20)
+  steps          Json?
+  notes          String   @db.Text
+  /// Eficiencia de quien la realizó (1–5).
+  score          Int?
+  /// Copia de lo revisado (fotos, PDF, formulario): se conserva aunque se rehaga desde cero.
+  snapshot       Json?
+  createdAt      DateTime @default(now())
+
+  activity     Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  evidenceUser User           @relation("EvidenceReviewSubject", fields: [evidenceUserId], references: [id], onDelete: Cascade)
+  reviewer     User?          @relation("EvidenceReviewAuthor", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([activityId])
+  @@index([companyId])
+  @@index([evidenceUserId])
+  @@map("activity_evidence_reviews")
 }
 
 /// Reasignación de una actividad inconclusa.
@@ -5805,59 +5840,59 @@ enum IntegraSyncStatus {
 
 /// Credenciales Artemis/HCT por empresa (cifradas). Fallback: env INTEGRA_HIK_*.
 model IntegraSite {
-  id              Int       @id @default(autoincrement())
-  companyId       Int
-  name            String    @db.VarChar(160)
-  host            String    @db.VarChar(500)
+  id             Int       @id @default(autoincrement())
+  companyId      Int
+  name           String    @db.VarChar(160)
+  host           String    @db.VarChar(500)
   /// AES-GCM payload (base64)
-  appKeyEnc       String    @db.Text
-  appSecretEnc    String    @db.Text
-  isActive        Boolean   @default(true)
-  isDefault       Boolean   @default(false)
-  lastSyncAt      DateTime?
-  lastHealthOkAt  DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  appKeyEnc      String    @db.Text
+  appSecretEnc   String    @db.Text
+  isActive       Boolean   @default(true)
+  isDefault      Boolean   @default(false)
+  lastSyncAt     DateTime?
+  lastHealthOkAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  company  CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  cameras  IntegraCamera[]
-  doors    IntegraDoor[]
-  people   IntegraPerson[]
-  personCards IntegraPersonCard[]
+  company             CompanyProfile               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cameras             IntegraCamera[]
+  doors               IntegraDoor[]
+  people              IntegraPerson[]
+  personCards         IntegraPersonCard[]
   personDeletePending IntegraPersonDeletePending[]
-  devices  IntegraDevice[]
-  vehicles IntegraVehicle[]
-  regions    IntegraRegion[]
-  syncRuns   IntegraSyncRun[]
-  alarmAcks  IntegraAlarmAck[]
-  socAlarms  IntegraSocAlarm[]
-  floorplans IntegraFloorplan[]
-  edgeAgent  IntegraEdgeAgent?
-  pushEvents IntegraPushEvent[]
-  roomBookings IntegraRoomBooking[]
-  spacePolicies IntegraSpacePolicy[]
-  recurringVisitors IntegraRecurringVisitor[]
-  detectionProfiles IntegraDetectionProfile[]
-  cameraCapabilities IntegraCameraCapability[]
+  devices             IntegraDevice[]
+  vehicles            IntegraVehicle[]
+  regions             IntegraRegion[]
+  syncRuns            IntegraSyncRun[]
+  alarmAcks           IntegraAlarmAck[]
+  socAlarms           IntegraSocAlarm[]
+  floorplans          IntegraFloorplan[]
+  edgeAgent           IntegraEdgeAgent?
+  pushEvents          IntegraPushEvent[]
+  roomBookings        IntegraRoomBooking[]
+  spacePolicies       IntegraSpacePolicy[]
+  recurringVisitors   IntegraRecurringVisitor[]
+  detectionProfiles   IntegraDetectionProfile[]
+  cameraCapabilities  IntegraCameraCapability[]
   /// sha256 del token que los equipos llevan en la URL de notificacion.
   /// Solo el hash: el token en claro se ensena una vez al configurarlos.
-  pushTokenHash String?  @db.VarChar(64)
-  pushTokenAt   DateTime?
+  pushTokenHash       String?                      @db.VarChar(64)
+  pushTokenAt         DateTime?
   /// Cliente operativo ERP (opcional) — no confundir con CompanyProfile
-  serviceClientId Int?
+  serviceClientId     Int?
   /// Override de módulos visibles: { "video": true, "anpr": false, ... }
-  modulesOverride Json?
+  modulesOverride     Json?
   /// Política SOC ACS: umbral escalado ticket + horario oficina (America/Mexico_City).
   /// Ej: { "denialThreshold": 3, "windowMinutes": 60, "afterHoursEnabled": true,
   ///       "officeWeekdays": [1,2,3,4,5], "officeStart": "08:00", "officeEnd": "19:00" }
-  alarmPolicy     Json?
-  label           String?  @db.VarChar(120)
-  notes           String?  @db.Text
+  alarmPolicy         Json?
+  label               String?                      @db.VarChar(120)
+  notes               String?                      @db.Text
   /// ARTEMIS (HikCentral on-prem) | HCT (Hik-Connect for Teams cloud) — ADR-0019
-  provider        String   @default("ARTEMIS") @db.VarChar(16)
+  provider            String                       @default("ARTEMIS") @db.VarChar(16)
 
-  @@index([companyId, isActive])
   @@unique([companyId, name])
+  @@index([companyId, isActive])
   @@map("integra_sites")
 }
 
@@ -5921,17 +5956,17 @@ model IntegraRegion {
 }
 
 model IntegraCamera {
-  id               Int      @id @default(autoincrement())
-  companyId        Int
-  siteId           Int
-  cameraIndexCode  String   @db.VarChar(120)
-  name             String   @db.VarChar(220)
-  regionName       String?  @db.VarChar(220)
-  regionIndexCode  String?  @db.VarChar(120)
-  status           String?  @db.VarChar(40)
-  encodeDevIndexCode String? @db.VarChar(120)
-  raw              Json?
-  syncedAt         DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  companyId          Int
+  siteId             Int
+  cameraIndexCode    String   @db.VarChar(120)
+  name               String   @db.VarChar(220)
+  regionName         String?  @db.VarChar(220)
+  regionIndexCode    String?  @db.VarChar(120)
+  status             String?  @db.VarChar(40)
+  encodeDevIndexCode String?  @db.VarChar(120)
+  raw                Json?
+  syncedAt           DateTime @default(now())
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -5947,46 +5982,46 @@ model IntegraCamera {
 /// lo que habia antes de existir esta tabla — salvo la sensibilidad, que baja
 /// del techo del rango a DEFAULT_SENSITIVITY.
 model IntegraDetectionProfile {
-  id        Int    @id @default(autoincrement())
-  companyId Int
-  siteId    Int
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  siteId           Int
   /// `cameraIndexCode` del espejo `integra_cameras`.
-  cameraId  String @db.VarChar(120)
+  cameraId         String    @db.VarChar(120)
   /// IP LAN a la que se le habla. Null = se resuelve del espejo al aplicar.
-  deviceIp  String? @db.VarChar(64)
+  deviceIp         String?   @db.VarChar(64)
   /// Canal fisico (1..16). Null = 1.
-  channel   Int?
+  channel          Int?
   /// `eventType` EXTRA del Apendice B para esta camara, sobre SMART_EVENT_TYPES.
   /// Ej: ["loitering","regionEntrance"]. Nada fuera del catalogo documentado.
-  eventTypes Json?
+  eventTypes       Json?
   /// `sensitivityLevel` 0..100 (DOCUMENTADO, Apendice A.49). Null = 50.
-  sensitivity Int?
+  sensitivity      Int?
   /// low | mediumLow | mediumHigh | high. EMPIRICO: solo se escribe si el
   /// equipo devolvio el tag. Null = `low` (lo que ya se escribia).
-  alarmConfidence String? @db.VarChar(24)
+  alarmConfidence  String?   @db.VarChar(24)
   /// human | vehicle | human,vehicle (DOCUMENTADO, Apendice A.49). Null = human.
-  detectionTarget String? @db.VarChar(24)
+  detectionTarget  String?   @db.VarChar(24)
   /// Hasta 4 poligonos normalizados 0..1: [[{"x":0.1,"y":0.5}, …], …].
   /// Se guardan normalizados y no en la rejilla del equipo porque cada firmware
   /// declara su propio `normalizedScreenSize`. Null = fotograma completo.
-  regions   Json?
+  regions          Json?
   /// Segundos que el objetivo debe permanecer antes de disparar. Null = 0.
   timeThresholdSec Int?
   /// Area minima del recuadro (0..1) para dar el objetivo por bueno.
   /// NO se escribe al equipo: no hay tag verificado para esto en el XML que
   /// devuelven las camaras. Es un filtro de servidor, reservado al overlay.
-  minTargetPct Float?
+  minTargetPct     Float?
   /// Perfil apagado = no se toca el equipo al recablear.
-  enabled   Boolean @default(true)
+  enabled          Boolean   @default(true)
   /// Ventana horaria en que la deteccion importa, p. ej.
   /// { "weekdays": [1,2,3,4,5], "from": "19:00", "to": "07:00" }.
   /// Se guarda aqui; el arbitraje horario del equipo es otro endpoint ISAPI.
-  schedule  Json?
+  schedule         Json?
   /// Ultima vez que este perfil se escribio en el equipo, y con que resultado.
-  lastAppliedAt   DateTime?
-  lastAppliedNote String?  @db.VarChar(500)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lastAppliedAt    DateTime?
+  lastAppliedNote  String?   @db.VarChar(500)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -6005,10 +6040,10 @@ model IntegraDetectionProfile {
 ///
 /// Cada flag es tri-estado: true/false = el equipo lo dijo; NULL = no lo dijo.
 model IntegraCameraCapability {
-  id        Int    @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   companyId Int
   siteId    Int
-  cameraId  String @db.VarChar(120)
+  cameraId  String  @db.VarChar(120)
   deviceIp  String? @db.VarChar(64)
   channel   Int?
 
@@ -6031,12 +6066,12 @@ model IntegraCameraCapability {
   /// `eventType` del Apendice B que el equipo declara soportar.
   supportedEventTypes Json?
   /// Tags `isSupportX` que devolvio y que aun no mapeamos a columna.
-  extra     Json?
+  extra               Json?
   /// false = el equipo no contesto a la ruta (403 notSupport en la PTZ) — que
   /// tambien es informacion, y por eso se guarda la fila igualmente.
-  probeOk   Boolean @default(false)
-  probeNote String? @db.VarChar(300)
-  probedAt  DateTime @default(now())
+  probeOk             Boolean  @default(false)
+  probeNote           String?  @db.VarChar(300)
+  probedAt            DateTime @default(now())
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -6049,36 +6084,36 @@ model IntegraCameraCapability {
 /// Visita recurrente ISAPI: Valid (rango fechas) + RightPlan/WeekPlan (días·horas)
 /// en puertas limitadas. Al vencer o cancelar → Valid.enable=false en terminales.
 model IntegraRecurringVisitor {
-  id               Int       @id @default(autoincrement())
-  companyId        Int
-  siteId           Int
-  visitorName      String    @db.VarChar(220)
-  phone            String?   @db.VarChar(40)
-  hostPersonId     String?   @db.VarChar(120)
-  hostName         String?   @db.VarChar(220)
+  id             Int       @id @default(autoincrement())
+  companyId      Int
+  siteId         Int
+  visitorName    String    @db.VarChar(220)
+  phone          String?   @db.VarChar(40)
+  hostPersonId   String?   @db.VarChar(120)
+  hostName       String?   @db.VarChar(220)
   /// employeeNo temporal en ACS (UserInfo).
-  employeeNo       String    @db.VarChar(32)
+  employeeNo     String    @db.VarChar(32)
   /// doorIndexCode[] p.ej. ["192.168.9.160|1", ...]
-  doorIndexCodes   Json
+  doorIndexCodes Json
   /// Weekday ISAPI: Monday…Sunday
-  weekdays         Json
+  weekdays       Json
   /// HH:MM:SS franja diaria en WeekPlanCfg
-  timeFrom         String    @db.VarChar(8)
-  timeTo           String    @db.VarChar(8)
+  timeFrom       String    @db.VarChar(8)
+  timeTo         String    @db.VarChar(8)
   /// Fecha local YYYY-MM-DD → Valid.beginTime / endTime
-  validFrom        DateTime  @db.Date
-  validTo          DateTime  @db.Date
+  validFrom      DateTime  @db.Date
+  validTo        DateTime  @db.Date
   /// planTemplateNo escrito en terminales (slot ≥10)
-  planTemplateNo   String    @default("10") @db.VarChar(8)
+  planTemplateNo String    @default("10") @db.VarChar(8)
   /// ACTIVE | PENDING | SYNCED | EXPIRED | CANCELLED | ERROR
-  status           String    @default("PENDING") @db.VarChar(16)
-  hasFace          Boolean   @default(false)
-  lastPushAt       DateTime?
-  lastError        String?   @db.Text
-  notes            String?   @db.Text
-  createdById      Int?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  status         String    @default("PENDING") @db.VarChar(16)
+  hasFace        Boolean   @default(false)
+  lastPushAt     DateTime?
+  lastError      String?   @db.Text
+  notes          String?   @db.Text
+  createdById    Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -6166,21 +6201,21 @@ model IntegraDoor {
 
 /// Ack/clear operativo NEXARA sobre alarmas Artemis (fuente de verdad SOC local).
 model IntegraAlarmAck {
-  id               Int       @id @default(autoincrement())
-  companyId        Int
-  siteId           Int
-  externalAlarmId  String    @db.VarChar(220)
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  siteId          Int
+  externalAlarmId String    @db.VarChar(220)
   /// ACK | CLEARED (OPEN = sin fila)
-  status           String    @default("ACK") @db.VarChar(16)
-  note             String?   @db.Text
-  userId           Int?
-  severity         String?   @db.VarChar(40)
-  title            String?   @db.VarChar(280)
-  raw              Json?
-  ackedAt          DateTime  @default(now())
-  clearedAt        DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  status          String    @default("ACK") @db.VarChar(16)
+  note            String?   @db.Text
+  userId          Int?
+  severity        String?   @db.VarChar(40)
+  title           String?   @db.VarChar(280)
+  raw             Json?
+  ackedAt         DateTime  @default(now())
+  clearedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -6192,34 +6227,34 @@ model IntegraAlarmAck {
 
 /// Cola SOC desde eventos push ACS (denegado / fuera de horario). No Artemis.
 model IntegraSocAlarm {
-  id             Int       @id @default(autoincrement())
-  companyId      Int
-  siteId         Int
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  siteId          Int
   /// DENIED | AFTER_HOURS
-  kind           String    @db.VarChar(24)
+  kind            String    @db.VarChar(24)
   /// OPEN | ACK | CLEARED | TICKETED
-  status         String    @default("OPEN") @db.VarChar(16)
+  status          String    @default("OPEN") @db.VarChar(16)
   /// Firma estable para abrir/actualizar la misma alarma (persona+puerta+kind).
-  fingerprint    String    @db.VarChar(180)
-  title          String    @db.VarChar(280)
-  severity       String    @default("alta") @db.VarChar(40)
-  personId       String?   @db.VarChar(64)
-  personName     String?   @db.VarChar(220)
-  doorNo         Int?
-  doorName       String?   @db.VarChar(220)
-  deviceIp       String?   @db.VarChar(64)
-  deviceName     String?   @db.VarChar(220)
-  photoPath      String?   @db.VarChar(300)
-  pushEventId    Int?
-  occurrenceCount Int      @default(1)
+  fingerprint     String    @db.VarChar(180)
+  title           String    @db.VarChar(280)
+  severity        String    @default("alta") @db.VarChar(40)
+  personId        String?   @db.VarChar(64)
+  personName      String?   @db.VarChar(220)
+  doorNo          Int?
+  doorName        String?   @db.VarChar(220)
+  deviceIp        String?   @db.VarChar(64)
+  deviceName      String?   @db.VarChar(220)
+  photoPath       String?   @db.VarChar(300)
+  pushEventId     Int?
+  occurrenceCount Int       @default(1)
   firstOccurredAt DateTime
   lastOccurredAt  DateTime
   ticketRequestId Int?
   escalatedAt     DateTime?
-  note            String?  @db.Text
+  note            String?   @db.Text
   userId          Int?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -6277,35 +6312,35 @@ model IntegraMapPin {
 /// de seguridad — el firmware manda campos que aquí no se tipan (RightPlan,
 /// doorRight, password…) y perderlos sería peor que duplicarlos.
 model IntegraPerson {
-  id            Int      @id @default(autoincrement())
-  companyId     Int
-  siteId        Int
-  personId      String   @db.VarChar(120)
-  personName    String   @db.VarChar(220)
-  personCode    String?  @db.VarChar(120)
-  orgIndexCode  String?  @db.VarChar(120)
+  id           Int       @id @default(autoincrement())
+  companyId    Int
+  siteId       Int
+  personId     String    @db.VarChar(120)
+  personName   String    @db.VarChar(220)
+  personCode   String?   @db.VarChar(120)
+  orgIndexCode String?   @db.VarChar(120)
   /// Departamento REAL. El DS-K1T no entrega organización en `UserInfo`, así
   /// que por ISAPI queda null a propósito: antes se le metía aquí el
   /// `userType`, que es otra cosa. Con Artemis/HikCentral sí viene poblado.
-  orgName       String?  @db.VarChar(220)
+  orgName      String?   @db.VarChar(220)
   /// `male` | `female` | `unknown` — tal cual lo manda el terminal.
-  gender        String?  @db.VarChar(32)
+  gender       String?   @db.VarChar(32)
   /// `normal` | `visitor` | `blackList` | `patrol` — tipo de usuario ACS.
-  userType      String?  @db.VarChar(64)
+  userType     String?   @db.VarChar(64)
   /// `Valid.enable`: la vigencia está activa.
-  validEnable   Boolean?
+  validEnable  Boolean?
   /// `Valid.beginTime` / `Valid.endTime` del terminal (hora local del equipo).
-  validFrom     DateTime?
-  validTo       DateTime?
-  numOfFace     Int?
-  numOfFP       Int?
-  numOfCard     Int?
+  validFrom    DateTime?
+  validTo      DateTime?
+  numOfFace    Int?
+  numOfFP      Int?
+  numOfCard    Int?
   /// URL de rostro EN EL TERMINAL. Muchos DS-K1T la anuncian y devuelven 404.
-  faceUrl       String?  @db.VarChar(500)
+  faceUrl      String?   @db.VarChar(500)
   /// IP del ACS donde se leyó. Desempata puertas cuando hay varios lectores.
-  sourceIp      String?  @db.VarChar(64)
-  raw           Json?
-  syncedAt      DateTime @default(now())
+  sourceIp     String?   @db.VarChar(64)
+  raw          Json?
+  syncedAt     DateTime  @default(now())
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -6376,38 +6411,38 @@ model IntegraPersonDeletePending {
 /// de pasar por la puerta: el terminal no entrega la suya —medido: 596 eventos
 /// del alertStream, cero JPEG— pero como camara responde en ~300 ms.
 model IntegraPushEvent {
-  id        Int      @id @default(autoincrement())
-  companyId Int
-  siteId    Int
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  siteId     Int
   /// IP del equipo que lo mando. Es lo unico que el aparato firma de si mismo.
-  deviceIp    String  @db.VarChar(64)
-  deviceName  String? @db.VarChar(220)
+  deviceIp   String   @db.VarChar(64)
+  deviceName String?  @db.VarChar(220)
   /// AccessControllerEvent | VMD | fielddetection | linedetection | facedetection…
-  eventType   String  @db.VarChar(64)
-  major       Int?
-  minor       Int?
+  eventType  String   @db.VarChar(64)
+  major      Int?
+  minor      Int?
   /// Etiqueta legible ya resuelta, para no recalcularla en cada consulta.
-  label       String? @db.VarChar(160)
-  occurredAt  DateTime
-  receivedAt  DateTime @default(now())
+  label      String?  @db.VarChar(160)
+  occurredAt DateTime
+  receivedAt DateTime @default(now())
 
-  personId    String? @db.VarChar(64)
-  personName  String? @db.VarChar(220)
-  doorNo      Int?
-  verifyMode  String? @db.VarChar(64)
+  personId        String? @db.VarChar(64)
+  personName      String? @db.VarChar(220)
+  doorNo          Int?
+  verifyMode      String? @db.VarChar(64)
   /// Ruta bajo /uploads: la foto que NEXARA tomo del equipo al recibirlo.
-  photoPath   String? @db.VarChar(300)
+  photoPath       String? @db.VarChar(300)
   /// Recuadros de deteccion normalizados 0..1, con su tipo (human/vehicle).
-  targets     Json?
+  targets         Json?
   /// `active` | `inactive`. DOCUMENTADO: Apendice A.49 del API Developer Guide
   /// V1.8.0 — «Durative alarm/event status: active-valid, inactive-invalid».
   /// El equipo dice cuando el objetivo SE VA; antes se adivinaba con TTL.
   /// Texto y no enum: un firmware nuevo puede traer un valor que no conocemos.
-  eventState  String? @db.VarChar(16)
+  eventState      String? @db.VarChar(16)
   /// DOCUMENTADO (mismo apendice): «number of times that the same alarm has
   /// been triggered». Agrupar duplicados sin heuristica propia.
   activePostCount Int?
-  raw         Json?
+  raw             Json?
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
@@ -6429,17 +6464,17 @@ model IntegraPushEvent {
 }
 
 model IntegraDevice {
-  id          Int               @id @default(autoincrement())
-  companyId   Int
-  siteId      Int
-  indexCode   String            @db.VarChar(120)
-  name        String            @db.VarChar(220)
-  kind        IntegraDeviceKind
-  ip          String?           @db.VarChar(80)
-  online      Boolean           @default(true)
-  deviceType  String?           @db.VarChar(80)
-  raw         Json?
-  syncedAt    DateTime          @default(now())
+  id         Int               @id @default(autoincrement())
+  companyId  Int
+  siteId     Int
+  indexCode  String            @db.VarChar(120)
+  name       String            @db.VarChar(220)
+  kind       IntegraDeviceKind
+  ip         String?           @db.VarChar(80)
+  online     Boolean           @default(true)
+  deviceType String?           @db.VarChar(80)
+  raw        Json?
+  syncedAt   DateTime          @default(now())
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
   site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)

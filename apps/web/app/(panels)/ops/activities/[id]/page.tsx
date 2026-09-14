@@ -7,7 +7,7 @@ import { Tag } from "@/components/ui/DataTable";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
-import ActivityEvidenceReviewPanel from "@/components/ops/ActivityEvidenceReviewPanel";
+import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
@@ -464,27 +464,8 @@ export default function ActivityDetailPage() {
         )}
       </DetailSection>
 
-      <DetailSection title="Evidencias de campo">
-        {activity.activityEvidence ? (
-          <>
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)" }}>
-              {countEvidenceFiles(activity.activityEvidence)} archivo(s) en el paquete de evidencias.
-              {" "}
-              <Link href={hrefs.evidences} style={{ color: "var(--primary)", fontWeight: 600 }}>
-                Ver pestaña Evidencias →
-              </Link>
-            </p>
-            <ActivityEvidenceReviewPanel activity={activity} showHeader={false} />
-          </>
-        ) : (
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>
-            Aún no hay fotos ni documentos cargados para esta actividad.{" "}
-            <Link href={hrefs.evidences} style={{ color: "var(--primary)", fontWeight: 600 }}>
-              Ir a Evidencias
-            </Link>{" "}
-            para capturar entrada, fotos en sitio y salida.
-          </p>
-        )}
+      <DetailSection title="Evidencias del equipo">
+        <EquipoEvidencias activityId={activity.id} compact verMasHref={hrefs.evidences} />
       </DetailSection>
 
       <DetailSection title="Incidencias y recomendaciones">

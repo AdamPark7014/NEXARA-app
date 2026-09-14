@@ -542,6 +542,8 @@ export class NotificationHierarchyService {
     anNumber?: string | null,
     /** Responsable (p. ej. Luis) que da seguimiento aunque no revise evidencias. */
     responsableId?: number | null,
+    /** Encargados de la cadena y jefe directo: también revisan. */
+    reviewerIds: number[] = [],
   ) {
     try {
       const ref = (anNumber && String(anNumber).trim()) || `ID ${activityId}`;
@@ -553,6 +555,9 @@ export class NotificationHierarchyService {
         recipientIds.add(sup.id);
       }
       if (responsableId && responsableId !== submitterUserId) recipientIds.add(responsableId);
+      for (const id of reviewerIds) {
+        if (id && id !== submitterUserId) recipientIds.add(id);
+      }
       for (const ceoId of await this.getCeoUserIds()) {
         if (ceoId !== submitterUserId) recipientIds.add(ceoId);
       }
@@ -567,7 +572,7 @@ export class NotificationHierarchyService {
           triggerUserId: submitterUserId,
           relatedEntityId: activityId,
           entityType: 'Activity',
-          relatedUrl: `/ops/activities/${activityId}/evidences`,
+          relatedUrl: `/erp/actividades/${activityId}/evidencias`,
           priority: 'high',
         });
       }
@@ -589,15 +594,36 @@ export class NotificationHierarchyService {
     /** Además del responsable: quien subió la evidencia (y Christian se agrega solo). */
     alsoNotify: number[] = [],
     reviewerId?: number | null,
+    /** Calificación (1–5), pasos devueltos, si se devolvió todo y si la actividad quedó finalizada. */
+    extra: { score?: number | null; steps?: string[]; full?: boolean; closed?: boolean } = {},
   ) {
     try {
       const type = status === 'approved' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED';
-      const title = status === 'approved' ? '✅ Evidencia aprobada' : '❌ Evidencia rechazada';
+      const title =
+        status === 'approved'
+          ? extra.closed
+            ? '✅ Actividad aprobada y finalizada'
+            : '✅ Evidencia aprobada'
+          : extra.full
+            ? '↩️ Evidencia devuelta: rehacer desde cero'
+            : '↩️ Evidencia devuelta para corregir';
       const base = (activityTitle && String(activityTitle).trim()) || `Actividad ${activityId}`;
+      const stepNames: Record<string, string> = {
+        ENTRY_PHOTO: 'foto de entrada',
+        EVIDENCE_PHOTOS: 'fotos en sitio',
+        SERVICE_SHEET_PDF: 'hoja de servicio PDF',
+        SERVICE_SHEET_DATA: 'formulario',
+        EXIT_PHOTO: 'foto de salida',
+      };
+      const pasos = (extra.steps ?? []).map((s) => stepNames[s] ?? s).join(', ');
+      const calif = extra.score ? ` Calificación: ${extra.score}/5.` : '';
+      const obs = notes ? ` Observaciones: ${notes}` : '';
       const message =
         status === 'approved'
-          ? `${reviewerName} aprobó la evidencia de "${base}".`
-          : `${reviewerName} rechazó la evidencia de "${base}".${notes ? ` Observaciones: ${notes}` : ''}`;
+          ? `${reviewerName} aprobó la evidencia de "${base}".${extra.closed ? ' La actividad quedó finalizada.' : ''}${calif}${obs}`
+          : extra.full
+            ? `${reviewerName} devolvió toda la evidencia de "${base}": hay que rehacerla desde cero.${calif}${obs}`
+            : `${reviewerName} devolvió "${base}" para corregir${pasos ? `: ${pasos}` : ''}.${calif}${obs}`;
 
       const recipients = new Set<number>([responsableUserId, ...alsoNotify]);
       for (const ceoId of await this.getCeoUserIds()) recipients.add(ceoId);
@@ -681,7 +707,7 @@ export class NotificationHierarchyService {
     }
   }
 
-  /** Cierre automático (todo el equipo subió su evidencia): responsable y Christian. */
+  /** Todo el equipo subió su evidencia (queda Por Validar): responsable y Christian. */
   async notifyActivityAutoCompleted(
     activityId: number,
     label: string,
@@ -697,14 +723,14 @@ export class NotificationHierarchyService {
           userId: uid,
           type: 'ACTIVITY_COMPLETED',
           category: 'activities',
-          title: '✅ Actividad terminada',
+          title: '📋 Actividad lista para revisión',
           message: who
-            ? `«${label}» quedó terminada. La última evidencia la subió ${who}.`
-            : `«${label}» quedó terminada: el equipo subió todas sus evidencias.`,
+            ? `«${label}»: el equipo terminó (la última evidencia la subió ${who}). Queda finalizada cuando alguien la aprueba.`
+            : `«${label}»: el equipo subió todas sus evidencias. Queda finalizada cuando alguien la aprueba.`,
           triggerUserId: lastUserId ?? undefined,
           relatedEntityId: activityId,
           entityType: 'Activity',
-          relatedUrl: `/erp/actividades/${activityId}`,
+          relatedUrl: `/erp/actividades/${activityId}/evidencias`,
           dedupeSeconds: 0,
         });
       }

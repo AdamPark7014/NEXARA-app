@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type ActivityEvidence } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { saveBase64Photo } from '../../common/file-upload.util';
 import { ActivitiesService } from '../activities.service.js';
@@ -84,6 +84,14 @@ export class ActivityEvidenceService {
             select: { id: true, nombre: true },
           })
         : null;
+      // También revisan los encargados de la cadena (LEAD) y el jefe directo de quien la subió.
+      const leads = await this.prisma.activityAssignee.findMany({
+        where: { activityId, retiradoAt: null, rol: 'LEAD' },
+        select: { userId: true },
+      });
+      const jefe = submitter
+        ? await this.prisma.user.findUnique({ where: { id: submitter.id }, select: { managerId: true } })
+        : null;
       await this.notificationHierarchy.notifyEvidenceSubmitted(
         submitter?.id ?? activity.responsableId,
         activityId,
@@ -91,6 +99,7 @@ export class ActivityEvidenceService {
         submitter?.nombre || activity.responsable.nombre || 'Usuario',
         activity.anNumber,
         activity.responsableId,
+        [...leads.map((l) => l.userId), ...(jefe?.managerId ? [jefe.managerId] : [])],
       );
     } catch {
       /* no bloquear flujo de evidencias */
@@ -398,8 +407,32 @@ export class ActivityEvidenceService {
   }
 
   /**
-   * Cierra la actividad solo cuando todos los assignees activos + responsable tienen evidencia COMPLETED.
+   * Quienes deben subir evidencia: assignees activos + responsable.
    * En despacho, quien reparte (LEAD, incluido el responsable) no ejecuta: no se le exige evidencia.
+   */
+  private async requiredExecutorIds(activityId: number): Promise<number[]> {
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { responsableId: true, assignmentCharge: true },
+    });
+    if (!activity) return [];
+    const assignees = await this.prisma.activityAssignee.findMany({
+      where: { activityId, retiradoAt: null },
+      select: { userId: true, rol: true },
+    });
+    const reparten = new Set<number>(
+      activity.assignmentCharge === 'despacho'
+        ? [activity.responsableId, ...assignees.filter((a) => a.rol === 'LEAD').map((a) => a.userId)]
+        : [],
+    );
+    return Array.from(
+      new Set([...assignees.map((a) => a.userId), activity.responsableId].filter(Boolean)),
+    ).filter((id) => !reparten.has(id));
+  }
+
+  /**
+   * Cuando todo el equipo completó su evidencia la actividad pasa a Por Validar (antes se cerraba sola).
+   * Queda 100 % finalizada al aprobarse: ver finalizeIfAllApproved.
    */
   private async maybeFinalizeActivity(
     activityId: number,
@@ -409,21 +442,9 @@ export class ActivityEvidenceService {
     const activity = await this.loadActivityForTenant(activityId, companyId);
     const meta = await this.prisma.activity.findUnique({
       where: { id: activityId },
-      select: { assignmentCharge: true, titulo: true, anNumber: true },
+      select: { titulo: true, anNumber: true },
     });
-    const despacho = meta?.assignmentCharge === 'despacho';
-    const assignees = await this.prisma.activityAssignee.findMany({
-      where: { activityId, retiradoAt: null },
-      select: { userId: true, rol: true },
-    });
-    const reparten = new Set<number>(
-      despacho
-        ? [activity.responsableId, ...assignees.filter((a) => a.rol === 'LEAD').map((a) => a.userId)]
-        : [],
-    );
-    const requiredUserIds = Array.from(
-      new Set([...assignees.map((a) => a.userId), activity.responsableId].filter(Boolean)),
-    ).filter((id) => !reparten.has(id));
+    const requiredUserIds = await this.requiredExecutorIds(activityId);
     if (requiredUserIds.length === 0) return;
 
     const completed = await this.prisma.activityEvidence.findMany({
@@ -438,15 +459,13 @@ export class ActivityEvidenceService {
     const completedIds = new Set(completed.map((e) => e.userId));
     if (!requiredUserIds.every((id) => completedIds.has(id))) return;
 
+    // Todo el equipo terminó: queda Por Validar hasta que un superior la apruebe.
     await this.prisma.activity.update({
       where: { id: activityId },
-      data: {
-        estatus: 'Finalizada',
-        fechaFinalizacion: new Date(),
-      },
+      data: { estatus: 'Por Validar' },
     });
 
-    // Luis (responsable) y Christian se enteran del cierre.
+    // Luis (responsable) y Christian se enteran de que ya pueden revisarla.
     void this.notificationHierarchy.notifyActivityAutoCompleted(
       activityId,
       meta?.titulo || meta?.anNumber || `Actividad ${activityId}`,
@@ -1306,6 +1325,8 @@ export class ActivityEvidenceService {
     reviewerId: number,
     notes?: string,
     companyId?: number | null,
+    /** Eficiencia de quien la realizó (1–5). */
+    score?: number | null,
   ) {
     // `isSuperAdmin` NO es columna de `User` —se calcula en el JWT
     // (`rbac.guard.ts`) o desde el correo (`platform-accounts.ts`)—, así que
@@ -1332,6 +1353,11 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Las evidencias deben estar completadas antes de aprobar');
     }
 
+    if (evidence.reviewStatus === 'APPROVED') {
+      throw new BadRequestException('Esta evidencia ya fue aprobada');
+    }
+
+    await this.recordReview(evidence, reviewerId, 'APROBADA', null, notes, score);
     const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
@@ -1339,16 +1365,14 @@ export class ActivityEvidenceService {
         reviewNotes: notes || null,
         reviewedById: reviewerId,
         reviewedAt: new Date(),
+        rejectedStep: null,
+        rejectedSteps: Prisma.DbNull,
+        ...(score != null ? { eficienciaScore: score } : {}),
       },
     });
 
-    // Actualizar estatus de actividad
-    await this.prisma.activity.update({
-      where: { id: activityId },
-      data: {
-        estatus: 'Aprobada',
-      },
-    });
+    // 100 % finalizada solo cuando la evidencia de todo el equipo está aprobada.
+    const finalizada = await this.finalizeIfAllApproved(activityId);
 
     try {
       const activity = await this.prisma.activity.findUnique({
@@ -1366,9 +1390,10 @@ export class ActivityEvidenceService {
           activity.titulo || '',
           'approved',
           reviewerUser.nombre,
-          undefined,
+          notes,
           [userId],
           reviewerId,
+          { score, closed: finalizada },
         );
       }
     } catch {
@@ -1392,8 +1417,14 @@ export class ActivityEvidenceService {
       resetFullFlow?: boolean;
     },
     companyId?: number | null,
+    /** Eficiencia de quien la realizó (1–5). */
+    score?: number | null,
   ) {
-    await this.loadActivityForTenant(activityId, companyId);
+    const activity = await this.loadActivityForTenant(activityId, companyId);
+    // Solo los pasos que aplican a este tipo de actividad (una tarea no lleva hoja PDF).
+    const kindSteps = EVIDENCE_STEP_ORDER.filter((s) =>
+      (evidenceStepsForKind(activity.coreKind) as string[]).includes(s),
+    );
 
     const evidence = await this.prisma.activityEvidence.findFirst({
       where: { activityId, userId, ...companyWhere(companyId ?? null) },
@@ -1403,30 +1434,34 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Las evidencias deben estar completadas antes de rechazar');
     }
 
-    const validSteps = [...EVIDENCE_STEP_ORDER];
+    const validSteps = kindSteps.length ? kindSteps : [...EVIDENCE_STEP_ORDER];
 
     if (options.resetFullFlow) {
-      const allSteps = [...EVIDENCE_STEP_ORDER];
+      // Rehacer desde cero: se vacía su evidencia (la copia queda en el registro de revisiones).
+      const allSteps = [...validSteps];
+      await this.recordReview(evidence, reviewerId, 'DEVUELTA_TODO', allSteps, notes, score);
       const updated = await this.prisma.activityEvidence.update({
         where: { id: evidence.id },
         data: {
           ...this.clearEvidenceData(),
+          evidencePhotosGeo: Prisma.DbNull,
           reviewStatus: 'REJECTED',
-          rejectedStep: 'ENTRY_PHOTO',
+          rejectedStep: allSteps[0],
           rejectedSteps: allSteps,
           reviewNotes: notes,
           reviewedById: reviewerId,
           reviewedAt: new Date(),
-          status: 'ENTRY_PHOTO',
+          status: allSteps[0],
+          ...(score != null ? { eficienciaScore: score } : {}),
         },
       });
 
       await this.prisma.activity.update({
         where: { id: activityId },
-        data: { estatus: 'En Proceso' },
+        data: { estatus: 'En Proceso', fechaFinalizacion: null },
       });
 
-      await this.notifyReject(activityId, reviewerId, notes, userId);
+      await this.notifyReject(activityId, reviewerId, notes, userId, { full: true, steps: allSteps, score });
       return updated;
     }
 
@@ -1448,6 +1483,7 @@ export class ActivityEvidenceService {
 
     const firstStep = this.firstRejectedStep(steps);
 
+    await this.recordReview(evidence, reviewerId, 'DEVUELTA_PASOS', steps, notes, score);
     const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
@@ -1458,19 +1494,27 @@ export class ActivityEvidenceService {
         reviewedById: reviewerId,
         reviewedAt: new Date(),
         status: firstStep,
+        ...(score != null ? { eficienciaScore: score } : {}),
       },
     });
 
+    // Vuelve a En Proceso (no «Rechazada», que cuenta como cerrada): corrige solo esos pasos.
     await this.prisma.activity.update({
       where: { id: activityId },
-      data: { estatus: 'Rechazada' },
+      data: { estatus: 'En Proceso', fechaFinalizacion: null },
     });
 
-    await this.notifyReject(activityId, reviewerId, notes, userId);
+    await this.notifyReject(activityId, reviewerId, notes, userId, { steps, score });
     return updated;
   }
 
-  private async notifyReject(activityId: number, reviewerId: number, notes: string, ownerId?: number) {
+  private async notifyReject(
+    activityId: number,
+    reviewerId: number,
+    notes: string,
+    ownerId?: number,
+    extra: { steps?: string[]; full?: boolean; score?: number | null } = {},
+  ) {
     try {
       const activity = await this.prisma.activity.findUnique({
         where: { id: activityId },
@@ -1490,11 +1534,122 @@ export class ActivityEvidenceService {
           notes,
           ownerId ? [ownerId] : [],
           reviewerId,
+          extra,
         );
       }
     } catch {
       /* seguir */
     }
+  }
+
+  /** Registro de la revisión con copia de lo revisado: sobrevive aunque la persona rehaga todo. */
+  private async recordReview(
+    evidence: ActivityEvidence,
+    reviewerId: number,
+    decision: 'APROBADA' | 'DEVUELTA_PASOS' | 'DEVUELTA_TODO',
+    steps: string[] | null,
+    notes: string | undefined,
+    score: number | null | undefined,
+  ) {
+    const num = (v: Prisma.Decimal | null) => (v == null ? null : Number(v));
+    const iso = (d: Date | null) => (d ? d.toISOString() : null);
+    await this.prisma.activityEvidenceReview.create({
+      data: {
+        activityId: evidence.activityId,
+        companyId: evidence.companyId,
+        evidenceUserId: evidence.userId,
+        reviewerId,
+        decision,
+        steps: steps ?? Prisma.DbNull,
+        notes: (notes || '').trim() || 'Sin observaciones',
+        score: score ?? null,
+        snapshot: {
+          entryPhotoUrl: evidence.entryPhotoUrl,
+          entryLatitude: num(evidence.entryLatitude),
+          entryLongitude: num(evidence.entryLongitude),
+          entryPhotoUploadedAt: iso(evidence.entryPhotoUploadedAt),
+          evidencePhotos: evidence.evidencePhotos,
+          evidencePhotosGeo: (evidence.evidencePhotosGeo as Prisma.InputJsonValue) ?? null,
+          evidencePhotosUploadedAt: iso(evidence.evidencePhotosUploadedAt),
+          serviceSheetPdfUrl: evidence.serviceSheetPdfUrl,
+          serviceSheetUploadedAt: iso(evidence.serviceSheetUploadedAt),
+          serviceSheetData: (evidence.serviceSheetData as Prisma.InputJsonValue) ?? null,
+          serviceSheetCompletedAt: iso(evidence.serviceSheetCompletedAt),
+          exitPhotoUrl: evidence.exitPhotoUrl,
+          exitLatitude: num(evidence.exitLatitude),
+          exitLongitude: num(evidence.exitLongitude),
+          exitPhotoUploadedAt: iso(evidence.exitPhotoUploadedAt),
+          completedAt: iso(evidence.completedAt),
+        },
+      },
+    });
+  }
+
+  /**
+   * Una actividad queda 100 % finalizada cuando la evidencia de cada quien la ejecutó está aprobada.
+   * Si falta alguien queda Por Validar (todos terminaron) o En Proceso (alguien sigue trabajando).
+   * Guarda la eficiencia promedio del equipo (1–5 → 0–100) en la actividad.
+   */
+  private async finalizeIfAllApproved(activityId: number): Promise<boolean> {
+    const required = await this.requiredExecutorIds(activityId);
+    if (required.length === 0) return false;
+    const rows = await this.prisma.activityEvidence.findMany({
+      where: { activityId, userId: { in: required } },
+      select: { status: true, reviewStatus: true, eficienciaScore: true },
+    });
+    const aprobadas = rows.filter((r) => r.reviewStatus === 'APPROVED');
+    if (aprobadas.length < required.length) {
+      const terminaron = rows.filter((r) => r.status === 'COMPLETED').length >= required.length;
+      await this.prisma.activity.update({
+        where: { id: activityId },
+        data: { estatus: terminaron ? 'Por Validar' : 'En Proceso' },
+      });
+      return false;
+    }
+    const scores = aprobadas
+      .map((r) => r.eficienciaScore)
+      .filter((s): s is number => typeof s === 'number');
+    await this.prisma.activity.update({
+      where: { id: activityId },
+      data: {
+        estatus: 'Finalizada',
+        fechaFinalizacion: new Date(),
+        ...(scores.length
+          ? { eficienciaScore: Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 20) }
+          : {}),
+      },
+    });
+    return true;
+  }
+
+  /**
+   * Revisión desde la cadena de mando (Christian, responsable, encargados, jefe directo).
+   * Quién puede revisar a quién lo decide MyActivitiesService; observaciones y calificación son obligatorias.
+   */
+  async reviewEvidence(params: {
+    activityId: number;
+    evidenceUserId: number;
+    reviewerId: number;
+    decision: 'aprobar' | 'devolver';
+    pasos?: string[];
+    todo?: boolean;
+    observaciones: string;
+    calificacion: number;
+    companyId?: number | null;
+  }) {
+    const { activityId, evidenceUserId, reviewerId, observaciones, calificacion, companyId } = params;
+    if (params.decision === 'aprobar') {
+      return this.approveEvidence(activityId, evidenceUserId, reviewerId, observaciones, companyId, calificacion);
+    }
+    return this.rejectEvidence(
+      activityId,
+      evidenceUserId,
+      reviewerId,
+      observaciones,
+      { rejectedSteps: params.todo ? undefined : params.pasos, resetFullFlow: Boolean(params.todo) },
+      companyId,
+      calificacion,
+    );
   }
 
   /**
@@ -1621,7 +1776,7 @@ export class ActivityEvidenceService {
       await this.prisma.activity.update({
         where: { id: activityId },
         data: {
-          estatus: transition.reviewStatus === 'REJECTED' ? 'Rechazada' : 'Pendiente',
+          estatus: 'En Proceso',
         },
       });
     }

@@ -19,6 +19,7 @@ import {
   type DispatchMyActivityDto,
   type ReorderMyActivitiesDto,
   type ReprogramarDespachoDto,
+  type RevisarEvidenciaDto,
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 
@@ -108,6 +109,56 @@ export class MeController {
       { id: Number(user.id), email: user.email ?? null },
       companyId,
       activityId,
+      body,
+    );
+  }
+
+  /** Evidencias del equipo por persona (Christian todo; cada encargado su parte de la cadena). */
+  @Get('activities/:id/evidencias')
+  teamEvidence(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.teamEvidence(
+      {
+        id: Number(user.id),
+        email: user.email ?? null,
+        roleKey: user.roleKey ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+        permissions: Array.isArray(user.permissions) ? user.permissions : [],
+      },
+      companyId,
+      activityId,
+    );
+  }
+
+  /** Aprobar o devolver (pasos o todo) la evidencia de alguien de la cadena, con observaciones y calificación. */
+  @Post('activities/:id/evidencias/:userId/revision')
+  reviewTeamEvidence(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Param('userId', ParseIntPipe) evidenceUserId: number,
+    @Body() body: RevisarEvidenciaDto,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.reviewTeamEvidence(
+      {
+        id: Number(user.id),
+        email: user.email ?? null,
+        roleKey: user.roleKey ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+        permissions: Array.isArray(user.permissions) ? user.permissions : [],
+      },
+      companyId,
+      activityId,
+      evidenceUserId,
       body,
     );
   }

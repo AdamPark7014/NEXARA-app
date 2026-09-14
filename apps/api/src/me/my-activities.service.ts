@@ -1,10 +1,15 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { ActivityTeamService, type AssigneeRole } from '../activities/activity-team.service.js';
+import { ActivityEvidenceService } from '../activities/evidence/activity-evidence.service.js';
+import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 const CEO_EMAIL = 'gerencia@nexara.com.mx';
+
+/** Dos personas sumadas con menos de 5 s de diferencia están en el mismo nivel de la cadena. */
+const MISMO_MOMENTO_MS = 5_000;
 
 /** Encargados de área: se auto-asignan y ordenan su cola (con justificación). */
 export const AREA_MANAGER_EMAILS = new Set<string>([
@@ -36,6 +41,27 @@ const DISPATCH_POOLS: Record<string, string[]> = {
 export type DispatchMyActivityDto = { userIds: number[]; indicaciones?: string };
 
 export type ReprogramarDespachoDto = { fecha: string; motivo?: string };
+
+/** Revisión de evidencia desde la cadena de mando. */
+export type RevisarEvidenciaDto = {
+  decision: 'aprobar' | 'devolver';
+  /** Pasos a corregir (devolución parcial). */
+  pasos?: string[];
+  /** Devolver todo: rehace sus evidencias desde cero. */
+  todo?: boolean;
+  observaciones: string;
+  /** Eficiencia de quien la realizó, 1–5. */
+  calificacion: number;
+};
+
+/** Quien consulta evidencias del equipo (rol y permisos deciden el alcance). */
+export type TeamEvidenceViewer = {
+  id: number;
+  email?: string | null;
+  roleKey?: string | null;
+  isSuperAdmin?: boolean;
+  permissions?: string[] | null;
+};
 
 export type MyActivitiesViewer = { id: number; email?: string | null };
 
@@ -130,6 +156,7 @@ export class MyActivitiesService {
     private readonly prisma: PrismaService,
     private readonly activities: ActivitiesService,
     private readonly team: ActivityTeamService,
+    private readonly evidence: ActivityEvidenceService,
   ) {}
 
   /**
@@ -217,6 +244,324 @@ export class MyActivitiesService {
     }
 
     return this.team.reschedule(activityId, nueva, motivo || null, companyId, viewer.id);
+  }
+
+  /**
+   * Evidencias del equipo de una actividad, por persona y en orden de la cadena (aunque esté cerrada).
+   * Christian, revisores y el responsable ven a todos; cada encargado ve a quienes la recibieron
+   * después de él (Antonio → su ingeniero); el resto solo lo suyo.
+   */
+  async teamEvidence(viewer: TeamEvidenceViewer, companyId: number | null, activityId: number) {
+    const activity = await this.prisma.activity.findFirst({
+      where: { id: activityId, deletedAt: null, ...(companyId != null ? { companyId } : {}) },
+      select: {
+        id: true,
+        anNumber: true,
+        titulo: true,
+        estatus: true,
+        coreKind: true,
+        assignmentCharge: true,
+        responsableId: true,
+        creadoPorId: true,
+        fechaAsignacion: true,
+        evidencePhotoRequired: true,
+        fechaFinalizacion: true,
+        creador: { select: { id: true, nombre: true, puesto: true, avatarUrl: true } },
+        responsable: { select: { id: true, nombre: true, puesto: true, avatarUrl: true } },
+        assignees: {
+          select: {
+            userId: true,
+            rol: true,
+            asignadoAt: true,
+            asignadoPorId: true,
+            retiradoAt: true,
+            indicaciones: true,
+            user: { select: { id: true, nombre: true, puesto: true, avatarUrl: true } },
+            asignadoPor: { select: { nombre: true } },
+          },
+          orderBy: { asignadoAt: 'asc' },
+        },
+        activityEvidences: {
+          select: {
+            userId: true,
+            status: true,
+            completedAt: true,
+            entryPhotoUrl: true,
+            entryLatitude: true,
+            entryLongitude: true,
+            entryPhotoUploadedAt: true,
+            evidencePhotos: true,
+            evidencePhotosGeo: true,
+            evidencePhotosUploadedAt: true,
+            serviceSheetPdfUrl: true,
+            serviceSheetUploadedAt: true,
+            serviceSheetData: true,
+            serviceSheetCompletedAt: true,
+            exitPhotoUrl: true,
+            exitLatitude: true,
+            exitLongitude: true,
+            exitPhotoUploadedAt: true,
+            reviewStatus: true,
+            reviewNotes: true,
+            reviewedAt: true,
+            reviewedBy: { select: { nombre: true } },
+            rejectedStep: true,
+            rejectedSteps: true,
+            eficienciaScore: true,
+          },
+        },
+        evidenceReviews: {
+          select: {
+            id: true,
+            evidenceUserId: true,
+            decision: true,
+            steps: true,
+            notes: true,
+            score: true,
+            snapshot: true,
+            createdAt: true,
+            reviewer: { select: { nombre: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+    if (!activity) throw new NotFoundException('Actividad no encontrada');
+
+    const despacho = activity.assignmentCharge === 'despacho';
+    type Eslabon = (typeof activity.assignees)[number];
+    // El responsable es parte de la cadena aunque no tenga fila de equipo (reparte o ejecuta).
+    const cadena: Eslabon[] = activity.assignees.some((m) => m.userId === activity.responsableId)
+      ? activity.assignees
+      : [
+          {
+            userId: activity.responsableId,
+            rol: 'LEAD' as Eslabon['rol'],
+            asignadoAt: activity.fechaAsignacion,
+            asignadoPorId: activity.creadoPorId,
+            retiradoAt: null,
+            indicaciones: null,
+            user: activity.responsable,
+            asignadoPor: activity.creador ? { nombre: activity.creador.nombre } : null,
+          },
+          ...activity.assignees,
+        ];
+
+    const email = norm(viewer.email);
+    const perms = new Set((viewer.permissions ?? []).map(String));
+    const todo =
+      Boolean(viewer.isSuperAdmin) ||
+      viewer.roleKey === 'ceo' ||
+      email === CEO_EMAIL ||
+      email === 'developer@nexara.com.mx' ||
+      perms.has('console.admin') ||
+      perms.has('evidences.review');
+    const esResponsable = activity.responsableId === viewer.id;
+    // Quien la creó ve todo, pero solo lectura (salvo que además sea superior de alguien).
+    const esCreador = activity.creadoPorId === viewer.id;
+    const mine =
+      cadena.find((m) => m.userId === viewer.id && !m.retiradoAt) ??
+      cadena.find((m) => m.userId === viewer.id);
+    const soyEncargado = Boolean(mine && !mine.retiradoAt && String(mine.rol) === 'LEAD');
+    // Jefes por organigrama (managerId hacia arriba): el jefe de alguien también lo revisa.
+    const jefesDe = await this.managerChains(cadena.map((m) => m.userId));
+
+    /** Soy encargado por encima de `m`: la recibió después que yo (o a la vez, si `m` no es encargado). */
+    const encimaDe = (m: Eslabon) => {
+      if (!soyEncargado || !mine) return false;
+      const diff = m.asignadoAt.getTime() - mine.asignadoAt.getTime();
+      return diff > MISMO_MOMENTO_MS || (Math.abs(diff) <= MISMO_MOMENTO_MS && String(m.rol) !== 'LEAD');
+    };
+    const reparteM = (m: Eslabon) => despacho && String(m.rol) === 'LEAD';
+    const puedeRevisar = (m: Eslabon) =>
+      m.userId !== viewer.id &&
+      !reparteM(m) &&
+      (todo || esResponsable || Boolean(jefesDe.get(m.userId)?.has(viewer.id)) || encimaDe(m));
+    const puedeVer = (m: Eslabon) =>
+      m.userId === viewer.id ||
+      todo ||
+      esResponsable ||
+      esCreador ||
+      puedeRevisar(m) ||
+      (soyEncargado &&
+        mine != null &&
+        m.asignadoAt.getTime() >= mine.asignadoAt.getTime() - MISMO_MOMENTO_MS);
+
+    const visibles = cadena.filter(puedeVer);
+    if (!visibles.length && !todo && !esResponsable && !esCreador) {
+      throw new ForbiddenException('No participas en esta actividad');
+    }
+
+    const evidenciaDe = new Map(activity.activityEvidences.map((e) => [e.userId, e]));
+    const revisionesDe = new Map<number, typeof activity.evidenceReviews>();
+    for (const r of activity.evidenceReviews) {
+      const list = revisionesDe.get(r.evidenceUserId) ?? [];
+      list.push(r);
+      revisionesDe.set(r.evidenceUserId, list);
+    }
+    const textos = (v: unknown) =>
+      Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : [];
+    const num = (v: unknown) => (v == null ? null : Number(v));
+
+    const members = visibles.map((m) => {
+      const e = evidenciaDe.get(m.userId) ?? null;
+      return {
+        userId: m.userId,
+        nombre: m.user?.nombre ?? '—',
+        puesto: m.user?.puesto ?? null,
+        avatarUrl: m.user?.avatarUrl ?? null,
+        rol: String(m.rol),
+        reparte: despacho && String(m.rol) === 'LEAD',
+        asignadoAt: m.asignadoAt,
+        asignadoPor: m.asignadoPor?.nombre ?? null,
+        retiradoAt: m.retiradoAt,
+        indicaciones: m.indicaciones,
+        pasoA: activity.assignees
+          .filter((o) => o.asignadoPorId === m.userId && o.userId !== m.userId)
+          .map((o) => ({ nombre: o.user?.nombre ?? '—', at: o.asignadoAt })),
+        progressPct: e ? evidenceProgressPct(e.status, activity.coreKind) : 0,
+        /** Puedo aprobarla o devolverla (ya la envió y soy su superior en la cadena). */
+        puedoRevisar: puedeRevisar(m) && e?.status === 'COMPLETED',
+        rejectedSteps: e ? (textos(e.rejectedSteps).length ? textos(e.rejectedSteps) : e.rejectedStep ? [e.rejectedStep] : []) : [],
+        eficienciaScore: e?.eficienciaScore ?? null,
+        revisiones: (revisionesDe.get(m.userId) ?? []).map((r) => ({
+          id: r.id,
+          decision: r.decision,
+          pasos: textos(r.steps),
+          observaciones: r.notes,
+          calificacion: r.score,
+          at: r.createdAt,
+          revisor: r.reviewer?.nombre ?? null,
+          // Copia de lo devuelto: permite ver lo que había aunque lo rehaga desde cero.
+          snapshot: r.decision === 'APROBADA' ? null : r.snapshot,
+        })),
+        evidence: e
+          ? {
+              status: e.status,
+              completedAt: e.completedAt,
+              entryPhotoUrl: e.entryPhotoUrl,
+              entryLatitude: num(e.entryLatitude),
+              entryLongitude: num(e.entryLongitude),
+              entryPhotoUploadedAt: e.entryPhotoUploadedAt,
+              evidencePhotos: e.evidencePhotos ?? [],
+              evidencePhotosGeo: Array.isArray(e.evidencePhotosGeo) ? e.evidencePhotosGeo : null,
+              evidencePhotosUploadedAt: e.evidencePhotosUploadedAt,
+              serviceSheetPdfUrl: e.serviceSheetPdfUrl,
+              serviceSheetUploadedAt: e.serviceSheetUploadedAt,
+              serviceSheetData: e.serviceSheetData,
+              serviceSheetCompletedAt: e.serviceSheetCompletedAt,
+              exitPhotoUrl: e.exitPhotoUrl,
+              exitLatitude: num(e.exitLatitude),
+              exitLongitude: num(e.exitLongitude),
+              exitPhotoUploadedAt: e.exitPhotoUploadedAt,
+              reviewStatus: e.reviewStatus,
+              reviewNotes: e.reviewNotes,
+              reviewedAt: e.reviewedAt,
+              reviewedBy: e.reviewedBy?.nombre ?? null,
+            }
+          : null,
+      };
+    });
+
+    return {
+      activity: {
+        id: activity.id,
+        anNumber: activity.anNumber,
+        titulo: activity.titulo,
+        estatus: activity.estatus,
+        coreKind: activity.coreKind,
+        assignmentCharge: activity.assignmentCharge,
+        evidencePhotoRequired: activity.evidencePhotoRequired,
+        fechaFinalizacion: activity.fechaFinalizacion,
+      },
+      alcance: todo || esResponsable || esCreador ? 'todo' : visibles.length > 1 ? 'equipo' : 'propio',
+      creador: activity.creador?.nombre ?? null,
+      responsable: activity.responsable?.nombre ?? null,
+      /** No puedo revisar a nadie de lo que veo (p. ej. quien la creó). */
+      soloLectura: !visibles.some((m) => puedeRevisar(m)),
+      resumen: {
+        ejecutores: members.filter((m) => !m.reparte).length,
+        terminaron: members.filter((m) => !m.reparte && m.evidence?.status === 'COMPLETED').length,
+        aprobadas: members.filter((m) => !m.reparte && m.evidence?.reviewStatus === 'APPROVED').length,
+        porRevisarMias: members.filter(
+          (m) => m.puedoRevisar && m.evidence?.reviewStatus !== 'APPROVED' && m.evidence?.reviewStatus !== 'REJECTED',
+        ).length,
+      },
+      members,
+    };
+  }
+
+  /**
+   * Aprobar o devolver (algunos pasos o todo) la evidencia de alguien de la cadena.
+   * Observaciones y calificación de eficiencia (1–5) son obligatorias. Devuelve la vista actualizada.
+   */
+  async reviewTeamEvidence(
+    viewer: TeamEvidenceViewer,
+    companyId: number | null,
+    activityId: number,
+    evidenceUserId: number,
+    dto: RevisarEvidenciaDto,
+  ) {
+    const decision = dto?.decision;
+    if (decision !== 'aprobar' && decision !== 'devolver') {
+      throw new BadRequestException('Indica si apruebas o devuelves la evidencia');
+    }
+    const observaciones = String(dto.observaciones ?? '').trim();
+    if (observaciones.length < 5) {
+      throw new BadRequestException(
+        decision === 'aprobar' ? 'Escribe por qué la apruebas' : 'Escribe qué debe corregir y por qué',
+      );
+    }
+    const calificacion = Number(dto.calificacion);
+    if (!Number.isInteger(calificacion) || calificacion < 1 || calificacion > 5) {
+      throw new BadRequestException('Califica su eficiencia de 1 a 5 estrellas');
+    }
+    const todo = decision === 'devolver' && Boolean(dto.todo);
+    const pasos = Array.isArray(dto.pasos) ? dto.pasos.map(String) : [];
+    if (decision === 'devolver' && !todo && pasos.length === 0) {
+      throw new BadRequestException('Elige qué pasos debe corregir o devuelve toda la actividad');
+    }
+
+    const vista = await this.teamEvidence(viewer, companyId, activityId);
+    const m = vista.members.find((x) => x.userId === evidenceUserId);
+    if (!m) throw new NotFoundException('Esa persona no está en esta actividad');
+    if (!m.evidence || m.evidence.status !== 'COMPLETED') {
+      throw new BadRequestException('Solo se revisa la evidencia que ya se envió');
+    }
+    if (!m.puedoRevisar) {
+      throw new ForbiddenException('Solo sus superiores en esta actividad pueden revisar esta evidencia');
+    }
+
+    await this.evidence.reviewEvidence({
+      activityId,
+      evidenceUserId,
+      reviewerId: viewer.id,
+      decision,
+      pasos,
+      todo,
+      observaciones,
+      calificacion,
+      companyId,
+    });
+    return this.teamEvidence(viewer, companyId, activityId);
+  }
+
+  /** Jefes (managerId hacia arriba) de cada usuario. */
+  private async managerChains(userIds: number[]): Promise<Map<number, Set<number>>> {
+    const out = new Map<number, Set<number>>();
+    if (!userIds.length) return out;
+    const users = await this.prisma.user.findMany({ select: { id: true, managerId: true } });
+    const jefeDe = new Map(users.map((u) => [u.id, u.managerId]));
+    for (const id of userIds) {
+      const jefes = new Set<number>();
+      let cur = jefeDe.get(id) ?? null;
+      while (cur != null && cur !== id && !jefes.has(cur)) {
+        jefes.add(cur);
+        cur = jefeDe.get(cur) ?? null;
+      }
+      out.set(id, jefes);
+    }
+    return out;
   }
 
   isAreaManager(email?: string | null): boolean {

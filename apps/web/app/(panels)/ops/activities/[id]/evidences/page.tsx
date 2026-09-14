@@ -4,9 +4,8 @@ import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
-import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
-import ActivityEvidenceReviewPanel from "@/components/ops/ActivityEvidenceReviewPanel";
+import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -21,11 +20,13 @@ export default function ActivityEvidencesPage() {
   const { user } = useUser();
   const v2 = resolveV2RoleKey(user);
   // En despacho, el LEAD solo reparte: no sube evidencias.
-  const myRow = activity?.assignees?.find((m) => m.user?.id === user?.id);
-  const reparte = activity?.assignmentCharge === "despacho" && myRow?.rol === "LEAD";
-  // Core: quien tiene la actividad captura sus evidencias (la API valida); el CEO solo revisa.
+  const myRow = activity?.assignees?.find((m) => m.user?.id === user?.id && !m.retiradoAt);
+  const despacho = activity?.assignmentCharge === "despacho";
+  const soyResponsable = Boolean(user?.id && activity?.responsable?.id === user.id);
+  const reparte = despacho && (myRow?.rol === "LEAD" || (soyResponsable && !myRow));
+  // Core: solo quien la ejecuta captura (equipo o responsable). Christian y los superiores revisan abajo.
   const canUpload = core
-    ? !isCeoEmail(user?.email) && !reparte
+    ? !isCeoEmail(user?.email) && !reparte && (Boolean(myRow) || soyResponsable)
     : v2 === ROLES.ING_CAMPO || v2 === ROLES.ING_SOPORTE || user?.isSuperAdmin;
 
   useEffect(() => {
@@ -41,19 +42,15 @@ export default function ActivityEvidencesPage() {
   if (!activity) return null;
 
   const files = activity.evidencias ?? [];
-  const review = activity.activityEvidence;
-
-  const reviewStatus = review?.reviewStatus ?? null;
-  const reviewVariant = reviewStatus === "APROBADA" || reviewStatus === "APPROVED" ? "positive" : reviewStatus === "RECHAZADA" || reviewStatus === "REJECTED" ? "danger" : review ? "warning" : "default";
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-        <KpiCard label="Archivos" value={files.length} icon="📎" variant={files.length > 0 ? "accent" : "default"} />
-        <KpiCard label="Paquete" value={review ? "Enviado" : "Sin enviar"} icon={review ? "📦" : "⏳"} variant={review ? "accent" : "default"} />
-        <KpiCard label="Revisión" value={(reviewStatus ?? "Pendiente").replace(/_/g, " ")} icon="🔍" variant={reviewVariant} />
-        <KpiCard label="Puede cargar" value={canUpload ? "Sí" : "No"} icon="⬆️" variant={canUpload ? "positive" : "default"} />
-      </div>
+      {!core && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+          <KpiCard label="Archivos" value={files.length} icon="📎" variant={files.length > 0 ? "accent" : "default"} />
+          <KpiCard label="Puede cargar" value={canUpload ? "Sí" : "No"} icon="⬆️" variant={canUpload ? "positive" : "default"} />
+        </div>
+      )}
       {reparte && (
         <DetailSection title="Tú repartes esta actividad">
           <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
@@ -62,36 +59,6 @@ export default function ActivityEvidencesPage() {
           </p>
         </DetailSection>
       )}
-      {review && (
-        <ActivityEvidenceReviewPanel activity={activity} showHeader={false} />
-      )}
-
-      {review && (
-        <DetailSection title="Estado del paquete">
-          <div
-            style={{
-              padding: 14,
-              borderRadius: 10,
-              border: "1px solid var(--border)",
-              marginBottom: 16,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Revisión de evidencias</div>
-              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
-                {review.reviewedBy?.nombre ? `Revisado por ${review.reviewedBy.nombre}` : "Pendiente de revisión"}
-              </div>
-            </div>
-            <Tag variant={review.reviewStatus === "APROBADA" || review.reviewStatus === "APPROVED" ? "positive" : review.reviewStatus === "RECHAZADA" || review.reviewStatus === "REJECTED" ? "danger" : "warning"}>
-              {(review.reviewStatus ?? "PENDIENTE").replace(/_/g, " ")}
-            </Tag>
-          </div>
-        </DetailSection>
-      )}
-
       {canUpload && (
         <DetailSection title="Captura de evidencias">
           <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
@@ -101,9 +68,14 @@ export default function ActivityEvidencesPage() {
         </DetailSection>
       )}
 
-      <DetailSection title={`Archivos (${files.length})`}>
+      <div style={{ marginBottom: 16 }}>
+        <EquipoEvidencias activityId={activity.id} />
+      </div>
+
+      {(files.length > 0 || !core) && (
+      <DetailSection title={`Otros archivos (${files.length})`}>
         {files.length === 0 ? (
-          <EmptyState icon="📷" title="Sin archivos adjuntos" description={canUpload ? "Usa el flujo de arriba para documentar la visita." : "El técnico aún no ha cargado evidencias."} />
+          <EmptyState icon="📎" title="Sin otros archivos" description="Aquí aparecen archivos sueltos adjuntos a la actividad." />
         ) : (
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
             {files.map((ev) => (
@@ -139,6 +111,7 @@ export default function ActivityEvidencesPage() {
           </ul>
         )}
       </DetailSection>
+      )}
     </>
   );
 }
