@@ -29,6 +29,9 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 8. Web evidencias: `canUpload` en Core exige ser del equipo o responsable (antes cualquier superior veía el flujo y la API le creaba una evidencia vacía); el responsable de un despacho sin fila cuenta como «reparte».
 9. **Push que faltaba (commit aparte):** entrada/salida propias, entrada sugerida por ACS y aviso a admins (`AttendanceService.avisar`), hora de comida próxima/vencida y aviso a admins (`LunchBreaksCronService.pushAll`) y «Nuevo acceso detectado» (`AuthService`, resuelve `NotificationsService` con `ModuleRef` porque NotificationsModule importa AuthModule) se escribían con `prisma.notification.create/createMany`: quedaban en la campana sin push ni socket. Ahora pasan por `NotificationsService.createNotification` con `relatedUrl` `/erp/asistencias` o `/erp/my-profile`. En pruebas sin el servicio, asistencia cae al `create` de antes.
 
+10. **Archivos que se borraban en Docker (reporte de Adam 12:24: fotos en negro y PDF vacío en AN-0001).** La API guarda en `/app/uploads` (raíz del proyecto en el contenedor) y el compose de desarrollo solo montaba `./apps/api/uploads`: cada `docker compose build api` + `up -d` borraba todo lo subido. Las fotos, el PDF y la salida de Alejandro en AN-0001 (13–14 sep) se perdieron en los rebuilds de hoy (11:28 y 12:01) y no se pueden recuperar; en BD siguen las rutas (la API responde 404). `docker-compose.yml` ahora monta `./uploads:/app/uploads` como `deploy/docker-compose.nexara.yml` (producción ya lo tenía). Para AN-0001 un superior debe «Devolver → Toda la actividad» para que Alejandro vuelva a subir.
+11. **Visor en `EquipoEvidencias`:** fotos, avatar y visor grande descargan con la sesión y, si el archivo no existe, muestran «Esta foto ya no está en el servidor» (antes cuadro negro). El PDF se descarga con la sesión y se dibuja con `components/PDFViewer.tsx` (pdf.js, `/pdf.worker.min.js`): `<object>` nunca iba a verse porque la CSP trae `object-src 'none'`.
+
 ### Verificado
 
 - `prisma generate` + `tsc --noEmit` API limpio. Web: sin errores nuevos (siguen los 4 previos: CommandPalette ×2, evidence-flow-helpers, module-guides).
@@ -36,6 +39,7 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 - Web: `build web` + `up -d`; `/erp/actividades/1/evidencias` 200; el bundle trae «Devolver este paso» y «Ver lo que se devolvió».
 - Cadena real AN-0001 en BD: Luis (responsable, LEAD) → Antonio (LEAD) → Alejandro (TECNICO); jefe de Alejandro y Carolina = Antonio. Con las reglas: Antonio ve y revisa a Alejandro, no ve a Luis. AN-0001 quedó «Finalizada» por el cierre automático viejo con evidencia sin aprobar: no se migraron datos; la pestaña la muestra «Por revisar».
 - Push: `tsc` API limpio; `jest src/attendance src/auth` 6 suites / 49 pruebas OK; `build api` + `up -d` arrancó sin errores de dependencias.
+- Archivos (12:30): `up -d api` con `./uploads:/app/uploads` montado (se ven los 11 archivos viejos de `uploads/activities`). `tsc` web sin errores nuevos; `build web` + `up -d`; `/erp/actividades/1/evidencias` 200, `/pdf.worker.min.js` 200 (pdf.js 3.11.174 = `pdfjs-dist`); el bundle trae «Esta foto ya no está en el servidor» y «El PDF ya no está en el servidor».
 
 ### Falta probar a mano
 

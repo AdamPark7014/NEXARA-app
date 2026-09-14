@@ -1,9 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import SessionImage from "@/components/SessionImage";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { flattenServiceSheetFields, mapsUrl, resolveAssetUrl } from "@/lib/evidence-display";
@@ -216,11 +216,138 @@ function Estrellas({ valor, size = 14 }: { valor: number; size?: number }) {
   );
 }
 
+type Archivo = { url: string; estado: "cargando" | "listo" | "error" };
+
+/** Descarga con la sesión los archivos protegidos de /uploads y avisa si ya no existen en el servidor. */
+function useArchivoProtegido(src: string | null | undefined, tipo?: string): Archivo {
+  const url = resolveAssetUrl(src);
+  const protegido = url.startsWith("/uploads/");
+  const [archivo, setArchivo] = useState<Archivo>(() =>
+    protegido ? { url: "", estado: "cargando" } : { url, estado: url ? "listo" : "error" },
+  );
+
+  useEffect(() => {
+    if (!url) {
+      setArchivo({ url: "", estado: "error" });
+      return;
+    }
+    if (!protegido) {
+      setArchivo({ url, estado: "listo" });
+      return;
+    }
+    let cancelado = false;
+    let blobUrl: string | null = null;
+    setArchivo({ url: "", estado: "cargando" });
+    void (async () => {
+      try {
+        const res = await fetch(url, { credentials: "include" });
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = await res.blob();
+        if (cancelado) return;
+        // El PDF se embebe como blob con su tipo: así el visor del navegador lo muestra en vez de descargarlo.
+        blobUrl = URL.createObjectURL(tipo ? new Blob([blob], { type: tipo }) : blob);
+        setArchivo({ url: blobUrl, estado: "listo" });
+      } catch {
+        if (!cancelado) setArchivo({ url: "", estado: "error" });
+      }
+    })();
+    return () => {
+      cancelado = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [url, protegido, tipo]);
+
+  return archivo;
+}
+
+function SinArchivo({ alto, texto, icono = "📭" }: { alto?: number; texto: string; icono?: string }) {
+  return (
+    <div
+      role="img"
+      aria-label={texto}
+      style={{
+        height: alto,
+        minHeight: 90,
+        display: "grid",
+        placeContent: "center",
+        justifyItems: "center",
+        gap: 4,
+        padding: 12,
+        textAlign: "center",
+        borderRadius: 12,
+        border: "1px dashed var(--border)",
+        background: "color-mix(in srgb, var(--text-secondary) 6%, var(--surface))",
+        color: "var(--text-secondary)",
+        fontSize: 12.5,
+        lineHeight: 1.35,
+      }}
+    >
+      <span style={{ fontSize: 20 }} aria-hidden>
+        {icono}
+      </span>
+      {texto}
+    </div>
+  );
+}
+
+function FotoProtegida({ url, alt, style, alto }: { url: string; alt: string; style: CSSProperties; alto?: number }) {
+  const foto = useArchivoProtegido(url);
+  const [rota, setRota] = useState(false);
+  if (foto.estado === "cargando") return <SinArchivo alto={alto} icono="⏳" texto="Cargando foto…" />;
+  if (foto.estado === "error" || rota) return <SinArchivo alto={alto} texto="Esta foto ya no está en el servidor" />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={foto.url} alt={alt} style={style} onError={() => setRota(true)} />;
+}
+
+const PDFViewer = dynamic(() => import("@/components/PDFViewer"), {
+  ssr: false,
+  loading: () => <SinArchivo alto={140} icono="⏳" texto="Cargando visor…" />,
+});
+
+/**
+ * El PDF se descarga con la sesión y se dibuja con pdf.js (visor de la web).
+ * `<object>` y el visor de Chrome en iframe los bloquea la CSP (`object-src 'none'`).
+ */
+function VisorPdf({ url }: { url: string }) {
+  const ruta = resolveAssetUrl(url);
+  const [pdf, setPdf] = useState<{ datos: Uint8Array | null; error: boolean }>({ datos: null, error: false });
+
+  useEffect(() => {
+    let cancelado = false;
+    if (!ruta) {
+      setPdf({ datos: null, error: true });
+      return;
+    }
+    setPdf({ datos: null, error: false });
+    void (async () => {
+      try {
+        const res = await fetch(ruta, { credentials: "include" });
+        if (!res.ok) throw new Error(String(res.status));
+        const datos = new Uint8Array(await res.arrayBuffer());
+        if (!cancelado) setPdf({ datos, error: false });
+      } catch {
+        if (!cancelado) setPdf({ datos: null, error: true });
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [ruta]);
+
+  if (pdf.error) {
+    return <SinArchivo alto={140} texto="El PDF ya no está en el servidor: hay que pedir que lo vuelva a subir." />;
+  }
+  if (!pdf.datos) return <SinArchivo alto={140} icono="⏳" texto="Cargando PDF…" />;
+  return <PDFViewer pdfUrl={ruta} pdfData={pdf.datos} fileName="Hoja de servicio.pdf" height="620px" />;
+}
+
 function Avatar({ nombre, url, size = 44 }: { nombre: string; url: string | null; size?: number }) {
-  if (url) {
+  const foto = useArchivoProtegido(url);
+  if (url && foto.estado === "listo") {
     return (
-      <SessionImage
-        src={resolveAssetUrl(url)}
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={foto.url}
         alt=""
         width={size}
         height={size}
@@ -311,16 +438,17 @@ function Miniatura({ foto, onOpen, alto = 132 }: { foto: Foto; onOpen: () => voi
           border: "1px solid var(--border)",
           borderRadius: 12,
           overflow: "hidden",
-          background: "#0f172a",
+          background: "color-mix(in srgb, var(--text-secondary) 8%, var(--surface))",
           cursor: "zoom-in",
           height: alto,
           display: "block",
           width: "100%",
         }}
       >
-        <SessionImage
-          src={resolveAssetUrl(foto.url)}
+        <FotoProtegida
+          url={foto.url}
           alt={foto.titulo}
+          alto={alto}
           style={{ width: "100%", height: alto, objectFit: "cover", display: "block" }}
         />
       </button>
@@ -399,9 +527,11 @@ function Visor({
         </button>
       </div>
       <div onClick={(e) => e.stopPropagation()} style={{ display: "grid", placeItems: "center", minHeight: 0, overflow: "hidden" }}>
-        <SessionImage
-          src={resolveAssetUrl(foto.url)}
+        <FotoProtegida
+          key={foto.url}
+          url={foto.url}
           alt={foto.titulo}
+          alto={240}
           style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 12 }}
         />
       </div>
@@ -568,22 +698,7 @@ function EvidenciaContenido({
 
       {ev.serviceSheetPdfUrl ? (
         <Seccion titulo="Hoja de servicio" hora={fmt(ev.serviceSheetUploadedAt)} accion={devolver("SERVICE_SHEET_PDF")}>
-          <object
-            data={resolveAssetUrl(ev.serviceSheetPdfUrl)}
-            type="application/pdf"
-            aria-label="Hoja de servicio"
-            style={{ width: "100%", height: "min(70vh, 520px)", borderRadius: 12, border: "1px solid var(--border)" }}
-          >
-            <p style={{ margin: 12, fontSize: 13 }}>Este navegador no muestra el PDF aquí; ábrelo con el botón.</p>
-          </object>
-          <a
-            href={resolveAssetUrl(ev.serviceSheetPdfUrl)}
-            target="_blank"
-            rel="noreferrer"
-            style={{ ...btn, justifySelf: "start" }}
-          >
-            📄 Abrir PDF
-          </a>
+          <VisorPdf url={ev.serviceSheetPdfUrl} />
         </Seccion>
       ) : null}
 
