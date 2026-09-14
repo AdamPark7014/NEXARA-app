@@ -29,6 +29,39 @@ const EVIDENCE_STEP_ORDER: ActivityEvidenceStatus[] = [
   'EXIT_PHOTO',
 ];
 
+type PhotoGeo = { latitude: number; longitude: number; capturedAt: string | null };
+
+/**
+ * Ubicación por foto de evidencia enviada por el cliente: se alinea al número de fotos y
+ * descarta coordenadas inválidas (null en su lugar). undefined si no mandó nada útil.
+ */
+function sanitizePhotoGeo(raw: unknown, count: number): Array<PhotoGeo | null> | undefined {
+  if (!Array.isArray(raw) || count <= 0) return undefined;
+  const out: Array<PhotoGeo | null> = [];
+  for (let i = 0; i < count; i++) {
+    const g = raw[i] as { latitude?: unknown; longitude?: unknown; capturedAt?: unknown } | null;
+    const lat = Number(g?.latitude);
+    const lng = Number(g?.longitude);
+    const valid =
+      g != null &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lng) <= 180 &&
+      !(lat === 0 && lng === 0);
+    out.push(
+      valid
+        ? {
+            latitude: lat,
+            longitude: lng,
+            capturedAt: typeof g?.capturedAt === 'string' ? g.capturedAt.slice(0, 40) : null,
+          }
+        : null,
+    );
+  }
+  return out.some(Boolean) ? out : undefined;
+}
+
 @Injectable()
 export class ActivityEvidenceService {
   constructor(
@@ -459,6 +492,8 @@ export class ActivityEvidenceService {
     userId: number,
     photoUrls: string[],
     companyId?: number | null,
+    /** Ubicación donde se tomó cada foto (opcional; clientes viejos no la mandan). */
+    photoGeo?: unknown,
   ) {
     const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
     const activity = await this.loadActivityForTenant(activityId, companyId);
@@ -473,15 +508,18 @@ export class ActivityEvidenceService {
       if (photoUrls.length < 1) {
         throw new BadRequestException('Para mantenimiento e inventario se requiere al menos 1 evidencia visual');
       }
-    } else if (photoUrls.length !== required) {
-      throw new BadRequestException(`Se requieren exactamente ${required} fotos de evidencia`);
+    } else if (photoUrls.length < required) {
+      // Al menos las requeridas: mandar de más no debe bloquear el paso.
+      throw new BadRequestException(`Se requieren al menos ${required} fotos de evidencia`);
     }
 
+    const geo = sanitizePhotoGeo(photoGeo, photoUrls.length);
     return this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
         evidencePhotos: photoUrls,
         evidencePhotosUploadedAt: new Date(),
+        ...(geo ? { evidencePhotosGeo: geo } : {}),
         status: nextEvidenceStep('EVIDENCE_PHOTOS', activity.coreKind),
       },
     });
@@ -1513,14 +1551,18 @@ export class ActivityEvidenceService {
           if (!Array.isArray(data.photoUrls) || data.photoUrls.length < 1) {
             throw new BadRequestException('Requiere al menos 1 evidencia visual');
           }
-        } else if (!Array.isArray(data.photoUrls) || data.photoUrls.length !== required) {
-          throw new BadRequestException(`Se requieren exactamente ${required} fotos de evidencia`);
+        } else if (!Array.isArray(data.photoUrls) || data.photoUrls.length < required) {
+          throw new BadRequestException(`Se requieren al menos ${required} fotos de evidencia`);
         }
-        updateData = {
-          ...updateData,
-          evidencePhotos: data.photoUrls,
-          evidencePhotosUploadedAt: new Date(),
-        };
+        {
+          const geo = sanitizePhotoGeo(data.photoGeo, data.photoUrls.length);
+          updateData = {
+            ...updateData,
+            evidencePhotos: data.photoUrls,
+            evidencePhotosUploadedAt: new Date(),
+            ...(geo ? { evidencePhotosGeo: geo } : {}),
+          };
+        }
         break;
       }
 

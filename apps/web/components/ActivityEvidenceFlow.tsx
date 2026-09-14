@@ -314,7 +314,14 @@ const ActivityEvidenceFlow = () => {
         const currentActivity = actividades.find((activity) => activity.id === activityId);
         const coreKind =
           data.coreKind || data.activity?.coreKind || currentActivity?.coreKind || undefined;
-        const evidencePhotoRequired = Number(data.evidencePhotoRequired) || 4;
+        // El número de fotos vive en la actividad (la API lo manda en data.activity); antes se caía a 4
+        // aunque la actividad pidiera 2 y la API rechazaba el paso por no ser exactamente 2.
+        const evidencePhotoRequired =
+          Number(
+            data.evidencePhotoRequired ??
+              data.activity?.evidencePhotoRequired ??
+              (currentActivity as { evidencePhotoRequired?: number } | undefined)?.evidencePhotoRequired,
+          ) || 4;
         setFlowData({
           activityId,
           step: data.status,
@@ -390,7 +397,10 @@ const ActivityEvidenceFlow = () => {
           step: 'ENTRY_PHOTO',
           evidencePhotos: [],
           coreKind: currentActivity?.coreKind,
-          evidencePhotoRequired: 4,
+          evidencePhotoRequired:
+            Number(
+              (currentActivity as { evidencePhotoRequired?: number } | undefined)?.evidencePhotoRequired,
+            ) || 4,
           indicaciones: currentActivity?.indicaciones ?? null,
         });
         setInventoryItems([]);
@@ -474,7 +484,7 @@ const ActivityEvidenceFlow = () => {
     return new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        () => reject('Error al obtener ubicación'),
+        () => reject('No se pudo obtener tu ubicación: activa el GPS y da permiso de ubicación al navegador'),
         { enableHighAccuracy: true, timeout: 5000 },
       );
     });
@@ -565,10 +575,30 @@ const ActivityEvidenceFlow = () => {
   };
 
   // Foto recién tomada esperando que el usuario la vea y decida (como en Asistencias).
-  const [pendingPhoto, setPendingPhoto] = useState<{
+  type PendingPhoto = {
     kind: 'entry' | 'evidence' | 'exit';
     dataUrl: string;
-  } | null>(null);
+    latitude: number;
+    longitude: number;
+    capturedAt: string;
+  };
+  const [pendingPhoto, setPendingPhoto] = useState<PendingPhoto | null>(null);
+  /** Ubicación de cada foto de evidencia (mismo orden que flowData.evidencePhotos). */
+  const [evidenceGeo, setEvidenceGeo] = useState<
+    Array<{ latitude: number; longitude: number; capturedAt: string } | null>
+  >([]);
+
+  /** Foto y ubicación se capturan juntas (como en Asistencias). */
+  const captureWithLocation = async (kind: PendingPhoto['kind']): Promise<PendingPhoto> => {
+    const [dataUrl, geo] = await Promise.all([capturePhoto(), getGeolocation()]);
+    return {
+      kind,
+      dataUrl,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      capturedAt: new Date().toISOString(),
+    };
+  };
 
   const photoErrorText = (err: unknown) =>
     err instanceof Error ? err.message : typeof err === 'string' ? err : 'Error al capturar foto';
@@ -579,8 +609,7 @@ const ActivityEvidenceFlow = () => {
     setLoading(true);
     setError(null);
     try {
-      const photoUrl = await capturePhoto();
-      setPendingPhoto({ kind: 'entry', dataUrl: photoUrl });
+      setPendingPhoto(await captureWithLocation('entry'));
     } catch (err) {
       setError(photoErrorText(err));
     } finally {
@@ -588,13 +617,14 @@ const ActivityEvidenceFlow = () => {
     }
   };
 
-  const sendEntryPhoto = async (photoUrl: string): Promise<boolean> => {
+  const sendEntryPhoto = async (photo: PendingPhoto): Promise<boolean> => {
     if (!flowData) return false;
     setLoading(true);
     setError(null);
 
     try {
-      const { latitude, longitude } = await getGeolocation();
+      // Misma ubicación que se mostró en la vista previa.
+      const { dataUrl: photoUrl, latitude, longitude } = photo;
 
       const endpoint = isCorrection
         ? `activity-evidence/${flowData.activityId}/resubmit`
@@ -645,8 +675,7 @@ const ActivityEvidenceFlow = () => {
     setLoading(true);
     setError(null);
     try {
-      const photoUrl = await capturePhoto();
-      setPendingPhoto({ kind: 'evidence', dataUrl: photoUrl });
+      setPendingPhoto(await captureWithLocation('evidence'));
     } catch (err) {
       setError(photoErrorText(err));
     } finally {
@@ -654,23 +683,33 @@ const ActivityEvidenceFlow = () => {
     }
   };
 
-  const addEvidencePhoto = (photoUrl: string) => {
+  const addEvidencePhoto = (photo: PendingPhoto) => {
     if (!flowData) return;
-    const updatedPhotos = [...flowData.evidencePhotos, photoUrl];
+    const previas = flowData.evidencePhotos.length;
+    const updatedPhotos = [...flowData.evidencePhotos, photo.dataUrl];
     setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+    setEvidenceGeo((prev) => {
+      const alineadas = prev.slice(0, previas);
+      while (alineadas.length < previas) alineadas.push(null);
+      return [
+        ...alineadas,
+        { latitude: photo.latitude, longitude: photo.longitude, capturedAt: photo.capturedAt },
+      ];
+    });
     setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
   };
 
   /** «Enviar/Usar esta foto» en la vista previa. */
   const confirmPendingPhoto = async () => {
     if (!pendingPhoto) return;
-    const { kind, dataUrl } = pendingPhoto;
+    const { kind } = pendingPhoto;
     if (kind === 'evidence') {
-      addEvidencePhoto(dataUrl);
+      addEvidencePhoto(pendingPhoto);
       setPendingPhoto(null);
       return;
     }
-    const ok = kind === 'entry' ? await sendEntryPhoto(dataUrl) : await sendExitPhoto(dataUrl);
+    const ok =
+      kind === 'entry' ? await sendEntryPhoto(pendingPhoto) : await sendExitPhoto(pendingPhoto);
     if (ok) setPendingPhoto(null);
   };
 
@@ -681,8 +720,7 @@ const ActivityEvidenceFlow = () => {
     setLoading(true);
     setError(null);
     try {
-      const dataUrl = await capturePhoto();
-      setPendingPhoto({ kind, dataUrl });
+      setPendingPhoto(await captureWithLocation(kind));
     } catch (err) {
       setError(photoErrorText(err));
     } finally {
@@ -695,6 +733,7 @@ const ActivityEvidenceFlow = () => {
     if (!flowData) return;
     const updatedPhotos = flowData.evidencePhotos.filter((_, i) => i !== index);
     setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+    setEvidenceGeo((prev) => prev.filter((_, i) => i !== index));
     setError(null);
   };
 
@@ -764,9 +803,11 @@ const ActivityEvidenceFlow = () => {
         ? `activity-evidence/${flowData.activityId}/resubmit`
         : `activity-evidence/${flowData.activityId}/evidence-photos`;
 
+      // Cada foto viaja con la ubicación donde se tomó (null si es una foto previa sin GPS).
+      const photoGeo = flowData.evidencePhotos.map((_, i) => evidenceGeo[i] ?? null);
       const body = isCorrection
-        ? { step: 'EVIDENCE_PHOTOS', data: { photoUrls: flowData.evidencePhotos } }
-        : { photoUrls: flowData.evidencePhotos };
+        ? { step: 'EVIDENCE_PHOTOS', data: { photoUrls: flowData.evidencePhotos, photoGeo } }
+        : { photoUrls: flowData.evidencePhotos, photoGeo };
 
       const res = await fetch(buildApiUrl(endpoint), {
         method: 'POST',
@@ -949,8 +990,7 @@ const ActivityEvidenceFlow = () => {
       }
 
       // Se toma y se muestra; se envía cuando el usuario confirma en la vista previa.
-      const photoUrl = await capturePhoto();
-      setPendingPhoto({ kind: 'exit', dataUrl: photoUrl });
+      setPendingPhoto(await captureWithLocation('exit'));
     } catch (err) {
       setError(photoErrorText(err));
     } finally {
@@ -959,13 +999,14 @@ const ActivityEvidenceFlow = () => {
   };
 
   // Paso 5 (confirmado): enviar la foto de salida que el usuario ya vio.
-  const sendExitPhoto = async (photoUrl: string): Promise<boolean> => {
+  const sendExitPhoto = async (photo: PendingPhoto): Promise<boolean> => {
     if (!flowData) return false;
     setLoading(true);
     setError(null);
 
     try {
-      const { latitude, longitude } = await getGeolocation();
+      // Misma ubicación que se mostró en la vista previa.
+      const { dataUrl: photoUrl, latitude, longitude } = photo;
 
       const endpoint = isCorrection
         ? `activity-evidence/${flowData.activityId}/resubmit`
@@ -1045,6 +1086,140 @@ const ActivityEvidenceFlow = () => {
   return (
     <div className={`card ${styles.flowCard}`}>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+      {pendingPhoto ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Revisa tu foto"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            background: 'rgba(15, 23, 42, 0.6)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 520,
+              background: 'var(--surface)',
+              color: 'inherit',
+              border: '1px solid var(--border)',
+              borderRadius: 18,
+              padding: 18,
+              display: 'grid',
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>
+                {pendingPhoto.kind === 'entry'
+                  ? 'Tu foto de entrada'
+                  : pendingPhoto.kind === 'exit'
+                    ? 'Tu foto de salida'
+                    : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
+                ¿Se ve bien? Si salió oscura o movida, toma otra.
+              </div>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={pendingPhoto.dataUrl}
+              alt="Foto que tomaste"
+              style={{
+                width: '100%',
+                maxHeight: '55vh',
+                objectFit: 'contain',
+                borderRadius: 12,
+                background: '#000',
+              }}
+            />
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+              📍 Ubicación capturada: {pendingPhoto.latitude.toFixed(5)}, {pendingPhoto.longitude.toFixed(5)} ·{' '}
+              <a
+                href={`https://www.google.com/maps?q=${pendingPhoto.latitude},${pendingPhoto.longitude}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: 'var(--primary)', fontWeight: 650 }}
+              >
+                Ver en mapa
+              </a>
+            </div>
+            {error ? <div style={{ fontSize: 13, color: '#b91c1c' }}>❌ {error}</div> : null}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => void confirmPendingPhoto()}
+                disabled={loading}
+                style={{
+                  flex: '1 1 160px',
+                  minHeight: 48,
+                  border: 'none',
+                  borderRadius: 12,
+                  background: 'var(--primary)',
+                  color: '#fff',
+                  fontWeight: 750,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  opacity: loading ? 0.7 : 1,
+                }}
+              >
+                {loading
+                  ? '⏳ Enviando…'
+                  : pendingPhoto.kind === 'evidence'
+                    ? '✓ Usar esta foto'
+                    : '✓ Enviar esta foto'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void retakePendingPhoto()}
+                disabled={loading}
+                style={{
+                  flex: '1 1 120px',
+                  minHeight: 48,
+                  borderRadius: 12,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'inherit',
+                  fontWeight: 650,
+                  fontSize: 15,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                📷 Tomar otra
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingPhoto(null);
+                  setError(null);
+                }}
+                disabled={loading}
+                style={{
+                  minHeight: 48,
+                  padding: '0 14px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  fontWeight: 650,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {error && <div className={styles.alertError}>❌ {error}</div>}
 
       {successMsg && <div className={styles.alertSuccess}>{successMsg}</div>}
@@ -1521,6 +1696,12 @@ const ActivityEvidenceFlow = () => {
               </button>
             )}
           </div>
+          {/* El aviso de arriba queda fuera de vista con 4 fotos: se repite junto al botón. */}
+          {error ? (
+            <div className={styles.alertError} role="alert" style={{ marginTop: 12 }}>
+              ❌ {error}
+            </div>
+          ) : null}
         </div>
       )}
 

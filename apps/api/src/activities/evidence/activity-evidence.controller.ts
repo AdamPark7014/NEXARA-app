@@ -102,7 +102,12 @@ export class ActivityEvidenceController {
   @Post(':activityId/evidence-photos')
   async saveEvidencePhotos(
     @Param('activityId') activityId: string,
-    @Body() body: { photoUrls: string[] },
+    @Body()
+    body: {
+      photoUrls: string[];
+      /** Ubicación donde se tomó cada foto (mismo orden que photoUrls). */
+      photoGeo?: Array<{ latitude: number; longitude: number; capturedAt?: string } | null>;
+    },
     @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
@@ -119,6 +124,7 @@ export class ActivityEvidenceController {
       req.user.id,
       processedUrls,
       companyId,
+      body.photoGeo,
     );
   }
 

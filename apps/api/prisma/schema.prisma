@@ -1193,6 +1193,8 @@ model ActivityEvidence {
   // Paso 2: Evidencias (N fotos configurables 2–8)
   evidencePhotos           String[]  @default([]) // Array de URLs
   evidencePhotosUploadedAt DateTime?
+  /// Ubicación donde se tomó cada foto de evidencia (mismo orden que evidencePhotos): [{latitude, longitude, capturedAt}]
+  evidencePhotosGeo        Json?
 
   // Paso 3: Hoja de servicio (PDF) — solo coreKind=servicio
   serviceSheetPdfUrl     String?   @db.VarChar(500)
