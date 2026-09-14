@@ -485,6 +485,27 @@ export class ActivityTeamService {
       }),
     ]);
 
+    // Revisiones de evidencia (aprobada / devuelta) y cuándo terminó cada quien su evidencia.
+    const [revisiones, terminadas] = await Promise.all([
+      this.prisma.activityEvidenceReview.findMany({
+        where: { activityId, ...companyWhere(tenantId) },
+        select: {
+          id: true,
+          decision: true,
+          score: true,
+          notes: true,
+          createdAt: true,
+          reviewer: { select: { nombre: true } },
+          evidenceUser: { select: { nombre: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.activityEvidence.findMany({
+        where: { activityId, completedAt: { not: null } },
+        select: { completedAt: true },
+      }),
+    ]);
+
     const fmtAgenda = (d: Date | null | undefined) =>
       d
         ? new Date(d).toLocaleString('es-MX', {
@@ -690,7 +711,7 @@ export class ActivityTeamService {
         icon: '📝',
       });
     }
-    if (evidence?.reviewedAt) {
+    if (evidence?.reviewedAt && revisiones.length === 0) {
       events.push({
         id: 'ev-review',
         at: new Date(evidence.reviewedAt).toISOString(),
@@ -701,9 +722,17 @@ export class ActivityTeamService {
       });
     }
 
-    // Tipo 3 del registro: cuándo se cumplió, contra lo programado.
-    if (activity.fechaFinalizacion) {
-      const fin = new Date(activity.fechaFinalizacion);
+    // Tipo 3 del registro: cuándo se cumplió (terminó el trabajo), contra lo programado.
+    // La aprobación llega después; la hora de cumplimiento es la de la última evidencia enviada.
+    const ultimaEvidencia = terminadas.reduce<Date | null>(
+      (max, e) => (e.completedAt && (!max || e.completedAt > max) ? e.completedAt : max),
+      null,
+    );
+    const cumplidaAt = /validar|finaliz/i.test(activity.estatus)
+      ? (ultimaEvidencia ?? activity.fechaFinalizacion)
+      : activity.fechaFinalizacion;
+    if (cumplidaAt) {
+      const fin = new Date(cumplidaAt);
       const prog = programadaEn(fin);
       const retrasoMin = prog ? Math.round((fin.getTime() - new Date(prog).getTime()) / 60_000) : null;
       const puntualidad =
@@ -719,6 +748,24 @@ export class ActivityTeamService {
         title: 'Cumplida',
         subtitle: prog ? `Programada: ${fmtAgenda(prog)} · ${puntualidad}` : undefined,
         icon: '✅',
+      });
+    }
+
+    for (const r of revisiones) {
+      const quien = r.reviewer?.nombre ?? 'Un superior';
+      const estrellas = r.score ? `${'★'.repeat(r.score)}${'☆'.repeat(Math.max(0, 5 - r.score))}` : null;
+      events.push({
+        id: `review-${r.id}`,
+        at: r.createdAt.toISOString(),
+        kind: 'revision',
+        title:
+          r.decision === 'APROBADA'
+            ? `Aprobada por ${quien}`
+            : r.decision === 'DEVUELTA_TODO'
+              ? `Devuelta completa por ${quien}`
+              : `Devuelta para corregir por ${quien}`,
+        subtitle: [r.evidenceUser?.nombre, estrellas, r.notes].filter(Boolean).join(' · '),
+        icon: r.decision === 'APROBADA' ? '✅' : '↩️',
       });
     }
 

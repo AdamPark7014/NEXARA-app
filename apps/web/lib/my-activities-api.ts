@@ -100,6 +100,120 @@ export function reprogramarDespacho(
   });
 }
 
+/** Evidencia de una persona del equipo (GET /me/activities/:id/evidencias). */
+export type TeamEvidenceMember = {
+  userId: number;
+  nombre: string;
+  puesto: string | null;
+  avatarUrl: string | null;
+  rol: string;
+  /** En despacho solo reparte (no sube evidencias). */
+  reparte: boolean;
+  asignadoAt: string;
+  asignadoPor: string | null;
+  retiradoAt: string | null;
+  indicaciones: string | null;
+  pasoA: Array<{ nombre: string; at: string }>;
+  progressPct: number;
+  /** Puedo aprobarla o devolverla (ya la envió y soy su superior en la cadena). */
+  puedoRevisar: boolean;
+  /** Pasos que le devolvieron y está corrigiendo. */
+  rejectedSteps: string[];
+  /** Eficiencia (1–5) de su última revisión. */
+  eficienciaScore: number | null;
+  /** Más reciente primero. */
+  revisiones: TeamEvidenceReview[];
+  evidence: TeamEvidence | null;
+};
+
+/** Lo que subió una persona (también la copia guardada al devolverla). */
+export type TeamEvidenceSnapshot = {
+  entryPhotoUrl: string | null;
+  entryLatitude: number | null;
+  entryLongitude: number | null;
+  entryPhotoUploadedAt: string | null;
+  evidencePhotos: string[];
+  evidencePhotosGeo: Array<{ latitude: number; longitude: number; capturedAt: string | null } | null> | null;
+  evidencePhotosUploadedAt: string | null;
+  serviceSheetPdfUrl: string | null;
+  serviceSheetUploadedAt: string | null;
+  serviceSheetData: unknown;
+  serviceSheetCompletedAt: string | null;
+  exitPhotoUrl: string | null;
+  exitLatitude: number | null;
+  exitLongitude: number | null;
+  exitPhotoUploadedAt: string | null;
+};
+
+export type TeamEvidence = TeamEvidenceSnapshot & {
+  status: string;
+  completedAt: string | null;
+  reviewStatus: string | null;
+  reviewNotes: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+};
+
+export type TeamEvidenceReview = {
+  id: number;
+  decision: "APROBADA" | "DEVUELTA_PASOS" | "DEVUELTA_TODO";
+  pasos: string[];
+  observaciones: string;
+  calificacion: number | null;
+  at: string;
+  revisor: string | null;
+  /** Copia de lo devuelto (null en aprobaciones). */
+  snapshot: TeamEvidenceSnapshot | null;
+};
+
+export type TeamEvidenceResponse = {
+  activity: {
+    id: number;
+    anNumber: string;
+    titulo: string;
+    estatus: string;
+    coreKind: string | null;
+    assignmentCharge: string | null;
+    evidencePhotoRequired: number;
+    fechaFinalizacion: string | null;
+  };
+  /** todo: toda la cadena · equipo: de ti hacia abajo · propio: solo lo tuyo. */
+  alcance: "todo" | "equipo" | "propio";
+  creador: string | null;
+  responsable: string | null;
+  /** No puedes revisar a nadie de lo que ves (p. ej. quien la creó). */
+  soloLectura: boolean;
+  resumen: { ejecutores: number; terminaron: number; aprobadas: number; porRevisarMias: number };
+  members: TeamEvidenceMember[];
+};
+
+export type RevisarEvidenciaInput = {
+  decision: "aprobar" | "devolver";
+  pasos?: string[];
+  /** Devolver todo: rehace sus evidencias desde cero. */
+  todo?: boolean;
+  observaciones: string;
+  /** Eficiencia de 1 a 5. */
+  calificacion: number;
+};
+
+export function fetchTeamEvidence(token: string, activityId: number): Promise<TeamEvidenceResponse> {
+  return erpFetch<TeamEvidenceResponse>(`me/activities/${activityId}/evidencias`, token);
+}
+
+/** Superior en la cadena aprueba o devuelve la evidencia de alguien (POST …/evidencias/:userId/revision). */
+export function revisarEvidencia(
+  token: string,
+  activityId: number,
+  userId: number,
+  input: RevisarEvidenciaInput,
+): Promise<TeamEvidenceResponse> {
+  return erpFetch<TeamEvidenceResponse>(`me/activities/${activityId}/evidencias/${userId}/revision`, token, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function fetchMyActivities(token: string): Promise<MyActivitiesResponse> {
   return erpFetch<MyActivitiesResponse>("me/activities", token);
 }

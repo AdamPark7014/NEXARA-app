@@ -51,6 +51,7 @@ export type ActivityDetail = {
     acsExitedAt?: string | null;
     acsLeftSite?: boolean | null;
     acsEntryDoor?: string | null;
+    retiradoAt?: string | null;
     user?: { id: number; nombre: string; email?: string };
   }>;
   fechaMaxima?: string | null;
