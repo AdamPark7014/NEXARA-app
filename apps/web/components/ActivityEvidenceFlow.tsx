@@ -12,6 +12,7 @@ import {
   type EvidenceStep,
 } from '@/lib/evidence-flow-helpers';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
 import { Socket } from 'socket.io-client';
@@ -443,40 +444,19 @@ const ActivityEvidenceFlow = () => {
     };
   }, [user?.token, selectedActivityId]);
 
-  // Capturar foto desde cámara
-  const capturePhoto = async (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      navigator.mediaDevices
-        .getUserMedia({
-          video: {
-            facingMode: cameraFacing,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-        })
-        .then((stream) => {
-          const video = document.createElement('video');
-          video.srcObject = stream;
-          video.onloadedmetadata = () => {
-            video.play();
-            setTimeout(() => {
-              const canvas = document.createElement('canvas');
-              canvas.width = Math.min(video.videoWidth, 640);
-              canvas.height = Math.min(video.videoHeight, 480);
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const photoUrl = canvas.toDataURL('image/jpeg', 0.4);
-                stream.getTracks().forEach((track) => track.stop());
-                resolve(photoUrl);
-              } else {
-                reject('Error al capturar foto');
-              }
-            }, 100);
-          };
-        })
-        .catch(() => reject('Error al acceder a cámara'));
-    });
+  // Toma un cuadro de la cámara en vivo, cuando el usuario ya se acomodó (antes disparaba sola a los 100 ms).
+  const grabFrame = (video: HTMLVideoElement): string | null => {
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) return null;
+    const scale = Math.min(1, 1280 / w);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.6);
   };
 
   // Obtener ubicación
@@ -588,33 +568,114 @@ const ActivityEvidenceFlow = () => {
     Array<{ latitude: number; longitude: number; capturedAt: string } | null>
   >([]);
 
-  /** Foto y ubicación se capturan juntas (como en Asistencias). */
-  const captureWithLocation = async (kind: PendingPhoto['kind']): Promise<PendingPhoto> => {
-    const [dataUrl, geo] = await Promise.all([capturePhoto(), getGeolocation()]);
-    return {
-      kind,
-      dataUrl,
-      latitude: geo.latitude,
-      longitude: geo.longitude,
-      capturedAt: new Date().toISOString(),
+  /** Cámara en vivo (como en Asistencias): el usuario se acomoda y toca «Tomar foto». */
+  const [liveKind, setLiveKind] = useState<PendingPhoto['kind'] | null>(null);
+  const [liveReady, setLiveReady] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const liveVideoRef = useRef<HTMLVideoElement | null>(null);
+  const liveStreamRef = useRef<MediaStream | null>(null);
+  const liveGeoRef = useRef<{ latitude: number; longitude: number } | null>(null);
+
+  const stopLiveStream = useCallback(() => {
+    liveStreamRef.current?.getTracks().forEach((track) => track.stop());
+    liveStreamRef.current = null;
+    setLiveReady(false);
+  }, []);
+
+  // Abre la cámara al entrar en vivo y la reabre al cambiar frontal/trasera.
+  useEffect(() => {
+    if (!liveKind) {
+      stopLiveStream();
+      return;
+    }
+    let cancelled = false;
+    // Algunos teléfonos no abren una segunda cámara si la anterior sigue activa.
+    liveStreamRef.current?.getTracks().forEach((track) => track.stop());
+    liveStreamRef.current = null;
+    setLiveError(null);
+    setLiveReady(false);
+    navigator.mediaDevices
+      .getUserMedia({
+        video: { facingMode: cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        liveStreamRef.current = stream;
+        const video = liveVideoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          void video.play().catch(() => undefined);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLiveError('No se pudo abrir la cámara: revisa el permiso de cámara del navegador');
+      });
+    return () => {
+      cancelled = true;
     };
+  }, [liveKind, cameraFacing, stopLiveStream]);
+
+  // Al salir de la pantalla, apaga la cámara.
+  useEffect(() => () => stopLiveStream(), [stopLiveStream]);
+
+  const openCamera = (kind: PendingPhoto['kind']) => {
+    setError(null);
+    setPendingPhoto(null);
+    liveGeoRef.current = null;
+    // La ubicación se busca desde que abre la cámara para tenerla lista al tomar la foto.
+    getGeolocation()
+      .then((geo) => {
+        liveGeoRef.current = geo;
+      })
+      .catch(() => undefined);
+    setLiveKind(kind);
+  };
+
+  const closeCamera = () => {
+    setLiveKind(null);
+    setLiveError(null);
+  };
+
+  /** «Tomar foto»: congela el cuadro actual y pasa a la vista previa con ubicación. */
+  const shootLive = async () => {
+    const video = liveVideoRef.current;
+    if (!liveKind || !video) return;
+    const dataUrl = grabFrame(video);
+    if (!dataUrl) {
+      setLiveError('La cámara aún no está lista; espera un segundo');
+      return;
+    }
+    const kind = liveKind;
+    setLoading(true);
+    setLiveError(null);
+    try {
+      const geo = liveGeoRef.current ?? (await getGeolocation());
+      setPendingPhoto({
+        kind,
+        dataUrl,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        capturedAt: new Date().toISOString(),
+      });
+      setLiveKind(null);
+    } catch (err) {
+      setLiveError(photoErrorText(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const photoErrorText = (err: unknown) =>
     err instanceof Error ? err.message : typeof err === 'string' ? err : 'Error al capturar foto';
 
-  // Paso 1: Foto de entrada — se toma y se muestra; se envía al confirmar.
+  // Paso 1: Foto de entrada — abre la cámara en vivo; se envía al confirmar la vista previa.
   const handleEntryPhoto = async () => {
     if (!flowData) return;
-    setLoading(true);
-    setError(null);
-    try {
-      setPendingPhoto(await captureWithLocation('entry'));
-    } catch (err) {
-      setError(photoErrorText(err));
-    } finally {
-      setLoading(false);
-    }
+    openCamera('entry');
   };
 
   const sendEntryPhoto = async (photo: PendingPhoto): Promise<boolean> => {
@@ -669,18 +730,10 @@ const ActivityEvidenceFlow = () => {
     }
   };
 
-  // Paso 2: Tomar foto de evidencia — se muestra y se agrega al confirmar.
+  // Paso 2: Foto de evidencia — abre la cámara en vivo; se agrega al confirmar la vista previa.
   const handleAddEvidencePhoto = async () => {
     if (!flowData) return;
-    setLoading(true);
-    setError(null);
-    try {
-      setPendingPhoto(await captureWithLocation('evidence'));
-    } catch (err) {
-      setError(photoErrorText(err));
-    } finally {
-      setLoading(false);
-    }
+    openCamera('evidence');
   };
 
   const addEvidencePhoto = (photo: PendingPhoto) => {
@@ -713,19 +766,10 @@ const ActivityEvidenceFlow = () => {
     if (ok) setPendingPhoto(null);
   };
 
-  /** «Tomar otra»: repite la captura del mismo paso. */
+  /** «Tomar otra»: vuelve a la cámara en vivo del mismo paso. */
   const retakePendingPhoto = async () => {
     if (!pendingPhoto) return;
-    const kind = pendingPhoto.kind;
-    setLoading(true);
-    setError(null);
-    try {
-      setPendingPhoto(await captureWithLocation(kind));
-    } catch (err) {
-      setError(photoErrorText(err));
-    } finally {
-      setLoading(false);
-    }
+    openCamera(pendingPhoto.kind);
   };
 
   // Remover foto de evidencia
@@ -989,8 +1033,8 @@ const ActivityEvidenceFlow = () => {
         }
       }
 
-      // Se toma y se muestra; se envía cuando el usuario confirma en la vista previa.
-      setPendingPhoto(await captureWithLocation('exit'));
+      // Abre la cámara en vivo; se envía cuando el usuario confirma la vista previa.
+      openCamera('exit');
     } catch (err) {
       setError(photoErrorText(err));
     } finally {
@@ -1086,7 +1130,8 @@ const ActivityEvidenceFlow = () => {
   return (
     <div className={`card ${styles.flowCard}`}>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-      {pendingPhoto ? (
+      {/* Portal a body: dentro de la tarjeta la capa quedaba atrapada y se encimaba con la página. */}
+      {pendingPhoto && typeof document !== 'undefined' ? createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -1218,8 +1263,160 @@ const ActivityEvidenceFlow = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
+      {liveKind && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Cámara"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 10000,
+                background: 'rgba(15, 23, 42, 0.75)',
+                display: 'grid',
+                placeItems: 'center',
+                padding: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  maxWidth: 560,
+                  background: 'var(--surface)',
+                  color: 'inherit',
+                  border: '1px solid var(--border)',
+                  borderRadius: 18,
+                  padding: 18,
+                  display: 'grid',
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 800 }}>
+                    {liveKind === 'entry'
+                      ? 'Foto de entrada'
+                      : liveKind === 'exit'
+                        ? 'Foto de salida'
+                        : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    Acomódate o encuadra bien y toca «Tomar foto».
+                  </div>
+                </div>
+                <div
+                  style={{
+                    position: 'relative',
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    background: '#000',
+                    minHeight: 220,
+                  }}
+                >
+                  <video
+                    ref={liveVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    onLoadedData={() => setLiveReady(true)}
+                    style={{
+                      width: '100%',
+                      maxHeight: '55vh',
+                      display: 'block',
+                      objectFit: 'contain',
+                      // Frontal en espejo, como un espejo real; la foto se guarda sin espejo.
+                      transform: cameraFacing === 'user' ? 'scaleX(-1)' : undefined,
+                    }}
+                  />
+                  {!liveReady && !liveError ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'grid',
+                        placeItems: 'center',
+                        color: '#fff',
+                        fontSize: 14,
+                      }}
+                    >
+                      Abriendo cámara…
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                  📍 Al tomar la foto se guarda tu ubicación.
+                </div>
+                {liveError ? <div style={{ fontSize: 13, color: '#b91c1c' }}>❌ {liveError}</div> : null}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => void shootLive()}
+                    disabled={!liveReady || loading}
+                    style={{
+                      flex: '1 1 160px',
+                      minHeight: 52,
+                      border: 'none',
+                      borderRadius: 12,
+                      background: 'var(--primary)',
+                      color: '#fff',
+                      fontWeight: 800,
+                      fontSize: 16,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      opacity: !liveReady || loading ? 0.6 : 1,
+                    }}
+                  >
+                    {loading ? '⏳ Ubicando…' : '📸 Tomar foto'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
+                    }
+                    disabled={loading}
+                    style={{
+                      flex: '1 1 120px',
+                      minHeight: 52,
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'inherit',
+                      fontWeight: 650,
+                      fontSize: 15,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    🔄 {cameraFacing === 'environment' ? 'Usar frontal' : 'Usar trasera'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeCamera}
+                    disabled={loading}
+                    style={{
+                      minHeight: 52,
+                      padding: '0 14px',
+                      borderRadius: 12,
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-secondary)',
+                      fontWeight: 650,
+                      fontSize: 14,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       {error && <div className={styles.alertError}>❌ {error}</div>}
 
       {successMsg && <div className={styles.alertSuccess}>{successMsg}</div>}
