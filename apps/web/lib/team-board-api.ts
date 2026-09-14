@@ -1,7 +1,7 @@
 import { erpFetch } from "@/lib/erp-api";
 
 export type BoardActivityBucket = "daily" | "projects" | "services";
-export type BoardUserStatus = "activo" | "inactivo" | "atrasado" | "sin_actividad";
+export type BoardUserStatus = "activo" | "inactivo" | "atrasado" | "libre" | "sin_actividad";
 
 export type TeamBoardActivity = {
   id: number;
@@ -43,6 +43,22 @@ export type TeamBoardUser = {
   workedMinutes: number | null;
   activityStartedAt: string | null;
   activityElapsedMinutes: number | null;
+  /** Atrasado: minutos pasados de la fecha máxima de lo que está haciendo. */
+  currentLateMinutes?: number | null;
+  /** Libre: desde cuándo no tiene nada abierto (terminó su última actividad de hoy). */
+  idleSinceAt?: string | null;
+  /** Libre: última actividad que terminó hoy y con cuánto atraso (null = sin fecha máxima). */
+  lastFinished?: {
+    id: number;
+    anNumber: string;
+    titulo: string;
+    finishedAt: string;
+    lateMinutes: number | null;
+  } | null;
+  /** Actividades suyas entregadas que nadie ha aprobado. */
+  enEsperaAprobacion?: number;
+  /** Actividades con evidencia devuelta que está corrigiendo. */
+  enCorreccion?: number;
 };
 
 export type TeamBoardHistoryItem = {
@@ -75,15 +91,17 @@ export type TeamBoardResponse = {
 export const STATUS_LABELS: Record<BoardUserStatus, string> = {
   activo: "Activo",
   atrasado: "Atrasado",
-  inactivo: "Inactivo",
+  libre: "Terminó",
   sin_actividad: "Sin actividad",
+  inactivo: "Inactivo",
 };
 
 export const STATUS_COLORS: Record<BoardUserStatus, string> = {
   activo: "#16a34a",
   atrasado: "#dc2626",
+  libre: "#0891b2",
+  sin_actividad: "#94a3b8",
   inactivo: "#94a3b8",
-  sin_actividad: "#2563eb",
 };
 
 export function formatMinutes(mins: number | null | undefined): string {
