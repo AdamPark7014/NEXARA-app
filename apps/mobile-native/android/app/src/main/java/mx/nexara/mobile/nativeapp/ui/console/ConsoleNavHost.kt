@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,10 +56,10 @@ import mx.nexara.mobile.nativeapp.ui.chat.ChatScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.ActividadesScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.BoardPersonScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.ConsoleActivityDetailByIdScreen
+import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityFormScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleClientsScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
-import mx.nexara.mobile.nativeapp.ui.console.screens.OpsNewActivityScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
@@ -76,7 +77,14 @@ internal object ConsoleRoutes {
     const val Notifications = "console/notifications"
     const val OfflineQueue = "console/offline-queue"
     const val ActivityDetail = "console/activity/{id}?tab={tab}"
-    const val NewActivity = "console/activities/new?requestId={requestId}&self={self}"
+    /**
+     * Alta Core: `self=true` = /erp/mis-actividades/nueva; `userId` = /erp/pizarra/:userId/asignar.
+     */
+    const val NewActivity = "console/activities/new?self={self}&userId={userId}"
+
+    fun selfAssign(): String = "console/activities/new?self=true&userId=-1"
+
+    fun assignTo(userId: Long): String = "console/activities/new?self=false&userId=$userId"
 
     /** El día de una persona del equipo (/erp/pizarra/:userId). */
     const val BoardPerson = "console/board/{userId}"
@@ -132,6 +140,8 @@ fun ConsoleNavHost(
     var actividadesVista by remember { mutableStateOf<String?>(null) }
     /** `comidas` cuando un aviso de hora de comida abre Asistencias. */
     var attendanceTab by remember { mutableStateOf<String?>(null) }
+    /** `?nueva=` de la web: la actividad recién auto-asignada se resalta en Mis actividades. */
+    var nuevaActividadId by remember { mutableStateOf<Long?>(null) }
     var unreadCount by remember { mutableIntStateOf(0) }
 
     val modules = remember(user) { CoreMenu.modulesFor(user) }
@@ -188,7 +198,7 @@ fun ConsoleNavHost(
         navController.navigate("console/board/$personId") { launchSingleTop = true }
     }
     val openSelfAssign: () -> Unit = {
-        navController.navigate("console/activities/new?requestId=-1&self=true") { launchSingleTop = true }
+        navController.navigate(ConsoleRoutes.selfAssign()) { launchSingleTop = true }
     }
 
     val currentTitle = when (currentRoute) {
@@ -294,18 +304,32 @@ fun ConsoleNavHost(
                     onOpenActivity = openActivity,
                     onOpenPerson = openPerson,
                     onSelfAssign = openSelfAssign,
+                    highlightActivityId = nuevaActividadId,
                 )
+                // El resaltado dura mientras sigues en la lista; al salir se olvida.
+                DisposableEffect(Unit) { onDispose { nuevaActividadId = null } }
             }
             nxComposable(ConsoleRoutes.NewActivity, style = NxNavAnimStyle.Modal) { entry ->
-                val rid = entry.arguments?.getString("requestId")?.toLongOrNull()
                 val self = entry.arguments?.getString("self") == "true"
-                OpsNewActivityScreen(
-                    requestId = if (rid != null && rid > 0) rid else null,
+                val targetId = entry.arguments?.getString("userId")?.toLongOrNull()?.takeIf { it > 0L }
+                CoreActivityFormScreen(
                     selfAssign = self,
-                    onBack = { navController.popBackStack() },
+                    targetUserId = targetId,
+                    onCancel = { navController.popBackStack() },
                     onCreated = { id ->
-                        navController.navigate("console/activity/$id") { launchSingleTop = true }
+                        if (self) {
+                            // Web: /erp/pizarra?vista=mias&nueva=:id — de vuelta a la lista, resaltada.
+                            actividadesVista = "mias"
+                            nuevaActividadId = id
+                            if (!navController.popBackStack(ConsoleRoutes.Activities, inclusive = false)) {
+                                navController.navigate(ConsoleRoutes.Activities) { launchSingleTop = true }
+                            }
+                        } else {
+                            // Web: /erp/pizarra/:userId — de vuelta al día de la persona (se recarga).
+                            navController.popBackStack()
+                        }
                     },
+                    onAssignOther = { otherId -> navController.navigate(ConsoleRoutes.assignTo(otherId)) },
                 )
             }
             nxComposable(ConsoleRoutes.Attendance) {
@@ -355,7 +379,7 @@ fun ConsoleNavHost(
                     userId = personId,
                     onOpenActivity = openActivity,
                     onAssign = {
-                        navController.navigate("console/activities/new?requestId=-1") { launchSingleTop = true }
+                        navController.navigate(ConsoleRoutes.assignTo(personId)) { launchSingleTop = true }
                     },
                 )
             }

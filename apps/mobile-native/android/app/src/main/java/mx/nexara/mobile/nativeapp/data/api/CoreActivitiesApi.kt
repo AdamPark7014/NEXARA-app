@@ -451,6 +451,10 @@ interface CoreActivitiesApi {
     @GET("operational-projects")
     suspend fun operationalProjects(): List<OperationalProjectDto>
 
+    /** AN sugerido del alta (`{ next }`). */
+    @GET("activities/next-an")
+    suspend fun nextAnNumber(): ResponseBody
+
     @PATCH("me/activities/order")
     suspend fun reorderMyActivities(@Body body: ReorderMyActivitiesRequest): MyActivitiesResponseDto
 
