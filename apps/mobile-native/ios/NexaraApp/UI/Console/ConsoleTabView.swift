@@ -115,6 +115,12 @@ struct ConsoleTabView: View {
             }
             return
         }
+        // `/erp/asistencias?tab=comidas` (push de hora de comida): abre Comidas directo.
+        if link.key == "attendance", link.params["tab"] == "comidas" {
+            deepLinkModuleKey = "comidas"
+            deepLinkModuleParams = link.params
+            return
+        }
         if let tab = bottomTabs.first(where: { $0.moduleKey == link.key }) {
             selectedTab = tab.id
             return

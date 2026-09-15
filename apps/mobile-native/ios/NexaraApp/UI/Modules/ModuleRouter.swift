@@ -61,8 +61,9 @@ struct ModuleRouter {
             UsersView()
         case (.console, "attendance"):
             AttendanceView()
-        case (.console, "my-lunch-breaks"):
-            MyLunchBreaksView()
+        case (.console, "my-lunch-breaks"), (.console, "comidas"):
+            // Core: salida y regreso con foto, justificación a destiempo y las comidas del equipo.
+            ComidasView()
         case (.console, "lunch-breaks"), (.contabilidad, "horas"):
             LunchBreaksAdminView()
         case (.console, "hr"):
