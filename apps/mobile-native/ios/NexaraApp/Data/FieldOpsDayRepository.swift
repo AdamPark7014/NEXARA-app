@@ -24,8 +24,8 @@ final class FieldOpsDayRepository {
     }
 
     /// `GET activity-evidence/history/report?from&to` — PDF con el historial
-    /// propio de evidencias en el rango. Se usa `get` (y no `getBinary`) por lo
-    /// mismo que en `FieldOpsActivityRepository.ticketReportPdf`: el endpoint fija
+    /// propio de evidencias en el rango. Se usa `get` (y no `getBinary`) porque
+    /// el endpoint fija
     /// `Content-Type: application/pdf` e ignora el `Accept`, y así la ruta queda
     /// visible para `scripts/parity-report.py`.
     func evidenceHistoryReport(from: String?, to: String?) async throws -> Data {
