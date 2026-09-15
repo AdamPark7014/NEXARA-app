@@ -94,8 +94,11 @@ enum NotificationDeepLinkResolver {
             return .module(panel: .erp, key: "tools", entityId: id)
         case "vehicle", "vehicles":
             return .module(panel: .erp, key: "vehicles", entityId: id)
-        case "attendance", "lunch_break":
+        case "attendance":
             return .module(panel: .erp, key: "attendance")
+        case "lunchbreak", "lunch_break", "lunch", "comida", "comidas":
+            // Igual que la web: `/erp/asistencias?tab=comidas`.
+            return .module(panel: .erp, key: "attendance", params: ["tab": "comidas"])
         case "saleslead", "lead", "leads":
             return .module(panel: .crm, key: "leads", entityId: id)
         case "salesopportunity", "opportunity", "opportunities":

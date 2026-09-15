@@ -244,11 +244,15 @@ object CoreActivityRules {
 
     // ── Pizarra y despacho ──────────────────────────────────────────────────
 
-    val BOARD_STATUS_ORDER = listOf("activo", "atrasado", "inactivo", "sin_actividad")
+    const val CIAN = 0xFF0891B2L
+
+    /** `inactivo` ya no lo produce el API; solo se pinta si una API vieja lo manda. */
+    val BOARD_STATUS_ORDER = listOf("activo", "atrasado", "libre", "sin_actividad")
 
     fun boardStatusLabel(status: String?): String = when (status) {
         "activo" -> "Activo"
         "atrasado" -> "Atrasado"
+        "libre" -> "Terminó"
         "inactivo" -> "Inactivo"
         else -> "Sin actividad"
     }
@@ -256,9 +260,52 @@ object CoreActivityRules {
     fun boardStatusColor(status: String?): Long = when (status) {
         "activo" -> VERDE
         "atrasado" -> ROJO
-        "inactivo" -> GRIS
-        else -> AZUL
+        "libre" -> CIAN
+        else -> GRIS
     }
+
+    /** Minutos de la pizarra, como `formatMinutes` de team-board-api.ts: «2 h 05 min». */
+    fun formatBoardMinutes(minutes: Double?): String {
+        val total = minutes?.takeIf { !it.isNaN() && !it.isInfinite() }?.toLong() ?: return "—"
+        val h = total / 60
+        val m = total % 60
+        return if (h <= 0) "$m min" else "$h h ${m.toString().padStart(2, '0')} min"
+    }
+
+    /** «Atrasado 1 h 20 min» · «Sin actividad desde hace 2 h 05 min» · o la etiqueta del estado. */
+    fun boardEstadoTexto(
+        status: String?,
+        currentLateMinutes: Double?,
+        idleSinceAt: String?,
+        now: Instant = Instant.now(),
+    ): String {
+        if (status == "atrasado" && currentLateMinutes != null && currentLateMinutes > 0) {
+            return "Atrasado ${formatBoardMinutes(currentLateMinutes)}"
+        }
+        val idle = parseInstant(idleSinceAt)
+        if (status == "libre" && idle != null) {
+            val min = ((now.toEpochMilli() - idle.toEpochMilli()) / 60_000).coerceAtLeast(0)
+            return if (min < 1) {
+                "Sin actividad desde hace un momento"
+            } else {
+                "Sin actividad desde hace ${formatBoardMinutes(min.toDouble())}"
+            }
+        }
+        return boardStatusLabel(status)
+    }
+
+    /** «Finalizó a las 10:49 con 1 h 20 min de atraso» / «…, a tiempo» / sin fecha máxima. */
+    fun boardTerminoTexto(finishedAt: String?, lateMinutes: Double?, zone: ZoneId = ZoneId.systemDefault()): String {
+        val hora = formatClock(finishedAt, zone)
+        return when {
+            lateMinutes == null -> "Finalizó a las $hora"
+            lateMinutes <= 0 -> "Finalizó a las $hora, a tiempo"
+            else -> "Finalizó a las $hora con ${formatBoardMinutes(lateMinutes)} de atraso"
+        }
+    }
+
+    fun boardEnEsperaTexto(count: Int): String =
+        if (count > 1) "⏳ $count en espera de aprobación" else "⏳ En espera de aprobación"
 
     private val INSTALADORES = listOf(
         "joan.sanchez@nexara.com.mx",

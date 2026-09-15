@@ -60,16 +60,55 @@ enum CoreStatusUI {
         return base
     }
 
+    /// Estados del tablero (`STATUS_LABELS`/`STATUS_COLORS` web). «inactivo» ya no
+    /// lo produce el API; se conserva por respuestas en caché.
     static func boardStatus(_ raw: String?) -> (label: String, color: Color) {
         switch raw ?? "" {
         case "activo": return ("Activo", CorePalette.green)
         case "atrasado": return ("Atrasado", CorePalette.red)
+        case "libre": return ("Terminó", CorePalette.cyan)
         case "inactivo": return ("Inactivo", CorePalette.slate)
-        default: return ("Sin actividad", CorePalette.blue)
+        default: return ("Sin actividad", CorePalette.slate)
         }
     }
 
-    static let boardStatusOrder = ["activo", "atrasado", "inactivo", "sin_actividad"]
+    static let boardStatusOrder = ["activo", "atrasado", "libre", "sin_actividad"]
+}
+
+/// Textos del tablero con detalle (espejo de `estadoTexto`/`terminoTexto` de la pizarra web).
+enum CoreBoardText {
+    /// «45 min», «1 h 05 min» (`formatMinutes` web).
+    static func minutes(_ value: Int) -> String {
+        let total = max(0, value)
+        let hours = total / 60
+        let mins = total % 60
+        if hours <= 0 { return "\(mins) min" }
+        return "\(hours) h \(String(format: "%02d", mins)) min"
+    }
+
+    /// «Atrasado 1 h 20 min», «Sin actividad desde hace 2 h 05 min» o la etiqueta del estado.
+    static func estado(_ user: TeamBoardUser, now: Date = Date()) -> String {
+        if user.status == "atrasado", let late = user.currentLateMinutes, late > 0 {
+            return "Atrasado \(minutes(late))"
+        }
+        if user.status == "libre", let since = CoreFormat.date(user.idleSinceAt) {
+            let mins = max(0, Int(now.timeIntervalSince(since) / 60))
+            return mins < 1 ? "Sin actividad desde hace un momento" : "Sin actividad desde hace \(minutes(mins))"
+        }
+        return CoreStatusUI.boardStatus(user.status).label
+    }
+
+    /// «Finalizó a las 10:49 con 1 h 20 min de atraso» (rojo) o «…, a tiempo» (verde).
+    static func termino(_ finished: TeamBoardLastFinished) -> (text: String, color: Color) {
+        let hora = CoreFormat.time(finished.finishedAt) ?? "—"
+        guard let late = finished.lateMinutes else {
+            return ("Finalizó a las \(hora)", CorePalette.green)
+        }
+        if late <= 0 {
+            return ("Finalizó a las \(hora), a tiempo", CorePalette.green)
+        }
+        return ("Finalizó a las \(hora) con \(minutes(late)) de atraso", CorePalette.red)
+    }
 }
 
 struct CoreChip: View {

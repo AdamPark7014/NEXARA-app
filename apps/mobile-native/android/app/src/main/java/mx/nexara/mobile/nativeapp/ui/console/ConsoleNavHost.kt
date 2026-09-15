@@ -197,6 +197,8 @@ fun ConsoleNavHost(
     var viaticHighlightId by remember { mutableStateOf<Long?>(null) }
     /** `?vista=mias|equipo` que llegó por deep link a Actividades. */
     var actividadesVista by remember { mutableStateOf<String?>(null) }
+    /** `comidas` cuando un aviso de hora de comida abre Asistencias. */
+    var attendanceTab by remember { mutableStateOf<String?>(null) }
 
     val deepLinkSignal by PendingDeepLink.signal.collectAsState()
     LaunchedEffect(panelId, deepLinkSignal) {
@@ -207,6 +209,7 @@ fun ConsoleNavHost(
         }
         viaticHighlightId = DeepLinkNavigation.viaticHighlightId(link)
         DeepLinkNavigation.actividadesVista(link)?.let { actividadesVista = it }
+        DeepLinkNavigation.attendanceTab(link)?.let { attendanceTab = it }
         val entityRoute = DeepLinkNavigation.consoleRoute(link)
         val target = entityRoute ?: routeForModuleKey(DeepLinkNavigation.consoleModuleKey(link))
         navController.navigate(target) { launchSingleTop = true }
@@ -471,7 +474,10 @@ fun ConsoleNavHost(
                 ConsoleUsersScreen()
             }
             nxComposable(ConsoleRoutes.Attendance) {
-                ConsoleAttendanceScreen()
+                val tab = attendanceTab
+                ConsoleAttendanceScreen(initialTab = tab)
+                // Se consume una vez: al volver a Asistencia después, abre en su pestaña normal.
+                LaunchedEffect(tab) { if (tab != null) attendanceTab = null }
             }
             nxComposable(ConsoleRoutes.Settings) {
                 ConsoleSettingsScreen(
@@ -670,10 +676,8 @@ fun ConsoleNavHost(
                     "fines" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.FinesRichScreen() } }
                     "employee-payments" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.EmployeePaymentsRichScreen() } }
                     "cotizaciones" -> { { mx.nexara.mobile.nativeapp.ui.modules.CotizacionesModuleScreen() } }
-                    "lunch-breaks" -> { { mx.nexara.mobile.nativeapp.ui.modules.LunchBreaksModuleScreen() } }
-                    "my-lunch-breaks" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyLunchBreaksModuleScreen(
-                        currentUserId = authRepo.loadSession()?.id,
-                    ) } }
+                    // Hora de comida con justificación y aprobación: vive en Asistencias → Comidas.
+                    "lunch-breaks", "my-lunch-breaks" -> { { ConsoleAttendanceScreen(initialTab = "comidas") } }
                     "documents" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.DocumentsRichScreen() } }
                     "accounting" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.AccountingRichScreen() } }
                     "invoicing" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.InvoicesRichScreen() } }

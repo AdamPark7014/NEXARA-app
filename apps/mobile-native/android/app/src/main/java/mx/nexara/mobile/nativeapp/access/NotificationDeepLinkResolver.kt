@@ -61,13 +61,28 @@ object NotificationDeepLinkResolver {
     }
 
     fun resolve(notification: NotificationRowDto): DeepLinkDestination? {
-        notification.relatedUrl?.trim()?.takeIf { it.isNotBlank() }?.let { url ->
-            DeepLinkParser.parseWebPath(url)?.let { return it }
-        }
-
         val entityType = notification.entityType?.trim()?.lowercase().orEmpty()
         val entityId = notification.relatedEntityId?.takeIf { it > 0L }
         val category = notification.category?.trim()?.lowercase().orEmpty()
+        val isLunch = category in LUNCH_CATEGORIES || entityType in LUNCH_ENTITY_TYPES
+
+        notification.relatedUrl?.trim()?.takeIf { it.isNotBlank() }?.let { url ->
+            DeepLinkParser.parseWebPath(url)?.let { dest ->
+                // Avisos de comida con URL de Asistencias sin pestaña: se abre Comidas.
+                if (isLunch && dest is DeepLinkDestination.Module && dest.key == "attendance" && dest.params["tab"] == null) {
+                    return dest.copy(params = dest.params + ("tab" to "comidas"))
+                }
+                return dest
+            }
+        }
+
+        if (isLunch) {
+            return DeepLinkDestination.Module(
+                panel = PanelId.ERP,
+                key = "attendance",
+                params = mapOf("tab" to "comidas"),
+            )
+        }
 
         // El API manda toda notificación de actividad (asignada, evidencia,
         // despacho, reprogramación, revisión) como `Activity` + id de la
@@ -88,6 +103,8 @@ object NotificationDeepLinkResolver {
     }
 
     private val ACTIVITY_ENTITY_TYPES = setOf("activity", "activities")
+    private val LUNCH_CATEGORIES = setOf("lunch_breaks", "lunch_break", "lunch-breaks", "comidas")
+    private val LUNCH_ENTITY_TYPES = setOf("lunchbreak", "lunch_break", "lunch_breaks")
     private val EVIDENCE_CATEGORIES = setOf("evidences", "evidence")
 
     private fun activityDetail(activityId: Long, tab: String?) = DeepLinkDestination.Module(
@@ -107,7 +124,7 @@ object NotificationDeepLinkResolver {
             "viatic", "viatico", "viatics" -> PanelId.ERP to "viatics"
             "tool_request", "toolrequest", "toolrenewal", "tool", "tools" -> PanelId.ERP to "tools"
             "vehicle", "vehicles", "vehiclecontrol" -> PanelId.ERP to "vehicles"
-            "attendance", "lunch_break" -> PanelId.ERP to "attendance"
+            "attendance" -> PanelId.ERP to "attendance"
             "saleslead", "lead", "leads" -> PanelId.CRM to "leads"
             "salesopportunity", "opportunity", "opportunities" -> PanelId.CRM to "oportunidades"
             "client", "clients", "salesclient" -> PanelId.CRM to "clients"
@@ -148,7 +165,7 @@ object NotificationDeepLinkResolver {
             return activityDetail(entityId, tab = "evidencias")
         }
         val (panel, key) = when (category) {
-            "attendance", "lunch_breaks" -> PanelId.ERP to "attendance"
+            "attendance" -> PanelId.ERP to "attendance"
             "activities" -> PanelId.ERP to "activities"
             "evidences" -> PanelId.ERP to "evidences"
             "viatics" -> PanelId.ERP to "viatics"

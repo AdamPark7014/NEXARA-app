@@ -161,12 +161,14 @@ fun BoardPersonScreen(
                             ) {
                                 Box(Modifier.size(10.dp).clip(CircleShape).background(color))
                                 Text(
-                                    CoreActivityRules.boardStatusLabel(p.status),
+                                    CoreActivityRules.boardEstadoTexto(p.status, p.currentLateMinutes, p.idleSinceAt),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = color,
                                 )
                             }
+                            Spacer(Modifier.height(6.dp))
+                            BoardStatusExtras(user = p, centered = false)
                         }
                     }
                 }
@@ -176,19 +178,19 @@ fun BoardPersonScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PersonStat(
                         label = "Entrada hoy",
-                        value = CoreActivityRules.formatClock(p.clockInAt),
+                        value = if (p.clockInAt != null) CoreActivityRules.formatClock(p.clockInAt) else "Sin entrada",
                         hint = if (p.clockInAt != null) "Check-in" else "Sin registro",
                         modifier = Modifier.weight(1f),
                     )
                     PersonStat(
                         label = "Tiempo en sitio",
-                        value = CoreActivityRules.formatMinutes(p.workedMinutes),
+                        value = CoreActivityRules.formatBoardMinutes(p.workedMinutes),
                         hint = "Desde la entrada",
                         modifier = Modifier.weight(1f),
                     )
                     PersonStat(
                         label = "En actividad",
-                        value = CoreActivityRules.formatMinutes(p.activityElapsedMinutes),
+                        value = CoreActivityRules.formatBoardMinutes(p.activityElapsedMinutes),
                         hint = p.activityStartedAt?.let { "Desde ${CoreActivityRules.formatClock(it)}" } ?: "Sin actividad",
                         modifier = Modifier.weight(1f),
                     )
