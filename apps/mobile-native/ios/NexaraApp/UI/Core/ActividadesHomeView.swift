@@ -320,6 +320,21 @@ struct TeamMemberDetailView: View {
                     }
                 }
 
+                // Web: botón «Asignar actividad» (`/erp/pizarra/[userId]/asignar`), solo para otra persona.
+                if !isSelf {
+                    Section {
+                        NavigationLink {
+                            CoreAssignActivityView(userId: userId) { message in
+                                notice = message
+                                Task { await load() }
+                            }
+                        } label: {
+                            Label("Asignar actividad", systemImage: "plus.circle.fill")
+                                .font(.body.weight(.bold))
+                        }
+                    }
+                }
+
                 let pendientes = isSelf ? pendingDispatches(member) : []
                 if !pendientes.isEmpty {
                     Section {

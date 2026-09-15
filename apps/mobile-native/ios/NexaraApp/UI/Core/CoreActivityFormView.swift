@@ -337,6 +337,8 @@ struct CoreSelfAssignSheet: View {
     @State private var kind: CoreActivityKind?
 
     private var me: SessionUser? { session.currentUser }
+    /// Como la web (`isAreaManagerEmail`): solo los encargados de área se auto-asignan.
+    private var isAreaManager: Bool { CoreActivityRules.isAreaManager(me?.email) }
     private var allowedKinds: [CoreActivityKind] {
         CoreActivityRules.kindsForAssignment(creator: me, targetEmail: me?.email)
     }
@@ -344,32 +346,39 @@ struct CoreSelfAssignSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Text("Queda solo a tu nombre, como ejecución directa. Ponle día, hora y cuánto te va a tomar; después la acomodas en tu cola.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                Section("1 · ¿Qué tipo de actividad es?") {
-                    ForEach(allowedKinds) { option in
-                        CoreKindRow(kind: option, selected: kind == option) { kind = option }
+                if isAreaManager {
+                    Section {
+                        Text("Queda solo a tu nombre, como ejecución directa. Ponle día, hora y cuánto te va a tomar; después la acomodas en tu cola.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
-                }
-                if let kind, let myId = me.flatMap({ Int($0.id) }) {
-                    CoreActivityFormView(
-                        kind: kind,
-                        charge: .ejecucion,
-                        responsableId: myId,
-                        selfAssign: true,
-                        submitLabel: "Crear actividad",
-                        onCreated: { id in
-                            onCreated(id)
-                            dismiss()
+                    Section("1 · ¿Qué tipo de actividad es?") {
+                        ForEach(allowedKinds) { option in
+                            CoreKindRow(kind: option, selected: kind == option) { kind = option }
                         }
-                    )
-                    .id(kind)
+                    }
+                    if let kind, let myId = me.flatMap({ Int($0.id) }) {
+                        CoreActivityFormView(
+                            kind: kind,
+                            charge: .ejecucion,
+                            responsableId: myId,
+                            selfAssign: true,
+                            submitLabel: "Crear actividad",
+                            onCreated: { id in
+                                onCreated(id)
+                                dismiss()
+                            }
+                        )
+                        .id(kind)
+                    } else {
+                        Section {
+                            Text("Elige un tipo para continuar.").foregroundStyle(.secondary)
+                        }
+                    }
                 } else {
                     Section {
-                        Text("Elige un tipo para continuar.").foregroundStyle(.secondary)
+                        Text("Solo los encargados de área pueden auto-asignarse actividades. Tu encargado te las asigna.")
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
