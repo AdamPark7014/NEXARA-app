@@ -308,6 +308,7 @@ export class MyActivitiesService {
             rejectedStep: true,
             rejectedSteps: true,
             eficienciaScore: true,
+            correctionSubmittedAt: true,
           },
         },
         evidenceReviews: {
@@ -458,6 +459,8 @@ export class MyActivitiesService {
               reviewNotes: e.reviewNotes,
               reviewedAt: e.reviewedAt,
               reviewedBy: e.reviewedBy?.nombre ?? null,
+              /** Cuándo envió la corrección de lo que se le devolvió. */
+              correctionSubmittedAt: e.correctionSubmittedAt,
             }
           : null,
       };

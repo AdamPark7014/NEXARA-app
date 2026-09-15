@@ -70,7 +70,12 @@ export class ActivityEvidenceService {
     private notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  private async notifyEvidenceReadyForReview(activityId: number, submitterId?: number | null) {
+  private async notifyEvidenceReadyForReview(
+    activityId: number,
+    submitterId?: number | null,
+    /** Reenvío de lo que se le devolvió: el aviso lo dice para que la revisen de nuevo. */
+    correccion = false,
+  ) {
     try {
       const activity = await this.prisma.activity.findUnique({
         where: { id: activityId },
@@ -100,6 +105,7 @@ export class ActivityEvidenceService {
         activity.anNumber,
         activity.responsableId,
         [...leads.map((l) => l.userId), ...(jefe?.managerId ? [jefe.managerId] : [])],
+        correccion,
       );
     } catch {
       /* no bloquear flujo de evidencias */
@@ -1771,7 +1777,8 @@ export class ActivityEvidenceService {
 
     if (transition.status === 'COMPLETED') {
       await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
-      void this.notifyEvidenceReadyForReview(activityId, updated.userId);
+      // Corrigió todo lo devuelto: vuelve a «Por revisar» y sus superiores pueden aprobar o devolver otra vez.
+      void this.notifyEvidenceReadyForReview(activityId, updated.userId, true);
     } else {
       await this.prisma.activity.update({
         where: { id: activityId },

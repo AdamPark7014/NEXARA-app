@@ -544,11 +544,15 @@ export class NotificationHierarchyService {
     responsableId?: number | null,
     /** Encargados de la cadena y jefe directo: también revisan. */
     reviewerIds: number[] = [],
+    /** Es la corrección de algo que se le devolvió. */
+    correccion = false,
   ) {
     try {
       const ref = (anNumber && String(anNumber).trim()) || `ID ${activityId}`;
       const titleAct = (activityTitle && String(activityTitle).trim()) || `Actividad ${ref}`;
-      const message = `${submitterName} completó el flujo de evidencias de "${titleAct}" (${ref}). Entra a revisarla.`;
+      const message = correccion
+        ? `${submitterName} corrigió lo que se le devolvió en "${titleAct}" (${ref}). Revísalo de nuevo: apruébalo o devuélvelo.`
+        : `${submitterName} completó el flujo de evidencias de "${titleAct}" (${ref}). Entra a revisarla.`;
 
       const recipientIds = new Set(await this.getEvidenceReviewerUserIds(submitterUserId));
       for (const sup of await this.getSupervisors(submitterUserId)) {
@@ -567,7 +571,7 @@ export class NotificationHierarchyService {
           userId: uid,
           type: 'EVIDENCE_SUBMITTED',
           category: 'evidences',
-          title: '📋 Evidencia lista para revisión',
+          title: correccion ? '🔁 Corrección lista para revisión' : '📋 Evidencia lista para revisión',
           message,
           triggerUserId: submitterUserId,
           relatedEntityId: activityId,

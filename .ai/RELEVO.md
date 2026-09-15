@@ -43,6 +43,11 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
    - Web `/erp/pizarra`: «Atrasado 1 h 20 min», «Sin actividad desde hace 2 h 05 min» + «Finalizó a las 10:49 con 1 h 20 min de atraso» (rojo) o «a tiempo» (verde), etiquetas chicas «⏳ En espera de aprobación» / «↩️ Corrigiendo evidencia»; «Sin actividades hoy»; filtro «Terminó»; «Inactivo» solo si una API vieja lo manda.
 14. **Reinicio de Docker/sesión (≈14:10):** los rebuilds de API y web de las 13:05 se cortaron (exit 4); se rehicieron con comidas + pizarra. El trabajo a medias de los agentes móviles quedó rescatado por `relevo salvar` en `c64bc09a` (sin compilar ni revisar).
 
+15. **Fotos con nombre en el historial por persona** (`/erp/pizarra/[userId]`, pedido 14:32): cada foto lleva «📍 Entrada», «📷 Evidencia N» o «🏁 Salida» y usa `FotoProtegida` (aviso si ya no existe); el PDF usa `VisorPdf` (pdf.js, 400 px) en vez de `<object>` bloqueado por la CSP. `FotoProtegida` y `VisorPdf` ahora se exportan desde `EquipoEvidencias.tsx`.
+16. **Volver a revisar una corrección (pedido 14:34, 15-09):** la API ya dejaba aprobar/devolver otra vez cuando la persona reenvía todo lo devuelto (queda COMPLETED + PENDING); lo que no se veía era que era una corrección. AN-0001 en BD: Christian devolvió «Fotos en sitio» 14:30 y Alejandro corrigió 14:31 → hoy está «Por Validar» esperando revisión (la captura de pantalla era la vista de Alejandro, que no puede revisarse a sí mismo).
+   - API: `teamEvidence` devuelve `correctionSubmittedAt`; el aviso tras corregir dice «🔁 Corrección lista para revisión … Revísalo de nuevo» (`notifyEvidenceReadyForReview(…, correccion)`).
+   - Web `EquipoEvidencias`: estado «🔁 Corrección por revisar», barra «Corrigió lo que se le devolvió (Fotos en sitio) · fecha. Revisa la corrección y apruébala o devuélvela de nuevo», pasos corregidos en azul «🔁 Corregido · hora»; mientras corrige: «Cuando envíe la corrección podrás aprobarla o devolverla otra vez».
+
 ### Verificado
 
 - `prisma generate` + `tsc --noEmit` API limpio. Web: sin errores nuevos (siguen los 4 previos: CommandPalette ×2, evidence-flow-helpers, module-guides).
