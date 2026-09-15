@@ -694,7 +694,7 @@ private fun DraftGrid(
                             Text("✕", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                         Text(
-                            if (draft.geo != null) "📍 ${index + 1}" else "${index + 1}",
+                            CoreActivityRules.fotoEvidenciaLabel(index + 1),
                             color = Color.White,
                             fontSize = 11.sp,
                             modifier = Modifier

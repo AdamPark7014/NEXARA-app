@@ -37,7 +37,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.ImageLoader
@@ -135,11 +137,20 @@ fun ProtectedImage(
             }
         },
         error = {
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color(0xFFF1F5F9)),
-                contentAlignment = Alignment.Center,
+            // 404 (el archivo ya no está en el servidor) u otro fallo: se dice, no se deja un hueco.
+            Column(
+                modifier = Modifier.fillMaxSize().background(Color(0xFFF1F5F9)).padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
                 Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color(0xFF94A3B8))
+                Text(
+                    "Archivo no disponible",
+                    fontSize = 10.sp,
+                    color = Color(0xFF64748B),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                )
             }
         },
     )
@@ -226,7 +237,11 @@ fun ProtectedPdfButton(
                             )
                         }
                     } catch (e: Exception) {
-                        error = e.toUserMessage("No se pudo abrir el PDF")
+                        error = if (e.message.orEmpty().contains("HTTP 404")) {
+                            "El PDF ya no está en el servidor: hay que pedir que lo vuelva a subir."
+                        } else {
+                            e.toUserMessage("No se pudo abrir el PDF")
+                        }
                     } finally {
                         loading = false
                     }

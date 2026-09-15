@@ -317,32 +317,29 @@ private fun HistoryCard(
             }
             if (open) {
                 if (ev != null) {
-                    val urls = (listOf(ev.entryPhotoUrl) + ev.evidencePhotos.orEmpty() + listOf(ev.exitPhotoUrl))
-                        .filterNotNull()
-                        .filter { it.isNotBlank() }
-                    if (urls.isNotEmpty()) {
-                        val fotos = urls.mapIndexed { i, url ->
-                            CoreActivityRules.EvidencePhoto(
-                                url = url,
-                                titulo = "${CoreActivityRules.shortName(nombre)} · Foto ${i + 1}",
-                                at = null,
-                                lat = null,
-                                lng = null,
-                            )
-                        }
+                    val fotos = CoreActivityRules.fotosEtiquetadas(
+                        ev.entryPhotoUrl,
+                        ev.evidencePhotos,
+                        ev.exitPhotoUrl,
+                        nombre,
+                    )
+                    if (fotos.isNotEmpty()) {
                         Row(
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             fotos.forEachIndexed { i, foto ->
-                                Box(
-                                    Modifier
-                                        .size(88.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
-                                        .clickable { onOpenPhoto(fotos, i) },
-                                ) {
-                                    ProtectedImage(url = foto.url, contentDescription = foto.titulo, modifier = Modifier.fillMaxSize())
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Box(
+                                        Modifier
+                                            .size(88.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
+                                            .clickable { onOpenPhoto(fotos, i) },
+                                    ) {
+                                        ProtectedImage(url = foto.url, contentDescription = foto.titulo, modifier = Modifier.fillMaxSize())
+                                    }
+                                    Text(foto.etiqueta, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
                                 }
                             }
                         }

@@ -74,6 +74,7 @@ import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedPdfButton
 import mx.nexara.mobile.nativeapp.ui.common.openMapsAt
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.EvidencePhoto
+import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.AZUL
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.NARANJA
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.ROJO
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_COMPLETED
@@ -311,7 +312,7 @@ private fun CompactMemberRow(m: TeamEvidenceMemberDto) {
                 Text(subtitle, fontSize = 12.sp, color = NxColors.Muted)
             }
             if (!reparte && ev != null) {
-                ToneChip(CoreActivityRules.memberEstadoUi(ev.status, ev.reviewStatus))
+                ToneChip(CoreActivityRules.memberEstadoUi(ev.status, ev.reviewStatus, ev.correctionSubmittedAt))
             }
         }
         if (!reparte) ProgressWithPct(m.progressPct)
@@ -329,7 +330,15 @@ private fun TeamMemberCard(
     val ev = m.evidence
     val reparte = m.reparte == true
     val puedoRevisar = m.puedoRevisar == true
-    val estado = if (reparte || ev == null) null else CoreActivityRules.memberEstadoUi(ev.status, ev.reviewStatus)
+    val estado = if (reparte || ev == null) {
+        null
+    } else {
+        CoreActivityRules.memberEstadoUi(ev.status, ev.reviewStatus, ev.correctionSubmittedAt)
+    }
+    val revisiones = m.revisiones.orEmpty()
+    // Tras corregir, la última devolución dice qué rehizo: se resalta para revisar eso primero.
+    val esCorreccion = CoreActivityRules.esCorreccion(ev, revisiones)
+    val corregidos = CoreActivityRules.pasosCorregidos(ev, revisiones)
     val porRevisar = puedoRevisar && ev?.status == STEP_COMPLETED &&
         ev.reviewStatus != "APPROVED" && ev.reviewStatus != "REJECTED"
     var abierta by remember(m.userId) { mutableStateOf(!reparte) }
@@ -396,7 +405,11 @@ private fun TeamMemberCard(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        "🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela.",
+                        if (esCorreccion) {
+                            CoreActivityRules.correccionTexto(ev?.correctionSubmittedAt, revisiones)
+                        } else {
+                            "🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
+                        },
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = NxColors.Slate,
@@ -433,9 +446,12 @@ private fun TeamMemberCard(
             }
 
             if (corrigiendo.isNotEmpty()) {
-                val notas = ev?.reviewNotes?.takeIf { it.isNotBlank() }?.let { " · «$it»" }.orEmpty()
                 SoftNote(
-                    text = "↩️ Está corrigiendo: ${corrigiendo.joinToString(", ") { CoreActivityRules.stepLabel(it) }}$notas",
+                    text = CoreActivityRules.corrigiendoTexto(
+                        pasos = corrigiendo,
+                        reviewNotes = ev?.reviewNotes,
+                        avisarReenvio = puedoRevisar || revisiones.isNotEmpty(),
+                    ),
                     color = NARANJA,
                 )
             }
@@ -460,6 +476,7 @@ private fun TeamMemberCard(
                         coreKind = coreKind,
                         nombre = m.nombre,
                         porCorregir = corrigiendo,
+                        corregidos = corregidos,
                         onOpenVisor = onOpenVisor,
                         onDevolverPaso = if (puedoRevisar && ev.status == STEP_COMPLETED) {
                             { step -> onRevisar(m, RevisionInicial(aprobar = false, pasos = listOf(step))) }
@@ -487,6 +504,8 @@ private fun EvidenceContent(
     nombre: String?,
     etiqueta: String = "",
     porCorregir: List<String> = emptyList(),
+    /** Pasos que ya rehizo tras la última devolución. */
+    corregidos: List<String> = emptyList(),
     onOpenVisor: (List<EvidencePhoto>, Int) -> Unit,
     onDevolverPaso: ((String) -> Unit)?,
 ) {
@@ -500,8 +519,10 @@ private fun EvidenceContent(
                     val hora = CoreActivityRules.horaPaso(ev, step)
                     val hecho = hora != null
                     val corregir = step in porCorregir
+                    val corregido = !corregir && hecho && step in corregidos
                     val color = when {
                         corregir -> Color(NARANJA)
+                        corregido -> Color(AZUL)
                         hecho -> Color(VERDE)
                         else -> null
                     }
@@ -514,7 +535,14 @@ private fun EvidenceContent(
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     ) {
                         Text(
-                            "${if (corregir) "↩️" else if (hecho) "✓" else "○"} ${CoreActivityRules.stepLabel(step)}",
+                            "${
+                                when {
+                                    corregir -> "↩️"
+                                    corregido -> "🔁"
+                                    hecho -> "✓"
+                                    else -> "○"
+                                }
+                            } ${CoreActivityRules.stepLabel(step)}",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = NxColors.Slate,
@@ -522,11 +550,17 @@ private fun EvidenceContent(
                         Text(
                             when {
                                 corregir -> "Por corregir"
+                                corregido -> "Corregido · ${CoreActivityRules.formatWhen(hora).orEmpty()}"
                                 hecho -> CoreActivityRules.formatWhen(hora) ?: "Hecho"
                                 else -> "Pendiente"
                             },
                             fontSize = 11.5.sp,
-                            color = if (corregir) Color(NARANJA) else NxColors.Muted,
+                            fontWeight = if (corregido) FontWeight.SemiBold else FontWeight.Normal,
+                            color = when {
+                                corregir -> Color(NARANJA)
+                                corregido -> Color(AZUL)
+                                else -> NxColors.Muted
+                            },
                         )
                     }
                 }
@@ -642,6 +676,7 @@ private fun PhotoThumb(foto: EvidencePhoto, height: Dp, onOpen: () -> Unit) {
         ) {
             ProtectedImage(url = foto.url, contentDescription = foto.titulo, modifier = Modifier.fillMaxSize())
         }
+        Text(foto.etiqueta, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Slate, maxLines = 1)
         val lat = foto.lat
         val lng = foto.lng
         if (lat != null && lng != null) {

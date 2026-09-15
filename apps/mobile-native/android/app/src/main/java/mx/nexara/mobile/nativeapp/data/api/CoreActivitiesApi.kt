@@ -232,6 +232,8 @@ data class TeamEvidenceDto(
     val reviewNotes: String? = null,
     val reviewedAt: String? = null,
     val reviewedBy: String? = null,
+    /** Cuándo envió la corrección de lo que se le devolvió. */
+    val correctionSubmittedAt: String? = null,
 )
 
 data class TeamEvidenceReviewDto(

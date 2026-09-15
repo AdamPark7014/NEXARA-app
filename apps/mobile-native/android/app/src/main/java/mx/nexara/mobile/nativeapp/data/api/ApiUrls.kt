@@ -46,7 +46,10 @@ fun resolveProtectedUploadUrl(raw: String?, origin: String = apiAssetOrigin()): 
         return value
     }
     if (value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true)) {
-        val path = runCatching { java.net.URI(value).path }.getOrNull() ?: return value
+        // `java.net.URI` rechaza espacios («foto salida.jpg»); la web usa `new URL`, que los acepta.
+        val path = runCatching { java.net.URI(value).path }.getOrNull()
+            ?: Regex("^https?://[^/]+(/[^?#]*)?", RegexOption.IGNORE_CASE).find(value)?.groupValues?.getOrNull(1)
+            ?: return value
         if (!PROTECTED_UPLOAD_PATH.containsMatchIn(path)) return value
     }
     val relative = value
