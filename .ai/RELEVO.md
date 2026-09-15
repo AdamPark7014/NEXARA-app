@@ -72,7 +72,7 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 
 ### A medias
 
-iOS escrito pero sin compilar: correr `.github/workflows/ios-testflight.yml` (macOS) y corregir lo que salga. Push iOS no llega hasta que Adam registre `mx.nexara.mobile.NexaraApp` en Firebase, suba la llave APNs y el CI escriba `GoogleService-Info.plist`. Android compila y pasa pruebas, sin probar en dispositivo.
+**Apps solo-ERP (pedido de Adam 15-09):** sin menú de paneles ni vistas fuera de ERP; portal solo para cuentas cliente/sucursal; GPS de jornada se activa al checar entrada desde el cliente (`PATCH gps/consent`) y la API lo apaga en la salida. Rescate WIP `77b16031`: borrados CRM/STUDIO/LAB/INTEGRA/OPS/Contabilidad en Android (186 archivos) e iOS (169). **Android NO compila en `77b16031`**: `ConsoleNavHost` aún referencia `OpsNewActivityScreen` (borrado) hasta que exista el formulario Core de crear/asignar actividad. iOS sin verificar tras el borrado (`python scripts/ios-static-check.py`). En curso: formulario Core en ambas; después Asistencias (scope subtree, CEO sin checada, pestañas, Trayectoria, GPS de jornada), Clientes `erp-clients`, Mi perfil editable, Chat iOS en tiempo real, campana de avisos. Emulador: `nexara_phone`; build `./gradlew.bat :app:assembleDebug -PDEV_API_BASE_URL=http://10.0.2.2:4000/api` (Docker expone la API en el 4000).
 
 ### Siguiente
 
