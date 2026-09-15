@@ -12,6 +12,7 @@ import kotlin.math.roundToLong
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
+import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceReviewDto
 
 /**
  * Reglas de Core (/erp) sin nada de Android, para poder probarlas en JVM.
@@ -364,11 +365,48 @@ object CoreActivityRules {
 
     fun isTeamFinalizada(ejecutores: Int, aprobadas: Int): Boolean = ejecutores > 0 && aprobadas >= ejecutores
 
-    fun memberEstadoUi(status: String?, reviewStatus: String?): Tone = when {
+    fun memberEstadoUi(status: String?, reviewStatus: String?, correctionSubmittedAt: String? = null): Tone = when {
         reviewStatus == "APPROVED" -> Tone("✅ Aprobada", VERDE)
         reviewStatus == "REJECTED" -> Tone("↩️ Corrigiendo", NARANJA)
+        status == STEP_COMPLETED && !correctionSubmittedAt.isNullOrBlank() -> Tone("🔁 Corrección por revisar", NARANJA)
         status == STEP_COMPLETED -> Tone("🔎 Por revisar", NARANJA)
         else -> Tone("⏳ En curso", AZUL)
+    }
+
+    /** La devolución más reciente (revisiones vienen de la más nueva a la más vieja). */
+    fun ultimaDevolucion(revisiones: List<TeamEvidenceReviewDto>): TeamEvidenceReviewDto? =
+        revisiones.firstOrNull { it.decision != "APROBADA" }
+
+    /** Ya envió la corrección de lo devuelto y nadie la ha aprobado. */
+    fun esCorreccion(ev: TeamEvidenceDto?, revisiones: List<TeamEvidenceReviewDto>): Boolean =
+        ev != null && !ev.correctionSubmittedAt.isNullOrBlank() && ev.status == STEP_COMPLETED &&
+            ev.reviewStatus != "APPROVED" && ultimaDevolucion(revisiones) != null
+
+    /** Pasos que rehizo tras la última devolución (se resaltan para revisarlos primero). */
+    fun pasosCorregidos(ev: TeamEvidenceDto?, revisiones: List<TeamEvidenceReviewDto>): List<String> =
+        if (esCorreccion(ev, revisiones)) ultimaDevolucion(revisiones)?.pasos.orEmpty() else emptyList()
+
+    /** Barra de quien revisa cuando lo que llega es una corrección. */
+    fun correccionTexto(
+        correctionSubmittedAt: String?,
+        revisiones: List<TeamEvidenceReviewDto>,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): String {
+        val ultima = ultimaDevolucion(revisiones)
+        val pasos = ultima?.pasos.orEmpty()
+        val que = if (pasos.isNotEmpty() && ultima?.decision != "DEVUELTA_TODO") {
+            " (${pasos.joinToString(", ") { stepLabel(it) }})"
+        } else {
+            " (rehízo toda la actividad)"
+        }
+        val cuando = formatWhen(correctionSubmittedAt, zone)?.let { " · $it" }.orEmpty()
+        return "🔁 Corrigió lo que se le devolvió$que$cuando. Revisa la corrección y apruébala o devuélvela de nuevo."
+    }
+
+    fun corrigiendoTexto(pasos: List<String>, reviewNotes: String?, avisarReenvio: Boolean): String {
+        val notas = reviewNotes?.takeIf { it.isNotBlank() }?.let { " · «$it»" }.orEmpty()
+        val aviso = if (avisarReenvio) ". Cuando envíe la corrección podrás aprobarla o devolverla otra vez." else ""
+        return "↩️ Está corrigiendo: ${pasos.joinToString(", ") { stepLabel(it) }}$notas$aviso"
     }
 
     fun memberRolUi(reparte: Boolean, rol: String?): Tone = when {
@@ -391,13 +429,35 @@ object CoreActivityRules {
             .distinct()
             .map { shortName(it) }
 
+    const val FOTO_ENTRADA = "📍 Entrada"
+    const val FOTO_SALIDA = "🏁 Salida"
+
+    fun fotoEvidenciaLabel(n: Int): String = "📷 Evidencia $n"
+
     data class EvidencePhoto(
         val url: String,
         val titulo: String,
         val at: String?,
         val lat: Double?,
         val lng: Double?,
+        /** Nombre corto de la foto: «📍 Entrada», «📷 Evidencia 2», «🏁 Salida». */
+        val etiqueta: String = titulo,
     )
+
+    /** Fotos etiquetadas a partir de las URLs sueltas del historial de una persona. */
+    fun fotosEtiquetadas(
+        entryPhotoUrl: String?,
+        evidencePhotos: List<String>?,
+        exitPhotoUrl: String?,
+        nombre: String?,
+    ): List<EvidencePhoto> = fotosDe(
+        TeamEvidenceDto(
+            entryPhotoUrl = entryPhotoUrl,
+            evidencePhotos = evidencePhotos.orEmpty().filter { it.isNotBlank() },
+            exitPhotoUrl = exitPhotoUrl,
+        ),
+        nombre,
+    ).fotos
 
     data class EvidencePhotoSet(
         val fotos: List<EvidencePhoto>,
@@ -416,23 +476,27 @@ object CoreActivityRules {
         ev.entryPhotoUrl?.takeIf { it.isNotBlank() }?.let { url ->
             entrada = fotos.size
             fotos += EvidencePhoto(
-                url, "$quien · Entrada", ev.entryPhotoUploadedAt,
+                url, "$quien · $FOTO_ENTRADA", ev.entryPhotoUploadedAt,
                 anyToDouble(ev.entryLatitude), anyToDouble(ev.entryLongitude),
+                etiqueta = FOTO_ENTRADA,
             )
         }
         ev.evidencePhotos.orEmpty().forEachIndexed { i, url ->
             val geo = geoAt(ev.evidencePhotosGeo, i)
+            val label = fotoEvidenciaLabel(i + 1)
             sitio += fotos.size
             fotos += EvidencePhoto(
-                url, "$quien · Foto en sitio ${i + 1}",
+                url, "$quien · $label",
                 geo?.capturedAt ?: ev.evidencePhotosUploadedAt, geo?.lat, geo?.lng,
+                etiqueta = label,
             )
         }
         ev.exitPhotoUrl?.takeIf { it.isNotBlank() }?.let { url ->
             salida = fotos.size
             fotos += EvidencePhoto(
-                url, "$quien · Salida", ev.exitPhotoUploadedAt,
+                url, "$quien · $FOTO_SALIDA", ev.exitPhotoUploadedAt,
                 anyToDouble(ev.exitLatitude), anyToDouble(ev.exitLongitude),
+                etiqueta = FOTO_SALIDA,
             )
         }
         return EvidencePhotoSet(fotos, entrada, sitio, salida)

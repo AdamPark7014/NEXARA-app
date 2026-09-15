@@ -5,6 +5,7 @@ import java.time.ZoneId
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
+import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceReviewDto
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.CaptureRole
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -190,7 +191,58 @@ class CoreActivityRulesTest {
         assertEquals("2026-09-14T10:00:00Z", set.fotos[1].at)
         assertNull(set.fotos[2].lat)
         assertEquals("2026-09-14T10:05:00Z", set.fotos[2].at)
-        assertEquals("Alejandro González · Salida", set.fotos[3].titulo)
+        assertEquals("Alejandro González · 🏁 Salida", set.fotos[3].titulo)
+        assertEquals(
+            listOf("📍 Entrada", "📷 Evidencia 1", "📷 Evidencia 2", "🏁 Salida"),
+            set.fotos.map { it.etiqueta },
+        )
+    }
+
+    @Test
+    fun historyPhotosAreLabeledEvenWithoutEntry() {
+        val fotos = CoreActivityRules.fotosEtiquetadas(null, listOf("/a.jpg", " "), "/x.jpg", "Ana")
+        assertEquals(listOf("📷 Evidencia 1", "🏁 Salida"), fotos.map { it.etiqueta })
+    }
+
+    // ── Corrección enviada (contrato 2026-09-15) ───────────────────────────
+
+    @Test
+    fun submittedCorrectionIsReviewedAgain() {
+        val devolucion = TeamEvidenceReviewDto(id = 2L, decision = "DEVUELTA_PASOS", pasos = listOf("EXIT_PHOTO", "SERVICE_SHEET_DATA"))
+        val aprobadaVieja = TeamEvidenceReviewDto(id = 1L, decision = "APROBADA")
+        val revisiones = listOf(devolucion, aprobadaVieja)
+        val ev = TeamEvidenceDto(status = "COMPLETED", reviewStatus = "PENDING", correctionSubmittedAt = "2026-09-15T16:10:00Z")
+
+        assertEquals(
+            "🔁 Corrección por revisar",
+            CoreActivityRules.memberEstadoUi(ev.status, ev.reviewStatus, ev.correctionSubmittedAt).label,
+        )
+        assertTrue(CoreActivityRules.esCorreccion(ev, revisiones))
+        assertEquals(listOf("EXIT_PHOTO", "SERVICE_SHEET_DATA"), CoreActivityRules.pasosCorregidos(ev, revisiones))
+        val zone = ZoneId.of("America/Mexico_City")
+        val texto = CoreActivityRules.correccionTexto(ev.correctionSubmittedAt, revisiones, zone)
+        assertTrue(texto, texto.startsWith("🔁 Corrigió lo que se le devolvió (Foto de salida, Formulario) · "))
+        assertTrue(texto, texto.endsWith(". Revisa la corrección y apruébala o devuélvela de nuevo."))
+
+        val todo = listOf(TeamEvidenceReviewDto(id = 3L, decision = "DEVUELTA_TODO"))
+        assertTrue(CoreActivityRules.correccionTexto(null, todo, zone).contains("(rehízo toda la actividad)"))
+
+        // Sin corrección enviada, o ya aprobada: no es corrección.
+        assertFalse(CoreActivityRules.esCorreccion(ev.copy(correctionSubmittedAt = null), revisiones))
+        assertFalse(CoreActivityRules.esCorreccion(ev.copy(reviewStatus = "APPROVED"), revisiones))
+        assertEquals(emptyList<String>(), CoreActivityRules.pasosCorregidos(ev, listOf(aprobadaVieja)))
+    }
+
+    @Test
+    fun correctingCopyTellsTheReviewerWhatComesNext() {
+        assertEquals(
+            "↩️ Está corrigiendo: Foto de entrada · «Sin GPS». Cuando envíe la corrección podrás aprobarla o devolverla otra vez.",
+            CoreActivityRules.corrigiendoTexto(listOf("ENTRY_PHOTO"), "Sin GPS", avisarReenvio = true),
+        )
+        assertEquals(
+            "↩️ Está corrigiendo: Fotos en sitio",
+            CoreActivityRules.corrigiendoTexto(listOf("EVIDENCE_PHOTOS"), null, avisarReenvio = false),
+        )
     }
 
     @Test

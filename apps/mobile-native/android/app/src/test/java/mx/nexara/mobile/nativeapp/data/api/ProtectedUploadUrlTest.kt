@@ -36,10 +36,16 @@ class ProtectedUploadUrlTest {
     }
 
     @Test
-    fun absoluteApiUploadIsNormalizedAndEncoded() {
+    fun absoluteUploadIsNormalizedAndEncoded() {
+        // Nombre con espacio: `java.net.URI` lo rechaza y aun así hay que normalizarlo.
         assertEquals(
             "https://api.nexara.com.mx/uploads/activities/foto%20salida.jpg",
-            resolveProtectedUploadUrl("http://10.0.2.2:3001/api/uploads/activities/foto salida.jpg", origin),
+            resolveProtectedUploadUrl("http://10.0.2.2:3001/uploads/activities/foto salida.jpg", origin),
+        )
+        // Igual que la web: una URL absoluta cuyo path no empieza en /uploads se deja tal cual.
+        assertEquals(
+            "http://10.0.2.2:3001/api/uploads/activities/x.jpg",
+            resolveProtectedUploadUrl("http://10.0.2.2:3001/api/uploads/activities/x.jpg", origin),
         )
     }
 
