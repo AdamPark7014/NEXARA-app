@@ -78,6 +78,13 @@ class CoreActivitiesRepository(context: Context) {
 
     suspend fun operationalProjects(): List<OperationalProjectDto> = api.operationalProjects()
 
+    /** «AN sugerido» del formulario web; vacío si el API no lo da. */
+    suspend fun nextAnNumber(): String {
+        val raw = api.nextAnNumber().string().trim()
+        if (!raw.startsWith("{")) return ""
+        return runCatching { org.json.JSONObject(raw).optString("next", "") }.getOrDefault("")
+    }
+
     suspend fun dispatch(activityId: Long, userIds: List<Long>, indicaciones: String?) {
         api.dispatch(
             activityId,
