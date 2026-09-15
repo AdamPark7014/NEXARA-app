@@ -156,6 +156,14 @@ data class CreateActivityRequest(
     val responsableId: Long,
     val estatus: String? = "Pendiente",
     val fechaInicio: String? = null,
+    val fechaEntregaEsperada: String? = null,
+    val fechaMaxima: String? = null,
+    /** Fotos de evidencia por persona (2–8). */
+    val evidencePhotoRequired: Int? = null,
+    /** tarea | proyecto | obra | servicio | comercial. */
+    val coreKind: String? = null,
+    /** ejecucion | despacho. */
+    val assignmentCharge: String? = null,
 )
 
 data class CreateActivityResponse(

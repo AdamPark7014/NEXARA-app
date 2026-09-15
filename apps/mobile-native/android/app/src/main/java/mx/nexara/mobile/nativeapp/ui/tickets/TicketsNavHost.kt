@@ -25,9 +25,11 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTealTopAppBarColors
 import androidx.compose.ui.graphics.Color
+import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
+import mx.nexara.mobile.nativeapp.navigation.PendingModuleLink
 import mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsPortalScreen
 import mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsProfileScreen
 
@@ -66,7 +68,7 @@ private object TicketsRoutes {
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun TicketsNavHost(
-    onExitToPanels: () -> Unit,
+    onLogout: () -> Unit,
 ) {
     val navController = rememberNavController()
     var chatChannelId by remember { mutableStateOf<Long?>(null) }
@@ -74,7 +76,14 @@ fun TicketsNavHost(
 
     val deepLinkSignal by PendingDeepLink.signal.collectAsState()
     LaunchedEffect(deepLinkSignal) {
-        val link = PendingDeepLink.consumeModuleDestination(PanelId.PORTAL) ?: return@LaunchedEffect
+        // Una cuenta de portal solo abre el portal: un enlace de Core se queda en su inicio.
+        val pending = PendingDeepLink.consume() ?: return@LaunchedEffect
+        val module = pending as? DeepLinkDestination.Module
+        if (module == null || module.panel != PanelId.PORTAL) {
+            navController.navigate(TicketsRoutes.Portal) { launchSingleTop = true }
+            return@LaunchedEffect
+        }
+        val link = PendingModuleLink(key = module.key, entityId = module.entityId, params = module.params)
         if (link.key == "chat") {
             chatChannelId = DeepLinkNavigation.chatChannelId(link)
             chatMessageId = DeepLinkNavigation.chatMessageId(link)
@@ -119,8 +128,8 @@ fun TicketsNavHost(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onExitToPanels) {
-                        Icon(Icons.Default.ExitToApp, contentDescription = "Salir a paneles")
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión")
                     }
                 },
             )
@@ -133,7 +142,7 @@ fun TicketsNavHost(
         ) {
             nxComposable(TicketsRoutes.Portal) {
                 TicketsPortalScreen(
-                    onExitToPanels = onExitToPanels,
+                    onLogout = onLogout,
                     onOpenProfile = { navController.navigate(TicketsRoutes.Profile) { launchSingleTop = true } },
                     onOpenBranches = { navController.navigate(TicketsRoutes.Branches) { launchSingleTop = true } },
                     onOpenRequests = { navController.navigate(TicketsRoutes.Requests) { launchSingleTop = true } },

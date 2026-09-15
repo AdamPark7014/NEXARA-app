@@ -1,56 +1,45 @@
 import Foundation
 
+/// Pantalla de Core a la que lleva un enlace.
+struct CoreLink: Equatable {
+    var module: CoreModule
+    /// Detalle de actividad (`/erp/actividades/:id`).
+    var activityId: Int? = nil
+    /// Actividades: `detalle` / `evidencias` / `historial`. Asistencias: `comidas`.
+    var tab: String? = nil
+    /// Día de una persona (`/erp/pizarra/:userId`).
+    var boardUserId: Int? = nil
+    /// Vista de Actividades (`mias` / `equipo`).
+    var vista: String? = nil
+    var chatChannelId: Int64? = nil
+    var chatMessageId: Int64? = nil
+    /// Cliente (`/erp/clientes/:id`).
+    var entityId: Int64? = nil
+
+    /// `CORE_HOME_PATH` = `/erp/pizarra`.
+    static let home = CoreLink(module: .actividades)
+}
+
 /// Destino de un deep link (`nexara://`, URL https o ruta web relativa).
 enum DeepLinkDestination: Equatable {
     case notifications
-    case module(panel: PanelId, key: String, entityId: Int64? = nil, params: [String: String] = [:])
+    case core(CoreLink)
+    /// Portal externo de clientes (`/tickets/...`, «NO se toca» en la web).
+    case portal(key: String, entityId: Int64?)
 }
 
+/// Solo existe ERP (Core): todo lo demás cae en Actividades, igual que
+/// `coreSurfaceRedirect` en `apps/web/lib/core-surface.ts`.
 enum DeepLinkParser {
-    /// Segmentos legacy ES → keys de catálogo móvil.
-    private static let segmentAliases: [String: String] = [
-        "clientes": "clients", "clients": "clients", "oportunidades": "oportunidades", "productos": "productos",
-        "proyectos": "projects", "licitaciones": "licitaciones", "cotizaciones": "cotizaciones",
-        "plantillas": "plantillas", "templates": "plantillas",
-        "service-clients": "service-clients", "clientes-servicio": "service-clients", "viaticos": "viatics", "mis-viaticos": "my-viatics",
-        "actividades": "activities", "mis-actividades": "my-activities",
-        "evidencias": "evidences", "mis-evidencias": "my-evidences",
-        "vehiculos": "vehicles", "mis-vehiculos": "my-vehicles",
-        "herramientas": "tools", "asistencia": "attendance", "asistencias": "attendance",
-        "empleados": "hr", "multas": "fines", "gastos": "expenses",
-        "banca": "banking", "bancos": "banking", "facturacion": "invoicing",
-        "contabilidad": "accounting", "almacen": "warehouse", "inventario": "stock",
-        "compras": "procurement", "auditoria": "audit", "documentos": "documents",
-        "notificaciones": "notifications-center", "notifications-center": "notifications-center",
-        "mi-perfil": "my-profile", "configuracion": "settings", "usuarios": "users",
-        "cola-offline": "offline-queue", "offline": "offline-queue",
-        "leads": "leads", "noticias": "news", "contactos": "contacts",
-        "dashboard": "dashboard", "flags": "flags", "health": "health", "ai": "ai",
-        "soporte": "client-tickets", "support": "client-tickets", "client-tickets": "client-tickets",
-        "executive": "executive", "approvals": "approvals", "bi": "bi", "analytics": "analytics",
-        "dispatch": "dispatch",
-        "chat": "chat",
-        "reuniones": "reuniones", "meetings": "reuniones",
-        "smart-quote": "smart-quote", "cotizar": "smart-quote", "nueva-cotizacion": "smart-quote",
-        "noc": "noc", "sla": "support-sla", "support-sla": "support-sla",
-        "maintenance-contracts": "maintenance-contracts", "contratos": "maintenance-contracts",
-        "companies": "companies", "kb": "kb", "exports": "exports",
-        "architecture": "architecture", "calendar": "calendar",
-        "orgchart": "orgchart", "kpis-hr": "kpis-hr", "kpis": "kpis-hr",
-        "branches": "branches", "sucursales": "branches",
-        "requests": "requests", "solicitudes": "requests",
-        "inventories": "inventories", "inventarios": "inventories",
-        "feedback": "feedback-pending", "feedback-pending": "feedback-pending",
-        "mis-servicios": "mis-servicios", "my-services": "mis-servicios", "services": "mis-servicios",
-        "pizarra": "pizarra",
+    /// `NON_ERP_PANEL_RE` de la web.
+    private static let nonErpHeads: Set<String> = [
+        "ops", "crm", "studio", "lab", "integra", "finance", "hr", "sales", "console", "consola",
+        "contabilidad", "people", "operacion", "noc", "support", "ventas",
     ]
-
-    private static let erpHeads: Set<String> = ["erp", "console", "consola", "people", "contabilidad"]
-    /// Core: lo que era OPS vive dentro de ERP; nadie aterriza en un hub OPS.
-    private static let legacyOpsHeads: Set<String> = ["ops", "operacion", "noc", "support"]
-
-    private static let activityKeys: Set<String> = ["actividades", "activities", "mis-actividades", "my-activities"]
-    private static let evidenceKeys: Set<String> = ["evidencias", "evidences", "mis-evidencias", "my-evidences"]
+    private static let portalHeads: Set<String> = ["tickets", "portal"]
+    private static let activityHeads: Set<String> = ["activities", "actividades"]
+    private static let myActivityHeads: Set<String> = ["my-activities", "mis-actividades"]
+    private static let evidenceHeads: Set<String> = ["evidences", "evidencias", "my-evidences", "mis-evidencias"]
 
     static func parse(_ url: URL) -> DeepLinkDestination? {
         var segments = url.pathComponents.filter { $0 != "/" }
@@ -92,113 +81,114 @@ enum DeepLinkParser {
         return parse(url)
     }
 
-    private static func parse(segments rawSegments: [String], params: [String: String]) -> DeepLinkDestination? {
-        let segments = rawSegments.map { $0.lowercased() }.filter { !$0.isEmpty }
-        guard !segments.isEmpty else { return nil }
-
-        let joined = segments.joined(separator: "/")
-        if joined == "notifications-center" || joined == "notifications" || segments.last == "notifications-center" {
-            return .notifications
-        }
-
-        let head = segments[0]
-        let legacyOps = legacyOpsHeads.contains(head)
-        let panel: PanelId
-        let moduleParts: [String]
-        if erpHeads.contains(head) || legacyOps {
-            panel = .erp
-            moduleParts = Array(segments.dropFirst())
-        } else {
-            switch head {
-            case "crm", "ventas":
-                panel = .crm
-                moduleParts = Array(segments.dropFirst())
-            case "studio", "web":
-                panel = .studio
-                moduleParts = Array(segments.dropFirst())
-            case "lab":
-                panel = .lab
-                moduleParts = Array(segments.dropFirst())
-            case "portal", "tickets":
-                panel = .portal
-                moduleParts = Array(segments.dropFirst())
-            case "integra":
-                panel = .integra
-                moduleParts = Array(segments.dropFirst())
-            default:
-                panel = .erp
-                moduleParts = segments
-            }
-        }
-
-        if panel == .erp, let core = coreDestination(parts: moduleParts, legacyOps: legacyOps, params: params) {
-            return core
-        }
-
-        let pathEntityId: Int64? = {
-            guard let last = moduleParts.last, last.allSatisfy(\.isNumber), let id = Int64(last), id > 0 else { return nil }
-            return id
-        }()
-        let parts = (pathEntityId != nil && moduleParts.count > 1) ? Array(moduleParts.dropLast()) : moduleParts
-        let rawKey = parts.last ?? "dashboard"
-        let key = segmentAliases[rawKey] ?? rawKey
-        if key == "notifications-center" { return .notifications }
-        return .module(panel: panel, key: key, entityId: pathEntityId, params: params)
+    private static func positiveInt(_ raw: String?) -> Int? {
+        guard let raw, let value = Int(raw), value > 0 else { return nil }
+        return value
     }
 
-    /// Rutas de Core y equivalencias de `coreSurfaceRedirect` (web) para OPS viejo.
-    ///
-    /// - `/erp/actividades/:id` → detalle; `/evidencias` y `/historial` → esa pestaña.
-    /// - `/ops/activities/:id[/evidences]` → detalle o evidencias (lo demás, detalle).
-    /// - `?activityId=N` en listas viejas de actividades o evidencias.
-    /// - `/erp/pizarra?vista=…`, `/erp/mis-actividades`, `/ops/my-activities` → Actividades.
-    private static func coreDestination(parts: [String], legacyOps: Bool, params: [String: String]) -> DeepLinkDestination? {
-        guard let first = parts.first else {
-            return legacyOps ? .module(panel: .erp, key: "pizarra") : nil
-        }
-        var cleanParams = params
-        cleanParams.removeValue(forKey: "activityId")
-        cleanParams.removeValue(forKey: "activityid")
-        let queryActivityId = Int64(params["activityId"] ?? params["activityid"] ?? "") ?? 0
+    private static func positiveInt64(_ raw: String?) -> Int64? {
+        guard let raw, let value = Int64(raw), value > 0 else { return nil }
+        return value
+    }
 
-        if activityKeys.contains(first) {
-            if parts.count >= 2, let id = Int64(parts[1]), id > 0 {
+    private static func parse(segments rawSegments: [String], params: [String: String]) -> DeepLinkDestination? {
+        let segments = rawSegments.map { $0.lowercased() }.filter { !$0.isEmpty }
+        guard let head = segments.first else { return nil }
+
+        if segments.contains("notifications-center") || segments == ["notifications"] {
+            return .notifications
+        }
+        if portalHeads.contains(head) {
+            let rest = Array(segments.dropFirst())
+            let entityId = positiveInt64(rest.last)
+            let parts = entityId != nil ? Array(rest.dropLast()) : rest
+            return .portal(key: parts.last ?? "home", entityId: entityId)
+        }
+        if nonErpHeads.contains(head) {
+            return .core(redirectNonErp(segments: segments, params: params))
+        }
+        let parts = head == "erp" ? Array(segments.dropFirst()) : segments
+        return erpDestination(parts: parts, params: params)
+    }
+
+    /// `coreSurfaceRedirect`: detalle y evidencias de actividad conservan el id,
+    /// «Mi perfil» y «Mis actividades» van a su equivalente; lo demás, a casa.
+    private static func redirectNonErp(segments: [String], params: [String: String]) -> CoreLink {
+        let head = segments[0]
+        let rest = Array(segments.dropFirst())
+
+        if head == "ops", rest.count >= 2, activityHeads.contains(rest[0]), let id = positiveInt(rest[1]) {
+            let suffix = rest.count >= 3 ? rest[2] : ""
+            let tab = (suffix == "evidences" || suffix == "evidencias") ? "evidencias" : "detalle"
+            return CoreLink(module: .actividades, activityId: id, tab: tab)
+        }
+
+        if head == "ops", rest.count == 1, let activityId = positiveInt(params["activityId"] ?? params["activityid"]) {
+            if evidenceHeads.contains(rest[0]) {
+                return CoreLink(module: .actividades, activityId: activityId, tab: "evidencias")
+            }
+            if activityHeads.contains(rest[0]) || myActivityHeads.contains(rest[0]) {
+                return CoreLink(module: .actividades, activityId: activityId, tab: "detalle")
+            }
+        }
+
+        if segments.last == "my-profile" {
+            return CoreLink(module: .perfil)
+        }
+        if head == "ops", rest.count == 1, myActivityHeads.contains(rest[0]) {
+            return CoreLink(module: .actividades, vista: "mias")
+        }
+        return CoreLink.home
+    }
+
+    /// Rutas de `/erp` que existen en Core; cualquier otra cae en Actividades.
+    private static func erpDestination(parts: [String], params: [String: String]) -> DeepLinkDestination {
+        guard let first = parts.first else { return .core(CoreLink.home) }
+        let queryActivityId = positiveInt(params["activityId"] ?? params["activityid"])
+
+        if activityHeads.contains(first) || myActivityHeads.contains(first) {
+            if parts.count >= 2, let id = positiveInt(parts[1]) {
                 let suffix = parts.count >= 3 ? parts[2] : ""
-                var tab = "detalle"
-                if evidenceKeys.contains(suffix) {
-                    tab = "evidencias"
-                } else if !legacyOps && (suffix == "historial" || suffix == "history") {
-                    tab = "historial"
+                let tab: String
+                switch suffix {
+                case "evidencias", "evidences": tab = "evidencias"
+                case "historial", "history": tab = "historial"
+                default: tab = "detalle"
                 }
-                cleanParams["tab"] = tab
-                return .module(panel: .erp, key: "activities", entityId: id, params: cleanParams)
+                return .core(CoreLink(module: .actividades, activityId: id, tab: tab))
             }
-            if queryActivityId > 0 {
-                cleanParams["tab"] = "detalle"
-                return .module(panel: .erp, key: "activities", entityId: queryActivityId, params: cleanParams)
+            if let queryActivityId {
+                return .core(CoreLink(module: .actividades, activityId: queryActivityId, tab: "detalle"))
             }
-            if first == "mis-actividades" || first == "my-activities" {
-                cleanParams["vista"] = "mias"
-            }
-            return .module(panel: .erp, key: "pizarra", params: cleanParams)
+            let vista = myActivityHeads.contains(first) ? "mias" : params["vista"]
+            return .core(CoreLink(module: .actividades, vista: vista))
         }
 
-        if evidenceKeys.contains(first), queryActivityId > 0 {
-            cleanParams["tab"] = "evidencias"
-            return .module(panel: .erp, key: "activities", entityId: queryActivityId, params: cleanParams)
-        }
-
-        if first == "pizarra" {
-            if parts.count >= 2, let userId = Int64(parts[1]), userId > 0 {
-                cleanParams["vista"] = "equipo"
-                cleanParams["userId"] = String(userId)
+        switch first {
+        case "pizarra":
+            var link = CoreLink(module: .actividades, vista: params["vista"])
+            if parts.count >= 2, let userId = positiveInt(parts[1]) {
+                link.boardUserId = userId
+                link.vista = "equipo"
             }
-            return .module(panel: .erp, key: "pizarra", params: cleanParams)
+            return .core(link)
+        case "asistencias", "asistencia", "attendance":
+            return .core(CoreLink(module: .asistencias, tab: params["tab"]))
+        case "chat":
+            let channel = parts.count >= 2 ? positiveInt64(parts[1]) : nil
+            return .core(CoreLink(
+                module: .chat,
+                chatChannelId: channel ?? positiveInt64(params["channel"] ?? params["channelid"]),
+                chatMessageId: positiveInt64(params["msg"] ?? params["messageid"])
+            ))
+        case "my-profile", "mi-perfil":
+            return .core(CoreLink(module: .perfil))
+        case "clientes":
+            return .core(CoreLink(module: .clientes, entityId: parts.count >= 2 ? positiveInt64(parts[1]) : nil))
+        case "notificaciones":
+            return .notifications
+        default:
+            return .core(CoreLink.home)
         }
-
-        if first == "asistencias" {
-            return .module(panel: .erp, key: "attendance", params: cleanParams)
-        }
-        return nil
     }
 }

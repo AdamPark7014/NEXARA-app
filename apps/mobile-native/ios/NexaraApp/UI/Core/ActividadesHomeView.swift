@@ -425,7 +425,7 @@ struct TeamMemberDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(CoreFormat.shortName(nombre))
+        .navigationTitle(CoreFormat.shortName(member?.nombre ?? nombre))
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }

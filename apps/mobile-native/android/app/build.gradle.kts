@@ -71,10 +71,16 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             val screenshotApi = project.findProperty("SCREENSHOT_API") == "true"
+            // Docker de desarrollo expone la API en el 4000: `-PDEV_API_BASE_URL=http://10.0.2.2:4000/api`.
+            val devApiBaseUrl = (project.findProperty("DEV_API_BASE_URL") as String?)?.trim()?.ifBlank { null }
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                if (screenshotApi) "\"https://api.nexara.com.mx/api\"" else "\"http://10.0.2.2:3001/api\"",
+                when {
+                    screenshotApi -> "\"https://api.nexara.com.mx/api\""
+                    devApiBaseUrl != null -> "\"$devApiBaseUrl\""
+                    else -> "\"http://10.0.2.2:3001/api\""
+                },
             )
         }
         release {

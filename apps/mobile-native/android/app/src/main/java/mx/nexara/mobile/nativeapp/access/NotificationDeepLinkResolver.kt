@@ -3,11 +3,11 @@ package mx.nexara.mobile.nativeapp.access
 import mx.nexara.mobile.nativeapp.data.api.NotificationRowDto
 
 /**
- * Resuelve una notificación a un destino navegable en la app móvil.
+ * Resuelve una notificación a un destino navegable en la app.
  *
- * Orden: `relatedUrl` (nuevo `/erp/...` o legado `/ops/...`, ver [DeepLinkParser])
- * → `entityType` + `relatedEntityId` → `category`. En Core todo lo operativo
- * aterriza en ERP: no existe una superficie OPS.
+ * Orden: `relatedUrl` (ver [DeepLinkParser], que ya aplica `coreSurfaceRedirect`)
+ * → `entityType` + `relatedEntityId` → `category`. Solo existe NEXARA Core: lo que
+ * apunte a un módulo que ya no está en la app abre la casa de Core (Actividades).
  */
 object NotificationDeepLinkResolver {
 
@@ -35,7 +35,7 @@ object NotificationDeepLinkResolver {
 
         var dest = resolve(notification) ?: return null
 
-        if (dest is DeepLinkDestination.Module && dest.key == "chat") {
+        if (dest is DeepLinkDestination.Module && dest.key == CoreKeys.CHAT) {
             val msgId = relatedEntityId?.takeIf {
                 entityType?.trim()?.lowercase() == "chat_message"
             }
@@ -69,20 +69,14 @@ object NotificationDeepLinkResolver {
         notification.relatedUrl?.trim()?.takeIf { it.isNotBlank() }?.let { url ->
             DeepLinkParser.parseWebPath(url)?.let { dest ->
                 // Avisos de comida con URL de Asistencias sin pestaña: se abre Comidas.
-                if (isLunch && dest is DeepLinkDestination.Module && dest.key == "attendance" && dest.params["tab"] == null) {
+                if (isLunch && dest is DeepLinkDestination.Module && dest.key == CoreKeys.ATTENDANCE && dest.params["tab"] == null) {
                     return dest.copy(params = dest.params + ("tab" to "comidas"))
                 }
                 return dest
             }
         }
 
-        if (isLunch) {
-            return DeepLinkDestination.Module(
-                panel = PanelId.ERP,
-                key = "attendance",
-                params = mapOf("tab" to "comidas"),
-            )
-        }
+        if (isLunch) return attendance(comidas = true)
 
         // El API manda toda notificación de actividad (asignada, evidencia,
         // despacho, reprogramación, revisión) como `Activity` + id de la
@@ -90,15 +84,17 @@ object NotificationDeepLinkResolver {
         if (entityType in ACTIVITY_ENTITY_TYPES && entityId != null) {
             return activityDetail(entityId, tab = if (category in EVIDENCE_CATEGORIES) "evidencias" else null)
         }
+        if (category in EVIDENCE_CATEGORIES && entityId != null) {
+            // Las notificaciones de evidencias traen el id de la actividad.
+            return activityDetail(entityId, tab = "evidencias")
+        }
 
         if (entityType.isNotBlank()) {
-            moduleForEntityType(entityType, entityId)?.let { return it }
+            forEntityType(entityType, entityId)?.let { return it }
         }
-
         if (category.isNotBlank()) {
-            moduleForCategory(category, entityId)?.let { return it }
+            forCategory(category)?.let { return it }
         }
-
         return null
     }
 
@@ -106,89 +102,70 @@ object NotificationDeepLinkResolver {
     private val LUNCH_CATEGORIES = setOf("lunch_breaks", "lunch_break", "lunch-breaks", "comidas")
     private val LUNCH_ENTITY_TYPES = setOf("lunchbreak", "lunch_break", "lunch_breaks")
     private val EVIDENCE_CATEGORIES = setOf("evidences", "evidence")
+    private val CHAT_ENTITY_TYPES = setOf("chat_message", "chat_channel", "chat", "channel")
+    private val TICKET_ENTITY_TYPES = setOf("ticket", "tickets", "service_sheet")
+
+    /**
+     * Tipos que apuntaban a módulos que ya no existen en la app (viáticos,
+     * herramientas, vehículos, CRM, compras, almacén, proyectos, mantenimiento,
+     * usuarios, multas, contabilidad): abren la casa de Core, igual que la web.
+     */
+    private val NON_CORE_ENTITY_TYPES = setOf(
+        "evidence", "evidences", "activityevidence",
+        "viatic", "viatico", "viatics",
+        "tool_request", "toolrequest", "toolrenewal", "tool", "tools",
+        "vehicle", "vehicles", "vehiclecontrol",
+        "saleslead", "lead", "leads",
+        "salesopportunity", "opportunity", "opportunities",
+        "cotizacion", "quote", "quotes",
+        "clientticketrequest",
+        "requisition", "purchase_order", "purchaserequisition", "purchaseorder", "procurement",
+        "stocklevel", "warehouse", "movement",
+        "salesproject", "project", "projects",
+        "maintenancecontractvisit", "maintenance",
+        "user", "users", "fine", "fines", "accounting", "entry",
+    )
+
+    private val NON_CORE_CATEGORIES = setOf(
+        "viatics", "tools", "fines", "vehicles", "quotes", "orders", "projects",
+        "sales", "crm", "erp", "noc", "approval", "confirmations",
+    )
+
+    private fun forEntityType(entityType: String, entityId: Long?): DeepLinkDestination? = when (entityType) {
+        in ACTIVITY_ENTITY_TYPES -> DeepLinkParser.CORE_HOME
+        "attendance", "attendanceday" -> attendance(comidas = false)
+        // relatedEntityId de `chat_message` es el mensaje; el canal viene en la URL o en el push.
+        in CHAT_ENTITY_TYPES -> DeepLinkDestination.Module(
+            panel = PanelId.ERP,
+            key = CoreKeys.CHAT,
+            entityId = if (entityType == "chat_message") null else entityId,
+        )
+        in TICKET_ENTITY_TYPES -> DeepLinkDestination.Module(panel = PanelId.PORTAL, key = "tickets", entityId = entityId)
+        "client", "clients", "salesclient" -> DeepLinkDestination.Module(panel = PanelId.ERP, key = CoreKeys.CLIENTS, entityId = entityId)
+        in NON_CORE_ENTITY_TYPES -> DeepLinkParser.CORE_HOME
+        else -> null
+    }
+
+    private fun forCategory(category: String): DeepLinkDestination? = when (category) {
+        "attendance" -> attendance(comidas = false)
+        "activities", "evidences", "evidence" -> DeepLinkParser.CORE_HOME
+        "chat" -> DeepLinkDestination.Module(panel = PanelId.ERP, key = CoreKeys.CHAT)
+        "profile" -> DeepLinkDestination.Module(panel = PanelId.ERP, key = CoreKeys.MY_PROFILE)
+        "tickets" -> DeepLinkDestination.Module(panel = PanelId.PORTAL, key = "tickets")
+        in NON_CORE_CATEGORIES -> DeepLinkParser.CORE_HOME
+        else -> null
+    }
+
+    private fun attendance(comidas: Boolean) = DeepLinkDestination.Module(
+        panel = PanelId.ERP,
+        key = CoreKeys.ATTENDANCE,
+        params = if (comidas) mapOf("tab" to "comidas") else emptyMap(),
+    )
 
     private fun activityDetail(activityId: Long, tab: String?) = DeepLinkDestination.Module(
         panel = PanelId.ERP,
-        key = "activities",
+        key = CoreKeys.ACTIVITIES,
         entityId = activityId,
         params = if (tab != null) mapOf("tab" to tab) else emptyMap(),
     )
-
-    private fun moduleForEntityType(
-        entityType: String,
-        entityId: Long?,
-    ): DeepLinkDestination.Module? {
-        val (panel, key) = when (entityType) {
-            "activity", "activities" -> PanelId.ERP to "activities"
-            "evidence", "evidences", "activityevidence" -> PanelId.ERP to "evidences"
-            "viatic", "viatico", "viatics" -> PanelId.ERP to "viatics"
-            "tool_request", "toolrequest", "toolrenewal", "tool", "tools" -> PanelId.ERP to "tools"
-            "vehicle", "vehicles", "vehiclecontrol" -> PanelId.ERP to "vehicles"
-            "attendance" -> PanelId.ERP to "attendance"
-            "saleslead", "lead", "leads" -> PanelId.CRM to "leads"
-            "salesopportunity", "opportunity", "opportunities" -> PanelId.CRM to "oportunidades"
-            "client", "clients", "salesclient" -> PanelId.CRM to "clients"
-            "cotizacion", "quote", "quotes" -> PanelId.CRM to "cotizaciones"
-            "ticket", "tickets", "service_sheet" -> PanelId.PORTAL to "tickets"
-            "clientticketrequest" -> PanelId.ERP to "client-tickets"
-            "chat_message", "chat_channel", "chat", "channel" -> PanelId.ERP to "chat"
-            "requisition", "purchase_order", "purchaserequisition", "purchaseorder", "procurement" ->
-                PanelId.ERP to "procurement"
-            "stocklevel", "warehouse", "movement" -> PanelId.ERP to "warehouse"
-            "salesproject", "project", "projects" -> PanelId.ERP to "projects"
-            "maintenancecontractvisit", "maintenance" -> PanelId.ERP to "maintenance-contracts"
-            "user", "users" -> PanelId.ERP to "users"
-            "fine", "fines" -> PanelId.ERP to "fines"
-            "accounting", "entry" -> PanelId.ERP to "accounting"
-            else -> return null
-        }
-
-        val resolvedEntityId = when (entityType) {
-            // relatedEntityId es messageId; el canal viene en relatedUrl.
-            "chat_message" -> null
-            else -> entityId
-        }
-
-        return DeepLinkDestination.Module(
-            panel = panel,
-            key = key,
-            entityId = resolvedEntityId,
-        )
-    }
-
-    private fun moduleForCategory(
-        category: String,
-        entityId: Long?,
-    ): DeepLinkDestination.Module? {
-        if (category in EVIDENCE_CATEGORIES && entityId != null) {
-            // Las notificaciones de evidencias traen el id de la actividad.
-            return activityDetail(entityId, tab = "evidencias")
-        }
-        val (panel, key) = when (category) {
-            "attendance" -> PanelId.ERP to "attendance"
-            "activities" -> PanelId.ERP to "activities"
-            "evidences" -> PanelId.ERP to "evidences"
-            "viatics" -> PanelId.ERP to "viatics"
-            "tools" -> PanelId.ERP to "tools"
-            "fines" -> PanelId.ERP to "fines"
-            "profile" -> PanelId.ERP to "my-profile"
-            "vehicles" -> PanelId.ERP to "vehicles"
-            "quotes" -> PanelId.CRM to "cotizaciones"
-            "orders" -> PanelId.ERP to "procurement"
-            "projects" -> PanelId.ERP to "projects"
-            "sales", "crm" -> PanelId.CRM to "dashboard"
-            "erp" -> PanelId.ERP to "dashboard"
-            "noc" -> PanelId.ERP to "noc"
-            "chat" -> PanelId.ERP to "chat"
-            "approval", "confirmations" -> PanelId.ERP to "approvals"
-            "tickets" -> PanelId.PORTAL to "tickets"
-            else -> return null
-        }
-
-        return DeepLinkDestination.Module(
-            panel = panel,
-            key = key,
-            entityId = entityId,
-        )
-    }
 }

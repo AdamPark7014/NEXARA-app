@@ -5,23 +5,10 @@ import mx.nexara.mobile.nativeapp.navigation.PendingModuleLink
 /** Construye rutas internas de NavHost a partir de un deep link de módulo. */
 object DeepLinkNavigation {
 
-    private val ACTIVITY_KEYS = setOf("activities", "my-activities")
-
-    fun ventasRoute(link: PendingModuleLink): String {
-        link.entityId?.let { id ->
-            return when (link.key) {
-                "oportunidades", "opportunities" -> "v/opportunity/$id"
-                "leads" -> "v/lead/$id"
-                "cotizaciones", "quotes" -> "v/quote/$id"
-                "clients", "clientes" -> "v/client/$id"
-                else -> "v/m/${link.key}"
-            }
-        }
-        return "v/m/${link.key}"
-    }
+    private val ACTIVITY_KEYS = setOf(CoreKeys.ACTIVITIES, CoreKeys.MY_ACTIVITIES)
 
     /**
-     * Ruta directa de consola: el día de una persona (`/erp/pizarra/:userId`)
+     * Ruta directa de Core: el día de una persona (`/erp/pizarra/:userId`)
      * o el detalle de una actividad con su pestaña (`/erp/actividades/:id/evidencias`).
      */
     fun consoleRoute(link: PendingModuleLink): String? {
@@ -30,11 +17,12 @@ object DeepLinkNavigation {
         }
         link.entityId?.let { id ->
             return when (link.key) {
-                "activities", "my-activities" -> {
+                CoreKeys.ACTIVITIES, CoreKeys.MY_ACTIVITIES -> {
                     val tab = link.params["tab"]
                     if (!tab.isNullOrBlank()) "console/activity/$id?tab=$tab"
                     else "console/activity/$id"
                 }
+                CoreKeys.CLIENTS -> "console/clients/$id"
                 else -> null
             }
         }
@@ -50,10 +38,8 @@ object DeepLinkNavigation {
         link.params["vista"]?.trim()?.lowercase()?.let { v ->
             if (v == "mias" || v == "equipo") return v
         }
-        return if (link.key == "my-activities") "mias" else null
+        return if (link.key == CoreKeys.MY_ACTIVITIES) "mias" else null
     }
-
-    fun consoleModuleKey(link: PendingModuleLink): String = link.key
 
     fun ticketsRoute(link: PendingModuleLink): String? {
         link.entityId?.let { id ->
@@ -76,18 +62,12 @@ object DeepLinkNavigation {
     fun chatMessageId(link: PendingModuleLink): Long? =
         link.params["msg"]?.toLongOrNull()?.takeIf { it > 0L }
 
-    fun viaticHighlightId(link: PendingModuleLink): Long? =
-        link.entityId?.takeIf { link.key in VIATIC_KEYS }
-
-    private val VIATIC_KEYS = setOf("viatics", "my-viatics")
-
-    private val LUNCH_KEYS = setOf("lunch-breaks", "my-lunch-breaks")
     private val LUNCH_TAB_VALUES = setOf("comidas", "comida", "lunch", "lunch-breaks")
 
-    /** `comidas` para /erp/asistencias?tab=comidas y los módulos viejos de comidas. */
+    /** `comidas` para /erp/asistencias?tab=comidas. */
     fun attendanceTab(link: PendingModuleLink): String? {
-        if (link.key in LUNCH_KEYS) return "comidas"
+        if (link.key != CoreKeys.ATTENDANCE) return null
         val tab = link.params["tab"]?.trim()?.lowercase()
-        return if (link.key == "attendance" && tab in LUNCH_TAB_VALUES) "comidas" else null
+        return if (tab in LUNCH_TAB_VALUES) "comidas" else null
     }
 }

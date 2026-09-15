@@ -347,26 +347,6 @@ struct MyActivitiesResponse: Decodable {
     }
 }
 
-/// Alta de una actividad a nombre propio (POST me/activities). El API fuerza
-/// responsable, creador y `assignmentCharge = ejecucion`; se mandan igual porque
-/// el DTO los exige.
-struct SelfAssignActivityBody: Encodable {
-    let titulo: String
-    let descripcion: String?
-    let indicaciones: String?
-    let prioridad: String
-    let coreKind: String
-    let activityType: String
-    let ticketType: String
-    let workType: String
-    let estatus: String
-    let creadoPorId: Int
-    let responsableId: Int
-    let fechaInicio: String?
-    let tiempoEstimadoMin: Int?
-    let tiempoMaximoMin: Int?
-}
-
 // MARK: - Pizarra del equipo (GET me/board)
 
 struct TeamBoardActivity: Decodable, Hashable {
@@ -440,6 +420,7 @@ struct TeamBoardHistoryEvidence: Decodable, Hashable {
     let evidencePhotos: [String]?
     let exitPhotoUrl: String?
     let serviceSheetPdfUrl: String?
+    let serviceSheetData: JSONValue?
 }
 
 struct TeamBoardHistoryItem: Decodable, Identifiable, Hashable {
@@ -682,7 +663,7 @@ struct EvidenceFlowState: Decodable, Hashable {
     }
 }
 
-// MARK: - Historial (GET activities/:id/team/timeline)
+// MARK: - Historial (GET activities/:id/timeline)
 
 struct ActivityTimelineEvent: Decodable, Identifiable, Hashable {
     let id: String

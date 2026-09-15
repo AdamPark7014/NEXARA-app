@@ -1,9 +1,8 @@
 import Foundation
 
-/// Espejo iOS de `RolePanelMatrix.kt` / `apps/api/src/common/rbac/roles.v2.ts`.
-///
-/// Respaldo determinista cuando `GET /me/navigation` no responde o devuelve
-/// paneles vacíos. Nunca decide por subcadena del nombre visible del rol.
+/// Espejo iOS de `apps/api/src/common/rbac/roles.v2.ts`: resuelve la clave
+/// canónica del rol (CEO, cliente, sucursal…). Nunca decide por subcadena del
+/// nombre visible del rol.
 enum RolePanelMatrix {
     static let superAdmin = "super_admin"
     static let ceo = "ceo"
@@ -28,32 +27,17 @@ enum RolePanelMatrix {
     /// Cuentas externas: solo portal, nunca paneles internos.
     static let externalRoles: Set<String> = [cliente, sucursal]
 
-    /// Paneles por rol = HOME ∪ EXTRA de roles.v2.ts.
-    private static let rolePanels: [String: [PanelId]] = [
-        superAdmin: [.erp, .crm, .ops, .studio, .lab, .integra],
-        ceo: [.erp, .crm, .ops, .studio, .lab, .integra],
-        arquitecto: [.ops, .erp, .crm, .integra],
-        dirOperaciones: [.erp, .ops, .crm, .integra],
-        dirAdmin: [.erp, .crm],
-        coordAdmin: [.erp, .crm],
-        administrativo: [.erp],
-        rh: [.erp],
-        contabilidad: [.erp],
-        coordOperaciones: [.ops, .erp, .integra],
-        ingCampo: [.ops],
-        ingSoporte: [.ops, .erp, .integra],
-        coordVentas: [.crm, .erp],
-        vendedor: [.crm],
-        liderDiseno: [.studio, .erp],
-        disenador: [.studio],
-        cliente: [.portal],
-        sucursal: [.portal],
+    /// Roles canónicos de roles.v2.ts (más la sucursal legacy).
+    private static let knownRoles: [String] = [
+        superAdmin, ceo, arquitecto, dirOperaciones, dirAdmin, coordAdmin, administrativo, rh,
+        contabilidad, coordOperaciones, ingCampo, ingSoporte, coordVentas, vendedor, liderDiseno,
+        disenador, cliente, sucursal,
     ]
 
     /// Alias → clave canónica, por cadena completa normalizada.
     private static let roleAliases: [String: String] = {
         var map: [String: String] = [:]
-        for key in rolePanels.keys {
+        for key in knownRoles {
             map[key] = key
         }
         // Nombres visibles (ROLE_LABELS.es)
@@ -163,12 +147,6 @@ enum RolePanelMatrix {
             if let hit = roleTokenAliases[token] { return hit }
         }
         return nil
-    }
-
-    /// Paneles del rol canónico; vacío si el rol no se reconoce.
-    static func panelsForRole(_ canonicalRole: String?) -> [PanelId] {
-        guard let canonicalRole else { return [] }
-        return rolePanels[canonicalRole] ?? []
     }
 
     static func isExternalRole(_ canonicalRole: String?) -> Bool {

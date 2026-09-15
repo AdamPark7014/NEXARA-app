@@ -3,6 +3,9 @@ package mx.nexara.mobile.nativeapp.data.console
 import android.content.Context
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
+import mx.nexara.mobile.nativeapp.data.api.AddTeamMemberRequest
+import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
+import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.CoreActivitiesApi
@@ -47,13 +50,33 @@ class CoreActivitiesRepository(context: Context) {
     )
 
     /** Devuelve el id creado; null si quedó en la cola sin conexión. */
-    suspend fun selfAssign(body: CreateActivityRequest): Long? {
-        val raw = api.selfAssign(body).string().trim()
-        if (!raw.startsWith("{")) return null
-        return runCatching { org.json.JSONObject(raw).optLong("id", 0L) }
+    suspend fun selfAssign(body: CreateActivityRequest): Long? = createdId(api.selfAssign(body).string())
+
+    /** Asignar a otra persona (`POST activities`); null si quedó en la cola sin conexión. */
+    suspend fun createActivity(body: CreateActivityRequest): Long? = createdId(api.createActivity(body).string())
+
+    private fun createdId(raw: String): Long? {
+        val trimmed = raw.trim()
+        if (!trimmed.startsWith("{")) return null
+        return runCatching { org.json.JSONObject(trimmed).optLong("id", 0L) }
             .getOrNull()
             ?.takeIf { it > 0L }
     }
+
+    suspend fun addTeamMember(activityId: Long, userId: Long, rol: String, indicaciones: String?) {
+        api.addTeamMember(
+            activityId,
+            AddTeamMemberRequest(
+                userId = userId,
+                rol = rol,
+                indicaciones = indicaciones?.trim()?.takeIf { it.isNotEmpty() },
+            ),
+        ).close()
+    }
+
+    suspend fun salesClients(sector: String): List<SalesClientDto> = api.salesClients(sector)
+
+    suspend fun operationalProjects(): List<OperationalProjectDto> = api.operationalProjects()
 
     suspend fun dispatch(activityId: Long, userIds: List<Long>, indicaciones: String?) {
         api.dispatch(

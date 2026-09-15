@@ -386,9 +386,70 @@ data class EvidenceFormDataWrapper(
     val formData: Map<String, String>,
 )
 
+// ── Alta de actividad (Core) ────────────────────────────────────────────────
+
+/** `POST activities/:id/team` — sumar a alguien al equipo de la actividad. */
+data class AddTeamMemberRequest(
+    val userId: Long,
+    /** LEAD | TECNICO | APOYO */
+    val rol: String,
+    val indicaciones: String? = null,
+)
+
+/** Cliente del padrón (`GET ventas/clientes?sector=`). */
+data class SalesClientOwnerDto(
+    val id: Long? = null,
+    val nombre: String? = null,
+    val email: String? = null,
+)
+
+data class SalesClientDto(
+    val id: Long,
+    val name: String? = null,
+    val legalName: String? = null,
+    val taxId: String? = null,
+    val fiscalAddress: String? = null,
+    val fiscalZipCode: String? = null,
+    val fiscalRegime: String? = null,
+    val billingEmail: String? = null,
+    val billingPhone: String? = null,
+    val notes: String? = null,
+    val status: String? = null,
+    /** Puente al cliente de servicio: es el id que usan actividades y proyectos. */
+    val serviceClientId: Long? = null,
+    /** `[{sector}]` o `["PROYECTO"]`: se lee con [sectorNames]. */
+    val sectors: List<Any?>? = null,
+    val owner: SalesClientOwnerDto? = null,
+) {
+    val sectorNames: List<String>
+        get() = sectors.orEmpty().mapNotNull { s ->
+            when (s) {
+                is String -> s
+                is Map<*, *> -> s["sector"]?.toString()
+                else -> null
+            }
+        }
+}
+
 interface CoreActivitiesApi {
     @GET("me/activities")
     suspend fun myActivities(): MyActivitiesResponseDto
+
+    /** Asignar a otra persona (mismo cuerpo que `me/activities`). */
+    @POST("activities")
+    suspend fun createActivity(@Body body: CreateActivityRequest): ResponseBody
+
+    @POST("activities/{id}/team")
+    suspend fun addTeamMember(
+        @Path("id") activityId: Long,
+        @Body body: AddTeamMemberRequest,
+    ): ResponseBody
+
+    @GET("ventas/clientes")
+    suspend fun salesClients(@retrofit2.http.Query("sector") sector: String): List<SalesClientDto>
+
+    @GET("operational-projects")
+    suspend fun operationalProjects(): List<OperationalProjectDto>
 
     @PATCH("me/activities/order")
     suspend fun reorderMyActivities(@Body body: ReorderMyActivitiesRequest): MyActivitiesResponseDto

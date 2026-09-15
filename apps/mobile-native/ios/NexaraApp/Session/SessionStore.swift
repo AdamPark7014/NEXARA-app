@@ -20,6 +20,8 @@ struct SessionUser: Codable, Equatable {
     var orgRoleKey: String? = nil
     /// Paneles de `GET /me/navigation` cuando la sesión los trae.
     var navPanels: [String]? = nil
+    /// `moduleKeys` ∪ `webModuleIds` de `GET /me/navigation`: filtran el menú de Core.
+    var navModules: [String]? = nil
     /// Tenant activo — se manda como `X-Company-Id` (paridad Android).
     var companyId: Int64? = nil
     /// ISO-8601 de caducidad del JWT; `maybeExtendSession` lo usa.

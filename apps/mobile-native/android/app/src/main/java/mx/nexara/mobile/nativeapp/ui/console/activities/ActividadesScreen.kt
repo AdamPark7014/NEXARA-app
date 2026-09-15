@@ -99,6 +99,8 @@ fun ActividadesScreen(
     onOpenActivity: (Long, String?) -> Unit,
     onOpenPerson: (Long) -> Unit,
     onSelfAssign: (() -> Unit)? = null,
+    /** Actividad recién auto-asignada: se resalta en «Mis actividades» (`?nueva=` en la web). */
+    highlightActivityId: Long? = null,
 ) {
     val context = LocalContext.current
     val user = remember(context) { AuthRepository(context).loadSession() }
@@ -168,6 +170,7 @@ fun ActividadesScreen(
             onOpenActivity = onOpenActivity,
             onOpenPerson = onOpenPerson,
             onSelfAssign = onSelfAssign,
+            highlightActivityId = highlightActivityId,
         )
         else -> Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
             if (conPestanas) {
@@ -180,6 +183,7 @@ fun ActividadesScreen(
                     onOpenActivity = onOpenActivity,
                     onOpenPerson = onOpenPerson,
                     onSelfAssign = onSelfAssign,
+                    highlightActivityId = highlightActivityId,
                 )
             } else {
                 TeamBoardContent(
@@ -414,6 +418,7 @@ private fun MisActividadesContent(
     onOpenActivity: (Long, String?) -> Unit,
     onOpenPerson: (Long) -> Unit,
     onSelfAssign: (() -> Unit)?,
+    highlightActivityId: Long? = null,
 ) {
     var data by remember { mutableStateOf<MyActivitiesResponseDto?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -421,7 +426,7 @@ private fun MisActividadesContent(
     var error by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
     var showDone by remember { mutableStateOf(false) }
-    var highlightId by remember { mutableStateOf<Long?>(null) }
+    var highlightId by remember(highlightActivityId) { mutableStateOf(highlightActivityId) }
     var pendingMove by remember { mutableStateOf<PendingMove?>(null) }
 
     LaunchedEffect(reload) {

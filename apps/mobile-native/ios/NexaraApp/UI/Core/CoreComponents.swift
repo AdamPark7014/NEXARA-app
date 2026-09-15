@@ -9,6 +9,7 @@ enum CorePalette {
     static let purple = Color(red: 0.486, green: 0.227, blue: 0.929)  // #7c3aed
     static let slate = Color(red: 0.580, green: 0.639, blue: 0.722)   // #94a3b8
     static let amber = Color(red: 0.961, green: 0.620, blue: 0.043)   // #f59e0b
+    static let cyan = Color(red: 0.031, green: 0.569, blue: 0.698)    // #0891b2
 }
 
 /// Etiquetas de estatus en lenguaje de campo (espejo de MisActividadesView web).
@@ -72,7 +73,8 @@ enum CoreStatusUI {
         }
     }
 
-    static let boardStatusOrder = ["activo", "atrasado", "libre", "sin_actividad"]
+    /// Orden de la leyenda (`STATUS_LABELS` web). «inactivo» solo se pinta si alguien lo trae.
+    static let boardStatusOrder = ["activo", "atrasado", "libre", "sin_actividad", "inactivo"]
 }
 
 /// Textos del tablero con detalle (espejo de `estadoTexto`/`terminoTexto` de la pizarra web).
