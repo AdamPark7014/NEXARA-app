@@ -147,6 +147,12 @@ private struct TeamPersonCard: View {
     let user: TeamBoardUser
     let isSelf: Bool
 
+    /// Libre sin nada abierto: «Última: …» como la web.
+    private var lastFinishedTitle: String? {
+        guard let finished = user.lastFinished else { return nil }
+        return "Última: \(finished.titulo ?? "Actividad")"
+    }
+
     private func openTitle(_ activity: TeamBoardOpenActivity) -> String {
         let base = activity.titulo ?? "Actividad"
         switch activity.assignmentCharge {
@@ -284,7 +290,22 @@ struct TeamMemberDetailView: View {
                                 Text(puesto).font(.caption).foregroundStyle(.secondary)
                             }
                             let status = CoreStatusUI.boardStatus(member.status)
-                            CoreChip(text: status.label, color: status.color)
+                            CoreChip(text: CoreBoardText.estado(member), color: status.color)
+                            if member.status == "libre", let finished = member.lastFinished {
+                                let termino = CoreBoardText.termino(finished)
+                                Text(termino.text)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(termino.color)
+                            }
+                            if (member.enCorreccion ?? 0) > 0 {
+                                CoreChip(text: "↩️ Corrigiendo evidencia", color: CorePalette.orange)
+                            }
+                            if let enEspera = member.enEsperaAprobacion, enEspera > 0 {
+                                CoreChip(
+                                    text: enEspera > 1 ? "⏳ \(enEspera) en espera de aprobación" : "⏳ En espera de aprobación",
+                                    color: CorePalette.purple
+                                )
+                            }
                         }
                     }
                     LabeledContent("Entrada", value: CoreFormat.time(member.clockInAt) ?? "Sin entrada")

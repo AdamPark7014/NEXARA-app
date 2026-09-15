@@ -483,6 +483,8 @@ struct TeamEvidenceData: Decodable, Hashable {
     let exitPhotoUploadedAt: String?
     let status: String?
     let completedAt: String?
+    /// Cuándo reenvió lo que le devolvieron (COMPLETED + PENDING = corrección por revisar).
+    let correctionSubmittedAt: String?
     let reviewStatus: String?
     let reviewNotes: String?
     let reviewedAt: String?

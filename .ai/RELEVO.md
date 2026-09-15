@@ -61,6 +61,8 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 
 17. **App Android al día con Core (agente, 15-09):** ERP solo (OPS dentro de ERP en navegación, permisos y enlaces), Actividades con pestañas Mis actividades / Mi equipo y tablero con los estados nuevos, Mis actividades (orden con justificación, auto-asignación, despacho, reprogramar), captura con CameraX en vivo + vista previa + GPS por foto + PDF + formulario + correcciones, revisión del equipo (estrellas, pasos o todo, historial, «Corrección por revisar»), fotos con nombre y aviso de archivo faltante, pestañas Detalle / Evidencias / Historial, Comidas en Asistencias y enlaces de avisos `/erp/…` y `/ops/…`. Archivos nuevos en `ui/console/activities`, `ui/console/comidas`, `data/api/CoreActivitiesApi.kt`, `ComidasApi.kt`, `ui/common/LiveCameraCapture.kt`, `ProtectedAssets.kt`. Verificado: `:app:compileDebugKotlin` OK y `:app:testDebugUnitTest` 490 pruebas, 0 fallos; `build.gradle.kts`, `gradle.properties`, `google-services.json` y Manifest sin cambios. **Sin probar en dispositivo** (cámara, GPS, push, API real). Pendiente: Comidas solo muestra hoy; «Asignar actividad» no preselecciona a la persona; la pantalla vieja de aprobar/rechazar evidencias sigue en el código.
 
+18. **App iOS al día con Core (agente, 15-09), SIN COMPILAR:** revisión del equipo (`UI/Core/TeamEvidenceView.swift`, antes `ActivityCoreDetailView` llamaba vistas que no existían y el target no podía compilar), Comidas (`Data/LunchCoreRepository.swift`, `UI/Core/ComidasView.swift`), tablero con los estados nuevos, enlaces de avisos `LunchBreak` / comidas, foto de asistencia con cámara en vivo + GPS, captura de evidencias (`EvidenceCaptureFlowView.swift`), Firebase Messaging por SPM (solo arranca si existe `GoogleService-Info.plist`; token FCM a `devices/push-token`). Revisión hecha aquí: sin tipos duplicados de nivel superior (los repetidos son anidados), sin plist ni llaves agregadas, `project.yml` con FirebaseMessaging. Riesgos: la primera compilación en Xcode puede dar errores de tipos o concurrencia; `MyLunchBreaksView`/`LunchBreaksAdminView` quedan sin uso; la cámara de comida pide GPS aunque no lo manda.
+
 ### Falta probar a mano
 
 1. Antonio → actividad de Alejandro con evidencia enviada → Evidencias: ve fotos/PDF/formulario, «Aprobar» con estrellas y observaciones → actividad Finalizada; Luis y Christian reciben aviso.
@@ -70,11 +72,11 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 
 ### A medias
 
-App móvil (Android + iOS) al día con Core solo-ERP: pedido de Adam en el mismo mensaje, se hace en el siguiente commit.
+iOS escrito pero sin compilar: correr `.github/workflows/ios-testflight.yml` (macOS) y corregir lo que salga. Push iOS no llega hasta que Adam registre `mx.nexara.mobile.NexaraApp` en Firebase, suba la llave APNs y el CI escriba `GoogleService-Info.plist`. Android compila y pasa pruebas, sin probar en dispositivo.
 
 ### Siguiente
 
-App móvil. Luego Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad Actividades/Asistencia). Al desplegar a producción subir juntas `20260913180000_drop_evidence_activity_unique_index`, `20260913190000_assignee_dispatch_log`, `20260914050000_activity_schedule_changes`, `20260914100000_evidence_photos_geo`, `20260914160000_evidence_reviews` y `20260914190000_lunch_break_review`.
+Compilar iOS en CI y probar ambas apps en dispositivo (cámara, GPS, push, comidas). Luego Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad Actividades/Asistencia). Al desplegar a producción subir juntas `20260913180000_drop_evidence_activity_unique_index`, `20260913190000_assignee_dispatch_log`, `20260914050000_activity_schedule_changes`, `20260914100000_evidence_photos_geo`, `20260914160000_evidence_reviews` y `20260914190000_lunch_break_review`.
 
 ### No tocar
 

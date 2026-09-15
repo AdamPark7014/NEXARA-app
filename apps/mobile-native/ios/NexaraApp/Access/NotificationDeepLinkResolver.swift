@@ -142,8 +142,10 @@ enum NotificationDeepLinkResolver {
             return activity(id, tab: "detalle")
         case "evidence", "evidences":
             return activity(id, tab: "evidencias")
-        case "attendance", "lunch_breaks":
+        case "attendance":
             return .module(panel: .erp, key: "attendance")
+        case "lunch_breaks", "lunch", "comidas":
+            return .module(panel: .erp, key: "attendance", params: ["tab": "comidas"])
         case "viatics":
             return .module(panel: .erp, key: "viatics", entityId: id)
         case "tool", "tools":

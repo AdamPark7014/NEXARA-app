@@ -224,6 +224,25 @@ struct AttendanceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 checkInCard
+                NavigationLink {
+                    ComidasView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Text("🍽️").font(.title2)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Hora de comida").font(.subheadline.bold())
+                            Text("Salida y regreso con foto · de 3:00 a 4:00 p.m.")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
                 dayCard
 
                 Text("Semana: \(vm.weekFrom) → \(vm.weekTo)")

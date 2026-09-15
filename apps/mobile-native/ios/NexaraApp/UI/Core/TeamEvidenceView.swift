@@ -24,7 +24,10 @@ enum TeamEvidenceUI {
         guard let evidence else { return nil }
         if evidence.reviewStatus == "APPROVED" { return ("✅ Aprobada", CorePalette.green) }
         if evidence.reviewStatus == "REJECTED" { return ("↩️ Corrigiendo", CorePalette.orange) }
-        if evidence.status == CoreEvidence.completed { return ("🔎 Por revisar", CorePalette.orange) }
+        if evidence.status == CoreEvidence.completed {
+            let hasCorrection = !(evidence.correctionSubmittedAt ?? "").isEmpty
+            return (hasCorrection ? "🔁 Corrección por revisar" : "🔎 Por revisar", CorePalette.orange)
+        }
         return ("⏳ En curso", CorePalette.blue)
     }
 
@@ -43,6 +46,11 @@ enum TeamEvidenceUI {
         default: return ("↩️ Devolvió pasos", CorePalette.orange)
         }
     }
+
+    // Nombre de cada foto, igual en miniaturas, visor e historial.
+    static let entryLabel = "📍 Entrada"
+    static let exitLabel = "🏁 Salida"
+    static func evidenceLabel(_ index: Int) -> String { "📷 Evidencia \(index + 1)" }
 
     static func stepList(_ steps: [String]) -> String {
         steps.map { CoreEvidence.label($0) }.joined(separator: ", ")
@@ -243,6 +251,43 @@ private struct TeamEvidenceMemberCard: View {
     private var isExpanded: Bool { expanded ?? !member.splits }
     private var evidence: TeamEvidenceData? { member.evidence }
 
+    /// Última devolución (las revisiones llegan de la más reciente a la más vieja).
+    private var lastReturn: TeamEvidenceReview? {
+        member.revisiones?.first { $0.decision != "APROBADA" }
+    }
+
+    /// Ya reenvió lo que se le devolvió y falta revisar la corrección.
+    private var isCorrectionReview: Bool {
+        guard let ev = evidence, !(ev.correctionSubmittedAt ?? "").isEmpty else { return false }
+        return ev.status == CoreEvidence.completed && ev.reviewStatus != "APPROVED" && lastReturn != nil
+    }
+
+    /// Pasos que rehízo (se resaltan para revisar eso primero).
+    private var correctedSteps: [String] {
+        isCorrectionReview ? (lastReturn?.pasos ?? []) : []
+    }
+
+    /// Pasos devueltos que todavía está corrigiendo.
+    private var stepsToFix: [String] {
+        evidence?.reviewStatus == "REJECTED" ? (member.rejectedSteps ?? []) : []
+    }
+
+    private var pendingText: String {
+        guard isCorrectionReview else {
+            return "🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
+        }
+        var text = "🔁 Corrigió lo que se le devolvió"
+        if !correctedSteps.isEmpty && lastReturn?.decision != "DEVUELTA_TODO" {
+            text += " (\(TeamEvidenceUI.stepList(correctedSteps)))"
+        } else {
+            text += " (rehízo toda la actividad)"
+        }
+        if let when = CoreFormat.when(evidence?.correctionSubmittedAt) {
+            text += " · \(when)"
+        }
+        return text + ". Revisa la corrección y apruébala o devuélvela de nuevo."
+    }
+
     private var roleLabel: String {
         if member.splits { return "📨 La reparte" }
         return member.rol == "APOYO" ? "🤝 Apoyo" : "👷 La ejecuta"
@@ -328,7 +373,7 @@ private struct TeamEvidenceMemberCard: View {
     private var reviewPrompt: some View {
         if TeamEvidenceUI.pendingReview(member) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela.")
+                Text(pendingText)
                     .font(.footnote.weight(.semibold))
                 HStack(spacing: 8) {
                     Button("✅ Aprobar") { onReview("aprobar", []) }
@@ -378,6 +423,9 @@ private struct TeamEvidenceMemberCard: View {
         if let notes = ev.reviewNotes, !notes.isEmpty {
             text += " · «\(notes)»"
         }
+        if member.canReview || !(member.revisiones ?? []).isEmpty {
+            text += ". Cuando envíe la corrección podrás aprobarla o devolverla otra vez."
+        }
         return text
     }
 
@@ -396,6 +444,8 @@ private struct TeamEvidenceMemberCard: View {
                     coreKind: coreKind,
                     nombre: member.nombre,
                     onReturnStep: returnStepAction,
+                    correctedSteps: correctedSteps,
+                    stepsToFix: stepsToFix,
                     onPhoto: onPhoto,
                     onPdf: onPdf
                 )
@@ -423,6 +473,10 @@ private struct TeamEvidenceContent: View {
     let coreKind: String?
     let nombre: String
     var onReturnStep: ((String) -> Void)? = nil
+    /// Pasos que rehízo en la corrección por revisar («🔁 Corregido · hora»).
+    var correctedSteps: [String] = []
+    /// Pasos devueltos que todavía está corrigiendo.
+    var stepsToFix: [String] = []
     let onPhoto: (CorePhotoItem) -> Void
     let onPdf: (CorePdfItem) -> Void
 
@@ -430,10 +484,11 @@ private struct TeamEvidenceContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            stepChecklist
             section("Entrada", time: evidence.entryPhotoUploadedAt, step: CoreEvidence.entryPhoto) {
                 photoThumb(
                     evidence.entryPhotoUrl,
-                    title: "Entrada de \(short)",
+                    title: TeamEvidenceUI.entryLabel,
                     latitude: evidence.entryLatitude?.value,
                     longitude: evidence.entryLongitude?.value,
                     time: evidence.entryPhotoUploadedAt
@@ -453,13 +508,60 @@ private struct TeamEvidenceContent: View {
             section("Salida", time: evidence.exitPhotoUploadedAt, step: CoreEvidence.exitPhoto) {
                 photoThumb(
                     evidence.exitPhotoUrl,
-                    title: "Salida de \(short)",
+                    title: TeamEvidenceUI.exitLabel,
                     latitude: evidence.exitLatitude?.value,
                     longitude: evidence.exitLongitude?.value,
                     time: evidence.exitPhotoUploadedAt
                 )
             }
         }
+    }
+
+    /// Pasos con su estado: ✓ hora · ↩️ Por corregir · 🔁 Corregido · hora · ○ Pendiente.
+    private var stepChecklist: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 8)], alignment: .leading, spacing: 8) {
+            ForEach(CoreEvidence.steps(for: coreKind), id: \.self) { step in
+                stepChip(step)
+            }
+        }
+    }
+
+    private func stepChip(_ step: String) -> some View {
+        let time = evidence.stepTime(step)
+        let done = time != nil
+        let toFix = stepsToFix.contains(step)
+        let corrected = !toFix && done && correctedSteps.contains(step)
+        let tone: Color? = toFix ? CorePalette.orange : (corrected ? CorePalette.blue : (done ? CorePalette.green : nil))
+        let icon = toFix ? "↩️" : (corrected ? "🔁" : (done ? "✓" : "○"))
+        let when = CoreFormat.when(time) ?? ""
+        let detail: String
+        if toFix {
+            detail = "Por corregir"
+        } else if corrected {
+            detail = when.isEmpty ? "Corregido" : "Corregido · \(when)"
+        } else if done {
+            detail = when.isEmpty ? "Hecho" : when
+        } else {
+            detail = "Pendiente"
+        }
+        let detailColor: Color = toFix ? CorePalette.orange : (corrected ? CorePalette.blue : Color.secondary)
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("\(icon) \(CoreEvidence.label(step))")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+            Text(detail)
+                .font(.caption2.weight(corrected ? .semibold : .regular))
+                .foregroundStyle(detailColor)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background((tone ?? Color.clear).opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke((tone ?? Color.secondary).opacity(0.35), lineWidth: 1)
+        )
     }
 
     private func section<Content: View>(_ title: String, time: String?, step: String, @ViewBuilder content: () -> Content) -> some View {
@@ -499,7 +601,7 @@ private struct TeamEvidenceContent: View {
         let geo = evidence.geo(at: index)
         return photoThumb(
             url,
-            title: "Foto \(index + 1) de \(short)",
+            title: TeamEvidenceUI.evidenceLabel(index),
             latitude: geo?.latitude?.value,
             longitude: geo?.longitude?.value,
             time: geo?.capturedAt ?? evidence.evidencePhotosUploadedAt,
@@ -565,20 +667,29 @@ private struct TeamEvidenceContent: View {
     ) -> some View {
         if let url, !url.isEmpty {
             Button {
-                onPhoto(CorePhotoItem(title: title, url: url, latitude: latitude, longitude: longitude, time: time))
+                onPhoto(CorePhotoItem(title: "\(short) · \(title)", url: url, latitude: latitude, longitude: longitude, time: time))
             } label: {
-                AuthenticatedImage(url: url)
-                    .frame(width: 96, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(alignment: .bottomLeading) {
-                        if showsPin && CoreMaps.url(latitude: latitude, longitude: longitude) != nil {
-                            Text("📍").font(.caption).padding(4)
+                VStack(alignment: .leading, spacing: 3) {
+                    AuthenticatedImage(url: url)
+                        .frame(width: 96, height: 96)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(alignment: .bottomTrailing) {
+                            if showsPin && CoreMaps.url(latitude: latitude, longitude: longitude) != nil {
+                                Image(systemName: "mappin.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.white, CorePalette.red)
+                                    .padding(4)
+                            }
                         }
-                    }
+                    Text(title)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
+                        .frame(width: 96, alignment: .leading)
+                }
             }
             .buttonStyle(.plain)
         } else {
-            missing("Sin foto")
+            missing("Sin foto · \(title)")
         }
     }
 
