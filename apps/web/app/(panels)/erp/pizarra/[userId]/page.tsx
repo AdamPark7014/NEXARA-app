@@ -19,6 +19,7 @@ import {
 import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
 import { labelForAssignmentCharge } from "@/lib/activity-kinds";
 import DespachoPendingPanel from "@/components/pizarra/DespachoPendingPanel";
+import { FotoProtegida, VisorPdf } from "@/components/ops/EquipoEvidencias";
 
 function initials(name: string): string {
   return name
@@ -308,27 +309,36 @@ export default function PizarraPersonaPage() {
                 </button>
                 {open && ev ? (
                   <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {[ev.entryPhotoUrl, ...(ev.evidencePhotos || []), ev.exitPhotoUrl]
-                        .filter(Boolean)
-                        .map((url, i) => {
-                          const src = resolveAssetUrl(url as string);
-                          return src ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              key={`${h.id}-img-${i}`}
-                              src={src}
-                              alt=""
-                              style={{
-                                width: 88,
-                                height: 88,
-                                objectFit: "cover",
-                                borderRadius: 10,
-                                border: "1px solid var(--border)",
-                              }}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                      {[
+                        ...(ev.entryPhotoUrl ? [{ url: ev.entryPhotoUrl, label: "📍 Entrada" }] : []),
+                        ...(ev.evidencePhotos || []).map((url, i) => ({ url, label: `📷 Evidencia ${i + 1}` })),
+                        ...(ev.exitPhotoUrl ? [{ url: ev.exitPhotoUrl, label: "🏁 Salida" }] : []),
+                      ].map((foto, i) => (
+                        <figure key={`${h.id}-foto-${i}`} style={{ margin: 0, display: "grid", gap: 4, width: 104 }}>
+                          <div
+                            style={{
+                              width: 104,
+                              height: 104,
+                              borderRadius: 10,
+                              overflow: "hidden",
+                              border: "1px solid var(--border)",
+                            }}
+                          >
+                            <FotoProtegida
+                              url={foto.url}
+                              alt={`${foto.label} · ${h.anNumber}`}
+                              alto={104}
+                              style={{ width: 104, height: 104, objectFit: "cover", display: "block" }}
                             />
-                          ) : null;
-                        })}
+                          </div>
+                          <figcaption
+                            style={{ fontSize: 11.5, fontWeight: 700, textAlign: "center", color: "var(--text-secondary)" }}
+                          >
+                            {foto.label}
+                          </figcaption>
+                        </figure>
+                      ))}
                     </div>
                     {labels.some((l) => formData[l.key]) ? (
                       <dl style={{ margin: 0, display: "grid", gap: 4 }}>
@@ -343,20 +353,10 @@ export default function PizarraPersonaPage() {
                       </dl>
                     ) : null}
                     {ev.serviceSheetPdfUrl ? (
-                      <object
-                        data={resolveAssetUrl(ev.serviceSheetPdfUrl) || undefined}
-                        type="application/pdf"
-                        style={{ width: "100%", height: 280, borderRadius: 10, border: "1px solid var(--border)" }}
-                      >
-                        <a
-                          href={resolveAssetUrl(ev.serviceSheetPdfUrl) || "#"}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ fontWeight: 700, color: "var(--primary)" }}
-                        >
-                          Ver hoja de servicio (PDF)
-                        </a>
-                      </object>
+                      <div style={{ display: "grid", gap: 6 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800 }}>📄 Hoja de servicio</div>
+                        <VisorPdf url={ev.serviceSheetPdfUrl} alto="400px" />
+                      </div>
                     ) : null}
                     <Link href={`/erp/actividades/${h.id}`} style={{ fontWeight: 700, color: "var(--primary)" }}>
                       Abrir actividad →

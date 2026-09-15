@@ -35,6 +35,7 @@ const CALIF_LABEL = ["", "Deficiente", "Regular", "Buena", "Muy buena", "Excelen
 const VERDE = "#16a34a";
 const NARANJA = "#d97706";
 const ROJO = "#dc2626";
+const AZUL = "#2563eb";
 
 function pasosDe(coreKind: string | null): string[] {
   return (evidenceStepsForKind(coreKind) as string[]).filter((s) => s !== "COMPLETED");
@@ -89,7 +90,11 @@ function estadoUi(ev: TeamEvidence | null): { label: string; color: string } | n
   if (!ev) return null;
   if (ev.reviewStatus === "APPROVED") return { label: "✅ Aprobada", color: VERDE };
   if (ev.reviewStatus === "REJECTED") return { label: "↩️ Corrigiendo", color: NARANJA };
-  if (ev.status === "COMPLETED") return { label: "🔎 Por revisar", color: NARANJA };
+  if (ev.status === "COMPLETED") {
+    return ev.correctionSubmittedAt
+      ? { label: "🔁 Corrección por revisar", color: NARANJA }
+      : { label: "🔎 Por revisar", color: NARANJA };
+  }
   return { label: "⏳ En curso", color: "#2563eb" };
 }
 
@@ -290,7 +295,7 @@ function SinArchivo({ alto, texto, icono = "📭" }: { alto?: number; texto: str
   );
 }
 
-function FotoProtegida({ url, alt, style, alto }: { url: string; alt: string; style: CSSProperties; alto?: number }) {
+export function FotoProtegida({ url, alt, style, alto }: { url: string; alt: string; style: CSSProperties; alto?: number }) {
   const foto = useArchivoProtegido(url);
   const [rota, setRota] = useState(false);
   if (foto.estado === "cargando") return <SinArchivo alto={alto} icono="⏳" texto="Cargando foto…" />;
@@ -308,7 +313,7 @@ const PDFViewer = dynamic(() => import("@/components/PDFViewer"), {
  * El PDF se descarga con la sesión y se dibuja con pdf.js (visor de la web).
  * `<object>` y el visor de Chrome en iframe los bloquea la CSP (`object-src 'none'`).
  */
-function VisorPdf({ url }: { url: string }) {
+export function VisorPdf({ url, alto = "620px" }: { url: string; alto?: "400px" | "500px" | "620px" }) {
   const ruta = resolveAssetUrl(url);
   const [pdf, setPdf] = useState<{ datos: Uint8Array | null; error: boolean }>({ datos: null, error: false });
 
@@ -338,7 +343,7 @@ function VisorPdf({ url }: { url: string }) {
     return <SinArchivo alto={140} texto="El PDF ya no está en el servidor: hay que pedir que lo vuelva a subir." />;
   }
   if (!pdf.datos) return <SinArchivo alto={140} icono="⏳" texto="Cargando PDF…" />;
-  return <PDFViewer pdfUrl={ruta} pdfData={pdf.datos} fileName="Hoja de servicio.pdf" height="620px" />;
+  return <PDFViewer pdfUrl={ruta} pdfData={pdf.datos} fileName="Hoja de servicio.pdf" height={alto} />;
 }
 
 function Avatar({ nombre, url, size = 44 }: { nombre: string; url: string | null; size?: number }) {
@@ -609,6 +614,7 @@ function EvidenciaContenido({
   nombre,
   etiqueta,
   porCorregir = [],
+  corregidos = [],
   abrirVisor,
   onDevolverPaso,
 }: {
@@ -617,6 +623,8 @@ function EvidenciaContenido({
   nombre: string;
   etiqueta?: string;
   porCorregir?: string[];
+  /** Pasos que ya rehizo tras la última devolución (se marcan para revisarlos primero). */
+  corregidos?: string[];
   abrirVisor: AbrirVisor;
   onDevolverPaso?: (step: string) => void;
 }) {
@@ -645,7 +653,8 @@ function EvidenciaContenido({
           const hora = horaPaso(ev, step);
           const hecho = hora != null;
           const corregir = porCorregir.includes(step);
-          const color = corregir ? NARANJA : hecho ? VERDE : null;
+          const corregido = !corregir && hecho && corregidos.includes(step);
+          const color = corregir ? NARANJA : corregido ? AZUL : hecho ? VERDE : null;
           return (
             <li
               key={step}
@@ -657,10 +666,17 @@ function EvidenciaContenido({
               }}
             >
               <div style={{ fontSize: 12.5, fontWeight: 750 }}>
-                {corregir ? "↩️" : hecho ? "✓" : "○"} {STEP_LABEL[step] ?? step}
+                {corregir ? "↩️" : corregido ? "🔁" : hecho ? "✓" : "○"} {STEP_LABEL[step] ?? step}
               </div>
-              <div style={{ fontSize: 11.5, color: corregir ? NARANJA : "var(--text-tertiary)", marginTop: 2 }}>
-                {corregir ? "Por corregir" : hecho ? fmt(hora) ?? "Hecho" : "Pendiente"}
+              <div
+                style={{
+                  fontSize: 11.5,
+                  color: corregir ? NARANJA : corregido ? AZUL : "var(--text-tertiary)",
+                  marginTop: 2,
+                  fontWeight: corregido ? 650 : undefined,
+                }}
+              >
+                {corregir ? "Por corregir" : corregido ? `Corregido · ${fmt(hora) ?? ""}` : hecho ? fmt(hora) ?? "Hecho" : "Pendiente"}
               </div>
             </li>
           );
@@ -1097,6 +1113,12 @@ function TarjetaPersona({
     m.puedoRevisar && ev?.status === "COMPLETED" && ev.reviewStatus !== "APPROVED" && ev.reviewStatus !== "REJECTED";
   const [abierta, setAbierta] = useState(!m.reparte);
   const corrigiendo = ev?.reviewStatus === "REJECTED" ? m.rejectedSteps : [];
+  // Tras corregir, la última devolución dice qué rehizo: se resalta para revisar eso primero.
+  const ultimaDevolucion = m.revisiones.find((r) => r.decision !== "APROBADA") ?? null;
+  const esCorreccion = Boolean(
+    ev?.correctionSubmittedAt && ev.status === "COMPLETED" && ev.reviewStatus !== "APPROVED" && ultimaDevolucion,
+  );
+  const corregidos = esCorreccion && ultimaDevolucion ? ultimaDevolucion.pasos : [];
   const devolverPaso = m.puedoRevisar ? (step: string) => onRevisar(m, { decision: "devolver", pasos: [step] }) : undefined;
 
   return (
@@ -1156,8 +1178,19 @@ function TarjetaPersona({
             background: `color-mix(in srgb, ${NARANJA} 8%, var(--surface))`,
           }}
         >
-          <span style={{ flex: "1 1 220px", fontSize: 13.5, fontWeight: 650 }}>
-            🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela.
+          <span style={{ flex: "1 1 220px", fontSize: 13.5, fontWeight: 650, lineHeight: 1.45 }}>
+            {esCorreccion ? (
+              <>
+                🔁 Corrigió lo que se le devolvió
+                {corregidos.length && ultimaDevolucion?.decision !== "DEVUELTA_TODO"
+                  ? ` (${corregidos.map((s) => STEP_LABEL[s] ?? s).join(", ")})`
+                  : " (rehízo toda la actividad)"}
+                {ev?.correctionSubmittedAt ? ` · ${fmt(ev.correctionSubmittedAt)}` : ""}. Revisa la corrección y apruébala o
+                devuélvela de nuevo.
+              </>
+            ) : (
+              "🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
+            )}
           </span>
           <button type="button" style={btnLleno(VERDE)} onClick={() => onRevisar(m, { decision: "aprobar" })}>
             ✅ Aprobar
@@ -1193,6 +1226,7 @@ function TarjetaPersona({
         >
           ↩️ Está corrigiendo: <strong>{corrigiendo.map((s) => STEP_LABEL[s] ?? s).join(", ")}</strong>
           {ev?.reviewNotes ? ` · «${ev.reviewNotes}»` : ""}
+          {m.puedoRevisar || m.revisiones.length ? ". Cuando envíe la corrección podrás aprobarla o devolverla otra vez." : ""}
         </p>
       ) : null}
 
@@ -1224,6 +1258,7 @@ function TarjetaPersona({
               coreKind={coreKind}
               nombre={m.nombre}
               porCorregir={corrigiendo}
+              corregidos={corregidos}
               abrirVisor={abrirVisor}
               onDevolverPaso={ev.status === "COMPLETED" ? devolverPaso : undefined}
             />

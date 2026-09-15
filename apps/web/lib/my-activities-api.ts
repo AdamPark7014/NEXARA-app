@@ -152,6 +152,8 @@ export type TeamEvidence = TeamEvidenceSnapshot & {
   reviewNotes: string | null;
   reviewedAt: string | null;
   reviewedBy: string | null;
+  /** Cuándo envió la corrección de lo que se le devolvió. */
+  correctionSubmittedAt?: string | null;
 };
 
 export type TeamEvidenceReview = {
