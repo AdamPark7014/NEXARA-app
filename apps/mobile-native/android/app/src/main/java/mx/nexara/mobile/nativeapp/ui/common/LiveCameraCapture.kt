@@ -123,6 +123,11 @@ fun LiveCameraCaptureDialog(
     requireLocation: Boolean,
     onCaptured: (GeoPhoto) -> Unit,
     onDismiss: () -> Unit,
+    /** false: la foto no lleva GPS y no se pide permiso de ubicación (p. ej. hora de comida). */
+    captureLocation: Boolean = true,
+    /** Cámara con la que abre (la comida abre con la frontal, como la web). */
+    frontCamera: Boolean = false,
+    subtitle: String = "Acomódate o encuadra bien y toca «Tomar foto».",
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -142,7 +147,7 @@ fun LiveCameraCaptureDialog(
     fun askPermissions() {
         val missing = buildList {
             if (!granted(Manifest.permission.CAMERA)) add(Manifest.permission.CAMERA)
-            if (!DeviceLocation.hasPermission(context)) {
+            if (captureLocation && !DeviceLocation.hasPermission(context)) {
                 add(Manifest.permission.ACCESS_FINE_LOCATION)
                 add(Manifest.permission.ACCESS_COARSE_LOCATION)
             }
@@ -155,14 +160,16 @@ fun LiveCameraCaptureDialog(
     var coords by remember { mutableStateOf<DeviceCoords?>(null) }
     var locating by remember { mutableStateOf(false) }
     LaunchedEffect(hasLocation) {
-        if (!hasLocation) return@LaunchedEffect
+        if (!captureLocation || !hasLocation) return@LaunchedEffect
         locating = true
         val fix = withTimeoutOrNull(15_000) { DeviceLocation.current(context, highAccuracy = true) }
         if (fix != null) coords = fix
         locating = false
     }
 
-    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    var lensFacing by remember {
+        mutableIntStateOf(if (frontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK)
+    }
     var ready by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -184,8 +191,8 @@ fun LiveCameraCaptureDialog(
                 return@launch
             }
             val dataUrl = withContext(Dispatchers.Default) { LivePhotoEncoding.toJpegDataUrl(bitmap) }
-            var geo = coords
-            if (geo == null && DeviceLocation.hasPermission(context)) {
+            var geo = if (captureLocation) coords else null
+            if (captureLocation && geo == null && DeviceLocation.hasPermission(context)) {
                 geo = withTimeoutOrNull(10_000) { DeviceLocation.current(context, highAccuracy = true) }
                 if (geo != null) coords = geo
             }
@@ -239,7 +246,7 @@ fun LiveCameraCaptureDialog(
             ) {
                 Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "Acomódate o encuadra bien y toca «Tomar foto».",
+                    subtitle,
                     color = Color(0xFFCBD5E1),
                     fontSize = 13.sp,
                 )
@@ -278,6 +285,7 @@ fun LiveCameraCaptureDialog(
                     }
                 }
                 val gpsLine = when {
+                    !captureLocation -> "🕑 La foto se guarda con la hora en que la tomas"
                     coords != null -> "📍 Al tomar la foto se guarda tu ubicación · GPS listo"
                     !hasLocation -> "📍 Da permiso de ubicación: la foto se guarda con tu GPS"
                     locating -> "📍 Al tomar la foto se guarda tu ubicación · buscando GPS…"
@@ -293,7 +301,11 @@ fun LiveCameraCaptureDialog(
                         modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                     ) {
                         Text(
-                            if (busy) "⏳ Ubicando…" else "📸 Tomar foto",
+                            when {
+                                !busy -> "📸 Tomar foto"
+                                captureLocation -> "⏳ Ubicando…"
+                                else -> "⏳ Procesando…"
+                            },
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
                         )

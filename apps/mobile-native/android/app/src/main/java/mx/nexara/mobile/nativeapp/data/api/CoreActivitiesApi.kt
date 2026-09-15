@@ -139,13 +139,23 @@ data class TeamBoardOpenActivityDto(
     val fechaInicio: String? = null,
 )
 
+/** Última actividad que la persona terminó hoy (estado `libre`). */
+data class TeamBoardLastFinishedDto(
+    val id: Long? = null,
+    val anNumber: String? = null,
+    val titulo: String? = null,
+    val finishedAt: String? = null,
+    /** Minutos contra la fecha máxima; null = no tenía fecha máxima. */
+    val lateMinutes: Double? = null,
+)
+
 data class TeamBoardUserDto(
     val id: Long,
     val nombre: String? = null,
     val email: String? = null,
     val avatarUrl: String? = null,
     val puesto: String? = null,
-    /** activo | inactivo | atrasado | sin_actividad */
+    /** activo | atrasado | libre | sin_actividad (inactivo solo en APIs viejas). */
     val status: String? = null,
     val currentActivity: TeamBoardActivityDto? = null,
     val openActivities: List<TeamBoardOpenActivityDto>? = null,
@@ -153,6 +163,15 @@ data class TeamBoardUserDto(
     val workedMinutes: Double? = null,
     val activityStartedAt: String? = null,
     val activityElapsedMinutes: Double? = null,
+    /** Atrasado: minutos pasados de la fecha máxima de lo que está haciendo. */
+    val currentLateMinutes: Double? = null,
+    /** Libre: desde cuándo no tiene nada abierto. */
+    val idleSinceAt: String? = null,
+    val lastFinished: TeamBoardLastFinishedDto? = null,
+    /** Actividades suyas entregadas que nadie ha aprobado. */
+    val enEsperaAprobacion: Int? = null,
+    /** Actividades con evidencia devuelta que está corrigiendo. */
+    val enCorreccion: Int? = null,
 )
 
 data class TeamBoardResponseDto(

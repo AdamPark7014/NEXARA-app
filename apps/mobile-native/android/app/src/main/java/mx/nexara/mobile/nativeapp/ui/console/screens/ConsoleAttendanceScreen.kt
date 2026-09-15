@@ -228,6 +228,8 @@ private fun shareCsv(context: Context, file: File) {
 @Composable
 fun ConsoleAttendanceScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    /** `comidas` abre la pestaña de hora de comida (/erp/asistencias?tab=comidas). */
+    initialTab: String? = null,
 ) {
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
@@ -258,10 +260,33 @@ fun ConsoleAttendanceScreen(
         }
         .sortedByDescending { it.totalMinutes ?: 0 }
 
+    var attendanceTab by remember { mutableStateOf(if (initialTab == "comidas") "comidas" else "asistencia") }
+    LaunchedEffect(initialTab) {
+        if (initialTab == "comidas") attendanceTab = "comidas"
+    }
+
+    Column(Modifier.fillMaxSize()) {
+    TabRow(selectedTabIndex = if (attendanceTab == "comidas") 1 else 0) {
+        Tab(
+            selected = attendanceTab == "asistencia",
+            onClick = { attendanceTab = "asistencia" },
+            text = { Text("Asistencia") },
+        )
+        Tab(
+            selected = attendanceTab == "comidas",
+            onClick = { attendanceTab = "comidas" },
+            text = { Text("🍽️ Comidas") },
+        )
+    }
+    if (attendanceTab == "comidas") {
+        mx.nexara.mobile.nativeapp.ui.console.comidas.ComidasPanel(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        )
+    } else {
     PullToRefreshBox(
         isRefreshing = state.isRefreshing,
         onRefresh = { vm.refresh(initial = false) },
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.weight(1f).fillMaxWidth(),
     ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
@@ -581,6 +606,8 @@ fun ConsoleAttendanceScreen(
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+    }
     }
     }
 }

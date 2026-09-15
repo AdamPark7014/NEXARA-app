@@ -298,6 +298,47 @@ class CoreActivityRulesTest {
         assertNull(CoreActivityRules.anyToDouble(null))
     }
 
+    // ── Pizarra: estados con detalle (contrato 2026-09-14) ─────────────────
+
+    @Test
+    fun boardStatusCopyMatchesTheWeb() {
+        val now = Instant.parse("2026-09-14T18:00:00Z")
+        assertEquals("Atrasado 1 h 20 min", CoreActivityRules.boardEstadoTexto("atrasado", 80.0, null, now))
+        assertEquals(
+            "Sin actividad desde hace 2 h 05 min",
+            CoreActivityRules.boardEstadoTexto("libre", null, "2026-09-14T15:55:00Z", now),
+        )
+        assertEquals(
+            "Sin actividad desde hace un momento",
+            CoreActivityRules.boardEstadoTexto("libre", null, "2026-09-14T17:59:40Z", now),
+        )
+        assertEquals("Atrasado", CoreActivityRules.boardEstadoTexto("atrasado", null, null, now))
+        assertEquals("Sin actividad", CoreActivityRules.boardEstadoTexto("sin_actividad", null, null, now))
+        assertEquals("Terminó", CoreActivityRules.boardStatusLabel("libre"))
+        assertFalse("inactivo ya no se produce", "inactivo" in CoreActivityRules.BOARD_STATUS_ORDER)
+    }
+
+    @Test
+    fun boardMinutesArePaddedLikeTheWeb() {
+        assertEquals("45 min", CoreActivityRules.formatBoardMinutes(45.0))
+        assertEquals("1 h 05 min", CoreActivityRules.formatBoardMinutes(65.0))
+        assertEquals("2 h 00 min", CoreActivityRules.formatBoardMinutes(120.0))
+        assertEquals("—", CoreActivityRules.formatBoardMinutes(null))
+    }
+
+    @Test
+    fun lastFinishedLineSaysLateOrOnTime() {
+        val zone = ZoneId.of("America/Mexico_City")
+        assertEquals(
+            "Finalizó a las 10:49 con 1 h 20 min de atraso",
+            CoreActivityRules.boardTerminoTexto("2026-09-14T16:49:00Z", 80.0, zone),
+        )
+        assertEquals("Finalizó a las 10:49, a tiempo", CoreActivityRules.boardTerminoTexto("2026-09-14T16:49:00Z", 0.0, zone))
+        assertEquals("Finalizó a las 10:49", CoreActivityRules.boardTerminoTexto("2026-09-14T16:49:00Z", null, zone))
+        assertEquals("⏳ En espera de aprobación", CoreActivityRules.boardEnEsperaTexto(1))
+        assertEquals("⏳ 3 en espera de aprobación", CoreActivityRules.boardEnEsperaTexto(3))
+    }
+
     @Test
     fun vistaIsNormalized() {
         assertEquals("mias", CoreActivityRules.normalizeVista("MIAS"))

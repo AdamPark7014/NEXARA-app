@@ -269,6 +269,44 @@ class NotificationDeepLinkResolverTest {
         }
     }
 
+    // ── Hora de comida ──────────────────────────────────────────────────────
+
+    @Test
+    fun resolveFromPushData_lunchUrlOpensComidas() {
+        val dest = NotificationDeepLinkResolver.resolveFromPushData(
+            mapOf("url" to "/erp/asistencias?tab=comidas", "category" to "lunch_breaks", "relatedEntityId" to "31"),
+        ) as DeepLinkDestination.Module
+
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("attendance", dest.key)
+        assertEquals("comidas", DeepLinkNavigation.attendanceTab(link(dest)))
+    }
+
+    @Test
+    fun resolve_lunchCategoryWithoutTabStillOpensComidas() {
+        val withUrl = NotificationDeepLinkResolver.resolve(
+            notification(relatedUrl = "/erp/asistencias", category = "lunch_breaks"),
+        ) as DeepLinkDestination.Module
+        assertEquals("attendance", withUrl.key)
+        assertEquals("comidas", DeepLinkNavigation.attendanceTab(link(withUrl)))
+
+        val categoryOnly = NotificationDeepLinkResolver.resolve(
+            notification(category = "lunch_breaks", relatedEntityId = 9L),
+        ) as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, categoryOnly.panel)
+        assertEquals("attendance", categoryOnly.key)
+        assertEquals("comidas", DeepLinkNavigation.attendanceTab(link(categoryOnly)))
+    }
+
+    @Test
+    fun resolve_plainAttendanceStaysOnTheAttendanceTab() {
+        val dest = NotificationDeepLinkResolver.resolve(
+            notification(relatedUrl = "/erp/asistencias", category = "attendance"),
+        ) as DeepLinkDestination.Module
+        assertEquals("attendance", dest.key)
+        assertNull(DeepLinkNavigation.attendanceTab(link(dest)))
+    }
+
     private fun link(dest: DeepLinkDestination.Module) =
         PendingModuleLink(key = dest.key, entityId = dest.entityId, params = dest.params)
 

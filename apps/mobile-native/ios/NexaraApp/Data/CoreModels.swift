@@ -407,6 +407,25 @@ struct TeamBoardUser: Decodable, Identifiable, Hashable {
     let workedMinutes: Int?
     let activityStartedAt: String?
     let activityElapsedMinutes: Int?
+    /// Atrasado: minutos pasados de la fecha máxima de lo que está haciendo.
+    let currentLateMinutes: Int?
+    /// Libre: desde cuándo no tiene nada abierto.
+    let idleSinceAt: String?
+    /// Libre: última actividad que terminó hoy.
+    let lastFinished: TeamBoardLastFinished?
+    /// Entregadas que nadie ha aprobado.
+    let enEsperaAprobacion: Int?
+    /// Con evidencia devuelta que está corrigiendo.
+    let enCorreccion: Int?
+}
+
+/// `lastFinished` del tablero. `lateMinutes` nulo = la actividad no tenía fecha máxima.
+struct TeamBoardLastFinished: Decodable, Hashable {
+    let id: Int?
+    let anNumber: String?
+    let titulo: String?
+    let finishedAt: String?
+    let lateMinutes: Int?
 }
 
 struct TeamBoardResponse: Decodable {

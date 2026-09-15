@@ -264,7 +264,9 @@ private fun TeamBoardContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        CoreActivityRules.BOARD_STATUS_ORDER.forEach { status ->
+                        val legend = CoreActivityRules.BOARD_STATUS_ORDER +
+                            listOfNotNull("inactivo".takeIf { (counts["inactivo"] ?: 0) > 0 })
+                        legend.forEach { status ->
                             val color = Color(CoreActivityRules.boardStatusColor(status))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -351,11 +353,13 @@ private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: ()
                 Text("TÚ", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Teal, letterSpacing = 1.sp)
             }
             Text(
-                CoreActivityRules.boardStatusLabel(user.status),
+                CoreActivityRules.boardEstadoTexto(user.status, user.currentLateMinutes, user.idleSinceAt),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = statusColor,
+                textAlign = TextAlign.Center,
             )
+            BoardStatusExtras(user = user, centered = true)
             val open = user.openActivities.orEmpty()
             if (open.isNotEmpty()) {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -385,7 +389,9 @@ private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: ()
             } else {
                 HorizontalDivider(color = Color(0xFFE2E8F0))
                 Text(
-                    user.currentActivity?.titulo ?: "Sin actividad abierta",
+                    user.currentActivity?.titulo
+                        ?: user.lastFinished?.titulo?.let { "Última: $it" }
+                        ?: "Sin actividades hoy",
                     fontSize = 12.sp,
                     color = NxColors.Muted,
                     textAlign = TextAlign.Center,

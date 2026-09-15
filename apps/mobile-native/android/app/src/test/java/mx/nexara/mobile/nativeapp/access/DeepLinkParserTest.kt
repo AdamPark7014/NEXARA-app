@@ -178,6 +178,16 @@ class DeepLinkParserTest {
     }
 
     @Test
+    fun parseWebPath_asistenciasComidasTab() {
+        val dest = DeepLinkParser.parseWebPath("/erp/asistencias?tab=comidas") as DeepLinkDestination.Module
+        assertEquals(PanelId.ERP, dest.panel)
+        assertEquals("attendance", dest.key)
+        assertEquals("comidas", DeepLinkNavigation.attendanceTab(link(dest)))
+        assertEquals("comidas", DeepLinkNavigation.attendanceTab(PendingModuleLink("my-lunch-breaks")))
+        assertNull(DeepLinkNavigation.attendanceTab(PendingModuleLink("attendance")))
+    }
+
+    @Test
     fun parseWebPath_noOpsPanelSurvives() {
         listOf(
             "/ops/activities/1",

@@ -80,4 +80,14 @@ object DeepLinkNavigation {
         link.entityId?.takeIf { link.key in VIATIC_KEYS }
 
     private val VIATIC_KEYS = setOf("viatics", "my-viatics")
+
+    private val LUNCH_KEYS = setOf("lunch-breaks", "my-lunch-breaks")
+    private val LUNCH_TAB_VALUES = setOf("comidas", "comida", "lunch", "lunch-breaks")
+
+    /** `comidas` para /erp/asistencias?tab=comidas y los módulos viejos de comidas. */
+    fun attendanceTab(link: PendingModuleLink): String? {
+        if (link.key in LUNCH_KEYS) return "comidas"
+        val tab = link.params["tab"]?.trim()?.lowercase()
+        return if (link.key == "attendance" && tab in LUNCH_TAB_VALUES) "comidas" else null
+    }
 }

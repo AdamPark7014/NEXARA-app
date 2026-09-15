@@ -176,13 +176,33 @@ private struct TeamPersonCard: View {
                         .font(.caption2.weight(.heavy))
                         .foregroundStyle(Color.accentColor)
                 }
-                Text(status.label)
+                Text(CoreBoardText.estado(user))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(status.color)
+                    .multilineTextAlignment(.center)
+                if user.status == "libre", let finished = user.lastFinished {
+                    let termino = CoreBoardText.termino(finished)
+                    Text(termino.text)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(termino.color)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 2)
+                }
+                if (user.enCorreccion ?? 0) > 0 {
+                    CoreChip(text: "↩️ Corrigiendo evidencia", color: CorePalette.orange)
+                        .padding(.top, 2)
+                }
+                if let enEspera = user.enEsperaAprobacion, enEspera > 0 {
+                    CoreChip(
+                        text: enEspera > 1 ? "⏳ \(enEspera) en espera de aprobación" : "⏳ En espera de aprobación",
+                        color: CorePalette.purple
+                    )
+                    .padding(.top, 2)
+                }
             }
             if open.isEmpty {
                 Divider()
-                Text(user.currentActivity?.titulo ?? "Sin actividad abierta")
+                Text(user.currentActivity?.titulo ?? lastFinishedTitle ?? "Sin actividades hoy")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
