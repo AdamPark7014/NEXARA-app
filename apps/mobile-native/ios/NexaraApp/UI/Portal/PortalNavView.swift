@@ -80,8 +80,12 @@ struct PortalNavView: View {
     }
 
     private func consumePortalDeepLink() {
-        guard let key = deepLink.consumeModule(for: .portal) else { return }
-        if let route = portalRoute(for: key) { deepLinkRoute = route }
+        guard let link = deepLink.consumePortal() else { return }
+        if link.key == "tickets", let id = link.entityId {
+            deepLinkRoute = .ticketDetail(id)
+        } else if let route = portalRoute(for: link.key) {
+            deepLinkRoute = route
+        }
     }
 
     @ViewBuilder
@@ -171,7 +175,7 @@ struct PortalHomeView: View {
                     }
                 }
 
-                Button("Cambiar panel", role: .destructive) { onExit() }
+                Button("Cerrar sesión", role: .destructive) { onExit() }
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
             }

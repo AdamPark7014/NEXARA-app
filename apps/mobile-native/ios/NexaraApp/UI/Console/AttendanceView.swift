@@ -55,16 +55,10 @@ final class AttendanceVM: ObservableObject {
             do {
                 current = try await ConsoleRepository.shared.attendanceCurrentItem()
                 let range = try await ConsoleRepository.shared.attendanceRangeItem(from: weekFrom, to: weekTo)
-                if range.events.isEmpty {
-                    records = await ExtraRepository.shared.attendanceEventItems()
-                } else {
-                    records = range.events
-                }
+                records = range.events
             } catch {
-                records = await ExtraRepository.shared.attendanceEventItems()
-                if records.isEmpty {
-                    loadError = error.toUserMessage()
-                }
+                // No existe `GET attendance`: sin respaldo, se dice el error.
+                loadError = error.toUserMessage()
             }
             isLoading = false
         }

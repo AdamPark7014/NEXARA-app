@@ -2,10 +2,9 @@ import Foundation
 
 /// Resuelve una notificación (push o bandeja) a una pantalla nativa.
 ///
-/// Orden, igual que Android `NotificationDeepLinkResolver`: `relatedUrl`
-/// (`url`/`deepLink` en el push) → `entityType` + `relatedEntityId` →
-/// `category`. A diferencia de Android, todo lo que era OPS abre dentro de ERP:
-/// Core ya no tiene un hub OPS (ver `coreSurfaceRedirect` en la web).
+/// Orden: `relatedUrl` (`url`/`deepLink` en el push) → `entityType` +
+/// `relatedEntityId` → `category`. Solo existe Core: lo que no es de Core abre
+/// Actividades, igual que `coreSurfaceRedirect` en la web.
 enum NotificationDeepLinkResolver {
     /// Datos del push FCM/APNs (`userInfo`). El API manda `url`, `entityType`,
     /// `relatedEntityId`, `category` y `nexara_notification_id` como texto.
@@ -69,15 +68,16 @@ enum NotificationDeepLinkResolver {
         if !cat.isEmpty, let destination = forCategory(cat, id: id) {
             return destination
         }
-        return nil
+        // Había datos pero no son de Core: a casa, como la web.
+        return (type.isEmpty && cat.isEmpty) ? nil : .core(CoreLink.home)
     }
 
-    /// Detalle de actividad en una pestaña, o la pizarra si no hay id.
+    /// Detalle de actividad en una pestaña, o Actividades si no hay id.
     private static func activity(_ id: Int64?, tab: String) -> DeepLinkDestination {
-        if let id {
-            return .module(panel: .erp, key: "activities", entityId: id, params: ["tab": tab])
+        if let id, let activityId = Int(exactly: id) {
+            return .core(CoreLink(module: .actividades, activityId: activityId, tab: tab))
         }
-        return .module(panel: .erp, key: "pizarra")
+        return .core(CoreLink.home)
     }
 
     private static func forEntityType(_ type: String, id: Int64?) -> DeepLinkDestination? {
@@ -88,49 +88,19 @@ enum NotificationDeepLinkResolver {
             return activity(id, tab: "evidencias")
         case "activity_schedule", "schedule_change", "reprogramacion":
             return activity(id, tab: "historial")
-        case "viatic", "viatico", "viatics":
-            return .module(panel: .erp, key: "viatics", entityId: id)
-        case "tool_request", "tool", "tools":
-            return .module(panel: .erp, key: "tools", entityId: id)
-        case "vehicle", "vehicles":
-            return .module(panel: .erp, key: "vehicles", entityId: id)
         case "attendance":
-            return .module(panel: .erp, key: "attendance")
+            return .core(CoreLink(module: .asistencias))
         case "lunchbreak", "lunch_break", "lunch", "comida", "comidas":
             // Igual que la web: `/erp/asistencias?tab=comidas`.
-            return .module(panel: .erp, key: "attendance", params: ["tab": "comidas"])
-        case "saleslead", "lead", "leads":
-            return .module(panel: .crm, key: "leads", entityId: id)
-        case "salesopportunity", "opportunity", "opportunities":
-            return .module(panel: .crm, key: "oportunidades", entityId: id)
-        case "client", "clients", "salesclient":
-            return .module(panel: .crm, key: "clients", entityId: id)
-        case "cotizacion", "quote", "quotes":
-            return .module(panel: .crm, key: "cotizaciones", entityId: id)
-        case "ticket", "tickets", "service_sheet":
-            return .module(panel: .portal, key: "tickets", entityId: id)
+            return .core(CoreLink(module: .asistencias, tab: "comidas"))
         case "chat_message":
             // relatedEntityId es el mensaje; el canal viene en relatedUrl.
-            return .module(panel: .erp, key: "chat")
+            return .core(CoreLink(module: .chat))
         case "chat_channel", "chat", "channel":
-            if let id {
-                return .module(panel: .erp, key: "chat", entityId: id, params: ["channel": String(id)])
-            }
-            return .module(panel: .erp, key: "chat")
-        case "requisition", "purchase_order", "procurement":
-            return .module(panel: .erp, key: "procurement", entityId: id)
-        case "stocklevel", "warehouse", "movement":
-            return .module(panel: .erp, key: "warehouse", entityId: id)
-        case "salesproject", "project", "projects":
-            return .module(panel: .erp, key: "projects", entityId: id)
-        case "maintenancecontractvisit", "maintenance":
-            return .module(panel: .erp, key: "maintenance-contracts", entityId: id)
-        case "user", "users":
-            return .module(panel: .erp, key: "users", entityId: id)
-        case "fine", "fines":
-            return .module(panel: .erp, key: "fines", entityId: id)
-        case "accounting", "entry":
-            return .module(panel: .erp, key: "accounting", entityId: id)
+            return .core(CoreLink(module: .chat, chatChannelId: id))
+        case "ticket", "tickets", "service_sheet":
+            // Solo el portal externo lo abre; en Core cae en Actividades.
+            return .portal(key: "tickets", entityId: id)
         default:
             return nil
         }
@@ -143,35 +113,15 @@ enum NotificationDeepLinkResolver {
         case "evidence", "evidences":
             return activity(id, tab: "evidencias")
         case "attendance":
-            return .module(panel: .erp, key: "attendance")
+            return .core(CoreLink(module: .asistencias))
         case "lunch_breaks", "lunch", "comidas":
-            return .module(panel: .erp, key: "attendance", params: ["tab": "comidas"])
-        case "viatics":
-            return .module(panel: .erp, key: "viatics", entityId: id)
-        case "tool", "tools":
-            return .module(panel: .erp, key: "tools", entityId: id)
-        case "fines":
-            return .module(panel: .erp, key: "fines", entityId: id)
-        case "profile":
-            return .module(panel: .erp, key: "my-profile")
-        case "vehicles":
-            return .module(panel: .erp, key: "vehicles", entityId: id)
-        case "quotes":
-            return .module(panel: .crm, key: "cotizaciones", entityId: id)
-        case "orders":
-            return .module(panel: .erp, key: "procurement", entityId: id)
-        case "projects":
-            return .module(panel: .erp, key: "projects", entityId: id)
-        case "sales", "crm":
-            return .module(panel: .crm, key: "dashboard")
-        case "erp", "ops", "noc":
-            return .module(panel: .erp, key: "pizarra")
+            return .core(CoreLink(module: .asistencias, tab: "comidas"))
         case "chat":
-            return .module(panel: .erp, key: "chat")
-        case "approval", "confirmations":
-            return .module(panel: .erp, key: "approvals")
+            return .core(CoreLink(module: .chat))
+        case "profile":
+            return .core(CoreLink(module: .perfil))
         case "tickets":
-            return .module(panel: .portal, key: "tickets", entityId: id)
+            return .portal(key: "tickets", entityId: id)
         default:
             return nil
         }

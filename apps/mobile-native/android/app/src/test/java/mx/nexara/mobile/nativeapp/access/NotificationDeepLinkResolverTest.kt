@@ -3,37 +3,29 @@ package mx.nexara.mobile.nativeapp.access
 import mx.nexara.mobile.nativeapp.data.api.NotificationRowDto
 import mx.nexara.mobile.nativeapp.navigation.PendingModuleLink
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NotificationDeepLinkResolverTest {
 
-    @Test
-    fun resolveFromPushData_ticket() {
-        val dest = NotificationDeepLinkResolver.resolveFromPushData(
-            mapOf(
-                "entityType" to "ticket",
-                "relatedEntityId" to "22",
-            ),
-        ) as DeepLinkDestination.Module
+    private val coreKeys = setOf("activities", "my-activities", "attendance", "chat", "my-profile", "erp-clients")
 
+    @Test
+    fun pushTicketGoesToThePortal() {
+        val dest = NotificationDeepLinkResolver.resolveFromPushData(
+            mapOf("entityType" to "ticket", "relatedEntityId" to "22"),
+        ) as DeepLinkDestination.Module
         assertEquals(PanelId.PORTAL, dest.panel)
         assertEquals("tickets", dest.key)
         assertEquals(22L, dest.entityId)
     }
 
     @Test
-    fun resolveFromPushData_chatMessage_withChannelId() {
+    fun pushChatMessageWithChannel() {
         val dest = NotificationDeepLinkResolver.resolveFromPushData(
-            mapOf(
-                "entityType" to "chat_message",
-                "relatedEntityId" to "55",
-                "channelId" to "9",
-            ),
+            mapOf("entityType" to "chat_message", "relatedEntityId" to "55", "channelId" to "9"),
         ) as DeepLinkDestination.Module
-
         assertEquals(PanelId.ERP, dest.panel)
         assertEquals("chat", dest.key)
         assertEquals(9L, dest.entityId)
@@ -41,132 +33,52 @@ class NotificationDeepLinkResolverTest {
     }
 
     @Test
-    fun resolveFromPushData_urlOnly() {
-        val dest = NotificationDeepLinkResolver.resolveFromPushData(
-            mapOf("url" to "/portal/tickets/4"),
-        ) as DeepLinkDestination.Module
-
+    fun pushUrlOnly() {
+        val dest = NotificationDeepLinkResolver.resolveFromPushData(mapOf("url" to "/portal/tickets/4")) as DeepLinkDestination.Module
         assertEquals(PanelId.PORTAL, dest.panel)
-        assertEquals("tickets", dest.key)
         assertEquals(4L, dest.entityId)
     }
 
     @Test
-    fun resolveFromPushData_titleBodyOnly_returnsNull() {
-        assertNull(
-            NotificationDeepLinkResolver.resolveFromPushData(
-                mapOf("title" to "Hola", "body" to "Mundo"),
-            ),
-        )
+    fun pushWithoutNavigationDataIsIgnored() {
+        assertNull(NotificationDeepLinkResolver.resolveFromPushData(mapOf("title" to "Hola", "body" to "Mundo")))
     }
 
     @Test
-    fun resolve_prefersRelatedUrlOverEntityType() {
+    fun relatedUrlWinsOverEntityType() {
         val dest = NotificationDeepLinkResolver.resolve(
-            notification(
-                entityType = "SalesOpportunity",
-                relatedEntityId = 10L,
-                relatedUrl = "/ops/activities/501",
-            ),
+            notification(entityType = "SalesOpportunity", relatedEntityId = 10L, relatedUrl = "/ops/activities/501"),
         ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
         assertEquals("activities", dest.key)
         assertEquals(501L, dest.entityId)
     }
 
     @Test
-    fun resolve_entityType_ticket() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(entityType = "ticket", relatedEntityId = 22L),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.PORTAL, dest.panel)
-        assertEquals("tickets", dest.key)
-        assertEquals(22L, dest.entityId)
-    }
-
-    @Test
-    fun resolve_entityType_chatMessage_stripsEntityId() {
+    fun chatMessageEntityStripsTheMessageId() {
         val dest = NotificationDeepLinkResolver.resolve(
             notification(entityType = "chat_message", relatedEntityId = 99L),
         ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
         assertEquals("chat", dest.key)
         assertNull(dest.entityId)
     }
 
     @Test
-    fun resolve_category_approvals() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(category = "approval", relatedEntityId = 5L),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
-        assertEquals("approvals", dest.key)
-        assertEquals(5L, dest.entityId)
-    }
-
-    @Test
-    fun resolve_category_crmDashboard() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(category = "crm"),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.CRM, dest.panel)
-        assertEquals("dashboard", dest.key)
-        assertNull(dest.entityId)
-    }
-
-    @Test
-    fun resolve_unknownEntityAndCategory_returnsNull() {
-        assertNull(
-            NotificationDeepLinkResolver.resolve(
-                notification(entityType = "unknown_widget", category = "misc"),
-            ),
+    fun notificationsCenterUrl() {
+        assertTrue(
+            NotificationDeepLinkResolver.resolve(notification(relatedUrl = "/erp/notifications-center"))
+                is DeepLinkDestination.Notifications,
         )
     }
 
     @Test
-    fun resolve_blankRelatedUrl_fallsBackToEntityType() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(
-                entityType = "quote",
-                relatedEntityId = 77L,
-                relatedUrl = "   ",
-            ),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.CRM, dest.panel)
-        assertEquals("cotizaciones", dest.key)
-        assertEquals(77L, dest.entityId)
+    fun unknownEntityAndCategoryReturnNull() {
+        assertNull(NotificationDeepLinkResolver.resolve(notification(entityType = "unknown_widget", category = "misc")))
     }
 
-    @Test
-    fun resolve_entityType_caseInsensitive() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(entityType = "  Viatic  ", relatedEntityId = 3L),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
-        assertEquals("viatics", dest.key)
-        assertEquals(3L, dest.entityId)
-    }
+    // ── Actividades ─────────────────────────────────────────────────────────
 
     @Test
-    fun resolve_relatedUrl_notificationsCenter() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(relatedUrl = "/erp/notifications-center"),
-        )
-        assertTrue(dest is DeepLinkDestination.Notifications)
-    }
-
-    // ── Core (/erp) ─────────────────────────────────────────────────────────
-
-    @Test
-    fun resolveFromPushData_erpEvidenceUrl_opensTheEvidencesTab() {
-        // Lo que manda notification-hierarchy.service.ts al terminar el equipo.
+    fun erpEvidenceUrlOpensTheEvidencesTab() {
         val dest = NotificationDeepLinkResolver.resolveFromPushData(
             mapOf(
                 "url" to "/erp/actividades/88/evidencias",
@@ -176,135 +88,94 @@ class NotificationDeepLinkResolverTest {
                 "channel" to "ops",
             ),
         ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
-        assertEquals("activities", dest.key)
         assertEquals(88L, dest.entityId)
         assertEquals("evidencias", dest.params["tab"])
         assertEquals("console/activity/88?tab=evidencias", DeepLinkNavigation.consoleRoute(link(dest)))
     }
 
     @Test
-    fun resolveFromPushData_erpHistorialUrl_opensTheHistoryTab() {
+    fun erpHistorialUrl() {
         val dest = NotificationDeepLinkResolver.resolveFromPushData(
             mapOf("url" to "/erp/actividades/14/historial", "category" to "activities"),
         ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
         assertEquals(14L, dest.entityId)
         assertEquals("historial", dest.params["tab"])
     }
 
     @Test
-    fun resolveFromPushData_legacyMyEvidencesUrl() {
-        val dest = NotificationDeepLinkResolver.resolveFromPushData(
-            mapOf("url" to "/ops/my-evidences?activityId=5", "category" to "evidences"),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
-        assertEquals("activities", dest.key)
-        assertEquals(5L, dest.entityId)
-        assertEquals("evidencias", dest.params["tab"])
-    }
-
-    @Test
-    fun resolve_activityEntityWithoutUrl_opensTheDetail() {
-        val dest = NotificationDeepLinkResolver.resolve(
+    fun activityEntityWithoutUrlOpensTheDetail() {
+        val plain = NotificationDeepLinkResolver.resolve(
             notification(entityType = "Activity", relatedEntityId = 42L, category = "activities"),
         ) as DeepLinkDestination.Module
+        assertEquals(42L, plain.entityId)
+        assertNull(plain.params["tab"])
 
-        assertEquals(PanelId.ERP, dest.panel)
-        assertEquals("activities", dest.key)
-        assertEquals(42L, dest.entityId)
-        assertNull(dest.params["tab"])
-    }
-
-    @Test
-    fun resolve_activityEntityWithEvidenceCategory_opensTheEvidencesTab() {
-        val dest = NotificationDeepLinkResolver.resolve(
+        val evidences = NotificationDeepLinkResolver.resolve(
             notification(entityType = "Activity", relatedEntityId = 42L, category = "evidences"),
         ) as DeepLinkDestination.Module
+        assertEquals("evidencias", evidences.params["tab"])
+    }
 
-        assertEquals(42L, dest.entityId)
-        assertEquals("evidencias", dest.params["tab"])
+    // ── Asistencias y comidas ───────────────────────────────────────────────
+
+    @Test
+    fun attendanceByUrlAndByCategory() {
+        assertEquals("attendance", (NotificationDeepLinkResolver.resolve(notification(relatedUrl = "/erp/asistencias", category = "attendance")) as DeepLinkDestination.Module).key)
+        val byCategory = NotificationDeepLinkResolver.resolve(notification(category = "attendance")) as DeepLinkDestination.Module
+        assertEquals("attendance", byCategory.key)
+        assertNull(DeepLinkNavigation.attendanceTab(link(byCategory)))
     }
 
     @Test
-    fun resolve_attendanceUrl() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(relatedUrl = "/erp/asistencias", category = "attendance"),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
-        assertEquals("attendance", dest.key)
-    }
-
-    @Test
-    fun resolve_attendanceCategoryOnly() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(category = "attendance"),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
-        assertEquals("attendance", dest.key)
-    }
-
-    @Test
-    fun resolve_operationalNotificationsNeverLandInOps() {
-        val entityTypes = listOf(
-            "Activity", "Viatico", "ToolRequest", "ToolRenewal", "VehicleControl",
-            "SalesProject", "MaintenanceContractVisit", "evidence",
-        )
-        entityTypes.forEach { type ->
-            val dest = NotificationDeepLinkResolver.resolve(
-                notification(entityType = type, relatedEntityId = 1L),
-            ) as DeepLinkDestination.Module
-            assertNotEquals("$type no debe abrir OPS", PanelId.OPS, dest.panel)
-        }
-        listOf("activities", "evidences", "viatics", "tools", "vehicles", "projects", "noc").forEach { category ->
-            val dest = NotificationDeepLinkResolver.resolve(
-                notification(category = category),
-            ) as DeepLinkDestination.Module
-            assertNotEquals("categoría $category no debe abrir OPS", PanelId.OPS, dest.panel)
-        }
-    }
-
-    // ── Hora de comida ──────────────────────────────────────────────────────
-
-    @Test
-    fun resolveFromPushData_lunchUrlOpensComidas() {
-        val dest = NotificationDeepLinkResolver.resolveFromPushData(
-            mapOf("url" to "/erp/asistencias?tab=comidas", "category" to "lunch_breaks", "relatedEntityId" to "31"),
-        ) as DeepLinkDestination.Module
-
-        assertEquals(PanelId.ERP, dest.panel)
-        assertEquals("attendance", dest.key)
-        assertEquals("comidas", DeepLinkNavigation.attendanceTab(link(dest)))
-    }
-
-    @Test
-    fun resolve_lunchCategoryWithoutTabStillOpensComidas() {
+    fun lunchNotificationsOpenComidas() {
         val withUrl = NotificationDeepLinkResolver.resolve(
             notification(relatedUrl = "/erp/asistencias", category = "lunch_breaks"),
         ) as DeepLinkDestination.Module
-        assertEquals("attendance", withUrl.key)
         assertEquals("comidas", DeepLinkNavigation.attendanceTab(link(withUrl)))
 
         val categoryOnly = NotificationDeepLinkResolver.resolve(
             notification(category = "lunch_breaks", relatedEntityId = 9L),
         ) as DeepLinkDestination.Module
-        assertEquals(PanelId.ERP, categoryOnly.panel)
         assertEquals("attendance", categoryOnly.key)
         assertEquals("comidas", DeepLinkNavigation.attendanceTab(link(categoryOnly)))
     }
 
+    // ── Lo que ya no existe en la app ───────────────────────────────────────
+
     @Test
-    fun resolve_plainAttendanceStaysOnTheAttendanceTab() {
-        val dest = NotificationDeepLinkResolver.resolve(
-            notification(relatedUrl = "/erp/asistencias", category = "attendance"),
-        ) as DeepLinkDestination.Module
-        assertEquals("attendance", dest.key)
-        assertNull(DeepLinkNavigation.attendanceTab(link(dest)))
+    fun nonCoreNotificationsOpenCoreHome() {
+        listOf(
+            "Viatico", "ToolRequest", "ToolRenewal", "VehicleControl", "SalesProject",
+            "MaintenanceContractVisit", "evidence", "SalesOpportunity", "quote", "requisition", "fine",
+        ).forEach { type ->
+            assertEquals(
+                "$type debe abrir la casa de Core",
+                DeepLinkParser.CORE_HOME,
+                NotificationDeepLinkResolver.resolve(notification(entityType = type, relatedEntityId = 1L)),
+            )
+        }
+        listOf("viatics", "tools", "vehicles", "projects", "noc", "crm", "approval", "quotes").forEach { category ->
+            assertEquals(
+                "categoría $category debe abrir la casa de Core",
+                DeepLinkParser.CORE_HOME,
+                NotificationDeepLinkResolver.resolve(notification(category = category)),
+            )
+        }
+    }
+
+    @Test
+    fun erpDestinationsAreAlwaysCoreModules() {
+        val samples = listOf(
+            notification(entityType = "Activity", relatedEntityId = 1L),
+            notification(entityType = "client", relatedEntityId = 3L),
+            notification(category = "profile"),
+            notification(relatedUrl = "/crm/quotes/1"),
+            notification(relatedUrl = "/erp/users?highlight=1"),
+        )
+        samples.forEach { n ->
+            val dest = NotificationDeepLinkResolver.resolve(n) as DeepLinkDestination.Module
+            assertTrue("${dest.key} no es un módulo de Core", dest.key in coreKeys)
+        }
     }
 
     private fun link(dest: DeepLinkDestination.Module) =

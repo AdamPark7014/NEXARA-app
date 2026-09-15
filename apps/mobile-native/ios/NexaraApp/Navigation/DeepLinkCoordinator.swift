@@ -11,7 +11,9 @@ final class DeepLinkCoordinator: ObservableObject {
     private init() {}
 
     func ingest(_ url: URL) {
-        pending = DeepLinkParser.parse(url)
+        if let destination = DeepLinkParser.parse(url) {
+            pending = destination
+        }
     }
 
     /// Destino ya resuelto (toque en un push o en la bandeja de notificaciones).
@@ -23,58 +25,20 @@ final class DeepLinkCoordinator: ObservableObject {
         pending = nil
     }
 
-    /// Módulo pendiente para un panel concreto (se consume al presentar).
-    func consumeModule(for panel: PanelId) -> String? {
-        guard case .module(let p, let key, _, _) = pending, p == panel else { return nil }
+    /// Lo consume el shell de Core. El personal nunca ve el portal externo:
+    /// un enlace de `/tickets` abre Actividades.
+    func consumeCore() -> DeepLinkDestination? {
+        guard let destination = pending else { return nil }
         pending = nil
-        return key
+        if case .portal = destination { return .core(CoreLink.home) }
+        return destination
     }
 
-    func consumeModuleLink(for panel: PanelId) -> (key: String, entityId: Int64?, params: [String: String])? {
-        guard case .module(let p, let key, let entityId, let params) = pending, p == panel else { return nil }
+    /// Lo consume el portal de clientes; lo de Core se descarta.
+    func consumePortal() -> (key: String, entityId: Int64?)? {
+        guard let destination = pending else { return nil }
         pending = nil
-        return (key, entityId, params)
-    }
-
-    func consumeNotifications() -> Bool {
-        guard case .notifications = pending else { return false }
-        pending = nil
-        return true
-    }
-}
-
-/// Presenta un módulo en full-screen sin duplicar tabs del panel.
-struct DeepLinkModulePresenter: ViewModifier {
-    let panel: PanelId
-    @Binding var presentedKey: String?
-    var moduleParams: [String: String] = [:]
-
-    func body(content: Content) -> some View {
-        content
-            .fullScreenCover(isPresented: Binding(
-                get: { presentedKey != nil },
-                set: { if !$0 { presentedKey = nil } }
-            )) {
-                if let key = presentedKey {
-                    NavigationStack {
-                        ModuleRouter.view(for: panel, key: key, params: moduleParams)
-                            .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
-                                    Button("Cerrar") { presentedKey = nil }
-                                }
-                            }
-                    }
-                }
-            }
-    }
-}
-
-extension View {
-    func deepLinkModulePresenter(
-        panel: PanelId,
-        presentedKey: Binding<String?>,
-        moduleParams: [String: String] = [:]
-    ) -> some View {
-        modifier(DeepLinkModulePresenter(panel: panel, presentedKey: presentedKey, moduleParams: moduleParams))
+        if case .portal(let key, let entityId) = destination { return (key, entityId) }
+        return nil
     }
 }

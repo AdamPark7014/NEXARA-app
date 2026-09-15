@@ -185,7 +185,7 @@ class TicketsPortalViewModel(app: Application) : AndroidViewModel(app) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketsPortalScreen(
-    onExitToPanels: () -> Unit,
+    onLogout: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenBranches: () -> Unit,
     onOpenRequests: () -> Unit,
@@ -239,7 +239,7 @@ fun TicketsPortalScreen(
             if (profile == null || profile.name.isBlank()) {
                 item {
                     Text("No se encontró perfil del portal.", color = MaterialTheme.colorScheme.error)
-                    OutlinedButton(onClick = onExitToPanels) { Text("Salir a paneles") }
+                    OutlinedButton(onClick = onLogout) { Text("Cerrar sesión") }
                 }
                 return@LazyColumn
             }
@@ -357,8 +357,8 @@ fun TicketsPortalScreen(
                 PortalNavCard(title = "Chat", subtitle = "Mensajes con soporte", onClick = onOpenChat)
             }
             item {
-                OutlinedButton(onClick = onExitToPanels, modifier = Modifier.fillMaxWidth()) {
-                    Text("Salir a paneles")
+                OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth()) {
+                    Text("Cerrar sesión")
                 }
             }
         }

@@ -70,7 +70,7 @@ struct MisActividadesView: View {
             }
         }
         .sheet(isPresented: $showSelfAssign) {
-            SelfAssignActivitySheet { newId in
+            CoreSelfAssignSheet { newId in
                 highlightId = newId
                 notice = "Actividad creada a tu nombre."
                 Task { await load() }
@@ -485,113 +485,6 @@ private struct ReorderReasonSheet: View {
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo guardar el orden")
-        }
-    }
-}
-
-// MARK: - Auto-asignarse (POST me/activities)
-
-private struct SelfAssignActivitySheet: View {
-    let onCreated: (Int) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var session = SessionStore.shared
-    @State private var titulo = ""
-    @State private var descripcion = ""
-    @State private var prioridad = "Media"
-    @State private var withDate = true
-    @State private var fecha = Date()
-    @State private var estimado = ""
-    @State private var maximo = ""
-    @State private var saving = false
-    @State private var error: String?
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("Queda solo a tu nombre, como ejecución directa (✅ Tarea). Ponle día, hora y cuánto te va a tomar; después la acomodas en tu cola.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                Section("Actividad") {
-                    TextField("Título", text: $titulo)
-                    TextField("Qué vas a hacer (opcional)", text: $descripcion, axis: .vertical)
-                        .lineLimit(2...5)
-                    Picker("Prioridad", selection: $prioridad) {
-                        Text("Urgente").tag("Alta")
-                        Text("Esta semana").tag("Media")
-                        Text("Puede esperar").tag("Baja")
-                    }
-                }
-                Section("Cuándo") {
-                    Toggle("Poner día y hora", isOn: $withDate)
-                    if withDate {
-                        DatePicker("Día y hora", selection: $fecha, displayedComponents: [.date, .hourAndMinute])
-                    }
-                    TextField("Tiempo estimado (min)", text: $estimado)
-                        .keyboardType(.numberPad)
-                    TextField("Tiempo máximo (min)", text: $maximo)
-                        .keyboardType(.numberPad)
-                }
-                if let error {
-                    Section {
-                        Text(error).foregroundStyle(CorePalette.red)
-                    }
-                }
-            }
-            .navigationTitle("🙋 Auto-asignarme")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { dismiss() }
-                        .disabled(saving)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(saving ? "Guardando…" : "Crear") { Task { await save() } }
-                        .disabled(saving || titulo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-        }
-    }
-
-    @MainActor
-    private func save() async {
-        let title = titulo.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else {
-            error = "Ponle un título a la actividad."
-            return
-        }
-        guard let me = session.currentUser.flatMap({ Int($0.id) }) else {
-            error = "Sesión inválida. Vuelve a entrar."
-            return
-        }
-        let details = descripcion.trimmingCharacters(in: .whitespacesAndNewlines)
-        let payload = SelfAssignActivityBody(
-            titulo: title,
-            descripcion: details.isEmpty ? nil : details,
-            indicaciones: nil,
-            prioridad: prioridad,
-            coreKind: "tarea",
-            activityType: "INTERNAL",
-            ticketType: "OTRO",
-            workType: "ISSUE",
-            estatus: "Pendiente",
-            creadoPorId: me,
-            responsableId: me,
-            fechaInicio: withDate ? CoreFormat.isoString(fecha) : nil,
-            tiempoEstimadoMin: Int(estimado.trimmingCharacters(in: .whitespaces)),
-            tiempoMaximoMin: Int(maximo.trimmingCharacters(in: .whitespaces))
-        )
-        saving = true
-        error = nil
-        defer { saving = false }
-        do {
-            let newId = try await CoreRepository.shared.selfAssign(payload)
-            onCreated(newId)
-            dismiss()
-        } catch {
-            self.error = error.toUserMessage(fallback: "No se pudo crear la actividad")
         }
     }
 }

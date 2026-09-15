@@ -93,7 +93,7 @@ struct NotificationsCenterView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button("Paneles", action: onBack)
+                Button("Cerrar", action: onBack)
             }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Button { Task { await load() } } label: {

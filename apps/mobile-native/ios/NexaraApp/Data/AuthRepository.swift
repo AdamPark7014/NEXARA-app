@@ -153,12 +153,7 @@ final class AuthRepository {
         var next = user
 
         if let data = try? await ApiClient.shared.get("company/mine") {
-            let list: [[String: Any]]
-            if let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                list = arr
-            } else {
-                list = IntegraJSON.decodeList(data)
-            }
+            let list = ApiClient.decodeMapList(data)
             let primary = list.first { ($0["isPrimary"] as? Bool) == true } ?? list.first
             if let id = primary.flatMap({ ConsoleHelpers.mapInt64($0, "id") }), id > 0 {
                 next.companyId = id
@@ -170,6 +165,8 @@ final class AuthRepository {
             if let rk = ConsoleHelpers.mapStr(map, "roleKey").nilIfEmpty { next.roleKey = rk }
             if let ok = ConsoleHelpers.mapStr(map, "orgRoleKey").nilIfEmpty { next.orgRoleKey = ok }
             if let panels = map["panels"] as? [String], !panels.isEmpty { next.navPanels = panels }
+            let moduleKeys = (map["moduleKeys"] as? [String] ?? []) + (map["webModuleIds"] as? [String] ?? [])
+            if !moduleKeys.isEmpty { next.navModules = Array(Set(moduleKeys)).sorted() }
         }
 
         return next

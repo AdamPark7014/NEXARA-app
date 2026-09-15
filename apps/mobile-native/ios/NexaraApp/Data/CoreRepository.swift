@@ -94,13 +94,6 @@ final class CoreRepository {
         return try decode(MyActivitiesResponse.self, from: data)
     }
 
-    /// Solo encargados de área (`canSelfAssign`). Devuelve el id creado.
-    func selfAssign(_ body: SelfAssignActivityBody) async throws -> Int {
-        let data = try await api.postJSON("me/activities", body: body)
-        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
-        return ConsoleHelpers.mapInt(ConsoleHelpers.decodeMap(data), "id")
-    }
-
     /// Quien reparte un despacho lo pasa a su equipo. Devuelve cuántos quedaron asignados.
     func dispatchActivity(activityId: Int, userIds: [Int], indicaciones: String?) async throws -> Int {
         struct Body: Encodable {
@@ -152,15 +145,10 @@ final class CoreRepository {
         return ConsoleHelpers.decodeMap(data)
     }
 
-    /// El API expone la línea de tiempo en `activities/:id/team/timeline`; se
-    /// intenta también la ruta corta por si algún despliegue la tiene.
+    /// `GET activities/:id/timeline` (ActivityTeamController). No existe
+    /// `activities/:id/team/timeline`: pedirla primero solo gastaba un 404.
     func timeline(activityId: Int) async throws -> [ActivityTimelineEvent] {
-        let data: Data
-        do {
-            data = try await api.get("activities/\(activityId)/team/timeline")
-        } catch let ApiError.http(code, _) where code == 404 {
-            data = try await api.get("activities/\(activityId)/timeline")
-        }
+        let data = try await api.get("activities/\(activityId)/timeline")
         if let wrapped = try? JSONDecoder().decode(ActivityTimelineResponse.self, from: data), let events = wrapped.events {
             return events
         }

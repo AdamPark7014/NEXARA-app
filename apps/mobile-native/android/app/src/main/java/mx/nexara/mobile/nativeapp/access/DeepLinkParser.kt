@@ -3,21 +3,11 @@ package mx.nexara.mobile.nativeapp.access
 import android.net.Uri
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import mx.nexara.mobile.nativeapp.access.PanelId.CRM
-import mx.nexara.mobile.nativeapp.access.PanelId.ERP
-import mx.nexara.mobile.nativeapp.access.PanelId.INTEGRA
-import mx.nexara.mobile.nativeapp.access.PanelId.LAB
-import mx.nexara.mobile.nativeapp.access.PanelId.OPS
-import mx.nexara.mobile.nativeapp.access.PanelId.PORTAL
-import mx.nexara.mobile.nativeapp.access.PanelId.STUDIO
 
 sealed class DeepLinkDestination {
     data object Notifications : DeepLinkDestination()
 
-    /** Selector de paneles (hub principal). */
-    data object PanelHub : DeepLinkDestination()
-
-    /** Módulo de panel; [entityId] y [params] abren detalle cuando aplica. */
+    /** Módulo; [entityId] y [params] abren detalle cuando aplica. */
     data class Module(
         val panel: PanelId,
         val key: String,
@@ -26,91 +16,28 @@ sealed class DeepLinkDestination {
     ) : DeepLinkDestination()
 }
 
+/**
+ * Traduce rutas web (`relatedUrl` de notificaciones, push, `nexara://`) a destinos
+ * de la app. Espejo de `coreSurfaceRedirect` (`apps/web/lib/core-surface.ts`):
+ *
+ * - Core conserva: `/erp/actividades/:id[/evidencias|/historial]`,
+ *   `/erp/pizarra[/:userId][?vista=]`, `/erp/mis-actividades`,
+ *   `/erp/asistencias[?tab=comidas]`, `/erp/chat`, `/erp/my-profile`, `/erp/clientes`.
+ * - Paneles fuera de /erp: el detalle y las evidencias de actividad conservan el
+ *   id, «Mi perfil» y «Mis actividades» van a su equivalente, todo lo demás cae en
+ *   la casa de Core (Actividades).
+ * - El portal (`/tickets`, `/portal`) solo lo abre una cuenta de cliente o de
+ *   sucursal; eso lo decide [PanelAccessResolver] al consumir el destino.
+ */
 object DeepLinkParser {
-    private val segmentAliases = mapOf(
-        "clientes" to "clients",
-        "oportunidades" to "oportunidades",
-        "opportunities" to "oportunidades",
-        "productos" to "productos",
-        "proyectos" to "projects",
-        "viaticos" to "viatics",
-        "mis-viaticos" to "my-viatics",
-        "actividades" to "activities",
-        "mis-actividades" to "my-activities",
-        "evidencias" to "evidences",
-        "mis-evidencias" to "my-evidences",
-        // Core (/erp): «Actividades» es la pizarra y «Asistencias» es asistencia.
-        "pizarra" to "activities",
-        "asistencias" to "attendance",
-        "vehiculos" to "vehicles",
-        "herramientas" to "tools",
-        "asistencia" to "attendance",
-        "empleados" to "hr",
-        "multas" to "fines",
-        "gastos" to "expenses",
-        "banca" to "banking",
-        "facturacion" to "invoicing",
-        "contabilidad" to "accounting",
-        "almacen" to "warehouse",
-        "compras" to "procurement",
-        "auditoria" to "audit",
-        "notificaciones" to "notifications-center",
-        "notifications-center" to "notifications-center",
-        "mi-perfil" to "my-profile",
-        "configuracion" to "settings",
-        "cola-offline" to "offline-queue",
-        "offline" to "offline-queue",
-        "usuarios" to "users",
-        "leads" to "leads",
-        "noticias" to "news",
-        "dashboard" to "dashboard",
-        "flags" to "flags",
-        "health" to "health",
-        "branches" to "branches",
-        "sucursales" to "branches",
-        "requests" to "requests",
-        "solicitudes" to "requests",
-        "inventories" to "inventories",
-        "inventarios" to "inventories",
-        "feedback" to "feedback-pending",
-        "soporte" to "client-tickets",
-        "support" to "client-tickets",
-        "client-tickets" to "client-tickets",
-        "executive" to "executive",
-        "approvals" to "approvals",
-        "bi" to "bi",
-        "analytics" to "analytics",
-        "noc" to "noc",
-        "sla" to "support-sla",
-        "support-sla" to "support-sla",
-        "maintenance-contracts" to "maintenance-contracts",
-        "contratos" to "maintenance-contracts",
-        "contracts" to "maintenance-contracts",
-        "companies" to "companies",
-        "kb" to "kb",
-        "exports" to "exports",
-        "architecture" to "architecture",
-        "calendar" to "calendar",
-        "orgchart" to "orgchart",
-        "kpis-hr" to "kpis-hr",
-        "kpis" to "kpis-hr",
-        "service-clients" to "service-clients",
-        "clientes-servicio" to "service-clients",
-        "plantillas" to "plantillas",
-        "templates" to "plantillas",
-        "quotes" to "cotizaciones",
-        "cotizacion" to "cotizaciones",
-        "cotizaciones" to "cotizaciones",
-        "smart-quote" to "smart-quote",
-        "cotizar" to "smart-quote",
-        "nueva-cotizacion" to "smart-quote",
-        "cotizacion-nueva" to "smart-quote",
-        "chat" to "chat",
-        "dispatch" to "dispatch",
-        "tickets" to "tickets",
-    )
 
-    /** Rutas web tipo `/crm/opportunities/123` o URL absoluta con path y query. */
+    /** Parámetro con el id de la persona en `/erp/pizarra/:userId`. */
+    const val BOARD_USER_PARAM = "userid"
+
+    /** `/erp/pizarra`: la casa de Core. */
+    val CORE_HOME = DeepLinkDestination.Module(panel = PanelId.ERP, key = CoreKeys.ACTIVITIES)
+
+    /** Rutas web tipo `/erp/actividades/123` o URL absoluta con path y query. */
     fun parseWebPath(pathOrUrl: String): DeepLinkDestination? {
         val trimmed = pathOrUrl.trim()
         if (trimmed.isBlank()) return null
@@ -159,267 +86,180 @@ object DeepLinkParser {
         return parseSegments(segments, params)
     }
 
+    private val ERP_HEADS = setOf("erp", "core")
+    private val PORTAL_HEADS = setOf("portal", "tickets")
+
+    /** `NON_ERP_PANEL_RE` de core-surface.ts. */
+    private val NON_ERP_HEADS = setOf(
+        "ops", "crm", "studio", "lab", "integra", "finance", "hr", "sales", "console",
+        "consola", "contabilidad", "people", "operacion", "noc", "support", "ventas",
+    )
+
+    private val NOTIFICATION_SEGMENTS = setOf("notifications-center", "notifications", "notificaciones")
+
     private fun parseSegments(
         segments: List<String>,
-        params: Map<String, String> = emptyMap(),
+        params: Map<String, String>,
     ): DeepLinkDestination? {
-        if (segments.isEmpty()) return null
+        if (segments.isEmpty()) return CORE_HOME
+        val lower = segments.map { it.lowercase() }
+        if (lower.last() in NOTIFICATION_SEGMENTS) return DeepLinkDestination.Notifications
 
-        val joined = segments.joinToString("/")
-        if (joined == "notifications-center" || joined == "notifications" || segments.last() == "notifications-center") {
-            return DeepLinkDestination.Notifications
+        val head = lower.first()
+        return when (head) {
+            in PORTAL_HEADS -> portalDestination(lower.drop(1), params)
+            in NON_ERP_HEADS -> legacyPanelDestination(head, lower.drop(1), params)
+            in ERP_HEADS -> coreDestination(lower.drop(1), params)
+            // `nexara://actividades/5`: sin prefijo de panel, se lee como Core.
+            else -> coreDestination(lower, params)
         }
-        if (joined == "panels" || joined == "paneles" || segments.singleOrNull() in setOf("panels", "paneles")) {
-            return DeepLinkDestination.PanelHub
-        }
+    }
 
-        val head = segments.first().lowercase()
-        val (sourcePanel, moduleParts) = when (head) {
-            "erp", "console", "people", "contabilidad" -> ERP to segments.drop(1)
-            "ops", "operacion", "noc", "support" -> OPS to segments.drop(1)
-            "crm", "ventas" -> CRM to segments.drop(1)
-            "studio", "web" -> STUDIO to segments.drop(1)
-            "lab" -> LAB to segments.drop(1)
-            "integra" -> INTEGRA to segments.drop(1)
-            "portal", "tickets" -> PORTAL to segments.drop(1)
-            else -> ERP to segments
-        }
-        // Core-only (apps/web/lib/core-surface.ts): no hay superficie OPS; aterriza en ERP.
-        val panel = sourcePanel.toCoreSurface()
+    // ── Core (/erp) ─────────────────────────────────────────────────────────
 
-        coreSurfaceDestination(sourcePanel, moduleParts, params)?.let { return it }
+    private val ACTIVITY_SEGMENTS = setOf("actividades", "activities", "pizarra")
+    private val MY_ACTIVITIES_SEGMENTS = setOf("mis-actividades", "my-activities")
+    private val EVIDENCE_LIST_SEGMENTS = setOf("my-evidences", "mis-evidencias", "evidences", "evidencias")
+    private val ATTENDANCE_SEGMENTS = setOf("asistencias", "asistencia", "attendance")
+    private val LUNCH_SEGMENTS = setOf("lunch-breaks", "my-lunch-breaks", "comidas")
+    private val PROFILE_SEGMENTS = setOf("my-profile", "mi-perfil")
+    private val CLIENT_SEGMENTS = setOf("clientes")
 
-        val activityDetail = parseActivityDetailPath(moduleParts)
-        if (activityDetail != null) {
-            val extraParams = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
-            return DeepLinkDestination.Module(
-                panel = panel,
-                key = activityDetail.key,
-                entityId = activityDetail.entityId,
-                params = extraParams + ("tab" to activityDetail.tab),
+    private fun coreDestination(parts: List<String>, params: Map<String, String>): DeepLinkDestination {
+        val extra = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
+        val first = parts.firstOrNull() ?: return CORE_HOME
+        val second = parts.getOrNull(1)
+        val activityId = params.longParam("activityid")
+
+        return when {
+            first == "pizarra" -> {
+                val personId = second?.toLongOrNull()?.takeIf { it > 0L }
+                module(
+                    CoreKeys.ACTIVITIES,
+                    params = if (personId != null) extra + (BOARD_USER_PARAM to personId.toString()) else extra,
+                )
+            }
+            first in MY_ACTIVITIES_SEGMENTS && activityId != null ->
+                module(CoreKeys.ACTIVITIES, entityId = activityId, params = extra)
+            first in MY_ACTIVITIES_SEGMENTS -> module(CoreKeys.MY_ACTIVITIES, params = extra)
+            first in ACTIVITY_SEGMENTS -> {
+                val id = second?.toLongOrNull()?.takeIf { it > 0L } ?: activityId
+                if (id == null) return module(CoreKeys.ACTIVITIES, params = extra)
+                val tab = parts.getOrNull(2)?.let { ACTIVITY_DETAIL_TABS[it] }
+                module(
+                    CoreKeys.ACTIVITIES,
+                    entityId = id,
+                    params = if (tab != null) extra + ("tab" to tab) else extra,
+                )
+            }
+            first in EVIDENCE_LIST_SEGMENTS && activityId != null ->
+                module(CoreKeys.ACTIVITIES, entityId = activityId, params = extra + ("tab" to "evidencias"))
+            first in ATTENDANCE_SEGMENTS -> module(CoreKeys.ATTENDANCE, params = extra)
+            // `/erp/hr/attendance` y `/erp/hr/lunch-breaks` (appUrls viejos) → Asistencias.
+            first == "hr" && second in ATTENDANCE_SEGMENTS -> module(CoreKeys.ATTENDANCE, params = extra)
+            first in LUNCH_SEGMENTS || (first == "hr" && second in LUNCH_SEGMENTS) ->
+                module(CoreKeys.ATTENDANCE, params = extra + ("tab" to "comidas"))
+            first == CoreKeys.CHAT -> module(
+                CoreKeys.CHAT,
+                entityId = second?.toLongOrNull()?.takeIf { it > 0L } ?: params.longParam("channel"),
+                params = extra,
             )
+            first in PROFILE_SEGMENTS -> module(CoreKeys.MY_PROFILE, params = extra)
+            first in CLIENT_SEGMENTS -> module(
+                CoreKeys.CLIENTS,
+                entityId = second?.toLongOrNull()?.takeIf { it > 0L },
+                params = extra,
+            )
+            else -> CORE_HOME
+        }
+    }
+
+    // ── Paneles fuera de /erp (coreSurfaceRedirect) ─────────────────────────
+
+    private val LEGACY_ACTIVITY_HEADS = setOf("ops", "operacion")
+
+    private fun legacyPanelDestination(
+        head: String,
+        parts: List<String>,
+        params: Map<String, String>,
+    ): DeepLinkDestination {
+        val extra = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
+        val first = parts.firstOrNull()
+
+        if (head in LEGACY_ACTIVITY_HEADS && first in setOf("activities", "actividades")) {
+            val id = parts.getOrNull(1)?.takeIf { s -> s.all(Char::isDigit) }?.toLongOrNull()
+            if (id != null && id > 0L) {
+                val suffix = parts.getOrNull(2)
+                return if (suffix == "evidences" || suffix == "evidencias") {
+                    module(CoreKeys.ACTIVITIES, entityId = id, params = extra + ("tab" to "evidencias"))
+                } else {
+                    module(CoreKeys.ACTIVITIES, entityId = id, params = extra)
+                }
+            }
         }
 
-        // `/ops/support/new` es la pantalla de alta del módulo, no un módulo "new".
-        val creating = moduleParts.size >= 2 && moduleParts.last().lowercase() in CREATION_SUFFIXES
-        val addressableParts = if (creating) moduleParts.dropLast(1) else moduleParts
-
-        val pathEntityId = addressableParts.lastOrNull()
-            ?.takeIf { it.all(Char::isDigit) }
-            ?.toLongOrNull()
-
-        val parts = addressableParts.let { p ->
-            if (pathEntityId != null && p.isNotEmpty()) p.dropLast(1) else p
+        val activityId = params.longParam("activityid")
+        if (head in LEGACY_ACTIVITY_HEADS && parts.size == 1 && activityId != null) {
+            if (first in EVIDENCE_LIST_SEGMENTS) {
+                return module(CoreKeys.ACTIVITIES, entityId = activityId, params = extra + ("tab" to "evidencias"))
+            }
+            if (first in MY_ACTIVITIES_SEGMENTS || first in setOf("activities", "actividades")) {
+                return module(CoreKeys.ACTIVITIES, entityId = activityId, params = extra)
+            }
         }
 
-        val rawKey = parts.lastOrNull() ?: "dashboard"
-        val rawLower = rawKey.lowercase()
-        val globalAlias = segmentAliases[rawLower] ?: rawLower
-        val key = panelKey(sourcePanel, rawLower, globalAlias)
+        if (parts.lastOrNull() == "my-profile") return module(CoreKeys.MY_PROFILE)
+        if (head in LEGACY_ACTIVITY_HEADS && parts.size == 1 && first in MY_ACTIVITIES_SEGMENTS) {
+            return module(CoreKeys.MY_ACTIVITIES)
+        }
+        return CORE_HOME
+    }
 
-        if (key == "notifications-center") return DeepLinkDestination.Notifications
-        if (key == "panels" || key == "paneles") return DeepLinkDestination.PanelHub
+    // ── Portal de clientes ──────────────────────────────────────────────────
 
-        val entityId = resolveEntityId(key, pathEntityId, params)
-        val extraParams = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
-            .let { if (creating) it + ("mode" to "new") else it }
+    private val PORTAL_KEY_ALIASES = mapOf(
+        "sucursales" to "branches",
+        "solicitudes" to "requests",
+        "inventarios" to "inventories",
+        "feedback" to "feedback-pending",
+        "mi-perfil" to "profile",
+        "my-profile" to "profile",
+    )
 
+    private fun portalDestination(parts: List<String>, params: Map<String, String>): DeepLinkDestination {
+        val pathId = parts.lastOrNull()?.takeIf { it.all(Char::isDigit) }?.toLongOrNull()
+        val keyParts = if (pathId != null) parts.dropLast(1) else parts
+        val raw = keyParts.lastOrNull() ?: "portal"
+        val key = PORTAL_KEY_ALIASES[raw] ?: raw
         return DeepLinkDestination.Module(
-            panel = panel,
+            panel = PanelId.PORTAL,
             key = key,
-            entityId = entityId,
-            params = extraParams,
+            entityId = pathId ?: params.longParam("highlight") ?: params.longParam("id"),
+            params = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS },
         )
     }
 
-    /** Parámetro con el id de la persona en `/erp/pizarra/:userId`. */
-    const val BOARD_USER_PARAM = "userid"
+    // ── Utilidades ──────────────────────────────────────────────────────────
 
-    private val EVIDENCE_LIST_SEGMENTS = setOf("my-evidences", "mis-evidencias", "evidences", "evidencias")
-    private val ACTIVITY_LIST_SEGMENTS = setOf("my-activities", "mis-actividades", "activities", "actividades")
-    private val MY_ACTIVITIES_SEGMENTS = setOf("my-activities", "mis-actividades")
+    private val ENTITY_ID_QUERY_KEYS = setOf("highlight", "id", "channel", "activityid")
 
     /**
-     * Rutas con significado propio en Core — espejo de `coreSurfaceRedirect`:
-     * - `/erp/pizarra` (`?vista=`) → Actividades; `/erp/pizarra/:userId` → el día de esa persona.
-     * - `/ops|erp/(my-)evidences?activityId=N` → detalle de N en Evidencias.
-     * - `/ops|erp/(my-)activities?activityId=N` → detalle de N.
-     * - `/ops/my-activities`, `/erp/mis-actividades` → Mis actividades.
-     *
-     * El detalle `/…/actividades/:id/<pestaña>` lo resuelve [parseActivityDetailPath].
+     * Sufijo de `/erp/actividades/{id}/<sufijo>` → clave de pestaña del detalle.
+     * La web conserva `evidencias` e `historial`; los sufijos en inglés son de
+     * los enlaces viejos de OPS.
      */
-    private fun coreSurfaceDestination(
-        source: PanelId,
-        parts: List<String>,
-        params: Map<String, String>,
-    ): DeepLinkDestination.Module? {
-        if (source != ERP && source != OPS) return null
-        val lower = parts.map { it.lowercase() }
-        val first = lower.firstOrNull() ?: return null
-        val extra = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
-        if (first == "pizarra") {
-            val personId = lower.getOrNull(1)?.toLongOrNull()?.takeIf { it > 0L }
-            return DeepLinkDestination.Module(
-                panel = ERP,
-                key = "activities",
-                params = if (personId != null) extra + (BOARD_USER_PARAM to personId.toString()) else extra,
-            )
-        }
-        if (lower.size != 1) return null
-        val activityId = params.longParam("activityid")
-        return when {
-            first in EVIDENCE_LIST_SEGMENTS && activityId != null -> DeepLinkDestination.Module(
-                panel = ERP,
-                key = "activities",
-                entityId = activityId,
-                params = extra + ("tab" to "evidencias"),
-            )
-            first in ACTIVITY_LIST_SEGMENTS && activityId != null -> DeepLinkDestination.Module(
-                panel = ERP,
-                key = "activities",
-                entityId = activityId,
-                params = extra,
-            )
-            first in MY_ACTIVITIES_SEGMENTS -> DeepLinkDestination.Module(
-                panel = ERP,
-                key = "my-activities",
-                params = extra,
-            )
-            else -> null
-        }
-    }
-
-    private val CREATION_SUFFIXES = setOf("new", "nueva", "nuevo", "crear")
-
-    private val ENTITY_ID_QUERY_KEYS =
-        setOf("highlight", "id", "channel", "activityid", "woid", "productid", "poid")
-
-    /**
-     * Claves que dependen del panel.
-     *
-     * El catálogo de ventas usa las claves en español (`clientes`, `proyectos`,
-     * `licitaciones`) mientras que las rutas web van en inglés, y `/ops/support` es
-     * la bandeja interna de soporte — no los tickets del portal, que en OPS son el
-     * módulo aparte `client-tickets`.
-     */
-    private fun panelKey(panel: PanelId, raw: String, aliased: String): String = when {
-        panel == CRM -> CRM_KEY_ALIASES[aliased] ?: aliased
-        panel == OPS && raw in OPS_SUPPORT_SEGMENTS -> "support"
-        panel == INTEGRA -> INTEGRA_KEY_ALIASES[raw] ?: INTEGRA_KEY_ALIASES[aliased] ?: aliased
-        else -> aliased
-    }
-
-    private val CRM_KEY_ALIASES = mapOf(
-        "clients" to "clientes",
-        "projects" to "proyectos",
-        "tenders" to "licitaciones",
-        "products" to "productos",
-        "templates" to "plantillas",
-        "targets" to "metas",
-        "reports" to "reportes",
+    private val ACTIVITY_DETAIL_TABS = mapOf(
+        "evidencias" to "evidencias",
+        "evidences" to "evidencias",
+        "historial" to "historial",
+        "history" to "historial",
     )
 
-    private val OPS_SUPPORT_SEGMENTS = setOf("support", "soporte")
-
-    /** Solo bajo /integra/ — no contaminar ERP attendance ni OPS events. */
-    private val INTEGRA_KEY_ALIASES = mapOf(
-        "access" to "integra-access",
-        "acceso" to "integra-access",
-        "puertas" to "integra-access",
-        "doors" to "integra-access",
-        "events" to "integra-events",
-        "eventos" to "integra-events",
-        "people" to "integra-people",
-        "personas" to "integra-people",
-        "attendance" to "integra-attendance",
-        "asistencia" to "integra-attendance",
-        "visitors" to "integra-visitors",
-        "visitantes" to "integra-visitors",
-        "alarms" to "integra-alarms",
-        "alarmas" to "integra-alarms",
-        "occupancy" to "integra-occupancy",
-        "en-sitio" to "integra-occupancy",
-        "presencia" to "integra-occupancy",
-        "devices" to "integra-devices",
-        "equipos" to "integra-devices",
-        "sites" to "integra-sites",
-        "sitios" to "integra-sites",
-        "settings" to "integra-sites",
-        "integra-access" to "integra-access",
-        "integra-events" to "integra-events",
-        "integra-people" to "integra-people",
-        "integra-attendance" to "integra-attendance",
-        "integra-visitors" to "integra-visitors",
-        "integra-alarms" to "integra-alarms",
-        "integra-occupancy" to "integra-occupancy",
-        "integra-devices" to "integra-devices",
-        "integra-sites" to "integra-sites",
-        // Módulos cableados el 2026-09-07. Los segmentos coinciden con la ruta
-        // web (`/integra/<segmento>`), así que un enlace copiado del navegador
-        // aterriza en la pantalla nativa equivalente.
-        "video" to "integra-video",
-        "camaras" to "integra-video",
-        "cámaras" to "integra-video",
-        "integra-video" to "integra-video",
-        "vehicles" to "integra-vehicles",
-        "vehiculos" to "integra-vehicles",
-        "vehículos" to "integra-vehicles",
-        "integra-vehicles" to "integra-vehicles",
-        "anpr" to "integra-anpr",
-        "placas" to "integra-anpr",
-        "integra-anpr" to "integra-anpr",
-        "schedules" to "integra-schedules",
-        "horarios" to "integra-schedules",
-        "integra-schedules" to "integra-schedules",
-        "espacios" to "integra-espacios",
-        "spaces" to "integra-espacios",
-        "integra-espacios" to "integra-espacios",
-        "detection" to "integra-detection",
-        "deteccion" to "integra-detection",
-        "detección" to "integra-detection",
-        "integra-detection" to "integra-detection",
-        "audit" to "integra-audit",
-        "auditoria" to "integra-audit",
-        "bitacora" to "integra-audit",
-        "integra-audit" to "integra-audit",
-        "notifications-center" to "integra-notifications",
-        "notificaciones" to "integra-notifications",
-        "integra-notifications" to "integra-notifications",
-        "my-profile" to "integra-my-profile",
-        "mi-perfil" to "integra-my-profile",
-        "integra-my-profile" to "integra-my-profile",
-        "map" to "integra-map",
-        "plano" to "integra-map",
-        "mapa" to "integra-map",
-        "floorplans" to "integra-map",
-        "integra-map" to "integra-map",
-        // En la web `/integra/dashboard` redirige a `/integra`, así que ese
-        // enlace viejo circula: aquí aterriza en el panorama nativo.
-        "dashboard" to "integra-dashboard",
-        "panorama" to "integra-dashboard",
-        "tablero" to "integra-dashboard",
-        "integra-dashboard" to "integra-dashboard",
-    )
-
-    private fun resolveEntityId(
+    private fun module(
         key: String,
-        pathEntityId: Long?,
-        params: Map<String, String>,
-    ): Long? {
-        pathEntityId?.let { return it }
-        // Cada módulo nombra su id como lo nombra la web (ver app-urls.ts):
-        // mantenimiento manda `woId`, almacén `productId` y compras `poId`.
-        return when (key) {
-            "chat" -> params.longParam("channel")
-            "my-evidences", "evidences" -> params.longParam("activityid")
-            "maintenance" -> params.longParam("woid") ?: params.longParam("highlight")
-            "warehouse", "stock" ->
-                params.longParam("productid") ?: params.longParam("highlight")
-            "procurement" ->
-                params.longParam("poid") ?: params.longParam("id") ?: params.longParam("highlight")
-            else -> params.longParam("highlight") ?: params.longParam("id")
-        }
-    }
+        entityId: Long? = null,
+        params: Map<String, String> = emptyMap(),
+    ) = DeepLinkDestination.Module(panel = PanelId.ERP, key = key, entityId = entityId, params = params)
 
     private fun parseQueryParams(query: String?): Map<String, String> {
         if (query.isNullOrBlank()) return emptyMap()
@@ -436,49 +276,4 @@ object DeepLinkParser {
 
     private fun Map<String, String>.longParam(name: String): Long? =
         this[name]?.toLongOrNull()?.takeIf { it > 0L }
-
-    /**
-     * Sufijo de `/ops/activities/{id}/<sufijo>` → clave de pestaña.
-     *
-     * La web emite el sufijo en inglés (`.../1/evidences`, ver
-     * `appUrls.opsActivityEvidences`) pero `activityDetailTabIndex` indexa por el
-     * nombre en español, así que aquí se normaliza. Sin esto la ruta no se
-     * reconocía como detalle y la notificación perdía el id de la actividad.
-     */
-    private val ACTIVITY_DETAIL_TABS = mapOf(
-        "info" to "info",
-        "detalle" to "info",
-        "operacion" to "operacion",
-        "operation" to "operacion",
-        "evidencias" to "evidencias",
-        "evidences" to "evidencias",
-        "viaticos" to "viaticos",
-        "viatics" to "viaticos",
-        "equipo" to "equipo",
-        "team" to "equipo",
-        "materiales" to "materiales",
-        "materials" to "materiales",
-        "historial" to "historial",
-        "history" to "historial",
-        "incidencias" to "incidencias",
-        "incidents" to "incidencias",
-        "aprobaciones" to "aprobaciones",
-        "approvals" to "aprobaciones",
-        "edit" to "edit",
-    )
-
-    private data class ActivityDetailPath(val key: String, val entityId: Long, val tab: String)
-
-    private fun parseActivityDetailPath(moduleParts: List<String>): ActivityDetailPath? {
-        if (moduleParts.size < 2) return null
-        val tab = ACTIVITY_DETAIL_TABS[moduleParts.last().lowercase()] ?: return null
-        val idSeg = moduleParts[moduleParts.size - 2]
-        if (!idSeg.all(Char::isDigit)) return null
-        val entityId = idSeg.toLongOrNull() ?: return null
-        val prefixParts = moduleParts.dropLast(2)
-        val rawKey = prefixParts.lastOrNull() ?: "activities"
-        val key = segmentAliases[rawKey.lowercase()] ?: rawKey.lowercase()
-        if (key !in setOf("activities", "my-activities")) return null
-        return ActivityDetailPath(key = key, entityId = entityId, tab = tab)
-    }
 }

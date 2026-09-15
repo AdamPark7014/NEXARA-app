@@ -181,7 +181,9 @@ struct ReprogramarSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 Section("Nueva fecha") {
-                    DatePicker("Día y hora", selection: $fecha, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                    // Como la web: se puede registrar una fecha pasada (se corrige lo que ya ocurrió).
+                    DatePicker("Día y hora", selection: $fecha, displayedComponents: [.date, .hourAndMinute])
+                        .environment(\.timeZone, CoreSchedule.mexico)
                 }
                 Section("Motivo (opcional)") {
                     TextField("Ej. El cliente pidió cambiar la visita", text: $motivo, axis: .vertical)
