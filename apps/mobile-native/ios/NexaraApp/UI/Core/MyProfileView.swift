@@ -85,7 +85,7 @@ struct MyProfileView: View {
 
     private var completenessSection: some View {
         Section("Completitud del perfil") {
-            ForEach(form.sections, id: \.label) { sec in
+            ForEach(form.sections) { sec in
                 let pct = Double(sec.filled) / Double(max(sec.total, 1))
                 HStack(spacing: 10) {
                     Text(sec.label).font(.caption).frame(width: 118, alignment: .leading)

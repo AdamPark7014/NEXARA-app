@@ -116,6 +116,8 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        // La campana del shell se refresca con cada push, no solo cada 45 s.
+        Task { @MainActor in await NotificationsBadgeStore.shared.refresh() }
         completionHandler([.banner, .badge, .sound, .list])
     }
 
@@ -126,6 +128,7 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
+        Task { @MainActor in await NotificationsBadgeStore.shared.refresh() }
         if let destination = NotificationDeepLinkResolver.resolve(userInfo: userInfo) {
             Task { @MainActor in
                 DeepLinkCoordinator.shared.ingest(destination: destination)

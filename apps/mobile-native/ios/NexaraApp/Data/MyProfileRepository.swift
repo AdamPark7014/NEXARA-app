@@ -26,16 +26,37 @@ struct MyProfileFields: Encodable, Equatable {
     }
 
     /// Barras de «Completitud del perfil».
-    var sections: [(label: String, filled: Int, total: Int)] {
+    var sections: [MyProfileSectionScore] {
         func count(_ values: [String]) -> Int {
             values.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count
         }
         return [
-            ("Datos personales", count([telefono, fechaNacimiento, ciudad, estado]), 4),
-            ("Documentos", count([curp, rfc, nss]), 3),
-            ("Emergencia", count([contactoEmergenciaNombre, contactoEmergenciaTelefono]), 2),
+            MyProfileSectionScore(
+                label: "Datos personales",
+                filled: count([telefono, fechaNacimiento, ciudad, estado]),
+                total: 4
+            ),
+            MyProfileSectionScore(
+                label: "Documentos",
+                filled: count([curp, rfc, nss]),
+                total: 3
+            ),
+            MyProfileSectionScore(
+                label: "Emergencia",
+                filled: count([contactoEmergenciaNombre, contactoEmergenciaTelefono]),
+                total: 2
+            ),
         ]
     }
+}
+
+/// Una barra de completitud del perfil.
+struct MyProfileSectionScore: Identifiable {
+    let label: String
+    let filled: Int
+    let total: Int
+
+    var id: String { label }
 }
 
 /// `GET users/profile/me`.

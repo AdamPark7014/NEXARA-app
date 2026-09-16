@@ -184,7 +184,11 @@ enum DeepLinkParser {
         case "my-profile", "mi-perfil":
             return .core(CoreLink(module: .perfil))
         case "clientes":
-            return .core(CoreLink(module: .clientes, entityId: parts.count >= 2 ? positiveInt64(parts[1]) : nil))
+            return .core(CoreLink(
+                module: .clientes,
+                vista: params["sector"],
+                entityId: parts.count >= 2 ? positiveInt64(parts[1]) : nil
+            ))
         case "notificaciones":
             return .notifications
         default:

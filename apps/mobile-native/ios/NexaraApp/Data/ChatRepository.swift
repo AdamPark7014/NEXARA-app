@@ -119,11 +119,15 @@ final class ChatRepository {
         channelId: Int64,
         limit: Int = 50,
         parentId: Int64? = nil,
-        beforeId: Int64? = nil
+        beforeId: Int64? = nil,
+        aroundId: Int64? = nil
     ) async throws -> ChatMessagesPage {
         var q: [String: String] = ["limit": String(limit)]
         if let parentId, parentId > 0 { q["parentId"] = String(parentId) }
         if let beforeId, beforeId > 0 { q["beforeId"] = String(beforeId) }
+        // `aroundId` centra la ventana en ese mensaje: así un enlace
+        // `?channel&msg` abre mensajes más viejos que los últimos 50.
+        if let aroundId, aroundId > 0, beforeId == nil { q["aroundId"] = String(aroundId) }
         let data = try await api.get("chat/channels/\(channelId)/messages", query: q)
         let map = ConsoleHelpers.decodeMap(data)
         let messages: [[String: Any]]
