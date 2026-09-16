@@ -32,7 +32,7 @@ interface Notif {
 }
 
 type ViewMode = "action" | "notifications" | "feed";
-type CategoryFilter = "all" | "ops" | "sales" | "erp" | "other";
+type CategoryFilter = "all" | "ops" | "attendance" | "chat" | "other";
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
@@ -55,9 +55,9 @@ function timeAgo(iso: string): string {
 
 function bucketCategory(category: string): CategoryFilter {
   const c = category.toLowerCase();
-  if (c.includes("sla") || c === "activity" || c === "activities" || c === "noc" || c === "evidence") return "ops";
-  if (c.includes("quote") || c === "crm" || c === "sales") return "sales";
-  if (c === "erp" || c.includes("purchase") || c.includes("stock") || c === "finance" || c === "approval") return "erp";
+  if (c.includes("sla") || c.startsWith("activit") || c.startsWith("evidence") || c === "approval" || c === "confirmations" || c === "erp") return "ops";
+  if (c === "attendance" || c.startsWith("lunch")) return "attendance";
+  if (c === "chat") return "chat";
   return "other";
 }
 
@@ -65,24 +65,22 @@ function isActionable(n: Notif): boolean {
   if (n.isRead) return false;
   if (n.priority === "high") return true;
   const b = bucketCategory(n.category);
-  return b === "ops" || b === "sales" || b === "erp";
+  return b === "ops" || b === "attendance";
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
   attendance: "Asistencia",
-  activity: "OT",
-  activities: "OT",
-  tool: "Herramientas",
-  finance: "Finanzas",
-  noc: "NOC",
-  crm: "CRM",
+  lunch_break: "Comida",
+  lunch_breaks: "Comida",
+  activity: "Actividad",
+  activities: "Actividad",
   approval: "Aprobación",
   evidence: "Evidencias",
-  sales: "Ventas",
-  quotes: "Cotizaciones",
-  "sla-alert": "SLA",
-  "sla-breach": "SLA",
-  erp: "ERP",
+  evidences: "Evidencias",
+  "sla-alert": "Atraso",
+  "sla-breach": "Atraso",
+  chat: "Chat",
+  profile: "Perfil",
   confirmations: "Confirmación",
 };
 
@@ -294,9 +292,9 @@ export default function NotificationsCenterPage() {
           onChange={setCategory}
           tabs={[
             { key: "all", label: "Todas" },
-            { key: "ops", label: "Ops / SLA" },
-            { key: "sales", label: "CRM / Cotiz." },
-            { key: "erp", label: "ERP / OC" },
+            { key: "ops", label: "Actividades" },
+            { key: "attendance", label: "Asistencia" },
+            { key: "chat", label: "Chat" },
             { key: "other", label: "Otras" },
           ]}
         />

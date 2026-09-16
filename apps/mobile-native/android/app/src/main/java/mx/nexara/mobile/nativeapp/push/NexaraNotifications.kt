@@ -56,17 +56,17 @@ object NexaraNotifications {
             NotificationChannel(CHANNEL_DEFAULT, "General", NotificationManager.IMPORTANCE_DEFAULT)
                 .apply { description = "Notificaciones generales" },
             NotificationChannel(CHANNEL_ALERTS, "Alertas", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "Alertas urgentes (GPS fuera de ruta, fallas, etc.)" },
-            NotificationChannel(CHANNEL_TICKETS, "Tickets", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "Tickets nuevos y actualizaciones" },
+                .apply { description = "Alertas urgentes de tu jornada y ubicación" },
+            NotificationChannel(CHANNEL_TICKETS, "Servicios", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Servicios y proyectos que te asignan" },
             NotificationChannel(CHANNEL_GPS, "Seguimiento", NotificationManager.IMPORTANCE_LOW)
                 .apply { description = "Estado de envío de ubicación en segundo plano" },
-            NotificationChannel(CHANNEL_OPS, "Operación", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "Actividades, evidencias, viáticos y despacho" },
+            NotificationChannel(CHANNEL_OPS, "Actividades", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Actividades, evidencias, atrasos y despacho" },
             NotificationChannel(CHANNEL_CHAT, "Chat", NotificationManager.IMPORTANCE_DEFAULT)
                 .apply { description = "Menciones y mensajes del equipo" },
-            NotificationChannel(CHANNEL_APPROVALS, "Aprobaciones", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "Flujos de aprobación y validaciones" },
+            NotificationChannel(CHANNEL_APPROVALS, "Revisiones", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Evidencias y horas de comida por aprobar o devueltas" },
         )
         channels.forEach { nm.createNotificationChannel(it) }
     }

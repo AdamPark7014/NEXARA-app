@@ -12,10 +12,10 @@ object NexaraAppMeta {
 
     fun versionCode(): Int = BuildConfig.VERSION_CODE
 
-    fun versionLabel(): String = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+    /** Lo que ve la gente: solo la versión, sin número de compilación ni tipo de build. */
+    fun versionLabel(): String = "v${BuildConfig.VERSION_NAME}"
 
     fun isDebugBuild(): Boolean = BuildConfig.DEBUG
 
-    fun buildLabel(context: Context): String =
-        if (BuildConfig.DEBUG) "${versionLabel()} · debug" else versionLabel()
+    fun buildLabel(context: Context): String = versionLabel()
 }

@@ -333,7 +333,7 @@ export default function CommandPalette({
       ? entityResults.filter((r) => CORE_SEARCH_ENTITY_TYPES.has(r.type))
       : entityResults;
     return rows
-      .map((r) => {
+      .map((r): Action | null => {
         const raw = searchResultUrl(r);
         if (!raw) return null;
         return {
@@ -346,7 +346,7 @@ export default function CommandPalette({
           group: "Entidades",
           url: resolveCrossPanelHref(raw, userJson, current),
           keywords: [r.type, r.recommendation ?? ""],
-        } satisfies Action;
+        };
       })
       .filter((a): a is Action => a != null);
   }, [entityResults, user]);

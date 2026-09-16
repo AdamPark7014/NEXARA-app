@@ -54,9 +54,9 @@ enum class NotificationFilter { ALL, UNREAD }
  */
 enum class NotificationCategory(val label: String) {
     TODAS("Todas"),
-    OPS("Operación"),
-    SALES("Comercial"),
-    ERP("ERP"),
+    OPS("Actividades"),
+    ASISTENCIA("Asistencia"),
+    CHAT("Chat"),
     OTRAS("Otras"),
     ;
 
@@ -64,33 +64,30 @@ enum class NotificationCategory(val label: String) {
         fun of(category: String?): NotificationCategory {
             val c = category?.trim()?.lowercase().orEmpty()
             return when {
-                c.contains("sla") || c == "activity" || c == "activities" ||
-                    c == "noc" || c == "evidence" -> OPS
-                c.contains("quote") || c == "crm" || c == "sales" -> SALES
-                c == "erp" || c.contains("purchase") || c.contains("stock") ||
-                    c == "finance" || c == "approval" -> ERP
+                c.contains("sla") || c.startsWith("activit") || c.startsWith("evidence") ||
+                    c == "approval" || c == "confirmations" || c == "erp" -> OPS
+                c == "attendance" || c.startsWith("lunch") -> ASISTENCIA
+                c == "chat" -> CHAT
                 else -> OTRAS
             }
         }
     }
 }
 
-/** Etiqueta legible de la categoría cruda, igual que `CATEGORY_LABEL` en la web. */
+/** Etiqueta legible de la categoría cruda, igual que `CATEGORY_LABEL` en la web (solo Core). */
 internal val NOTIFICATION_CATEGORY_LABEL: Map<String, String> = mapOf(
     "attendance" to "Asistencia",
-    "activity" to "OT",
-    "activities" to "OT",
-    "tool" to "Herramientas",
-    "finance" to "Finanzas",
-    "noc" to "NOC",
-    "crm" to "CRM",
+    "lunch_break" to "Comida",
+    "lunch_breaks" to "Comida",
+    "activity" to "Actividad",
+    "activities" to "Actividad",
     "approval" to "Aprobación",
     "evidence" to "Evidencias",
-    "sales" to "Ventas",
-    "quotes" to "Cotizaciones",
-    "sla-alert" to "SLA",
-    "sla-breach" to "SLA",
-    "erp" to "ERP",
+    "evidences" to "Evidencias",
+    "sla-alert" to "Atraso",
+    "sla-breach" to "Atraso",
+    "chat" to "Chat",
+    "profile" to "Perfil",
     "confirmations" to "Confirmación",
 )
 

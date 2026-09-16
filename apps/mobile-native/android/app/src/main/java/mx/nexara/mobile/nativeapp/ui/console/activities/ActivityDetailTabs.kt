@@ -177,7 +177,7 @@ fun ActivityInfoTab(
                         if (branch.isNotBlank()) ADetailRow("Sucursal", branch)
                         if (!a.branchAddress.isNullOrBlank()) ADetailRow("Dirección", a.branchAddress!!)
                         if (!a.prioridad.isNullOrBlank()) ADetailRow("Prioridad", a.prioridad!!)
-                        if (!a.ticketType.isNullOrBlank()) ADetailRow("Tipo ticket", a.ticketType!!)
+                        if (!a.ticketType.isNullOrBlank()) ADetailRow("Tipo de servicio", a.ticketType!!)
                         ADetailRow("Asignación", a.fechaAsignacion?.take(16)?.replace('T', ' ') ?: "—")
                         ADetailRow("Inicio", a.fechaInicio?.take(16)?.replace('T', ' ') ?: "—")
                         ADetailRow("Entrega esperada", a.fechaEntregaEsperada?.take(10) ?: "—")

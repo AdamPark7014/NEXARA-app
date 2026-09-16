@@ -18,12 +18,14 @@ struct LoginView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     VStack(spacing: 8) {
-                        Image(systemName: "building.2.crop.circle")
-                            .font(.system(size: 56))
-                            .foregroundColor(accent)
-                            .padding(16)
-                            .background(accent.opacity(0.12))
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                        // Mismo logo que Android; verde fuerte porque lleva «NEXARA» en blanco.
+                        Image("LogoNexara")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 80, height: 80)
+                            .padding(5)
+                            .background(Color(red: 0.06, green: 0.46, blue: 0.43))
+                            .clipShape(RoundedRectangle(cornerRadius: 22))
                         Text("NEXARA")
                             .font(.caption)
                             .fontWeight(.semibold)
