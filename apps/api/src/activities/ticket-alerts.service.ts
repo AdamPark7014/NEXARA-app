@@ -156,9 +156,12 @@ export class TicketAlertsService {
   private async getConsoleAdminIds(): Promise<number[]> {
     const admins = await this.prisma.user.findMany({
       where: {
+        isActive: true,
+        // `User` no tiene `isSuperAdmin`: filtrar por él hacía fallar la consulta y ningún aviso de
+        // SLA salía. Los dueños de plataforma se reconocen por correo.
         OR: [
-          { isSuperAdmin: true } as any,
-          { role: { accesoConsoleAdmin: true } as any },
+          { email: { in: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] } },
+          { role: { accesoConsoleAdmin: true } },
         ],
       },
       select: { id: true },

@@ -16,7 +16,11 @@ import { LoginDto } from './dto/login.dto.js';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../common/current-user.decorator.js';
-import { clearSessionCookie, setSessionCookie } from '../common/security/session-cookie.js';
+import {
+  clearSessionCookie,
+  sessionTokenFromHeaders,
+  setSessionCookie,
+} from '../common/security/session-cookie.js';
 
 @Controller('auth')
 export class AuthController {
@@ -113,6 +117,20 @@ export class AuthController {
       user.jti as string | undefined,
       req,
     );
+    if (result?.access_token) {
+      setSessionCookie(res, result.access_token);
+    }
+    return result;
+  }
+
+  /**
+   * Apps móviles: renueva la sesión aunque el token ya haya vencido (sin guard JWT a propósito;
+   * `refreshSession` valida la firma, la sesión y al usuario). 401 = hay que volver a entrar.
+   */
+  @Post('session/refresh')
+  @HttpCode(200)
+  async refreshSession(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.refreshSession(sessionTokenFromHeaders(req.headers ?? {}));
     if (result?.access_token) {
       setSessionCookie(res, result.access_token);
     }

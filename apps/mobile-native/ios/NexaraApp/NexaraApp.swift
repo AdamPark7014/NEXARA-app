@@ -77,5 +77,10 @@ struct RootView: View {
                 app.route = AppState.landing(for: session.currentUser)
             }
         }
+        // Sesión leída del llavero tarde (arranque con el teléfono bloqueado):
+        // la persona nunca cerró sesión, así que sale del login sola.
+        .onReceive(NotificationCenter.default.publisher(for: SessionStore.didRestoreNotification)) { _ in
+            app.route = AppState.landing(for: session.currentUser)
+        }
     }
 }

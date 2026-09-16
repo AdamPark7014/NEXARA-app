@@ -6,8 +6,12 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.BuildConfig
 import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
 import mx.nexara.mobile.nativeapp.data.session.SessionEvents
+import mx.nexara.mobile.nativeapp.data.session.SessionRefreshPolicy
+import mx.nexara.mobile.nativeapp.data.session.SessionRefresher
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -48,6 +52,7 @@ object ApiClient {
     private fun httpClient(
         tokenProvider: (() -> String?)? = null,
         companyIdProvider: (() -> Long?)? = null,
+        withOffline: Boolean = true,
     ): OkHttpClient {
         val logging = HttpLoggingInterceptor()
         logging.level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
@@ -82,17 +87,82 @@ object ApiClient {
                 if (companyId != null && companyId > 0L) {
                     builder.header("X-Company-Id", companyId.toString())
                 }
-                val response = chain.proceed(builder.build())
-                if (response.code == 401) {
-                    SessionEvents.notifyExpired()
-                }
-                response
+                val authedRequest = builder.build()
+                val response = chain.proceed(authedRequest)
+                if (response.code != 401) return@addInterceptor response
+                recoverFrom401(chain, authedRequest, response, sentToken = token)
             }
             .apply {
-                NexaraOffline.httpInterceptor()?.let { addInterceptor(it) }
+                if (withOffline) NexaraOffline.httpInterceptor()?.let { addInterceptor(it) }
             }
             .addInterceptor(logging)
             .build()
+    }
+
+    /** Marca (no viaja al servidor) de una petición ya reintentada tras renovar. */
+    private object AuthRetryTag
+
+    /**
+     * Un 401 ya no cierra la sesión por sí solo.
+     *
+     * 1. Si el token guardado cambió desde que salió la petición → reintenta con él.
+     * 2. Si no, renovación single-flight ([SessionRefresher]):
+     *    - 200 → reintenta UNA vez con el token nuevo.
+     *    - 401 → expiración confirmada → [SessionEvents.notifyExpired].
+     *    - red/5xx → devuelve el 401 original SIN avisar; se reintenta luego.
+     * Login, la propia renovación y logout nunca entran aquí (ver
+     * [SessionRefreshPolicy.isExcludedPath]); lo reintentado tampoco (sin bucles).
+     */
+    private fun recoverFrom401(
+        chain: Interceptor.Chain,
+        request: Request,
+        response: Response,
+        sentToken: String,
+    ): Response {
+        val stored = SessionRefresher.storedSession()
+        val decision = SessionRefreshPolicy.decideOn401(
+            encodedPath = request.url.encodedPath,
+            sentToken = sentToken,
+            alreadyRetried = request.tag(AuthRetryTag::class.java) != null,
+            storedToken = stored?.token,
+            storedIsPortal = stored != null && (stored.isClient || stored.isBranchUser),
+        )
+        return when (decision) {
+            SessionRefreshPolicy.On401.PassThrough -> response
+            SessionRefreshPolicy.On401.NotifyExpired -> {
+                SessionEvents.notifyExpired()
+                response
+            }
+            is SessionRefreshPolicy.On401.RetryWith -> retryWith(chain, request, response, decision.token)
+            SessionRefreshPolicy.On401.Refresh -> when (val r = SessionRefresher.refreshBlocking(sentToken)) {
+                is SessionRefresher.Result.Refreshed -> retryWith(chain, request, response, r.token)
+                SessionRefresher.Result.Revoked -> {
+                    SessionEvents.notifyExpired()
+                    response
+                }
+                SessionRefresher.Result.Transient,
+                SessionRefresher.Result.NoSession,
+                SessionRefresher.Result.NotSupported,
+                -> response
+            }
+        }
+    }
+
+    private fun retryWith(
+        chain: Interceptor.Chain,
+        request: Request,
+        response: Response,
+        token: String,
+    ): Response {
+        // Un cuerpo de un solo uso no se puede reenviar: el 401 sube tal cual,
+        // pero la sesión ya quedó renovada para la siguiente petición.
+        if (request.body?.isOneShot() == true) return response
+        response.close()
+        val retried = request.newBuilder()
+            .header("Authorization", "Bearer $token")
+            .tag(AuthRetryTag::class.java, AuthRetryTag)
+            .build()
+        return chain.proceed(retried)
     }
 
     private fun retrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
@@ -112,5 +182,14 @@ object ApiClient {
     val auth: AuthApi = retrofitNoAuth.create(AuthApi::class.java)
     val portalAuth: PortalAuthApi = retrofitNoAuth.create(PortalAuthApi::class.java)
     val kbPublic: KbPublicApi = retrofitNoAuth.create(KbPublicApi::class.java)
+
+    /**
+     * Cliente de renovación de sesión: sin interceptor de token (el bearer va
+     * explícito) y SIN cola offline — un POST a `auth/session/refresh` sin red
+     * no debe encolarse ni contestarse con un 202 falso.
+     */
+    val sessionApi: AuthApi by lazy {
+        retrofit(httpClient(tokenProvider = null, withOffline = false)).create(AuthApi::class.java)
+    }
 
 }

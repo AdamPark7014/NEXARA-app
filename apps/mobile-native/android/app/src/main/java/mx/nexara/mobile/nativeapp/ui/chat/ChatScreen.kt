@@ -120,6 +120,7 @@ import mx.nexara.mobile.nativeapp.access.DeepLinkParser
 import mx.nexara.mobile.nativeapp.data.SessionStore
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
+import mx.nexara.mobile.nativeapp.push.ActiveConversation
 import mx.nexara.mobile.nativeapp.data.api.ChatChannelDetailDto
 import mx.nexara.mobile.nativeapp.data.api.ChatChannelDto
 import mx.nexara.mobile.nativeapp.data.api.ChatColleagueDto
@@ -1520,6 +1521,13 @@ fun ChatScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Conversación visible: su push no se muestra y se quita su notificación apilada.
+    val visibleThreadId = state.selectedChannel?.id?.takeIf { isScreenActive }?.toString()
+    DisposableEffect(visibleThreadId) {
+        visibleThreadId?.let { ActiveConversation.open(ctx, it) }
+        onDispose { visibleThreadId?.let { ActiveConversation.close(it) } }
     }
 
     LaunchedEffect(state.selectedChannel?.id, isScreenActive) {

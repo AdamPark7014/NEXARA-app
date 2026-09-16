@@ -3,10 +3,21 @@
  * Una misma entidad/acción colapsa en la bandeja en vez de spamear.
  */
 
-export type PushRoutingChannel = 'default' | 'alerts' | 'tickets' | 'gps' | 'ops' | 'chat' | 'approvals';
+export type PushRoutingChannel =
+  | 'default'
+  | 'alerts'
+  | 'tickets'
+  | 'gps'
+  | 'ops'
+  | 'chat'
+  | 'approvals'
+  | 'attendance';
 
 export function channelForCategory(category?: string | null): PushRoutingChannel {
   const c = (category || '').toLowerCase();
+  if (c.includes('attendance') || c.includes('lunch') || c.includes('asistencia') || c.includes('comida')) {
+    return 'attendance';
+  }
   if (c.includes('ticket') || c.includes('support') || c.includes('alarm')) return 'tickets';
   if (c.includes('gps')) return 'gps';
   if (c.includes('chat') || c.includes('mention')) return 'chat';

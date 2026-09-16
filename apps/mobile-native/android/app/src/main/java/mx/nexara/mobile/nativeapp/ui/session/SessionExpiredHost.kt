@@ -30,8 +30,11 @@ fun SessionExpiredHost(
     val scope = rememberCoroutineScope()
     var showDialog by remember { mutableStateOf(false) }
 
+    // `SessionEvents` solo emite con expiración confirmada por el servidor; varias
+    // peticiones pueden confirmarla a la vez, así que un solo diálogo/snackbar.
     LaunchedEffect(Unit) {
         SessionEvents.expired.collect {
+            if (showDialog) return@collect
             showDialog = true
             scope.launch {
                 snackbarHostState.showSnackbar("Tu sesión expiró. Inicia sesión de nuevo.")

@@ -22,7 +22,24 @@ export type PushPayload = {
   entityType?: string | null;
   relatedEntityId?: number | null;
   category?: string | null;
+  /** chat = mensaje de conversación (se apila por hilo); event = aviso de actividad, asistencia, etc. */
+  kind?: 'chat' | 'event';
+  /** Quién lo provocó: nombre y foto para el aviso del teléfono. */
+  senderId?: number | null;
+  senderName?: string | null;
+  senderAvatar?: string | null;
+  /** Conversación o entidad que agrupa los avisos (id de canal de chat, actividad…). */
+  threadId?: string | null;
+  /** Nombre del grupo en chats grupales; vacío en mensajes directos. */
+  threadTitle?: string | null;
+  messageId?: number | null;
 };
+
+/** Errores de FCM que significan que el token ya no sirve (app desinstalada o reinstalada). */
+const DEAD_FCM_TOKEN_CODES = new Set([
+  'messaging/registration-token-not-registered',
+  'messaging/invalid-registration-token',
+]);
 
 @Injectable()
 export class PushDispatchService {
@@ -66,9 +83,15 @@ export class PushDispatchService {
     }
   }
 
-  async sendToUser(userId: number, payload: PushPayload): Promise<void> {
-    const rows = await this.prisma.userPushEndpoint.findMany({ where: { userId } });
+  /**
+   * Datos del aviso tal como los recibe el teléfono (FCM `data`). También viajan por el socket
+   * (`push:show`) para que la app los muestre aunque FCM no esté configurado o tarde.
+   */
+  buildPushData(userId: number, payload: PushPayload): Record<string, string> {
+    return this.buildData(userId, payload).data;
+  }
 
+  private buildData(userId: number, payload: PushPayload) {
     const priority = payload.priority || 'normal';
     const collapseKey =
       payload.collapseKey ||
@@ -79,6 +102,8 @@ export class PushDispatchService {
     const channel = payload.channel || 'default';
     const event = payload.event || '';
 
+    const kind = payload.kind || 'event';
+    const threadId = payload.threadId || tag;
     const data: Record<string, string> = {
       title: payload.title,
       body: payload.body,
@@ -92,7 +117,21 @@ export class PushDispatchService {
       entityType: payload.entityType || '',
       relatedEntityId: payload.relatedEntityId != null ? String(payload.relatedEntityId) : '',
       category: payload.category || '',
+      kind,
+      sender_id: payload.senderId != null ? String(payload.senderId) : '',
+      sender_name: payload.senderName || '',
+      sender_avatar: payload.senderAvatar || '',
+      thread_id: threadId,
+      thread_title: payload.threadTitle || '',
+      message_id: payload.messageId != null ? String(payload.messageId) : '',
+      sent_at: new Date().toISOString(),
     };
+    return { data, priority, collapseKey, kind, threadId };
+  }
+
+  async sendToUser(userId: number, payload: PushPayload): Promise<void> {
+    const rows = await this.prisma.userPushEndpoint.findMany({ where: { userId } });
+    const { data, collapseKey, kind, threadId } = this.buildData(userId, payload);
 
     const fcmOk = this.tryInitFirebase();
     const webOk = this.tryInitWebPush();
@@ -100,46 +139,42 @@ export class PushDispatchService {
     for (const row of rows) {
       if (row.fcmToken && fcmOk) {
         try {
+          // Android: solo `data` y prioridad alta. Así el servicio de la app SIEMPRE recibe el
+          // mensaje (primer plano, fondo o app cerrada) y lo dibuja como aviso emergente con su
+          // canal, remitente y conversación; con un bloque `notification` Android lo pinta solo
+          // en segundo plano, en un canal sin sonido emergente. iOS lee el `alert` de `apns`.
           await admin.messaging().send({
             token: row.fcmToken,
-            notification: { title: payload.title, body: payload.body },
-            data: {
-              title: payload.title,
-              body: payload.body,
-              url: data.url,
-              priority,
-              tag,
-              channel,
-              event,
-              collapse_key: collapseKey,
-              nexara_notification_id: nid,
-              entityType: data.entityType,
-              relatedEntityId: data.relatedEntityId,
-              category: data.category,
-            },
+            data,
             android: {
-              priority: priority === 'high' ? 'high' : 'normal',
-              collapseKey,
-              notification: {
-                tag,
-                channelId: channel === 'default' ? 'nexara_default' : `nexara_${channel}`,
-                priority: priority === 'high' ? 'high' : 'default',
-              },
+              priority: 'high',
+              // En chat cada mensaje cuenta: sin collapseKey FCM no descarta los pendientes.
+              ...(kind === 'chat' ? {} : { collapseKey }),
             },
             apns: {
+              headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
               payload: {
                 aps: {
+                  alert: { title: payload.title, body: payload.body },
                   sound: 'default',
-                  threadId: collapseKey,
-                  ...(priority === 'high' ? { contentAvailable: true } : {}),
+                  threadId,
                 },
               },
             },
           });
         } catch (e) {
-          this.logger.warn(
-            `FCM fallo token …${row.fcmToken.length > 8 ? row.fcmToken.slice(-8) : row.fcmToken}: ${e instanceof Error ? e.message : e}`,
-          );
+          const code = (e as { code?: string } | null)?.code || '';
+          const tokenTail = row.fcmToken.length > 8 ? row.fcmToken.slice(-8) : row.fcmToken;
+          if (DEAD_FCM_TOKEN_CODES.has(code)) {
+            // Token de una app desinstalada o reinstalada: se borra para no reintentar para siempre.
+            await (row.webPushEndpoint
+              ? this.prisma.userPushEndpoint.update({ where: { id: row.id }, data: { fcmToken: null } })
+              : this.prisma.userPushEndpoint.delete({ where: { id: row.id } })
+            ).catch(() => undefined);
+            this.logger.log(`FCM token …${tokenTail} ya no existe (${code}); eliminado`);
+          } else {
+            this.logger.warn(`FCM fallo token …${tokenTail}: ${e instanceof Error ? e.message : e}`);
+          }
         }
       }
 

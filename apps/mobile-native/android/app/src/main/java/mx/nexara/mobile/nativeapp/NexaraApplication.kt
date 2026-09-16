@@ -6,11 +6,31 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import mx.nexara.mobile.nativeapp.data.realtime.RealtimeBus
+import mx.nexara.mobile.nativeapp.push.NexaraNotifications
+import mx.nexara.mobile.nativeapp.push.NexaraPushRenderer
+import mx.nexara.mobile.nativeapp.push.PushPayload
 
 class NexaraApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = !BuildConfig.DEBUG
+        // Canales antes que nada: un push con la app cerrada arranca el proceso
+        // directo en NexaraFirebaseService, sin pasar por MainActivity.
+        NexaraNotifications.ensureChannels(this)
+
+        // Mientras el proceso vive (app abierta, en segundo plano o con la jornada activa), cada
+        // aviso que llega por el socket se muestra igual que un push de FCM. Si FCM también lo
+        // entrega, el renderizador descarta el repetido.
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            RealtimeBus.pushes.collect { data ->
+                runCatching { NexaraPushRenderer.render(this@NexaraApplication, PushPayload.from(data)) }
+            }
+        }
     }
 
     override fun newImageLoader(): ImageLoader {

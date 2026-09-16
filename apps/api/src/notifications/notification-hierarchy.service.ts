@@ -3,12 +3,20 @@ import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { appUrls } from '../common/app-urls.js';
+import { WORKDAY_TIMEZONE } from '../common/time/workday.js';
+import { expectedStartHm, isLateVsSchedule } from '../attendance/attendance-hybrid.match.js';
+import { buildAccessScheduleAssignment } from '../integra/access-schedule-defaults.js';
 import {
   portalTicketActionNotifyMeta,
   portalTicketCommentNotifyMeta,
   supportRequestStaffUrl,
   type PortalTicketClientAction,
 } from './portal-ticket-notify.js';
+
+/** 8:02 a. m. en la zona de la jornada. */
+function horaMexico(d: Date): string {
+  return d.toLocaleTimeString('es-MX', { timeZone: WORKDAY_TIMEZONE, hour: 'numeric', minute: '2-digit' });
+}
 
 /**
  * Servicio que maneja notificaciones jerárquicas
@@ -121,52 +129,81 @@ export class NotificationHierarchyService {
     type: 'ATTENDANCE_CHECKIN' | 'ATTENDANCE_CHECKOUT',
     userName: string,
     deviceInfo?: string,
+    at: Date = new Date(),
   ) {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        include: { role: true },
+        select: {
+          nombre: true,
+          employeeNumber: true,
+          roleKey: true,
+          tipoContrato: true,
+          role: { select: { orgRoleKey: true } },
+        },
       });
-
       if (!user) return;
 
-      const isAdmin = (user.role as any)?.accesoConsoleAdmin === true;
+      const nombre = user.nombre || userName;
+      const entrada = type === 'ATTENDANCE_CHECKIN';
+      const hora = horaMexico(at);
+      const lugar = deviceInfo ? ` · ${deviceInfo}` : '';
 
-      const actionText = type === 'ATTENDANCE_CHECKIN' ? 'entró a laborar' : 'dejó de laborar';
-      const deviceText = deviceInfo ? ` desde ${deviceInfo}` : '';
+      // Retardo contra su plantilla (oficina 09:00, contratista 08:00, con 15 min de gracia).
+      let horarioEsperado: string | null = null;
+      if (entrada) {
+        const plantilla = buildAccessScheduleAssignment({
+          employeeNumber: user.employeeNumber,
+          isActive: true,
+          roleKey: user.roleKey,
+          orgRoleKey: user.role?.orgRoleKey,
+          tipoContrato: user.tipoContrato,
+        });
+        if (isLateVsSchedule(at.toISOString(), plantilla.key)) {
+          horarioEsperado = expectedStartHm(plantilla.key);
+        }
+      }
 
-      if (isAdmin) {
-        // Admin entra/sale -> notificar a otros admins
-        const otherAdmins = await this.getSuperAdmins();
-        for (const admin of otherAdmins.filter(a => a.id !== userId)) {
-          await this.notificationsService.createNotification({
-            userId: admin.id,
-            type,
-            category: 'attendance',
-            title: `Admin ${type === 'ATTENDANCE_CHECKIN' ? 'en línea' : 'fuera de línea'}`,
-            message: `${userName} ${actionText}${deviceText}`,
-            triggerUserId: userId,
-            priority: 'high',
-          });
-        }
-      } else {
-        // Usuario normal -> notificar a admins del depto
-        const supervisors = await this.getSupervisors(userId);
-        for (const supervisor of supervisors) {
-          await this.notificationsService.createNotification({
-            userId: supervisor.id,
-            type,
-            category: 'attendance',
-            title: type === 'ATTENDANCE_CHECKIN' ? 'Usuario en línea' : 'Usuario fuera de línea',
-            message: `${userName} ${actionText}${deviceText}`,
-            triggerUserId: userId,
-            relatedUrl: appUrls.erpAttendance(undefined, userId),
-          });
-        }
+      const title = !entrada
+        ? `🔴 ${nombre} terminó su jornada`
+        : horarioEsperado
+          ? `🟠 ${nombre} entró a trabajar con retardo`
+          : `🟢 ${nombre} entró a trabajar`;
+      const message = !entrada
+        ? `Salida a las ${hora}${lugar}`
+        : horarioEsperado
+          ? `Entrada a las ${hora}; su horario es a las ${horarioEsperado}${lugar}`
+          : `Entrada a las ${hora}${lugar}`;
+
+      for (const id of await this.shiftWatcherIds(userId)) {
+        await this.notificationsService.createNotification({
+          userId: id,
+          type,
+          category: 'attendance',
+          title,
+          message,
+          triggerUserId: userId,
+          relatedEntityId: userId,
+          entityType: 'User',
+          relatedUrl: appUrls.erpAttendance(undefined, userId),
+          priority: horarioEsperado ? 'high' : 'normal',
+          dedupeSeconds: 60,
+        });
       }
     } catch (error) {
       this.logger.error(`Error notifying attendance change:`, error);
     }
+  }
+
+  /**
+   * Quienes siguen la jornada de alguien: sus jefes por organigrama (Antonio → Luis → …),
+   * Christian y los administradores de su departamento.
+   */
+  private async shiftWatcherIds(userId: number): Promise<number[]> {
+    const ids = new Set<number>(await this.lunchReviewerIds(userId));
+    for (const s of await this.getSupervisors(userId)) ids.add(s.id);
+    ids.delete(userId);
+    return [...ids];
   }
 
   /**
@@ -178,18 +215,20 @@ export class NotificationHierarchyService {
     userName: string,
   ) {
     try {
-      const supervisors = await this.getSupervisors(userId);
-      const actionText = type === 'LUNCH_CHECKIN' ? 'entró a comida' : 'regresó del descanso';
-
-      for (const supervisor of supervisors) {
+      const sale = type === 'LUNCH_CHECKIN';
+      const hora = horaMexico(new Date());
+      for (const id of await this.shiftWatcherIds(userId)) {
         await this.notificationsService.createNotification({
-          userId: supervisor.id,
+          userId: id,
           type,
           category: 'lunch_breaks',
-          title: type === 'LUNCH_CHECKIN' ? 'Usuario en comida' : 'Usuario regresó',
-          message: `${userName} ${actionText}`,
+          title: sale ? `🍽️ ${userName} salió a comer` : `↩️ ${userName} regresó de comer`,
+          message: sale ? `Salida a comer a las ${hora}` : `Regreso a las ${hora}`,
           triggerUserId: userId,
+          relatedEntityId: userId,
+          entityType: 'User',
           relatedUrl: appUrls.erpLunchBreaks(userId),
+          dedupeSeconds: 60,
         });
       }
     } catch (error) {
@@ -235,6 +274,88 @@ export class NotificationHierarchyService {
       }
     } catch (error) {
       this.logger.error(`Error notifying activity started:`, error);
+    }
+  }
+
+  /**
+   * Avance en campo paso a paso: «Alejandro inició AN-0001», «subió 4 fotos», «subió la hoja de
+   * servicio», «llenó el formulario». Lo reciben el responsable, quien la creó, los encargados de
+   * la actividad, los jefes por organigrama de quien la hace y Christian. En el teléfono cada
+   * paso reemplaza al anterior de la misma persona y actividad, así no se amontonan.
+   * (La salida y «lista para revisión» las avisa `notifyEvidenceSubmitted`.)
+   */
+  async notifyActivityProgress(params: {
+    activityId: number;
+    actorId: number;
+    paso: 'inicio' | 'evidencias' | 'hoja' | 'formulario';
+    fotos?: number;
+    at?: Date;
+  }) {
+    const { activityId, actorId, paso } = params;
+    try {
+      const [activity, actor, leads] = await Promise.all([
+        this.prisma.activity.findUnique({
+          where: { id: activityId },
+          select: {
+            anNumber: true,
+            titulo: true,
+            responsableId: true,
+            creadoPorId: true,
+            client: { select: { name: true } },
+          },
+        }),
+        this.prisma.user.findUnique({ where: { id: actorId }, select: { nombre: true } }),
+        this.prisma.activityAssignee.findMany({
+          where: { activityId, rol: 'LEAD', retiradoAt: null },
+          select: { userId: true },
+        }),
+      ]);
+      if (!activity) return;
+
+      const nombre = actor?.nombre || 'Alguien del equipo';
+      const ref = activity.anNumber || `Actividad ${activityId}`;
+      const cliente = activity.client?.name ? ` · ${activity.client.name}` : '';
+      const hora = horaMexico(params.at ?? new Date());
+      const fotos = params.fotos ?? 0;
+
+      const title = {
+        inicio: `▶️ ${nombre} inició ${ref}`,
+        evidencias: `📷 ${nombre} subió ${fotos === 1 ? '1 foto' : `${fotos} fotos`} de evidencia`,
+        hoja: `📄 ${nombre} subió la hoja de servicio`,
+        formulario: `📝 ${nombre} llenó el formulario de servicio`,
+      }[paso];
+      const message =
+        paso === 'inicio'
+          ? `Llegó a las ${hora} · ${activity.titulo}${cliente}`
+          : `${ref} · ${activity.titulo}${cliente}`;
+
+      const targets = new Set<number>(await this.lunchReviewerIds(actorId));
+      if (activity.responsableId) targets.add(activity.responsableId);
+      if (activity.creadoPorId) targets.add(activity.creadoPorId);
+      for (const l of leads) targets.add(l.userId);
+      targets.delete(actorId);
+
+      for (const userId of targets) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_STARTED',
+          category: 'activities',
+          title,
+          message,
+          triggerUserId: actorId,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activityId}`,
+          priority: paso === 'inicio' ? 'high' : 'normal',
+          channel: 'ops',
+          // Mismo aviso en el teléfono para toda la visita de esta persona a esta actividad.
+          collapseKey: `nx_act_${activityId}_by${actorId}`,
+          // El inicio se deduplica con el de «En Proceso»; los pasos siguientes no se descartan.
+          dedupeSeconds: paso === 'inicio' ? 120 : 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error(`notifyActivityProgress ${paso}`, error);
     }
   }
 
@@ -428,47 +549,62 @@ export class NotificationHierarchyService {
     assignedById?: number | null,
   ) {
     try {
-      // Notificar al usuario asignado
+      const [activity, asignado] = await Promise.all([
+        this.prisma.activity.findUnique({
+          where: { id: activityId },
+          select: {
+            anNumber: true,
+            titulo: true,
+            fechaInicio: true,
+            client: { select: { name: true } },
+          },
+        }),
+        this.prisma.user.findUnique({ where: { id: userId }, select: { nombre: true } }),
+      ]);
+      const ref = activity?.anNumber || activityTitle;
+      const titulo = activity?.titulo ? ` · ${activity.titulo}` : '';
+      const cliente = activity?.client?.name ? ` · ${activity.client.name}` : '';
+      const cuando = activity?.fechaInicio
+        ? ` · ${activity.fechaInicio.toLocaleString('es-MX', {
+            timeZone: WORKDAY_TIMEZONE,
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+          })}`
+        : '';
+      const url = `/erp/actividades/${activityId}`;
+      // Quien asigna no recibe su propio aviso (p. ej. al asignarse una tarea a sí mismo).
+      const actor = assignedById ?? undefined;
+
       await this.notificationsService.createNotification({
         userId,
         type: 'ACTIVITY_ASSIGNED',
         category: 'activities',
-        title: '✨ Nueva actividad asignada',
-        message: `Se te ha asignado: "${activityTitle}". Revísala en tu plataforma.`,
+        title: `✨ Nueva actividad: ${ref}`,
+        message: `${assignedByName} te asignó${titulo}${cliente}${cuando}`.replace('asignó · ', 'asignó '),
+        triggerUserId: actor,
         relatedEntityId: activityId,
         entityType: 'Activity',
-        relatedUrl: appUrls.opsActivity(activityId),
+        relatedUrl: url,
         priority: 'high',
       });
 
-      // Notificar a supervisores
-      const supervisors = await this.getSupervisors(userId);
-      for (const supervisor of supervisors) {
+      // Sus jefes por organigrama, Christian y los administradores de su departamento.
+      const nombreAsignado = asignado?.nombre || 'alguien del equipo';
+      for (const id of await this.shiftWatcherIds(userId)) {
+        if (id === assignedById) continue;
         await this.notificationsService.createNotification({
-          userId: supervisor.id,
+          userId: id,
           type: 'ACTIVITY_ASSIGNED',
           category: 'activities',
-          title: 'Actividad asignada a equipo',
-          message: `${assignedByName} asignó "${activityTitle}" a un miembro del equipo`,
+          title: `📌 ${assignedByName} asignó ${ref} a ${nombreAsignado}`,
+          message: `${activity?.titulo || activityTitle}${cliente}${cuando}`,
+          triggerUserId: actor,
           relatedEntityId: activityId,
           entityType: 'Activity',
-          relatedUrl: appUrls.opsActivity(activityId),
-        });
-      }
-
-      // Christian ve toda asignación (salvo que él mismo la hizo o ya la recibió).
-      const already = new Set([userId, ...supervisors.map((s) => s.id)]);
-      for (const ceoId of await this.getCeoUserIds()) {
-        if (already.has(ceoId) || ceoId === assignedById) continue;
-        await this.notificationsService.createNotification({
-          userId: ceoId,
-          type: 'ACTIVITY_ASSIGNED',
-          category: 'activities',
-          title: 'Actividad asignada',
-          message: `${assignedByName} asignó "${activityTitle}".`,
-          relatedEntityId: activityId,
-          entityType: 'Activity',
-          relatedUrl: `/erp/actividades/${activityId}`,
+          relatedUrl: url,
         });
       }
     } catch (error) {
@@ -819,6 +955,82 @@ export class NotificationHierarchyService {
       }
     } catch (error) {
       this.logger.error('notifyActivityAutoCompleted', error);
+    }
+  }
+
+  /**
+   * Reasignación: el nuevo responsable recibe la actividad, el anterior sabe a quién pasó (y si
+   * sigue de apoyo), y quien la creó y Christian ven el movimiento. Nadie recibe su propio aviso.
+   */
+  async notifyActivityReassigned(params: {
+    activityId: number;
+    actorId: number;
+    deUsuarioId: number | null;
+    aUsuarioId: number;
+    motivo?: string | null;
+    retiradoAnterior?: boolean;
+  }) {
+    const { activityId, actorId, deUsuarioId, aUsuarioId } = params;
+    try {
+      const [activity, personas] = await Promise.all([
+        this.prisma.activity.findUnique({
+          where: { id: activityId },
+          select: { anNumber: true, titulo: true, creadoPorId: true, client: { select: { name: true } } },
+        }),
+        this.prisma.user.findMany({
+          where: { id: { in: [actorId, aUsuarioId, ...(deUsuarioId ? [deUsuarioId] : [])] } },
+          select: { id: true, nombre: true },
+        }),
+      ]);
+      if (!activity) return;
+      const nombreDe = (id: number | null) => personas.find((p) => p.id === id)?.nombre || 'alguien';
+      const ref = activity.anNumber || `Actividad ${activityId}`;
+      const cliente = activity.client?.name ? ` · ${activity.client.name}` : '';
+      const motivo = params.motivo?.trim() ? ` Motivo: ${params.motivo.trim()}` : '';
+      const base = {
+        type: 'ACTIVITY_ASSIGNED',
+        category: 'activities',
+        triggerUserId: actorId,
+        relatedEntityId: activityId,
+        entityType: 'Activity',
+        relatedUrl: `/erp/actividades/${activityId}`,
+        channel: 'ops',
+        dedupeSeconds: 0,
+      } as const;
+
+      await this.notificationsService.createNotification({
+        ...base,
+        userId: aUsuarioId,
+        title: `📌 Te reasignaron ${ref}`,
+        message: `${activity.titulo}${cliente}. Te la pasó ${nombreDe(actorId)}.${motivo}`,
+        priority: 'high',
+      });
+
+      if (deUsuarioId && deUsuarioId !== aUsuarioId) {
+        await this.notificationsService.createNotification({
+          ...base,
+          userId: deUsuarioId,
+          title: `🔄 ${ref} pasó a ${nombreDe(aUsuarioId)}`,
+          message: `${nombreDe(actorId)} la reasignó; ${
+            params.retiradoAnterior ? 'ya no estás en el equipo' : 'sigues en el equipo como apoyo'
+          }.${motivo}`,
+        });
+      }
+
+      const observadores = new Set<number>(await this.getCeoUserIds());
+      if (activity.creadoPorId) observadores.add(activity.creadoPorId);
+      observadores.delete(aUsuarioId);
+      if (deUsuarioId) observadores.delete(deUsuarioId);
+      for (const userId of observadores) {
+        await this.notificationsService.createNotification({
+          ...base,
+          userId,
+          title: `🔄 ${nombreDe(actorId)} reasignó ${ref}`,
+          message: `${activity.titulo}${cliente}: de ${nombreDe(deUsuarioId)} a ${nombreDe(aUsuarioId)}.${motivo}`,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityReassigned', error);
     }
   }
 

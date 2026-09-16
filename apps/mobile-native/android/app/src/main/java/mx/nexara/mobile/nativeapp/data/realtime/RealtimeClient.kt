@@ -43,6 +43,10 @@ class RealtimeClient {
     private val _chatMembersChanged = MutableSharedFlow<ChatMembersChangedEvent>(extraBufferCapacity = 16)
     val chatMembersChanged: SharedFlow<ChatMembersChangedEvent> = _chatMembersChanged
 
+    /** Avisos `push:show`: los mismos datos que manda FCM, para pintarlos aunque FCM no llegue. */
+    private val _pushes = MutableSharedFlow<Map<String, String>>(extraBufferCapacity = 32)
+    val pushes: SharedFlow<Map<String, String>> = _pushes
+
     private val _connected = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val connected: SharedFlow<Unit> = _connected
 
@@ -58,6 +62,18 @@ class RealtimeClient {
                 timestamp = obj.optString("timestamp").takeIf { it.isNotBlank() },
             ),
         )
+    }
+
+    private val onPushShow = Emitter.Listener { args ->
+        val obj = args.firstOrNull() as? JSONObject ?: return@Listener
+        val data = buildMap {
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                if (!obj.isNull(k)) put(k, obj.optString(k))
+            }
+        }
+        _pushes.tryEmit(data)
     }
 
     private val onChatMessage = Emitter.Listener { args ->
@@ -120,17 +136,37 @@ class RealtimeClient {
         _chatMembersChanged.tryEmit(ChatMembersChangedEvent(channelId = channelId))
     }
 
+    /** true tras disconnect/connect_error del socket actual; false al crear/conectar. */
+    @Volatile
+    private var socketDead = false
+
     private val onConnect = Emitter.Listener {
+        socketDead = false
         _connected.tryEmit(Unit)
         emitPresence("online")
     }
 
     private val onDisconnect = Emitter.Listener {
+        socketDead = true
         _disconnected.tryEmit(Unit)
     }
 
-    private val onConnectError = Emitter.Listener {
-        _disconnected.tryEmit(Unit)
+    /**
+     * Handshake rechazado por el middleware del gateway (`next(new Error('unauthorized'))`).
+     * Lleva el token con el que se intentó: el bus renueva y reconecta, nunca
+     * cierra la sesión desde el socket.
+     */
+    private val _authFailed = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val authFailed: SharedFlow<String> = _authFailed
+
+    private val onConnectError = Emitter.Listener { args ->
+        socketDead = true
+        val failedToken = activeToken
+        if (failedToken != null && isUnauthorizedConnectError(args)) {
+            _authFailed.tryEmit(failedToken)
+        } else {
+            _disconnected.tryEmit(Unit)
+        }
     }
 
     @Synchronized
@@ -148,6 +184,7 @@ class RealtimeClient {
         val s = IO.socket(baseUrl, opts)
         socket = s
         activeToken = token
+        socketDead = false
 
         s.on(Socket.EVENT_CONNECT, onConnect)
         s.on(Socket.EVENT_DISCONNECT, onDisconnect)
@@ -160,6 +197,7 @@ class RealtimeClient {
         s.on("chat:channel-activity", onChatChannelActivity)
         s.on("chat:channel-updated", onChatChannelUpdated)
         s.on("chat:members-changed", onChatMembersChanged)
+        s.on("push:show", onPushShow)
         s.connect()
     }
 
@@ -169,6 +207,20 @@ class RealtimeClient {
     }
 
     fun isConnected(): Boolean = socket?.connected() == true
+
+    /** Hay un socket para [token] conectado o todavía intentando conectar. */
+    fun isLiveFor(token: String): Boolean =
+        activeToken == token && socket != null && !socketDead
+
+    private fun isUnauthorizedConnectError(args: Array<out Any?>): Boolean {
+        val first = args.firstOrNull() ?: return false
+        val message = when (first) {
+            is JSONObject -> first.optString("message")
+            is Throwable -> first.message
+            else -> first.toString()
+        }.orEmpty()
+        return message.contains("unauthorized", ignoreCase = true)
+    }
 
     fun joinChatChannel(channelId: Long) {
         if (channelId <= 0L) return

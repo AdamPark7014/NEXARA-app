@@ -205,41 +205,55 @@ final class AuthRepository {
         }
         if let superAdmin = map["isSuperAdmin"] as? Bool { current.isSuperAdmin = superAdmin }
 
+        // Mientras viajaba la petición la sesión pudo renovarse (token nuevo) o
+        // cerrarse: se conserva el token vigente y nunca se resucita una sesión cerrada.
+        guard let now = SessionStore.shared.currentUser, now.id == current.id else {
+            return SessionStore.shared.currentUser
+        }
+        current.token = now.token
+        current.expiresAt = now.expiresAt
         SessionStore.shared.save(current)
         return current
     }
 
-    /// Sliding session: si faltan < 20 min, pide token nuevo. Paridad Android `maybeExtendSession`.
+    /// Renovación de la sesión al volver a primer plano: si el token vence en
+    /// menos de 60 min (o no se sabe cuándo vence, o ya venció) se pide uno nuevo
+    /// con `POST auth/session/refresh`. Después se refrescan permisos y navegación.
+    /// La sesión solo se cierra si el servidor responde 401 a la renovación.
     func maybeExtendSession() async {
-        guard var current = SessionStore.shared.currentUser else { return }
+        guard let current = SessionStore.shared.currentUser else { return }
         if current.isClient || current.isBranchUser { return }
 
-        current = await enrichSession(current)
-        SessionStore.shared.save(current)
+        if Self.needsRefresh(expiresAt: current.expiresAt) {
+            _ = await refreshSession()
+        }
 
         // Los permisos se refrescan aquí y no sólo al iniciar sesión: es el
         // único punto que la app vuelve a pisar de forma periódica
         // (`NexaraApp.swift` lo llama al volver a primer plano).
-        if let refreshed = await refreshProfile() { current = refreshed }
-
-        guard let expiresRaw = current.expiresAt,
-              let expires = ISO8601DateFormatter().date(from: expiresRaw)
-                ?? ISO8601DateFormatter.withFractional.date(from: expiresRaw)
-        else { return }
-
-        let remaining = expires.timeIntervalSinceNow
-        guard remaining <= 20 * 60 else { return }
-
-        do {
-            let data = try await ApiClient.shared.postJSON("auth/session/extend", body: EmptyBody())
-            let resp = try JSONDecoder().decode(SessionExtendResponse.self, from: data)
-            var latest = SessionStore.shared.currentUser ?? current
-            latest.token = resp.access_token
-            if let exp = resp.expiresAt { latest.expiresAt = exp }
-            SessionStore.shared.save(latest)
-        } catch {
-            // Best-effort: no tumbar la sesión si el extend falla.
+        guard let latest = SessionStore.shared.currentUser, latest.id == current.id else { return }
+        var enriched = await enrichSession(latest)
+        if let now = SessionStore.shared.currentUser, now.id == enriched.id {
+            enriched.token = now.token
+            enriched.expiresAt = now.expiresAt
+            SessionStore.shared.save(enriched)
         }
+        _ = await refreshProfile()
+    }
+
+    /// `POST auth/session/refresh`. Una sola renovación a la vez para toda la app.
+    @discardableResult
+    func refreshSession() async -> SessionRefreshOutcome {
+        await SessionRefresher.shared.refresh()
+    }
+
+    /// `true` si `expiresAt` no se conoce, no se entiende, ya pasó o faltan < 60 min.
+    static func needsRefresh(expiresAt raw: String?) -> Bool {
+        guard let raw, !raw.isEmpty,
+              let expires = ISO8601DateFormatter().date(from: raw)
+                ?? ISO8601DateFormatter.withFractional.date(from: raw)
+        else { return true }
+        return expires.timeIntervalSinceNow < 60 * 60
     }
 
     func logout() {
@@ -247,7 +261,90 @@ final class AuthRepository {
     }
 }
 
-private struct EmptyBody: Encodable {}
+/// Resultado de `POST auth/session/refresh`.
+enum SessionRefreshOutcome: Sendable {
+    /// 200: token nuevo ya guardado en `SessionStore`.
+    case refreshed(String)
+    /// 401: sesión revocada, usuario inactivo o sin uso > 30 días. Ya se cerró sesión.
+    case revoked
+    /// Red, 5xx, respuesta rara o sesión que no aplica: la sesión se conserva.
+    case failed
+}
+
+/// Single-flight de la renovación: si varias peticiones reciben 401 a la vez,
+/// todas esperan la MISMA llamada a `auth/session/refresh`.
+actor SessionRefresher {
+    static let shared = SessionRefresher()
+
+    private var inFlight: Task<SessionRefreshOutcome, Never>?
+
+    private init() {}
+
+    func refresh() async -> SessionRefreshOutcome {
+        if let inFlight {
+            return await inFlight.value
+        }
+        let task = Task<SessionRefreshOutcome, Never> {
+            await SessionRefresher.performRefresh()
+        }
+        inFlight = task
+        let outcome = await task.value
+        inFlight = nil
+        return outcome
+    }
+
+    private static func performRefresh() async -> SessionRefreshOutcome {
+        guard let user = SessionStore.shared.currentUser, !user.token.isEmpty else {
+            return .failed
+        }
+        // El API rechaza los tokens de portal (cliente/sucursal) con 401: pedirle
+        // la renovación cerraría una sesión que nadie revocó.
+        guard !user.isClient, !user.isBranchUser else {
+            return .failed
+        }
+        let userId = user.id
+        let usedToken = user.token
+
+        let data: Data
+        do {
+            data = try await ApiClient.shared.refreshSessionToken(usedToken)
+        } catch let error as ApiError {
+            if case .http(let code, _) = error, code == 401 {
+                // Revocación confirmada por el servidor: único cierre automático.
+                // Solo si la sesión sigue siendo la que se intentó renovar.
+                await MainActor.run {
+                    if let now = SessionStore.shared.currentUser, now.id == userId, now.token == usedToken {
+                        AuthRepository.shared.logout()
+                    }
+                }
+                return .revoked
+            }
+            return .failed
+        } catch {
+            return .failed
+        }
+
+        guard let resp = try? JSONDecoder().decode(AuthRepository.SessionExtendResponse.self, from: data),
+              !resp.access_token.isEmpty else {
+            return .failed
+        }
+        let newToken = resp.access_token
+        let newExpiresAt = resp.expiresAt
+        let applied = await MainActor.run { () -> Bool in
+            // Si mientras tanto se cerró sesión o entró otra cuenta, no se toca nada.
+            guard var latest = SessionStore.shared.currentUser,
+                  latest.id == userId, latest.token == usedToken else {
+                return false
+            }
+            latest.token = newToken
+            if let newExpiresAt { latest.expiresAt = newExpiresAt }
+            // `save` también reconecta el socket con el token nuevo.
+            SessionStore.shared.save(latest)
+            return true
+        }
+        return applied ? .refreshed(newToken) : .failed
+    }
+}
 
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }

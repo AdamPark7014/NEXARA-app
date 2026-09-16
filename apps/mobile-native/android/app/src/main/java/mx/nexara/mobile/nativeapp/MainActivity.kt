@@ -23,11 +23,18 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import com.google.firebase.messaging.FirebaseMessaging
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.session.SessionRefreshPolicy
+import mx.nexara.mobile.nativeapp.data.session.SessionRefresher
 import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.DevicesApi
@@ -54,9 +61,11 @@ class MainActivity : FragmentActivity() {
 
         NexaraNotifications.ensureChannels(this)
         NexaraOffline.install(applicationContext)
+        SessionRefresher.install(applicationContext)
         handleDeepLink(intent)
         askNotificationPermissionIfNeeded()
         refreshFcmToken()
+        startSessionKeepAlive()
 
         setContent {
             NexaraTheme {
@@ -69,10 +78,6 @@ class MainActivity : FragmentActivity() {
                     var unlockAttempt by remember { mutableStateOf(0) }
                     val authRepo = remember { AuthRepository(this@MainActivity) }
                     val activity = this@MainActivity
-
-                    LaunchedEffect(Unit) {
-                        runCatching { authRepo.maybeExtendSession() }
-                    }
 
                     LaunchedEffect(locked, unlockAttempt) {
                         if (!locked) return@LaunchedEffect
@@ -123,6 +128,38 @@ class MainActivity : FragmentActivity() {
                             onUnlock = { if (!isUnlocking) unlockAttempt++ },
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /** Navegación RBAC: una vez por instancia de la Activity (como antes). */
+    private var navigationRefreshed = false
+
+    /**
+     * La sesión no se cierra sola. Cada vez que la Activity entra en STARTED
+     * (arranque en frío con sesión guardada y cada vuelta desde segundo plano) y
+     * luego cada 30 min mientras siga en primer plano:
+     * renueva el token si faltan < 60 min o se desconoce el vencimiento, y
+     * arranca/reanuda realtime con la sesión guardada. Se cancela en onStop.
+     */
+    private fun startSessionKeepAlive() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                val repo = withContext(Dispatchers.IO) { AuthRepository(applicationContext) }
+                while (true) {
+                    try {
+                        repo.ensureSessionFresh()
+                        if (!navigationRefreshed) {
+                            withContext(Dispatchers.IO) { repo.refreshNavigation() }
+                            navigationRefreshed = true
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "keep-alive de sesión: ${e.javaClass.simpleName}")
+                    }
+                    delay(SessionRefreshPolicy.FOREGROUND_CHECK_INTERVAL_MS)
                 }
             }
         }
