@@ -80,6 +80,8 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
 
 ### Siguiente
 
+**Despliegue al servidor de prueba (listo, sin ejecutar por decisión de Adam 16-09):** el servidor Hetzner `5.78.215.109` (SSH puerto 2222) es ENTORNO DE PRUEBA; su repo `/var/www/nexara-app` está en `9de7e45f` (10-09) y ya hizo `git fetch` de esta rama (`5287b6ec`, 110 commits por delante). Para desplegar: `cd /var/www/nexara-app && git pull && ./deploy/update.sh --with-migrate` (entran 10+ migraciones, entre ellas evidencias con revisión, cierre por aprobación y comidas con justificación). No hace falta respaldo manual (el de prueba se purgó a pedido de Adam). El emulador tiene la app apuntando a `https://api.nexara.com.mx/api`, que corre código del 10-09: el login funciona pero las pantallas nuevas fallarán hasta desplegar.
+
 Compilar iOS en CI y probar ambas apps en dispositivo (cámara, GPS, push, comidas). Luego Cursor ejecuta `.ai/EXEC-PACKET.md` (usabilidad Actividades/Asistencia). Al desplegar a producción subir juntas `20260913180000_drop_evidence_activity_unique_index`, `20260913190000_assignee_dispatch_log`, `20260914050000_activity_schedule_changes`, `20260914100000_evidence_photos_geo`, `20260914160000_evidence_reviews` y `20260914190000_lunch_break_review`.
 
 ### No tocar
