@@ -44,4 +44,3 @@ interface NotificationsApi {
     @DELETE("notifications/{id}")
     suspend fun delete(@Path("id") id: Long): okhttp3.ResponseBody
 }
-

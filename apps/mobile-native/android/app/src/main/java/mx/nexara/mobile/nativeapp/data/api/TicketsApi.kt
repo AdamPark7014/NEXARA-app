@@ -431,4 +431,3 @@ interface TicketsApi {
     @GET("client-portal/quotes/{id}/pdf")
     suspend fun getQuotePdfRaw(@Path("id") id: Long): okhttp3.ResponseBody
 }
-
