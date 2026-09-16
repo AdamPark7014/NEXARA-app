@@ -71,7 +71,10 @@ enum CoreNavigation {
             case .actividades, .perfil:
                 return true
             case .clientes:
-                return !ClientSector.sectors(for: user.email).isEmpty && allowedByNavigation(module)
+                // Como el sidebar web: hace falta sector por correo Y que
+                // `GET me/navigation` conceda `erp-clients`.
+                return !ClientSector.sectors(for: user.email).isEmpty
+                    && !module.navigationKeys.isDisjoint(with: nav)
             case .asistencias, .chat:
                 return allowedByNavigation(module)
             }

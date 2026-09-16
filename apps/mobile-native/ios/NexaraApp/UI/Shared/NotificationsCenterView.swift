@@ -11,9 +11,16 @@ struct NotificationsCenterView: View {
     @State private var message: String?
     @State private var showFeed = false
     @State private var feedItems: [[String: Any]] = []
+    @State private var categoryFilter: NotifCategoryFilter = .all
 
     private var unread: Int {
         rows.filter { ($0["isRead"] as? Bool) != true }.count
+    }
+
+    /// Filtro por categoría, con los mismos cubos que `bucketCategory` de la web.
+    private var filteredRows: [[String: Any]] {
+        guard categoryFilter != .all else { return rows }
+        return rows.filter { NotifCategoryFilter.bucket(ConsoleHelpers.mapStr($0, "category")) == categoryFilter }
     }
 
     var body: some View {
@@ -25,6 +32,17 @@ struct NotificationsCenterView: View {
                 }
                 .pickerStyle(.segmented)
                 .listRowInsets(EdgeInsets())
+            }
+            if !showFeed {
+                Section {
+                    Picker("Categoría", selection: $categoryFilter) {
+                        ForEach(NotifCategoryFilter.allCases) { f in
+                            Text(f.title).tag(f)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowInsets(EdgeInsets())
+                }
             }
             if let message {
                 Section {
@@ -68,7 +86,10 @@ struct NotificationsCenterView: View {
                 }
             } else {
                 Section("\(unread) sin leer") {
-                    ForEach(rows, id: \.notifKey) { n in
+                    if filteredRows.isEmpty {
+                        Text("Sin notificaciones en esta categoría").foregroundColor(.secondary)
+                    }
+                    ForEach(filteredRows, id: \.notifKey) { n in
                         notificationRow(n)
                             .contentShape(Rectangle())
                             .onTapGesture { open(n) }
@@ -137,7 +158,7 @@ struct NotificationsCenterView: View {
                     Text(timeAgo(ConsoleHelpers.mapStr(n, "createdAt")))
                     if !category.isEmpty {
                         Text("·").foregroundColor(.secondary)
-                        Text(category).font(.caption2)
+                        Text(NotifCategoryFilter.label(category)).font(.caption2)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color(.tertiarySystemFill))
                             .clipShape(Capsule())
@@ -258,6 +279,55 @@ struct NotificationsCenterView: View {
         let h = m / 60
         if h < 24 { return "Hace \(h)h" }
         return "Hace \(h / 24)d"
+    }
+}
+
+/// Filtros del centro de notificaciones — `CategoryFilter`, `bucketCategory`
+/// y `CATEGORY_LABEL` de `apps/web/app/(panels)/erp/notifications-center`.
+private enum NotifCategoryFilter: String, CaseIterable, Identifiable {
+    case all, ops, sales, erp, other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "Todas"
+        case .ops: return "Ops / SLA"
+        case .sales: return "CRM / Cotiz."
+        case .erp: return "ERP / OC"
+        case .other: return "Otras"
+        }
+    }
+
+    static func bucket(_ category: String) -> NotifCategoryFilter {
+        let c = category.lowercased()
+        if c.contains("sla") || c == "activity" || c == "activities" || c == "noc" || c == "evidence" {
+            return .ops
+        }
+        if c.contains("quote") || c == "crm" || c == "sales" { return .sales }
+        if c == "erp" || c.contains("purchase") || c.contains("stock") || c == "finance" || c == "approval" {
+            return .erp
+        }
+        return .other
+    }
+
+    static func label(_ category: String) -> String {
+        switch category.lowercased() {
+        case "attendance": return "Asistencia"
+        case "activity", "activities": return "OT"
+        case "tool": return "Herramientas"
+        case "finance": return "Finanzas"
+        case "noc": return "NOC"
+        case "crm": return "CRM"
+        case "approval": return "Aprobación"
+        case "evidence": return "Evidencias"
+        case "sales": return "Ventas"
+        case "quotes": return "Cotizaciones"
+        case "sla-alert", "sla-breach": return "SLA"
+        case "erp": return "ERP"
+        case "confirmations": return "Confirmación"
+        default: return category
+        }
     }
 }
 

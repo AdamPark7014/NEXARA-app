@@ -29,6 +29,9 @@ struct CoreShellView: View {
     @State private var chatChannelId: Int64?
     @State private var chatMessageId: Int64?
     @State private var chatNonce = 0
+    @State private var clientesLinkId: Int?
+    @State private var clientesSectorSlug: String?
+    @State private var clientesNonce = 0
 
     private var modules: [CoreModule] { CoreNavigation.modules(for: session.currentUser) }
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
@@ -73,7 +76,12 @@ struct CoreShellView: View {
             }
         case .clientes:
             NavigationStack {
-                ServiceClientsView().toolbar { bellItem }
+                ClientesHomeView(
+                    initialClientId: clientesLinkId,
+                    initialSectorSlug: clientesSectorSlug
+                )
+                .toolbar { bellItem }
+                .id(clientesNonce)
             }
         case .perfil:
             NavigationStack {
@@ -191,7 +199,12 @@ struct CoreShellView: View {
             chatChannelId = link.chatChannelId
             chatMessageId = link.chatMessageId
             chatNonce += 1
-        case .clientes, .perfil:
+        case .clientes:
+            // `/erp/clientes/:id` y `?sector=` abren la ficha o la pestaña.
+            clientesLinkId = link.entityId.map { Int($0) }
+            clientesSectorSlug = link.vista
+            clientesNonce += 1
+        case .perfil:
             break
         }
     }

@@ -42,7 +42,19 @@ struct ChatView: View {
     @State private var createTopic = ""
     @State private var createPrivate = false
     @State private var topicDraft = ""
-    @State private var pollToken = UUID()
+    // Tiempo real: el canal abierto vive de los eventos del socket
+    // (`chat:message`, `chat:typing`, …), no de un sondeo cada 3 s.
+    @State private var joinedChannelId: Int64?
+    @State private var typingUsers: [Int64: ChatTypingUser] = [:]
+    @State private var lastTypingSentAt: Date?
+    @State private var scrollTarget: Int64?
+    @State private var highlightedMessageId: Int64?
+    @State private var jumpedToOlderWindow = false
+    @State private var didJumpToInitialMessage = false
+    @State private var mentionOpen = false
+    @State private var mentionQuery = ""
+    @State private var mentionResults: [[String: Any]] = []
+    @State private var mentionLoading = false
     // Búsqueda y ficha de canal: `chat/search`, `chat/channels/:id` y sus
     // acciones de silenciar / salir vivían sólo en la web.
     @State private var showSearch = false
@@ -100,10 +112,13 @@ struct ChatView: View {
                 Task { await openInitialMessageIfNeeded() }
             }
             .onChange(of: selectedChannelId) { _, newId in
-                pollToken = UUID()
-                guard let newId else { return }
-                Task { await pollLoop(channelId: newId, token: pollToken) }
+                joinChannel(newId)
             }
+            .onReceive(RealtimeBus.shared.chatEvents.receive(on: DispatchQueue.main)) { event in
+                handleChatEvent(event)
+            }
+            .task { await sweepTypingUsers() }
+            .onDisappear { leaveChannel() }
             .sheet(item: $pdfItem) { item in
                 NavigationStack { PDFViewerScreen(title: item.title, data: item.data) }
             }
@@ -295,15 +310,31 @@ struct ChatView: View {
                                 let mid = ConsoleHelpers.mapInt64(msg, "id") ?? 0
                                 messageRow(msg, showThreadHint: true)
                                     .id(mid)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.teal, lineWidth: highlightedMessageId == mid ? 2 : 0)
+                                    )
                             }
                         }
                     }
                     .padding()
                 }
                 .onChange(of: messages.count) { _, _ in
+                    // Si se saltó a un mensaje viejo, no arrastrar la vista al final.
+                    guard scrollTarget == nil else { return }
                     if let last = rootMessages.last,
                        let id = ConsoleHelpers.mapInt64(last, "id"), id > 0 {
                         withAnimation { proxy.scrollTo(id, anchor: .bottom) }
+                    }
+                }
+                .onChange(of: scrollTarget) { _, target in
+                    guard let target else { return }
+                    withAnimation { proxy.scrollTo(target, anchor: .center) }
+                    highlightedMessageId = target
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        if highlightedMessageId == target { highlightedMessageId = nil }
+                        if scrollTarget == target { scrollTarget = nil }
                     }
                 }
             }
@@ -423,26 +454,81 @@ struct ChatView: View {
     }
 
     private var composeBar: some View {
-        HStack(alignment: .bottom) {
-            TextField("Mensaje…", text: $draft, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(1...4)
-            Button { showDocPicker = true } label: {
-                Image(systemName: "paperclip")
+        VStack(alignment: .leading, spacing: 6) {
+            if jumpedToOlderWindow {
+                Button("Ir a lo más reciente") {
+                    guard let id = selectedChannelId else { return }
+                    Task { await loadMessages(channelId: id) }
+                }
+                .font(.caption)
             }
-            .disabled(sending || uploading || selectedChannelId == nil)
-            Button {
-                Task { await sendMessage() }
-            } label: {
-                Image(systemName: "paperplane.fill")
+            if !typingLine.isEmpty {
+                Text(typingLine).font(.caption2).foregroundStyle(.secondary)
             }
-            .disabled(
-                sending || uploading ||
-                draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                selectedChannelId == nil
-            )
+            if mentionOpen && (!mentionResults.isEmpty || mentionLoading) {
+                mentionSuggestions
+            }
+            HStack(alignment: .bottom) {
+                TextField("Mensaje…", text: $draft, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...4)
+                    .onChange(of: draft) { _, value in onDraftChange(value) }
+                Button { showDocPicker = true } label: {
+                    Image(systemName: "paperclip")
+                }
+                .disabled(sending || uploading || selectedChannelId == nil)
+                Button {
+                    Task { await sendMessage() }
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                }
+                .disabled(
+                    sending || uploading ||
+                    draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                    selectedChannelId == nil
+                )
+            }
         }
         .padding()
+    }
+
+    /// «Fulano está escribiendo…», con la misma caducidad que la web (2.8 s).
+    private var typingLine: String {
+        let names = typingUsers.values
+            .map { $0.nombre.split(separator: " ").first.map(String.init) ?? $0.nombre }
+            .filter { !$0.isEmpty }
+            .sorted()
+        switch names.count {
+        case 0: return ""
+        case 1: return "\(names[0]) está escribiendo…"
+        case 2: return "\(names[0]) y \(names[1]) están escribiendo…"
+        default: return "Varias personas están escribiendo…"
+        }
+    }
+
+    private var mentionSuggestions: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if mentionLoading { ProgressView().scaleEffect(0.7) }
+                ForEach(Array(mentionResults.prefix(8).enumerated()), id: \.offset) { _, m in
+                    Button { insertMention(m) } label: {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(ConsoleHelpers.mapStr(m, "label")).font(.caption.bold())
+                            let sub = ConsoleHelpers.mapStr(m, "subtitle")
+                            if !sub.isEmpty {
+                                Text(sub).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .frame(maxHeight: 58)
     }
 
     // MARK: – Thread
@@ -559,7 +645,7 @@ struct ChatView: View {
                 }
             }
             if !body.isEmpty {
-                Text(body).font(.body)
+                Text(ChatMentionFormat.display(body)).font(.body)
             }
             if !attachmentUrl.isEmpty {
                 let label = attachmentName.isEmpty ? "Adjunto" : attachmentName
@@ -739,9 +825,8 @@ struct ChatView: View {
     /// Salta al canal y al mensaje que devolvió la búsqueda.
     ///
     /// El resultado puede estar en un canal que no es el abierto y en un mensaje
-    /// anterior a los 50 que carga la vista: por eso se pagina hacia atrás hasta
-    /// encontrarlo, con tope para no tirar de la lista entera de un canal con
-    /// años de historial.
+    /// anterior a los 50 que carga la vista: `aroundId` trae la ventana centrada
+    /// en él de una sola llamada, sin paginar hacia atrás.
     private func openSearchHit(channelId: Int64, messageId: Int64) async {
         guard channelId > 0 else { return }
         if selectedChannelId != channelId {
@@ -749,14 +834,13 @@ struct ChatView: View {
             replyTo = nil
             threadRoot = nil
             threadReplies = []
-            await loadMessages(channelId: channelId, markRead: true)
+            await loadMessages(channelId: channelId, markRead: true, aroundId: messageId > 0 ? messageId : nil)
         }
         guard messageId > 0 else { return }
-        var intentos = 0
-        while !messages.contains(where: { ConsoleHelpers.mapInt64($0, "id") == messageId }),
-              hasMoreMessages, intentos < 6 {
-            await loadOlderMessages()
-            intentos += 1
+        if messages.contains(where: { ConsoleHelpers.mapInt64($0, "id") == messageId }) {
+            scrollTarget = messageId
+        } else {
+            await loadMessages(channelId: channelId, aroundId: messageId)
         }
         if let msg = messages.first(where: { ConsoleHelpers.mapInt64($0, "id") == messageId }) {
             // Si el mensaje es respuesta dentro de un hilo, se abre el hilo; si
@@ -770,20 +854,26 @@ struct ChatView: View {
         }
     }
 
+    /// Enlace `?channel&msg`: salta al mensaje aunque sea anterior a los últimos 50.
     private func openInitialMessageIfNeeded() async {
-        guard let msgId = initialMessageId, msgId > 0 else { return }
-        guard threadRoot == nil else { return }
-        if let msg = rootMessages.first(where: { ConsoleHelpers.mapInt64($0, "id") == msgId }) {
-            threadRoot = msg
-            await loadThreadReplies(parentId: msgId)
+        guard let msgId = initialMessageId, msgId > 0, !didJumpToInitialMessage else { return }
+        guard let channelId = selectedChannelId else { return }
+        didJumpToInitialMessage = true
+        if messages.contains(where: { ConsoleHelpers.mapInt64($0, "id") == msgId }) {
+            scrollTarget = msgId
+        } else {
+            await loadMessages(channelId: channelId, aroundId: msgId)
         }
     }
 
-    private func loadMessages(channelId: Int64, markRead: Bool = false) async {
+    /// `aroundId` centra la ventana en ese mensaje (enlaces `?channel&msg`).
+    private func loadMessages(channelId: Int64, markRead: Bool = false, aroundId: Int64? = nil) async {
         do {
-            let page = try await ChatRepository.shared.listMessages(channelId: channelId)
+            let page = try await ChatRepository.shared.listMessages(channelId: channelId, aroundId: aroundId)
             messages = page.messages
             hasMoreMessages = page.hasMore
+            jumpedToOlderWindow = aroundId != nil
+            if let aroundId, aroundId > 0 { scrollTarget = aroundId }
             pinned = (try? await ChatRepository.shared.listPins(channelId: channelId)) ?? []
             if markRead {
                 await ChatRepository.shared.markRead(channelId: channelId)
@@ -815,31 +905,201 @@ struct ChatView: View {
         loadingOlder = false
     }
 
-    private func pollLoop(channelId: Int64, token: UUID) async {
-        while !Task.isCancelled && pollToken == token && selectedChannelId == channelId {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard pollToken == token, selectedChannelId == channelId else { break }
-            await pollNewMessages(channelId: channelId)
+    // MARK: – Tiempo real
+
+    /// Sala del canal abierto: `chat:join` / `chat:leave`, como `WorkspaceChat.tsx`.
+    private func joinChannel(_ channelId: Int64?) {
+        if let current = joinedChannelId, current != channelId {
+            RealtimeBus.shared.emitChat("chat:leave", ["channelId": current])
+        }
+        typingUsers = [:]
+        guard let channelId, channelId > 0 else {
+            joinedChannelId = nil
+            return
+        }
+        RealtimeBus.shared.emitChat("chat:join", ["channelId": channelId])
+        joinedChannelId = channelId
+    }
+
+    private func leaveChannel() {
+        if let current = joinedChannelId {
+            RealtimeBus.shared.emitChat("chat:leave", ["channelId": current])
+        }
+        joinedChannelId = nil
+    }
+
+    /// Mismos eventos y mismas reglas que la web.
+    private func handleChatEvent(_ event: ChatSocketEvent) {
+        let payload = event.payload
+        switch event.name {
+        case "connect":
+            // Reconexión: volver a la sala y rellenar el hueco de mensajes.
+            joinedChannelId = nil
+            joinChannel(selectedChannelId)
+            if let id = selectedChannelId { Task { await loadMessages(channelId: id) } }
+        case "chat:message":
+            handleIncomingMessage(payload)
+        case "chat:message-updated":
+            let id = ConsoleHelpers.mapInt64(payload, "id") ?? 0
+            replaceMessage(id: id, with: payload)
+        case "chat:message-deleted":
+            let id = ConsoleHelpers.mapInt64(payload, "id") ?? 0
+            messages.removeAll { ConsoleHelpers.mapInt64($0, "id") == id }
+            threadReplies.removeAll { ConsoleHelpers.mapInt64($0, "id") == id }
+            pinned.removeAll { ConsoleHelpers.mapInt64($0, "id") == id }
+        case "chat:channel-activity":
+            let channelId = ConsoleHelpers.mapInt64(payload, "channelId") ?? 0
+            guard channelId > 0, channelId != selectedChannelId else { return }
+            bumpChannel(
+                channelId: channelId,
+                preview: ConsoleHelpers.mapStr(payload, "preview"),
+                at: ConsoleHelpers.mapStr(payload, "at"),
+                increment: true
+            )
+        case "chat:typing":
+            let channelId = ConsoleHelpers.mapInt64(payload, "channelId") ?? 0
+            let userId = ConsoleHelpers.mapInt64(payload, "userId") ?? 0
+            guard channelId == selectedChannelId, userId > 0, userId != currentUserId else { return }
+            typingUsers[userId] = ChatTypingUser(
+                nombre: ConsoleHelpers.mapStr(payload, "nombre"),
+                at: Date()
+            )
+        case "chat:channel-updated":
+            let id = ConsoleHelpers.mapInt64(payload, "id") ?? 0
+            guard let idx = channels.firstIndex(where: { ConsoleHelpers.mapInt64($0, "id") == id }) else { return }
+            var ch = channels[idx]
+            ch["topic"] = ConsoleHelpers.mapStr(payload, "topic")
+            channels[idx] = ch
+        case "chat:members-changed":
+            Task { await loadChannels(refresh: true) }
+        default:
+            break
         }
     }
 
-    private func pollNewMessages(channelId: Int64) async {
-        let afterId = messages.compactMap { ConsoleHelpers.mapInt64($0, "id") }.max()
-        do {
-            let page = try await ChatRepository.shared.listMessages(channelId: channelId)
-            if let afterId {
-                let newer = page.messages.filter { (ConsoleHelpers.mapInt64($0, "id") ?? 0) > afterId }
-                if !newer.isEmpty {
-                    let existing = Set(messages.compactMap { ConsoleHelpers.mapInt64($0, "id") })
-                    let toAdd = newer.filter { !(existing.contains(ConsoleHelpers.mapInt64($0, "id") ?? -1)) }
-                    messages.append(contentsOf: toAdd)
-                }
-            } else {
-                messages = page.messages
-            }
-        } catch {
-            // silent poll
+    private func handleIncomingMessage(_ msg: [String: Any]) {
+        let channelId = ConsoleHelpers.mapInt64(msg, "channelId") ?? 0
+        let messageId = ConsoleHelpers.mapInt64(msg, "id") ?? 0
+        let parentId = ConsoleHelpers.mapInt64(msg, "parentId") ?? 0
+        guard messageId > 0, channelId > 0 else { return }
+        let preview = ConsoleHelpers.mapStr(msg, "body", "message")
+        let at = ConsoleHelpers.mapStr(msg, "createdAt")
+
+        guard channelId == selectedChannelId else {
+            bumpChannel(channelId: channelId, preview: preview, at: at, increment: true)
+            return
         }
+
+        if parentId <= 0,
+           !messages.contains(where: { ConsoleHelpers.mapInt64($0, "id") == messageId }) {
+            messages.append(msg)
+        }
+        if parentId > 0,
+           let root = threadRoot,
+           ConsoleHelpers.mapInt64(root, "id") == parentId,
+           !threadReplies.contains(where: { ConsoleHelpers.mapInt64($0, "id") == messageId }) {
+            threadReplies.append(msg)
+        }
+        if let authorId = ConsoleHelpers.mapInt64(msg, "authorId") {
+            typingUsers[authorId] = nil
+        }
+        bumpChannel(channelId: channelId, preview: preview, at: at, increment: false)
+        Task { await ChatRepository.shared.markRead(channelId: channelId) }
+    }
+
+    private func replaceMessage(id: Int64, with msg: [String: Any]) {
+        guard id > 0 else { return }
+        if let idx = messages.firstIndex(where: { ConsoleHelpers.mapInt64($0, "id") == id }) {
+            messages[idx] = msg
+        }
+        if let idx = threadReplies.firstIndex(where: { ConsoleHelpers.mapInt64($0, "id") == id }) {
+            threadReplies[idx] = msg
+        }
+        if let root = threadRoot, ConsoleHelpers.mapInt64(root, "id") == id {
+            threadRoot = msg
+        }
+        let isPinned = !ConsoleHelpers.mapStr(msg, "pinnedAt").isEmpty
+        if let idx = pinned.firstIndex(where: { ConsoleHelpers.mapInt64($0, "id") == id }) {
+            if isPinned { pinned[idx] = msg } else { pinned.remove(at: idx) }
+        } else if isPinned {
+            pinned.insert(msg, at: 0)
+        }
+    }
+
+    /// Lista de canales en vivo: no leídas, último mensaje y hora.
+    private func bumpChannel(channelId: Int64, preview: String, at: String, increment: Bool) {
+        guard let idx = channels.firstIndex(where: { ConsoleHelpers.mapInt64($0, "id") == channelId }) else { return }
+        var ch = channels[idx]
+        if increment {
+            ch["unreadCount"] = ConsoleHelpers.mapInt(ch, "unreadCount") + 1
+            ch["unread"] = true
+        } else {
+            ch["unreadCount"] = 0
+            ch["unread"] = false
+        }
+        if !preview.isEmpty { ch["lastMessagePreview"] = preview }
+        if !at.isEmpty { ch["lastMessageAt"] = at }
+        channels[idx] = ch
+    }
+
+    private func sweepTypingUsers() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard !typingUsers.isEmpty else { continue }
+            let now = Date()
+            typingUsers = typingUsers.filter { now.timeIntervalSince($0.value.at) < 2.8 }
+        }
+    }
+
+    /// `emitTyping` de la web: como mucho un aviso cada 1.2 s.
+    private func emitTyping() {
+        guard let channelId = selectedChannelId else { return }
+        if let last = lastTypingSentAt, Date().timeIntervalSince(last) < 1.2 { return }
+        lastTypingSentAt = Date()
+        RealtimeBus.shared.emitChat("chat:typing", [
+            "channelId": channelId,
+            "nombre": SessionStore.shared.currentUser?.nombre ?? "Alguien",
+        ])
+    }
+
+    // MARK: – Menciones
+
+    private func onDraftChange(_ value: String) {
+        emitTyping()
+        guard let partial = ChatMentionFormat.pendingMention(in: value) else {
+            mentionOpen = false
+            mentionQuery = ""
+            mentionResults = []
+            return
+        }
+        mentionOpen = true
+        if partial != mentionQuery || mentionResults.isEmpty {
+            mentionQuery = partial
+            Task { await loadMentions(partial) }
+        }
+    }
+
+    /// `chat/mentions?kind=USER` — las mismas personas que ofrece la web.
+    private func loadMentions(_ query: String) async {
+        mentionLoading = true
+        let results = (try? await ChatRepository.shared.listMentions(query: query, kind: "USER")) ?? []
+        guard mentionOpen, mentionQuery == query else {
+            mentionLoading = false
+            return
+        }
+        mentionResults = results
+        mentionLoading = false
+    }
+
+    private func insertMention(_ mention: [String: Any]) {
+        draft = ChatMentionFormat.replacePending(
+            in: draft,
+            label: ConsoleHelpers.mapStr(mention, "label"),
+            userId: ConsoleHelpers.mapInt64(mention, "id") ?? 0
+        )
+        mentionOpen = false
+        mentionQuery = ""
+        mentionResults = []
     }
 
     private func loadThreadReplies(parentId: Int64) async {

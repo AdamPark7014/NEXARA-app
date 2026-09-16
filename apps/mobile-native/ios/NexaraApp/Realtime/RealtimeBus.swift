@@ -8,11 +8,32 @@ struct EntityUpdatedEvent: Equatable {
     let timestamp: String?
 }
 
+/// Evento del workspace de chat tal cual llega del socket
+/// (`chat:message`, `chat:typing`, … y `connect` al reconectar).
+struct ChatSocketEvent {
+    let name: String
+    let payload: [String: Any]
+}
+
 /// Conexión Socket.IO única — paridad Android `RealtimeBus`.
 final class RealtimeBus: ObservableObject {
     static let shared = RealtimeBus()
 
     let events = PassthroughSubject<EntityUpdatedEvent, Never>()
+    /// Mismos eventos que escucha `apps/web/components/WorkspaceChat.tsx`.
+    let chatEvents = PassthroughSubject<ChatSocketEvent, Never>()
+
+    /// Eventos de chat que emite el gateway (`realtime.gateway.ts`).
+    private static let chatEventNames = [
+        "chat:message",
+        "chat:message-updated",
+        "chat:message-deleted",
+        "chat:channel-activity",
+        "chat:typing",
+        "chat:presence",
+        "chat:channel-updated",
+        "chat:members-changed",
+    ]
 
     private var manager: SocketManager?
     private var socket: SocketIOClient?
@@ -49,7 +70,24 @@ final class RealtimeBus: ObservableObject {
             )
             self.events.send(ev)
         }
-        sock?.connect()
+        for name in Self.chatEventNames {
+            sock?.on(name) { [weak self] data, _ in
+                self?.chatEvents.send(
+                    ChatSocketEvent(name: name, payload: data.first as? [String: Any] ?? [:])
+                )
+            }
+        }
+        // Al (re)conectar, la vista vuelve a unirse al canal y rellena el hueco.
+        sock?.on(clientEvent: .connect) { [weak self] _, _ in
+            self?.chatEvents.send(ChatSocketEvent(name: "connect", payload: [:]))
+        }
+        sock?.connect(withPayload: ["token": token])
+    }
+
+    /// `chat:join` / `chat:leave` / `chat:typing` / `chat:presence` hacia el gateway.
+    func emitChat(_ event: String, _ payload: [String: Any]) {
+        guard let socket, socket.status == .connected else { return }
+        socket.emit(event, payload)
     }
 
     func stop() {
