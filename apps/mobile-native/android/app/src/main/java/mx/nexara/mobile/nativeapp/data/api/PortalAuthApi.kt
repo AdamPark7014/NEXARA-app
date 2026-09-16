@@ -61,4 +61,3 @@ interface PortalAuthApi {
         @Body body: PortalLoginRequest,
     ): BranchPortalLoginResponse
 }
-

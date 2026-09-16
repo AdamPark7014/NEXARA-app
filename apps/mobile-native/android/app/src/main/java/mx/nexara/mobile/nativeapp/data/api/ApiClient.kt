@@ -113,5 +113,4 @@ object ApiClient {
     val portalAuth: PortalAuthApi = retrofitNoAuth.create(PortalAuthApi::class.java)
     val kbPublic: KbPublicApi = retrofitNoAuth.create(KbPublicApi::class.java)
 
-    fun healthApi(tokenProvider: () -> String?): HealthApi = authed(tokenProvider).create(HealthApi::class.java)
 }

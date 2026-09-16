@@ -48,11 +48,6 @@ data class AssignViaticJsonRequest(
     val vehicleId: Long? = null,
 )
 
-data class ViaticApproveRequest(
-    val action: String,
-    val note: String? = null,
-)
-
 data class ActivityShortDto(
     val id: Long? = null,
     val anNumber: String? = null,
@@ -166,20 +161,10 @@ data class CreateActivityRequest(
     val assignmentCharge: String? = null,
 )
 
-data class CreateActivityResponse(
-    val id: Long? = null,
-)
-
 data class ExecuteActivityRequest(
     val estatus: String? = null,
     val fechaInicio: String? = null,
     val fechaFinalizacion: String? = null,
-)
-
-data class ReassignActivityRequest(
-    val aUsuarioId: Long,
-    val motivo: String? = null,
-    val retirarAnterior: Boolean? = null,
 )
 
 data class ActivityIncidentDto(
@@ -351,32 +336,10 @@ interface ConsoleApi {
         @retrofit2.http.Body body: AssignViaticJsonRequest,
     ): ViaticDto
 
-    @PATCH("viatics/{id}/approve")
-    suspend fun approveViatic(
-        @Path("id") id: Long,
-        @retrofit2.http.Body body: ViaticApproveRequest,
-    ): okhttp3.ResponseBody
-
-    @PATCH("viatics/{id}/pagado")
-    suspend fun markViaticPagado(
-        @Path("id") id: Long,
-    ): okhttp3.ResponseBody
-
     @GET("activities")
     suspend fun getActivities(
         @Query("scope") scope: String? = null,
     ): List<ActivityDto>
-
-    @retrofit2.http.POST("activities")
-    suspend fun createActivity(
-        @retrofit2.http.Body body: CreateActivityRequest,
-    ): CreateActivityResponse
-
-    @GET("activities/next-an")
-    suspend fun getNextAnNumberRaw(): okhttp3.ResponseBody
-
-    @GET("activities/dispatch-board")
-    suspend fun getDispatchBoardRaw(): okhttp3.ResponseBody
 
     @GET("activity-feed")
     suspend fun getActivityFeedRaw(@Query("limit") limit: Int = 40): okhttp3.ResponseBody
@@ -396,12 +359,6 @@ interface ConsoleApi {
     suspend fun patchActivityExecute(
         @Path("id") id: Long,
         @retrofit2.http.Body body: ExecuteActivityRequest,
-    ): ActivityDto
-
-    @POST("activities/{id}/reasignar")
-    suspend fun reassignActivity(
-        @Path("id") id: Long,
-        @Body body: ReassignActivityRequest,
     ): ActivityDto
 
     @GET("activities/{activityId}/incidencias")
@@ -452,23 +409,6 @@ interface ConsoleApi {
     @GET("users")
     suspend fun getUsers(): List<VisibleUserDto>
 
-    @GET("users/roles")
-    suspend fun getUserRoles(): List<UserRolePickerDto>
-
-    @GET("users/departments")
-    suspend fun getUserDepartments(): List<UserDepartmentPickerDto>
-
-    @retrofit2.http.POST("users")
-    suspend fun createUser(
-        @retrofit2.http.Body body: CreateUserBody,
-    ): UserAdminDto
-
-    @PATCH("users/{id}")
-    suspend fun updateUser(
-        @Path("id") id: Long,
-        @retrofit2.http.Body body: UpdateUserBody,
-    ): UserAdminDto
-
     /**
      * @param scope `subtree` limita al organigrama de quien consulta. Sin él, un
      * usuario con `attendance.manage` recibe la empresa entera (la web solo lo
@@ -496,74 +436,12 @@ interface ConsoleApi {
     @GET("attendance/current")
     suspend fun getAttendanceCurrent(): AttendanceCurrentDto
 
-    @GET("attendance/day")
-    suspend fun getAttendanceDay(
-        @Query("date") date: String? = null,
-    ): AttendanceDayDto
-
     @retrofit2.http.POST("attendance")
     suspend fun postAttendance(
         @retrofit2.http.Body body: AttendanceRegisterRequest,
     ): AttendanceRegisterResponse
 
     // ── Evidences (Activity Evidence) ─────────────────────────────────────────
-
-    @GET("activity-evidence/history")
-    suspend fun getMyEvidenceHistory(): List<ActivityEvidenceRowDto>
-
-    @GET("activity-evidence/review-history")
-    suspend fun getEvidenceReviewHistory(): List<ActivityEvidenceRowDto>
-
-    @GET("activity-evidence/history/report")
-    suspend fun getMyEvidenceHistoryReport(
-        @Query("from") from: String? = null,
-        @Query("to") to: String? = null,
-    ): okhttp3.ResponseBody
-
-    @GET("activity-evidence/{activityId}/report")
-    suspend fun getMyTicketReport(
-        @retrofit2.http.Path("activityId") activityId: Long,
-    ): okhttp3.ResponseBody
-
-    @GET("activity-evidence/{activityId}")
-    suspend fun getActivityEvidence(
-        @retrofit2.http.Path("activityId") activityId: Long,
-    ): ActivityEvidenceDetailDto
-
-    @retrofit2.http.POST("activity-evidence/{activityId}/entry-photo")
-    suspend fun postEvidenceEntryPhoto(
-        @retrofit2.http.Path("activityId") activityId: Long,
-        @retrofit2.http.Body body: ActivityEvidencePhotoStepRequest,
-    ): ActivityEvidenceDetailDto
-
-    @retrofit2.http.POST("activity-evidence/{activityId}/evidence-photos")
-    suspend fun postEvidencePhotos(
-        @retrofit2.http.Path("activityId") activityId: Long,
-        @retrofit2.http.Body body: ActivityEvidencePhotosStepRequest,
-    ): ActivityEvidenceDetailDto
-
-    @retrofit2.http.POST("activity-evidence/{activityId}/service-sheet-pdf")
-    suspend fun postEvidenceServiceSheetPdf(
-        @retrofit2.http.Path("activityId") activityId: Long,
-        @retrofit2.http.Body body: ActivityEvidencePdfStepRequest,
-    ): ActivityEvidenceDetailDto
-
-    @retrofit2.http.POST("activity-evidence/{activityId}/service-sheet-data")
-    suspend fun postEvidenceServiceSheetData(
-        @retrofit2.http.Path("activityId") activityId: Long,
-        @retrofit2.http.Body body: Any,
-    ): ActivityEvidenceDetailDto
-
-    @retrofit2.http.POST("activity-evidence/{activityId}/exit-photo")
-    suspend fun postEvidenceExitPhoto(
-        @retrofit2.http.Path("activityId") activityId: Long,
-        @retrofit2.http.Body body: ActivityEvidencePhotoStepRequest,
-    ): ActivityEvidenceDetailDto
-
-    @GET("activities/{activityId}/report")
-    suspend fun getAdminTicketReport(
-        @retrofit2.http.Path("activityId") activityId: Long,
-    ): okhttp3.ResponseBody
 
     @GET("activities/{id}/timeline")
     suspend fun getActivityTimeline(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
@@ -576,90 +454,6 @@ interface ConsoleApi {
 
     @GET("activities/{id}/reasignaciones")
     suspend fun getActivityReassignments(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
-
-    @retrofit2.http.POST("activity-evidence/{activityId}/approve")
-    suspend fun approveEvidence(
-        @retrofit2.http.Path("activityId") activityId: Long,
-        @retrofit2.http.Body body: EvidenceReviewRequest,
-    ): okhttp3.ResponseBody
-
-    @retrofit2.http.POST("activity-evidence/{activityId}/reject")
-    suspend fun rejectEvidence(
-        @retrofit2.http.Path("activityId") activityId: Long,
-        @retrofit2.http.Body body: EvidenceRejectRequest,
-    ): okhttp3.ResponseBody
-
-    // ── Vehicles ─────────────────────────────────────────────────────────────
-
-    @GET("vehicles")
-    suspend fun getVehicleControls(): List<VehicleControlDto>
-
-    @GET("vehicles/inventory")
-    suspend fun getVehicleInventory(): List<VehicleAssetDto>
-
-    @retrofit2.http.POST("vehicles/inventory")
-    suspend fun createVehicleInventory(
-        @retrofit2.http.Body body: UpsertVehicleAssetRequest,
-    ): VehicleAssetDto
-
-    @PATCH("vehicles/inventory/{id}")
-    suspend fun updateVehicleInventory(
-        @Path("id") id: Long,
-        @retrofit2.http.Body body: UpsertVehicleAssetRequest,
-    ): VehicleAssetDto
-
-    @PATCH("vehicles/{id}/approve")
-    suspend fun approveVehicleRequest(
-        @Path("id") id: Long,
-        @retrofit2.http.Body body: ApproveVehicleRequest,
-    ): VehicleControlDto
-
-    @retrofit2.http.POST("vehicles")
-    suspend fun createVehicleRequest(
-        @retrofit2.http.Body body: CreateVehicleRequest,
-    ): VehicleControlDto
-
-    @retrofit2.http.POST("vehicles/{id}/renewal")
-    suspend fun requestVehicleRenewal(
-        @Path("id") id: Long,
-        @retrofit2.http.Body body: VehicleRenewalRequest,
-    ): VehicleControlDto
-
-    @Multipart
-    @retrofit2.http.POST("vehicles/{id}/start-use")
-    suspend fun startVehicleUse(
-        @Path("id") id: Long,
-        @Part("odometroKm") odometroKm: RequestBody,
-        @Part("combustiblePct") combustiblePct: RequestBody,
-        @Part("interna-0") interna0: MultipartBody.Part,
-        @Part("interna-1") interna1: MultipartBody.Part,
-        @Part("interna-2") interna2: MultipartBody.Part,
-        @Part("interna-3") interna3: MultipartBody.Part,
-        @Part("externa-0") externa0: MultipartBody.Part,
-        @Part("externa-1") externa1: MultipartBody.Part,
-        @Part("externa-2") externa2: MultipartBody.Part,
-        @Part("externa-3") externa3: MultipartBody.Part,
-        @Part odometro: MultipartBody.Part,
-    ): VehicleControlDto
-
-    @Multipart
-    @retrofit2.http.POST("vehicles/{id}/end-use")
-    suspend fun endVehicleUse(
-        @Path("id") id: Long,
-        @Part("odometroKm") odometroKm: RequestBody,
-        @Part("combustiblePct") combustiblePct: RequestBody,
-        @Part("interna-0") interna0: MultipartBody.Part,
-        @Part("interna-1") interna1: MultipartBody.Part,
-        @Part("interna-2") interna2: MultipartBody.Part,
-        @Part("interna-3") interna3: MultipartBody.Part,
-        @Part("externa-0") externa0: MultipartBody.Part,
-        @Part("externa-1") externa1: MultipartBody.Part,
-        @Part("externa-2") externa2: MultipartBody.Part,
-        @Part("externa-3") externa3: MultipartBody.Part,
-        @Part odometro: MultipartBody.Part,
-    ): VehicleControlDto
-
-    // ── GPS ─────────────────────────────────────────────────────────────────
 
     @GET("gps/me")
     suspend fun getGpsMe(): GpsMeResponse
@@ -685,168 +479,6 @@ interface ConsoleApi {
 
     // ── Tools ────────────────────────────────────────────────────────────────
 
-    @GET("tool-requests/my-requests")
-    suspend fun getMyToolRequests(): List<ToolRequestDto>
-
-    @GET("tool-requests")
-    suspend fun getToolRequests(
-        @Query("status") status: String? = null,
-    ): List<ToolRequestDto>
-
-    @retrofit2.http.POST("tool-requests/{requestId}/renewal-request")
-    suspend fun postToolRenewalRequest(
-        @retrofit2.http.Path("requestId") requestId: Long,
-        @retrofit2.http.Body body: ToolRenewalRequest,
-    ): okhttp3.ResponseBody
-
-    @GET("tool-requests/inventory")
-    suspend fun getToolInventory(
-        @Query("q") q: String? = null,
-        @Query("includeRetired") includeRetired: String? = null,
-    ): List<ToolInventoryItemDto>
-
-    @GET("tool-requests/inventory/search")
-    suspend fun searchToolInventory(
-        @Query("q") q: String,
-    ): List<ToolInventorySearchOptionDto>
-
-    @GET("tool-requests/kits/my")
-    suspend fun getMyToolKit(): List<ToolKitAssignmentDto>
-
-    @GET("tool-requests/kits/users")
-    suspend fun getToolKitsUsers(): List<ToolKitUserRowDto>
-
-    @retrofit2.http.POST("tool-requests/kits/{assignmentId}/report")
-    suspend fun reportToolKitIncident(
-        @retrofit2.http.Path("assignmentId") assignmentId: Long,
-        @retrofit2.http.Body body: ToolKitIncidentRequest,
-    ): okhttp3.ResponseBody
-
-    @retrofit2.http.POST("tool-requests/kits/events/{eventId}/resolve")
-    suspend fun resolveToolKitEvent(
-        @retrofit2.http.Path("eventId") eventId: Long,
-        @retrofit2.http.Body body: ToolKitResolveRequest,
-    ): okhttp3.ResponseBody
-
-    @retrofit2.http.POST("tool-requests/kits/assign")
-    suspend fun assignToolKit(
-        @retrofit2.http.Body body: ToolKitAssignRequest,
-    ): okhttp3.ResponseBody
-
-    @GET("tool-requests/renewals/pending")
-    suspend fun getToolRenewalsPending(): List<ToolRenewalDto>
-
-    @retrofit2.http.POST("tool-requests/renewals/{renewalId}/approve")
-    suspend fun approveToolRenewal(
-        @retrofit2.http.Path("renewalId") renewalId: Long,
-    ): okhttp3.ResponseBody
-
-    @retrofit2.http.POST("tool-requests/renewals/{renewalId}/reject")
-    suspend fun rejectToolRenewal(
-        @retrofit2.http.Path("renewalId") renewalId: Long,
-        @retrofit2.http.Body body: ToolRenewalRejectRequest,
-    ): okhttp3.ResponseBody
-
-    // ── Clients / Service Clients / Tickets ─────────────────────────────────
-
-    @GET("service-clients")
-    suspend fun getServiceClients(): List<ServiceClientDto>
-
-    @GET("service-clients/{id}/report")
-    suspend fun getServiceClientReport(
-        @Path("id") clientId: Long,
-    ): okhttp3.ResponseBody
-
-    @Multipart
-    @retrofit2.http.POST("service-clients")
-    suspend fun createServiceClient(
-        @Part("name") name: RequestBody,
-        @Part("contactName") contactName: RequestBody?,
-        @Part("contactEmail") contactEmail: RequestBody?,
-        @Part("contactPhone") contactPhone: RequestBody?,
-        @Part("address") address: RequestBody?,
-        @Part("city") city: RequestBody?,
-        @Part("state") state: RequestBody?,
-        @Part("country") country: RequestBody?,
-        @Part("accountCode") accountCode: RequestBody?,
-        @Part("portalEmail") portalEmail: RequestBody?,
-        @Part("portalPassword") portalPassword: RequestBody?,
-        @Part("isActive") isActive: RequestBody,
-        @Part logo: MultipartBody.Part?,
-    ): CreateServiceClientResponse
-
-    @Multipart
-    @retrofit2.http.PUT("service-clients/{id}")
-    suspend fun updateServiceClientMultipart(
-        @Path("id") clientId: Long,
-        @Part("name") name: RequestBody,
-        @Part("contactName") contactName: RequestBody?,
-        @Part("contactEmail") contactEmail: RequestBody?,
-        @Part("contactPhone") contactPhone: RequestBody?,
-        @Part("address") address: RequestBody?,
-        @Part("city") city: RequestBody?,
-        @Part("state") state: RequestBody?,
-        @Part("country") country: RequestBody?,
-        @Part("accountCode") accountCode: RequestBody?,
-        @Part("portalEmail") portalEmail: RequestBody?,
-        @Part("portalPassword") portalPassword: RequestBody?,
-        @Part("isActive") isActive: RequestBody,
-        @Part logo: MultipartBody.Part?,
-    ): ServiceClientDto
-
-    @retrofit2.http.PUT("service-clients/{id}")
-    suspend fun updateServiceClientJson(
-        @Path("id") clientId: Long,
-        @retrofit2.http.Body body: UpdateServiceClientRequest,
-    ): ServiceClientDto
-
-    @GET("activities/detailed")
-    suspend fun getActivitiesDetailed(): List<ActivityDetailedDto>
-
-    @GET("inventories")
-    suspend fun getInventories(): List<InventorySnapshotDto>
-
-    @GET("inventories/{id}/report")
-    suspend fun getInventoryReport(
-        @Path("id") inventoryId: Long,
-    ): okhttp3.ResponseBody
-
-    @PATCH("inventories/{id}/status")
-    suspend fun patchInventoryStatus(
-        @Path("id") inventoryId: Long,
-        @retrofit2.http.Body body: InventoryStatusPatchRequest,
-    ): InventorySnapshotDto
-
-    // ── Operational projects ────────────────────────────────────────────────
-
-    @GET("operational-projects")
-    suspend fun getOperationalProjects(): List<OperationalProjectDto>
-
-    @retrofit2.http.POST("operational-projects")
-    suspend fun createOperationalProject(
-        @retrofit2.http.Body body: CreateOperationalProjectRequest,
-    ): OperationalProjectDto
-
-    @PATCH("operational-projects/{id}/status")
-    suspend fun patchOperationalProjectStatus(
-        @Path("id") projectId: Long,
-        @retrofit2.http.Body body: OperationalProjectStatusPatchRequest,
-    ): OperationalProjectDto
-
-    @retrofit2.http.POST("operational-projects/{id}/engineers")
-    suspend fun addOperationalProjectEngineer(
-        @Path("id") projectId: Long,
-        @retrofit2.http.Body body: OperationalProjectEngineerAddRequest,
-    ): okhttp3.ResponseBody
-
-    @retrofit2.http.DELETE("operational-projects/{id}/engineers/{engineerId}")
-    suspend fun removeOperationalProjectEngineer(
-        @Path("id") projectId: Long,
-        @Path("engineerId") engineerId: Long,
-    ): okhttp3.ResponseBody
-
-    // ── User profile (console users) ───────────────────────────────────────
-
     @GET("users/profile/me")
     suspend fun getMyProfile(): UserProfileMeDto
 
@@ -857,72 +489,7 @@ interface ConsoleApi {
 
     // ── System settings (console.admin) ─────────────────────────────────────
 
-    @GET("settings")
-    suspend fun getSettings(): List<SystemSettingDto>
-
-    @retrofit2.http.PUT("settings")
-    suspend fun upsertSetting(
-        @retrofit2.http.Body body: UpsertSettingBody,
-    ): SystemSettingDto
-
-    @retrofit2.http.DELETE("settings/{key}")
-    suspend fun deleteSetting(
-        @Path("key") key: String,
-    ): okhttp3.ResponseBody
-
-    // ── API keys de la empresa (console.admin / company.settings.manage) ────
-
-    @GET("company/api-keys")
-    suspend fun getCompanyApiKeysRaw(): okhttp3.ResponseBody
-
-    @retrofit2.http.POST("company/api-keys")
-    suspend fun createCompanyApiKey(
-        @retrofit2.http.Body body: CreateCompanyApiKeyBody,
-    ): okhttp3.ResponseBody
-
-    @retrofit2.http.DELETE("company/api-keys/{id}")
-    suspend fun revokeCompanyApiKey(
-        @Path("id") id: Long,
-    ): okhttp3.ResponseBody
-
-    // ── Webhooks outbound ──────────────────────────────────────────────────
-
-    @GET("webhooks")
-    suspend fun getWebhooksRaw(): okhttp3.ResponseBody
-
-    @GET("webhooks/dlq")
-    suspend fun getWebhooksDlqRaw(
-        @retrofit2.http.Query("limit") limit: Int = 50,
-    ): okhttp3.ResponseBody
-
-    @retrofit2.http.POST("webhooks/deliveries/{deliveryId}/replay")
-    suspend fun replayWebhookDelivery(
-        @Path("deliveryId") deliveryId: Long,
-    ): okhttp3.ResponseBody
 }
-
-data class CreateCompanyApiKeyBody(
-    val name: String,
-    val scopes: List<String>? = null,
-    val expiresAt: String? = null,
-)
-
-data class CreateOperationalProjectRequest(
-    val title: String,
-    val description: String? = null,
-    val vendorId: Long,
-    val clientId: Long,
-    val startDate: String,
-    val endDate: String? = null,
-)
-
-data class OperationalProjectStatusPatchRequest(
-    val status: String, // ACTIVE | ON_HOLD | COMPLETED
-)
-
-data class OperationalProjectEngineerAddRequest(
-    val engineerId: Long,
-)
 
 data class OperationalProjectDto(
     val id: Long,
@@ -976,127 +543,6 @@ data class ServiceClientDto(
     val _count: Any? = null,
 )
 
-data class CreateServiceClientResponse(
-    val client: ServiceClientDto? = null,
-    val credentials: PortalCredentialsDto? = null,
-)
-
-data class PortalCredentialsDto(
-    val email: String? = null,
-    val password: String? = null,
-)
-
-data class UpdateServiceClientRequest(
-    val name: String,
-    val contactName: String? = null,
-    val contactEmail: String? = null,
-    val contactPhone: String? = null,
-    val address: String? = null,
-    val city: String? = null,
-    val state: String? = null,
-    val country: String? = null,
-    val accountCode: String? = null,
-    val portalEmail: String? = null,
-    val portalPassword: String? = null,
-    val isActive: Boolean = true,
-)
-
-data class ActivityDetailedDto(
-    val id: Long,
-    val anNumber: String? = null,
-    val titulo: String? = null,
-    val estatus: String? = null,
-    val prioridad: String? = null,
-    val ticketType: String? = null,
-    val fechaAsignacion: String? = null,
-    val fechaInicio: String? = null,
-    val fechaFinalizacion: String? = null,
-    val branchName: String? = null,
-    val branchCity: String? = null,
-    val branchState: String? = null,
-    val responsable: SimpleUserDto? = null,
-    val evidencias: List<ActivityTicketEvidenceDto>? = null,
-    val serviceSheet: ServiceSheetDto? = null,
-    val client: ActivityClientRefDto? = null,
-    val clientFeedback: ClientFeedbackDto? = null,
-)
-
-data class ActivityClientRefDto(
-    val id: Long,
-    val name: String? = null,
-    val logoUrl: String? = null,
-)
-
-data class ActivityTicketEvidenceDto(
-    val id: Long,
-    val archivoUrl: String,
-    val tipoEvidencia: String? = null,
-    val calificacionEficiencia: String? = null,
-    val latitud: Double? = null,
-    val longitud: Double? = null,
-)
-
-data class ServiceSheetDto(
-    val pdfUrl: String? = null,
-)
-
-data class ClientFeedbackDto(
-    val rating: Int? = null,
-    val wasOnTime: Boolean? = null,
-    val wasFriendly: Boolean? = null,
-    val wasSolved: Boolean? = null,
-    val comments: String? = null,
-    val createdAt: String? = null,
-)
-
-data class InventorySnapshotDto(
-    val id: Long,
-    val status: String? = null,
-    val previousCount: Int? = null,
-    val currentCount: Int? = null,
-    val deltaCount: Int? = null,
-    val updatedAt: String? = null,
-    val branch: InventoryBranchRefDto? = null,
-    val client: InventoryClientRefDto? = null,
-    val activity: InventoryActivityRefDto? = null,
-)
-
-data class InventoryBranchRefDto(
-    val id: Long? = null,
-    val name: String? = null,
-    val branchNumber: String? = null,
-)
-
-data class InventoryClientRefDto(
-    val id: Long? = null,
-    val name: String? = null,
-)
-
-data class InventoryActivityRefDto(
-    val id: Long? = null,
-    val anNumber: String? = null,
-    val titulo: String? = null,
-    val workType: String? = null,
-)
-
-data class InventoryStatusPatchRequest(
-    val status: String,
-)
-
-data class EvidenceReviewRequest(
-    val notes: String? = null,
-    // Ignorado por la API (reviewer = JWT). Se mantiene opcional por compat.
-    val reviewerId: Long? = null,
-)
-
-data class EvidenceRejectRequest(
-    val notes: String,
-    val rejectedStep: String? = null,
-    val rejectedSteps: List<String>? = null,
-    val resetFullFlow: Boolean? = null,
-    val reviewerId: Long? = null,
-)
-
 data class ActivityEvidenceActivityDto(
     val id: Long? = null,
     val anNumber: String,
@@ -1108,42 +554,6 @@ data class ActivityEvidenceActivityDto(
     val branchAddress: String? = null,
     val creador: SimpleUserDto? = null,
     val responsable: SimpleUserDto? = null,
-)
-
-data class ActivityEvidenceRowDto(
-    val id: Long,
-    val tipoEvidencia: String? = null,
-    val archivoUrl: String? = null,
-    val archivos: Any? = null,
-    val aprobada: Boolean? = null,
-    val estatus: String? = null,
-    val comentarios: String? = null,
-    val observacionesRevision: String? = null,
-    val calificacionEficiencia: String? = null,
-    val fechaEvidencia: String? = null,
-    val revisadoEn: String? = null,
-    val latitud: Double? = null,
-    val longitud: Double? = null,
-    val entryPhotoUrl: String? = null,
-    val entryPhotoUploadedAt: String? = null,
-    val entryLatitude: Double? = null,
-    val entryLongitude: Double? = null,
-    val evidencePhotos: List<String>? = null,
-    val evidencePhotosUploadedAt: String? = null,
-    val serviceSheetPdfUrl: String? = null,
-    val serviceSheetUploadedAt: String? = null,
-    val serviceSheetData: Any? = null,
-    val serviceSheetCompletedAt: String? = null,
-    val exitPhotoUrl: String? = null,
-    val exitPhotoUploadedAt: String? = null,
-    val exitLatitude: Double? = null,
-    val exitLongitude: Double? = null,
-    val completedAt: String? = null,
-    val createdAt: String? = null,
-    val updatedAt: String? = null,
-    val actividad: ActivityEvidenceActivityDto? = null,
-    val user: SimpleUserDto? = null,
-    val aprobadoPor: SimpleUserDto? = null,
 )
 
 data class ActivityEvidenceDetailDto(
@@ -1170,118 +580,8 @@ data class ActivityEvidencePhotoStepRequest(
     val longitude: Double,
 )
 
-data class ActivityEvidencePhotosStepRequest(
-    val photoUrls: List<String>,
-)
-
 data class ActivityEvidencePdfStepRequest(
     val pdfUrl: String,
-)
-
-data class VehicleControlDto(
-    val id: Long,
-    val nombreVehiculo: String? = null,
-    val placasVehiculo: String? = null,
-    val estatusAprobacion: String,
-    val fechaSolicitud: String? = null,
-    val fechaInicioSolicitada: String? = null,
-    val fechaFinSolicitada: String? = null,
-    val fechaInicioAprobada: String? = null,
-    val fechaFinAprobada: String? = null,
-    val solicitante: SimpleUserDto? = null,
-    val evidenciaEntregaUrl: String? = null,
-    val evidenciaDevolucionUrl: String? = null,
-    val entregaFotos: List<String>? = null,
-    val fotosSalida: Any? = null,
-    val fotosDevolucion: Any? = null,
-    val entregaEstatus: String? = null,
-    val entregaObservaciones: String? = null,
-    val entregaAprobada: Boolean? = null,
-    val renovacionEstatus: String? = null,
-    val renovacionSolicitadaInicio: String? = null,
-    val renovacionSolicitadaFin: String? = null,
-    val penalizacionMonto: Double? = null,
-    val penalizacionNotas: String? = null,
-    val vehiculo: VehicleAssetDto? = null,
-    val fechaInicio: String? = null,
-    val fechaFin: String? = null,
-)
-
-data class VehicleAssetDto(
-    val id: Long,
-    val nombre: String,
-    val placas: String? = null,
-    val estatus: String? = null,
-    val activo: Boolean? = null,
-    val notas: String? = null,
-)
-
-data class UpsertVehicleAssetRequest(
-    val nombre: String? = null,
-    val placas: String? = null,
-    val estatus: String? = null,
-    val activo: Boolean? = null,
-    val notas: String? = null,
-)
-
-data class ApproveVehicleRequest(
-    val action: String, // approve | reject
-    val note: String? = null,
-    val fechaInicioAprobada: String? = null,
-    val fechaFinAprobada: String? = null,
-)
-
-data class CreateVehicleRequest(
-    val actividadId: Long,
-    val vehicleId: Long? = null,
-    val nombreVehiculo: String? = null,
-    val placasVehiculo: String? = null,
-    val motivoUso: String? = null,
-    val fechaInicioSolicitada: String? = null,
-    val fechaFinSolicitada: String? = null,
-)
-
-data class VehicleRenewalRequest(
-    val renovacionSolicitadaInicio: String? = null,
-    val renovacionSolicitadaFin: String? = null,
-)
-
-data class UserRolePickerDto(
-    val id: Long,
-    val nombre: String,
-)
-
-data class UserDepartmentPickerDto(
-    val id: Long,
-    val nombre: String,
-)
-
-data class CreateUserBody(
-    val nombre: String,
-    val email: String,
-    val password: String,
-    val roleId: Long,
-    val departmentId: Long,
-    val employeeNumber: String? = null,
-    val managerId: Long? = null,
-)
-
-data class UpdateUserBody(
-    val nombre: String? = null,
-    val email: String? = null,
-    val password: String? = null,
-    val roleId: Long? = null,
-    val departmentId: Long? = null,
-    val employeeNumber: String? = null,
-    val managerId: Long? = null,
-    val isActive: Boolean? = null,
-)
-
-data class UserAdminDto(
-    val id: Long,
-    val nombre: String,
-    val email: String? = null,
-    val isActive: Boolean? = null,
 )
 
 data class GpsUserDto(
@@ -1321,142 +621,6 @@ data class GpsConsentRequest(
 
 data class GpsConsentResponse(
     val consent: Boolean? = null,
-)
-
-data class ToolUserRefDto(
-    val nombre: String,
-    val email: String? = null,
-)
-
-data class ToolApproverDto(
-    val nombre: String,
-)
-
-data class ToolRequestDto(
-    val id: Long,
-    val requestedBy: ToolUserRefDto? = null,
-    val toolName: String,
-    val model: String,
-    val serialNumber: String,
-    val reason: String,
-    val startDate: String,
-    val expectedReturnDate: String,
-    val status: String,
-    val requestDate: String,
-    val approvalDate: String? = null,
-    val approvedBy: ToolApproverDto? = null,
-    val returnDate: String? = null,
-    val renewalCount: Int? = null,
-)
-
-data class ToolRenewalRequest(
-    val newReturnDate: String,
-    val renewalReason: String? = null,
-)
-
-data class ToolInventoryItemDto(
-    val id: Long,
-    val toolName: String,
-    val model: String,
-    val serialNumber: String,
-    val panoramicPhotoUrl: String? = null,
-    val serialPhotoUrl: String? = null,
-    val status: String,
-)
-
-data class ToolInventorySearchOptionDto(
-    val id: Long,
-    val toolName: String,
-    val model: String,
-    val serialNumber: String,
-    val status: String? = null,
-)
-
-data class ToolKitEventDto(
-    val id: Long,
-    val description: String,
-    val resolution: String,
-    val reportedAt: String,
-)
-
-data class ToolKitInventoryItemDto(
-    val id: Long,
-    val toolName: String,
-    val model: String,
-    val serialNumber: String,
-    val status: String,
-)
-
-data class ToolKitAssignmentDto(
-    val id: Long,
-    val assignmentType: String,
-    val assignedAt: String,
-    val dueReturnDate: String? = null,
-    val replacementCount: Int? = null,
-    val inventoryItem: ToolKitInventoryItemDto,
-    val events: List<ToolKitEventDto> = emptyList(),
-)
-
-data class ToolKitUserDto(
-    val id: Long,
-    val nombre: String,
-    val email: String,
-)
-
-data class ToolKitUserRowDto(
-    val id: Long,
-    val assignmentType: String,
-    val isActive: Boolean? = null,
-    val assignedAt: String,
-    val dueReturnDate: String? = null,
-    val replacementCount: Int? = null,
-    val user: ToolKitUserDto,
-    val inventoryItem: ToolKitInventoryItemDto,
-    val events: List<ToolKitEventDto>? = null,
-)
-
-data class ToolKitIncidentRequest(
-    val description: String,
-)
-
-data class ToolKitResolveRequest(
-    val resolution: String,
-    val notes: String? = null,
-    val fineAmount: Double? = null,
-)
-
-data class ToolKitAssignRequest(
-    val userId: Long,
-    val inventoryItemId: Long,
-    val assignmentType: String, // KIT | LOAN
-)
-
-data class ToolRenewalUserDto(
-    val id: Long,
-    val nombre: String,
-    val email: String,
-)
-
-data class ToolRenewalToolRequestDto(
-    val id: Long,
-    val toolName: String,
-    val usuario: ToolRenewalUserDto,
-)
-
-data class ToolRenewalDto(
-    val id: Long,
-    val toolRequestId: Long,
-    val previousReturnDate: String,
-    val newReturnDate: String,
-    val renewalReason: String? = null,
-    val status: String,
-    val requestDate: String,
-    val approvalDate: String? = null,
-    val toolRequest: ToolRenewalToolRequestDto,
-)
-
-data class ToolRenewalRejectRequest(
-    val reason: String,
 )
 
 data class UserProfileMeDto(
@@ -1512,21 +676,3 @@ data class UpdateUserProfileBody(
     val contactoEmergenciaNombre: String? = null,
     val contactoEmergenciaTelefono: String? = null,
 )
-
-data class SystemSettingDto(
-    val id: Int,
-    val key: String,
-    val value: String,
-    val category: String,
-    val label: String? = null,
-    val createdAt: String? = null,
-    val updatedAt: String? = null,
-)
-
-data class UpsertSettingBody(
-    val key: String,
-    val value: String,
-    val category: String,
-    val label: String? = null,
-)
-

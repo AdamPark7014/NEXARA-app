@@ -97,4 +97,3 @@ interface BranchPortalApi {
     @GET("branch-portal/inventories/{id}/report")
     suspend fun inventoryReportPdf(@Path("id") id: Long): Response<okhttp3.ResponseBody>
 }
-
