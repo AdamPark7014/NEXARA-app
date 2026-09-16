@@ -119,13 +119,14 @@ fun LoginScreen(
                         modifier = Modifier
                             .size(90.dp)
                             .clip(RoundedCornerShape(22.dp))
-                            .background(Color(0xFFCCFBF1)),
+                            // Verde fuerte: el logo lleva «NEXARA» en blanco y sobre un fondo claro no se lee.
+                            .background(NexaraTealDark),
                         contentAlignment = Alignment.Center,
                     ) {
                         Image(
                             painter = painterResource(R.drawable.logo_nexara),
                             contentDescription = "Nexara",
-                            modifier = Modifier.size(62.dp),
+                            modifier = Modifier.size(80.dp),
                             contentScale = ContentScale.Fit,
                         )
                     }

@@ -87,13 +87,14 @@ fun AppLockScreen(
                     modifier = Modifier
                         .size(90.dp)
                         .clip(RoundedCornerShape(22.dp))
-                        .background(Color(0xFFCCFBF1)),
+                        // Verde fuerte, como en el login: el logo lleva «NEXARA» en blanco.
+                        .background(Color(0xFF0F766E)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
                         painter = painterResource(R.drawable.logo_nexara),
                         contentDescription = "NEXARA",
-                        modifier = Modifier.size(62.dp),
+                        modifier = Modifier.size(80.dp),
                         contentScale = ContentScale.Fit,
                     )
                 }

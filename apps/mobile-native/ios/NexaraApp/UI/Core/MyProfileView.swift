@@ -108,8 +108,8 @@ struct MyProfileView: View {
         return Section("Datos de cuenta") {
             row("Nombre", p.nombre)
             row("Email", p.email)
-            row("Nº empleado (ACS)", employee)
-            row("Estado Integra", integraStatus)
+            row("Nº de empleado", employee)
+            row("Control de acceso", integraStatus)
         }
     }
 
@@ -118,7 +118,7 @@ struct MyProfileView: View {
         case "linked":
             let name = identity?.personName ?? ""
             return "Vinculado · \(name.isEmpty ? (identity?.personId ?? "") : name)"
-        case "erp_only": return "Código ERP sin persona ACS"
+        case "erp_only": return "Tu número aún no está en control de acceso"
         case "unlinked": return "Sin número de empleado"
         default: return "—"
         }
@@ -127,21 +127,18 @@ struct MyProfileView: View {
     private var attendanceSection: some View {
         let linked = identity?.status == "linked"
         return Section {
-            row("Checador ERP", erpLine)
-            row("Puertas ACS", acsLine(linked: linked))
+            row("Checador de la app", erpLine)
+            row("Pases en puertas", acsLine(linked: linked))
             if !linked {
-                Text(
-                    (identity?.howToLink ?? "").isEmpty
-                        ? "Pide a RH que vincule tu nº de empleado con el employeeNo del terminal en Integra → Personas."
-                        : (identity?.howToLink ?? "")
-                )
-                .font(.caption)
-                .foregroundColor(.secondary)
+                // El texto de la API es para administradores (Integra, employeeNo); aquí va el del empleado.
+                Text("Pide a RH que vincule tu número de empleado con el control de acceso.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         } header: {
             Text("Acceso y asistencia (hoy)")
         } footer: {
-            Text("Misma identidad que el terminal ACS. El checador ERP sigue siendo la fuente de nómina.")
+            Text("El checador de la app es el que cuenta para tu nómina.")
         }
     }
 
@@ -154,7 +151,7 @@ struct MyProfileView: View {
 
     private func acsLine(linked: Bool) -> String {
         guard let hybrid, !hybrid.acsFirstAt.isEmpty else {
-            return linked ? "Sin pases hoy" : "Sin vínculo ACS"
+            return linked ? "Sin pases hoy" : "Sin vincular"
         }
         let door = hybrid.acsFirstDoor.isEmpty ? "puerta" : hybrid.acsFirstDoor
         return "\(hybrid.acsPasses) pases · \(door) · desde \(clock(hybrid.acsFirstAt))"

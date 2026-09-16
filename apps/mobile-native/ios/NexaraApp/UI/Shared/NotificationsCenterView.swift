@@ -285,46 +285,41 @@ struct NotificationsCenterView: View {
 /// Filtros del centro de notificaciones — `CategoryFilter`, `bucketCategory`
 /// y `CATEGORY_LABEL` de `apps/web/app/(panels)/erp/notifications-center`.
 private enum NotifCategoryFilter: String, CaseIterable, Identifiable {
-    case all, ops, sales, erp, other
+    case all, ops, attendance, chat, other
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .all: return "Todas"
-        case .ops: return "Ops / SLA"
-        case .sales: return "CRM / Cotiz."
-        case .erp: return "ERP / OC"
+        case .ops: return "Actividades"
+        case .attendance: return "Asistencia"
+        case .chat: return "Chat"
         case .other: return "Otras"
         }
     }
 
     static func bucket(_ category: String) -> NotifCategoryFilter {
         let c = category.lowercased()
-        if c.contains("sla") || c == "activity" || c == "activities" || c == "noc" || c == "evidence" {
+        if c.contains("sla") || c.hasPrefix("activit") || c.hasPrefix("evidence")
+            || c == "approval" || c == "confirmations" || c == "erp" {
             return .ops
         }
-        if c.contains("quote") || c == "crm" || c == "sales" { return .sales }
-        if c == "erp" || c.contains("purchase") || c.contains("stock") || c == "finance" || c == "approval" {
-            return .erp
-        }
+        if c == "attendance" || c.hasPrefix("lunch") { return .attendance }
+        if c == "chat" { return .chat }
         return .other
     }
 
     static func label(_ category: String) -> String {
         switch category.lowercased() {
         case "attendance": return "Asistencia"
-        case "activity", "activities": return "OT"
-        case "tool": return "Herramientas"
-        case "finance": return "Finanzas"
-        case "noc": return "NOC"
-        case "crm": return "CRM"
+        case "lunch_break", "lunch_breaks": return "Comida"
+        case "activity", "activities": return "Actividad"
         case "approval": return "Aprobación"
-        case "evidence": return "Evidencias"
-        case "sales": return "Ventas"
-        case "quotes": return "Cotizaciones"
-        case "sla-alert", "sla-breach": return "SLA"
-        case "erp": return "ERP"
+        case "evidence", "evidences": return "Evidencias"
+        case "sla-alert", "sla-breach": return "Atraso"
+        case "chat": return "Chat"
+        case "profile": return "Perfil"
         case "confirmations": return "Confirmación"
         default: return category
         }

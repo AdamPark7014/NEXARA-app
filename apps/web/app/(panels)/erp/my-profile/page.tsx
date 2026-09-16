@@ -207,7 +207,7 @@ export default function MyProfilePage() {
               <div><span style={lbl}>Nombre</span><div style={{ fontSize: 14, fontWeight: 600 }}>{profile.nombre}</div></div>
               <div><span style={lbl}>Email</span><div style={{ fontSize: 14, fontWeight: 600 }}>{profile.email}</div></div>
               <div>
-                <span style={lbl}>Nº empleado (ACS)</span>
+                <span style={lbl}>Nº de empleado</span>
                 <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "ui-monospace, monospace" }}>
                   {identity?.user.employeeNumber ||
                     identity?.user.companyEmployeeNumber ||
@@ -216,12 +216,12 @@ export default function MyProfilePage() {
                 </div>
               </div>
               <div>
-                <span style={lbl}>Estado Integra</span>
+                <span style={lbl}>Control de acceso</span>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>
                   {identity?.status === "linked"
                     ? `Vinculado · ${identity.acsPerson?.personName || identity.acsPerson?.personId}`
                     : identity?.status === "erp_only"
-                      ? "Código ERP sin persona ACS"
+                      ? "Tu número aún no está en control de acceso"
                       : identity?.status === "unlinked"
                         ? "Sin número de empleado"
                         : "—"}
@@ -232,7 +232,7 @@ export default function MyProfilePage() {
 
           <Section
             title="Acceso y asistencia (hoy)"
-            subtitle="Misma identidad que el terminal ACS. El checador ERP sigue siendo la fuente de nómina."
+            subtitle="El checador de la app es el que cuenta para tu nómina."
           >
             {(() => {
               const row = hybrid?.items?.[0];
@@ -241,7 +241,7 @@ export default function MyProfilePage() {
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
-                    <span style={lbl}>Checador ERP</span>
+                    <span style={lbl}>Checador de la app</span>
                     <div style={{ fontSize: 13 }}>
                       {erp?.checkIn
                         ? `Entrada ${new Date(erp.checkIn).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
@@ -252,13 +252,13 @@ export default function MyProfilePage() {
                     </div>
                   </div>
                   <div>
-                    <span style={lbl}>Puertas ACS</span>
+                    <span style={lbl}>Pases en puertas</span>
                     <div style={{ fontSize: 13 }}>
                       {acs?.firstAt
                         ? `${acs.passes ?? 0} pases · ${acs.firstDoor || "puerta"} · desde ${new Date(acs.firstAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
                         : identity?.status === "linked"
                           ? "Sin pases hoy"
-                          : "Sin vínculo ACS"}
+                          : "Sin vincular"}
                     </div>
                   </div>
                 </div>
@@ -266,8 +266,8 @@ export default function MyProfilePage() {
             })()}
             {identity?.status !== "linked" && (
               <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--text-secondary)" }}>
-                {identity?.howToLink ||
-                  "Pide a RH que vincule tu nº de empleado con el employeeNo del terminal en Integra → Personas."}
+                {/* El texto de la API es para administradores (Integra, employeeNo); aquí va el del empleado. */}
+                Pide a RH que vincule tu número de empleado con el control de acceso.
               </p>
             )}
           </Section>

@@ -18,17 +18,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
-import androidx.compose.material.icons.outlined.AttachMoney
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.GpsFixed
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.RequestQuote
-import androidx.compose.material.icons.outlined.Support
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.SyncProblem
 import androidx.compose.material3.Button
@@ -82,11 +78,7 @@ enum class OfflineMutationKind(
 ) {
     Evidence("Evidencia", Icons.Outlined.PhotoCamera, NxColors.Info),
     Activity("Actividad", Icons.Outlined.Event, NxColors.Teal),
-    Viatic("Viático", Icons.Outlined.AttachMoney, NxColors.Warning),
-    Vehicle("Vehículo", Icons.Outlined.DirectionsCar, NxColors.Slate),
-    Ticket("Ticket", Icons.Outlined.Support, NxColors.Danger),
     Chat("Chat", Icons.Outlined.Chat, Color(0xFF6366F1)),
-    Quote("Cotización", Icons.Outlined.RequestQuote, Color(0xFF7C3AED)),
     Attendance("Asistencia", Icons.AutoMirrored.Outlined.Assignment, Color(0xFF0891B2)),
     Gps("GPS", Icons.Outlined.GpsFixed, Color(0xFF059669)),
     Generic("Mutación", Icons.Outlined.CloudSync, NxColors.Muted),
@@ -97,12 +89,8 @@ fun classifyOfflineMutation(item: QueuedMutation): OfflineMutationKind {
     return when {
         "evidencia" in path || "evidence" in path -> OfflineMutationKind.Evidence
         "actividad" in path || "activity" in path || "activities" in path -> OfflineMutationKind.Activity
-        "viatic" in path -> OfflineMutationKind.Viatic
-        "vehiculo" in path || "vehicle" in path -> OfflineMutationKind.Vehicle
-        "ticket" in path -> OfflineMutationKind.Ticket
         "chat" in path || "message" in path -> OfflineMutationKind.Chat
-        "cotizacion" in path || "quote" in path -> OfflineMutationKind.Quote
-        "asistencia" in path || "attendance" in path -> OfflineMutationKind.Attendance
+        "asistencia" in path || "attendance" in path || "lunch" in path -> OfflineMutationKind.Attendance
         "gps" in path || "location" in path -> OfflineMutationKind.Gps
         else -> OfflineMutationKind.Generic
     }

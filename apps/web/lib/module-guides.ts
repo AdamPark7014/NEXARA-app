@@ -463,6 +463,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `users`,
   },
+  'erp-clients': {
+    id: 'erp-clients',
+    summary: `Clientes a los que se les da servicio: datos, sucursales y contactos.`,
+    audience: `Dirección, encargados y quien asigna actividades.`,
+    how: `Catálogo único de clientes; las actividades y servicios se ligan a un cliente de aquí.`,
+    steps: [
+      `Busca o da de alta el cliente`,
+      `Revisa sus sucursales y contactos`,
+      `Asígnale actividades desde Mis actividades`,
+    ],
+    connects: `mis-actividades`,
+  },
   'crm-dashboard': {
     id: 'crm-dashboard',
     summary: `Home comercial: pipeline, actividad del equipo e insights (LTV, forecast).`,

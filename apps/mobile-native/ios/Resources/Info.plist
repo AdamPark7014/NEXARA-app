@@ -44,7 +44,7 @@
     <key>NSPhotoLibraryUsageDescription</key>
     <string>La app accede a fotos para adjuntar evidencias.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>La app guarda evidencias y comprobantes en tu galería.</string>
+    <string>La app guarda tus evidencias en la galería.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Se usa cuando grabas video con la cámara.</string>
     <key>NSUserTrackingUsageDescription</key>

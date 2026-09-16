@@ -101,7 +101,7 @@ data class MyProfileUiState(
         get() = when (identity?.status) {
             "linked" -> "Vinculado · " +
                 (identity.acsPerson?.personName ?: identity.acsPerson?.personId ?: "")
-            "erp_only" -> "Código ERP sin persona ACS"
+            "erp_only" -> "Tu número aún no está en control de acceso"
             "unlinked" -> "Sin número de empleado"
             else -> "—"
         }
@@ -565,8 +565,8 @@ private fun ProfileCoreSummary(
 
             ProfileInfoRow("Departamento", state.departmentName ?: "—", teal, sub)
             ProfileInfoRow("Rol", state.roleName ?: "—", teal, sub)
-            ProfileInfoRow("Nº empleado (ACS)", state.acsEmployeeNumber, teal, sub)
-            ProfileInfoRow("Estado Integra", state.integraStatusLabel, teal, sub)
+            ProfileInfoRow("Nº de empleado", state.acsEmployeeNumber, teal, sub)
+            ProfileInfoRow("Control de acceso", state.integraStatusLabel, teal, sub)
 
             HorizontalDivider()
 
@@ -584,19 +584,19 @@ private fun ProfileCoreSummary(
                 acs?.firstAt != null ->
                     "${acs.passes ?: 0} pases · ${acs.firstDoor ?: "puerta"} · desde ${hhmmMexico(acs.firstAt) ?: "—"}"
                 state.identity?.status == "linked" -> "Sin pases hoy"
-                else -> "Sin vínculo ACS"
+                else -> "Sin vincular"
             }
-            ProfileInfoRow("Checador ERP", erpTexto, teal, sub)
-            ProfileInfoRow("Puertas ACS", acsTexto, teal, sub)
+            ProfileInfoRow("Checador de la app", erpTexto, teal, sub)
+            ProfileInfoRow("Pases en puertas", acsTexto, teal, sub)
             Text(
-                "El checador ERP sigue siendo la fuente de nómina.",
+                "El checador de la app es el que cuenta para tu nómina.",
                 style = MaterialTheme.typography.bodySmall,
                 color = sub,
             )
             if (state.identity?.status != "linked") {
                 Text(
-                    state.identity?.howToLink
-                        ?: "Pide a RH que vincule tu nº de empleado con el employeeNo del terminal en Integra → Personas.",
+                    // El texto de la API es para administradores (Integra, employeeNo); aquí va el del empleado.
+                    "Pide a RH que vincule tu número de empleado con el control de acceso.",
                     style = MaterialTheme.typography.bodySmall,
                     color = sub,
                 )
