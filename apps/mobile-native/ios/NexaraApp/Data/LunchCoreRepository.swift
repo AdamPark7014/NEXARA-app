@@ -123,14 +123,18 @@ final class LunchCoreRepository {
     }
 
     /// Salida a comer. Devuelve `false` si quedó en la cola sin conexión.
-    func checkIn(photoDataUrl: String, justificacion: String?) async throws -> Bool {
+    ///
+    /// `at` es la hora **del servidor** (`mi-dia.ahora` más lo que haya corrido
+    /// el reloj desde entonces): un teléfono adelantado diez minutos marcaba la
+    /// comida fuera de horario y pedía justificación por nada.
+    func checkIn(photoDataUrl: String, justificacion: String?, at: Date = Date()) async throws -> Bool {
         struct Body: Encodable {
             let checkinTime: String
             let checkinPhotoUrl: String
             let justificacion: String?
         }
         let data = try await api.postJSON("lunch-breaks/checkin", body: Body(
-            checkinTime: CoreFormat.isoString(Date()),
+            checkinTime: CoreFormat.isoString(at),
             checkinPhotoUrl: photoDataUrl,
             justificacion: LunchCoreRepository.cleanReason(justificacion)
         ))
@@ -138,14 +142,14 @@ final class LunchCoreRepository {
     }
 
     /// Regreso de comer. Devuelve `false` si quedó en la cola sin conexión.
-    func checkOut(photoDataUrl: String, justificacion: String?) async throws -> Bool {
+    func checkOut(photoDataUrl: String, justificacion: String?, at: Date = Date()) async throws -> Bool {
         struct Body: Encodable {
             let checkoutTime: String
             let checkoutPhotoUrl: String
             let justificacion: String?
         }
         let data = try await api.putJSON("lunch-breaks/checkout", body: Body(
-            checkoutTime: CoreFormat.isoString(Date()),
+            checkoutTime: CoreFormat.isoString(at),
             checkoutPhotoUrl: photoDataUrl,
             justificacion: LunchCoreRepository.cleanReason(justificacion)
         ))

@@ -36,9 +36,9 @@
         <string>UIInterfaceOrientationPortrait</string>
     </array>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>La app usa tu ubicación para registrar actividad GPS.</string>
+    <string>Tu ubicación se guarda con la foto de entrada y salida, y con la evidencia que subes desde sitio.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>La app envía tu ubicación en segundo plano cuando estás en ruta.</string>
+    <string>Mientras tu jornada esté abierta, NEXARA comparte tu ubicación con tu encargado, aunque la app esté cerrada. Se detiene al marcar tu salida.</string>
     <key>NSCameraUsageDescription</key>
     <string>La app usa la cámara para adjuntar evidencias.</string>
     <key>NSPhotoLibraryUsageDescription</key>
