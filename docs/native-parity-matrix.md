@@ -113,7 +113,7 @@ Si un hueco te sorprende, compruébalo a mano antes de mandar a nadie a taparlo.
 | Mis actividades | `/erp/mis-actividades` | NATIVO · pestaña «Mis actividades» dentro de Actividades | sin verificar |
 | Asistencias | `/erp/asistencias` | NATIVO · ConsoleAttendanceScreen (checada + comidas) | sin verificar |
 | Chat | `/erp/chat` | NATIVO · ChatScreen | sin verificar |
-| Clientes | `/erp/clientes` | CASCARON · aún abre el padrón de clientes de servicio, no el de sectores de la web | sin verificar |
+| Clientes | `/erp/clientes` | NATIVO · padrón por sector, búsqueda, ficha fiscal, alta de sector y proyectos | sin verificar |
 | Mi perfil | `/erp/my-profile` | NATIVO · MyProfileScreen | sin verificar |
 | Notificaciones | `/erp/notifications-center` | NATIVO · NotificationsScreen desde la campana | sin verificar |
 

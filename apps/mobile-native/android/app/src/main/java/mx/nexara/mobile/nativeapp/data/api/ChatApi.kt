@@ -213,12 +213,18 @@ interface ChatApi {
     @POST("chat/dm")
     suspend fun openDm(@Body body: OpenChatDmBody): ChatChannelDto
 
+    /**
+     * `aroundId` pide la ventana centrada en ese mensaje (el servidor devuelve
+     * los anteriores y los posteriores), así un enlace `?channel&msg` abre un
+     * mensaje viejo sin depender de que caiga en los últimos 50.
+     */
     @GET("chat/channels/{id}/messages")
     suspend fun listMessages(
         @Path("id") channelId: Long,
         @Query("limit") limit: Int? = 50,
         @Query("parentId") parentId: Long? = null,
         @Query("beforeId") beforeId: Long? = null,
+        @Query("aroundId") aroundId: Long? = null,
     ): ChatMessagesResponse
 
     @GET("chat/channels/{id}/pins")

@@ -19,6 +19,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 internal val ActivStatusColors = mapOf(
@@ -144,11 +145,20 @@ internal fun parseIsoLocalDateTime(value: String): Pair<LocalDate, LocalTime>? =
     }
 }.getOrNull()
 
+/**
+ * El DatePicker de Material trabaja en UTC: entrega y espera medianoche UTC.
+ * Leerlo con la zona del teléfono adelantaba o atrasaba un día (en México, con
+ * UTC-6, «hoy» se guardaba como el día anterior). Igual que
+ * [CoreActivityKinds.dateToPickerMillis] / [CoreActivityKinds.pickerMillisToDate].
+ */
 internal fun LocalDate.toPickerMillis(): Long =
-    atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
 internal fun millisToLocalDate(millis: Long): LocalDate =
-    Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+    Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+
+/** «Hoy» es el de México, no el del reloj del teléfono. */
+internal fun todayInMexico(): LocalDate = LocalDate.now(CoreActivityKinds.MEXICO)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -184,7 +194,7 @@ fun DatePickerField(
 
     if (showPicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = (parseIsoLocalDate(value) ?: LocalDate.now()).toPickerMillis(),
+            initialSelectedDateMillis = (parseIsoLocalDate(value) ?: todayInMexico()).toPickerMillis(),
         )
         DatePickerDialog(
             onDismissRequest = { showPicker = false },
@@ -244,7 +254,7 @@ fun DateTimePickerField(
     )
 
     if (showDatePicker) {
-        val initial = parsed?.first ?: LocalDate.now()
+        val initial = parsed?.first ?: todayInMexico()
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initial.toPickerMillis())
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },

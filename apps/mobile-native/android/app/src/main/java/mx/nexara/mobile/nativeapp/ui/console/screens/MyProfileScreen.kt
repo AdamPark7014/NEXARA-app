@@ -37,8 +37,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.data.api.HybridItemDto
+import mx.nexara.mobile.nativeapp.data.api.MyIdentityDto
 import mx.nexara.mobile.nativeapp.data.api.UpdateUserProfileBody
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
+import mx.nexara.mobile.nativeapp.data.profile.ProfileIdentityRepository
+import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityKinds
+import mx.nexara.mobile.nativeapp.ui.console.activities.DatePickerField
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.security.AppLock
@@ -55,21 +60,56 @@ data class MyProfileUiState(
     val error: String? = null,
     val saveMessage: String? = null,
     val telefono: String = "",
+    val fechaNacimiento: String = "",
     val direccion: String = "",
     val colonia: String = "",
     val ciudad: String = "",
     val estado: String = "",
     val codigoPostal: String = "",
+    val pais: String = "",
     val curp: String = "",
     val rfc: String = "",
+    val ineNumero: String = "",
     val nss: String = "",
     val contactoEmergenciaNombre: String = "",
     val contactoEmergenciaTelefono: String = "",
     val profileStatus: String? = null,
-)
+    /** Identidad ERP↔ACS (`integra/identity/me`); null si Integra no contestó. */
+    val identity: MyIdentityDto? = null,
+    /** Fila de hoy del contraste híbrido (`attendance/hybrid?date=`). */
+    val hybrid: HybridItemDto? = null,
+    val employeeNumber: String? = null,
+    val roleName: String? = null,
+    val departmentName: String? = null,
+) {
+    /** «Perfil completo»: los mismos 7 campos que cuenta la web. */
+    val completeness: Int
+        get() {
+            val campos = listOf(telefono, curp, rfc, nss, fechaNacimiento, ciudad, estado)
+            return Math.round(campos.count { it.isNotBlank() } * 100f / campos.size)
+        }
+
+    /** Nº de empleado con la misma cadena de respaldo que la web. */
+    val acsEmployeeNumber: String
+        get() = identity?.user?.employeeNumber
+            ?: identity?.user?.companyEmployeeNumber
+            ?: employeeNumber
+            ?: "—"
+
+    /** Texto de «Estado Integra», igual que en el panel. */
+    val integraStatusLabel: String
+        get() = when (identity?.status) {
+            "linked" -> "Vinculado · " +
+                (identity.acsPerson?.personName ?: identity.acsPerson?.personId ?: "")
+            "erp_only" -> "Código ERP sin persona ACS"
+            "unlinked" -> "Sin número de empleado"
+            else -> "—"
+        }
+}
 
 class MyProfileViewModel(app: android.app.Application) : AndroidViewModel(app) {
     private val repo = ConsoleRepository(app.applicationContext)
+    private val identityRepo = ProfileIdentityRepository(app.applicationContext)
     private val _state = MutableStateFlow(MyProfileUiState())
     val state: StateFlow<MyProfileUiState> = _state
 
@@ -79,13 +119,16 @@ class MyProfileViewModel(app: android.app.Application) : AndroidViewModel(app) {
         _state.update {
             when (field) {
                 "telefono" -> it.copy(telefono = value)
+                "fechaNacimiento" -> it.copy(fechaNacimiento = value)
                 "direccion" -> it.copy(direccion = value)
                 "colonia" -> it.copy(colonia = value)
                 "ciudad" -> it.copy(ciudad = value)
                 "estado" -> it.copy(estado = value)
                 "codigoPostal" -> it.copy(codigoPostal = value)
+                "pais" -> it.copy(pais = value)
                 "curp" -> it.copy(curp = value)
                 "rfc" -> it.copy(rfc = value)
+                "ineNumero" -> it.copy(ineNumero = value)
                 "nss" -> it.copy(nss = value)
                 "contactoEmergenciaNombre" -> it.copy(contactoEmergenciaNombre = value)
                 "contactoEmergenciaTelefono" -> it.copy(contactoEmergenciaTelefono = value)
@@ -99,22 +142,35 @@ class MyProfileViewModel(app: android.app.Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val me = withContext(Dispatchers.IO) { repo.myProfile() }
+                // Integra y el contraste híbrido son opcionales: si no contestan,
+                // el perfil se muestra igual (como en la web, con `.catch`).
+                val hoy = CoreActivityKinds.todayInMexico()
+                val identity = withContext(Dispatchers.IO) { identityRepo.myIdentityOrNull() }
+                val hybrid = withContext(Dispatchers.IO) { identityRepo.hybridDayOrNull(hoy) }
                 val p = me.perfil
                 _state.update {
                     it.copy(
                         loading = false,
                         telefono = p?.telefono.orEmpty(),
+                        fechaNacimiento = p?.fechaNacimiento.orEmpty().take(10),
                         direccion = p?.direccion.orEmpty(),
                         colonia = p?.colonia.orEmpty(),
                         ciudad = p?.ciudad.orEmpty(),
                         estado = p?.estado.orEmpty(),
                         codigoPostal = p?.codigoPostal.orEmpty(),
+                        pais = p?.pais.orEmpty(),
                         curp = p?.curp.orEmpty(),
                         rfc = p?.rfc.orEmpty(),
+                        ineNumero = p?.ineNumero.orEmpty(),
                         nss = p?.nss.orEmpty(),
                         contactoEmergenciaNombre = p?.contactoEmergenciaNombre.orEmpty(),
                         contactoEmergenciaTelefono = p?.contactoEmergenciaTelefono.orEmpty(),
                         profileStatus = p?.estatus,
+                        identity = identity,
+                        hybrid = hybrid?.items?.firstOrNull(),
+                        employeeNumber = me.employeeNumber,
+                        roleName = me.role?.nombre,
+                        departmentName = me.department?.nombre,
                     )
                 }
             } catch (e: Exception) {
@@ -134,13 +190,16 @@ class MyProfileViewModel(app: android.app.Application) : AndroidViewModel(app) {
                     repo.updateMyProfile(
                         UpdateUserProfileBody(
                             telefono = s.telefono.trim().ifBlank { null },
+                            fechaNacimiento = s.fechaNacimiento.trim().ifBlank { null },
                             direccion = s.direccion.trim().ifBlank { null },
                             colonia = s.colonia.trim().ifBlank { null },
                             ciudad = s.ciudad.trim().ifBlank { null },
                             estado = s.estado.trim().ifBlank { null },
                             codigoPostal = s.codigoPostal.trim().ifBlank { null },
+                            pais = s.pais.trim().ifBlank { null },
                             curp = s.curp.trim().ifBlank { null },
                             rfc = s.rfc.trim().ifBlank { null },
+                            ineNumero = s.ineNumero.trim().ifBlank { null },
                             nss = s.nss.trim().ifBlank { null },
                             contactoEmergenciaNombre = s.contactoEmergenciaNombre.trim().ifBlank { null },
                             contactoEmergenciaTelefono = s.contactoEmergenciaTelefono.trim().ifBlank { null },
@@ -262,6 +321,13 @@ fun MyProfileScreen(
             }
         }
 
+        // ── Completitud, identidad ACS y asistencia de hoy ────────────────
+        if (!profileState.loading && profileState.error == null) {
+            item {
+                ProfileCoreSummary(state = profileState, teal = Teal, sub = Sub, slate = Slate)
+            }
+        }
+
         // ── Info fields (API) ─────────────────────────────────────────────
         item {
             Card(
@@ -280,13 +346,20 @@ fun MyProfileScreen(
                             TextButton(onClick = { vm.load() }) { Text("Reintentar") }
                         }
                         ProfileField("Teléfono", profileState.telefono) { vm.setField("telefono", it) }
+                        DatePickerField(
+                            label = "Fecha de nacimiento",
+                            value = profileState.fechaNacimiento,
+                            onValueChange = { vm.setField("fechaNacimiento", it) },
+                        )
                         ProfileField("Dirección", profileState.direccion) { vm.setField("direccion", it) }
                         ProfileField("Colonia", profileState.colonia) { vm.setField("colonia", it) }
                         ProfileField("Ciudad", profileState.ciudad) { vm.setField("ciudad", it) }
                         ProfileField("Estado", profileState.estado) { vm.setField("estado", it) }
                         ProfileField("C.P.", profileState.codigoPostal) { vm.setField("codigoPostal", it) }
+                        ProfileField("País", profileState.pais) { vm.setField("pais", it) }
                         ProfileField("CURP", profileState.curp) { vm.setField("curp", it) }
                         ProfileField("RFC", profileState.rfc) { vm.setField("rfc", it) }
+                        ProfileField("Número de INE", profileState.ineNumero) { vm.setField("ineNumero", it) }
                         ProfileField("NSS", profileState.nss) { vm.setField("nss", it) }
                         ProfileField("Contacto emergencia", profileState.contactoEmergenciaNombre) {
                             vm.setField("contactoEmergenciaNombre", it)
@@ -433,6 +506,102 @@ fun MyProfileScreen(
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** «hh:mm» en hora de México a partir de un instante ISO del servidor. */
+private fun hhmmMexico(iso: String?): String? = iso?.takeIf { it.isNotBlank() }?.let { raw ->
+    runCatching {
+        java.time.Instant.parse(raw)
+            .atZone(CoreActivityKinds.MEXICO)
+            .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+    }.getOrNull()
+}
+
+/**
+ * Espejo de las tarjetas de `/erp/my-profile`: KPI de perfil completo, ficha de
+ * identidad ACS y el contraste de asistencia de hoy (checador ERP vs puertas).
+ */
+@Composable
+private fun ProfileCoreSummary(
+    state: MyProfileUiState,
+    teal: Color,
+    sub: Color,
+    slate: Color,
+) {
+    val pct = state.completeness
+    val pctColor = when {
+        pct >= 80 -> Color(0xFF059669)
+        pct >= 50 -> Color(0xFFD97706)
+        else -> Color(0xFFDC2626)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(1.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Perfil completo", fontWeight = FontWeight.SemiBold, color = slate)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "$pct%",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = pctColor,
+                )
+                LinearProgressIndicator(
+                    progress = { pct / 100f },
+                    modifier = Modifier.weight(1f),
+                    color = pctColor,
+                )
+            }
+            Text(
+                "Cuenta teléfono, CURP, RFC, NSS, fecha de nacimiento, ciudad y estado.",
+                style = MaterialTheme.typography.bodySmall,
+                color = sub,
+            )
+
+            HorizontalDivider()
+
+            ProfileInfoRow("Departamento", state.departmentName ?: "—", teal, sub)
+            ProfileInfoRow("Rol", state.roleName ?: "—", teal, sub)
+            ProfileInfoRow("Nº empleado (ACS)", state.acsEmployeeNumber, teal, sub)
+            ProfileInfoRow("Estado Integra", state.integraStatusLabel, teal, sub)
+
+            HorizontalDivider()
+
+            Text("Acceso y asistencia (hoy)", fontWeight = FontWeight.SemiBold, color = slate)
+            val erp = state.hybrid?.erp
+            val acs = state.hybrid?.acs
+            val erpTexto = when {
+                erp?.checkIn != null -> buildString {
+                    append("Entrada ${hhmmMexico(erp.checkIn) ?: "—"}")
+                    hhmmMexico(erp.checkOut)?.let { append(" · Salida $it") }
+                }
+                else -> "Sin entrada"
+            }
+            val acsTexto = when {
+                acs?.firstAt != null ->
+                    "${acs.passes ?: 0} pases · ${acs.firstDoor ?: "puerta"} · desde ${hhmmMexico(acs.firstAt) ?: "—"}"
+                state.identity?.status == "linked" -> "Sin pases hoy"
+                else -> "Sin vínculo ACS"
+            }
+            ProfileInfoRow("Checador ERP", erpTexto, teal, sub)
+            ProfileInfoRow("Puertas ACS", acsTexto, teal, sub)
+            Text(
+                "El checador ERP sigue siendo la fuente de nómina.",
+                style = MaterialTheme.typography.bodySmall,
+                color = sub,
+            )
+            if (state.identity?.status != "linked") {
+                Text(
+                    state.identity?.howToLink
+                        ?: "Pide a RH que vincule tu nº de empleado con el employeeNo del terminal en Integra → Personas.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = sub,
+                )
+            }
+        }
     }
 }
 

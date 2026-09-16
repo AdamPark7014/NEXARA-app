@@ -382,6 +382,11 @@ data class ChatUiState(
     val searchError: String? = null,
     /** true = la búsqueda se limita al canal abierto. */
     val searchInChannel: Boolean = false,
+    /**
+     * Mensaje al que hay que saltar (`?channel&msg`): la lista se desplaza hasta
+     * él una vez cargado. Se limpia al cambiar de canal.
+     */
+    val jumpTargetId: Long? = null,
 ) {
     /** Silenciado según la ficha; si aún no llegó, se asume que no. */
     val isMuted: Boolean get() = channelDetail?.muted == true
@@ -869,6 +874,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 showSearch = false,
                 searchResults = emptyList(),
                 searchError = null,
+                jumpTargetId = null,
             )
         }
         refreshMessages(ch.id, markRead = true)
@@ -943,6 +949,31 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Salto a un mensaje que puede no estar en la última página: se pide la
+     * ventana centrada en él (`aroundId`) y se marca como destino para que la
+     * lista se desplace hasta ahí.
+     */
+    fun jumpToMessage(channelId: Long, messageId: Long) {
+        if (messageId <= 0L) return
+        viewModelScope.launch {
+            _state.update { it.copy(refreshingMessages = true, messagesError = null) }
+            runCatching {
+                withContext(Dispatchers.IO) { repo.messagesAround(channelId, messageId) }
+            }.onSuccess { msgs ->
+                _state.update {
+                    it.copy(refreshingMessages = false, messages = msgs, jumpTargetId = messageId)
+                }
+            }.onFailure { e ->
+                _state.update {
+                    it.copy(refreshingMessages = false, messagesError = e.toUserMessage())
+                }
+            }
+        }
+    }
+
+    fun clearJumpTarget() = _state.update { it.copy(jumpTargetId = null) }
+
     fun clearChannel() {
         _state.value.selectedChannel?.id?.let { RealtimeBus.leaveChatChannel(it) }
         _state.update {
@@ -965,6 +996,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 showSearch = it.showSearch && !it.searchInChannel,
                 searchInChannel = false,
                 searchResults = if (it.searchInChannel) emptyList() else it.searchResults,
+                jumpTargetId = null,
             )
         }
     }
@@ -1406,11 +1438,14 @@ fun ChatScreen(
     LaunchedEffect(initialMessageId, state.messages, state.selectedChannel) {
         val msgId = initialMessageId ?: return@LaunchedEffect
         if (msgId <= 0L) return@LaunchedEffect
-        if (state.selectedChannel == null) return@LaunchedEffect
+        val channel = state.selectedChannel ?: return@LaunchedEffect
         if (state.threadRoot?.id == msgId) return@LaunchedEffect
         val msg = state.messages.find { it.id == msgId }
         if (msg != null) {
             vm.openThread(msg)
+        } else if (state.jumpTargetId != msgId && !state.refreshingMessages) {
+            // No está en la última página: se pide la ventana centrada en él.
+            vm.jumpToMessage(channel.id, msgId)
         }
     }
 
@@ -1521,6 +1556,12 @@ fun ChatScreen(
         }
 
         LaunchedEffect(state.messages.size) {
+            // Con un salto pendiente no se arrastra la lista al final: el
+            // destino es el mensaje del enlace, no el último del canal.
+            if (state.jumpTargetId != null) {
+                prevMessageCount.intValue = state.messages.size
+                return@LaunchedEffect
+            }
             if (state.messages.isNotEmpty()) {
                 val lastIndex = state.messages.lastIndex
                 if (state.messages.size >= prevMessageCount.intValue) {
@@ -1528,6 +1569,24 @@ fun ChatScreen(
                 }
                 prevMessageCount.intValue = state.messages.size
             }
+        }
+
+        // Salto a un mensaje concreto (`?channel&msg`): los encabezados
+        // condicionales del LazyColumn desplazan el índice de la lista.
+        LaunchedEffect(state.jumpTargetId, messageListItems) {
+            val target = state.jumpTargetId ?: return@LaunchedEffect
+            val index = messageListItems.indexOfFirst {
+                it is ChatListItem.Message && it.msg.id == target
+            }
+            if (index < 0) return@LaunchedEffect
+            val leading = listOf(
+                state.channelActionError != null,
+                state.messagesError != null,
+                state.pinnedMessages.isNotEmpty(),
+            ).count { it }
+            listState.animateScrollToItem(index + leading)
+            prevMessageCount.intValue = state.messages.size
+            vm.clearJumpTarget()
         }
 
         Scaffold(

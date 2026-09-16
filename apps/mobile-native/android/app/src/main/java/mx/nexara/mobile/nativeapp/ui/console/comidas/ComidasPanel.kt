@@ -88,7 +88,11 @@ private data class RegistroEnCurso(val momento: String, val aDestiempo: Boolean)
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ComidasPanel(modifier: Modifier = Modifier) {
+fun ComidasPanel(
+    modifier: Modifier = Modifier,
+    /** Día que se consulta (`yyyy-MM-dd`); null = hoy. Lo manda el selector de Asistencias. */
+    fecha: String? = null,
+) {
     val context = LocalContext.current
     val repo = remember(context) { ComidasRepository(context) }
     val scope = rememberCoroutineScope()
@@ -114,7 +118,7 @@ fun ComidasPanel(modifier: Modifier = Modifier) {
     var revisando by remember { mutableStateOf<Pair<ComidaFilaDto, Boolean>?>(null) }
     var visor by remember { mutableStateOf<Pair<String, String>?>(null) }
 
-    LaunchedEffect(reload) {
+    LaunchedEffect(reload, fecha) {
         loading = true
         var fallo: String? = null
         try {
@@ -127,7 +131,9 @@ fun ComidasPanel(modifier: Modifier = Modifier) {
             fallo = e.toUserMessage("No se pudieron cargar las comidas")
         }
         try {
-            equipo = withContext(Dispatchers.IO) { repo.equipo() }
+            // Antes siempre pedía hoy: con el selector de Asistencias en otro día
+            // la lista del equipo contradecía a la fecha de arriba.
+            equipo = withContext(Dispatchers.IO) { repo.equipo(fecha) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
