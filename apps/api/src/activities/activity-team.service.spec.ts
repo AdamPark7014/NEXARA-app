@@ -27,6 +27,7 @@ function build(over: Record<string, any> = {}) {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     activityReassignment: { findMany: jest.fn().mockResolvedValue([]) },
+    activityEvidence: { upsert: jest.fn().mockResolvedValue({ id: 1 }) },
     stockMovement: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(async (fn: any) => fn(tx)),
     ...over.prisma,

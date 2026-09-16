@@ -497,7 +497,7 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Ya se ha guardado la foto de entrada');
     }
 
-    return this.prisma.activityEvidence.update({
+    const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
         entryPhotoUrl: photoUrl,
@@ -507,6 +507,17 @@ export class ActivityEvidenceService {
         status: 'EVIDENCE_PHOTOS',
       },
     });
+    this.avisarAvance({ activityId, actorId: userId, paso: 'inicio', at: updated.entryPhotoUploadedAt ?? undefined });
+    return updated;
+  }
+
+  /** Avance en campo para responsable, encargados y jefes; un fallo del aviso nunca rompe el guardado. */
+  private avisarAvance(params: Parameters<NotificationHierarchyService['notifyActivityProgress']>[0]) {
+    try {
+      void Promise.resolve(this.notificationHierarchy.notifyActivityProgress(params)).catch(() => undefined);
+    } catch {
+      /* sin aviso */
+    }
   }
 
   /**
@@ -539,7 +550,7 @@ export class ActivityEvidenceService {
     }
 
     const geo = sanitizePhotoGeo(photoGeo, photoUrls.length);
-    return this.prisma.activityEvidence.update({
+    const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
         evidencePhotos: photoUrls,
@@ -548,6 +559,8 @@ export class ActivityEvidenceService {
         status: nextEvidenceStep('EVIDENCE_PHOTOS', activity.coreKind),
       },
     });
+    this.avisarAvance({ activityId, actorId: userId, paso: 'evidencias', fotos: photoUrls.length });
+    return updated;
   }
 
   /**
@@ -574,7 +587,7 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Este tipo de actividad no requiere hoja de servicio PDF');
     }
 
-    return this.prisma.activityEvidence.update({
+    const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
         serviceSheetPdfUrl: pdfUrl,
@@ -582,6 +595,8 @@ export class ActivityEvidenceService {
         status: nextEvidenceStep('SERVICE_SHEET_PDF', activity.coreKind),
       },
     });
+    this.avisarAvance({ activityId, actorId: userId, paso: 'hoja' });
+    return updated;
   }
 
   /**
@@ -600,7 +615,7 @@ export class ActivityEvidenceService {
       throw new BadRequestException('No estás en el paso correcto para completar la plantilla');
     }
 
-    return this.prisma.activityEvidence.update({
+    const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
         serviceSheetData: data,
@@ -608,6 +623,8 @@ export class ActivityEvidenceService {
         status: nextEvidenceStep('SERVICE_SHEET_DATA', activity.coreKind),
       },
     });
+    this.avisarAvance({ activityId, actorId: userId, paso: 'formulario' });
+    return updated;
   }
 
   /**

@@ -23,7 +23,7 @@ final class OfflineSyncCoordinator {
         }
 
         guard await NetworkMonitor.shared.isOnline else { return }
-        guard let token = SessionStore.shared.token, !token.isEmpty else { return }
+        guard var token = SessionStore.shared.token, !token.isEmpty else { return }
 
         let pending = OfflineMutationQueue.shared.load()
         guard !pending.isEmpty else { return }
@@ -43,7 +43,15 @@ final class OfflineSyncCoordinator {
                 req.httpBody = body.data(using: .utf8)
             }
             do {
-                let (_, res) = try await URLSession.shared.data(for: req)
+                var (_, res) = try await URLSession.shared.data(for: req)
+                // Token vencido mientras la mutación esperaba en cola: se renueva la
+                // sesión y se reintenta una vez, en vez de descartarla como 401 permanente.
+                if (res as? HTTPURLResponse)?.statusCode == 401,
+                   case .refreshed(let fresh) = await SessionRefresher.shared.refresh() {
+                    token = fresh
+                    req.setValue("Bearer \(fresh)", forHTTPHeaderField: "Authorization")
+                    (_, res) = try await URLSession.shared.data(for: req)
+                }
                 guard let http = res as? HTTPURLResponse else { continue }
                 if (200..<300).contains(http.statusCode) {
                     done.insert(item.id)

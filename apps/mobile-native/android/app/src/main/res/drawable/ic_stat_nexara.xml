@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ícono de barra de estado de NEXARA: una «N» sólida, blanca sobre transparente.
+  Android solo usa el canal alfa de este ícono (lo tiñe con el color de la
+  notificación), así que no lleva degradados ni fondo.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.5,20.5V3.5H8.6L15.4,13.9V3.5H19.5V20.5H15.4L8.6,10.1V20.5Z" />
+</vector>

@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.SharedFlow
 
 import mx.nexara.mobile.nativeapp.data.api.ChatMessageDto
 
+import mx.nexara.mobile.nativeapp.data.session.SessionRefresher
+
 import org.json.JSONObject
 
 import kotlin.math.min
@@ -51,6 +53,9 @@ object RealtimeBus {
 
 
     val events: SharedFlow<EntityUpdatedEvent> = client.entityEvents
+
+    /** Avisos que el servidor manda también por el socket (ver `NexaraApplication`). */
+    val pushes: SharedFlow<Map<String, String>> = client.pushes
 
     val chatMessages: SharedFlow<ChatMessageDto> = client.chatMessages
 
@@ -94,6 +99,16 @@ object RealtimeBus {
 
         }
 
+        scope.launch {
+
+            client.authFailed.collect { failedToken ->
+
+                runCatching { handleAuthFailure(failedToken) }
+
+            }
+
+        }
+
     }
 
 
@@ -121,6 +136,56 @@ object RealtimeBus {
     }
 
 
+
+    /**
+     * Arranque en frío / vuelta a primer plano con sesión guardada: igual que
+     * tras el login, pero sin tirar un socket que ya está vivo o conectando.
+     */
+    fun ensureStarted(token: String) = onTokenRefreshed(token)
+
+    /**
+     * Token renovado por `SessionRefresher`. La auth del socket solo se valida en
+     * el handshake, así que un socket sano NO se tira (no se pierden eventos): se
+     * adopta el token para la próxima reconexión. Sin socket vivo, conecta ya.
+     */
+    fun onTokenRefreshed(token: String) {
+        if (token.isBlank()) return
+        scope.launch {
+            mutex.withLock {
+                startedToken = token
+                if (client.isConnected() || client.isLiveFor(token)) return@withLock
+                reconnectAttempt = 0
+                client.connect(token)
+            }
+        }
+    }
+
+    /**
+     * Handshake rechazado (`unauthorized`). Nunca cierra sesión desde aquí:
+     * renueva (single-flight compartido con HTTP) y reconecta. Si el servidor
+     * confirma revocación, el socket queda abajo y la siguiente llamada HTTP
+     * muestra el aviso de sesión expirada.
+     */
+    private suspend fun handleAuthFailure(failedToken: String) {
+        val current = mutex.withLock { startedToken } ?: return
+        if (current != failedToken) {
+            mutex.withLock {
+                val latest = startedToken ?: return@withLock
+                if (client.isConnected() || client.isLiveFor(latest)) return@withLock
+                client.connect(latest)
+            }
+            return
+        }
+        when (val result = SessionRefresher.refreshBlocking(failedToken)) {
+            is SessionRefresher.Result.Refreshed -> onTokenRefreshed(result.token)
+            SessionRefresher.Result.Transient,
+            SessionRefresher.Result.NotSupported,
+            -> scheduleReconnect()
+            SessionRefresher.Result.Revoked,
+            SessionRefresher.Result.NoSession,
+            -> Unit
+        }
+    }
 
     fun stop() {
 

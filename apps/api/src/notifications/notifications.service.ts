@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationType } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
 import { PERMISSIONS } from '../common/permissions.js';
-import { PushDispatchService } from '../devices/push-dispatch.service.js';
+import { PushDispatchService, type PushPayload } from '../devices/push-dispatch.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { buildCollapseKey, channelForCategory } from './notification-push-meta.js';
@@ -290,6 +290,26 @@ export class NotificationsService {
   }
 
   /**
+   * Push al teléfono sin fila en la campana: mensajes de chat, que ya viven en su conversación.
+   */
+  pushOnly(userId: number, payload: PushPayload) {
+    this.emitPushToSocket(userId, payload);
+    return this.pushDispatch.sendToUser(userId, payload);
+  }
+
+  /** Mismo aviso por el socket del usuario: la app lo pinta como notificación del sistema. */
+  private emitPushToSocket(userId: number, payload: PushPayload) {
+    try {
+      this.gateway?.notifyUser(userId, {
+        event: 'push:show',
+        notification: this.pushDispatch.buildPushData(userId, payload),
+      });
+    } catch {
+      /* el socket es un extra; el push sigue su curso */
+    }
+  }
+
+  /**
    * Crear notificación individual con opciones completas.
    * Push eficiente: canal + collapseKey; dedupe corto; no auto-notif al actor.
    */
@@ -311,6 +331,8 @@ export class NotificationsService {
             userId: payload.userId,
             type: payload.type as NotificationType,
             relatedEntityId: payload.relatedEntityId,
+            // Mismo aviso de otra persona (p. ej. dos del equipo entregan a la vez) no es repetido.
+            ...(payload.triggerUserId != null ? { triggerUserId: payload.triggerUserId } : {}),
             createdAt: { gte: since },
           },
           select: { id: true },
@@ -371,21 +393,28 @@ export class NotificationsService {
           userId: payload.userId,
         });
 
+      const push: PushPayload = {
+        title: payload.title,
+        body: payload.message,
+        relatedUrl: payload.relatedUrl,
+        priority: payload.priority || 'normal',
+        notificationId: notification.id,
+        tag: collapseKey,
+        channel,
+        event: String(payload.type),
+        collapseKey,
+        entityType: payload.entityType,
+        relatedEntityId: payload.relatedEntityId,
+        category: payload.category,
+        kind: 'event',
+        senderId: notification.triggerUser?.id ?? null,
+        senderName: notification.triggerUser?.nombre ?? null,
+        senderAvatar: notification.triggerUser?.avatarUrl ?? null,
+        threadId: collapseKey,
+      };
+      this.emitPushToSocket(payload.userId, push);
       void this.pushDispatch
-        .sendToUser(payload.userId, {
-          title: payload.title,
-          body: payload.message,
-          relatedUrl: payload.relatedUrl,
-          priority: payload.priority || 'normal',
-          notificationId: notification.id,
-          tag: collapseKey,
-          channel,
-          event: String(payload.type),
-          collapseKey,
-          entityType: payload.entityType,
-          relatedEntityId: payload.relatedEntityId,
-          category: payload.category,
-        })
+        .sendToUser(payload.userId, push)
         .catch((err) => this.logger.warn(`Push dispatch: ${err instanceof Error ? err.message : err}`));
 
       return notification;

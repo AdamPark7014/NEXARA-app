@@ -6,15 +6,26 @@ import mx.nexara.mobile.nativeapp.data.api.LoginRequest
 import mx.nexara.mobile.nativeapp.data.api.PortalLoginRequest
 import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
 import mx.nexara.mobile.nativeapp.data.realtime.RealtimeBus
+import mx.nexara.mobile.nativeapp.data.session.SessionEvents
+import mx.nexara.mobile.nativeapp.data.session.SessionRefreshPolicy
+import mx.nexara.mobile.nativeapp.data.session.SessionRefresher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.time.Instant
+import kotlinx.coroutines.withContext
 
 class AuthRepository(
     context: Context,
 ) {
+    private val appContext = context.applicationContext
     private val deviceIdentityProvider = DeviceIdentityProvider(context)
     private val sessionStore = SessionStore(context)
+
+    init {
+        // Todo cliente autenticado nace de un AuthRepository: así el interceptor
+        // de 401 siempre tiene acceso a la sesión guardada para renovarla.
+        SessionRefresher.install(context)
+    }
 
     suspend fun login(email: String, password: String): SessionUser {
         val headers = deviceIdentityProvider.headers().asHeaders()
@@ -50,8 +61,7 @@ class AuthRepository(
 
             sessionStore.save(user)
             RealtimeBus.start(user.token)
-            user = enrichSession(user)
-            sessionStore.save(user)
+            user = saveEnriched(enrichSession(user)) ?: user
             return user
         } catch (e: Exception) {
             lastError = e
@@ -189,45 +199,74 @@ class AuthRepository(
         )
     }
 
+    /**
+     * Guarda la navegación/empresa enriquecida SOBRE la sesión más reciente.
+     *
+     * `enrichSession` hace llamadas de red; si mientras tanto un 401 renovó el
+     * token, guardar la copia vieja pisaría el token nuevo con el anterior. Y si
+     * la sesión se cerró en medio, no hay que resucitarla. Devuelve null en ese caso.
+     */
+    private fun saveEnriched(enriched: SessionUser): SessionUser? {
+        val latest = sessionStore.load() ?: return null
+        if (latest.id != enriched.id || !latest.email.equals(enriched.email, ignoreCase = true)) {
+            return null
+        }
+        val merged = enriched.copy(token = latest.token, expiresAt = latest.expiresAt)
+        sessionStore.save(merged)
+        return merged
+    }
+
     /** Refresca paneles/módulos desde /me/navigation (login o resume). */
     suspend fun refreshNavigation() {
         val current = sessionStore.load() ?: return
         if (current.isClient || current.isBranchUser) return
-        val enriched = enrichSession(current)
-        sessionStore.save(enriched)
+        saveEnriched(enrichSession(current))
     }
 
     /**
-     * Sliding session: si faltan < 20 min para expiresAt, pide token nuevo.
-     * También refresca navegación RBAC en cada llamada (integración, no solo login).
+     * Renueva el token con `POST auth/session/refresh` (acepta token vencido).
+     * Single-flight compartido con el interceptor de 401 y el socket; guarda
+     * token + expiresAt y reconecta realtime con el token nuevo.
+     */
+    suspend fun refreshSession(): SessionRefresher.Result = withContext(Dispatchers.IO) {
+        val observed = sessionStore.load()?.token ?: return@withContext SessionRefresher.Result.NoSession
+        SessionRefresher.refreshBlocking(observedToken = observed)
+    }
+
+    /**
+     * Renovación proactiva (arranque, cada vuelta a primer plano y cada 30 min en
+     * primer plano): si expiresAt es desconocido o faltan < 60 min, renueva en
+     * segundo plano. Además arranca realtime con la sesión guardada, para que
+     * funcione sin volver a iniciar sesión tras un arranque en frío.
+     *
+     * Solo un 401 del servidor en la renovación avisa de sesión expirada; sin red
+     * o con 5xx la sesión sigue intacta y se reintenta en la próxima revisión.
+     */
+    suspend fun ensureSessionFresh() = withContext(Dispatchers.IO) {
+        val current = sessionStore.load() ?: return@withContext
+        val isPortal = current.isClient || current.isBranchUser
+        if (!isPortal &&
+            SessionRefreshPolicy.shouldRefreshProactively(current.expiresAt, System.currentTimeMillis())
+        ) {
+            if (refreshSession() == SessionRefresher.Result.Revoked) {
+                SessionEvents.notifyExpired()
+                return@withContext
+            }
+        }
+        val token = sessionStore.load()?.token ?: return@withContext
+        RealtimeBus.ensureStarted(token)
+    }
+
+    /**
+     * Compatibilidad: antes pedía `auth/session/extend` solo con < 20 min. Ahora
+     * refresca la navegación RBAC y delega en [ensureSessionFresh].
      */
     suspend fun maybeExtendSession() {
         val current = sessionStore.load() ?: return
-        if (current.isClient || current.isBranchUser) return
-
-        runCatching { refreshNavigation() }
-
-        val expiresRaw = sessionStore.load()?.expiresAt ?: current.expiresAt ?: return
-        val expires = runCatching { Instant.parse(expiresRaw) }.getOrNull() ?: return
-        val remainingMs = expires.toEpochMilli() - System.currentTimeMillis()
-        if (remainingMs > 20L * 60_000L) return
-
-        val api = ApiClient.authed(
-            tokenProvider = { sessionStore.load()?.token },
-            companyIdProvider = { sessionStore.load()?.companyId },
-        ).create(mx.nexara.mobile.nativeapp.data.api.AuthApi::class.java)
-
-        runCatching {
-            val res = api.extendSession()
-            val latest = sessionStore.load() ?: current
-            sessionStore.save(
-                latest.copy(
-                    token = res.access_token,
-                    expiresAt = res.expiresAt ?: latest.expiresAt,
-                ),
-            )
-            RealtimeBus.start(res.access_token)
+        if (!(current.isClient || current.isBranchUser)) {
+            runCatching { refreshNavigation() }
         }
+        ensureSessionFresh()
     }
 
     fun loadSession(): SessionUser? = sessionStore.load()
@@ -243,6 +282,8 @@ class AuthRepository(
         sessionStore.clear()
         RealtimeBus.stop()
         runCatching { NexaraOffline.apiCache().clear() }
+        // En un teléfono compartido, quien entre después no debe ver los chats ni avisos del anterior.
+        runCatching { mx.nexara.mobile.nativeapp.push.NexaraPushRenderer.clearAll(appContext) }
         if (!bearer.isNullOrBlank()) {
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 runCatching {

@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -189,23 +190,57 @@ class SessionStore(context: Context) {
 
     companion object {
         /**
+         * Prefs cifradas ya abiertas en este proceso. Solo se cachea el éxito: si
+         * una apertura cae al respaldo, la siguiente vuelve a intentar el Keystore.
+         * Así un fallo puntual en una de las muchas `SessionStore(context)` no deja
+         * a media app leyendo un fichero vacío (= «sesión cerrada» sin que nadie
+         * la cerrara).
+         */
+        @Volatile
+        private var encryptedPrefs: SharedPreferences? = null
+
+        /**
          * Encrypted prefs when Keystore works; plain MODE_PRIVATE fallback so a
          * broken Keystore never crashes login (Play/device-specific Keystore bugs).
+         *
+         * El Keystore a veces falla de forma transitoria (arranque en frío, otro
+         * hilo creando la MasterKey): se reintenta una vez antes de caer al
+         * respaldo, que para una sesión ya guardada equivale a borrarla. El
+         * formato y los nombres de fichero no cambian.
          */
         private fun openPrefs(context: Context): SharedPreferences {
-            return try {
-                val masterKey = MasterKey.Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-                EncryptedSharedPreferences.create(
-                    context,
-                    "nexara_session",
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-                )
-            } catch (_: Exception) {
-                context.getSharedPreferences("nexara_session_fallback", Context.MODE_PRIVATE)
+            encryptedPrefs?.let { return it }
+            synchronized(this) {
+                encryptedPrefs?.let { return it }
+                repeat(2) { attempt ->
+                    try {
+                        val masterKey = MasterKey.Builder(context)
+                            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                            .build()
+                        val prefs = EncryptedSharedPreferences.create(
+                            context,
+                            "nexara_session",
+                            masterKey,
+                            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                        )
+                        encryptedPrefs = prefs
+                        return prefs
+                    } catch (e: Exception) {
+                        Log.w(
+                            "SessionStore",
+                            "EncryptedSharedPreferences intento ${attempt + 1} falló: ${e.javaClass.simpleName}",
+                        )
+                        if (attempt == 0) {
+                            try {
+                                Thread.sleep(60L)
+                            } catch (_: InterruptedException) {
+                                Thread.currentThread().interrupt()
+                            }
+                        }
+                    }
+                }
+                return context.getSharedPreferences("nexara_session_fallback", Context.MODE_PRIVATE)
             }
         }
     }

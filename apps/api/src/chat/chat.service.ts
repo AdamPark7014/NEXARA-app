@@ -30,6 +30,7 @@ const authorSelect = {
   id: true,
   nombre: true,
   email: true,
+  avatarUrl: true,
 } as const;
 
 export type PostMessageInput = {
@@ -732,6 +733,7 @@ export class ChatService {
       });
     }
 
+    const mencionados = this.mentionedUserIds(message.body, userId);
     void this.notifyUserMentions({
       body: message.body,
       channelId,
@@ -741,7 +743,99 @@ export class ChatService {
       authorName: message.author?.nombre ?? 'Alguien',
     }).catch(() => undefined);
 
+    void this.pushNewMessage({
+      channel,
+      message,
+      authorId: userId,
+      // Los mencionados ya reciben «te mencionó»: no les llegan dos avisos del mismo mensaje.
+      excluir: mencionados,
+    }).catch(() => undefined);
+
     return payload;
+  }
+
+  /**
+   * Aviso al teléfono de cada mensaje, como WhatsApp: a todos los miembros menos el autor y
+   * quienes silenciaron la conversación. Sin fila en la campana (el mensaje ya está en el chat).
+   * En directos el título es quien escribe; en grupos, «Luis en #obras».
+   */
+  private async pushNewMessage(opts: {
+    channel: { id: number; name: string; kind: ChatChannelKind };
+    message: {
+      id: number;
+      body: string;
+      parentId: number | null;
+      attachmentUrl: string | null;
+      attachmentName: string | null;
+      author: { id: number; nombre: string | null; avatarUrl: string | null } | null;
+    };
+    authorId: number;
+    excluir: Set<number>;
+  }) {
+    const { channel, message } = opts;
+    const ahora = new Date();
+    const miembros = await this.prisma.chatChannelMember.findMany({
+      where: {
+        channelId: channel.id,
+        userId: { not: opts.authorId },
+        OR: [{ mutedUntil: null }, { mutedUntil: { lt: ahora } }],
+      },
+      select: { userId: true },
+    });
+    const destinatarios = miembros.map((m) => m.userId).filter((id) => !opts.excluir.has(id));
+    if (destinatarios.length === 0) return;
+
+    const autor = message.author?.nombre || 'Alguien';
+    const directo = channel.kind === ChatChannelKind.DIRECT;
+    const texto = this.textoParaAviso(message);
+    const title = directo ? autor : `${autor} en #${channel.name}`;
+    const body = message.parentId ? `↪️ ${texto}` : texto;
+
+    await Promise.all(
+      destinatarios.map((uid) =>
+        this.notifications.pushOnly(uid, {
+          title,
+          body,
+          relatedUrl: `/erp/chat?channel=${channel.id}&msg=${message.id}`,
+          priority: 'high',
+          channel: 'chat',
+          event: 'CHAT_MESSAGE',
+          category: 'chat',
+          entityType: 'chat_message',
+          relatedEntityId: message.id,
+          tag: `nx_chat_${channel.id}`,
+          kind: 'chat',
+          senderId: opts.authorId,
+          senderName: autor,
+          senderAvatar: message.author?.avatarUrl ?? null,
+          threadId: `chat-${channel.id}`,
+          threadTitle: directo ? '' : `#${channel.name}`,
+          messageId: message.id,
+        }),
+      ),
+    );
+  }
+
+  /** Texto legible del mensaje para el aviso: menciones como @nombre y adjuntos con ícono. */
+  private textoParaAviso(message: { body: string; attachmentUrl: string | null; attachmentName: string | null }) {
+    const limpio = this.preview((message.body || '').replace(/\[@([^\]]+)\]\(user:\d+\)/g, '@$1'));
+    if (!message.attachmentUrl) return limpio || 'Mensaje nuevo';
+    const esImagen = /\.(jpe?g|png|gif|webp|heic)(\?|$)/i.test(message.attachmentUrl);
+    const adjunto = esImagen ? '📷 Foto' : `📎 ${message.attachmentName || 'Archivo'}`;
+    const sinEtiqueta = limpio.startsWith('Archivo: ') ? '' : limpio;
+    return sinEtiqueta ? `${adjunto} · ${sinEtiqueta}` : adjunto;
+  }
+
+  /** Ids mencionados con `[@nombre](user:id)`, sin el autor. */
+  private mentionedUserIds(body: string, authorId: number): Set<number> {
+    const ids = new Set<number>();
+    const re = /\]\(user:(\d+)\)/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(body || ''))) {
+      const id = Number(match[1]);
+      if (Number.isFinite(id) && id > 0 && id !== authorId) ids.add(id);
+    }
+    return ids;
   }
 
   /** Notifica a usuarios mencionados con tokens `[@nombre](user:id)`. */

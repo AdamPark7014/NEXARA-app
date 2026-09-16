@@ -521,6 +521,7 @@ export class AttendanceService {
       'ATTENDANCE_CHECKIN',
       attendance.user.nombre || 'Usuario',
       deviceInfo,
+      now,
     );
 
     return {
@@ -654,6 +655,7 @@ export class AttendanceService {
         'ATTENDANCE_CHECKIN',
         attendance.user.nombre || 'Usuario',
         deviceInfo,
+        now,
       );
 
       return {
@@ -751,6 +753,7 @@ export class AttendanceService {
       'ATTENDANCE_CHECKOUT',
       attendance.user.nombre || 'Usuario',
       deviceInfo,
+      now,
     );
 
     return {
@@ -800,23 +803,9 @@ export class AttendanceService {
         const isAdminUser = !isSuperAdmin && allAdmins.some(a => a.id === userId);
         if (!this.isSuperAdminEmail(admin.email) && isAdminUser) continue;
 
-        const typeLabel = type === 'entrada' ? 'entrada' : 'salida';
-        const title = `${user.nombre} registró ${typeLabel}`;
-        const message = `${user.nombre} (${user.email}) registró ${typeLabel} a las ${timestamp.toLocaleTimeString('es-MX')}`;
-
         try {
-          await this.avisar({
-            userId: admin.id,
-            type: type === 'entrada' ? 'ATTENDANCE_CHECKIN' : 'ATTENDANCE_CHECKOUT',
-            category: 'attendance',
-            title,
-            message,
-            triggerUserId: userId,
-            relatedEntityId: userId,
-            entityType: 'Attendance',
-            relatedUrl: '/erp/asistencias',
-          });
-
+          // El aviso con push lo manda NotificationHierarchyService.notifyAttendanceChange a sus
+          // jefes y a Christian; aquí solo queda el evento en vivo para la consola web.
           // Emitir notificación en tiempo real al admin
           this.realtimeGateway.emit('attendance:notification', {
             adminId: admin.id,

@@ -201,7 +201,7 @@ export class ActivityTeamService {
       });
     }
 
-    void this.notificationHierarchy.notifyActivityDispatched({
+    void this.notificationHierarchy?.notifyActivityDispatched({
       activityId,
       label: activity.titulo || activity.anNumber || `Actividad ${activityId}`,
       actorId: byId,
@@ -289,7 +289,7 @@ export class ActivityTeamService {
       throw new BadRequestException('Esa persona ya es el responsable de la actividad');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await tx.activity.update({
         where: { id: activityId },
         data: { responsableId: input.aUsuarioId, fechaAsignacion: new Date() },
@@ -343,6 +343,17 @@ export class ActivityTeamService {
 
       return { reassigned: true, de: anterior, a: input.aUsuarioId };
     });
+
+    // Opcional: las pruebas del equipo arman el servicio sin avisos.
+    void this.notificationHierarchy?.notifyActivityReassigned({
+      activityId,
+      actorId,
+      deUsuarioId: anterior ?? null,
+      aUsuarioId: input.aUsuarioId,
+      motivo: input.motivo,
+      retiradoAnterior: input.retirarAnterior,
+    });
+    return result;
   }
 
   /** Historial de reasignaciones, para responder "¿quién la ha tenido?". */

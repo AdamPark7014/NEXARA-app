@@ -215,8 +215,11 @@ struct CoreShellView: View {
     @MainActor
     private func refreshNavigationIfNeeded() async {
         guard let user = session.currentUser, user.navModules == nil else { return }
-        let enriched = await AuthRepository.shared.enrichSession(user)
-        if enriched != user, SessionStore.shared.currentUser?.id == user.id {
+        var enriched = await AuthRepository.shared.enrichSession(user)
+        if enriched != user, let now = SessionStore.shared.currentUser, now.id == user.id {
+            // El token pudo renovarse mientras tanto: se guarda el vigente.
+            enriched.token = now.token
+            enriched.expiresAt = now.expiresAt
             SessionStore.shared.save(enriched)
         }
     }

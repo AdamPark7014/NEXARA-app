@@ -50,6 +50,9 @@ type UserWithRole = {
   email?: string;
 };
 
+/** Una sesión móvil sin usar este tiempo ya no se renueva y pide iniciar sesión otra vez. */
+const MOBILE_SESSION_IDLE_MS = 30 * 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -1069,6 +1072,76 @@ export class AuthService {
     if (expiresAt.getTime() > absoluteCap.getTime()) {
       expiresAt = absoluteCap;
     }
+
+    await this.prisma.userSession.update({
+      where: { jti },
+      data: { expiresAt, lastSeenAt: new Date() },
+    });
+
+    const payload = {
+      sub: user.id,
+      roleId: user.roleId,
+      roleKey: this.resolveEffectiveRoleKey(user) ?? user.roleKey ?? null,
+      orgRoleKey: user.role?.orgRoleKey ?? null,
+      departmentId: user.departmentId,
+      permissions,
+      isSuperAdmin,
+      isPlatformOwner: this.isPlatformOwner(user.email),
+      jti,
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload, { expiresIn: expiresInRaw as any }),
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
+  /**
+   * Renovación de las apps móviles (`POST auth/session/refresh`). Acepta el JWT aunque ya
+   * haya vencido —la firma sí se valida— y lo renueva mientras la sesión no esté revocada, el
+   * usuario siga activo y la sesión se haya usado en los últimos 30 días. Sin tope absoluto:
+   * en el teléfono la sesión dura hasta que la persona la cierra o un administrador la revoca.
+   */
+  async refreshSession(token: string | null | undefined) {
+    if (!token) {
+      throw new UnauthorizedException('Sin sesión');
+    }
+    let claims: { sub?: number; jti?: string; isClient?: boolean; isBranchUser?: boolean };
+    try {
+      claims = this.jwtService.verify(token, { ignoreExpiration: true });
+    } catch {
+      throw new UnauthorizedException('Token inválido');
+    }
+    if (!claims?.sub || !claims.jti || claims.isClient || claims.isBranchUser) {
+      throw new UnauthorizedException('Token inválido');
+    }
+    const userId = Number(claims.sub);
+    const jti = String(claims.jti);
+
+    const session = await this.prisma.userSession.findUnique({ where: { jti } });
+    if (!session || session.userId !== userId) {
+      throw new UnauthorizedException('Sesión inválida');
+    }
+    if (session.revokedAt) {
+      throw new UnauthorizedException('Sesión revocada. Vuelve a iniciar sesión.');
+    }
+    const lastUseMs = Math.max(session.lastSeenAt.getTime(), session.createdAt.getTime());
+    if (Date.now() - lastUseMs > MOBILE_SESSION_IDLE_MS) {
+      throw new UnauthorizedException('Sesión sin uso por más de 30 días. Vuelve a iniciar sesión.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true, department: true },
+    });
+    if (!user || user.isActive === false) {
+      throw new UnauthorizedException('Usuario inactivo o inexistente');
+    }
+
+    const isSuperAdmin = this.isSuperAdmin(user.email);
+    const permissions = this.resolveUserPermissions(user, isSuperAdmin);
+    const expiresInRaw = process.env.JWT_EXPIRES_IN || '4h';
+    const expiresAt = new Date(Date.now() + this.parseExpiresToMs(expiresInRaw));
 
     await this.prisma.userSession.update({
       where: { jti },

@@ -118,6 +118,7 @@ struct ChatView: View {
                 handleChatEvent(event)
             }
             .task { await sweepTypingUsers() }
+            .onAppear { ActiveConversation.shared.set(selectedChannelId) }
             .onDisappear { leaveChannel() }
             .sheet(item: $pdfItem) { item in
                 NavigationStack { PDFViewerScreen(title: item.title, data: item.data) }
@@ -913,6 +914,8 @@ struct ChatView: View {
             RealtimeBus.shared.emitChat("chat:leave", ["channelId": current])
         }
         typingUsers = [:]
+        // Push: los avisos de esta conversación no salen mientras está abierta.
+        ActiveConversation.shared.set(channelId)
         guard let channelId, channelId > 0 else {
             joinedChannelId = nil
             return
@@ -926,6 +929,7 @@ struct ChatView: View {
             RealtimeBus.shared.emitChat("chat:leave", ["channelId": current])
         }
         joinedChannelId = nil
+        ActiveConversation.shared.clear()
     }
 
     /// Mismos eventos y mismas reglas que la web.

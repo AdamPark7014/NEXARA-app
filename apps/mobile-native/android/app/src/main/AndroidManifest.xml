@@ -54,10 +54,13 @@
         </service>
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="nexara_default" />
+            android:value="nx2_default" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
+            android:resource="@drawable/ic_stat_nexara" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/nexara_primary_dark" />
         <!-- Crashlytics sí; Analytics/AD_ID no (Play Console). -->
         <meta-data
             android:name="firebase_analytics_collection_deactivated"

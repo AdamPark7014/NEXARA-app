@@ -173,7 +173,87 @@ final class ApiClient {
     private static let mutatingMethods: Set<String> = ["POST", "PUT", "PATCH", "DELETE"]
     private static let queuedBody = Data("{\"queued\":true,\"offline\":true}".utf8)
 
+    /// Rutas cuyo 401 es la respuesta final: renovar la sesión no las arregla.
+    private static let noRefreshPaths = ["/auth/login", "/portal/login", "/auth/session/refresh", "/auth/logout"]
+
+    /// Un 401 en una petición autenticada no cierra la sesión: se renueva el token
+    /// (una sola renovación para todas las peticiones que fallen a la vez) y se
+    /// reintenta UNA vez. Solo `SessionRefresher` cierra sesión, y solo si el
+    /// servidor responde 401 a la renovación.
     private func perform(_ req: URLRequest) async throws -> Data {
+        do {
+            return try await performOnce(req)
+        } catch let error as ApiError {
+            guard case .http(let code, _) = error, code == 401,
+                  let retry = await requestAfterSessionRefresh(req) else {
+                throw error
+            }
+            // Un solo reintento: si vuelve a fallar, se lanza ese error tal cual.
+            return try await performOnce(retry)
+        }
+    }
+
+    /// Petición lista para reintentar con el token renovado, o `nil` si no aplica
+    /// (sin token, login/refresh/logout, portal de cliente o sucursal, o la
+    /// renovación no se logró).
+    private func requestAfterSessionRefresh(_ req: URLRequest) async -> URLRequest? {
+        guard let header = req.value(forHTTPHeaderField: "Authorization"), header.hasPrefix("Bearer ") else {
+            return nil
+        }
+        let path = req.url?.path ?? ""
+        guard !Self.noRefreshPaths.contains(where: { path.hasSuffix($0) || path.contains($0 + "/") || path.contains($0 + "-") }) else {
+            return nil
+        }
+        // El API solo renueva tokens de personal; a un token de portal un 401 en
+        // la renovación lo sacaría sin que el servidor lo haya revocado.
+        guard let user = SessionStore.shared.currentUser, !user.isClient, !user.isBranchUser else {
+            return nil
+        }
+        let usedToken = String(header.dropFirst("Bearer ".count))
+        // Otra petición ya renovó el token mientras esta viajaba: basta reintentar.
+        if !user.token.isEmpty, user.token != usedToken {
+            return Self.request(req, bearer: user.token)
+        }
+        switch await SessionRefresher.shared.refresh() {
+        case .refreshed(let token):
+            return Self.request(req, bearer: token)
+        case .revoked, .failed:
+            return nil
+        }
+    }
+
+    private static func request(_ req: URLRequest, bearer token: String) -> URLRequest {
+        var copy = req
+        copy.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return copy
+    }
+
+    /// `POST auth/session/refresh` con el token vigente (puede estar vencido).
+    /// Va directo por la red: sin cola offline (un refresh encolado no sirve de
+    /// nada) y sin la renovación por 401 de `perform` (aquí el 401 es la respuesta).
+    func refreshSessionToken(_ token: String) async throws -> Data {
+        var req = try buildRequest("auth/session/refresh", method: "POST")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.httpBody = Data("{}".utf8)
+        do {
+            let (data, response) = try await session.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                throw ApiError.http(-1, "Respuesta inválida")
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                throw ApiError.http(http.statusCode, String(data: data, encoding: .utf8))
+            }
+            return data
+        } catch let e as ApiError {
+            throw e
+        } catch {
+            throw ApiError.transport(error)
+        }
+    }
+
+    private func performOnce(_ req: URLRequest) async throws -> Data {
         let method = (req.httpMethod ?? "GET").uppercased()
         let urlStr = req.url?.absoluteString ?? ""
         let authTag = String((req.value(forHTTPHeaderField: "Authorization") ?? "anon").prefix(48))
