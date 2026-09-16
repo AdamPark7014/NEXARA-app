@@ -18,9 +18,16 @@ struct NexaraApp: App {
             .onOpenURL { url in
                 DeepLinkCoordinator.shared.ingest(url)
             }
+            .task {
+                // Jornada abierta con consentimiento: vuelve a armar el rastreo al abrir la app
+                // (si no, tras un relanzamiento por ubicación el GPS de la jornada no se re-arma).
+                guard session.currentUser != nil else { return }
+                await ShiftGpsTracker.shared.resumeIfNeeded()
+            }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active, session.currentUser != nil else { return }
                 Task { await AuthRepository.shared.maybeExtendSession() }
+                Task { await ShiftGpsTracker.shared.resumeIfNeeded() }
             }
         }
     }

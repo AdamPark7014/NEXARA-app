@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Estados de la hora de comida (espejo de `ComidasPanel` web).
 enum LunchUI {
@@ -41,16 +42,28 @@ enum LunchUI {
     }
 }
 
-private struct LunchReasonRequest: Identifiable {
-    let id = UUID()
-    let checkIn: Bool
-}
-
 private struct LunchCameraRequest: Identifiable {
     let id = UUID()
     /// `true` = salida a comer; `false` = regreso.
     let checkIn: Bool
-    let reason: String?
+    /// El horario ya dice que va a destiempo: se toma la foto igual y el motivo
+    /// se escribe después, con la foto ya guardada.
+    let askReason: Bool
+}
+
+/// Foto ya tomada que espera el motivo antes de mandarse.
+private struct LunchPendingPhoto: Identifiable {
+    let id = UUID()
+    let checkIn: Bool
+    let photo: CapturedGeoPhoto
+    /// Lo que contestó el API cuando fue él quien dijo que era a destiempo.
+    let serverMessage: String?
+}
+
+private enum LunchRegisterOutcome {
+    case done
+    case needsReason(String)
+    case failed(String)
 }
 
 private struct LunchReviewRequest: Identifiable {
@@ -70,6 +83,10 @@ private struct LunchFilterOption: Identifiable {
 /// «Comidas» de Asistencias: tu salida y regreso con foto (todos menos Dirección)
 /// y, para jefes, las comidas de su gente con aprobación de las que fueron a destiempo.
 struct ComidasView: View {
+    /// Día que impone la pantalla de Asistencias cuando esta vista va dentro de
+    /// su pestaña «Comidas»; `nil` cuando se abre sola (aviso o enlace).
+    let externalFecha: Date?
+
     @ObservedObject private var session = SessionStore.shared
     @State private var myDay: LunchMyDay?
     @State private var myDayError: String?
@@ -80,16 +97,28 @@ struct ComidasView: View {
     @State private var filter = "todos"
     @State private var notice: String?
     @State private var now = Date()
-    @State private var reasonRequest: LunchReasonRequest?
-    @State private var pendingReason: String?
-    @State private var pendingCheckIn = true
     @State private var camera: LunchCameraRequest?
+    @State private var pendingPhoto: LunchPendingPhoto?
+    @State private var reasonRequest: LunchPendingPhoto?
     /// El API dijo que ya es a destiempo: la próxima vez se pide el motivo.
     @State private var forceReason = false
     @State private var review: LunchReviewRequest?
     @State private var photo: CorePhotoItem?
+    /// `mi-dia.ahora` menos el reloj del teléfono.
+    @State private var clockOffset: TimeInterval = 0
+
+    init(fecha: Date? = nil) {
+        externalFecha = fecha
+        _fecha = State(initialValue: fecha ?? Date())
+    }
 
     private var isCeo: Bool { CoreOrg.isCeo(session.currentUser?.email) }
+    private var effectiveFecha: Date { externalFecha ?? fecha }
+    private var isToday: Bool { AttendanceClock.isToday(effectiveFecha) }
+
+    /// Hora del **servidor**: el reloj del teléfono puede ir adelantado y una
+    /// comida a tiempo acababa pidiendo justificación por esos minutos.
+    private func serverNow() -> Date { Date().addingTimeInterval(clockOffset) }
 
     var body: some View {
         ScrollView {
@@ -104,7 +133,11 @@ struct ComidasView: View {
                     Text("Dirección supervisa las comidas: no registra la suya.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                } else if let myDay {
+                } else if !isToday {
+                    Text("Tu comida de ese día no se puede cambiar.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if let myDay, myDay.debeRegistrar {
                     myDayCard(myDay)
                 } else if let myDayError {
                     Text(myDayError).font(.footnote).foregroundStyle(CorePalette.red)
@@ -127,20 +160,40 @@ struct ComidasView: View {
         .onChange(of: fecha) { _, _ in
             Task { await loadTeam() }
         }
-        .sheet(item: $reasonRequest, onDismiss: openCameraAfterReason) { request in
-            LunchReasonSheet(checkIn: request.checkIn, windowText: myDay?.windowText ?? "3:00 a 4:00 p.m.") { reason in
-                pendingCheckIn = request.checkIn
-                pendingReason = reason
-            }
+        .onChange(of: externalFecha) { _, _ in
+            Task { await load() }
         }
-        .fullScreenCover(item: $camera) { request in
+        .fullScreenCover(item: $camera, onDismiss: openReasonAfterCamera) { request in
             GeoPhotoCaptureView(
                 title: request.checkIn ? "Tu foto de salida a comer" : "Tu foto de regreso",
-                confirmLabel: "✓ Registrar con esta foto",
+                confirmLabel: request.askReason ? "✓ Continuar" : "✓ Registrar con esta foto",
                 requireLocation: false,
-                onConfirm: { captured in await register(request, photo: captured) },
+                onConfirm: { captured in
+                    if request.askReason {
+                        pendingPhoto = LunchPendingPhoto(checkIn: request.checkIn, photo: captured, serverMessage: nil)
+                        camera = nil
+                        return nil
+                    }
+                    switch await register(checkIn: request.checkIn, photo: captured, reason: nil) {
+                    case .done:
+                        camera = nil
+                        return nil
+                    case .needsReason(let message):
+                        // El API decidió con su reloj: la foto no se tira.
+                        pendingPhoto = LunchPendingPhoto(checkIn: request.checkIn, photo: captured, serverMessage: message)
+                        camera = nil
+                        return nil
+                    case .failed(let message):
+                        return message
+                    }
+                },
                 onCancel: { camera = nil }
             )
+        }
+        .sheet(item: $reasonRequest) { pending in
+            LunchReasonSheet(pending: pending, windowText: myDay?.windowText ?? "3:00 a 4:00 p.m.") { reason in
+                await register(checkIn: pending.checkIn, photo: pending.photo, reason: reason)
+            }
         }
         .sheet(item: $review) { request in
             LunchReviewSheet(request: request) { message in
@@ -268,54 +321,61 @@ struct ComidasView: View {
         .coreCard(highlight: record.revisionEstado == "RECHAZADA" ? CorePalette.red : nil)
     }
 
+    /// La foto va primero: pedir el motivo antes obligaba a escribirlo, salir a
+    /// la cámara y volver, y un tropiezo en medio perdía las dos cosas.
     private func startRegister(checkIn: Bool, late: Bool) {
         notice = nil
-        if late || forceReason {
-            reasonRequest = LunchReasonRequest(checkIn: checkIn)
-        } else {
-            camera = LunchCameraRequest(checkIn: checkIn, reason: nil)
-        }
+        camera = LunchCameraRequest(checkIn: checkIn, askReason: late || forceReason)
     }
 
-    private func openCameraAfterReason() {
-        guard let reason = pendingReason else { return }
-        pendingReason = nil
-        camera = LunchCameraRequest(checkIn: pendingCheckIn, reason: reason)
+    /// La cámara ya se cerró: si la foto quedó esperando motivo, se pide ahora.
+    private func openReasonAfterCamera() {
+        guard let pending = pendingPhoto else { return }
+        pendingPhoto = nil
+        reasonRequest = pending
     }
 
     @MainActor
-    private func register(_ request: LunchCameraRequest, photo captured: CapturedGeoPhoto) async -> String? {
+    private func register(checkIn: Bool, photo captured: CapturedGeoPhoto, reason: String?) async -> LunchRegisterOutcome {
         do {
             let sent: Bool
-            if request.checkIn {
-                sent = try await LunchCoreRepository.shared.checkIn(photoDataUrl: captured.dataUrl, justificacion: request.reason)
+            if checkIn {
+                sent = try await LunchCoreRepository.shared.checkIn(
+                    photoDataUrl: captured.dataUrl,
+                    justificacion: reason,
+                    at: serverNow()
+                )
             } else {
-                sent = try await LunchCoreRepository.shared.checkOut(photoDataUrl: captured.dataUrl, justificacion: request.reason)
+                sent = try await LunchCoreRepository.shared.checkOut(
+                    photoDataUrl: captured.dataUrl,
+                    justificacion: reason,
+                    at: serverNow()
+                )
             }
-            camera = nil
             forceReason = false
             if !sent {
                 notice = CoreError.queuedOffline.errorDescription
-            } else if request.checkIn {
-                notice = request.reason != nil
+            } else if checkIn {
+                notice = reason != nil
                     ? "Registraste tu salida a comer. Tu justificación quedó por aprobar."
                     : "Registraste tu salida a comer. ¡Buen provecho!"
             } else {
-                notice = request.reason != nil
+                notice = reason != nil
                     ? "Registraste tu regreso. Tu justificación quedó por aprobar."
                     : "Registraste tu regreso de comer."
             }
             await load()
-            return nil
+            return .done
         } catch {
             let message = error.toUserMessage(fallback: "No se pudo registrar tu comida")
             let lower = message.lowercased()
-            // La API decide con su hora: si dice que ya es a destiempo, se pide el motivo.
-            if request.reason == nil && (lower.contains("horario") || lower.contains("hora de regreso") || lower.contains("por qué")) {
+            // La API decide con su hora: si dice que ya es a destiempo, se
+            // conserva la foto y solo se pide el motivo.
+            if reason == nil && (lower.contains("horario") || lower.contains("hora de regreso") || lower.contains("por qué")) {
                 forceReason = true
-                return message + " Cancela y vuelve a intentarlo: te pediremos el motivo."
+                return .needsReason(message)
             }
-            return message
+            return .failed(message)
         }
     }
 
@@ -349,8 +409,19 @@ struct ComidasView: View {
             Text("Aprueba o rechaza las que fueron fuera de 3:00 a 4:00 p.m.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-            DatePicker("Día", selection: $fecha, in: ...Date(), displayedComponents: .date)
-                .font(.subheadline)
+            if let pendientes = team.resumen?.pendientes, pendientes > 0 {
+                Text("⏳ Tienes \(pendientes) comida\(pendientes == 1 ? "" : "s") a destiempo por aprobar.")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(CorePalette.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(CorePalette.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            }
+            // Dentro de Asistencias manda el día de esa pantalla; suelta, el suyo.
+            if externalFecha == nil {
+                DatePicker("Día", selection: $fecha, in: ...Date(), displayedComponents: .date)
+                    .font(.subheadline)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(filterOptions(team)) { option in
@@ -397,14 +468,22 @@ struct ComidasView: View {
     private func load() async {
         loading = true
         defer { loading = false }
-        now = Date()
-        if !isCeo {
+        now = serverNow()
+        // `mi-dia` solo existe para hoy: un día pasado ya no se registra.
+        if !isCeo && isToday {
             do {
-                myDay = try await LunchCoreRepository.shared.myDay()
+                let day = try await LunchCoreRepository.shared.myDay()
+                myDay = day
+                if let ahora = CoreFormat.date(day.ahora) {
+                    clockOffset = ahora.timeIntervalSince(Date())
+                    now = serverNow()
+                }
                 myDayError = nil
             } catch {
                 myDayError = error.toUserMessage(fallback: "No se pudo cargar tu comida")
             }
+        } else {
+            myDay = nil
         }
         await loadTeam()
     }
@@ -412,7 +491,7 @@ struct ComidasView: View {
     @MainActor
     private func loadTeam() async {
         do {
-            team = try await LunchCoreRepository.shared.team(fecha: FieldOpsDayRepository.dayString(fecha))
+            team = try await LunchCoreRepository.shared.team(fecha: FieldOpsDayRepository.dayString(effectiveFecha))
             teamError = nil
         } catch {
             teamError = error.toUserMessage(fallback: "No se pudieron cargar las comidas del equipo")
@@ -424,7 +503,7 @@ struct ComidasView: View {
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             if Task.isCancelled { break }
-            now = Date()
+            now = serverNow()
         }
     }
 }
@@ -541,23 +620,35 @@ private struct LunchTeamRowCard: View {
     }
 }
 
+/// El motivo, con la foto ya tomada delante: se registra desde aquí, sin
+/// volver a la cámara.
 private struct LunchReasonSheet: View {
-    let checkIn: Bool
+    let pending: LunchPendingPhoto
     let windowText: String
-    let onContinue: (String) -> Void
+    let onSubmit: (String) async -> LunchRegisterOutcome
 
     @Environment(\.dismiss) private var dismiss
     @State private var reason = ""
     @State private var error: String?
+    @State private var saving = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Text(checkIn
-                        ? "Estás fuera de tu horario de comida (\(windowText)). Escribe por qué; tu jefe lo aprobará o rechazará."
-                        : "Ya pasó la hora de regreso (4:00 p.m.). Escribe por qué; tu jefe lo aprobará o rechazará.")
-                        .font(.footnote)
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(uiImage: pending.photo.image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        Text(pending.serverMessage ?? (pending.checkIn
+                            ? "Estás fuera de tu horario de comida (\(windowText)). Escribe por qué; tu jefe lo aprobará o rechazará."
+                            : "Ya pasó la hora de regreso (4:00 p.m.). Escribe por qué; tu jefe lo aprobará o rechazará."))
+                            .font(.footnote)
+                    }
+                } footer: {
+                    Text("Tu foto ya está tomada: no hay que repetirla.")
                 }
                 Section("¿Por qué?") {
                     TextField("Motivo", text: $reason, axis: .vertical)
@@ -569,27 +660,40 @@ private struct LunchReasonSheet: View {
                     }
                 }
             }
-            .navigationTitle(checkIn ? "Salir a comer" : "Ya regresé")
+            .navigationTitle(pending.checkIn ? "Salir a comer" : "Ya regresé")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { dismiss() }
+                        .disabled(saving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Tomar foto") { continueTapped() }
+                    Button(saving ? "Registrando…" : "Registrar") {
+                        Task { await submit() }
+                    }
+                    .disabled(saving)
                 }
             }
+            .interactiveDismissDisabled(saving)
         }
     }
 
-    private func continueTapped() {
+    @MainActor
+    private func submit() async {
         let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= LunchCoreRepository.minReason else {
             error = "Escribe por qué (al menos 5 letras): tu jefe lo revisará."
             return
         }
-        onContinue(trimmed)
-        dismiss()
+        saving = true
+        error = nil
+        defer { saving = false }
+        switch await onSubmit(trimmed) {
+        case .done:
+            dismiss()
+        case .needsReason(let message), .failed(let message):
+            error = message
+        }
     }
 }
 
