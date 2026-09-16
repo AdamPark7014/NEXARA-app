@@ -48,7 +48,7 @@ targets:
     sources:
       - path: NexaraApp
       - path: Resources/Assets.xcassets
-      # No se versiona: CI lo escribe desde un secreto. `optional` permite
+      # Configuración de cliente de Firebase (proyecto nexara-app), versionada. `optional` permite
       # generar el proyecto sin él (la app arranca, pero sin push FCM).
       - path: Resources/GoogleService-Info.plist
         optional: true

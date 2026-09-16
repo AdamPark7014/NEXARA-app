@@ -56,7 +56,10 @@ export class PushDispatchService {
     if (!raw) return false;
     try {
       if (!admin.apps.length) {
-        const cred = JSON.parse(raw) as admin.ServiceAccount;
+        // JSON tal cual o en base64 (así lo instala scripts/firebase/instalar-clave-servidor.ps1,
+        // sin comillas ni saltos de línea que el .env pueda romper).
+        const json = raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+        const cred = JSON.parse(json) as admin.ServiceAccount;
         admin.initializeApp({ credential: admin.credential.cert(cred) });
       }
       this.firebaseInited = true;

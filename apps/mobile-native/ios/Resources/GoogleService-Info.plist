@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyCGtCv5qjrm1AIQ4wabB-Mz4Axtx0pp7Vk</string>
+	<key>GCM_SENDER_ID</key>
+	<string>256395721696</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>mx.nexara.mobile.NexaraApp</string>
+	<key>PROJECT_ID</key>
+	<string>nexara-app</string>
+	<key>STORAGE_BUCKET</key>
+	<string>nexara-app.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:256395721696:ios:d9207ea04de7424558c985</string>
+</dict>
+</plist>

@@ -87,7 +87,8 @@ apps/mobile-native/ios/**/xcuserdata/
 apps/mobile-native/ios/**/*.xcworkspace/xcuserdata/
 apps/mobile-native/ios/Pods/
 apps/mobile-native/ios/**/*.ipa
-apps/mobile-native/ios/**/GoogleService-Info.plist
+# GoogleService-Info.plist SÍ se versiona (como google-services.json): es configuración de cliente
+# de Firebase, no un secreto, y el runner de TestFlight no tiene otra forma de obtenerlo.
 # `NexaraApp.xcodeproj` lo genera XcodeGen desde project.yml dentro del runner.
 # Versionarlo significaria mantener dos definiciones del mismo proyecto y que
 # una de las dos empiece a mentir.
