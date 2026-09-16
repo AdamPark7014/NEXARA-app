@@ -48,7 +48,7 @@ object ModuleCatalog {
         mod("activities", "Actividades", "📋", "/erp/pizarra", ParityStatus.NATIVO),
         mod("attendance", "Asistencias", "🗓️", "/erp/asistencias", ParityStatus.NATIVO),
         mod("chat", "Chat", "💬", "/erp/chat", ParityStatus.NATIVO),
-        mod("erp-clients", "Clientes", "🤝", "/erp/clientes", ParityStatus.CASCARON),
+        mod("erp-clients", "Clientes", "🤝", "/erp/clientes", ParityStatus.NATIVO),
         mod("my-profile", "Mi perfil", "👤", "/erp/my-profile", ParityStatus.NATIVO),
         mod("notifications-center", "Notificaciones", "🔔", "/erp/notifications-center", ParityStatus.NATIVO),
     )

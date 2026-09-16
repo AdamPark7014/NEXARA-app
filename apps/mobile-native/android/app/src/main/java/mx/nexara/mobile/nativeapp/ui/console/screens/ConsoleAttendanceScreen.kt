@@ -1,9 +1,14 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
+import android.Manifest
 import android.app.Application
 import android.content.Context
-import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -20,41 +25,78 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.AttendanceCurrentDto
-import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto
+import mx.nexara.mobile.nativeapp.data.api.AttendanceEventDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto
+import mx.nexara.mobile.nativeapp.data.api.GpsLocationDto
+import mx.nexara.mobile.nativeapp.data.api.attendanceCoord
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
+import mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
-import mx.nexara.mobile.nativeapp.ui.console.util.currentMonthRange
-import mx.nexara.mobile.nativeapp.ui.console.util.currentWeekRange
-import mx.nexara.mobile.nativeapp.ui.console.util.lastWeekRange
+import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
-import java.io.File
+import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
+import mx.nexara.mobile.nativeapp.util.DeviceLocation
+import mx.nexara.mobile.nativeapp.util.JornadaGps
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
-// ── State ────────────────────────────────────────────────────────────────────
+/*
+ * Asistencias — espejo de apps/web/app/(panels)/erp/asistencias/page.tsx.
+ *
+ * Tres pestañas sobre un mismo día: equipo, comidas y trayectoria. Antes esta
+ * pantalla era otra cosa: rangos de semana/mes, ranking de horas y export CSV
+ * que la web no tiene, el equipo decidido por `console.admin` en vez del rol, y
+ * la consulta sin `scope`, así que cualquiera con `attendance.manage` veía a la
+ * empresa entera.
+ */
 
-private val ATTENDANCE_RANGE_PRESETS = listOf(
-    "week" to "Esta semana",
-    "lastWeek" to "Semana pasada",
-    "month" to "Este mes",
+// ── Estado ───────────────────────────────────────────────────────────────────
+
+enum class AttendanceEstado(val etiqueta: String, val color: Color) {
+    PRESENTE("En jornada", Color(0xFF16A34A)),
+    COMPLETO("Completó", Color(0xFF2563EB)),
+    AUSENTE("Sin checada", Color(0xFF94A3B8)),
+}
+
+data class AttendancePersona(
+    val userId: Long,
+    val nombre: String,
+    val subtitulo: String,
+    val estado: AttendanceEstado,
+    val entradaIso: String?,
+    val salidaIso: String?,
+    val fotoEntrada: String?,
+    val fotoSalida: String?,
+    val mapaEntrada: String?,
+    val mapaSalida: String?,
 )
 
 data class AttendanceUiState(
@@ -63,102 +105,233 @@ data class AttendanceUiState(
     val error: String? = null,
     val checkInLoading: Boolean = false,
     val checkInMessage: String? = null,
-    val exportMessage: String? = null,
-    val rangePreset: String = "week",
-    val userQuery: String = "",
-    val from: String = currentWeekRange().from,
-    val to: String = currentWeekRange().to,
+    val fecha: String = hoyIso(),
+    val filtro: AttendanceEstado? = null,
     val current: AttendanceCurrentDto? = null,
-    val payload: AttendanceRangeDto? = null,
-)
+    val misChecadas: List<AttendanceEventDto> = emptyList(),
+    val personas: List<AttendancePersona> = emptyList(),
+    val gpsActivo: Boolean = false,
+    val equipoGps: List<GpsLocationDto> = emptyList(),
+    val trayecto: List<GpsLocationDto> = emptyList(),
+    val trayectoCargando: Boolean = false,
+) {
+    val presentes: Int get() = personas.count { it.estado == AttendanceEstado.PRESENTE }
+    val completos: Int get() = personas.count { it.estado == AttendanceEstado.COMPLETO }
+    val ausentes: Int get() = personas.count { it.estado == AttendanceEstado.AUSENTE }
+    val visibles: List<AttendancePersona>
+        get() = filtro?.let { f -> personas.filter { it.estado == f } } ?: personas
+}
+
+// ── Fechas y formato ─────────────────────────────────────────────────────────
+
+private val HORA_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+private val ISO_FECHA: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+fun hoyIso(): String = LocalDate.now().format(ISO_FECHA)
+
+/** Tolera `...Z`, con offset y sin él: el API mezcla las tres formas. */
+internal fun parseInstante(iso: String?): Instant? {
+    val value = iso?.trim().orEmpty()
+    if (value.isEmpty()) return null
+    return runCatching { Instant.parse(value) }
+        .recoverCatching { java.time.OffsetDateTime.parse(value).toInstant() }
+        .recoverCatching {
+            java.time.LocalDateTime.parse(value).atZone(ZoneId.systemDefault()).toInstant()
+        }
+        .getOrNull()
+}
+
+private fun fmtHora(iso: String?): String =
+    parseInstante(iso)?.atZone(ZoneId.systemDefault())?.toLocalTime()?.format(HORA_FMT) ?: "—"
+
+private fun pad2(n: Long): String = n.coerceAtLeast(0).toString().padStart(2, '0')
+
+/** `0:00:00` · `1:05:09` — igual que `fmtHms` de la web. */
+internal fun fmtHms(totalMs: Long): String {
+    if (totalMs <= 0) return "0:00:00"
+    val s = totalMs / 1000
+    return "${s / 3600}:${pad2((s % 3600) / 60)}:${pad2(s % 60)}"
+}
+
+private fun transcurridoMs(inicioIso: String?, finIso: String?, ahoraMs: Long): Long {
+    val inicio = parseInstante(inicioIso)?.toEpochMilli() ?: return 0
+    val fin = parseInstante(finIso)?.toEpochMilli() ?: ahoraMs
+    return (fin - inicio).coerceAtLeast(0)
+}
+
+private fun iniciales(nombre: String): String =
+    nombre.split(" ").filter { it.isNotBlank() }.take(2)
+        .mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("")
+
+private fun mapaUrl(lat: Double?, lng: Double?): String? {
+    if (lat == null || lng == null) return null
+    return "https://www.google.com/maps?q=${"%.6f".format(lat)},${"%.6f".format(lng)}"
+}
+
+private fun ultimaPorTipo(
+    eventos: List<AttendanceEventDto>?,
+    tipo: String,
+): AttendanceEventDto? =
+    eventos?.filter { it.type.equals(tipo, ignoreCase = true) }?.maxByOrNull { it.timestamp }
+
+// ── Mapeo (espejo de `mapped` en la web) ─────────────────────────────────────
+
+internal fun mapPersonas(
+    usuarios: List<AttendanceRangeUserDto>,
+    fecha: String,
+    yoId: Long?,
+): List<AttendancePersona> = usuarios
+    .map { raw ->
+        val entrada = ultimaPorTipo(raw.attendances, "entrada")
+        val salida = ultimaPorTipo(raw.attendances, "salida")
+        val dia = raw.days?.firstOrNull { it.date == fecha || it.date.startsWith(fecha) }
+        val estado = when {
+            dia?.isOpen == true -> AttendanceEstado.PRESENTE
+            entrada != null && salida != null -> AttendanceEstado.COMPLETO
+            entrada != null -> AttendanceEstado.PRESENTE
+            else -> AttendanceEstado.AUSENTE
+        }
+        val fotoEntrada = raw.attendances
+            ?.lastOrNull { it.type.equals("entrada", true) && !it.photoUrl.isNullOrBlank() }?.photoUrl
+        val fotoSalida = raw.attendances
+            ?.lastOrNull { it.type.equals("salida", true) && !it.photoUrl.isNullOrBlank() }?.photoUrl
+        AttendancePersona(
+            userId = raw.userId,
+            nombre = raw.userName?.trim()?.takeIf { it.isNotEmpty() }
+                ?: raw.email?.takeIf { it.isNotBlank() }
+                ?: "Usuario #${raw.userId}",
+            subtitulo = listOfNotNull(
+                raw.roleName?.takeIf { it.isNotBlank() },
+                raw.department?.takeIf { it.isNotBlank() },
+            ).joinToString(" · ").ifBlank { "—" },
+            estado = estado,
+            entradaIso = entrada?.timestamp,
+            salidaIso = salida?.timestamp,
+            fotoEntrada = fotoEntrada,
+            fotoSalida = fotoSalida,
+            mapaEntrada = mapaUrl(
+                attendanceCoord(entrada?.entryLatitude),
+                attendanceCoord(entrada?.entryLongitude),
+            ),
+            mapaSalida = mapaUrl(
+                attendanceCoord(salida?.exitLatitude),
+                attendanceCoord(salida?.exitLongitude),
+            ),
+        )
+    }
+    .sortedWith(
+        compareBy<AttendancePersona> { if (yoId != null && it.userId == yoId) 0 else 1 }
+            .thenBy { it.estado.ordinal }
+            .thenBy { it.nombre.lowercase() },
+    )
 
 // ── ViewModel ────────────────────────────────────────────────────────────────
 
 class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ConsoleRepository(app.applicationContext)
+    private val sesion: SessionUser? = AuthRepository(app.applicationContext).loadSession()
+
+    val viewMode: AttendanceViewMode = attendanceViewMode(sesion)
+    val puedeVerTrayectoria: Boolean = attendanceCanSeeTrajectory(sesion)
+    private val scope: String? = attendanceScopeParam(sesion)
+
     private val _state = MutableStateFlow(AttendanceUiState())
     val state: StateFlow<AttendanceUiState> = _state
 
-    fun setRangePreset(preset: String) {
-        val range = when (preset) {
-            "lastWeek" -> lastWeekRange()
-            "month" -> currentMonthRange()
-            else -> currentWeekRange()
-        }
-        _state.update { it.copy(rangePreset = preset, from = range.from, to = range.to) }
+    init {
+        refresh(initial = true)
+        reanudarGpsSiJornadaAbierta()
+    }
+
+    fun setFecha(fecha: String) {
+        if (fecha == _state.value.fecha) return
+        _state.update { it.copy(fecha = fecha) }
         refresh(initial = true)
     }
 
-    fun setUserQuery(value: String) = _state.update { it.copy(userQuery = value) }
+    fun setFiltro(estado: AttendanceEstado?) = _state.update { it.copy(filtro = estado) }
+
+    fun clearMessage() = _state.update { it.copy(checkInMessage = null) }
 
     fun refresh(initial: Boolean = true) {
-        val snapshot = _state.value
+        val fecha = _state.value.fecha
         _state.update {
             it.copy(
-                isLoading = initial && it.payload == null,
+                isLoading = initial && it.personas.isEmpty() && it.current == null,
                 isRefreshing = !initial,
-                error = null,
+                error = if (initial) null else it.error,
             )
         }
         viewModelScope.launch {
-            try {
-                val current = withContext(Dispatchers.IO) {
-                    runCatching { repo.attendanceCurrent() }.getOrNull()
-                }
-                val range = withContext(Dispatchers.IO) {
-                    repo.attendanceRange(from = snapshot.from, to = snapshot.to, tryHierarchyFirst = true)
-                }
-                _state.update {
-                    it.copy(isLoading = false, isRefreshing = false, current = current, payload = range, error = null)
-                }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        isRefreshing = false,
-                        error = e.toUserMessage("No se pudo cargar asistencia"),
-                    )
-                }
-            }
-        }
-    }
+            var fallo: String? = null
+            val current = runCatching { withContext(Dispatchers.IO) { repo.attendanceCurrent() } }.getOrNull()
+            val historial = runCatching {
+                withContext(Dispatchers.IO) { repo.attendanceHistory(fecha) }
+            }.getOrDefault(emptyList())
 
-    fun exportCsv(context: Context) {
-        val users = _state.value.payload?.users.orEmpty()
-        if (users.isEmpty()) {
-            _state.update { it.copy(exportMessage = "Sin datos para exportar") }
-            return
-        }
-        viewModelScope.launch {
-            try {
-                val snapshot = _state.value
-                val csv = buildString {
-                    appendLine("Usuario,Horas,Dias registrados")
-                    users.forEach { u ->
-                        val name = (u.userName ?: "Usuario ${u.userId}").replace("\"", "\"\"")
-                        val hours = String.format("%.2f", (u.totalMinutes ?: 0) / 60.0)
-                        appendLine("\"$name\",$hours,${u.days?.size ?: 0}")
+            val personas = if (viewMode.canManageTeam) {
+                try {
+                    val rango = withContext(Dispatchers.IO) {
+                        repo.attendanceRange(from = fecha, to = fecha, scope = scope)
                     }
+                    mapPersonas(rango.users.orEmpty(), fecha, sesion?.id)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    fallo = e.toUserMessage("No se pudo cargar el equipo")
+                    emptyList()
                 }
-                val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-                val file = File(dir, "asistencia-${snapshot.from}-${snapshot.to}.csv")
-                withContext(Dispatchers.IO) { file.writeText(csv) }
-                shareCsv(context, file)
-                _state.update { it.copy(exportMessage = "✅ CSV listo para compartir") }
-            } catch (e: Exception) {
-                _state.update { it.copy(exportMessage = "❌ ${e.toUserMessage("No se pudo exportar")}") }
+            } else {
+                emptyList()
+            }
+
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    current = current,
+                    misChecadas = historial,
+                    personas = personas,
+                    error = fallo,
+                    gpsActivo = JornadaGps.isRunning(),
+                )
             }
         }
     }
 
-    fun clearExportMessage() = _state.update { it.copy(exportMessage = null) }
+    fun cargarTrayectoria() {
+        if (!puedeVerTrayectoria) return
+        val fecha = _state.value.fecha
+        _state.update { it.copy(trayectoCargando = true, error = null) }
+        viewModelScope.launch {
+            var fallo: String? = null
+            val equipo = runCatching { withContext(Dispatchers.IO) { repo.gpsTeam() } }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrDefault(emptyList())
+            val puntos = try {
+                withContext(Dispatchers.IO) { repo.gpsTrajectory(date = fecha) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                fallo = e.toUserMessage("No se pudo cargar trayectoria")
+                emptyList()
+            }
+            _state.update {
+                it.copy(trayectoCargando = false, equipoGps = equipo, trayecto = puntos, error = fallo)
+            }
+        }
+    }
 
+    /**
+     * Registra la checada y, en la entrada, enciende el GPS de jornada: consent
+     * en el API + servicio en primer plano. En la salida se apagan los dos.
+     */
     fun checkIn(type: String, photoBase64: String) {
         _state.update { it.copy(checkInLoading = true, checkInMessage = null) }
         viewModelScope.launch {
             try {
                 val coords = withContext(Dispatchers.IO) {
-                    mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
+                    DeviceLocation.current(getApplication())
                 }
                 val res = withContext(Dispatchers.IO) {
                     repo.attendanceCheckIn(
@@ -168,23 +341,26 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         photoBase64 = photoBase64,
                     )
                 }
-                // Aquí se llamaba a `gpsUpdateConsent(enabled = true)` en cada
-                // entrada con GPS. Fichar no es consentir el rastreo: eso
-                // encendía el consentimiento sin que nadie lo otorgara y dejaba
-                // al usuario visible en el mapa del equipo el resto del día.
-                // El consentimiento se otorga en el interruptor de la pantalla
-                // de GPS (`ConsoleGpsScreen`), que es donde se explica.
-                val base = res.message ?: if (type == "entrada") "✅ Entrada registrada" else "✅ Salida registrada"
-                val geoHint = when {
+                val gpsNota = if (type == "entrada") encenderGps() else apagarGps()
+                val base = res.message
+                    ?: if (type == "entrada") "✅ Entrada registrada" else "✅ Salida registrada"
+                val geo = when {
                     coords == null -> " (sin GPS — activa ubicación)"
                     coords.accuracyM != null && coords.accuracyM > 100f ->
-                        " · GPS ${"%.5f".format(coords.lat)}, ${"%.5f".format(coords.lng)} (±${coords.accuracyM.toInt()}m — baja precisión)"
-                    coords.accuracyM != null ->
-                        " · GPS ${"%.5f".format(coords.lat)}, ${"%.5f".format(coords.lng)} (±${coords.accuracyM.toInt()}m)"
-                    else -> " · GPS ${"%.5f".format(coords.lat)}, ${"%.5f".format(coords.lng)}"
+                        " · GPS ±${coords.accuracyM.toInt()}m (baja precisión)"
+                    coords.accuracyM != null -> " · GPS ±${coords.accuracyM.toInt()}m"
+                    else -> " · GPS ok"
                 }
-                _state.update { it.copy(checkInLoading = false, checkInMessage = base + geoHint) }
+                _state.update {
+                    it.copy(
+                        checkInLoading = false,
+                        checkInMessage = base + geo + gpsNota,
+                        gpsActivo = JornadaGps.isRunning(),
+                    )
+                }
                 refresh(initial = false)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
@@ -196,33 +372,54 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun clearMessage() = _state.update { it.copy(checkInMessage = null) }
-}
-
-// ── Color palette ─────────────────────────────────────────────────────────────
-
-private val TealColor = Color(0xFF0D9488)
-private val TealLight = Color(0xFFCCFBF1)
-private val GreenColor = Color(0xFF10B981)
-private val GreenLight = Color(0xFFD1FAE5)
-private val BlueColor = Color(0xFF3B82F6)
-private val BlueLight = Color(0xFFDBEAFE)
-private val RedColor = Color(0xFFEF4444)
-private val RedLight = Color(0xFFFEE2E2)
-private val SlateText = Color(0xFF0F172A)
-private val SubText = Color(0xFF64748B)
-
-private fun shareCsv(context: Context, file: File) {
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/csv"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    private suspend fun encenderGps(): String {
+        val app = getApplication<Application>()
+        if (!JornadaGps.canTrack(app)) return " · sin permiso de ubicación: no se comparte el trayecto"
+        runCatching { withContext(Dispatchers.IO) { repo.gpsUpdateConsent(true) } }
+        JornadaGps.start(app)
+        return " · compartiendo ubicación de jornada"
     }
-    context.startActivity(Intent.createChooser(intent, "Compartir asistencia"))
+
+    private suspend fun apagarGps(): String {
+        val app = getApplication<Application>()
+        JornadaGps.stop(app)
+        runCatching { withContext(Dispatchers.IO) { repo.gpsUpdateConsent(false) } }
+        return " · se dejó de compartir tu ubicación"
+    }
+
+    /** Si el día quedó abierto y el consentimiento sigue puesto, el rastreo vuelve solo. */
+    private fun reanudarGpsSiJornadaAbierta() {
+        val app = getApplication<Application>()
+        if (!JornadaGps.canTrack(app) || JornadaGps.isRunning()) return
+        viewModelScope.launch {
+            val abierta = runCatching {
+                withContext(Dispatchers.IO) { repo.attendanceCurrent() }
+            }.getOrNull()?.isOpen == true
+            if (!abierta) return@launch
+            val consiente = runCatching {
+                withContext(Dispatchers.IO) { repo.gpsMe() }
+            }.getOrNull()?.consent == true
+            if (!consiente) return@launch
+            JornadaGps.start(app)
+            _state.update { it.copy(gpsActivo = true) }
+        }
+    }
+
+    fun detenerGpsManual() {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            apagarGps()
+            _state.update { it.copy(gpsActivo = false) }
+        }
+        JornadaGps.stop(app)
+    }
 }
 
-// ── Main composable ──────────────────────────────────────────────────────────
+// ── Pantalla ─────────────────────────────────────────────────────────────────
+
+private const val TAB_EQUIPO = "equipo"
+private const val TAB_COMIDAS = "comidas"
+private const val TAB_TRAYECTORIA = "trayectoria"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -232,104 +429,214 @@ fun ConsoleAttendanceScreen(
     initialTab: String? = null,
 ) {
     val context = LocalContext.current
-    val authRepo = remember(context) { AuthRepository(context) }
-    val user = remember { authRepo.loadSession() }
-    val isSuperAdmin = user?.isSuperAdmin == true
-    val isAdmin = !isSuperAdmin && (user?.permissions ?: emptyList()).contains("console.admin")
-
     val vm: ConsoleAttendanceViewModel = viewModel()
     val state by vm.state.collectAsState()
-    var selectedUser by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto?>(null) }
-    var pendingCheckInType by remember { mutableStateOf<String?>(null) }
 
-    if (state.payload == null && state.isLoading && state.error == null) vm.refresh(initial = true)
-
-    val selUser = selectedUser
-    if (selUser != null) {
-        AttendanceUserDetail(selUser, onBack = { selectedUser = null })
-        return
-    }
-
-    val current = state.current
-    val isCheckedIn = current?.isOpen == true
-    val userQuery = state.userQuery.trim().lowercase()
-    val teamUsers = (state.payload?.users ?: emptyList())
-        .filter { u ->
-            if (userQuery.isBlank()) true
-            else (u.userName ?: "Usuario ${u.userId}").lowercase().contains(userQuery)
-        }
-        .sortedByDescending { it.totalMinutes ?: 0 }
-
-    var attendanceTab by remember { mutableStateOf(if (initialTab == "comidas") "comidas" else "asistencia") }
+    var tab by remember { mutableStateOf(if (initialTab == TAB_COMIDAS) TAB_COMIDAS else TAB_EQUIPO) }
     LaunchedEffect(initialTab) {
-        if (initialTab == "comidas") attendanceTab = "comidas"
+        if (initialTab == TAB_COMIDAS) tab = TAB_COMIDAS
     }
 
-    Column(Modifier.fillMaxSize()) {
-    TabRow(selectedTabIndex = if (attendanceTab == "comidas") 1 else 0) {
-        Tab(
-            selected = attendanceTab == "asistencia",
-            onClick = { attendanceTab = "asistencia" },
-            text = { Text("Asistencia") },
-        )
-        Tab(
-            selected = attendanceTab == "comidas",
-            onClick = { attendanceTab = "comidas" },
-            text = { Text("🍽️ Comidas") },
-        )
+    val pestanas = buildList {
+        add(TAB_EQUIPO to "Equipo del día")
+        add(TAB_COMIDAS to "Comidas")
+        if (vm.puedeVerTrayectoria) add(TAB_TRAYECTORIA to "Trayectoria")
     }
-    if (attendanceTab == "comidas") {
-        mx.nexara.mobile.nativeapp.ui.console.comidas.ComidasPanel(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+    val indice = pestanas.indexOfFirst { it.first == tab }.coerceAtLeast(0)
+
+    // Refresco en vivo: cada 15 s mientras la pestaña está a la vista.
+    LaunchedEffect(tab, state.fecha) {
+        if (tab != TAB_EQUIPO) return@LaunchedEffect
+        while (true) {
+            delay(15_000)
+            vm.refresh(initial = false)
+        }
+    }
+    // …y al volver a la app, sin esperar al siguiente tic.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, tab) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && tab == TAB_EQUIPO) vm.refresh(initial = false)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(tab, state.fecha) {
+        if (tab == TAB_TRAYECTORIA) vm.cargarTrayectoria()
+    }
+
+    Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
+        SelectorFecha(
+            fecha = state.fecha,
+            onFecha = vm::setFecha,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         )
-    } else {
-    PullToRefreshBox(
-        isRefreshing = state.isRefreshing,
-        onRefresh = { vm.refresh(initial = false) },
-        modifier = Modifier.weight(1f).fillMaxWidth(),
-    ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(contentPadding),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    "Periodo: ${state.from} → ${state.to}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = SubText,
+
+        TabRow(selectedTabIndex = indice) {
+            pestanas.forEach { (key, label) ->
+                Tab(
+                    selected = tab == key,
+                    onClick = { tab = key },
+                    text = { Text(label) },
                 )
+            }
+        }
+
+        when (tab) {
+            TAB_COMIDAS -> mx.nexara.mobile.nativeapp.ui.console.comidas.ComidasPanel(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                fecha = state.fecha,
+            )
+
+            TAB_TRAYECTORIA -> TrayectoriaTab(
+                state = state,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = contentPadding,
+                onAbrir = { url -> openExternalUrl(context, url) },
+            )
+
+            else -> PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { vm.refresh(initial = false) },
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) {
+                EquipoTab(
+                    vm = vm,
+                    state = state,
+                    contentPadding = contentPadding,
+                    onAbrir = { url -> openExternalUrl(context, url) },
+                )
+            }
+        }
+    }
+}
+
+// ── Selector de día ──────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SelectorFecha(
+    fecha: String,
+    onFecha: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var abierto by remember { mutableStateOf(false) }
+    val hoy = remember { LocalDate.now() }
+    val esHoy = fecha == hoy.format(ISO_FECHA)
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Asistencias",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = NxColors.Slate,
+            )
+            Text(
+                "Tu checada (foto + GPS) · equipo · comidas",
+                fontSize = 12.sp,
+                color = NxColors.Muted,
+            )
+        }
+        OutlinedButton(onClick = { abierto = true }) {
+            Text(if (esHoy) "Hoy · $fecha" else fecha, fontSize = 13.sp)
+        }
+    }
+
+    if (abierto) {
+        val hoyUtc = hoy.toEpochDay() * 86_400_000L
+        val inicial = runCatching { LocalDate.parse(fecha, ISO_FECHA) }.getOrDefault(hoy)
+        val estado = rememberDatePickerState(
+            initialSelectedDateMillis = inicial.toEpochDay() * 86_400_000L,
+            selectableDates = object : SelectableDates {
+                // No hay asistencia del futuro: el máximo es hoy, como en la web.
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= hoyUtc
+                override fun isSelectableYear(year: Int) = year <= hoy.year
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { abierto = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    estado.selectedDateMillis?.let { millis ->
+                        onFecha(LocalDate.ofEpochDay(millis / 86_400_000L).format(ISO_FECHA))
+                    }
+                    abierto = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { abierto = false }) { Text("Cancelar") }
+            },
+        ) {
+            DatePicker(state = estado)
+        }
+    }
+}
+
+// ── Pestaña «Equipo del día» ─────────────────────────────────────────────────
+
+@Composable
+private fun EquipoTab(
+    vm: ConsoleAttendanceViewModel,
+    state: AttendanceUiState,
+    contentPadding: PaddingValues,
+    onAbrir: (String) -> Unit,
+) {
+    val esHoy = state.fecha == hoyIso()
+    var ahoraMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val hayJornadaAbierta = state.presentes > 0 || state.current?.isOpen == true
+    LaunchedEffect(hayJornadaAbierta) {
+        while (hayJornadaAbierta) {
+            ahoraMs = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        state.error?.let { msg ->
+            item {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ATTENDANCE_RANGE_PRESETS.forEach { (key, label) ->
-                        val sel = state.rangePreset == key
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (sel) TealColor else Color(0xFFF1F5F9))
-                                .clickable { vm.setRangePreset(key) }
-                                .padding(horizontal = 14.dp, vertical = 7.dp),
-                        ) {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = if (sel) Color.White else Color(0xFF475569),
-                            )
-                        }
-                    }
+                    Text(msg, fontSize = 13.sp, color = NxColors.Danger, modifier = Modifier.weight(1f))
+                    OutlinedButton(onClick = { vm.refresh() }) { Text("Reintentar") }
                 }
-                if (!state.exportMessage.isNullOrBlank()) {
-                    Text(
-                        state.exportMessage!!,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (state.exportMessage!!.startsWith("✅")) GreenColor else RedColor,
+            }
+        }
+
+        if (vm.viewMode.canRegisterSelf) {
+            item {
+                LocationPermissionBanner(
+                    message = "La asistencia registra tu GPS al marcar entrada o salida.",
+                    requestOnAppear = true,
+                )
+            }
+            item { MiJornadaCard(vm = vm, state = state, esHoy = esHoy, ahoraMs = ahoraMs) }
+            if (state.gpsActivo) {
+                item { GpsJornadaAviso(onDetener = vm::detenerGpsManual) }
+            }
+        }
+
+        if (!vm.viewMode.canManageTeam) {
+            if (!vm.viewMode.canRegisterSelf) {
+                item {
+                    NxEmptyState(
+                        title = "Vista de equipo",
+                        subtitle = "Disponible para dirección, RRHH y coordinadores.",
                     )
                 }
             }
+            item { Spacer(Modifier.height(24.dp)) }
+            return@LazyColumn
         }
 
         if (state.isLoading) {
@@ -337,368 +644,581 @@ fun ConsoleAttendanceScreen(
             return@LazyColumn
         }
 
-        if (!state.error.isNullOrBlank()) {
-            item {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { vm.refresh() }) { Text("Reintentar") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                KpiAsistencia(Modifier.weight(1f), "Equipo", state.personas.size.toString(), NxColors.InfoSoft, NxColors.Info) {
+                    vm.setFiltro(null)
+                }
+                KpiAsistencia(Modifier.weight(1f), "En jornada", state.presentes.toString(), NxColors.SuccessSoft, AttendanceEstado.PRESENTE.color) {
+                    vm.setFiltro(AttendanceEstado.PRESENTE)
+                }
+                KpiAsistencia(Modifier.weight(1f), "Completó", state.completos.toString(), NxColors.InfoSoft, AttendanceEstado.COMPLETO.color) {
+                    vm.setFiltro(AttendanceEstado.COMPLETO)
+                }
+                KpiAsistencia(Modifier.weight(1f), "Sin checada", state.ausentes.toString(), Color(0xFFF1F5F9), AttendanceEstado.AUSENTE.color) {
+                    vm.setFiltro(AttendanceEstado.AUSENTE)
+                }
             }
-            return@LazyColumn
         }
 
-        // ── Personal check-in (not superadmin) ──────────────────────────────
-        if (!isSuperAdmin) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                ChipEstado("Todos", state.personas.size, null, state.filtro == null) { vm.setFiltro(null) }
+                AttendanceEstado.entries.forEach { estado ->
+                    val n = state.personas.count { it.estado == estado }
+                    ChipEstado(estado.etiqueta, n, estado.color, state.filtro == estado) {
+                        vm.setFiltro(estado)
+                    }
+                }
+            }
+        }
+
+        if (state.visibles.isEmpty()) {
             item {
-                mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner(
-                    message = "La asistencia registra tu GPS al marcar entrada o salida.",
-                    requestOnAppear = true,
+                NxEmptyState(
+                    title = if (state.personas.isEmpty()) "Sin registros" else "Nadie en este filtro",
+                    subtitle = if (state.personas.isEmpty()) {
+                        "Nadie en tu alcance para el ${state.fecha}."
+                    } else {
+                        "Prueba otro chip o el KPI de arriba."
+                    },
                 )
             }
-            item {
-                Card(
+        }
+
+        items(state.visibles, key = { "asis-${it.userId}" }) { persona ->
+            PersonaCard(persona = persona, ahoraMs = ahoraMs, onAbrir = onAbrir)
+        }
+
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun MiJornadaCard(
+    vm: ConsoleAttendanceViewModel,
+    state: AttendanceUiState,
+    esHoy: Boolean,
+    ahoraMs: Long,
+) {
+    val context = LocalContext.current
+    var pendiente by remember { mutableStateOf<String?>(null) }
+
+    val abierta = state.current?.isOpen == true
+    val hayEntrada = state.misChecadas.any { it.type.equals("entrada", true) }
+    val haySalida = state.misChecadas.any { it.type.equals("salida", true) }
+    // El API contesta 400 a la segunda entrada del día: aquí se apaga antes.
+    val puedeEntrada = esHoy && !hayEntrada && !abierta
+    val puedeSalida = esHoy && abierta
+    val inicioIso = state.current?.lastEntryAt
+        ?: state.misChecadas.filter { it.type.equals("entrada", true) }.maxByOrNull { it.timestamp }?.timestamp
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (abierta) NxColors.SuccessSoft else Color(0xFFF8FAFC),
+        ),
+        elevation = CardDefaults.cardElevation(2.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                "MI JORNADA",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = NxColors.Muted,
+            )
+            Box(
+                modifier = Modifier.size(72.dp).clip(CircleShape)
+                    .background(if (abierta) AttendanceEstado.PRESENTE.color else Color(0xFFE2E8F0)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(if (abierta) "🟢" else "⚫", fontSize = 28.sp)
+            }
+            Text(
+                when {
+                    abierta -> "Jornada en curso"
+                    haySalida && hayEntrada -> "Jornada completada"
+                    else -> "Sin entrada registrada"
+                },
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (abierta) AttendanceEstado.PRESENTE.color else NxColors.Slate,
+            )
+            if (abierta && inicioIso != null) {
+                Text(
+                    fmtHms(transcurridoMs(inicioIso, null, ahoraMs)),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = AttendanceEstado.PRESENTE.color,
+                )
+                Text("Desde las ${fmtHora(inicioIso)}", fontSize = 12.sp, color = NxColors.Muted)
+            }
+
+            if (!esHoy) {
+                Text(
+                    "Estás viendo el ${state.fecha}: solo se puede checar en el día de hoy.",
+                    fontSize = 12.sp,
+                    color = NxColors.Muted,
+                    textAlign = TextAlign.Center,
+                )
+            }
+
+            val tipoPendiente = pendiente
+            if (tipoPendiente != null) {
+                Text(
+                    if (tipoPendiente == "entrada") "Toma una foto para registrar entrada"
+                    else "Toma una foto para registrar salida",
+                    fontSize = 12.sp,
+                    color = NxColors.Muted,
+                )
+                MediaPickerBar(
+                    onPicked = { picked ->
+                        val first = picked.firstOrNull() ?: return@MediaPickerBar
+                        val dataUrl = ImageDataUrl.fromCaptured(context, first)
+                        if (dataUrl.isNullOrBlank()) {
+                            vm.clearMessage()
+                            return@MediaPickerBar
+                        }
+                        pendiente = null
+                        vm.checkIn(tipoPendiente, dataUrl)
+                    },
+                    allowCamera = true,
+                    allowGallery = false,
+                    allowDocuments = false,
+                )
+                TextButton(onClick = { pendiente = null }) { Text("Cancelar") }
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isCheckedIn) GreenLight else Color(0xFFF8FAFC),
-                    ),
-                    elevation = CardDefaults.cardElevation(2.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                    Button(
+                        onClick = { pendiente = "entrada" },
+                        enabled = puedeEntrada && !state.checkInLoading,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AttendanceEstado.PRESENTE.color),
+                        shape = RoundedCornerShape(12.dp),
                     ) {
                         Text(
-                            "MI REGISTRO DIARIO",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                            ),
-                            color = SubText,
+                            if (state.checkInLoading) "Registrando…" else "▶  Entrada",
+                            fontWeight = FontWeight.Bold,
                         )
-                        Spacer(Modifier.height(12.dp))
-
-                        // Big status indicator
-                        Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(CircleShape)
-                                .background(if (isCheckedIn) GreenColor else Color(0xFFE2E8F0)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                if (isCheckedIn) "🟢" else "⚫",
-                                fontSize = 32.sp,
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
+                    }
+                    Button(
+                        onClick = { pendiente = "salida" },
+                        enabled = puedeSalida && !state.checkInLoading,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Danger),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
                         Text(
-                            if (isCheckedIn) "Jornada en curso" else "Sin entrada registrada hoy",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = if (isCheckedIn) GreenColor else SlateText,
+                            if (state.checkInLoading) "Registrando…" else "⏹  Salida",
+                            fontWeight = FontWeight.Bold,
                         )
+                    }
+                }
+                if (esHoy && !puedeEntrada && !puedeSalida) {
+                    Text(
+                        if (hayEntrada) "Ya registraste tu entrada de hoy." else "Primero registra tu entrada.",
+                        fontSize = 12.sp,
+                        color = NxColors.Muted,
+                    )
+                }
+            }
 
-                        if (current != null) {
-                            Spacer(Modifier.height(4.dp))
-                            val mins = current.totalMinutes ?: 0
-                            Text(
-                                "${String.format("%.1f", mins / 60.0)}h acumuladas hoy",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SubText,
-                            )
-                        }
+            state.checkInMessage?.takeIf { it.isNotBlank() }?.let { msg ->
+                Text(
+                    msg,
+                    fontSize = 12.sp,
+                    color = if (msg.startsWith("✅")) AttendanceEstado.PRESENTE.color else NxColors.Danger,
+                    textAlign = TextAlign.Center,
+                )
+            }
 
-                        Spacer(Modifier.height(16.dp))
-
-                        // Check-in / Check-out buttons — foto obligatoria
-                        if (pendingCheckInType != null) {
-                            Text(
-                                if (pendingCheckInType == "entrada") "Toma una foto para registrar entrada"
-                                else "Toma una foto para registrar salida",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SubText,
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            MediaPickerBar(
-                                onPicked = { picked ->
-                                    val first = picked.firstOrNull() ?: return@MediaPickerBar
-                                    val dataUrl = ImageDataUrl.fromCaptured(context, first)
-                                    if (dataUrl.isNullOrBlank()) {
-                                        vm.clearMessage()
-                                        return@MediaPickerBar
-                                    }
-                                    val type = pendingCheckInType ?: return@MediaPickerBar
-                                    pendingCheckInType = null
-                                    vm.checkIn(type, dataUrl)
-                                },
-                                allowCamera = true,
-                                allowGallery = false,
-                                allowDocuments = false,
-                            )
-                            TextButton(onClick = { pendingCheckInType = null }) {
-                                Text("Cancelar")
-                            }
-                        } else {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                if (!isCheckedIn) {
-                                    Button(
-                                        onClick = { pendingCheckInType = "entrada" },
-                                        enabled = !state.checkInLoading,
-                                        modifier = Modifier.weight(1f).height(52.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = GreenColor),
-                                        shape = RoundedCornerShape(12.dp),
-                                    ) {
-                                        Text(
-                                            if (state.checkInLoading) "Registrando..." else "▶  Registrar Entrada",
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-                                } else {
-                                    Button(
-                                        onClick = { pendingCheckInType = "salida" },
-                                        enabled = !state.checkInLoading,
-                                        modifier = Modifier.weight(1f).height(52.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = RedColor),
-                                        shape = RoundedCornerShape(12.dp),
-                                    ) {
-                                        Text(
-                                            if (state.checkInLoading) "Registrando..." else "⏹  Registrar Salida",
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        if (!state.checkInMessage.isNullOrBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                state.checkInMessage!!,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (state.checkInMessage!!.startsWith("✅")) GreenColor else RedColor,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
+            if (state.misChecadas.isNotEmpty()) {
+                HorizontalDivider()
+                Text(
+                    "Checadas del ${state.fecha}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NxColors.Slate,
+                )
+                state.misChecadas.sortedBy { it.timestamp }.forEach { ev ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            if (ev.type.equals("entrada", true)) "📍 Entrada" else "🏁 Salida",
+                            fontSize = 12.5.sp,
+                            color = NxColors.Slate,
+                        )
+                        Text(fmtHora(ev.timestamp), fontSize = 12.5.sp, color = NxColors.Muted)
                     }
                 }
             }
         }
+    }
+}
 
-        // ── Team / All summary ───────────────────────────────────────────────
-        if (isAdmin || isSuperAdmin) {
-            val users = state.payload?.users ?: emptyList()
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+/**
+ * Rastreo activo: se dice en pantalla, no solo en la notificación. Android 10+
+ * además exige pedir el permiso «todo el tiempo» aparte del de primer plano.
+ */
+@Composable
+private fun GpsJornadaAviso(onDetener: () -> Unit) {
+    val context = LocalContext.current
+    var fondoConcedido by remember { mutableStateOf(tieneUbicacionEnSegundoPlano(context)) }
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { fondoConcedido = tieneUbicacionEnSegundoPlano(context) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = NxColors.InfoSoft),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "📡 Jornada en curso · compartiendo ubicación",
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = NxColors.Slate,
+            )
+            Text(
+                "Tu ubicación se envía cada pocos minutos para dibujar el trayecto del día. " +
+                    "Se apaga sola al registrar tu salida.",
+                fontSize = 12.sp,
+                color = NxColors.Muted,
+            )
+            if (!fondoConcedido && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                Text(
+                    "Con la pantalla apagada el trayecto se corta: permite la ubicación «todo el tiempo».",
+                    fontSize = 12.sp,
+                    color = NxColors.Muted,
+                )
+                OutlinedButton(
+                    onClick = { launcher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) },
+                ) { Text("Permitir todo el tiempo", fontSize = 13.sp) }
+            }
+            TextButton(onClick = onDetener) { Text("Dejar de compartir", fontSize = 13.sp) }
+        }
+    }
+}
+
+private fun tieneUbicacionEnSegundoPlano(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
+    return ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
+}
+
+@Composable
+private fun PersonaCard(
+    persona: AttendancePersona,
+    ahoraMs: Long,
+    onAbrir: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+        elevation = CardDefaults.cardElevation(2.dp),
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(CircleShape).background(NxColors.TealSoft),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        if (isSuperAdmin) "Asistencia de todos los usuarios" else "Asistencia del equipo",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = SlateText,
-                    )
-                    Text("${teamUsers.size}/${users.size}", style = MaterialTheme.typography.bodySmall, color = SubText)
-                }
-            }
-
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = state.userQuery,
-                        onValueChange = vm::setUserQuery,
-                        label = { Text("Buscar usuario") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                    OutlinedButton(
-                        onClick = { vm.clearExportMessage(); vm.exportCsv(context) },
-                        enabled = users.isNotEmpty(),
-                    ) {
-                        Text("CSV")
-                    }
-                }
-            }
-
-            // Summary card
-            item {
-                val totalMins = state.payload?.totalMinutesAll ?: 0
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    SummaryKpi(
-                        modifier = Modifier.weight(1f),
-                        label = "Usuarios",
-                        value = users.size.toString(),
-                        bg = BlueLight,
-                        accent = BlueColor,
-                    )
-                    SummaryKpi(
-                        modifier = Modifier.weight(1f),
-                        label = "Total horas",
-                        value = "${String.format("%.1f", totalMins / 60.0)}h",
-                        bg = TealLight,
-                        accent = TealColor,
-                    )
-                    SummaryKpi(
-                        modifier = Modifier.weight(1f),
-                        label = "Promedio",
-                        value = if (users.isEmpty()) "–" else "${String.format("%.1f", (totalMins.toDouble() / users.size) / 60.0)}h",
-                        bg = GreenLight,
-                        accent = GreenColor,
+                        iniciales(persona.nombre),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NxColors.Teal,
                     )
                 }
-            }
-
-            if (teamUsers.isEmpty()) {
-                item {
-                    NxEmptyState(
-                        title = "Sin registros",
-                        subtitle = if (userQuery.isBlank()) "No hay asistencia en este periodo." else "Ningún usuario coincide con la búsqueda.",
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        persona.nombre,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NxColors.Slate,
+                        maxLines = 1,
                     )
+                    Text(persona.subtitulo, fontSize = 11.5.sp, color = NxColors.Muted, maxLines = 1)
                 }
-            }
-
-            // User rows sorted by hours desc
-            items(teamUsers.take(200)) { u ->
-                val hours = String.format("%.1f", (u.totalMinutes ?: 0) / 60.0)
-                val daysCount = u.days?.size ?: 0
-                Card(
-                    onClick = { selectedUser = u },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(2.dp),
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(persona.estado.color.copy(alpha = 0.12f))
+                        .padding(horizontal = 9.dp, vertical = 4.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                u.userName ?: "Usuario ${u.userId}",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = SlateText,
+                    Text(
+                        persona.estado.etiqueta,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = persona.estado.color,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF8FAFC))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("ENTRADA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
+                    Text(fmtHora(persona.entradaIso), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("SALIDA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
+                    Text(fmtHora(persona.salidaIso), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        if (persona.estado == AttendanceEstado.PRESENTE) "EN VIVO" else "JORNADA",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = NxColors.Muted,
+                    )
+                    Text(
+                        if (persona.estado == AttendanceEstado.AUSENTE) {
+                            "—"
+                        } else {
+                            fmtHms(
+                                transcurridoMs(
+                                    persona.entradaIso,
+                                    if (persona.estado == AttendanceEstado.PRESENTE) null else persona.salidaIso,
+                                    ahoraMs,
+                                ),
                             )
-                            Text(
-                                "$daysCount días registrados",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = SubText,
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(TealLight)
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                        ) {
-                            Text(
-                                "${hours}h",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = TealColor,
-                            )
-                        }
+                        },
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = persona.estado.color,
+                    )
+                }
+            }
+
+            if (persona.fotoEntrada != null || persona.fotoSalida != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    persona.fotoEntrada?.let { FotoChecada("📍 Entrada", it) }
+                    persona.fotoSalida?.let { FotoChecada("🏁 Salida", it) }
+                }
+            }
+
+            if (persona.mapaEntrada != null || persona.mapaSalida != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    persona.mapaEntrada?.let { url ->
+                        Text(
+                            "Mapa entrada",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = NxColors.Teal,
+                            modifier = Modifier.clickable { onAbrir(url) },
+                        )
+                    }
+                    persona.mapaSalida?.let { url ->
+                        Text(
+                            "Mapa salida",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = NxColors.Teal,
+                            modifier = Modifier.clickable { onAbrir(url) },
+                        )
                     }
                 }
             }
         }
-
-        item { Spacer(Modifier.height(24.dp)) }
-    }
-    }
-    }
     }
 }
 
 @Composable
-private fun AttendanceUserDetail(
-    u: mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto,
-    onBack: () -> Unit,
-) {
-    val hours = String.format("%.1f", (u.totalMinutes ?: 0) / 60.0)
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item { Button(onClick = onBack) { Text("← Asistencia") } }
-        item {
-            Text(u.userName ?: "Usuario ${u.userId}", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-            Text("${hours}h · ${u.days?.size ?: 0} días", style = MaterialTheme.typography.bodySmall, color = SubText)
-        }
-        val days = u.days
-        if (!days.isNullOrEmpty()) {
-            item {
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(1.dp)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Días registrados", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
-                        days.forEach { day ->
-                            val dayHours = String.format("%.1f", day.totalMinutes / 60.0)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(day.date.take(10), style = MaterialTheme.typography.bodySmall, color = SubText)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (day.isOpen == true) {
-                                        Text("Abierta", style = MaterialTheme.typography.labelSmall, color = TealColor)
-                                    }
-                                    Text("${dayHours}h", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        val events = u.attendances
-        if (!events.isNullOrEmpty()) {
-            item {
-                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(1.dp)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Eventos", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
-                        events.forEach { ev ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(ev.type.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
-                                Text(ev.timestamp.take(16), style = MaterialTheme.typography.bodySmall, color = SubText)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        item { Spacer(Modifier.height(24.dp)) }
+private fun FotoChecada(etiqueta: String, url: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        ProtectedImage(
+            url = url,
+            contentDescription = etiqueta,
+            modifier = Modifier.size(62.dp).clip(RoundedCornerShape(10.dp)),
+        )
+        Text(etiqueta, fontSize = 10.sp, color = NxColors.Muted)
     }
 }
 
 @Composable
-private fun SummaryKpi(
+private fun KpiAsistencia(
     modifier: Modifier,
     label: String,
     value: String,
     bg: Color,
     accent: Color,
+    onClick: () -> Unit,
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = bg),
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                value,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = accent,
-            )
-            Text(label, style = MaterialTheme.typography.labelSmall, color = SubText)
+            Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = accent)
+            Text(label, fontSize = 10.5.sp, color = NxColors.Muted, textAlign = TextAlign.Center)
         }
     }
 }
 
+@Composable
+private fun ChipEstado(
+    label: String,
+    count: Int,
+    color: Color?,
+    activo: Boolean,
+    onClick: () -> Unit,
+) {
+    val tinte = color ?: NxColors.Teal
+    val shape = RoundedCornerShape(999.dp)
+    Box(
+        modifier = Modifier
+            .heightIn(min = 34.dp)
+            .clip(shape)
+            .background(if (activo) tinte.copy(alpha = 0.12f) else Color.White)
+            .border(1.dp, if (activo) tinte else Color(0xFFE2E8F0), shape)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "$label $count",
+            fontSize = 12.5.sp,
+            fontWeight = if (activo) FontWeight.Bold else FontWeight.SemiBold,
+            color = if (activo) tinte else NxColors.Slate,
+        )
+    }
+}
+
+// ── Pestaña «Trayectoria» ────────────────────────────────────────────────────
+
+@Composable
+private fun TrayectoriaTab(
+    state: AttendanceUiState,
+    modifier: Modifier,
+    contentPadding: PaddingValues,
+    onAbrir: (String) -> Unit,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (state.trayectoCargando) {
+            item { NxLoadingBlock("Cargando trayectoria…") }
+            return@LazyColumn
+        }
+
+        item {
+            Text(
+                "GPS del equipo",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = NxColors.Slate,
+            )
+            Text("Unidades con jornada abierta.", fontSize = 12.sp, color = NxColors.Muted)
+        }
+
+        if (state.equipoGps.isEmpty()) {
+            item { NxEmptyState(title = "Sin ubicaciones", subtitle = "Nadie comparte GPS ahora.") }
+        }
+
+        items(state.equipoGps, key = { "gps-${it.id}" }) { punto ->
+            val lat = attendanceCoord(punto.latitud)
+            val lng = attendanceCoord(punto.longitud)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+                elevation = CardDefaults.cardElevation(1.dp),
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        punto.usuario?.nombre ?: "Usuario #${punto.usuarioId}",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NxColors.Slate,
+                    )
+                    Text(
+                        if (lat != null && lng != null) {
+                            "${"%.5f".format(lat)}, ${"%.5f".format(lng)}"
+                        } else {
+                            "Sin coordenadas"
+                        },
+                        fontSize = 12.sp,
+                        color = NxColors.Muted,
+                    )
+                    mapaUrl(lat, lng)?.let { url ->
+                        Text(
+                            "Ver en mapa",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = NxColors.Teal,
+                            modifier = Modifier.clickable { onAbrir(url) },
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Text(
+                "Mi trayecto · ${state.trayecto.size} puntos",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = NxColors.Slate,
+            )
+            Text("Entrada, GPS y salida del ${state.fecha}.", fontSize = 12.sp, color = NxColors.Muted)
+        }
+
+        if (state.trayecto.isEmpty()) {
+            item {
+                NxEmptyState(
+                    title = "Sin puntos",
+                    subtitle = "No hay recorrido registrado para este día.",
+                )
+            }
+        } else {
+            item {
+                val ruta = state.trayecto.mapNotNull { p ->
+                    val lat = attendanceCoord(p.latitud)
+                    val lng = attendanceCoord(p.longitud)
+                    if (lat != null && lng != null) "${"%.6f".format(lat)},${"%.6f".format(lng)}" else null
+                }
+                if (ruta.isNotEmpty()) {
+                    val muestra = if (ruta.size <= 18) ruta else {
+                        val paso = (ruta.size - 1).toDouble() / 17
+                        (0..17).map { ruta[Math.round(it * paso).toInt()] }
+                    }
+                    OutlinedButton(
+                        onClick = { onAbrir("https://www.google.com/maps/dir/${muestra.joinToString("/")}") },
+                    ) { Text("Ver recorrido en Maps", fontSize = 13.sp) }
+                }
+            }
+        }
+
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}

@@ -48,6 +48,52 @@ import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 
 enum class NotificationFilter { ALL, UNREAD }
 
+/**
+ * Cubos de categoría del centro de notificaciones web (`bucketCategory` en
+ * `apps/web/app/(panels)/erp/notifications-center/page.tsx`).
+ */
+enum class NotificationCategory(val label: String) {
+    TODAS("Todas"),
+    OPS("Operación"),
+    SALES("Comercial"),
+    ERP("ERP"),
+    OTRAS("Otras"),
+    ;
+
+    companion object {
+        fun of(category: String?): NotificationCategory {
+            val c = category?.trim()?.lowercase().orEmpty()
+            return when {
+                c.contains("sla") || c == "activity" || c == "activities" ||
+                    c == "noc" || c == "evidence" -> OPS
+                c.contains("quote") || c == "crm" || c == "sales" -> SALES
+                c == "erp" || c.contains("purchase") || c.contains("stock") ||
+                    c == "finance" || c == "approval" -> ERP
+                else -> OTRAS
+            }
+        }
+    }
+}
+
+/** Etiqueta legible de la categoría cruda, igual que `CATEGORY_LABEL` en la web. */
+internal val NOTIFICATION_CATEGORY_LABEL: Map<String, String> = mapOf(
+    "attendance" to "Asistencia",
+    "activity" to "OT",
+    "activities" to "OT",
+    "tool" to "Herramientas",
+    "finance" to "Finanzas",
+    "noc" to "NOC",
+    "crm" to "CRM",
+    "approval" to "Aprobación",
+    "evidence" to "Evidencias",
+    "sales" to "Ventas",
+    "quotes" to "Cotizaciones",
+    "sla-alert" to "SLA",
+    "sla-breach" to "SLA",
+    "erp" to "ERP",
+    "confirmations" to "Confirmación",
+)
+
 enum class NotificationViewMode { BANDEJA, FEED }
 
 data class NotificationsUiState(
@@ -59,6 +105,7 @@ data class NotificationsUiState(
     val unreadCount: Int = 0,
     val rows: List<NotificationRowDto> = emptyList(),
     val filter: NotificationFilter = NotificationFilter.ALL,
+    val category: NotificationCategory = NotificationCategory.TODAS,
     val viewMode: NotificationViewMode = NotificationViewMode.BANDEJA,
     val feedItems: List<Map<String, Any?>> = emptyList(),
 )
@@ -87,6 +134,8 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissMessage() = _state.update { it.copy(message = null) }
 
     fun setFilter(filter: NotificationFilter) = _state.update { it.copy(filter = filter) }
+
+    fun setCategory(category: NotificationCategory) = _state.update { it.copy(category = category) }
 
     fun setViewMode(mode: NotificationViewMode) {
         _state.update { it.copy(viewMode = mode) }
@@ -217,6 +266,9 @@ fun NotificationsScreen(
     val filteredRows = when (state.filter) {
         NotificationFilter.ALL -> state.rows
         NotificationFilter.UNREAD -> state.rows.filter { it.isRead != true }
+    }.let { rows ->
+        if (state.category == NotificationCategory.TODAS) rows
+        else rows.filter { NotificationCategory.of(it.category) == state.category }
     }
 
     Column(
@@ -331,6 +383,29 @@ fun NotificationsScreen(
                     }
                 }
 
+                // Mismos cubos de categoría que el centro de notificaciones web.
+                item {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        NotificationCategory.entries.forEach { cat ->
+                            val count = if (cat == NotificationCategory.TODAS) {
+                                state.rows.size
+                            } else {
+                                state.rows.count { NotificationCategory.of(it.category) == cat }
+                            }
+                            FilterChip(
+                                selected = state.category == cat,
+                                onClick = { vm.setCategory(cat) },
+                                label = { Text("${cat.label} ($count)") },
+                            )
+                        }
+                    }
+                }
+
                 if (!state.message.isNullOrBlank()) {
                     item {
                         Text(state.message!!, color = MaterialTheme.colorScheme.primary)
@@ -387,7 +462,9 @@ fun NotificationsScreen(
                                     Text(n.message!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 val meta = buildList {
-                                    n.category?.takeIf { it.isNotBlank() }?.let { add(it) }
+                                    n.category?.takeIf { it.isNotBlank() }?.let { raw ->
+                                        add(NOTIFICATION_CATEGORY_LABEL[raw.lowercase()] ?: raw)
+                                    }
                                     n.createdAt?.takeIf { it.isNotBlank() }?.let { add(it.take(16)) }
                                     if (n.isRead == true) add("Leída") else add("No leída")
                                     if (isNavigable) add("Abrir módulo")

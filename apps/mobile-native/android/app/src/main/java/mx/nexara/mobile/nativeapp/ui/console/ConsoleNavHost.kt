@@ -57,8 +57,11 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.ActividadesScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.BoardPersonScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.ConsoleActivityDetailByIdScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityFormScreen
+import mx.nexara.mobile.nativeapp.access.ClientSector
+import mx.nexara.mobile.nativeapp.ui.console.clients.ClientDetailScreen
+import mx.nexara.mobile.nativeapp.ui.console.clients.ClientsListScreen
+import mx.nexara.mobile.nativeapp.ui.console.clients.NewClientScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
-import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleClientsScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
@@ -73,6 +76,16 @@ internal object ConsoleRoutes {
     const val Attendance = "console/attendance"
     const val Chat = "console/chat"
     const val Clients = "console/clients"
+
+    /** Ficha del cliente (`/erp/clientes/:id`); es la ruta que arma [DeepLinkNavigation]. */
+    const val ClientDetail = "console/clients/{id}"
+
+    /**
+     * Alta de cliente (`/erp/clientes/nuevo?sector=`). No cuelga de
+     * `console/clients/` para no competir con [ClientDetail] al resolver la ruta.
+     */
+    const val NewClient = "console/clients-new?sector={sector}"
+
     const val MyProfile = "console/my-profile"
     const val Notifications = "console/notifications"
     const val OfflineQueue = "console/offline-queue"
@@ -81,6 +94,10 @@ internal object ConsoleRoutes {
      * Alta Core: `self=true` = /erp/mis-actividades/nueva; `userId` = /erp/pizarra/:userId/asignar.
      */
     const val NewActivity = "console/activities/new?self={self}&userId={userId}"
+
+    fun clientDetail(id: Long): String = "console/clients/$id"
+
+    fun newClient(sectorSlug: String?): String = "console/clients-new?sector=${sectorSlug.orEmpty()}"
 
     fun selfAssign(): String = "console/activities/new?self=true&userId=-1"
 
@@ -206,6 +223,8 @@ fun ConsoleNavHost(
         ConsoleRoutes.Attendance -> "Asistencias"
         ConsoleRoutes.Chat -> "Chat"
         ConsoleRoutes.Clients -> "Clientes"
+        ConsoleRoutes.ClientDetail -> "Cliente"
+        ConsoleRoutes.NewClient -> "Nuevo cliente"
         ConsoleRoutes.MyProfile -> "Mi perfil"
         ConsoleRoutes.Notifications -> "Notificaciones"
         ConsoleRoutes.OfflineQueue -> "Cola offline"
@@ -345,7 +364,39 @@ fun ConsoleNavHost(
                 )
             }
             nxComposable(ConsoleRoutes.Clients) {
-                ConsoleClientsScreen()
+                ClientsListScreen(
+                    onOpenClient = { clientId ->
+                        navController.navigate(ConsoleRoutes.clientDetail(clientId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNewClient = { sector ->
+                        navController.navigate(ConsoleRoutes.newClient(sector?.slug)) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            nxComposable(ConsoleRoutes.ClientDetail, style = NxNavAnimStyle.Push) { entry ->
+                val clientId = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                ClientDetailScreen(
+                    clientId = clientId,
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            nxComposable(ConsoleRoutes.NewClient, style = NxNavAnimStyle.Modal) { entry ->
+                val slug = entry.arguments?.getString("sector").orEmpty()
+                NewClientScreen(
+                    presetSector = ClientSector.fromApi(slug),
+                    onBack = { navController.popBackStack() },
+                    onCreated = { clientId ->
+                        // Igual que la web: del alta se sale a la ficha recién creada.
+                        navController.popBackStack()
+                        navController.navigate(ConsoleRoutes.clientDetail(clientId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
             }
             nxComposable(ConsoleRoutes.MyProfile) {
                 MyProfileScreen(

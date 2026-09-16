@@ -261,14 +261,38 @@ data class AttendanceDayDto(
     val isOpen: Boolean? = null,
 )
 
+/**
+ * Checada suelta. `entry*` / `exit*` llegan como `Decimal` de Prisma: según el
+ * serializador salen como número o como cadena, así que se leen con
+ * [attendanceCoord] en vez de declararlos `Double`.
+ */
 data class AttendanceEventDto(
     val type: String,
     val timestamp: String,
+    val deviceInfo: String? = null,
+    val photoUrl: String? = null,
+    val entryLatitude: Any? = null,
+    val entryLongitude: Any? = null,
+    val exitLatitude: Any? = null,
+    val exitLongitude: Any? = null,
 )
+
+/** `null` cuando el valor no es una coordenada real (espejo de `toCoord` en la web). */
+fun attendanceCoord(value: Any?): Double? = when (value) {
+    null -> null
+    is Double -> value.takeIf { it.isFinite() }
+    is Float -> value.toDouble().takeIf { it.isFinite() }
+    is Number -> value.toDouble().takeIf { it.isFinite() }
+    is String -> value.trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+    else -> null
+}
 
 data class AttendanceRangeUserDto(
     val userId: Long,
     val userName: String? = null,
+    val email: String? = null,
+    val department: String? = null,
+    val roleName: String? = null,
     val totalMinutes: Int? = null,
     val days: List<AttendanceDayDto>? = null,
     val attendances: List<AttendanceEventDto>? = null,
@@ -290,6 +314,8 @@ data class AttendanceCurrentDto(
     val checkOut: String? = null,
     val totalMinutes: Int? = null,
     val isOpen: Boolean? = null,
+    /** Hora de la última entrada de la jornada abierta (`AttendanceDay.lastEntryAt`). */
+    val lastEntryAt: String? = null,
 )
 
 data class AttendanceRegisterRequest(
@@ -443,11 +469,23 @@ interface ConsoleApi {
         @retrofit2.http.Body body: UpdateUserBody,
     ): UserAdminDto
 
+    /**
+     * @param scope `subtree` limita al organigrama de quien consulta. Sin él, un
+     * usuario con `attendance.manage` recibe la empresa entera (la web solo lo
+     * omite para CEO / plataforma).
+     */
     @GET("attendance/hierarchy/range")
     suspend fun getAttendanceHierarchyRange(
         @Query("from") from: String,
         @Query("to") to: String,
+        @Query("scope") scope: String? = null,
     ): AttendanceRangeDto
+
+    /** Checadas propias del día (`attendance/history?date=`). */
+    @GET("attendance/history")
+    suspend fun getAttendanceHistory(
+        @Query("date") date: String? = null,
+    ): List<AttendanceEventDto>
 
     @GET("attendance/range")
     suspend fun getAttendanceRange(
@@ -1425,6 +1463,8 @@ data class UserProfileMeDto(
     val id: Long,
     val nombre: String,
     val email: String,
+    /** Nº de empleado ERP; la web lo usa como último recurso para la ficha ACS. */
+    val employeeNumber: String? = null,
     val perfil: UserProfileDataDto? = null,
     val role: UserRoleRefDto? = null,
     val department: UserDepartmentRefDto? = null,

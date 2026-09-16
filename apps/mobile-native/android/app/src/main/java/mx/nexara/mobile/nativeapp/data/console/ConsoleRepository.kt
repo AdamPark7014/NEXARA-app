@@ -220,10 +220,20 @@ class ConsoleRepository(context: Context) {
         }
     }
 
-    suspend fun attendanceRange(from: String, to: String, tryHierarchyFirst: Boolean = true) =
+    /**
+     * @param scope `subtree` para ver solo el organigrama propio. La web solo lo
+     * omite para el dueño de la plataforma y el super admin; sin él cualquier
+     * `attendance.manage` recibía la asistencia de toda la empresa.
+     */
+    suspend fun attendanceRange(
+        from: String,
+        to: String,
+        tryHierarchyFirst: Boolean = true,
+        scope: String? = null,
+    ) =
         if (tryHierarchyFirst) {
             try {
-                api.getAttendanceHierarchyRange(from = from, to = to)
+                api.getAttendanceHierarchyRange(from = from, to = to, scope = scope)
             } catch (_: Exception) {
                 api.getAttendanceRange(from = from, to = to)
             }
@@ -232,6 +242,9 @@ class ConsoleRepository(context: Context) {
         }
 
     suspend fun attendanceCurrent() = api.getAttendanceCurrent()
+
+    /** Checadas propias del día (`yyyy-MM-dd`); null = hoy. */
+    suspend fun attendanceHistory(date: String? = null) = api.getAttendanceHistory(date = date)
 
     suspend fun attendanceCheckIn(
         type: String,

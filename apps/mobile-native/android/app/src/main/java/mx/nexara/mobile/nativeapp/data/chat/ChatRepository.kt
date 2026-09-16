@@ -64,6 +64,13 @@ class ChatRepository(context: Context) {
     suspend fun messages(channelId: Long, limit: Int = 50): List<ChatMessageDto> =
         api.listMessages(channelId, limit).messages
 
+    /**
+     * Ventana centrada en [aroundId] (`GET chat/channels/:id/messages?aroundId=`):
+     * así un enlace `?channel&msg` abre un mensaje anterior a los últimos 50.
+     */
+    suspend fun messagesAround(channelId: Long, aroundId: Long, limit: Int = 50): List<ChatMessageDto> =
+        api.listMessages(channelId, limit = limit, aroundId = aroundId).messages
+
     /** Latest page filtered client-side; API has `beforeId` only (no `sinceId`). */
     suspend fun messagesNewSince(channelId: Long, afterId: Long?, limit: Int = 50): List<ChatMessageDto> {
         val page = api.listMessages(channelId, limit).messages

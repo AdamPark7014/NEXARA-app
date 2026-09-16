@@ -5,6 +5,15 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--
+      Rastreo de jornada: entre la entrada y la salida la app envía la ubicación
+      aunque la pantalla esté apagada, para dibujar el trayecto del día en el
+      ERP. Mientras ocurre hay una notificación permanente que lo dice, y se
+      apaga sola al registrar la salida.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -27,6 +36,13 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
+
+        <!-- GPS de jornada: vive entre la entrada y la salida, en primer plano. -->
+        <service
+            android:name=".util.JornadaGpsService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="location" />
 
         <!-- Firebase Cloud Messaging -->
         <service
