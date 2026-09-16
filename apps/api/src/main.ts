@@ -176,11 +176,26 @@ async function bootstrap() {
     banWindowMs: readPositiveIntEnv('IP_BAN_WINDOW_MS', 60 * 60_000),
   });
 
+  // En desarrollo, la web, el emulador de Android y curl salen todos por loopback:
+  // dos o tres contraseñas mal escritas dejaban la máquina entera fuera una hora.
+  // En producción no aplica: ahí el castigo por IP es la defensa contra fuerza bruta.
+  const isLocalIp = (ip: string) => {
+    const clean = (ip || '').replace(/^::ffff:/, '');
+    return (
+      clean === '127.0.0.1' ||
+      clean === '::1' ||
+      clean.startsWith('10.') ||
+      clean.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(clean)
+    );
+  };
+  const banExempt = (ip: string) => process.env['NODE_ENV'] !== 'production' && isLocalIp(ip);
+
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
     // Prefer Express req.ip (trust proxy = 1). Raw X-Forwarded-For[0] is spoofable.
     const ip = getClientIpFromRequestMeta(undefined, request.ip);
 
-    if (ipPenaltyBox.isBanned(ip)) {
+    if (!banExempt(ip) && ipPenaltyBox.isBanned(ip)) {
       const retrySeconds = Math.max(1, Math.ceil(ipPenaltyBox.retryAfterMs(ip) / 1000));
       response.setHeader('Retry-After', `${retrySeconds}`);
       response.status(403).json({
