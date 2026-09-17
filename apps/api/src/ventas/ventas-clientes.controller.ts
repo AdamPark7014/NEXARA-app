@@ -56,9 +56,21 @@ export class VentasClientesController {
     return this.satService.lookupFiscalByRfc(rfc);
   }
 
+  /**
+   * Qué puede hacer quien consulta con el padrón: agregar/editar (jefes con personal a cargo,
+   * administración y dirección) y desactivar/eliminar (solo Christian). Ruta literal antes de `:id`.
+   */
+  @Get('permisos')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
+  permisos(@CurrentUser() user: any) {
+    return this.ventasService.getClientPermissions(user);
+  }
+
+  // Quién agrega (jefes con personal a cargo, administración, dirección) lo decide el servicio.
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
   async create(
     @Body() dto: CreateSalesClientDto,
     @CurrentUser() user: any,
@@ -129,7 +141,7 @@ export class VentasClientesController {
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateSalesClientDto,
@@ -148,9 +160,10 @@ export class VentasClientesController {
     return updated;
   }
 
+  // Guard amplio a propósito: la regla (solo Christian) la aplica el servicio con un 403 claro.
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
   async remove(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: any,
@@ -163,8 +176,51 @@ export class VentasClientesController {
       entityId: removed.id,
       actorId: user?.id,
       companyId,
+      metadata: { name: removed.name, taxId: removed.taxId ?? null },
     });
     return removed;
+  }
+
+  /** Desactivar (status «Inactivo»): solo Christian. Queda en AuditLog. */
+  @Post(':id/desactivar')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
+  async deactivate(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const { updated, prevStatus } = await this.ventasService.setClientActive(id, false, user, companyId);
+    await this.ventasService.createAuditEvent({
+      action: 'client.deactivate',
+      entityType: 'client',
+      entityId: updated.id,
+      actorId: user?.id,
+      companyId,
+      metadata: { name: updated.name, from: prevStatus, to: updated.status },
+    });
+    return updated;
+  }
+
+  /** Reactivar (status «Activo»): solo Christian. Queda en AuditLog. */
+  @Post(':id/reactivar')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [...SALES_VIEW_ACCESS, ...SALES_MANAGE_ACCESS] })
+  async reactivate(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const { updated, prevStatus } = await this.ventasService.setClientActive(id, true, user, companyId);
+    await this.ventasService.createAuditEvent({
+      action: 'client.reactivate',
+      entityType: 'client',
+      entityId: updated.id,
+      actorId: user?.id,
+      companyId,
+      metadata: { name: updated.name, from: prevStatus, to: updated.status },
+    });
+    return updated;
   }
 
   @Post(':id/provision-service-client')
