@@ -1,11 +1,11 @@
 import { ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { PERMISSIONS } from '../common/permissions.js';
 import { companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { CreateGpsDto } from './dto/create-gps.dto.js';
 import { parseWorkDate, workDateColumn, workDayBounds } from '../common/time/workday.js';
 import { ActivityGeofenceService } from '../activities/geofence/activity-geofence.service.js';
+import { puedeVerGpsDireccion } from '../attendance/asistencia-confiable.js';
 
 @Injectable()
 export class GpsService {
@@ -136,39 +136,39 @@ export class GpsService {
     return Array.from(byUser.values());
   }
 
-  private hasPermission(
-    user: { permissions?: string[]; isSuperAdmin?: boolean } | null | undefined,
-    permission: string,
-  ) {
-    if (!user) return false;
-    if (user.isSuperAdmin) return true;
-    return Boolean(user.permissions?.includes(permission));
+  /**
+   * GPS en vivo: sólo dirección.
+   *
+   * El mapa del equipo y las trayectorias son telemetría minuto a minuto, no
+   * asistencia. Un coordinador ve las checadas de su gente —con el punto desde
+   * el que ficharon y su distancia al sitio—; seguir a alguien por la ciudad se
+   * queda en dirección (contrato del viernes 18-09, sección A).
+   */
+  private exigirDireccion(requester?: { email?: string | null } | null) {
+    if (!puedeVerGpsDireccion(requester)) {
+      throw new ForbiddenException('El GPS en vivo del equipo es solo para dirección');
+    }
   }
 
   async findTeamLocations(
     requester: {
       id: number;
       departmentId?: number;
+      email?: string | null;
       permissions?: string[];
       isSuperAdmin?: boolean;
     },
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
+    this.exigirDireccion(requester);
     const today = this.getTodayDateOnly();
-    const canSeeAll =
-      this.hasPermission(requester, PERMISSIONS.CONSOLE_ADMIN) ||
-      this.hasPermission(requester, PERMISSIONS.GPS_MANAGE);
 
     const userFilter: any = {
       locationConsent: true,
       attendanceDays: { some: { date: today, isOpen: true } },
       companyMemberships: { some: { companyId: tenantId } },
     };
-
-    if (!canSeeAll && requester.departmentId) {
-      userFilter.departmentId = requester.departmentId;
-    }
 
     const allowedUsers = await this.prisma.user.findMany({
       where: userFilter,
@@ -207,43 +207,18 @@ export class GpsService {
     });
   }
 
-  /** Viewer + descendientes por managerId (mismo criterio que asistencia subtree). */
-  private async getManagerSubtreeIds(
-    rootId: number,
-    companyId?: number | null,
-  ): Promise<Set<number>> {
-    const tenantId = requireCompanyId(companyId);
-    const users = await this.prisma.user.findMany({
-      where: {
-        isActive: true,
-        companyMemberships: { some: { companyId: tenantId } },
-      },
-      select: { id: true, managerId: true },
-    });
-    const children = new Map<number, number[]>();
-    for (const u of users) {
-      if (u.managerId == null) continue;
-      const list = children.get(u.managerId) ?? [];
-      list.push(u.id);
-      children.set(u.managerId, list);
-    }
-    const out = new Set<number>([rootId]);
-    const queue = [rootId];
-    while (queue.length) {
-      const id = queue.shift()!;
-      for (const child of children.get(id) ?? []) {
-        if (out.has(child)) continue;
-        out.add(child);
-        queue.push(child);
-      }
-    }
-    return out;
-  }
-
+  /**
+   * Trayectoria de una persona: sólo dirección, la suya incluida.
+   *
+   * Antes un encargado con `attendance.manage` veía el recorrido completo de
+   * sus subordinados. Eso es seguir a alguien por la ciudad, no comprobar que
+   * llegó: para eso están la checada, su punto y su distancia al sitio.
+   */
   async getTrajectoryForUser(
     requester: {
       id: number;
       departmentId?: number;
+      email?: string | null;
       permissions?: string[];
       isSuperAdmin?: boolean;
     },
@@ -251,36 +226,8 @@ export class GpsService {
     date?: string,
     companyId?: number | null,
   ) {
-    const perms = requester.permissions ?? [];
-    const isDirGps =
-      Boolean(requester.isSuperAdmin) ||
-      perms.includes(PERMISSIONS.GPS_MANAGE) ||
-      perms.includes(PERMISSIONS.CONSOLE_ADMIN);
-    const isTeamManager = perms.includes(PERMISSIONS.ATTENDANCE_MANAGE);
-    const hasGpsView = perms.includes(PERMISSIONS.GPS_VIEW);
-    const isSelf = targetUserId === requester.id;
-
-    // Propio trayecto: dirección sí; campo (GPS_VIEW sin manage) sí; encargados no.
-    if (isSelf) {
-      if (isDirGps || (hasGpsView && !isTeamManager)) {
-        return this.getMyTrajectory(targetUserId, date, companyId);
-      }
-      throw new ForbiddenException('Los encargados no pueden ver su propio trayecto GPS');
-    }
-
-    // Ajenos: dirección company-wide; encargados solo subordinados (managerId).
-    if (isDirGps) {
-      return this.getMyTrajectory(targetUserId, date, companyId);
-    }
-
-    if (isTeamManager) {
-      const tree = await this.getManagerSubtreeIds(requester.id, companyId);
-      if (tree.has(targetUserId)) {
-        return this.getMyTrajectory(targetUserId, date, companyId);
-      }
-    }
-
-    throw new ForbiddenException('No tienes permisos para ver el trayecto de este usuario');
+    this.exigirDireccion(requester);
+    return this.getMyTrajectory(targetUserId, date, companyId);
   }
 
   /**
@@ -303,9 +250,16 @@ export class GpsService {
     });
   }
 
-  findOneWithUser(id: number) {
-    return this.prisma['locationTracking'].findUnique({
-      where: { id },
+  /**
+   * Un punto suelto, acotado a la empresa de quien pregunta.
+   *
+   * Antes buscaba por id a secas: con el id de otra empresa devolvía su punto,
+   * con su usuario dentro. Ahora sin `companyId` no hay resultado.
+   */
+  findOneWithUser(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    return this.prisma['locationTracking'].findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         usuario: { include: { role: true, department: true } },
         actividad: true,
