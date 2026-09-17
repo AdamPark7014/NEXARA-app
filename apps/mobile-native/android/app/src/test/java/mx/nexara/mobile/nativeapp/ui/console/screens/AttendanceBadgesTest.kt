@@ -1,5 +1,8 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
+import mx.nexara.mobile.nativeapp.data.api.ActivityPersonRefDto
+import mx.nexara.mobile.nativeapp.data.api.AttendanceCorreccionDto
+import mx.nexara.mobile.nativeapp.data.api.AttendanceEventDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRegisterResponse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -64,6 +67,58 @@ class AttendanceBadgesTest {
     fun `una api vieja no genera insignias`() {
         assertTrue(AttendanceBadges.deRegistro(AttendanceRegisterResponse(id = 1, type = "entrada")).isEmpty())
         assertTrue(AttendanceBadges.deRegistro(null).isEmpty())
+    }
+
+    @Test
+    fun `una checada del equipo lleva sus avisos y sus correcciones`() {
+        val badges = AttendanceBadges.de(
+            AttendanceEventDto(
+                type = "salida",
+                timestamp = "2026-09-17T23:30:00Z",
+                cierreAutomatico = true,
+                validacion = "REVISAR",
+                motivoValidacion = "Sin salida registrada: cierre automático",
+                correcciones = listOf(
+                    AttendanceCorreccionDto(
+                        antes = "2026-09-17T23:30:00Z",
+                        despues = "2026-09-17T18:05:00Z",
+                        motivo = "Se fue a las 18:05 y olvidó checar",
+                        por = ActivityPersonRefDto(id = 1, nombre = "Christian"),
+                    ),
+                ),
+            ),
+        )
+        val textos = badges.map { it.texto }
+        assertEquals(
+            listOf(
+                AttendanceBadges.CIERRE_AUTOMATICO,
+                "Revisar: Sin salida registrada: cierre automático",
+                AttendanceBadges.CORREGIDA,
+            ),
+            textos,
+        )
+    }
+
+    @Test
+    fun `la correccion dice quien y por que`() {
+        assertEquals(
+            "Corregida por Christian: olvidó checar salida",
+            AttendanceBadges.correccionTexto(
+                AttendanceCorreccionDto(
+                    motivo = "olvidó checar salida",
+                    por = ActivityPersonRefDto(id = 1, nombre = "Christian"),
+                ),
+            ),
+        )
+        assertEquals("Corregida", AttendanceBadges.correccionTexto(AttendanceCorreccionDto()))
+    }
+
+    @Test
+    fun `una checada vieja del equipo no inventa avisos`() {
+        assertTrue(
+            AttendanceBadges.de(AttendanceEventDto(type = "entrada", timestamp = "2026-09-17T14:00:00Z")).isEmpty(),
+        )
+        assertTrue(AttendanceBadges.de(null as AttendanceEventDto?).isEmpty())
     }
 
     @Test
