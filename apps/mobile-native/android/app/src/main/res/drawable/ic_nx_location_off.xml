@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols «location_off»: alerta de asistencia (ubicación simulada, fuera de sitio, cierre automático). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,6.5c1.38,0 2.5,1.12 2.5,2.5c0,0.74 -0.33,1.39 -0.83,1.85l3.63,3.63c0.98,-1.86 1.7,-3.8 1.7,-5.48c0,-3.87 -3.13,-7 -7,-7c-1.98,0 -3.76,0.83 -5.04,2.15l3.19,3.19C10.61,6.83 11.26,6.5 12,6.5z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M20.49,20.49L3.51,3.51L2.1,4.93l3.15,3.15C5.09,8.63 5,9.2 5,9.8c0,4.77 5.73,10.7 7,11.9c0.59,-0.56 2.32,-2.29 3.92,-4.42l3.16,3.16L20.49,20.49z" />
+</vector>
