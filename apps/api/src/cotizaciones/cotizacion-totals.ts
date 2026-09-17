@@ -13,6 +13,9 @@ import {
 
 export type RawCotizacionItem = {
   productId?: number | string | null;
+  grupo?: string | null;
+  paqueteClave?: string | null;
+  paqueteCantidad?: number | string | null;
   category?: string | null;
   name?: string | null;
   description?: string | null;
@@ -50,6 +53,10 @@ export type RawCotizacionItem = {
 
 export type NormalizedCotizacionItem = {
   productId: number | null;
+  /** EQUIPOS | MATERIALES | MANO_DE_OBRA; `null` = se deduce al imprimir. */
+  grupo: string | null;
+  paqueteClave: string | null;
+  paqueteCantidad: number | null;
   category: string;
   name: string;
   description: string | null;
@@ -186,6 +193,9 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
 
     return {
       productId: item.productId ? Number(item.productId) : null,
+      grupo: item.grupo?.trim().toUpperCase().replace(/[\s-]+/g, '_') || null,
+      paqueteClave: item.paqueteClave?.trim() || null,
+      paqueteCantidad: item.paqueteCantidad != null ? Number(item.paqueteCantidad) : null,
       category: item.category?.trim() || 'Otros',
       name: item.name?.trim() || 'Concepto',
       description: item.description?.trim() || null,

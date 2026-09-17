@@ -1,10 +1,28 @@
-import { IsArray, IsDateString, IsEmail, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsDateString, IsEmail, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CotizacionItemDto } from './cotizacion-item.dto.js';
+import { SEGMENTOS } from '../terminos-segmento.js';
 
 export class UpdateCotizacionDto {
+  /** El folio no se reescribe desde el cliente: se conserva el que emitió el servidor. */
   @IsOptional()
   @IsString()
   quoteNumber?: string;
+
+  @IsOptional()
+  @IsIn([...SEGMENTOS])
+  segmento?: string;
+
+  @IsOptional()
+  @IsString()
+  objetivo?: string;
+
+  @IsOptional()
+  @IsArray()
+  alcanceBloques?: unknown[];
+
+  @IsOptional()
+  @IsArray()
+  planos?: unknown[];
 
   @IsOptional()
   @IsDateString()

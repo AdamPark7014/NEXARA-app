@@ -1,9 +1,25 @@
-import { IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { GRUPOS } from '../partidas-grupos.js';
 
 export class CotizacionItemDto {
   @IsOptional()
   @IsInt()
   productId?: number;
+
+  /** Grupo en la propuesta técnica. Si no viene se deduce del concepto. */
+  @IsOptional()
+  @IsIn([...GRUPOS])
+  grupo?: string;
+
+  /** Paquete que generó la partida («camara-bala-instalada»). */
+  @IsOptional()
+  @IsString()
+  paqueteClave?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  paqueteCantidad?: number;
 
   @IsOptional()
   @IsString()

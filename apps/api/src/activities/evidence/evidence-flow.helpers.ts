@@ -18,6 +18,18 @@ export function requiresServiceSheetPdf(coreKind?: string | null): boolean {
   return (coreKind || '').toLowerCase() === 'servicio';
 }
 
+/**
+ * En una actividad **comercial** el paso de formulario lo cubre la cotización.
+ *
+ * Contrato del viernes (D): foto de entrada → fotos del levantamiento → **cotización** (en lugar de
+ * la hoja de servicio; el paso se da por hecho cuando la cotización queda ENVIADA) → foto de salida.
+ * No se agrega un paso nuevo al flujo: el de `SERVICE_SHEET_DATA` se rellena solo con el folio y la
+ * fecha de envío, así que las apps viejas siguen viendo los mismos cinco pasos.
+ */
+export function pasoCubiertoPorCotizacion(coreKind?: string | null): boolean {
+  return (coreKind || '').toLowerCase() === 'comercial';
+}
+
 /** Ordered steps for a kind (COMPLETED is the terminal marker). */
 export function evidenceStepsForKind(coreKind?: string | null): EvidenceStep[] {
   if (requiresServiceSheetPdf(coreKind)) {

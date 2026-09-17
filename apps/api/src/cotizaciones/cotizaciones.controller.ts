@@ -5,6 +5,7 @@ import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
+import { LigarActividadDto, RechazarCotizacionDto } from './dto/rechazar-cotizacion.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -33,6 +34,28 @@ export class CotizacionesController {
   @Get()
   findAll(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
     return this.cotizacionesService.findAll(query, companyId);
+  }
+
+  /**
+   * Lista de Core: folio, cliente, segmento, estado, total y quién intervino.
+   * Va **antes** de `:id` para que Nest no la trate como un id.
+   */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('core')
+  listaCore(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
+    return this.cotizacionesService.listaCore(query, companyId);
+  }
+
+  /** Detalle de Core: estado y segmento en español, términos, partidas agrupadas y participantes. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('core/:id')
+  detalleCore(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.detalleCore(id, companyId);
   }
 
   @UseGuards(RbacGuard)
@@ -98,6 +121,78 @@ export class CotizacionesController {
     res.send(pdf);
   }
 
+  /** Quién intervino y con qué papel (línea de tiempo de la web). */
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
+  @Get(':id/participantes')
+  participantes(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.participantes(id, companyId);
+  }
+
+  /** Versiones guardadas: cada edición sobre una enviada deja una. */
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
+  @Get(':id/versiones')
+  versiones(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.versiones(id, companyId);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/revisar')
+  revisar(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.revisar(id, user?.id, companyId);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/aprobar')
+  aprobar(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.aprobar(id, user?.id, companyId);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/rechazar')
+  rechazar(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RechazarCotizacionDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.rechazar(id, dto.motivo, {
+      porNombre: dto.nombre ?? user?.nombre ?? null,
+      userId: user?.id,
+      companyId,
+    });
+  }
+
+  /** «Ligar cotización» desde la actividad comercial (o desde la cotización). */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/actividad')
+  ligarActividad(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: LigarActividadDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.ligarActividad(id, dto.activityId, companyId);
+  }
+
   @Get('public/:token')
   getPublic(@Param('token') token: string) {
     return this.cotizacionesService.getPublicByToken(token);
@@ -106,5 +201,11 @@ export class CotizacionesController {
   @Post('public/:token/sign')
   signPublic(@Param('token') token: string, @Body() dto: SignCotizacionDto) {
     return this.cotizacionesService.signByToken(token, dto);
+  }
+
+  /** El cliente rechaza con motivo desde el enlace, sin tener que escribir un correo. */
+  @Post('public/:token/rechazar')
+  rechazarPublic(@Param('token') token: string, @Body() dto: RechazarCotizacionDto) {
+    return this.cotizacionesService.rechazarPorToken(token, dto.motivo, dto.nombre);
   }
 }
