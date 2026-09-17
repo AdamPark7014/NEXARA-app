@@ -161,7 +161,8 @@ final class AsistenciasRepository {
         let data = try await api.get("attendance/hierarchy/range", query: query)
         let map = ConsoleHelpers.decodeMap(data)
         let rows = (map["users"] as? [[String: Any]]) ?? ApiClient.decodeMapList(data)
-        return rows.map { AttendanceTeamMember(raw: $0) }
+        // Safety net: Christian/Adam/Claudia/cuenta demo no son empleados: fuera de "sin checada".
+        return rows.map { AttendanceTeamMember(raw: $0) }.filter { !CoreOrg.isNonEmployee($0.email) }
     }
 
     /// `GET attendance/history?date=YYYY-MM-DD` — mis checadas de ese día.

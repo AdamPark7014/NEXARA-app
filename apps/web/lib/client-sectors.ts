@@ -3,6 +3,7 @@
  * Alineada a ORG_EMAILS en activity-kinds.ts.
  */
 import { ORG_EMAILS } from "@/lib/activity-kinds";
+import { isCeoEquivalentEmail } from "@/lib/platform-accounts";
 
 export type ClientSector = "PROYECTO" | "CORPORATIVO" | "COMERCIAL";
 
@@ -58,6 +59,7 @@ const SECTOR_MATRIX: Record<string, ClientSector[]> = {
 export function clientSectorsForEmail(email?: string | null): ClientSector[] {
   const e = norm(email);
   if (!e) return [];
+  if (isCeoEquivalentEmail(e)) return [...ALL_CLIENT_SECTORS];
   return SECTOR_MATRIX[e] ? [...SECTOR_MATRIX[e]] : [];
 }
 

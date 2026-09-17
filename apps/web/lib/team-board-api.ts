@@ -1,4 +1,5 @@
 import { erpFetch } from "@/lib/erp-api";
+import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 
 export type BoardActivityBucket = "daily" | "projects" | "services";
 export type BoardUserStatus = "activo" | "inactivo" | "atrasado" | "libre" | "sin_actividad";
@@ -119,8 +120,10 @@ export function formatClock(iso: string | null | undefined): string {
   return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-export function fetchTeamBoard(token: string): Promise<TeamBoardResponse> {
-  return erpFetch<TeamBoardResponse>("me/board", token);
+export async function fetchTeamBoard(token: string): Promise<TeamBoardResponse> {
+  const board = await erpFetch<TeamBoardResponse>("me/board", token);
+  // Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados.
+  return { ...board, users: (board.users ?? []).filter((u) => !isNonEmployeeEmail(u.email)) };
 }
 
 export function fetchTeamBoardUser(token: string, userId: number): Promise<TeamBoardUser> {

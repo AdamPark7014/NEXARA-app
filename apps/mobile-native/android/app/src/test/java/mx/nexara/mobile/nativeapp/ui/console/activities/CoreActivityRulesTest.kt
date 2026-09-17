@@ -57,6 +57,13 @@ class CoreActivityRulesTest {
     }
 
     @Test
+    fun claudiaIsTreatedExactlyLikeTheCeo() {
+        // Claudia (tester) tiene los mismos permisos que Christian sin ser empleada.
+        val role = CoreActivityRules.captureRole(1L, "claudia.bernal@nexara.com.mx", "ejecucion", 1L, "TECNICO", true)
+        assertEquals(CaptureRole.NINGUNO, role)
+    }
+
+    @Test
     fun outsiderDoesNotCapture() {
         assertEquals(
             CaptureRole.NINGUNO,
@@ -317,6 +324,13 @@ class CoreActivityRulesTest {
     fun ceoEmailIsCaseInsensitive() {
         assertTrue(CoreActivityRules.isCeoEmail(" GERENCIA@nexara.com.mx "))
         assertFalse(CoreActivityRules.isCeoEmail("developer@nexara.com.mx"))
+    }
+
+    @Test
+    fun claudiaCountsAsCeoEquivalent() {
+        // Owner rule: Claudia debe tener EXACTAMENTE los mismos permisos que Christian.
+        assertTrue(CoreActivityRules.isCeoEmail(" Claudia.Bernal@nexara.com.mx "))
+        assertFalse(CoreActivityRules.isCeoEmail("play.review@nexara.com.mx"))
     }
 
     // ── Formatos ────────────────────────────────────────────────────────────

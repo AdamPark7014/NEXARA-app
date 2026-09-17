@@ -168,6 +168,19 @@ enum CoreEvidence {
 enum CoreOrg {
     static let ceoEmail = "gerencia@nexara.com.mx"
     static let serviceCoordinatorEmail = "direccion.operaciones@nexara.com.mx"
+    /// Tester: debe tener EXACTAMENTE los mismos permisos que Christian sin
+    /// aparecer como empleada. Owner rule (Adam) — ver `isCeo` / `isNonEmployee`.
+    static let claudiaTesterEmail = "claudia.bernal@nexara.com.mx"
+    /// Cuenta demo de revisión de tiendas (Apple/Google).
+    static let playReviewEmail = "play.review@nexara.com.mx"
+
+    /// Christian y su equivalente de permisos (Claudia). Cualquier decisión de
+    /// permisos que comparaba contra `ceoEmail` directo debe usar `isCeo(_:)`.
+    static let ceoEquivalentEmails: Set<String> = [ceoEmail, claudiaTesterEmail]
+
+    /// Cuentas de plataforma / pruebas que NUNCA deben listarse como empleados
+    /// (equipo, pizarra, pickers de "asignar a", listas de asistencia/comida).
+    static var nonEmployeeEmails: Set<String> { [ceoEmail, developerEmail, claudiaTesterEmail, playReviewEmail] }
 
     /// A quién puede pasar cada encargado un despacho (espejo de `DISPATCH_POOLS`).
     static let dispatchPools: [String: [String]] = [
@@ -190,7 +203,12 @@ enum CoreOrg {
     }
 
     static func isCeo(_ email: String?) -> Bool {
-        normalized(email) == ceoEmail
+        ceoEquivalentEmails.contains(normalized(email))
+    }
+
+    /// Cuentas que nunca deben listarse como empleado (equipo/asignar/asistencia).
+    static func isNonEmployee(_ email: String?) -> Bool {
+        nonEmployeeEmails.contains(normalized(email))
     }
 
     static func dispatchPool(for email: String?) -> [String] {

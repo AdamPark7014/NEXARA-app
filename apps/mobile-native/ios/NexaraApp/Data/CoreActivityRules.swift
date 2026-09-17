@@ -87,7 +87,8 @@ enum ClientSector: String, CaseIterable, Identifiable, Hashable {
 
     /// `clientSectorsForEmail`: vacío = no ve el módulo Clientes.
     static func sectors(for email: String?) -> [ClientSector] {
-        matrix[CoreOrg.normalized(email)] ?? []
+        if CoreOrg.isCeo(email) { return ClientSector.allCases }
+        return matrix[CoreOrg.normalized(email)] ?? []
     }
 
     /// `clientSectorsForActivityKind`: sectores de cliente al asignar ese tipo.
@@ -266,6 +267,7 @@ enum CoreActivityRules {
     static func kindsForTarget(email: String?) -> [CoreActivityKind] {
         let normalized = CoreOrg.normalized(email)
         guard !normalized.isEmpty else { return [.tarea] }
+        if CoreOrg.isCeo(email) { return all }
         return receiveByEmail[normalized] ?? [.tarea]
     }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.ConsoleApi
@@ -182,27 +183,35 @@ class ConsoleRepository(context: Context) {
         ),
     )
 
+    /** Safety net: Christian/Adam/Claudia/cuenta demo no deben aparecer como responsable asignable. */
     suspend fun usersFetch(preferAssignable: Boolean = true): List<mx.nexara.mobile.nativeapp.data.api.VisibleUserDto> {
-        if (!preferAssignable) return api.getUsers()
-        return try {
-            api.getAssignableUsers()
-        } catch (_: Exception) {
+        val users = if (!preferAssignable) {
             api.getUsers()
+        } else {
+            try {
+                api.getAssignableUsers()
+            } catch (_: Exception) {
+                api.getUsers()
+            }
         }
+        return users.filter { !PlatformAccounts.isNonEmployeeEmail(it.email) }
     }
 
     /**
      * @param scope `subtree` para ver solo el organigrama propio. La web solo lo
      * omite para el dueño de la plataforma y el super admin; sin él cualquier
      * `attendance.manage` recibía la asistencia de toda la empresa.
+     *
+     * Safety net: filtra del resultado a Christian/Adam/Claudia/cuenta demo —
+     * no son empleados y no deben verse como "sin checada".
      */
     suspend fun attendanceRange(
         from: String,
         to: String,
         tryHierarchyFirst: Boolean = true,
         scope: String? = null,
-    ) =
-        if (tryHierarchyFirst) {
+    ): mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto {
+        val raw = if (tryHierarchyFirst) {
             try {
                 api.getAttendanceHierarchyRange(from = from, to = to, scope = scope)
             } catch (_: Exception) {
@@ -211,6 +220,8 @@ class ConsoleRepository(context: Context) {
         } else {
             api.getAttendanceRange(from = from, to = to)
         }
+        return raw.copy(users = raw.users?.filter { !PlatformAccounts.isNonEmployeeEmail(it.email) })
+    }
 
     suspend fun attendanceCurrent() = api.getAttendanceCurrent()
 

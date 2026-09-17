@@ -18,6 +18,7 @@ import { buildApiUrl, getSocketBaseUrl, parseResponseJson } from "@/lib/api-base
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { attendanceMapUrl } from "@/lib/gps-map-links";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
+import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail, isNonEmployeeEmail } from "@/lib/platform-accounts";
 import { erpFetch } from "@/lib/erp-api";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
@@ -232,12 +233,13 @@ export default function ErpAsistenciasPage() {
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  // CEO / plataforma: company-wide (sin scope=subtree). Encargados: árbol managerId.
+  // CEO / plataforma (Christian, Claudia equivalente, Adam): company-wide (sin scope=subtree).
+  // Encargados: árbol managerId.
   const companyWideViewer = Boolean(
     user?.isSuperAdmin ||
       user?.roleKey === "ceo" ||
-      (user?.email || "").toLowerCase() === "gerencia@nexara.com.mx" ||
-      (user?.email || "").toLowerCase() === "developer@nexara.com.mx",
+      isCeoEquivalentEmail(user?.email) ||
+      isDeveloperSuperAdminEmail(user?.email),
   );
 
   const loadEquipo = useCallback(
@@ -258,7 +260,9 @@ export default function ErpAsistenciasPage() {
           `attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}${scopeQs}`,
           token,
         );
-        setMembers(Array.isArray(raw) ? raw : (raw?.users ?? []));
+        const list = Array.isArray(raw) ? raw : (raw?.users ?? []);
+        // Christian/Adam/Claudia/cuenta demo no son empleados: no deben verse como "sin checada".
+        setMembers(list.filter((u) => !isNonEmployeeEmail(u.email)));
       } catch (e) {
         setMembers([]);
         if (!quiet) setError(e instanceof Error ? e.message : "No se pudo cargar el equipo");

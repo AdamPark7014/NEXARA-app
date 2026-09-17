@@ -23,7 +23,7 @@ struct ClientesHomeView: View {
 
     /// Como la web: dirección general y superadmin ven al encargado en la fila.
     private var showOwner: Bool {
-        CoreOrg.normalized(session.currentUser?.email) == CoreOrg.ceoEmail
+        CoreOrg.isCeo(session.currentUser?.email)
             || session.currentUser?.isSuperAdmin == true
     }
 

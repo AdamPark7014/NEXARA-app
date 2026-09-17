@@ -32,10 +32,19 @@ data class ChatChannelDto(
     val lastReadAt: String? = null,
 )
 
+data class ChatReactionUserDto(
+    val id: Long = 0L,
+    val nombre: String = "",
+    val avatarUrl: String? = null,
+    val reactedAt: String? = null,
+)
+
 data class ChatReactionDto(
     val emoji: String = "",
     val count: Int = 0,
     val userIds: List<Long> = emptyList(),
+    /** Reactores en orden de reacción (más antiguo primero). Opcional por compatibilidad. */
+    val users: List<ChatReactionUserDto> = emptyList(),
 )
 
 data class ChatMessageDto(

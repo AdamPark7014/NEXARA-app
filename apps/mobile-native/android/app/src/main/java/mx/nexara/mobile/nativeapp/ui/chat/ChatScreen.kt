@@ -14,6 +14,8 @@ import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -105,6 +107,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
@@ -131,7 +134,9 @@ import mx.nexara.mobile.nativeapp.data.api.ChatChannelDto
 import mx.nexara.mobile.nativeapp.data.api.ChatColleagueDto
 import mx.nexara.mobile.nativeapp.data.api.ChatMentionDto
 import mx.nexara.mobile.nativeapp.data.api.ChatReactionDto
+import mx.nexara.mobile.nativeapp.data.api.ChatReactionUserDto
 import mx.nexara.mobile.nativeapp.data.api.ChatSearchHitDto
+import mx.nexara.mobile.nativeapp.data.api.resolveProtectedUploadUrl
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.common.NxAsyncImage
 import mx.nexara.mobile.nativeapp.data.api.ChatMessageDto
@@ -156,6 +161,7 @@ import mx.nexara.mobile.nativeapp.ui.util.downloadAuthedToCache
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 import mx.nexara.mobile.nativeapp.ui.util.openFile
 import java.io.File
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -2798,7 +2804,7 @@ private fun EditMessageDialog(
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatMessageCard(
     msg: ChatMessageDto,
@@ -2816,6 +2822,8 @@ private fun ChatMessageCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var showReactionPicker by remember { mutableStateOf(false) }
+    var reactorsSheetOpen by remember { mutableStateOf(false) }
+    var reactorsSheetEmoji by remember { mutableStateOf(ALL_REACTIONS_TAB) }
     val canThread = msg.parentId == null
     val isOwn = msg.authorId == currentUserId
     val isEdited = !msg.editedAt.isNullOrBlank()
@@ -2970,6 +2978,10 @@ private fun ChatMessageCard(
                     reactions = msg.reactions,
                     currentUserId = currentUserId,
                     onReact = { emoji -> onReact(msg, emoji) },
+                    onShowReactors = { emoji ->
+                        reactorsSheetEmoji = emoji ?: ALL_REACTIONS_TAB
+                        reactorsSheetOpen = true
+                    },
                     onDarkBubble = isOwn,
                 )
             }
@@ -3010,6 +3022,19 @@ private fun ChatMessageCard(
                     )
                 }
             }
+        }
+    }
+
+    if (reactorsSheetOpen) {
+        val reactorsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { reactorsSheetOpen = false },
+            sheetState = reactorsSheetState,
+        ) {
+            ReactionsBottomSheetContent(
+                reactions = msg.reactions,
+                initialEmoji = reactorsSheetEmoji,
+            )
         }
     }
 }
@@ -3056,16 +3081,48 @@ private fun messageActionItems(
     }
 }
 
+/** Tab especial "Todas" del bottom sheet de reactores (no es un emoji real). */
+private const val ALL_REACTIONS_TAB = "__all__"
+
+/** "hace 5 min" / "hace 2 h" / "hace 3 d" para el bottom sheet de reactores. */
+private fun formatRelativeReactionTime(iso: String?): String {
+    if (iso.isNullOrBlank()) return ""
+    val instant = parseChatInstant(iso) ?: return ""
+    var diff = Duration.between(instant, Instant.now())
+    if (diff.isNegative) diff = Duration.ZERO
+    val minutes = diff.toMinutes()
+    return when {
+        minutes < 1 -> "ahora"
+        minutes < 60 -> "hace $minutes min"
+        diff.toHours() < 24 -> "hace ${diff.toHours()} h"
+        diff.toDays() < 7 -> "hace ${diff.toDays()} d"
+        else -> instant.atZone(chatZone).toLocalDate().format(chatDayFmt)
+    }
+}
+
+private fun reactorInitials(name: String): String {
+    val parts = name.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (parts.isEmpty()) return "?"
+    if (parts.size == 1) return parts[0].take(2).uppercase(Locale.ROOT)
+    return (parts[0].take(1) + parts[1].take(1)).uppercase(Locale.ROOT)
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReactionChips(
     reactions: List<ChatReactionDto>,
     currentUserId: Long,
     onReact: (String) -> Unit,
+    onShowReactors: (String?) -> Unit,
     onDarkBubble: Boolean = false,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.padding(top = 2.dp),
+        modifier = Modifier
+            .padding(top = 2.dp)
+            // Presionar sostenido en el área de reacciones (fuera de un chip puntual)
+            // también abre el detalle, con la pestaña "Todas".
+            .combinedClickable(onClick = {}, onLongClick = { onShowReactors(null) }),
     ) {
         reactions.forEach { reaction ->
             val mine = reaction.userIds.contains(currentUserId)
@@ -3088,7 +3145,10 @@ private fun ReactionChips(
                         color = chipBorder,
                         shape = RoundedCornerShape(12.dp),
                     )
-                    .clickable { onReact(reaction.emoji) }
+                    .combinedClickable(
+                        onClick = { onReact(reaction.emoji) },
+                        onLongClick = { onShowReactors(reaction.emoji) },
+                    )
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -3100,6 +3160,145 @@ private fun ReactionChips(
                     fontWeight = if (mine) FontWeight.Bold else FontWeight.Normal,
                     color = if (onDarkBubble && !mine) Color.White.copy(alpha = 0.9f) else Color.Unspecified,
                 )
+            }
+        }
+    }
+}
+
+/** Avatar circular de un reactor: foto protegida si hay `avatarUrl`, si no iniciales en azul. */
+@Composable
+private fun ReactorAvatarCircle(user: ChatReactionUserDto, size: Dp = 32.dp) {
+    val url = user.avatarUrl?.takeIf { it.isNotBlank() }
+    if (url != null) {
+        NxAsyncImage(
+            model = resolveProtectedUploadUrl(url),
+            contentDescription = null,
+            modifier = Modifier.size(size).clip(CircleShape),
+            contentScale = ContentScale.Crop,
+        )
+    } else {
+        Box(
+            modifier = Modifier.size(size).clip(CircleShape).background(NxColors.BrandSoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                reactorInitials(user.nombre),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = NxColors.Brand,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReactionTabChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) NxColors.BrandSoft else MaterialTheme.colorScheme.surfaceVariant)
+            .border(
+                width = 1.dp,
+                color = if (selected) NxColors.Brand.copy(alpha = 0.5f) else Color.Transparent,
+                shape = RoundedCornerShape(999.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) NxColors.Brand else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
+}
+
+/**
+ * Contenido del ModalBottomSheet "quién reaccionó": pestañas por emoji (Todas primero)
+ * y la lista de reactores en el orden en que reaccionaron (más antiguo primero, tal
+ * como lo entrega el API en `users[]`).
+ */
+@Composable
+private fun ReactionsBottomSheetContent(
+    reactions: List<ChatReactionDto>,
+    initialEmoji: String?,
+) {
+    var activeEmoji by remember(reactions) { mutableStateOf(initialEmoji ?: ALL_REACTIONS_TAB) }
+    val totalCount = reactions.sumOf { it.count }
+    val activeReactors = remember(reactions, activeEmoji) {
+        if (activeEmoji == ALL_REACTIONS_TAB) {
+            reactions
+                .flatMap { r -> r.users.map { it to r.emoji } }
+                .sortedBy { (u, _) -> parseChatInstant(u.reactedAt.orEmpty())?.toEpochMilli() ?: 0L }
+        } else {
+            val match = reactions.firstOrNull { it.emoji == activeEmoji }
+            (match?.users ?: emptyList()).map { it to activeEmoji }
+        }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 20.dp),
+    ) {
+        Text(
+            "Reacciones",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ReactionTabChip(
+                label = "Todas · $totalCount",
+                selected = activeEmoji == ALL_REACTIONS_TAB,
+                onClick = { activeEmoji = ALL_REACTIONS_TAB },
+            )
+            reactions.forEach { r ->
+                ReactionTabChip(
+                    label = "${r.emoji} ${r.count}",
+                    selected = activeEmoji == r.emoji,
+                    onClick = { activeEmoji = r.emoji },
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        if (activeReactors.isEmpty()) {
+            Text(
+                "Sin reacciones",
+                style = MaterialTheme.typography.bodySmall,
+                color = NxColors.Muted,
+                modifier = Modifier.padding(vertical = 16.dp),
+            )
+        } else {
+            LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                items(activeReactors) { (user, emoji) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ReactorAvatarCircle(user)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                user.nombre,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                formatRelativeReactionTime(user.reactedAt).ifBlank { "—" },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NxColors.Muted,
+                            )
+                        }
+                        if (activeEmoji == ALL_REACTIONS_TAB) {
+                            Text(emoji, style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
             }
         }
     }

@@ -21,6 +21,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import ListExportActions from "@/components/ui/ListExportActions";
 import { resolveAssetUrl } from "@/lib/evidence-display";
+import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 
@@ -424,7 +425,9 @@ function TeamAttendanceView({
       const raw = await apiFetch<HierarchyRangeResponse | ApiAttendanceUser[]>(
         `attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}`, token
       );
-      const arr: ApiAttendanceUser[] = !raw ? [] : Array.isArray(raw) ? raw : (raw.users ?? []);
+      const rawArr: ApiAttendanceUser[] = !raw ? [] : Array.isArray(raw) ? raw : (raw.users ?? []);
+      // Christian/Adam/Claudia/cuenta demo no son empleados: fuera de la lista de asistencia.
+      const arr = rawArr.filter((u) => !isNonEmployeeEmail(u.email));
       const ORDER = { PRESENTE: 0, COMPLETO: 1, AUSENTE: 2 } as const;
       const mapped = arr.map((u) => mapApiUser(u, dateFilter));
       mapped.sort((a, b) => (ORDER[a.estado ?? "AUSENTE"] ?? 2) - (ORDER[b.estado ?? "AUSENTE"] ?? 2));
