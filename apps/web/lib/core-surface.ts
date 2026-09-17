@@ -6,6 +6,8 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'chat',
   'my-profile',
   'erp-clients',
+  // Cotizaciones entra a Core: sin esto el módulo existe pero el sidebar lo esconde.
+  'erp-cotizaciones',
 ];
 export const CORE_PANEL_ID = 'erp' as const;
 

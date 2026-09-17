@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 /** Rechazo con motivo: lo usa dirección desde Core y el cliente desde el enlace público. */
 export class RechazarCotizacionDto {
@@ -16,4 +16,14 @@ export class RechazarCotizacionDto {
 export class LigarActividadDto {
   @IsInt()
   activityId!: number;
+}
+
+/** Agregar N paquetes («Cámara bala instalada»). */
+export class AgregarPaqueteDto {
+  @IsString()
+  clave!: string;
+
+  @IsInt()
+  @Min(1)
+  cantidad!: number;
 }

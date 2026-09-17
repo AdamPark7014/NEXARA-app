@@ -56,6 +56,14 @@ export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
 ];
 
 /**
+ * Cotizaciones en Core (contrato del viernes, D): dirección, administración y coordinadores.
+ *
+ * No entra en `CORE_OLA1_PAGE_PATHS` a propósito: eso lo abriría para todo el personal de campo, y
+ * aquí se ven precios de compra, márgenes y la cartera de clientes.
+ */
+export const COTIZACIONES_CORE_PATHS: PageRule[] = ['/erp/cotizaciones', '/erp/cotizaciones/**'];
+
+/**
  * Mapeo legacy documentado en `lib/legacy-path-remap.ts`.
  */
 
@@ -85,6 +93,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── ARQUITECTO — OPS supervisor + ERP parcial ────────────────────────
   [ROLES.ARQUITECTO]: [
     '/ops/**',
+    ...COTIZACIONES_CORE_PATHS,
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
@@ -109,6 +118,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── DIR. OPERACIONES — visión global, aprobaciones operativas ────────
   [ROLES.DIR_OPERACIONES]: [
     '/erp',
+    ...COTIZACIONES_CORE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
@@ -172,6 +182,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
   [ROLES.COORD_ADMIN]: [
     '/erp',
+    ...COTIZACIONES_CORE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
@@ -224,6 +235,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── ADMINISTRATIVO — operación día a día ─────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
     '/erp',
+    ...COTIZACIONES_CORE_PATHS,
     '/erp/dashboard',
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
@@ -259,6 +271,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── COORD OPERACIONES — supervisa campo / project manager ────────────
   [ROLES.COORD_OPERACIONES]: [
     '/ops/**',
+    ...COTIZACIONES_CORE_PATHS,
     '/ops/chat',
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
@@ -332,6 +345,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── COORD VENTAS — gerente comercial ─────────────────────────────────
   [ROLES.COORD_VENTAS]: [
     '/crm/**',
+    ...COTIZACIONES_CORE_PATHS,
     '/crm/chat',
     '/erp/dashboard',
     '/erp/chat',
