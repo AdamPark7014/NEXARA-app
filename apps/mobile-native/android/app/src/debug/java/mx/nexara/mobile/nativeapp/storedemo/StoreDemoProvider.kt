@@ -14,6 +14,7 @@ class StoreDemoProvider : ContentProvider() {
     override fun onCreate(): Boolean {
         val ctx = context ?: return true
         ApiDebugHooks.interceptors = listOf(StoreDemoInterceptor(ctx))
+        ApiDebugHooks.forceSelfCheckIn = java.io.File(ctx.filesDir, "store_demo/checador").exists()
         return true
     }
 

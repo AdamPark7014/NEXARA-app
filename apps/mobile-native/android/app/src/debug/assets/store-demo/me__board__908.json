@@ -10,7 +10,7 @@
   "anNumber": null,
   "titulo": "Configuración de red y NVR · Grupo Textil del Valle",
   "estatus": "En Proceso",
-  "fechaMaxima": "2026-09-17T10:34:50.000Z",
+  "fechaMaxima": "2026-09-17T11:17:24.000Z",
   "bucket": "services"
  },
  "openActivities": [
@@ -29,12 +29,12 @@
     "luis.torres@demo.nexara.mx"
    ],
    "reparte": false,
-   "fechaInicio": "2026-09-17T04:29:50.000Z"
+   "fechaInicio": "2026-09-17T05:12:24.000Z"
   }
  ],
- "clockInAt": "2026-09-17T02:39:50.000Z",
+ "clockInAt": "2026-09-17T03:22:24.000Z",
  "workedMinutes": 175,
- "activityStartedAt": "2026-09-17T04:29:50.000Z",
+ "activityStartedAt": "2026-09-17T05:12:24.000Z",
  "activityElapsedMinutes": 65,
  "currentLateMinutes": null,
  "idleSinceAt": null,

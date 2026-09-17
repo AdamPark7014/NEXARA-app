@@ -897,17 +897,11 @@ private fun MiJornadaCard(
 }
 
 /**
- * Rastreo activo: se dice en pantalla, no solo en la notificación. Android 10+
- * además exige pedir el permiso «todo el tiempo» aparte del de primer plano.
+ * Rastreo activo: se dice en pantalla, no solo en la notificación. El servicio en
+ * primer plano sigue enviando la ubicación con la pantalla apagada, sin pedir «todo el tiempo».
  */
 @Composable
 private fun GpsJornadaAviso(onDetener: () -> Unit) {
-    val context = LocalContext.current
-    var fondoConcedido by remember { mutableStateOf(tieneUbicacionEnSegundoPlano(context)) }
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { fondoConcedido = tieneUbicacionEnSegundoPlano(context) }
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = NxColors.InfoSoft),
@@ -927,27 +921,9 @@ private fun GpsJornadaAviso(onDetener: () -> Unit) {
                 fontSize = 12.sp,
                 color = NxColors.Muted,
             )
-            if (!fondoConcedido && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                Text(
-                    "Con la pantalla apagada el trayecto se corta: permite la ubicación «todo el tiempo».",
-                    fontSize = 12.sp,
-                    color = NxColors.Muted,
-                )
-                OutlinedButton(
-                    onClick = { launcher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) },
-                ) { Text("Permitir todo el tiempo", fontSize = 13.sp) }
-            }
             TextButton(onClick = onDetener) { Text("Dejar de compartir", fontSize = 13.sp) }
         }
     }
-}
-
-private fun tieneUbicacionEnSegundoPlano(context: Context): Boolean {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
-    return ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.ACCESS_BACKGROUND_LOCATION,
-    ) == PackageManager.PERMISSION_GRANTED
 }
 
 @Composable

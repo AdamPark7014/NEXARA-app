@@ -10,7 +10,7 @@
   "anNumber": null,
   "titulo": "Cableado estructurado · Bodega Norte",
   "estatus": "En Proceso",
-  "fechaMaxima": "2026-09-17T04:49:50.000Z",
+  "fechaMaxima": "2026-09-17T05:32:24.000Z",
   "bucket": "projects"
  },
  "openActivities": [
@@ -29,12 +29,12 @@
     "javier.morales@demo.nexara.mx"
    ],
    "reparte": false,
-   "fechaInicio": "2026-09-17T01:44:50.000Z"
+   "fechaInicio": "2026-09-17T02:27:24.000Z"
   }
  ],
- "clockInAt": "2026-09-17T01:29:50.000Z",
+ "clockInAt": "2026-09-17T02:12:24.000Z",
  "workedMinutes": 245,
- "activityStartedAt": "2026-09-17T01:44:50.000Z",
+ "activityStartedAt": "2026-09-17T02:27:24.000Z",
  "activityElapsedMinutes": 230,
  "currentLateMinutes": 45,
  "idleSinceAt": null,

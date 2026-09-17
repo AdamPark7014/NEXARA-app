@@ -22,7 +22,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T02:32:50.000Z",
+     "timestamp": "2026-09-17T03:15:24.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -47,7 +47,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T02:46:50.000Z",
+     "timestamp": "2026-09-17T03:29:24.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -72,7 +72,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T02:19:50.000Z",
+     "timestamp": "2026-09-17T03:02:24.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -97,7 +97,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T01:29:50.000Z",
+     "timestamp": "2026-09-17T02:12:24.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -122,7 +122,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T03:04:50.000Z",
+     "timestamp": "2026-09-17T03:47:24.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -157,7 +157,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T01:54:50.000Z",
+     "timestamp": "2026-09-17T02:37:24.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,
@@ -165,7 +165,7 @@
     },
     {
      "type": "salida",
-     "timestamp": "2026-09-17T05:14:50.000Z",
+     "timestamp": "2026-09-17T05:57:24.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "exitLatitude": 19.0431,
@@ -190,7 +190,7 @@
    "attendances": [
     {
      "type": "entrada",
-     "timestamp": "2026-09-17T02:39:50.000Z",
+     "timestamp": "2026-09-17T03:22:24.000Z",
      "deviceInfo": "Móvil · Android · NEXARA App",
      "photoUrl": null,
      "entryLatitude": 19.0414,

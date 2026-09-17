@@ -7,7 +7,7 @@
  "description": null,
  "peer": null,
  "memberCount": 12,
- "lastMessageAt": "2026-09-17T05:28:50.000Z",
+ "lastMessageAt": "2026-09-17T06:11:24.000Z",
  "muted": false,
  "mutedUntil": null,
  "supervised": false,
@@ -19,7 +19,7 @@
    "email": "mariana.lopez@demo.nexara.mx",
    "avatarUrl": null,
    "role": "member",
-   "lastReadAt": "2026-09-17T05:29:50.000Z"
+   "lastReadAt": "2026-09-17T06:12:24.000Z"
   },
   {
    "id": 902,
@@ -27,7 +27,7 @@
    "email": "diego.ramirez@demo.nexara.mx",
    "avatarUrl": null,
    "role": "member",
-   "lastReadAt": "2026-09-17T05:29:50.000Z"
+   "lastReadAt": "2026-09-17T06:12:24.000Z"
   },
   {
    "id": 903,
@@ -35,7 +35,7 @@
    "email": "fernanda.cruz@demo.nexara.mx",
    "avatarUrl": null,
    "role": "member",
-   "lastReadAt": "2026-09-17T05:29:50.000Z"
+   "lastReadAt": "2026-09-17T06:12:24.000Z"
   },
   {
    "id": 904,
@@ -43,7 +43,7 @@
    "email": "javier.morales@demo.nexara.mx",
    "avatarUrl": null,
    "role": "member",
-   "lastReadAt": "2026-09-17T05:29:50.000Z"
+   "lastReadAt": "2026-09-17T06:12:24.000Z"
   },
   {
    "id": 905,
@@ -51,7 +51,7 @@
    "email": "sofia.martinez@demo.nexara.mx",
    "avatarUrl": null,
    "role": "member",
-   "lastReadAt": "2026-09-17T05:29:50.000Z"
+   "lastReadAt": "2026-09-17T06:12:24.000Z"
   },
   {
    "id": 906,
@@ -59,7 +59,7 @@
    "email": "ricardo.hernandez@demo.nexara.mx",
    "avatarUrl": null,
    "role": "member",
-   "lastReadAt": "2026-09-17T05:29:50.000Z"
+   "lastReadAt": "2026-09-17T06:12:24.000Z"
   }
  ]
 }
