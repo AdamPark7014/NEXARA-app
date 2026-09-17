@@ -226,6 +226,8 @@ class MyProfileViewModel(app: android.app.Application) : AndroidViewModel(app) {
 fun MyProfileScreen(
     contentPadding: PaddingValues = PaddingValues(20.dp),
     onOpenOfflineQueue: (() -> Unit)? = null,
+    /** Cierre de sesión: vive aquí, al final y con confirmación (ya no en la barra superior). */
+    onLogout: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
@@ -240,6 +242,7 @@ fun MyProfileScreen(
     val profileState by vm.state.collectAsState()
     val isSuperAdmin = user?.isSuperAdmin == true
     var appLockEnabled by remember { mutableStateOf(AppLock.isEnabled(context)) }
+    var confirmLogout by remember { mutableStateOf(false) }
     val lockAvailable = remember(context) { AppLock.canAuthenticate(context) }
     val Brand = NxColors.Brand
     val Slate = Color(0xFF0F172A)
@@ -492,6 +495,20 @@ fun MyProfileScreen(
             }
         }
 
+        if (onLogout != null) {
+            item {
+                OutlinedButton(
+                    onClick = { confirmLogout = true },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NxColors.Danger.copy(alpha = 0.5f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NxColors.Danger),
+                ) {
+                    Text("Cerrar sesión", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
         item {
             NxAppMetaFooter(
                 onOpenPrivacy = { openExternalUrl(context, NexaraAppMeta.PRIVACY_URL) },
@@ -499,6 +516,23 @@ fun MyProfileScreen(
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+
+    if (confirmLogout && onLogout != null) {
+        AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text("¿Cerrar sesión?") },
+            text = { Text("Tendrás que volver a entrar con tu correo y contraseña.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmLogout = false
+                    onLogout()
+                }) { Text("Cerrar sesión", color = NxColors.Danger, fontWeight = FontWeight.SemiBold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = false }) { Text("Cancelar") }
+            },
+        )
     }
 }
 

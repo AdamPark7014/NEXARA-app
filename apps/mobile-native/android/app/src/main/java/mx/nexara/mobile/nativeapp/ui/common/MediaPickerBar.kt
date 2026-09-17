@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,19 +46,14 @@ private fun freshCameraOutputUri(context: Context): Uri {
 }
 
 /**
- * Botonera para capturar/adjuntar evidencias: cámara, fotos, o documentos (PDF/Excel).
- * Devuelve una lista de URIs seleccionadas.
+ * Abre la cámara del sistema (pide el permiso si falta) y entrega la foto tomada.
+ * Devuelve la función que la lanza: un solo toque, sin botonera intermedia.
  */
 @Composable
-fun MediaPickerBar(
-    onPicked: (List<CapturedMedia>) -> Unit,
-    modifier: Modifier = Modifier,
-    allowCamera: Boolean = true,
-    allowGallery: Boolean = true,
-    allowDocuments: Boolean = true,
-) {
+fun rememberCameraCapture(onCaptured: (CapturedMedia) -> Unit): () -> Unit {
     val context = LocalContext.current
-    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    // Guardado: si Android recrea la actividad con la cámara abierta, la foto no se pierde.
+    var pendingCameraUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var hasCam by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -69,7 +65,7 @@ fun MediaPickerBar(
         contract = ActivityResultContracts.TakePicture()
     ) { success: Boolean ->
         val uri = pendingCameraUri
-        if (success && uri != null) onPicked(listOf(CapturedMedia(uri, "image/jpeg")))
+        if (success && uri != null) onCaptured(CapturedMedia(uri, "image/jpeg"))
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -84,6 +80,34 @@ fun MediaPickerBar(
             }
         }
     }
+
+    return {
+        if (!hasCam) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        } else {
+            val uri = freshCameraOutputUri(context)
+            if (uri != Uri.EMPTY) {
+                pendingCameraUri = uri
+                cameraLauncher.launch(uri)
+            }
+        }
+    }
+}
+
+/**
+ * Botonera para capturar/adjuntar evidencias: cámara, fotos, o documentos (PDF/Excel).
+ * Devuelve una lista de URIs seleccionadas.
+ */
+@Composable
+fun MediaPickerBar(
+    onPicked: (List<CapturedMedia>) -> Unit,
+    modifier: Modifier = Modifier,
+    allowCamera: Boolean = true,
+    allowGallery: Boolean = true,
+    allowDocuments: Boolean = true,
+) {
+    val context = LocalContext.current
+    val launchCamera = rememberCameraCapture { media -> onPicked(listOf(media)) }
 
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia()
@@ -101,18 +125,6 @@ fun MediaPickerBar(
             CapturedMedia(it, resolver.getType(it) ?: "application/octet-stream")
         }
         if (results.isNotEmpty()) onPicked(results)
-    }
-
-    fun launchCamera() {
-        if (!hasCam) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-            return
-        }
-        val uri = freshCameraOutputUri(context)
-        if (uri != Uri.EMPTY) {
-            pendingCameraUri = uri
-            cameraLauncher.launch(uri)
-        }
     }
 
     Row(

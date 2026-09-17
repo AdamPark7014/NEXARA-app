@@ -8,8 +8,6 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +22,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,12 +59,13 @@ import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
 import mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner
-import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIcons
 import mx.nexara.mobile.nativeapp.ui.enterprise.icon
+import mx.nexara.mobile.nativeapp.ui.common.rememberCameraCapture
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
@@ -75,6 +75,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /*
  * Asistencias — espejo de apps/web/app/(panels)/erp/asistencias/page.tsx.
@@ -449,7 +450,8 @@ fun ConsoleAttendanceScreen(
     }
 
     val pestanas = buildList {
-        add(TAB_EQUIPO to "Equipo del día")
+        // Quien no ve equipo solo tiene su jornada en esta pestaña: se llama como lo que muestra.
+        add(TAB_EQUIPO to if (vm.viewMode.canManageTeam) "Equipo del día" else "Mi jornada")
         add(TAB_COMIDAS to "Comidas")
         if (vm.puedeVerTrayectoria) add(TAB_TRAYECTORIA to "Trayectoria")
     }
@@ -524,6 +526,14 @@ fun ConsoleAttendanceScreen(
 
 // ── Selector de día ──────────────────────────────────────────────────────────
 
+private val DIA_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", Locale.forLanguageTag("es-MX"))
+
+/** «Hoy, jueves 17 de septiembre» · «Lunes 14 de septiembre». */
+internal fun etiquetaDia(fecha: String, esHoy: Boolean): String {
+    val dia = runCatching { LocalDate.parse(fecha, ISO_FECHA).format(DIA_FMT) }.getOrDefault(fecha)
+    return if (esHoy) "Hoy, $dia" else dia.replaceFirstChar { it.uppercase() }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SelectorFecha(
@@ -535,26 +545,26 @@ private fun SelectorFecha(
     val hoy = remember { LocalDate.now() }
     val esHoy = fecha == hoy.format(ISO_FECHA)
 
+    // Sin título repetido: la barra ya dice «Asistencias». Solo el día que se está viendo.
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                "Asistencias",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = NxColors.Slate,
-            )
-            Text(
-                "Tu checada (foto + GPS) · equipo · comidas",
-                fontSize = 12.sp,
-                color = NxColors.Muted,
-            )
+        OutlinedButton(
+            onClick = { abierto = true },
+            modifier = Modifier.heightIn(min = 48.dp),
+        ) {
+            Icon(NxIcons.Calendar, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(etiquetaDia(fecha, esHoy), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
-        OutlinedButton(onClick = { abierto = true }) {
-            Text(if (esHoy) "Hoy · $fecha" else fecha, fontSize = 13.sp)
+        Spacer(Modifier.weight(1f))
+        if (!esHoy) {
+            TextButton(
+                onClick = { onFecha(hoy.format(ISO_FECHA)) },
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) { Text("Ir a hoy") }
         }
     }
 
@@ -655,33 +665,18 @@ private fun EquipoTab(
             return@LazyColumn
         }
 
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                KpiAsistencia(Modifier.weight(1f), "Equipo", state.personas.size.toString(), NxColors.InfoSoft, NxColors.Info) {
-                    vm.setFiltro(null)
-                }
-                KpiAsistencia(Modifier.weight(1f), "En jornada", state.presentes.toString(), NxColors.SuccessSoft, AttendanceEstado.PRESENTE.color) {
-                    vm.setFiltro(AttendanceEstado.PRESENTE)
-                }
-                KpiAsistencia(Modifier.weight(1f), "Completó", state.completos.toString(), NxColors.InfoSoft, AttendanceEstado.COMPLETO.color) {
-                    vm.setFiltro(AttendanceEstado.COMPLETO)
-                }
-                KpiAsistencia(Modifier.weight(1f), "Sin checada", state.ausentes.toString(), Color(0xFFF1F5F9), AttendanceEstado.AUSENTE.color) {
-                    vm.setFiltro(AttendanceEstado.AUSENTE)
-                }
-            }
-        }
-
+        // Una sola fila de filtros con conteo (antes: tarjetas KPI y chips que hacían lo mismo).
         item {
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ChipEstado("Todos", state.personas.size, null, state.filtro == null) { vm.setFiltro(null) }
                 AttendanceEstado.entries.forEach { estado ->
                     val n = state.personas.count { it.estado == estado }
                     ChipEstado(estado.etiqueta, n, estado.color, state.filtro == estado) {
-                        vm.setFiltro(estado)
+                        // Tocar el filtro activo vuelve a «Todos».
+                        vm.setFiltro(if (state.filtro == estado) null else estado)
                     }
                 }
             }
@@ -689,14 +684,19 @@ private fun EquipoTab(
 
         if (state.visibles.isEmpty()) {
             item {
-                NxEmptyState(
-                    title = if (state.personas.isEmpty()) "Sin registros" else "Nadie en este filtro",
-                    subtitle = if (state.personas.isEmpty()) {
-                        "Nadie en tu alcance para el ${state.fecha}."
-                    } else {
-                        "Prueba otro chip o el KPI de arriba."
-                    },
-                )
+                if (state.personas.isEmpty()) {
+                    NxEmptyState(
+                        title = "Sin registros",
+                        subtitle = "Nadie en tu alcance para ${etiquetaDia(state.fecha, esHoy).replaceFirstChar { it.lowercase() }}.",
+                    )
+                } else {
+                    NxEmptyState(
+                        title = "Nadie en este filtro",
+                        subtitle = "Nadie de tu equipo está en «${state.filtro?.etiqueta.orEmpty()}».",
+                        actionLabel = "Ver a todos",
+                        onAction = { vm.setFiltro(null) },
+                    )
+                }
             }
         }
 
@@ -716,7 +716,18 @@ private fun MiJornadaCard(
     ahoraMs: Long,
 ) {
     val context = LocalContext.current
-    var pendiente by remember { mutableStateOf<String?>(null) }
+    // Sobrevive a que Android recree la actividad mientras la cámara está abierta.
+    var pendiente by rememberSaveable { mutableStateOf<String?>(null) }
+    val tomarFoto = rememberCameraCapture { foto ->
+        val tipo = pendiente ?: return@rememberCameraCapture
+        pendiente = null
+        val dataUrl = ImageDataUrl.fromCaptured(context, foto)
+        if (dataUrl.isNullOrBlank()) {
+            vm.clearMessage()
+            return@rememberCameraCapture
+        }
+        vm.checkIn(tipo, dataUrl)
+    }
 
     val abierta = state.current?.isOpen == true
     val hayEntrada = state.misChecadas.any { it.type.equals("entrada", true) }
@@ -787,75 +798,54 @@ private fun MiJornadaCard(
                 )
             }
 
-            val tipoPendiente = pendiente
-            if (tipoPendiente != null) {
-                Text(
-                    if (tipoPendiente == "entrada") "Toma una foto para registrar entrada"
-                    else "Toma una foto para registrar salida",
-                    fontSize = 12.sp,
-                    color = NxColors.Muted,
-                )
-                MediaPickerBar(
-                    onPicked = { picked ->
-                        val first = picked.firstOrNull() ?: return@MediaPickerBar
-                        val dataUrl = ImageDataUrl.fromCaptured(context, first)
-                        if (dataUrl.isNullOrBlank()) {
-                            vm.clearMessage()
-                            return@MediaPickerBar
-                        }
-                        pendiente = null
-                        vm.checkIn(tipoPendiente, dataUrl)
+            // Un solo botón con el siguiente paso; la cámara se abre directo (sin botonera intermedia).
+            val siguiente = when {
+                puedeEntrada -> "entrada"
+                puedeSalida -> "salida"
+                else -> null
+            }
+            if (siguiente != null || state.checkInLoading) {
+                Button(
+                    onClick = {
+                        pendiente = siguiente
+                        tomarFoto()
                     },
-                    allowCamera = true,
-                    allowGallery = false,
-                    allowDocuments = false,
-                )
-                TextButton(onClick = { pendiente = null }) { Text("Cancelar") }
-            } else {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    enabled = siguiente != null && !state.checkInLoading,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+                    shape = RoundedCornerShape(12.dp),
                 ) {
-                    Button(
-                        onClick = { pendiente = "entrada" },
-                        enabled = puedeEntrada && !state.checkInLoading,
-                        modifier = Modifier.weight(1f).height(50.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AttendanceEstado.PRESENTE.color),
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        if (!state.checkInLoading) {
-                            Icon(NxGlyph.ENTRY.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                        }
-                        Text(
-                            if (state.checkInLoading) "Registrando…" else "Entrada",
-                            fontWeight = FontWeight.Bold,
+                    if (state.checkInLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = NxColors.Brand,
                         )
-                    }
-                    Button(
-                        onClick = { pendiente = "salida" },
-                        enabled = puedeSalida && !state.checkInLoading,
-                        modifier = Modifier.weight(1f).height(50.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Danger),
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        if (!state.checkInLoading) {
-                            Icon(NxGlyph.EXIT.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text("Registrando…", fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(
+                            if (siguiente == "salida") NxGlyph.EXIT.icon else NxGlyph.ENTRY.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            if (state.checkInLoading) "Registrando…" else "Salida",
+                            if (siguiente == "salida") "Registrar salida" else "Registrar entrada",
                             fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
                         )
                     }
                 }
-                if (esHoy && !puedeEntrada && !puedeSalida) {
+                if (!state.checkInLoading) {
                     Text(
-                        if (hayEntrada) "Ya registraste tu entrada de hoy." else "Primero registra tu entrada.",
+                        "Se toma una foto y tu ubicación.",
                         fontSize = 12.sp,
                         color = NxColors.Muted,
                     )
                 }
+            } else if (esHoy && hayEntrada && !haySalida) {
+                Text("Ya registraste tu entrada de hoy.", fontSize = 12.sp, color = NxColors.Muted)
             }
 
             state.checkInMessage?.takeIf { it.isNotBlank() }?.let { msg ->
@@ -1025,24 +1015,16 @@ private fun PersonaCard(
             }
 
             if (persona.mapaEntrada != null || persona.mapaSalida != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     persona.mapaEntrada?.let { url ->
-                        Text(
-                            "Mapa entrada",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = NxColors.Brand,
-                            modifier = Modifier.clickable { onAbrir(url) },
-                        )
+                        TextButton(onClick = { onAbrir(url) }) {
+                            Text("Mapa entrada", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Brand)
+                        }
                     }
                     persona.mapaSalida?.let { url ->
-                        Text(
-                            "Mapa salida",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = NxColors.Brand,
-                            modifier = Modifier.clickable { onAbrir(url) },
-                        )
+                        TextButton(onClick = { onAbrir(url) }) {
+                            Text("Mapa salida", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Brand)
+                        }
                     }
                 }
             }
@@ -1062,31 +1044,8 @@ private fun FotoChecada(etiqueta: String, url: String, icon: ImageVector) {
     }
 }
 
-@Composable
-private fun KpiAsistencia(
-    modifier: Modifier,
-    label: String,
-    value: String,
-    bg: Color,
-    accent: Color,
-    onClick: () -> Unit,
-) {
-    Card(
-        modifier = modifier.clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = bg),
-        elevation = CardDefaults.cardElevation(0.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = accent)
-            Text(label, fontSize = 10.5.sp, color = NxColors.Muted, textAlign = TextAlign.Center)
-        }
-    }
-}
-
+/** Chip de filtro Material (48 dp de área táctil) con el punto de color del estado. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChipEstado(
     label: String,
@@ -1095,25 +1054,20 @@ private fun ChipEstado(
     activo: Boolean,
     onClick: () -> Unit,
 ) {
-    val tinte = color ?: NxColors.Brand
-    val shape = RoundedCornerShape(999.dp)
-    Box(
-        modifier = Modifier
-            .heightIn(min = 34.dp)
-            .clip(shape)
-            .background(if (activo) tinte.copy(alpha = 0.12f) else Color.White)
-            .border(1.dp, if (activo) tinte else Color(0xFFE2E8F0), shape)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            "$label $count",
-            fontSize = 12.5.sp,
-            fontWeight = if (activo) FontWeight.Bold else FontWeight.SemiBold,
-            color = if (activo) tinte else NxColors.Slate,
-        )
-    }
+    FilterChip(
+        selected = activo,
+        onClick = onClick,
+        label = { Text("$label $count", maxLines = 1) },
+        leadingIcon = color?.let { c ->
+            { Box(Modifier.size(8.dp).clip(CircleShape).background(c)) }
+        },
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = Color.White,
+            selectedContainerColor = NxColors.BrandSoft,
+            selectedLabelColor = NxColors.BrandDark,
+            labelColor = NxColors.Slate,
+        ),
+    )
 }
 
 // ── Pestaña «Trayectoria» ────────────────────────────────────────────────────
@@ -1175,13 +1129,9 @@ private fun TrayectoriaTab(
                         color = NxColors.Muted,
                     )
                     mapaUrl(lat, lng)?.let { url ->
-                        Text(
-                            "Ver en mapa",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = NxColors.Brand,
-                            modifier = Modifier.clickable { onAbrir(url) },
-                        )
+                        TextButton(onClick = { onAbrir(url) }) {
+                            Text("Ver en mapa", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Brand)
+                        }
                     }
                 }
             }
