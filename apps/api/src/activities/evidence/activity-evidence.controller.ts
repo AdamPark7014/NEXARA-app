@@ -16,6 +16,7 @@ import { ActivityGeofenceService } from '../geofence/activity-geofence.service.j
 import { RBAC, RbacGuard } from '../../common/rbac.guard.js';
 import { UrlAccessGuard } from '../../common/rbac/url-access.guard.js';
 import { saveBase64Photo, saveBase64Pdf } from '../../common/file-upload.util';
+import { materializarAdjuntosDeCorreccion } from './evidence-flow.helpers.js';
 import { CurrentCompanyId } from '../../common/tenant/current-company.decorator.js';
 import { CurrentUser } from '../../common/current-user.decorator.js';
 import { PERMISSIONS } from '../../common/permissions.js';
@@ -336,11 +337,17 @@ export class ActivityEvidenceController {
     @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    // Corregir un paso manda la misma foto que el paso original: base64 desde la cámara.
+    // Sin esta conversión el data URL entero iba a `exitPhotoUrl` (VARCHAR(500)) y la
+    // foto de salida moría con un error de Postgres en vez de guardarse.
     return this.service.resubmitStep(
       parseInt(activityId, 10),
       req.user.id,
-      body.step,
-      body.data,
+      body?.step,
+      materializarAdjuntosDeCorreccion(body?.data, {
+        foto: (base64) => saveBase64Photo(base64, __dirname, 'activities'),
+        pdf: (base64) => saveBase64Pdf(base64, __dirname, 'activities'),
+      }),
       companyId,
     );
   }
