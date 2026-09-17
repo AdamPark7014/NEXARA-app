@@ -570,6 +570,8 @@ model User {
   viaticosAsignados         Viatico[]                  @relation("ViaticoAsignadoPor")
   attendances               Attendance[]
   attendanceDays            AttendanceDay[]
+  faltasJustificadas        AttendanceJustification[]  @relation("AttendanceJustificationUser")
+  faltasJustificadasPor     AttendanceJustification[]  @relation("AttendanceJustificationAuthor")
   lunchBreaks               LunchBreak[]
   employeePayments          EmployeePayment[]
   employeePaymentsCreated   EmployeePayment[]          @relation("EmployeePaymentCreator")
@@ -1469,6 +1471,25 @@ model AttendanceDay {
 
   @@unique([companyId, userId, date])
   @@index([companyId])
+}
+
+/// Falta justificada: Christian marca un día sin checada como justificado, con motivo.
+/// No crea checadas ni jornada: el día se muestra como «Falta justificada · motivo».
+model AttendanceJustification {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  companyId     Int
+  date          DateTime       @db.Date
+  reason        String         @db.Text
+  justifiedById Int?
+  createdAt     DateTime       @default(now())
+  user          User           @relation("AttendanceJustificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  justifiedBy   User?          @relation("AttendanceJustificationAuthor", fields: [justifiedById], references: [id], onDelete: SetNull)
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, date])
+  @@index([companyId, date])
+  @@map("attendance_justifications")
 }
 
 model LunchBreak {
@@ -5058,6 +5079,7 @@ model CompanyProfile {
   leaveRequests              LeaveRequest[]
   attendances                Attendance[]
   attendanceDays             AttendanceDay[]
+  attendanceJustifications   AttendanceJustification[]
   lunchBreaks                LunchBreak[]
   newsPosts                  NewsPost[]
   pageContents               PageContent[]

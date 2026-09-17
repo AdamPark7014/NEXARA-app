@@ -1014,6 +1014,51 @@ export class NotificationHierarchyService {
     return [...ids];
   }
 
+  /**
+   * Christian justificó la falta de un día: la persona lo sabe («Tu falta del jue 17 sep quedó
+   * justificada · motivo») y sus jefes por organigrama también. Quien la justificó no recibe aviso.
+   */
+  async notifyAbsenceJustified(params: {
+    userId: number;
+    actorId: number;
+    fecha: string;
+    motivo: string;
+    justificationId: number;
+  }) {
+    try {
+      const nombre = persona(await this.resolveActorName(params.userId));
+      const motivo = `Motivo: ${params.motivo.trim().slice(0, 200)}`;
+      const comun = {
+        type: 'ATTENDANCE_ABSENCE',
+        category: 'attendance',
+        icon: 'falta_justificada',
+        triggerUserId: params.actorId,
+        relatedEntityId: params.justificationId,
+        entityType: 'AttendanceJustification',
+        priority: 'normal' as const,
+        dedupeSeconds: 0,
+      };
+      await this.notificationsService.createNotification({
+        ...comun,
+        userId: params.userId,
+        title: `Tu falta del ${params.fecha} quedó justificada`,
+        message: motivo,
+        relatedUrl: '/erp/asistencias',
+      });
+      for (const jefe of await this.lunchReviewerIds(params.userId)) {
+        await this.notificationsService.createNotification({
+          ...comun,
+          userId: jefe,
+          title: `${nombre}: falta del ${params.fecha} justificada`,
+          message: motivo,
+          relatedUrl: appUrls.erpAttendance(undefined, params.userId),
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyAbsenceJustified', error);
+    }
+  }
+
   /** Comida a destiempo: sus jefes y Christian reciben el motivo para aprobarla o rechazarla. */
   async notifyLunchLate(params: {
     userId: number;
