@@ -4,6 +4,7 @@ import { AllExceptionsFilter } from './common/errors/all-exception.filter';
 import { appLogger } from './common/errors/logger';
 import { Reflector } from '@nestjs/core';
 import { CoreModule } from './common/core.module';
+import { MapsModule } from './common/maps/maps.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { StripSecretsInterceptor } from './common/security/strip-secrets.interceptor';
@@ -104,6 +105,7 @@ import { CelebrationsModule } from './celebrations/celebrations.module.js';
 @Module({
   imports: [
     CoreModule,
+    MapsModule,
     ExcelModule,
     ObservabilityModule,
     JobsModule,
