@@ -519,8 +519,18 @@ private fun AssignFlow(
                     }
                 } else {
                     val failure = try {
+                        // Contrato B: el «tiempo estimado» que pidió el formulario viaja como horasPlan.
+                        val horasPlan = ActivityPlanTime.horasDesdeMinutos(body.tiempoEstimadoMin)
                         withContext(Dispatchers.IO) {
-                            plan.forEach { repo.addTeamMember(id, it.userId, it.rol, it.indicaciones) }
+                            plan.forEach {
+                                repo.addTeamMember(
+                                    activityId = id,
+                                    userId = it.userId,
+                                    rol = it.rol,
+                                    indicaciones = it.indicaciones,
+                                    horasPlan = horasPlan,
+                                )
+                            }
                         }
                         null
                     } catch (e: Exception) {
