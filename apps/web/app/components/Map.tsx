@@ -1,12 +1,10 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import styles from "./Map.module.css";
+import { googleMapsMapId, isGoogleMapsConfigured, loadGoogleMaps, loadMapConstructor } from "@/lib/google-maps-loader";
 
-const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
-// La clave va SOLO en la variable de entorno: escrita aquí viajaba en el bundle público y
-// cualquiera podía gastarla (el consumo de Places del 17-09 se cobró a NEXARA).
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "";
+const NEXARA_LOCATION = { lat: 19.073802875589788, lng: -98.2778382565653 };
+const NEXARA_MAPS_LINK = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
 
 const NEXARA_MAP_STYLES = [
   { elementType: "geometry", stylers: [{ color: "#07111f" }] },
@@ -25,164 +23,39 @@ const NEXARA_MAP_STYLES = [
   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#6f85a5" }] },
 ] as const;
 
-// Tipos para Google Maps
-interface GoogleMapsOptions {
-  zoom: number;
-  center: { lat: number; lng: number };
-  mapId?: string;
-  mapTypeControl: boolean;
-  fullscreenControl: boolean;
-  streetViewControl: boolean;
-  zoomControl: boolean;
-}
-interface GoogleMarkerOptions {
-  position: { lat: number; lng: number };
-  map: unknown;
-  title?: string;
-  animation?: number;
-}
-interface GoogleInfoWindowOptions {
-  content: string;
-}
-interface GoogleMapsAPI {
-  Map?: new (element: HTMLDivElement, options: GoogleMapsOptions) => unknown;
-  Marker: new (options: GoogleMarkerOptions) => unknown;
-  InfoWindow: new (options: GoogleInfoWindowOptions) => unknown;
-  Animation: { DROP: number };
-  importLibrary?: (library: string) => Promise<{ Map?: new (element: HTMLDivElement, options: GoogleMapsOptions) => unknown }>;
-  marker?: {
-    AdvancedMarkerElement?: new (options: GoogleMarkerOptions) => unknown;
-  };
-}
-
-declare global {
-  interface Window {
-    google?: {
-      maps: GoogleMapsAPI;
-    };
-    initMap?: () => void;
-  }
-}
-
+/**
+ * Mapa de la página de contacto.
+ *
+ * Se montaba con la página: cada visita al sitio público —incluidos los robots
+ * y quien solo venía por el teléfono— instanciaba un mapa, que es justo lo que
+ * Google cobra como «Dynamic Maps», y de paso cargaba la librería Places que
+ * esta pantalla no usa para nada.
+ *
+ * Ahora la visita ve una tarjeta con la dirección y el enlace a Maps (gratis);
+ * el mapa interactivo solo se crea si alguien pulsa «Ver mapa».
+ */
 export default function Map() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<unknown>(null);
+  const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (mapInstance.current || typeof window === "undefined") return;
-
-    const loadGoogleMapsScript = () => {
-      if (window.google?.maps) return Promise.resolve();
-      if (!GOOGLE_MAPS_API_KEY) return Promise.reject(new Error("API key no configurada"));
-
-      const injectScript = () =>
-        new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.id = GOOGLE_MAPS_SCRIPT_ID;
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&libraries=places,marker&loading=async`;
-          script.async = true;
-          script.defer = true;
-          script.onload = () => {
-            window.setTimeout(() => {
-              if (window.google?.maps) {
-                resolve();
-              } else {
-                reject(new Error("Google Maps no se inicializó correctamente"));
-              }
-            }, 120);
-          };
-          script.onerror = () => reject(new Error("Error al cargar Google Maps API"));
-          document.head.appendChild(script);
-        });
-
-      const removeExistingScript = () => {
-        const stale = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
-        stale?.parentElement?.removeChild(stale);
-      };
-
-      return new Promise<void>((resolve, reject) => {
-        const existingScript = document.getElementById(GOOGLE_MAPS_SCRIPT_ID) as HTMLScriptElement | null;
-
-        if (existingScript) {
-          if (window.google?.maps) {
-            resolve();
-            return;
-          }
-
-          const start = Date.now();
-          const checkGoogle = window.setInterval(() => {
-            if (window.google?.maps) {
-              window.clearInterval(checkGoogle);
-              resolve();
-              return;
-            }
-
-            if (Date.now() - start > 12000) {
-              window.clearInterval(checkGoogle);
-              removeExistingScript();
-              injectScript().then(resolve).catch(reject);
-            }
-          }, 120);
-
-          existingScript.addEventListener("error", () => {
-            window.clearInterval(checkGoogle);
-            removeExistingScript();
-            injectScript().then(resolve).catch(reject);
-          }, { once: true });
-
-          return;
-        }
-
-        injectScript().then(resolve).catch(reject);
-      });
-    };
-
-    const resolveMapConstructor = async (maps: GoogleMapsAPI) => {
-      if (typeof maps.Map === "function") return maps.Map;
-      if (typeof maps.importLibrary === "function") {
-        const mapsLibrary = await maps.importLibrary("maps");
-        if (typeof mapsLibrary?.Map === "function") return mapsLibrary.Map;
-      }
-      return null;
-    };
-
-    const waitForMapConstructor = async (maps: GoogleMapsAPI) => {
-      for (let attempt = 0; attempt < 25; attempt += 1) {
-        const MapConstructor = await resolveMapConstructor(maps);
-        if (MapConstructor) return MapConstructor;
-        await new Promise((r) => window.setTimeout(r, 120));
-      }
-      return null;
-    };
+    if (!active || mapInstance.current || typeof window === "undefined") return;
 
     let cancelled = false;
     const initializeMap = async () => {
       try {
-        await loadGoogleMapsScript();
+        // `marker` sí; `places` no: aquí no se busca ninguna dirección.
+        const MapConstructor = await loadMapConstructor();
+        await loadGoogleMaps(["marker"]);
         if (cancelled || !mapRef.current) return;
 
-        const maps = window.google?.maps;
-        if (!maps) {
-          setError("Google Maps API no disponible");
-          return;
-        }
-
-        const MapConstructor = await waitForMapConstructor(maps);
-        if (!MapConstructor) {
-          throw new Error("Google Maps Map no disponible");
-        }
-
-        if (typeof maps.importLibrary === "function" && !maps.marker?.AdvancedMarkerElement) {
-          await maps.importLibrary("marker");
-        }
-
-        const location = { lat: 19.073802875589788, lng: -98.2778382565653 };
+        const mapId = googleMapsMapId();
         mapInstance.current = new MapConstructor(mapRef.current, {
           zoom: 16,
-          center: location,
-          ...(GOOGLE_MAPS_MAP_ID ? { mapId: GOOGLE_MAPS_MAP_ID } : {}),
-          ...(!GOOGLE_MAPS_MAP_ID ? { styles: NEXARA_MAP_STYLES } : {}),
+          center: NEXARA_LOCATION,
+          ...(mapId ? { mapId } : { styles: NEXARA_MAP_STYLES }),
           mapTypeControl: false,
           fullscreenControl: false,
           streetViewControl: false,
@@ -191,15 +64,15 @@ export default function Map() {
 
         const currentMap = mapInstance.current;
         const mapsAny = window.google?.maps as any;
-        const canUseAdvancedMarker = Boolean(GOOGLE_MAPS_MAP_ID && mapsAny?.marker?.AdvancedMarkerElement);
+        const canUseAdvancedMarker = Boolean(mapId && mapsAny?.marker?.AdvancedMarkerElement);
         const marker = canUseAdvancedMarker
           ? new mapsAny.marker.AdvancedMarkerElement({
-              position: location,
+              position: NEXARA_LOCATION,
               map: currentMap,
               title: "NEXARA",
             })
           : new mapsAny.Marker({
-              position: location,
+              position: NEXARA_LOCATION,
               map: currentMap,
               title: "NEXARA",
               animation: mapsAny.Animation?.DROP,
@@ -211,7 +84,7 @@ export default function Map() {
               <img src="/logo-nexara-lockup.png" alt="NEXARA" class="nexara-map-logo" />
               <h3 class="nexara-map-title">NEXARA</h3>
               <p class="nexara-map-subtitle">Explanada Puebla · Momoxpan</p>
-              <button type="button" class="nexara-map-btn" onclick="window.open('https://maps.app.goo.gl/34XSHPwUSeMAB7x69','_blank','noopener')">
+              <button type="button" class="nexara-map-btn" onclick="window.open('${NEXARA_MAPS_LINK}','_blank','noopener')">
                 Ver ubicación
               </button>
             </div>
@@ -244,7 +117,7 @@ export default function Map() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [active]);
 
   if (error) {
     return (
@@ -253,6 +126,29 @@ export default function Map() {
           <p>{error}</p>
           <p style={{ fontSize: "0.85rem", marginTop: "8px", opacity: 0.7 }}>
             Verifica que tu API key esté habilitada y configurada en Google Cloud Console
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!active) {
+    return (
+      <div className={styles.mapContainer}>
+        <div className={styles.mapPlaceholder}>
+          <p style={{ margin: 0, fontWeight: 600, color: "#eef4ff" }}>NEXARA</p>
+          <p style={{ margin: "4px 0 14px" }}>Explanada Puebla · Momoxpan</p>
+          {isGoogleMapsConfigured() ? (
+            <button type="button" className="nexara-map-btn" onClick={() => setActive(true)}>
+              Ver mapa
+            </button>
+          ) : (
+            <p style={{ fontSize: "0.85rem", opacity: 0.7 }}>Mapa no disponible.</p>
+          )}
+          <p style={{ marginTop: 12, fontSize: "0.8rem" }}>
+            <a href={NEXARA_MAPS_LINK} target="_blank" rel="noopener noreferrer" style={{ color: "#2dd8f2" }}>
+              Abrir en Google Maps
+            </a>
           </p>
         </div>
       </div>

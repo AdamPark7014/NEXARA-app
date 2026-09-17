@@ -1,8 +1,17 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./ClientLocationPicker.module.css";
-
-const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
+import { useVisibleOnce } from "@/lib/use-visible-once";
+import { googleMapsLink, staticMapUrl } from "@/lib/static-map";
+import {
+  DEBOUNCE_MS,
+  MIN_QUERY_LENGTH,
+  PlacesSearch,
+  isQueryWorthSearching,
+  normalizeQuery,
+  parseCoordinateInput,
+  type PlaceSuggestion,
+} from "@/lib/places-autocomplete";
 
 export type ClientLocationValue = {
   address?: string;
@@ -18,218 +27,202 @@ type ClientLocationPickerProps = {
   height?: number;
 };
 
-const loadGoogleMaps = (apiKey: string) => {
-  if (!apiKey) return Promise.reject(new Error("API key no configurada"));
-  if (window.google?.maps) return Promise.resolve();
-
-  const injectScript = () =>
-    new Promise<void>((resolve, reject) => {
-      const script = document.createElement("script");
-      script.id = GOOGLE_MAPS_SCRIPT_ID;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places,marker&loading=async`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        window.setTimeout(() => {
-          if (window.google?.maps) {
-            resolve();
-          } else {
-            reject(new Error("Google Maps no se inicializó correctamente"));
-          }
-        }, 120);
-      };
-      script.onerror = () => reject(new Error("Error al cargar Google Maps"));
-      document.body.appendChild(script);
-    });
-
-  const removeExistingScript = () => {
-    const stale = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
-    stale?.parentElement?.removeChild(stale);
-  };
-
-  return new Promise<void>((resolve, reject) => {
-    const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
-    if (existing) {
-      if (window.google?.maps) {
-        resolve();
-        return;
-      }
-
-      const start = Date.now();
-      const checkGoogle = window.setInterval(() => {
-        if (window.google?.maps) {
-          window.clearInterval(checkGoogle);
-          resolve();
-          return;
-        }
-
-        if (Date.now() - start > 12000) {
-          window.clearInterval(checkGoogle);
-          removeExistingScript();
-          injectScript().then(resolve).catch(reject);
-        }
-      }, 120);
-
-      existing.addEventListener("error", () => {
-        window.clearInterval(checkGoogle);
-        removeExistingScript();
-        injectScript().then(resolve).catch(reject);
-      }, { once: true });
-      return;
-    }
-    injectScript().then(resolve).catch(reject);
-  });
-};
-
-const ensurePlacesLibrary = async () => {
-  if (!window.google?.maps) throw new Error("Google Maps no disponible");
-  const google = window.google as any;
-  if (google.maps.places) return;
-  if (typeof google.maps.importLibrary === "function") {
-    await google.maps.importLibrary("places");
-  }
-};
-
-const resolveMapCtor = async (mapsApi: any) => {
-  if (typeof mapsApi?.Map === "function") return mapsApi.Map;
-  if (typeof mapsApi?.importLibrary === "function") {
-    const mapsLibrary = await mapsApi.importLibrary("maps");
-    if (typeof mapsLibrary?.Map === "function") return mapsLibrary.Map;
-  }
-  return null;
-};
-
 const toNumber = (value?: number | null) => {
   if (value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const createMapMarker = (googleMaps: any, map: any, position: { lat: number; lng: number }) => {
-  return new googleMaps.Marker({
-    map,
-    position,
-  });
-};
-
-const setMapMarkerPosition = (marker: any, position: { lat: number; lng: number }) => {
-  if (!marker) return;
-  if (typeof marker.setPosition === "function") {
-    marker.setPosition(position);
-    return;
-  }
-  marker.position = position;
-};
-
+/**
+ * Selector de ubicación de sucursal.
+ *
+ * Antes montaba un mapa interactivo completo —el SDK de Maps más una instancia
+ * de `Map`, que es lo que Google factura como «Dynamic Map»— solo para enseñar
+ * un pin que nadie podía arrastrar: el marcador no tenía ni `draggable` ni
+ * manejador de clic. Y colgaba `places.Autocomplete` del input, que pide
+ * predicciones en cada tecla.
+ *
+ * Ahora: campo de texto normal, vista previa como imagen estática cacheada por
+ * nuestra API, y búsqueda de Places solo cuando el usuario la pide (≥4
+ * caracteres, 400 ms de espera, México, sesión que se cierra al elegir). Quien
+ * ya tiene el punto puede pegar coordenadas o un enlace de Google Maps: eso no
+ * cuesta nada.
+ */
 export default function ClientLocationPicker({ label, value, onChange, height = 220 }: ClientLocationPickerProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const mapInstance = useRef<any>(null);
-  const markerInstance = useRef<any>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [previewRef, previewVisible] = useVisibleOnce<HTMLDivElement>();
+  const searchRef = useRef<PlacesSearch | null>(null);
+  const debounceRef = useRef<number | null>(null);
   const [inputValue, setInputValue] = useState(value.address || "");
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  /** La búsqueda asistida no arranca sola: la enciende el usuario. */
+  const [assistEnabled, setAssistEnabled] = useState(false);
 
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+  const lat = toNumber(value.latitud);
+  const lng = toNumber(value.longitud);
 
-  useEffect(() => {
-    let isActive = true;
-    if (!apiKey) return undefined;
-    loadGoogleMaps(apiKey)
-      .then(async () => {
-        if (!isActive || !mapRef.current || !window.google?.maps) return;
-        const google = window.google as any;
-        let mapCtor: any = null;
-        for (let attempt = 0; attempt < 25; attempt += 1) {
-          mapCtor = await resolveMapCtor(google.maps);
-          if (mapCtor) break;
-          await new Promise((resolve) => window.setTimeout(resolve, 120));
-        }
-        if (!mapCtor) {
-          setStatus("Google Maps Map constructor no disponible.");
-          return;
-        }
-        const center = {
-          lat: toNumber(value.latitud) || 19.4326,
-          lng: toNumber(value.longitud) || -99.1332,
-        };
-        mapInstance.current = new mapCtor(mapRef.current, {
-          center,
-          zoom: 13,
-          mapTypeControl: false,
-          fullscreenControl: false,
-          streetViewControl: false,
-        });
-        markerInstance.current = createMapMarker(google.maps, mapInstance.current, center);
+  const previewUrl = useMemo(
+    () => (previewVisible ? staticMapUrl(lat, lng, { zoom: 16, width: 600, height: 300 }) : ""),
+    [previewVisible, lat, lng],
+  );
+  const mapsLink = useMemo(() => googleMapsLink(lat, lng), [lat, lng]);
 
-        await ensurePlacesLibrary();
-        if (!google.maps?.places) {
-          setStatus("Google Places no disponible.");
-          return;
-        }
+  const getSearch = useCallback(() => {
+    if (!searchRef.current) searchRef.current = new PlacesSearch();
+    return searchRef.current;
+  }, []);
 
-        if (inputRef.current) {
-          const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-            fields: ["formatted_address", "geometry", "place_id"],
-            types: ["geocode"],
-          });
-          autocomplete.addListener("place_changed", () => {
-            const place = autocomplete.getPlace();
-            if (!place?.geometry?.location) return;
-            const next = {
-              address: place.formatted_address,
-              placeId: place.place_id,
-              latitud: place.geometry.location.lat(),
-              longitud: place.geometry.location.lng(),
-            };
-            onChange(next);
-            setMapMarkerPosition(markerInstance.current, {
-              lat: place.geometry.location.lat(),
-              lng: place.geometry.location.lng(),
-            });
-            mapInstance.current?.setCenter(place.geometry.location);
-            setStatus("Ubicación actualizada");
-          });
-        }
-      })
-      .catch((err) => setStatus(err.message));
+  const runSearch = useCallback(async (query: string) => {
+    if (!isQueryWorthSearching(query)) {
+      setSuggestions([]);
+      return;
+    }
+    setSearching(true);
+    setStatus(null);
+    try {
+      setSuggestions(await getSearch().suggest(query));
+    } catch (error) {
+      setSuggestions([]);
+      setStatus(error instanceof Error ? error.message : "No se pudo buscar la dirección");
+    } finally {
+      setSearching(false);
+    }
+  }, [getSearch]);
 
-    return () => {
-      isActive = false;
-    };
-  }, [apiKey]);
+  const handleInput = (raw: string) => {
+    setInputValue(raw);
+    onChange({ ...value, address: raw });
 
-  useEffect(() => {
-    if (!mapInstance.current || !markerInstance.current) return;
-    const lat = toNumber(value.latitud);
-    const lng = toNumber(value.longitud);
-    if (lat === null || lng === null) return;
-    const pos = { lat, lng };
-    setMapMarkerPosition(markerInstance.current, pos);
-    mapInstance.current.setCenter(pos);
-  }, [value.latitud, value.longitud]);
+    // Pegar coordenadas o un enlace de Maps resuelve el punto sin pedir nada.
+    const coords = parseCoordinateInput(raw);
+    if (coords) {
+      setSuggestions([]);
+      onChange({ ...value, address: raw, latitud: coords.lat, longitud: coords.lng });
+      setStatus("Coordenadas leídas del texto");
+      return;
+    }
+
+    if (!assistEnabled) return;
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => void runSearch(raw), DEBOUNCE_MS);
+  };
+
+  const handlePick = async (suggestion: PlaceSuggestion) => {
+    setSuggestions([]);
+    setSearching(true);
+    try {
+      const place = await getSearch().resolve(suggestion.id);
+      if (!place) {
+        setStatus("No se pudo obtener la ubicación del sitio elegido");
+        return;
+      }
+      setInputValue(place.address || suggestion.label);
+      onChange({
+        address: place.address || suggestion.label,
+        placeId: place.placeId,
+        latitud: place.lat,
+        longitud: place.lng,
+      });
+      setStatus("Ubicación actualizada");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "No se pudo obtener la ubicación");
+    } finally {
+      setSearching(false);
+    }
+  };
 
   useEffect(() => {
     setInputValue(value.address || "");
   }, [value.address]);
 
-  useEffect(() => {
-    if (!mapRef.current) return;
-    mapRef.current.style.height = `${height}px`;
-  }, [height]);
+  useEffect(() => () => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    searchRef.current?.endSession();
+  }, []);
+
+  const tooShort = assistEnabled && normalizeQuery(inputValue).length > 0
+    && normalizeQuery(inputValue).length < MIN_QUERY_LENGTH;
 
   return (
     <div className={styles.wrapper}>
       <label className={styles.label}>{label}</label>
-      <input
-        ref={inputRef}
-        className="input"
-        placeholder="Busca la ubicación en Google Maps"
-        value={inputValue}
-        onChange={(event) => setInputValue(event.target.value)}
-      />
-      <div ref={mapRef} className={styles.mapContainer} />
+
+      <div className={styles.searchRow}>
+        <input
+          className="input"
+          placeholder="Dirección, o pega coordenadas / enlace de Google Maps"
+          value={inputValue}
+          onChange={(event) => handleInput(event.target.value)}
+        />
+        <button
+          type="button"
+          className={styles.searchButton}
+          onClick={() => {
+            if (assistEnabled) {
+              setAssistEnabled(false);
+              setSuggestions([]);
+              searchRef.current?.endSession();
+              return;
+            }
+            setAssistEnabled(true);
+            void runSearch(inputValue);
+          }}
+          disabled={searching}
+        >
+          {assistEnabled ? "Dejar de buscar" : "Buscar en Google"}
+        </button>
+      </div>
+
+      {tooShort && (
+        <div className={styles.hint}>Escribe al menos {MIN_QUERY_LENGTH} caracteres para buscar.</div>
+      )}
+
+      {suggestions.length > 0 && (
+        <ul className={styles.suggestions}>
+          {suggestions.map((suggestion) => (
+            <li key={suggestion.id}>
+              <button type="button" className={styles.suggestion} onClick={() => void handlePick(suggestion)}>
+                {suggestion.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div ref={previewRef} style={{ minHeight: height }}>
+        {previewUrl ? (
+          <a href={mapsLink || previewUrl} target="_blank" rel="noopener noreferrer">
+            <img
+              className={styles.previewImage}
+              src={previewUrl}
+              alt="Ubicación seleccionada"
+              loading="lazy"
+              style={{ maxHeight: height }}
+            />
+          </a>
+        ) : (
+          <div className={styles.previewPlaceholder} style={{ minHeight: height }}>
+            {lat !== null && lng !== null
+              ? "Cargando vista previa…"
+              : "Sin ubicación: busca la dirección o pega las coordenadas."}
+          </div>
+        )}
+      </div>
+
+      {lat !== null && lng !== null && (
+        <div className={styles.hint}>
+          {lat.toFixed(5)}, {lng.toFixed(5)}
+          {mapsLink && (
+            <>
+              {" · "}
+              <a href={mapsLink} target="_blank" rel="noopener noreferrer">Abrir en Google Maps</a>
+            </>
+          )}
+        </div>
+      )}
+
       {status && <div className={styles.status}>{status}</div>}
     </div>
   );
 }
-
