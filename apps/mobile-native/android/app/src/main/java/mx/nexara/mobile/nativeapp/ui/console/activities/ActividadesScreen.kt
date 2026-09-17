@@ -76,6 +76,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.SessionUser
+import mx.nexara.mobile.nativeapp.data.api.BoardAsignadaPorMiDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivitiesResponseDto
 import mx.nexara.mobile.nativeapp.data.api.MyActivityItemDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardResponseDto
@@ -134,17 +135,25 @@ fun ActividadesScreen(
     var boardError by remember { mutableStateOf<String?>(null) }
     var boardLoading by remember { mutableStateOf(true) }
     var boardReload by remember { mutableIntStateOf(0) }
+    /** Contrato C: Hoy · Semana · Mes para la pizarra y para «Asignadas por mí». */
+    var rango by rememberSaveable { mutableStateOf(BoardRange.HOY) }
+    var asignadasPorMi by remember { mutableStateOf<List<BoardAsignadaPorMiDto>>(emptyList()) }
 
-    LaunchedEffect(boardReload) {
+    LaunchedEffect(boardReload, rango) {
         boardLoading = true
+        val (desde, hasta) = BoardRange.fechas(rango)
         try {
-            board = withContext(Dispatchers.IO) { repo.board() }
+            board = withContext(Dispatchers.IO) { repo.board(desde = desde, hasta = hasta) }
             boardError = null
         } catch (e: Exception) {
             boardError = e.toUserMessage("No se pudo cargar Actividades")
         } finally {
             boardLoading = false
         }
+        // El endpoint puede no existir todavía: sin lista, la sección no aparece.
+        asignadasPorMi = runCatching {
+            withContext(Dispatchers.IO) { repo.boardAsignadasPorMi(desde = desde, hasta = hasta) }
+        }.getOrDefault(emptyList())
     }
 
     val users = board?.users.orEmpty().let { list ->
@@ -159,13 +168,14 @@ fun ActividadesScreen(
     // Quien no tiene equipo (o mientras se sabe) ve directo lo suyo: no espera a la pizarra.
     val verMias = !isCeo && (!conPestanas || vista == VISTA_MIAS)
 
-    // La pizarra se actualiza sola cada 30 s mientras se está viendo.
-    LaunchedEffect(viendoEquipo) {
+    // La pizarra se actualiza sola cada 30 s mientras se está viendo, en el rango elegido.
+    LaunchedEffect(viendoEquipo, rango) {
         if (!viendoEquipo) return@LaunchedEffect
+        val (desde, hasta) = BoardRange.fechas(rango)
         while (true) {
             delay(30_000)
             try {
-                board = withContext(Dispatchers.IO) { repo.board() }
+                board = withContext(Dispatchers.IO) { repo.board(desde = desde, hasta = hasta) }
             } catch (_: Exception) {
                 // Sin red: se queda la última pizarra.
             }
@@ -204,6 +214,10 @@ fun ActividadesScreen(
                 error = boardError,
                 onRefresh = { boardReload++ },
                 onOpenPerson = onOpenPerson,
+                rango = rango,
+                onRango = { rango = it },
+                asignadasPorMi = asignadasPorMi,
+                onOpenActivity = onOpenActivity,
             )
         }
     }
@@ -257,12 +271,21 @@ private fun TeamBoardContent(
     error: String?,
     onRefresh: () -> Unit,
     onOpenPerson: (Long) -> Unit,
+    rango: BoardRange = BoardRange.HOY,
+    onRango: (BoardRange) -> Unit = {},
+    asignadasPorMi: List<BoardAsignadaPorMiDto> = emptyList(),
+    onOpenActivity: (Long, String?) -> Unit = { _, _ -> },
 ) {
     val counts = ActividadesUx.boardCounts(users)
     /** Estado elegido en los chips; null = todos. */
     var filtro by rememberSaveable { mutableStateOf<String?>(null) }
     val visibles = ActividadesUx.filterBoard(users, filtro)
     Column(Modifier.fillMaxSize()) {
+        BoardRangeSelector(
+            rango = rango,
+            onRango = onRango,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        )
         if (users.isNotEmpty()) {
             BoardFilterRow(
                 total = users.size,
@@ -309,6 +332,31 @@ private fun TeamBoardContent(
                 }
                 gridItems(visibles, key = { it.id }) { u ->
                     PersonBoardCard(user = u, isSelf = u.id == meId, onClick = { onOpenPerson(u.id) })
+                }
+
+                // Contrato C: lo que yo asigné en el rango, con persona, estado y semáforo.
+                if (asignadasPorMi.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "ASIGNADAS POR MÍ (${asignadasPorMi.size})",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = NxColors.Muted,
+                            )
+                            Text(
+                                "Lo que repartiste ${BoardRange.descripcion(rango).replaceFirstChar { it.lowercase() }}.",
+                                fontSize = 12.sp,
+                                color = NxColors.Muted,
+                            )
+                        }
+                    }
+                    asignadasPorMi.forEach { a ->
+                        item(span = { GridItemSpan(maxLineSpan) }, key = "apm-${a.id}") {
+                            AsignadaPorMiCard(a = a, onClick = { onOpenActivity(a.id, null) })
+                        }
+                    }
                 }
             }
         }
@@ -357,6 +405,58 @@ private fun boardChipColors() = FilterChipDefaults.filterChipColors(
     selectedLabelColor = NxColors.BrandDark,
     labelColor = NxColors.Slate,
 )
+
+/** Una actividad que yo repartí: a quién, cómo va y su semáforo. */
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun AsignadaPorMiCard(a: BoardAsignadaPorMiDto, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                listOfNotNull(a.anNumber, a.titulo).joinToString(" · ").ifBlank { "Actividad #${a.id}" },
+                fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = NxColors.Slate,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            a.quien?.nombre?.takeIf { it.isNotBlank() }?.let {
+                NxIconText(
+                    text = CoreActivityRules.shortName(it),
+                    icon = NxGlyph.PERSON.icon,
+                    fontSize = 12.5.sp,
+                    color = NxColors.Muted,
+                )
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                ActivitySemaforo.luz(a.semaforo)?.let { luz -> ToneChip("● ${luz.etiqueta}", luz.color) }
+                ToneChip(CoreActivityRules.estatusUi(a.estatus))
+                if (ActivitySemaforo.estaPendienteDeAceptar(a.aceptacion)) {
+                    ToneChip("Sin aceptar", CoreActivityRules.NARANJA)
+                }
+                ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
+                    ToneChip(texto, ActivitySemaforo.planRealColor(a.excedida))
+                }
+            }
+            if (ActivitySemaforo.fueRechazada(a.aceptacion)) {
+                Text(
+                    ActivitySemaforo.rechazadaTexto(a.motivoRechazo),
+                    fontSize = 12.5.sp,
+                    color = Color(CoreActivityRules.ROJO),
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: () -> Unit) {
@@ -420,14 +520,34 @@ private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: ()
                             "ejecucion" -> " · Ejecución"
                             else -> ""
                         }
-                        Text(
-                            "${a.titulo.orEmpty()}$suffix",
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = NxColors.Muted,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        // Semáforo por actividad (contrato C): el punto de color delante del título.
+                        val luz = ActivitySemaforo.luz(a.semaforo)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (luz != null) {
+                                Box(Modifier.size(7.dp).clip(CircleShape).background(Color(luz.color)))
+                            }
+                            Text(
+                                "${a.titulo.orEmpty()}$suffix",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (a.excedida == true) Color(CoreActivityRules.ROJO) else NxColors.Muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
+                            Text(
+                                texto,
+                                fontSize = 10.sp,
+                                color = Color(ActivitySemaforo.planRealColor(a.excedida)),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                         val pct = (a.progressPct ?: 0.0).coerceIn(0.0, 100.0)
                         LinearProgressIndicator(
                             progress = { (pct / 100.0).toFloat() },

@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,12 +89,16 @@ fun BoardPersonScreen(
     var reload by remember { mutableIntStateOf(0) }
     var expandedId by remember { mutableStateOf<Long?>(null) }
     var visor by remember { mutableStateOf<Pair<List<CoreActivityRules.EvidencePhoto>, Int>?>(null) }
+    /** Contrato C: Hoy · Semana · Mes (`me/board?desde&hasta`). */
+    var rango by rememberSaveable { mutableStateOf(BoardRange.HOY) }
 
-    LaunchedEffect(userId, reload) {
+    LaunchedEffect(userId, reload, rango) {
+        val (desde, hasta) = BoardRange.fechas(rango)
         try {
             val (card, hist) = withContext(Dispatchers.IO) {
-                val c = repo.boardUser(userId)
-                val h = runCatching { repo.boardUserHistory(userId) }.getOrDefault(emptyList())
+                val c = repo.boardUser(userId, desde = desde, hasta = hasta)
+                val h = runCatching { repo.boardUserHistory(userId, desde = desde, hasta = hasta) }
+                    .getOrDefault(emptyList())
                 c to h
             }
             person = card
@@ -175,6 +180,31 @@ fun BoardPersonScreen(
             }
 
             item {
+                BoardRangeSelector(
+                    rango = rango,
+                    onRango = { rango = it },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            // Contrato C: a tiempo, eficiencia, productividad y cerradas del rango.
+            val tiles = BoardKpis.tiles(p.kpis)
+            if (tiles.isNotEmpty()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        tiles.chunked(2).forEach { fila ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                fila.forEach { tile ->
+                                    KpiTile(tile = tile, modifier = Modifier.weight(1f))
+                                }
+                                if (fila.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PersonStat(
                         label = "Entrada hoy",
@@ -228,6 +258,11 @@ fun BoardPersonScreen(
 
             item {
                 Text("HISTORIAL DE ACTIVIDADES", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Muted)
+                Text(
+                    BoardRange.descripcion(rango),
+                    fontSize = 12.sp,
+                    color = NxColors.Muted,
+                )
             }
             if (history.isEmpty()) {
                 item { Text("Sin historial todavía.", fontSize = 14.sp, color = NxColors.Muted) }
@@ -258,6 +293,64 @@ fun BoardPersonScreen(
 
     visor?.let { (fotos, index) ->
         EvidencePhotoViewer(fotos = fotos, startIndex = index, onClose = { visor = null })
+    }
+}
+
+/** Hoy · Semana · Mes (contrato C); lo que se elige va como `desde`/`hasta`. */
+@Composable
+fun BoardRangeSelector(
+    rango: BoardRange,
+    onRango: (BoardRange) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White)
+                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            BoardRange.entries.forEach { opcion ->
+                val on = opcion == rango
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 44.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (on) NxColors.Brand else Color.Transparent)
+                        .clickable { onRango(opcion) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        opcion.etiqueta,
+                        fontSize = 13.5.sp,
+                        fontWeight = if (on) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        color = if (on) Color.White else NxColors.Slate,
+                    )
+                }
+            }
+        }
+        Text(BoardRange.descripcion(rango), fontSize = 11.5.sp, color = NxColors.Muted)
+    }
+}
+
+/** Un número de la tira de KPI (a tiempo, eficiencia, productividad, cerradas). */
+@Composable
+fun KpiTile(tile: BoardKpis.Tile, modifier: Modifier = Modifier) {
+    val color = Color(tile.color)
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(tile.etiqueta, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted, maxLines = 1)
+        Text(tile.valor, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = color, maxLines = 1)
+        Text(tile.pie, fontSize = 11.sp, color = NxColors.Muted, maxLines = 2)
     }
 }
 
@@ -314,6 +407,16 @@ private fun HistoryCard(
                     color = NxColors.Slate,
                 )
                 if (subtitle.isNotBlank()) Text(subtitle, fontSize = 12.sp, color = NxColors.Muted)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Contrato C: sigue en su historial aunque la hayan sacado de la actividad.
+                if (h.retirado == true) {
+                    ToneChip("Retirado", CoreActivityRules.MORADO)
+                }
+                ActivitySemaforo.luz(h.semaforo)?.let { luz -> ToneChip("● ${luz.etiqueta}", luz.color) }
+                ActivitySemaforo.planRealTexto(h.minutosPlan, h.minutosReales)?.let { texto ->
+                    ToneChip(texto, ActivitySemaforo.planRealColor(h.excedida))
+                }
             }
             if (open) {
                 if (ev != null) {
