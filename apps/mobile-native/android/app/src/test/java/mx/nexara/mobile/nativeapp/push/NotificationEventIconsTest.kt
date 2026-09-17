@@ -17,6 +17,13 @@ class NotificationEventIconsTest {
     }
 
     @Test
+    fun alertaDeAsistenciaTieneIconoPropioYRojo() {
+        // Contrato A: ATTENDANCE_FLAGGED (ubicación simulada, fuera de sitio, cierre automático).
+        assertEquals(R.drawable.ic_nx_location_off, NotificationEventIcons.glyphRes("asistencia_alerta"))
+        assertEquals(NotificationEventIcons.RED, NotificationEventIcons.color("asistencia_alerta"))
+    }
+
+    @Test
     fun iconosNuevosDelServidorNoCaenEnLaCampana() {
         listOf("cancelada", "falta_justificada", "cliente").forEach { icon ->
             assertNotEquals(icon, R.drawable.ic_nx_notifications, NotificationEventIcons.glyphRes(icon))

@@ -87,6 +87,17 @@ class AttendanceViewModeTest {
         )
     }
 
+    @Test
+    fun `la trayectoria del equipo es solo de direccion`() {
+        // Contrato A: el GPS del equipo dejó de ser cosa de `gps.manage`.
+        assertTrue(attendanceCanSeeTrajectory("gerencia@nexara.com.mx"))
+        assertTrue(attendanceCanSeeTrajectory("claudia.bernal@nexara.com.mx"))
+        assertFalse(attendanceCanSeeTrajectory("coord@nexara.com.mx"))
+        assertFalse(attendanceCanSeeTrajectory("rh@nexara.com.mx"))
+        assertFalse(attendanceCanSeeTrajectory("developer@nexara.com.mx"))
+        assertFalse(attendanceCanSeeTrajectory(null as String?))
+    }
+
     private fun attendanceScopeParamFor(email: String?, roleKey: String?, isSuperAdmin: Boolean): String? =
         if (attendanceIsCompanyWideViewer(email, roleKey, isSuperAdmin)) null else "subtree"
 }
