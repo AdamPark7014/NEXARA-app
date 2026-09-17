@@ -577,6 +577,8 @@ model User {
   employeePaymentsCreated   EmployeePayment[]          @relation("EmployeePaymentCreator")
   cotizaciones              Cotizacion[]
   cotizacionVersions        CotizacionVersion[]
+  cotizacionParticipaciones CotizacionParticipante[]   @relation("CotizacionParticipante")
+  cotizacionContador        CotizacionContador?        @relation("CotizacionContador")
   supplierPurchaseOrders    SupplierPurchaseOrder[]
   salesClientsManaged       SalesClient[]              @relation("SalesClientOwner")
   salesClientDocuments      SalesClientDocument[]      @relation("SalesClientDocumentUploader")
@@ -877,6 +879,10 @@ model Activity {
   ticketReportGeneratedAt DateTime?
   /// Tipo Core (hub Actividades): tarea|proyecto|obra|servicio|comercial
   coreKind                String?                  @db.VarChar(20)
+  /// Una actividad comercial **es** una cotización: su evidencia son los anexos de la propuesta y su
+  /// avance sigue el estado de la cotización (ENVIADA → Por Validar, APROBADA → Finalizada).
+  cotizacionId            Int?
+  cotizacion              Cotizacion?              @relation("ActividadCotizacion", fields: [cotizacionId], references: [id], onDelete: SetNull)
   /// Encargo al responsable: ejecucion (la hace él) | despacho (la reparte a su equipo)
   assignmentCharge        String?                  @db.VarChar(20)
   /// Fotos de evidencia exigidas por persona (2–8), fijadas al asignar.
@@ -930,6 +936,7 @@ model Activity {
 
   geofenceAlerts          ActivityGeofenceAlert[]
   @@unique([companyId, anNumber])
+  @@index([cotizacionId])
   @@index([projectId])
   @@index([clientId])
   @@index([companyId])
@@ -1745,18 +1752,61 @@ model FeatureFlag {
   @@map("feature_flags")
 }
 
+/// Estados del contrato (D): BORRADOR | ENVIADA | APROBADA | RECHAZADA | VENCIDA.
+/// Los tres primeros son los nombres con los que nació el enum y hay cotizaciones vivas con ellos;
+/// la traducción al español vive en `cotizaciones/estado-cotizacion.ts`.
 enum CotizacionStatus {
   DRAFT
   SENT
   APPROVED
+  REJECTED
+  EXPIRED
+}
+
+/// Segmento de la cotización: decide plantillas y términos, nunca el folio.
+enum CotizacionSegmento {
+  COMERCIAL
+  OBRA
+  LICITACION
+  SERVICIO
+}
+
+/// Papel de cada persona en la cotización (se registra solo).
+enum CotizacionParticipanteRol {
+  ELABORO
+  LEVANTAMIENTO
+  REVISO
+  APROBO
+  ENVIO
 }
 
 model Cotizacion {
   id              Int                      @id @default(autoincrement())
-  quoteNumber     String                   @db.VarChar(40)
+  quoteNumber     String                   @db.VarChar(80)
   issueDate       DateTime
   validUntil      DateTime?
   status          CotizacionStatus         @default(DRAFT)
+  /// Segmento (obligatorio al crear en Core). Las 4 cotizaciones que ya existían quedaron COMERCIAL.
+  segmento        CotizacionSegmento       @default(COMERCIAL)
+  /// Nomenclatura con la que se emitió el folio. Se congela: si la persona cambia de clave, los
+  /// folios ya emitidos no se tocan.
+  folioNomenclatura String?                @db.VarChar(20)
+  /// Consecutivo de esa persona (4 dígitos en el folio).
+  folioConsecutivo  Int?
+  /// Versión enviada: 1 = primer envío; de 2 en adelante el folio agrega -R2, -R3.
+  revision          Int                    @default(1)
+  /// Folio con la cadena de quién intervino, fijado en cada envío (`NEX-LJ75100126-0007-JA.CE-R2`).
+  folioEnviado      String?                @db.VarChar(120)
+  /// 01 Objetivo del proyecto (plantilla por segmento, con las cifras de la cotización).
+  objetivo          String?                @db.Text
+  /// 02 Alcance: bloques reutilizables con sus parámetros `[{ clave, titulo, parametros, texto }]`.
+  alcanceBloques    Json?
+  /// 03 Planos: anexos propios o heredados de la actividad `[{ url, nombre, tipo, origen }]`.
+  planos            Json?
+  rejectedAt        DateTime?
+  rejectedReason    String?                @db.Text
+  rejectedByName    String?                @db.VarChar(180)
+  expiredAt         DateTime?
   /// FK al cliente comercial ERP (opcional: cotizaciones legacy solo con strings)
   salesClientId   Int?
   opportunityId   Int?
@@ -1801,6 +1851,10 @@ model Cotizacion {
   salesQuotes     SalesOpportunityQuote[]
   /// Recomendaciones de Ingeniería que se convirtieron en esta cotización.
   recommendations ActivityRecommendation[]
+  /// Quién intervino y con qué papel (se registra solo al crear/revisar/aprobar/enviar).
+  participantes   CotizacionParticipante[]
+  /// Actividades comerciales ligadas a esta cotización (su evidencia son sus anexos).
+  actividades     Activity[]                @relation("ActividadCotizacion")
 
   @@unique([companyId, quoteNumber])
   @@index([salesClientId])
@@ -1813,6 +1867,13 @@ model CotizacionItem {
   id                    Int        @id @default(autoincrement())
   cotizacionId          Int
   productId             Int?
+  /// Grupo en la propuesta técnica: EQUIPOS | MATERIALES | MANO_DE_OBRA. Si va vacío se deduce del
+  /// concepto (`cotizaciones/partidas-grupos.ts`).
+  grupo                 String?    @db.VarChar(20)
+  /// Paquete del que salió la partida («Cámara bala instalada»), para poder recontarlo y editarlo.
+  paqueteClave          String?    @db.VarChar(60)
+  /// Cuántos paquetes generaron esta partida.
+  paqueteCantidad       Int?
   category              String?    @db.VarChar(120)
   name                  String     @db.VarChar(200)
   description           String?
@@ -1858,6 +1919,36 @@ model CotizacionItem {
   @@index([productCtId])
   @@index([supplierId])
   @@map("cotizacion_items")
+}
+
+/// Quién intervino en una cotización. De aquí sale la cadena de siglas del folio al enviar.
+model CotizacionParticipante {
+  id           Int                       @id @default(autoincrement())
+  cotizacionId Int
+  userId       Int
+  /// `employeeNumber` al momento (o la nomenclatura rellenada): el folio no se reescribe después.
+  clave        String                    @db.VarChar(20)
+  siglas       String                    @db.VarChar(4)
+  rol          CotizacionParticipanteRol
+  at           DateTime                  @default(now())
+  cotizacion   Cotizacion                @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  user         User                      @relation("CotizacionParticipante", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cotizacionId, userId, rol])
+  @@index([cotizacionId])
+  @@index([userId])
+  @@map("cotizacion_participantes")
+}
+
+/// Contador de folios **por persona**, en transacción: dos cotizaciones simultáneas no repiten folio.
+model CotizacionContador {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  ultimo    Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation("CotizacionContador", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("cotizacion_contadores")
 }
 
 model CotizacionVersion {
