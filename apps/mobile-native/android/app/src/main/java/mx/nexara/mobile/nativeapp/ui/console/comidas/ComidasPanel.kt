@@ -288,8 +288,8 @@ fun ComidasPanel(
                             modifier = Modifier
                                 .heightIn(min = 36.dp)
                                 .clip(shape)
-                                .background(if (on) NxColors.TealSoft else Color.White)
-                                .border(1.dp, if (on) NxColors.Teal else Color(0xFFE2E8F0), shape)
+                                .background(if (on) NxColors.BrandSoft else Color.White)
+                                .border(1.dp, if (on) NxColors.Brand else Color(0xFFE2E8F0), shape)
                                 .clickable { filtro = f }
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                             contentAlignment = Alignment.Center,
@@ -298,7 +298,7 @@ fun ComidasPanel(
                                 if (n != null) "${f.label} $n" else f.label,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (on) NxColors.Teal else NxColors.Slate,
+                                color = if (on) NxColors.Brand else NxColors.Slate,
                             )
                         }
                     }

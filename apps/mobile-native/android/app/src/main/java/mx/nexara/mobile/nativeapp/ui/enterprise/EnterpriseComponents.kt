@@ -71,8 +71,15 @@ import androidx.compose.ui.unit.sp
  * Uso: dashboards y pantallas de decisión (no CRUD genérico).
  */
 object NxColors {
-    val Teal = Color(0xFF0D9488)
-    val TealSoft = Color(0xFFCCFBF1)
+    /** Azul de marca: botones, encabezados, pestañas, chips, enlaces, progreso, FAB. */
+    val Brand = Color(0xFF2563EB)
+    /** Azul profundo: fondos fuertes (mosaicos del logo, que trae letras blancas). */
+    val BrandDark = Color(0xFF1E40AF)
+    val BrandSoft = Color(0xFFDBEAFE)
+    /** Tinte de superficie (degradados suaves, tarjetas destacadas). */
+    val BrandTint = Color(0xFFEFF6FF)
+    /** Acento para gráficas e insignias. */
+    val Accent = Color(0xFF3B82F6)
     val Slate = Color(0xFF0F172A)
     val Muted = Color(0xFF64748B)
     val Success = Color(0xFF10B981)
@@ -96,8 +103,8 @@ enum class NxTone { Neutral, Success, Warning, Danger, Info, Brand }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NxTealTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
-    containerColor = NxColors.Teal,
+fun NxBrandTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
+    containerColor = NxColors.Brand,
     titleContentColor = Color.White,
     navigationIconContentColor = Color.White,
     actionIconContentColor = Color.White,
@@ -109,7 +116,7 @@ fun NxTone.fg(): Color = when (this) {
     NxTone.Warning -> NxColors.Warning
     NxTone.Danger -> NxColors.Danger
     NxTone.Info -> NxColors.Info
-    NxTone.Brand -> NxColors.Teal
+    NxTone.Brand -> NxColors.Brand
 }
 
 fun NxTone.bg(): Color = when (this) {
@@ -118,7 +125,7 @@ fun NxTone.bg(): Color = when (this) {
     NxTone.Warning -> NxColors.WarningSoft
     NxTone.Danger -> NxColors.DangerSoft
     NxTone.Info -> NxColors.InfoSoft
-    NxTone.Brand -> NxColors.TealSoft
+    NxTone.Brand -> NxColors.BrandSoft
 }
 
 data class NxKpi(
@@ -363,7 +370,7 @@ fun NxEmptyState(
         Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(4.dp))
-            Button(onClick = onAction, colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal)) {
+            Button(onClick = onAction, colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand)) {
                 Text(actionLabel)
             }
         }
@@ -377,7 +384,7 @@ fun NxLoadingBlock(message: String = "Cargando…") {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CircularProgressIndicator(color = NxColors.Teal)
+        CircularProgressIndicator(color = NxColors.Brand)
         Text(message, color = NxColors.Muted, style = MaterialTheme.typography.bodySmall)
     }
 }
@@ -493,9 +500,9 @@ fun NxSearchField(
         enabled = enabled,
         shape = RoundedCornerShape(NxDimens.PanelRadius),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = NxColors.Teal,
-            cursorColor = NxColors.Teal,
-            focusedLeadingIconColor = NxColors.Teal,
+            focusedBorderColor = NxColors.Brand,
+            cursorColor = NxColors.Brand,
+            focusedLeadingIconColor = NxColors.Brand,
         ),
     )
 }
@@ -675,7 +682,7 @@ fun NxSnackbarHost(
             snackbarData = data,
             containerColor = NxColors.Slate,
             contentColor = Color.White,
-            actionColor = NxColors.TealSoft,
+            actionColor = NxColors.BrandSoft,
             shape = RoundedCornerShape(NxDimens.PanelRadius),
         )
     }
@@ -705,7 +712,7 @@ fun NxAppMetaFooter(
                 Text(
                     "Política de privacidad",
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxColors.Teal,
+                    color = NxColors.Brand,
                 )
             }
         }

@@ -937,14 +937,14 @@ private fun PersonaCard(
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
-                    modifier = Modifier.size(44.dp).clip(CircleShape).background(NxColors.TealSoft),
+                    modifier = Modifier.size(44.dp).clip(CircleShape).background(NxColors.BrandSoft),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         iniciales(persona.nombre),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = NxColors.Teal,
+                        color = NxColors.Brand,
                     )
                 }
                 Column(Modifier.weight(1f)) {
@@ -1027,7 +1027,7 @@ private fun PersonaCard(
                             "Mapa entrada",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = NxColors.Teal,
+                            color = NxColors.Brand,
                             modifier = Modifier.clickable { onAbrir(url) },
                         )
                     }
@@ -1036,7 +1036,7 @@ private fun PersonaCard(
                             "Mapa salida",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = NxColors.Teal,
+                            color = NxColors.Brand,
                             modifier = Modifier.clickable { onAbrir(url) },
                         )
                     }
@@ -1091,7 +1091,7 @@ private fun ChipEstado(
     activo: Boolean,
     onClick: () -> Unit,
 ) {
-    val tinte = color ?: NxColors.Teal
+    val tinte = color ?: NxColors.Brand
     val shape = RoundedCornerShape(999.dp)
     Box(
         modifier = Modifier
@@ -1175,7 +1175,7 @@ private fun TrayectoriaTab(
                             "Ver en mapa",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = NxColors.Teal,
+                            color = NxColors.Brand,
                             modifier = Modifier.clickable { onAbrir(url) },
                         )
                     }

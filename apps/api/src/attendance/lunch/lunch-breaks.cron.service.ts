@@ -4,6 +4,7 @@ import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
 import { WORKDAY_TIMEZONE, workDateColumn } from '../../common/time/workday.js';
+import { horaAviso, nombreCorto } from '../../notifications/notification-push-meta.js';
 
 @Injectable()
 export class LunchBreaksCronService {
@@ -43,8 +44,9 @@ export class LunchBreaksCronService {
           userId: u.id,
           type: NotificationType.LUNCH_CHECKIN,
           category: 'lunch_break',
-          title: '🍽️ Hora de Comida',
-          message: 'Tu hora de comida se acerca en 10 minutos. Registra tu entrada, deja tu escritorio limpio y tómate tiempo para descansar.',
+          title: 'Tu hora de comida empieza en 10 minutos',
+          message: 'Registra tu salida a comer con foto desde la app',
+          icon: 'comida_sale',
           isRead: false,
           entityType: 'lunch_break',
           priority: 'normal',
@@ -104,8 +106,9 @@ export class LunchBreaksCronService {
           userId: u.user.id,
           type: NotificationType.LUNCH_CHECKOUT,
           category: 'lunch_break',
-          title: '🍽️ Hora de Comida Completada',
-          message: 'Tu hora de comida ha expirado. Por favor regresa al trabajo y registra tu salida con una foto de que iniciaste labores nuevamente.',
+          title: 'Tu hora de comida terminó',
+          message: 'Registra tu regreso con una foto al retomar labores',
+          icon: 'comida_tarde',
           isRead: false,
           entityType: 'lunch_break',
           priority: 'high',
@@ -139,14 +142,16 @@ export class LunchBreaksCronService {
 
       const isSuperAdmin = userData.email === 'developer@nexara.com.mx' || userData.email === 'gerencia@nexara.com.mx';
       
+      const nombre = nombreCorto(userData.nombre) || 'Alguien del equipo';
+      const hora = horaAviso(new Date());
       const messages = {
-        checkin: `${userData.nombre} registró su entrada a comida. Foto capturada.`,
-        checkout: `${userData.nombre} registró su regreso del almuerzo. Foto capturada.`,
+        checkin: `${hora} · Registro con foto`,
+        checkout: `${hora} · Registro con foto`,
       };
 
       const titles = {
-        checkin: `🍽️ ${userData.nombre} - Entrada a Comida`,
-        checkout: `🍽️ ${userData.nombre} - Regreso del Almuerzo`,
+        checkin: `${nombre} salió a comer`,
+        checkout: `${nombre} regresó de comer`,
       };
 
       // Si es un usuario normal, notificar a admins
@@ -168,6 +173,7 @@ export class LunchBreaksCronService {
           category: 'lunch_break',
           title: titles[type],
           message: messages[type],
+          icon: type === 'checkin' ? 'comida_sale' : 'comida_regresa',
           isRead: false,
           entityType: 'lunch_break',
           priority: 'normal',
@@ -193,6 +199,7 @@ export class LunchBreaksCronService {
       message: string;
       entityType: string;
       priority: string;
+      icon?: string;
     }>,
   ) {
     for (const n of notifications) {
@@ -203,6 +210,7 @@ export class LunchBreaksCronService {
           category: n.category,
           title: n.title,
           message: n.message,
+          icon: n.icon,
           entityType: n.entityType,
           priority: n.priority === 'high' ? 'high' : 'normal',
           relatedUrl: '/erp/asistencias',

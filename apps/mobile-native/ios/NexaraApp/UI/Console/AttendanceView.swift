@@ -371,7 +371,7 @@ struct AttendanceView: View {
         )) {
             GeoPhotoCaptureView(
                 title: photoType == "salida" ? "Tu foto de salida" : "Tu foto de entrada",
-                confirmLabel: "✓ Registrar con esta foto",
+                confirmLabel: "Registrar con esta foto",
                 requireLocation: false,
                 onConfirm: { captured in
                     let type = photoType ?? "entrada"

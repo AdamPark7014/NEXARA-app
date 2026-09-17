@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import LoginIcon from "@mui/icons-material/Login";
+import LogoutIcon from "@mui/icons-material/Logout";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import { IconLabel } from "@/components/ui/IconBadge";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -311,9 +316,13 @@ export default function PizarraPersonaPage() {
                   <div style={{ display: "grid", gap: 10, fontSize: 13 }}>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                       {[
-                        ...(ev.entryPhotoUrl ? [{ url: ev.entryPhotoUrl, label: "📍 Entrada" }] : []),
-                        ...(ev.evidencePhotos || []).map((url, i) => ({ url, label: `📷 Evidencia ${i + 1}` })),
-                        ...(ev.exitPhotoUrl ? [{ url: ev.exitPhotoUrl, label: "🏁 Salida" }] : []),
+                        ...(ev.entryPhotoUrl ? [{ url: ev.entryPhotoUrl, label: "Entrada", icon: LoginIcon }] : []),
+                        ...(ev.evidencePhotos || []).map((url, i) => ({
+                          url,
+                          label: `Evidencia ${i + 1}`,
+                          icon: PhotoCameraOutlinedIcon,
+                        })),
+                        ...(ev.exitPhotoUrl ? [{ url: ev.exitPhotoUrl, label: "Salida", icon: LogoutIcon }] : []),
                       ].map((foto, i) => (
                         <figure key={`${h.id}-foto-${i}`} style={{ margin: 0, display: "grid", gap: 4, width: 104 }}>
                           <div
@@ -335,7 +344,9 @@ export default function PizarraPersonaPage() {
                           <figcaption
                             style={{ fontSize: 11.5, fontWeight: 700, textAlign: "center", color: "var(--text-secondary)" }}
                           >
-                            {foto.label}
+                            <IconLabel icon={foto.icon} size={14} gap={4}>
+                              {foto.label}
+                            </IconLabel>
                           </figcaption>
                         </figure>
                       ))}
@@ -354,7 +365,11 @@ export default function PizarraPersonaPage() {
                     ) : null}
                     {ev.serviceSheetPdfUrl ? (
                       <div style={{ display: "grid", gap: 6 }}>
-                        <div style={{ fontSize: 12, fontWeight: 800 }}>📄 Hoja de servicio</div>
+                        <div style={{ fontSize: 12, fontWeight: 800 }}>
+                          <IconLabel icon={DescriptionOutlinedIcon} size={16}>
+                            Hoja de servicio
+                          </IconLabel>
+                        </div>
                         <VisorPdf url={ev.serviceSheetPdfUrl} alto="400px" />
                       </div>
                     ) : null}

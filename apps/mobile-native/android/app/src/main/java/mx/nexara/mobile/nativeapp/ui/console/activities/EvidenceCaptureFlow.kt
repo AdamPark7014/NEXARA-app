@@ -399,7 +399,7 @@ fun EvidenceCaptureFlow(
                         Button(
                             onClick = { savePhotos() },
                             enabled = !busy && drafts.size >= photoRequired,
-                            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         ) { Text(if (busy) "⏳ Guardando…" else "✓ Siguiente paso →") }
                     }
@@ -587,7 +587,7 @@ private fun PrimaryAction(label: String, enabled: Boolean, onClick: () -> Unit) 
     Button(
         onClick = onClick,
         enabled = enabled,
-        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
     ) {
         Text(label, fontWeight = FontWeight.Bold, fontSize = 15.sp)
@@ -621,7 +621,7 @@ private fun StepProgress(steps: List<String>, flow: EvidenceFlowDto?, current: S
                         .background(
                             when {
                                 done -> Color(CoreActivityRules.VERDE)
-                                active -> NxColors.Teal
+                                active -> NxColors.Brand
                                 else -> Color(0xFFE2E8F0)
                             },
                         ),

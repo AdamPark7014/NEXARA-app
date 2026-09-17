@@ -129,9 +129,9 @@ fun NxBottomTabBar(
                     )
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = NxColors.Teal,
-                    selectedTextColor = NxColors.Teal,
-                    indicatorColor = NxColors.TealSoft,
+                    selectedIconColor = NxColors.Brand,
+                    selectedTextColor = NxColors.Brand,
+                    indicatorColor = NxColors.BrandSoft,
                     unselectedIconColor = NxColors.Muted,
                     unselectedTextColor = NxColors.Muted,
                 ),

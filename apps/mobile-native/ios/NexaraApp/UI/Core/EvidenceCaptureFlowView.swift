@@ -115,7 +115,7 @@ struct EvidenceCaptureFlowView: View {
                 }
                 statusBanner
                 if let indicaciones = flow?.assigneeIndicaciones ?? flow?.activity?.indicaciones, !indicaciones.isEmpty {
-                    Text("💬 \(indicaciones)")
+                    NxIconText(systemName: "text.bubble", text: indicaciones)
                         .font(.footnote)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,7 +125,9 @@ struct EvidenceCaptureFlowView: View {
                     stepCard(step, number: index + 1)
                 }
                 if let message {
-                    Text(message).font(.footnote.weight(.semibold)).foregroundStyle(CorePalette.green)
+                    NxIconText(systemName: "checkmark.circle.fill", text: message)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(CorePalette.green)
                 }
                 if let errorText {
                     Text(errorText).font(.footnote.weight(.semibold)).foregroundStyle(CorePalette.red)
@@ -137,17 +139,18 @@ struct EvidenceCaptureFlowView: View {
     @ViewBuilder
     private var statusBanner: some View {
         if isApproved {
-            bannerText("✅ Tu evidencia fue aprobada.", color: CorePalette.green)
+            bannerText("Tu evidencia fue aprobada.", icon: "checkmark.seal.fill", color: CorePalette.green)
         } else if isCorrection {
             let labels = rejected.map { CoreEvidence.label($0) }.joined(separator: ", ")
             let notes = (flow?.reviewNotes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             bannerText(
-                "↩️ Te devolvieron: \(labels.isEmpty ? "algunos pasos" : labels). Corrige solo eso."
+                "Te devolvieron: \(labels.isEmpty ? "algunos pasos" : labels). Corrige solo eso."
                     + (notes.isEmpty ? "" : "\n«\(notes)»"),
+                icon: "arrow.uturn.backward.circle.fill",
                 color: CorePalette.orange
             )
         } else if isLocked {
-            bannerText("📦 Enviada. Queda en revisión: tu superior la aprueba o te la devuelve.", color: CorePalette.blue)
+            bannerText("Enviada. Queda en revisión: tu superior la aprueba o te la devuelve.", icon: "paperplane.fill", color: CorePalette.blue)
         } else {
             let index = (steps.firstIndex(of: currentStep) ?? 0) + 1
             Text("Paso \(min(index, steps.count)) de \(steps.count)")
@@ -156,12 +159,17 @@ struct EvidenceCaptureFlowView: View {
         }
     }
 
-    private func bannerText(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.footnote.weight(.semibold))
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+    private func bannerText(_ text: String, icon: String, color: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: icon)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(color)
+            Text(text)
+        }
+        .font(.footnote.weight(.semibold))
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func stepTitle(_ step: String) -> String {
@@ -277,7 +285,12 @@ struct EvidenceCaptureFlowView: View {
                         }
                         .overlay(alignment: .bottomLeading) {
                             if photo.coords != nil {
-                                Text("📍").font(.caption).padding(4)
+                                Image(systemName: "location.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.white)
+                                    .padding(4)
+                                    .background(Color.black.opacity(0.55), in: Circle())
+                                    .padding(4)
                             }
                         }
                     }
@@ -407,7 +420,10 @@ struct EvidenceCaptureFlowView: View {
                     Text(when).font(.caption).foregroundStyle(.secondary)
                 }
                 if let mapUrl = CoreMaps.url(latitude: latitude, longitude: longitude, label: label) {
-                    Link("📍 Ver en mapa", destination: mapUrl).font(.caption.weight(.semibold))
+                    Link(destination: mapUrl) {
+                        Label("Ver en mapa", systemImage: "mappin.and.ellipse")
+                    }
+                    .font(.caption.weight(.semibold))
                 }
             }
         }
@@ -421,7 +437,7 @@ struct EvidenceCaptureFlowView: View {
         case CoreEvidence.entryPhoto:
             GeoPhotoCaptureView(
                 title: "Tu foto de entrada",
-                confirmLabel: "✓ Enviar esta foto",
+                confirmLabel: "Enviar esta foto",
                 requireLocation: true,
                 onConfirm: { photo in await sendGeoPhoto(step: CoreEvidence.entryPhoto, photo: photo) },
                 onCancel: { camera = nil }
@@ -429,7 +445,7 @@ struct EvidenceCaptureFlowView: View {
         case CoreEvidence.exitPhoto:
             GeoPhotoCaptureView(
                 title: "Tu foto de salida",
-                confirmLabel: "✓ Enviar esta foto",
+                confirmLabel: "Enviar esta foto",
                 requireLocation: true,
                 onConfirm: { photo in await sendGeoPhoto(step: CoreEvidence.exitPhoto, photo: photo) },
                 onCancel: { camera = nil }
@@ -437,7 +453,7 @@ struct EvidenceCaptureFlowView: View {
         default:
             GeoPhotoCaptureView(
                 title: "Tu foto en sitio \(pendingPhotos.count + 1)",
-                confirmLabel: "✓ Usar esta foto",
+                confirmLabel: "Usar esta foto",
                 requireLocation: false,
                 onConfirm: { photo in
                     pendingPhotos.append(photo)
@@ -495,12 +511,12 @@ struct EvidenceCaptureFlowView: View {
         let status = saved.status ?? flow?.status ?? ""
         if status == CoreEvidence.completed {
             message = correction
-                ? "🎉 ¡Corrección enviada! Tu evidencia será revisada nuevamente."
-                : "🎉 ¡Evidencia enviada! Queda en revisión."
+                ? "¡Corrección enviada! Tu evidencia será revisada nuevamente."
+                : "¡Evidencia enviada! Queda en revisión."
         } else if correction {
-            message = "✅ Paso corregido. Siguiente: \(CoreEvidence.label(status))"
+            message = "Paso corregido. Siguiente: \(CoreEvidence.label(status))"
         } else {
-            message = "✅ Listo: \(CoreEvidence.label(step)). Siguiente: \(CoreEvidence.label(status))"
+            message = "Listo: \(CoreEvidence.label(step)). Siguiente: \(CoreEvidence.label(status))"
         }
         onChanged?()
     }

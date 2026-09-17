@@ -66,7 +66,7 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxTealTopAppBarColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxBrandTopAppBarColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
 import mx.nexara.mobile.nativeapp.ui.shared.OfflineQueueScreen
@@ -247,7 +247,7 @@ fun ConsoleNavHost(
                         color = Color.White,
                     )
                 },
-                colors = NxTealTopAppBarColors(),
+                colors = NxBrandTopAppBarColors(),
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = { navController.popBackStack() }) {

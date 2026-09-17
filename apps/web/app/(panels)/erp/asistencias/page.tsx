@@ -21,6 +21,10 @@ import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { erpFetch } from "@/lib/erp-api";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
+import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 type TabId = "equipo" | "comidas" | "trayectoria";
@@ -465,7 +469,7 @@ export default function ErpAsistenciasPage() {
           {!isManager ? (
             canRegister ? null : (
               <EmptyState
-                icon="👥"
+                icon={<GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />}
                 title="Vista de equipo"
                 description="Disponible para managers (CEO / subtree)."
               />
@@ -580,10 +584,10 @@ export default function ErpAsistenciasPage() {
               </div>
 
               <Section title={sectionTitle} subtitle="Toca una tarjeta para abrir la pizarra de la persona.">
-                {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando asistencia del subtree." />}
+                {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando…" description="Consultando asistencia del subtree." />}
                 {!loading && filtered.length === 0 && (
                   <EmptyState
-                    icon="👥"
+                    icon={<GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />}
                     title={mapped.length === 0 ? "Sin registros" : "Nadie en este filtro"}
                     description={
                       mapped.length === 0
@@ -880,9 +884,9 @@ export default function ErpAsistenciasPage() {
         <>
           {canLiveGps && (
             <Section title="GPS del equipo" subtitle="Unidades con jornada abierta (gps/team).">
-              {loading && <EmptyState icon="⏳" title="Cargando…" description="Telemetría del equipo." />}
+              {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando…" description="Telemetría del equipo." />}
               {!loading && teamGps.length === 0 && (
-                <EmptyState icon="📡" title="Sin ubicaciones" description="Nadie comparte GPS ahora." />
+                <EmptyState icon={<SatelliteAltOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin ubicaciones" description="Nadie comparte GPS ahora." />
               )}
               {!loading && teamGps.length > 0 && (
                 <div
@@ -922,14 +926,14 @@ export default function ErpAsistenciasPage() {
           {canSeeOwnTrajectory ? (
             <Section title={`Mi trayecto · ${trajectory.length} puntos`} subtitle="Entrada, GPS y salida del día.">
               {loading ? (
-                <EmptyState icon="⏳" title="Cargando trayecto…" description="" />
+                <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando trayecto…" description="" />
               ) : (
                 <GpsTrajectoryPreview trajectory={trajectory} attendances={dayAttendances} />
               )}
             </Section>
           ) : (
             <EmptyState
-              icon="📍"
+              icon={<PlaceOutlinedIcon fontSize="inherit" aria-hidden="true" />}
               title="Sin trayecto propio"
               description="Los encargados ven el GPS del día en las tarjetas de sus subordinados (pestaña Equipo), no el suyo."
             />

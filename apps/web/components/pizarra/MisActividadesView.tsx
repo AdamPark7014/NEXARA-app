@@ -3,10 +3,27 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import type { SvgIconComponent } from "@mui/icons-material";
+import CelebrationIcon from "@mui/icons-material/Celebration";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import TimerOutlinedIcon from "@mui/icons-material/TimerOutlined";
+import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import EventRepeatIcon from "@mui/icons-material/EventRepeat";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import CheckIcon from "@mui/icons-material/Check";
+import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { useUser } from "@/components/UserContext";
-import { ACTIVITY_KINDS, isCeoEmail, type ActivityKind } from "@/lib/activity-kinds";
+import { ACTIVITY_KINDS, isCeoEmail, type ActivityIconKey, type ActivityKind } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
+import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
+import { IconBadge, IconLabel } from "@/components/ui/IconBadge";
 import {
   fetchMyActivities,
   reorderMyActivities,
@@ -60,9 +77,18 @@ function priorityUi(p?: string | null) {
 
 function kindLabel(item: MyActivityItem): string {
   const meta = item.coreKind ? ACTIVITY_KINDS[item.coreKind as ActivityKind] : null;
-  const base = meta ? `${meta.emoji} ${meta.title}` : "📌 Actividad";
+  const base = meta ? meta.title : "Actividad";
   return item.coreKind === "tarea" && item.ticketTypeCustom ? `${base} · ${item.ticketTypeCustom}` : base;
 }
+
+/** Clave de icono del tipo (sin tipo → icono genérico en ActivityKindIcon). */
+function kindIcon(item: MyActivityItem): ActivityIconKey | null {
+  const meta = item.coreKind ? ACTIVITY_KINDS[item.coreKind as ActivityKind] : null;
+  return meta ? meta.icon : null;
+}
+
+/** Icono en línea con texto corrido (se alinea con la línea base). */
+const INLINE_ICON_SX = { fontSize: 16, verticalAlign: "-0.22em", mr: "5px" } as const;
 
 function formatWhen(iso?: string | null): string | null {
   if (!iso) return null;
@@ -120,7 +146,7 @@ const btnSecondary: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-function Chip({ children, color }: { children: ReactNode; color?: string }) {
+function Chip({ children, color, icon: Icon }: { children: ReactNode; color?: string; icon?: SvgIconComponent }) {
   return (
     <span
       style={{
@@ -136,6 +162,7 @@ function Chip({ children, color }: { children: ReactNode; color?: string }) {
         color: color ?? "var(--text-secondary)",
       }}
     >
+      {Icon ? <Icon aria-hidden="true" sx={{ fontSize: 15, flex: "0 0 auto" }} /> : null}
       {children}
     </span>
   );
@@ -347,7 +374,7 @@ export default function MisActividadesPage() {
             justifyItems: "center",
           }}
         >
-          <div style={{ fontSize: 34 }}>🎉</div>
+          <IconBadge icon={CelebrationIcon} size={56} />
           <div style={{ fontWeight: 800, fontSize: 16 }}>Todo al día</div>
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
             Cuando te asignen algo aparecerá aquí.
@@ -444,13 +471,23 @@ export default function MisActividadesPage() {
                   </div>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {a.porRepartir ? <Chip color="#d97706">📨 Te toca repartirla</Chip> : null}
+                  {a.porRepartir ? (
+                    <Chip color="#d97706" icon={SendOutlinedIcon}>
+                      Te toca repartirla
+                    </Chip>
+                  ) : null}
                   <Chip color={estatusUi(a.estatus).color}>{estatusUi(a.estatus).label}</Chip>
-                  <Chip color={pr.color}>● {pr.label}</Chip>
-                  <Chip>{kindLabel(a)}</Chip>
+                  <Chip color={pr.color}>
+                    <FiberManualRecordIcon aria-hidden="true" sx={{ fontSize: 9 }} />
+                    {pr.label}
+                  </Chip>
                   <Chip>
+                    <ActivityKindIcon kind={kindIcon(a)} size={15} />
+                    {kindLabel(a)}
+                  </Chip>
+                  <Chip icon={a.autoAsignada ? PanToolOutlinedIcon : undefined}>
                     {a.autoAsignada
-                      ? "🙋 Auto-asignada"
+                      ? "Auto-asignada"
                       : a.asignadaPor
                         ? `De ${shortName(a.asignadaPor.nombre)}`
                         : "Asignada"}
@@ -465,14 +502,20 @@ export default function MisActividadesPage() {
                     color: "var(--text-secondary)",
                   }}
                 >
-                  <span>📅 {when ?? "Sin fecha"}</span>
+                  <IconLabel icon={EventOutlinedIcon} gap={5}>
+                    {when ?? "Sin fecha"}
+                  </IconLabel>
                   {est ? (
-                    <span>
-                      ⏱ {est}
+                    <IconLabel icon={TimerOutlinedIcon} gap={5}>
+                      {est}
                       {max ? ` · tope ${max}` : ""}
-                    </span>
+                    </IconLabel>
                   ) : null}
-                  {lugar ? <span>📍 {lugar}</span> : null}
+                  {lugar ? (
+                    <IconLabel icon={PlaceOutlinedIcon} gap={5}>
+                      {lugar}
+                    </IconLabel>
+                  ) : null}
                 </div>
                 {a.indicaciones ? (
                   <p
@@ -490,7 +533,8 @@ export default function MisActividadesPage() {
                 ) : null}
                 {a.ordenJustificacion ? (
                   <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                    📝 <strong>Por qué va aquí:</strong> {a.ordenJustificacion}
+                    <EditNoteOutlinedIcon aria-hidden="true" sx={INLINE_ICON_SX} />
+                    <strong>Por qué va aquí:</strong> {a.ordenJustificacion}
                   </p>
                 ) : null}
                 {canReorder ? (
@@ -527,7 +571,11 @@ export default function MisActividadesPage() {
       {seguimiento.length ? (
         <section style={{ display: "grid", gap: 10 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>👀 En seguimiento ({seguimiento.length})</h2>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
+              <IconLabel icon={VisibilityOutlinedIcon} size={18}>
+                En seguimiento ({seguimiento.length})
+              </IconLabel>
+            </h2>
             <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
               Ya las repartiste: aquí ves a quién se las pasaste y cómo va quien las ejecuta.
             </p>
@@ -568,7 +616,10 @@ export default function MisActividadesPage() {
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   <Chip color={est.color}>{est.label}</Chip>
-                  <Chip>{kindLabel(s)}</Chip>
+                  <Chip>
+                    <ActivityKindIcon kind={kindIcon(s)} size={15} />
+                    {kindLabel(s)}
+                  </Chip>
                   {avance ? (
                     <Chip color={avance.color}>
                       {shortName(ejecutor?.nombre)}: {avance.label}
@@ -578,12 +629,14 @@ export default function MisActividadesPage() {
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-                  📨 Enviada a {s.pasadaA.map((p) => shortName(p.nombre)).join(" → ")}
+                  <SendOutlinedIcon aria-hidden="true" sx={INLINE_ICON_SX} />
+                  Enviada a {s.pasadaA.map((p) => shortName(p.nombre)).join(" → ")}
                   {primera ? ` · ${formatWhen(primera.at) ?? ""}` : ""}
                 </div>
                 {s.ultimaReprogramacion ? (
                   <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                    🕑 Reprogramada por {shortName(s.ultimaReprogramacion.por) || "alguien"} ·{" "}
+                    <EventRepeatIcon aria-hidden="true" sx={INLINE_ICON_SX} />
+                    Reprogramada por {shortName(s.ultimaReprogramacion.por) || "alguien"} ·{" "}
                     {formatWhen(s.ultimaReprogramacion.at) ?? ""}
                   </div>
                 ) : null}
@@ -606,9 +659,16 @@ export default function MisActividadesPage() {
           <button
             type="button"
             onClick={() => setShowDone((v) => !v)}
-            style={{ ...btnSecondary, justifySelf: "start", fontSize: 13 }}
+            style={{ ...btnSecondary, justifySelf: "start", fontSize: 13, gap: 6 }}
+            aria-expanded={showDone}
           >
-            ✅ Hechas hoy ({done.length}) {showDone ? "▲" : "▼"}
+            <TaskAltIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+            <span>Hechas hoy ({done.length})</span>
+            {showDone ? (
+              <ExpandLessIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            ) : (
+              <ExpandMoreIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            )}
           </button>
           {showDone
             ? done.map((a) => (
@@ -629,7 +689,8 @@ export default function MisActividadesPage() {
                   }}
                 >
                   <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    ✔ {a.titulo}
+                    <CheckIcon aria-hidden="true" sx={{ ...INLINE_ICON_SX, fontSize: 15, mr: "6px" }} />
+                    {a.titulo}
                   </span>
                   <span style={{ color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
                     {a.fechaFinalizacion

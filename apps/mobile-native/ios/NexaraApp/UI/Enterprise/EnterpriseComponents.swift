@@ -12,7 +12,7 @@ enum NxTone {
         case .warning: return Color(red: 0.96, green: 0.62, blue: 0.04)
         case .danger:  return Color(red: 0.94, green: 0.27, blue: 0.27)
         case .info:    return Color(red: 0.23, green: 0.51, blue: 0.96)
-        case .brand:   return Color(red: 0.05, green: 0.58, blue: 0.53)
+        case .brand:   return NxBrand.primary
         }
     }
 
@@ -103,7 +103,7 @@ struct NxKpiGrid: View {
 
 struct NxSparkline: View {
     let values: [CGFloat]
-    var color: Color = .teal
+    var color: Color = NxBrand.primary
 
     var body: some View {
         GeometryReader { geo in
@@ -172,7 +172,7 @@ struct NxEmptyState: View {
             Text(title).font(.headline)
             Text(subtitle).font(.caption).foregroundColor(.secondary).multilineTextAlignment(.center)
             if let actionLabel, let onAction {
-                Button(actionLabel, action: onAction).buttonStyle(.borderedProminent).tint(.teal)
+                Button(actionLabel, action: onAction).buttonStyle(.borderedProminent).tint(NxBrand.primary)
             }
         }
         .padding(32)

@@ -6,7 +6,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { PushDispatchService, type PushPayload } from '../devices/push-dispatch.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
-import { buildCollapseKey, channelForCategory } from './notification-push-meta.js';
+import { buildCollapseKey, channelForCategory, iconForNotification } from './notification-push-meta.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -29,6 +29,8 @@ export interface INotificationPayload {
   excludeActor?: boolean;
   /** Ventana de dedupe en segundos (default 120). 0 = sin dedupe. */
   dedupeSeconds?: number;
+  /** Ícono vectorial del aviso en las apps; si falta se deriva de type+category (`iconForNotification`). */
+  icon?: string;
 }
 
 @Injectable()
@@ -411,6 +413,7 @@ export class NotificationsService {
         senderName: notification.triggerUser?.nombre ?? null,
         senderAvatar: notification.triggerUser?.avatarUrl ?? null,
         threadId: collapseKey,
+        icon: payload.icon ?? iconForNotification(String(payload.type), payload.category),
       };
       this.emitPushToSocket(payload.userId, push);
       void this.pushDispatch

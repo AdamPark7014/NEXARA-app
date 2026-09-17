@@ -474,7 +474,8 @@ export class ActivityEvidenceService {
     // Luis (responsable) y Christian se enteran de que ya pueden revisarla.
     void this.notificationHierarchy.notifyActivityAutoCompleted(
       activityId,
-      meta?.titulo || meta?.anNumber || `Actividad ${activityId}`,
+      // El aviso nombra la actividad por su título, nunca por el folio.
+      meta?.titulo || '',
       activity.responsableId,
       lastUserId ?? null,
     );

@@ -19,6 +19,20 @@ import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missi
 import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
+import type { SvgIconComponent } from "@mui/icons-material";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import CheckIcon from "@mui/icons-material/Check";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import EngineeringOutlinedIcon from "@mui/icons-material/EngineeringOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 
 const STATUSES = [
   "Pendiente",
@@ -176,16 +190,16 @@ export default function ActivityDetailPage() {
   const evidenceCount = countEvidenceFiles(activity.activityEvidence);
 
   const isCancelOrReschedule = /cancel|rechaz/i.test(activity.estatus);
-  const activityFlow: { key: string; label: string; icon: string }[] = isCancelOrReschedule
+  const activityFlow: { key: string; label: string; icon: SvgIconComponent }[] = isCancelOrReschedule
     ? [
-        { key: "Pendiente", label: "Pendiente", icon: "📅" },
-        { key: flowStepForStatus(activity.estatus), label: flowStepForStatus(activity.estatus), icon: /cancel/i.test(activity.estatus) ? "✕" : "⛔" },
+        { key: "Pendiente", label: "Pendiente", icon: EventOutlinedIcon },
+        { key: flowStepForStatus(activity.estatus), label: flowStepForStatus(activity.estatus), icon: /cancel/i.test(activity.estatus) ? CancelOutlinedIcon : BlockOutlinedIcon },
       ]
     : [
-        { key: "Pendiente", label: "Pendiente", icon: "📅" },
-        { key: "En Proceso", label: "En proceso", icon: "⚙️" },
-        { key: "Por Validar", label: "Por validar", icon: "🔎" },
-        { key: "Finalizada", label: "Finalizada", icon: "✅" },
+        { key: "Pendiente", label: "Pendiente", icon: EventOutlinedIcon },
+        { key: "En Proceso", label: "En proceso", icon: SettingsOutlinedIcon },
+        { key: "Por Validar", label: "Por validar", icon: RateReviewOutlinedIcon },
+        { key: "Finalizada", label: "Finalizada", icon: TaskAltIcon },
       ];
   const activeFlowKey = flowStepForStatus(activity.estatus);
   const activeFlowIdx = Math.max(0, activityFlow.findIndex((s) => s.key === activeFlowKey));
@@ -214,23 +228,23 @@ export default function ActivityDetailPage() {
             ))}
           </ul>
           <Link href={hrefs.evidences} style={{ textDecoration: "none" }}>
-            <Button size="sm" variant="primary" iconLeft="📸">Subir evidencias</Button>
+            <Button size="sm" variant="primary" iconLeft={<PhotoCameraOutlinedIcon fontSize="inherit" aria-hidden="true" />}>Subir evidencias</Button>
           </Link>
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
-        <KpiCard label="Estado" value={activity.estatus.replace(/_/g, " ")} variant={activityStatusVariant(activity.estatus)} icon="📋" />
-        <KpiCard label="Prioridad" value={priorityDisplay} variant={/urgente|alta/i.test(priorityDisplay) ? (/urgente/i.test(priorityDisplay) ? "danger" : "warning") : "default"} icon="⚡" />
-        <KpiCard label="Evidencias" value={evidenceCount} icon="📎" hint="Archivos adjuntos" />
+        <KpiCard label="Estado" value={activity.estatus.replace(/_/g, " ")} variant={activityStatusVariant(activity.estatus)} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+        <KpiCard label="Prioridad" value={priorityDisplay} variant={/urgente|alta/i.test(priorityDisplay) ? (/urgente/i.test(priorityDisplay) ? "danger" : "warning") : "default"} icon={<BoltOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+        <KpiCard label="Evidencias" value={evidenceCount} icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} hint="Archivos adjuntos" />
         {despacho ? (
           <KpiCard
             label="Ejecuta"
             value={ejecutaLabel}
-            icon="👷"
+            icon={<EngineeringOutlinedIcon fontSize="inherit" aria-hidden="true" />}
             hint={`Despacho · coordina ${activity.responsable?.nombre ?? "—"}`}
           />
         ) : (
-          <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon="👷" />
+          <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon={<EngineeringOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
         )}
       </div>
 
@@ -292,7 +306,11 @@ export default function ActivityDetailPage() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: done ? 14 : 16, fontWeight: 700, color,
                   }}>
-                    {done ? "✓" : step.icon}
+                    {done ? (
+                      <CheckIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    ) : (
+                      <step.icon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    )}
                   </div>
                   <span style={{ fontSize: 11, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>
                     {step.label}
@@ -316,7 +334,7 @@ export default function ActivityDetailPage() {
             <Tag variant={hasProject ? "accent" : "neutral"}>{hasProject ? "Con proyecto" : "Sin proyecto"}</Tag>
           </div>
           {canEdit && !editing && (
-            <Button size="sm" variant="ghost" onClick={openEdit}>✎ Editar</Button>
+            <Button size="sm" variant="ghost" onClick={openEdit} iconLeft={<EditOutlinedIcon fontSize="inherit" aria-hidden="true" />}>Editar</Button>
           )}
         </div>
 

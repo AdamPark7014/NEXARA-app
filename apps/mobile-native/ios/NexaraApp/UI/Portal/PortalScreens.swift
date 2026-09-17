@@ -516,7 +516,7 @@ struct PortalTicketsView: View {
                         ], id: \.0) { key, label in
                             Button(label) { filter = key }
                                 .buttonStyle(.bordered)
-                                .tint(filter == key ? .teal : .secondary)
+                                .tint(filter == key ? NxBrand.primary : Color.secondary)
                         }
                     }
                 }
@@ -563,7 +563,7 @@ struct PortalTicketsView: View {
                                 Text(meta).font(.caption).foregroundColor(.secondary)
                             }
                             if open && ageH >= 48 {
-                                Text("⚠ Fuera de ventana operativa (>48h)")
+                                NxIconText(systemName: "exclamationmark.triangle.fill", text: "Fuera de ventana operativa (>48h)")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundColor(.red)
                             }
@@ -626,7 +626,7 @@ struct PortalTicketDetailView: View {
                     .background(Color(.secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     Button("Descargar reporte PDF") { Task { await downloadPdf() } }
-                        .buttonStyle(.borderedProminent).tint(.teal)
+                        .buttonStyle(.borderedProminent).tint(NxBrand.primary)
                 }
                 .padding()
             } else { ProgressView().padding(.top, 40) }
@@ -850,7 +850,7 @@ struct PortalInventoryDetailView: View {
                     Toggle("Confirmar diferencia", isOn: $confirmDifference)
                     HStack {
                         Button(saving ? "Guardando…" : "Sincronizar") { Task { await sync() } }
-                            .buttonStyle(.borderedProminent).tint(.teal)
+                            .buttonStyle(.borderedProminent).tint(NxBrand.primary)
                         Button("Aprobar") { Task { await decide("APPROVE") } }.buttonStyle(.bordered)
                         Button("Rechazar", role: .destructive) { Task { await decide("REJECT") } }
                     }

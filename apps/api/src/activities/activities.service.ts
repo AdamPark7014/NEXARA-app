@@ -128,7 +128,8 @@ export class ActivitiesService {
       await this.notificationHierarchy.notifyActivityAssigned(
         activity.responsableId,
         activity.id,
-        activity.anNumber || 'Nueva actividad',
+        // El aviso nombra la actividad por su título, no por el folio.
+        activity.titulo || 'Nueva actividad',
         activity.creador?.nombre || 'Sistema',
         activity.creadoPorId,
       );
@@ -959,10 +960,8 @@ const updatedActivity = await this.prisma['activity'].update({
       const nextStatus = String(updateActivityDto.estatus);
       const prevStatus = String(prev.estatus || '');
       if (/finalizada|completada/i.test(nextStatus) && !/finalizada|completada/i.test(prevStatus)) {
-        const label =
-          (updatedActivity.anNumber && String(updatedActivity.anNumber).trim()) ||
-          (updatedActivity.titulo && String(updatedActivity.titulo).trim()) ||
-          `Actividad ${id}`;
+        // Los avisos nombran la actividad por su título; el folio no es identificador para la gente.
+        const label = (updatedActivity.titulo && String(updatedActivity.titulo).trim()) || '';
         const actorName = String(actor.nombre || 'Usuario').trim() || 'Usuario';
         void this.notificationHierarchy
           .notifyActivityMarkedFinished(actor.id, id, label, actorName, updatedActivity.responsableId)
@@ -972,10 +971,7 @@ const updatedActivity = await this.prisma['activity'].update({
         /en\s*proceso|en_proceso|enproceso|en_progreso/i.test(nextStatus) &&
         !/en\s*proceso|en_proceso|enproceso|en_progreso/i.test(prevStatus)
       ) {
-        const label =
-          (updatedActivity.anNumber && String(updatedActivity.anNumber).trim()) ||
-          (updatedActivity.titulo && String(updatedActivity.titulo).trim()) ||
-          `Actividad ${id}`;
+        const label = (updatedActivity.titulo && String(updatedActivity.titulo).trim()) || '';
         const actorName = String(actor.nombre || 'Usuario').trim() || 'Usuario';
         void this.notificationHierarchy
           .notifyActivityStarted(

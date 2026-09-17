@@ -60,7 +60,7 @@
             android:resource="@drawable/ic_stat_nexara" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/nexara_primary_dark" />
+            android:resource="@color/nexara_primary" />
         <!-- Crashlytics sí; Analytics/AD_ID no (Play Console). -->
         <meta-data
             android:name="firebase_analytics_collection_deactivated"

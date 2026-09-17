@@ -42,7 +42,7 @@ struct MisActividadesView: View {
                     Text(error).font(.footnote).foregroundStyle(CorePalette.red)
                 }
                 if let notice {
-                    Text(notice).font(.footnote).foregroundStyle(CorePalette.green)
+                    NxIconText(systemName: "checkmark.circle.fill", text: notice).font(.footnote).foregroundStyle(CorePalette.green)
                 }
                 orderNote
                 if !loading && open.isEmpty && error == nil {
@@ -158,13 +158,15 @@ struct MisActividadesView: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Text("🎉").font(.largeTitle)
+            NxIconBadge(systemName: "checkmark.circle", tint: CorePalette.green, size: 56, circle: true)
             Text("Todo al día").font(.headline)
             Text("Cuando te asignen algo aparecerá aquí.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if data?.canSelfAssign == true {
-                Button("＋ Auto-asignarme una actividad") { showSelfAssign = true }
+                Button { showSelfAssign = true } label: {
+                    Label("Auto-asignarme una actividad", systemImage: "plus")
+                }
                     .buttonStyle(.borderedProminent)
             }
         }
@@ -176,7 +178,7 @@ struct MisActividadesView: View {
     // MARK: Cola
 
     private func assignedLabel(_ item: MyActivityItem) -> String {
-        if item.autoAsignada == true { return "🙋 Auto-asignada" }
+        if item.autoAsignada == true { return "Auto-asignada" }
         if let by = item.asignadaPor?.nombre, !by.isEmpty { return "De \(CoreFormat.shortName(by))" }
         return "Asignada"
     }
@@ -189,7 +191,7 @@ struct MisActividadesView: View {
         let whenText = CoreFormat.when(item.fechaInicio ?? item.fechaMaxima) ?? "Sin fecha"
         let estimate = CoreFormat.minutes(item.tiempoEstimadoMin)
         let cap = CoreFormat.minutes(item.tiempoMaximoMin)
-        let timeText = estimate.map { "⏱ " + $0 + (cap.map { " · tope " + $0 } ?? "") }
+        let timeText = estimate.map { $0 + (cap.map { " · tope " + $0 } ?? "") }
         let highlight: Color? = highlightId == item.id ? Color.accentColor : (first ? Color.accentColor.opacity(0.4) : nil)
 
         return HStack(alignment: .top, spacing: 12) {
@@ -210,21 +212,21 @@ struct MisActividadesView: View {
 
                 CoreFlowLayout {
                     if item.porRepartir == true {
-                        CoreChip(text: "📨 Te toca repartirla", color: CorePalette.orange)
+                        CoreChip(icon: "paperplane", text: "Te toca repartirla", color: CorePalette.orange)
                     }
                     CoreChip(text: estatus.label, color: estatus.color)
-                    CoreChip(text: "● \(priority.label)", color: priority.color)
-                    CoreChip(text: CoreStatusUI.kind(item.coreKind, ticketTypeCustom: item.ticketTypeCustom))
-                    CoreChip(text: assignedLabel(item))
+                    CoreChip(icon: "flag.fill", text: priority.label, color: priority.color)
+                    CoreChip(icon: CoreStatusUI.kindSymbol(item.coreKind), text: CoreStatusUI.kind(item.coreKind, ticketTypeCustom: item.ticketTypeCustom))
+                    CoreChip(icon: item.autoAsignada == true ? "person.crop.circle.badge.checkmark" : "person", text: assignedLabel(item))
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("📅 \(whenText)")
+                    NxIconText(systemName: "calendar", text: whenText)
                     if let timeText {
-                        Text(timeText)
+                        NxIconText(systemName: "timer", text: timeText)
                     }
                     if !lugar.isEmpty {
-                        Text("📍 \(lugar)")
+                        NxIconText(systemName: "mappin.and.ellipse", text: lugar)
                     }
                 }
                 .font(.footnote)
@@ -238,7 +240,7 @@ struct MisActividadesView: View {
                         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                 }
                 if let why = item.ordenJustificacion, !why.isEmpty {
-                    (Text("📝 Por qué va aquí: ").bold() + Text(why))
+                    (Text(Image(systemName: "text.bubble")) + Text(" Por qué va aquí: ").bold() + Text(why))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -296,7 +298,8 @@ struct MisActividadesView: View {
 
     private var seguimientoSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("👀 En seguimiento (\(seguimiento.count))").font(.headline)
+            NxIconText(systemName: "eye", text: "En seguimiento (\(seguimiento.count))", tint: NxBrand.primary)
+                .font(.headline)
             Text("Ya las repartiste: aquí ves a quién se las pasaste y cómo va quien las ejecuta.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -313,7 +316,7 @@ struct MisActividadesView: View {
         let avance = executor.map { CoreStatusUI.avance($0.evidenceStatus) }
         let chain = passed.map { CoreFormat.shortName($0.nombre) }.joined(separator: " → ")
         let firstAt = passed.first.flatMap { CoreFormat.when($0.at) }
-        let sentText = "📨 Enviada a " + chain + (firstAt.map { " · " + $0 } ?? "")
+        let sentText = "Enviada a " + chain + (firstAt.map { " · " + $0 } ?? "")
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
@@ -331,24 +334,24 @@ struct MisActividadesView: View {
             }
             CoreFlowLayout {
                 CoreChip(text: estatus.label, color: estatus.color)
-                CoreChip(text: CoreStatusUI.kind(item.coreKind, ticketTypeCustom: item.ticketTypeCustom))
+                CoreChip(icon: CoreStatusUI.kindSymbol(item.coreKind), text: CoreStatusUI.kind(item.coreKind, ticketTypeCustom: item.ticketTypeCustom))
                 if let avance, let executor {
                     CoreChip(text: "\(CoreFormat.shortName(executor.nombre)): \(avance.label)", color: avance.color)
                 } else {
                     CoreChip(text: "Falta que la asignen", color: CorePalette.orange)
                 }
             }
-            Text(sentText)
+            NxIconText(systemName: "paperplane", text: sentText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if let change = item.ultimaReprogramacion {
                 let by = CoreFormat.shortName(change.por)
-                Text("🕑 Reprogramada por \(by.isEmpty ? "alguien" : by) · \(CoreFormat.when(change.at) ?? "")")
+                NxIconText(systemName: "calendar.badge.clock", text: "Reprogramada por \(by.isEmpty ? "alguien" : by) · \(CoreFormat.when(change.at) ?? "")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             HStack {
-                Text("📅 Programada: \(CoreFormat.when(item.fechaInicio) ?? "Sin fecha")")
+                NxIconText(systemName: "calendar", text: "Programada: \(CoreFormat.when(item.fechaInicio) ?? "Sin fecha")")
                     .font(.caption)
                 Spacer()
                 Button("Cambiar fecha y hora") {
@@ -368,8 +371,15 @@ struct MisActividadesView: View {
             Button {
                 withAnimation { showDone.toggle() }
             } label: {
-                Text("✅ Hechas hoy (\(done.count)) \(showDone ? "▲" : "▼")")
-                    .font(.subheadline.weight(.semibold))
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(CorePalette.green)
+                    Text("Hechas hoy (\(done.count))")
+                    Image(systemName: showDone ? "chevron.up" : "chevron.down")
+                        .imageScale(.small)
+                }
+                .font(.subheadline.weight(.semibold))
             }
             .buttonStyle(.bordered)
 
@@ -379,7 +389,8 @@ struct MisActividadesView: View {
                         ActivityCoreDetailView(activityId: item.id)
                     } label: {
                         HStack {
-                            Text("✔ \(item.displayTitle)").lineLimit(1)
+                            NxIconText(systemName: "checkmark", text: item.displayTitle, tint: CorePalette.green)
+                                .lineLimit(1)
                             Spacer()
                             Text(CoreFormat.time(item.fechaFinalizacion) ?? (item.estatus ?? ""))
                                 .foregroundStyle(.secondary)

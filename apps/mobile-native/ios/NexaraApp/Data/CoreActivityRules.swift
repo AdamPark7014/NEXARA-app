@@ -64,11 +64,12 @@ enum ClientSector: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var emoji: String {
+    /// SF Symbol del sector (antes emoji).
+    var symbol: String {
         switch self {
-        case .proyecto: return "📁"
-        case .corporativo: return "🏢"
-        case .comercial: return "🤝"
+        case .proyecto: return "folder"
+        case .corporativo: return "building.2"
+        case .comercial: return "briefcase"
         }
     }
 
@@ -127,13 +128,14 @@ enum CoreActivityKind: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var emoji: String {
+    /// SF Symbol del tipo (antes emoji).
+    var symbol: String {
         switch self {
-        case .tarea: return "✅"
-        case .proyecto: return "📁"
-        case .obra: return "🏗️"
-        case .servicio: return "🛠️"
-        case .comercial: return "💼"
+        case .tarea: return "checklist"
+        case .proyecto: return "folder"
+        case .obra: return "hammer"
+        case .servicio: return "wrench.and.screwdriver"
+        case .comercial: return "briefcase"
         }
     }
 
@@ -158,19 +160,20 @@ enum CoreActivityKind: String, CaseIterable, Identifiable, Hashable {
 struct CoreTareaTipo: Identifiable, Hashable {
     let id: String
     let label: String
-    let emoji: String
+    /// SF Symbol (antes emoji).
+    let symbol: String
 
     static let all: [CoreTareaTipo] = [
-        CoreTareaTipo(id: "levantamiento", label: "Levantamiento", emoji: "📐"),
-        CoreTareaTipo(id: "recoleccion", label: "Recolección", emoji: "📦"),
-        CoreTareaTipo(id: "entrega", label: "Entrega", emoji: "🚚"),
-        CoreTareaTipo(id: "junta", label: "Junta", emoji: "🤝"),
-        CoreTareaTipo(id: "compra", label: "Compra de material", emoji: "🛒"),
-        CoreTareaTipo(id: "preparacion", label: "Preparación de equipo", emoji: "🔧"),
-        CoreTareaTipo(id: "tramite", label: "Trámite", emoji: "📄"),
-        CoreTareaTipo(id: "capacitacion", label: "Capacitación", emoji: "🎓"),
-        CoreTareaTipo(id: "documentacion", label: "Reporte / documentación", emoji: "📝"),
-        CoreTareaTipo(id: "otro", label: "Otro", emoji: "✏️"),
+        CoreTareaTipo(id: "levantamiento", label: "Levantamiento", symbol: "ruler"),
+        CoreTareaTipo(id: "recoleccion", label: "Recolección", symbol: "shippingbox"),
+        CoreTareaTipo(id: "entrega", label: "Entrega", symbol: "truck.box"),
+        CoreTareaTipo(id: "junta", label: "Junta", symbol: "person.2"),
+        CoreTareaTipo(id: "compra", label: "Compra de material", symbol: "cart"),
+        CoreTareaTipo(id: "preparacion", label: "Preparación de equipo", symbol: "wrench.adjustable"),
+        CoreTareaTipo(id: "tramite", label: "Trámite", symbol: "doc.text"),
+        CoreTareaTipo(id: "capacitacion", label: "Capacitación", symbol: "graduationcap"),
+        CoreTareaTipo(id: "documentacion", label: "Reporte / documentación", symbol: "doc.richtext"),
+        CoreTareaTipo(id: "otro", label: "Otro", symbol: "pencil"),
     ]
 }
 

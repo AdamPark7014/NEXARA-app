@@ -11,6 +11,7 @@ import mx.nexara.mobile.nativeapp.access.ClientSectors
 import mx.nexara.mobile.nativeapp.access.OrgEmails
 import mx.nexara.mobile.nativeapp.access.RoleKeys
 import mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 
 /**
  * Alta de actividad Core sin nada de Android, para probarla en JVM.
@@ -49,7 +50,7 @@ object CoreActivityKinds {
         val id: String,
         val title: String,
         val help: String,
-        val emoji: String,
+        val glyph: NxGlyph,
         val projectMode: String,
         val ticketType: String? = null,
         val ticketTypeCustom: String? = null,
@@ -61,42 +62,42 @@ object CoreActivityKinds {
 
     private val KINDS: Map<String, KindMeta> = mapOf(
         TAREA to KindMeta(
-            TAREA, "Tarea", "Del día, sin proyecto ni cliente.", "✅", WITHOUT_PROJECT,
+            TAREA, "Tarea", "Del día, sin proyecto ni cliente.", NxGlyph.TASK, WITHOUT_PROJECT,
             ticketType = "OTRO",
         ),
         PROYECTO to KindMeta(
-            PROYECTO, "Proyecto", "Liga a un proyecto operativo y su cliente.", "📁", WITH_PROJECT,
+            PROYECTO, "Proyecto", "Liga a un proyecto operativo y su cliente.", NxGlyph.PROJECT, WITH_PROJECT,
         ),
         OBRA to KindMeta(
-            OBRA, "Obra", "Instalación / obra en sitio, ligada a proyecto.", "🏗️", WITH_PROJECT,
+            OBRA, "Obra", "Instalación / obra en sitio, ligada a proyecto.", NxGlyph.WORKSITE, WITH_PROJECT,
             ticketType = "INSTALACION", requiresSchedule = true,
         ),
         SERVICIO to KindMeta(
-            SERVICIO, "Servicio", "Cliente de servicio. Luis → Antonio → soporte.", "🛠️", WITHOUT_PROJECT,
+            SERVICIO, "Servicio", "Cliente de servicio. Luis → Antonio → soporte.", NxGlyph.SERVICE, WITHOUT_PROJECT,
             needsServiceClient = true, requiresSchedule = true,
         ),
         COMERCIAL to KindMeta(
-            COMERCIAL, "Comercial", "Solo encargados de área.", "💼", WITHOUT_PROJECT,
+            COMERCIAL, "Comercial", "Solo encargados de área.", NxGlyph.COMMERCIAL, WITHOUT_PROJECT,
             ticketType = "OTRO", ticketTypeCustom = "COMERCIAL",
         ),
     )
 
     fun meta(kind: String?): KindMeta? = KINDS[kind]
 
-    data class TareaTipo(val id: String, val label: String, val emoji: String)
+    data class TareaTipo(val id: String, val label: String, val glyph: NxGlyph)
 
     /** Subtipos de Tarea: viajan como ticketType OTRO + ticketTypeCustom = label (o el texto de «Otro»). */
     val TAREA_TIPOS: List<TareaTipo> = listOf(
-        TareaTipo("levantamiento", "Levantamiento", "📐"),
-        TareaTipo("recoleccion", "Recolección", "📦"),
-        TareaTipo("entrega", "Entrega", "🚚"),
-        TareaTipo("junta", "Junta", "🤝"),
-        TareaTipo("compra", "Compra de material", "🛒"),
-        TareaTipo("preparacion", "Preparación de equipo", "🔧"),
-        TareaTipo("tramite", "Trámite", "📄"),
-        TareaTipo("capacitacion", "Capacitación", "🎓"),
-        TareaTipo("documentacion", "Reporte / documentación", "📝"),
-        TareaTipo(TAREA_OTRO, "Otro", "✏️"),
+        TareaTipo("levantamiento", "Levantamiento", NxGlyph.SURVEY),
+        TareaTipo("recoleccion", "Recolección", NxGlyph.PICKUP),
+        TareaTipo("entrega", "Entrega", NxGlyph.DELIVERY),
+        TareaTipo("junta", "Junta", NxGlyph.MEETING),
+        TareaTipo("compra", "Compra de material", NxGlyph.PURCHASE),
+        TareaTipo("preparacion", "Preparación de equipo", NxGlyph.EQUIPMENT_PREP),
+        TareaTipo("tramite", "Trámite", NxGlyph.PROCEDURE),
+        TareaTipo("capacitacion", "Capacitación", NxGlyph.TRAINING),
+        TareaTipo("documentacion", "Reporte / documentación", NxGlyph.DOCUMENTATION),
+        TareaTipo(TAREA_OTRO, "Otro", NxGlyph.OTHER),
     )
 
     data class ChargeMeta(val id: String, val title: String, val help: String, val badge: String)

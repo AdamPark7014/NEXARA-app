@@ -20,15 +20,18 @@ struct TeamEvidenceReviewRequest: Identifiable {
 
 /// Reglas de pantalla de las evidencias del equipo (espejo de `EquipoEvidencias` web).
 enum TeamEvidenceUI {
-    static func estado(_ evidence: TeamEvidenceData?) -> (label: String, color: Color)? {
+    /// `icon` es un SF Symbol para `CoreChip(icon:)`.
+    static func estado(_ evidence: TeamEvidenceData?) -> (label: String, icon: String, color: Color)? {
         guard let evidence else { return nil }
-        if evidence.reviewStatus == "APPROVED" { return ("✅ Aprobada", CorePalette.green) }
-        if evidence.reviewStatus == "REJECTED" { return ("↩️ Corrigiendo", CorePalette.orange) }
+        if evidence.reviewStatus == "APPROVED" { return ("Aprobada", "checkmark.seal", CorePalette.green) }
+        if evidence.reviewStatus == "REJECTED" { return ("Corrigiendo", "arrow.uturn.backward", CorePalette.orange) }
         if evidence.status == CoreEvidence.completed {
-            let hasCorrection = !(evidence.correctionSubmittedAt ?? "").isEmpty
-            return (hasCorrection ? "🔁 Corrección por revisar" : "🔎 Por revisar", CorePalette.orange)
+            if !(evidence.correctionSubmittedAt ?? "").isEmpty {
+                return ("Corrección por revisar", "arrow.triangle.2.circlepath", CorePalette.orange)
+            }
+            return ("Por revisar", "text.magnifyingglass", CorePalette.orange)
         }
-        return ("⏳ En curso", CorePalette.blue)
+        return ("En curso", "hourglass", CorePalette.blue)
     }
 
     /// Ya la envió, nadie la ha aprobado ni devuelto y a mí me toca revisarla.
@@ -39,18 +42,18 @@ enum TeamEvidenceUI {
             && evidence.reviewStatus != "REJECTED"
     }
 
-    static func decision(_ raw: String) -> (label: String, color: Color) {
+    static func decision(_ raw: String) -> (label: String, icon: String, color: Color) {
         switch raw {
-        case "APROBADA": return ("✅ Aprobada", CorePalette.green)
-        case "DEVUELTA_TODO": return ("↩️ Devolvió todo", CorePalette.orange)
-        default: return ("↩️ Devolvió pasos", CorePalette.orange)
+        case "APROBADA": return ("Aprobada", "checkmark.seal", CorePalette.green)
+        case "DEVUELTA_TODO": return ("Devolvió todo", "arrow.uturn.left", CorePalette.orange)
+        default: return ("Devolvió pasos", "arrow.uturn.left", CorePalette.orange)
         }
     }
 
     // Nombre de cada foto, igual en miniaturas, visor e historial.
-    static let entryLabel = "📍 Entrada"
-    static let exitLabel = "🏁 Salida"
-    static func evidenceLabel(_ index: Int) -> String { "📷 Evidencia \(index + 1)" }
+    static let entryLabel = "Entrada"
+    static let exitLabel = "Salida"
+    static func evidenceLabel(_ index: Int) -> String { "Evidencia \(index + 1)" }
 
     static func stepList(_ steps: [String]) -> String {
         steps.map { CoreEvidence.label($0) }.joined(separator: ", ")
@@ -86,7 +89,7 @@ struct TeamEvidenceView: View {
             if let data {
                 summary(data)
                 if let notice {
-                    Text(notice)
+                    NxIconText(systemName: "checkmark.circle.fill", text: notice)
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(CorePalette.green)
                 }
@@ -137,11 +140,11 @@ struct TeamEvidenceView: View {
         let resumen = data.resumen
         return VStack(alignment: .leading, spacing: 6) {
             CoreFlowLayout {
-                CoreChip(text: "👷 \(resumen.ejecutores) ejecutan")
-                CoreChip(text: "📦 \(resumen.terminaron) enviaron", color: CorePalette.blue)
-                CoreChip(text: "✅ \(resumen.aprobadas) aprobadas", color: CorePalette.green)
+                CoreChip(icon: "person.2", text: "\(resumen.ejecutores) ejecutan")
+                CoreChip(icon: "paperplane", text: "\(resumen.terminaron) enviaron", color: CorePalette.blue)
+                CoreChip(icon: "checkmark.seal", text: "\(resumen.aprobadas) aprobadas", color: CorePalette.green)
                 if resumen.porRevisarMias > 0 {
-                    CoreChip(text: "🔎 \(resumen.porRevisarMias) por revisar", color: CorePalette.orange)
+                    CoreChip(icon: "text.magnifyingglass", text: "\(resumen.porRevisarMias) por revisar", color: CorePalette.orange)
                 }
             }
             if data.soloLectura == true && data.alcance != "propio" {
@@ -182,10 +185,10 @@ struct TeamEvidenceCompactView: View {
         VStack(alignment: .leading, spacing: 8) {
             if let data {
                 CoreFlowLayout {
-                    CoreChip(text: "📦 \(data.resumen.terminaron)/\(data.resumen.ejecutores) enviaron", color: CorePalette.blue)
-                    CoreChip(text: "✅ \(data.resumen.aprobadas) aprobadas", color: CorePalette.green)
+                    CoreChip(icon: "paperplane", text: "\(data.resumen.terminaron)/\(data.resumen.ejecutores) enviaron", color: CorePalette.blue)
+                    CoreChip(icon: "checkmark.seal", text: "\(data.resumen.aprobadas) aprobadas", color: CorePalette.green)
                     if data.resumen.porRevisarMias > 0 {
-                        CoreChip(text: "🔎 \(data.resumen.porRevisarMias) por revisar", color: CorePalette.orange)
+                        CoreChip(icon: "text.magnifyingglass", text: "\(data.resumen.porRevisarMias) por revisar", color: CorePalette.orange)
                     }
                 }
                 if data.members.isEmpty {
@@ -201,9 +204,9 @@ struct TeamEvidenceCompactView: View {
                             .lineLimit(1)
                         Spacer(minLength: 4)
                         if member.splits {
-                            CoreChip(text: "📨 La reparte", color: CorePalette.purple)
+                            CoreChip(icon: "paperplane", text: "La reparte", color: CorePalette.purple)
                         } else if let estado = TeamEvidenceUI.estado(member.evidence) {
-                            CoreChip(text: estado.label, color: estado.color)
+                            CoreChip(icon: estado.icon, text: estado.label, color: estado.color)
                         } else {
                             CoreChip(text: "Sin evidencia")
                         }
@@ -274,9 +277,9 @@ private struct TeamEvidenceMemberCard: View {
 
     private var pendingText: String {
         guard isCorrectionReview else {
-            return "🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
+            return "Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
         }
-        var text = "🔁 Corrigió lo que se le devolvió"
+        var text = "Corrigió lo que se le devolvió"
         if !correctedSteps.isEmpty && lastReturn?.decision != "DEVUELTA_TODO" {
             text += " (\(TeamEvidenceUI.stepList(correctedSteps)))"
         } else {
@@ -289,8 +292,13 @@ private struct TeamEvidenceMemberCard: View {
     }
 
     private var roleLabel: String {
-        if member.splits { return "📨 La reparte" }
-        return member.rol == "APOYO" ? "🤝 Apoyo" : "👷 La ejecuta"
+        if member.splits { return "La reparte" }
+        return member.rol == "APOYO" ? "Apoyo" : "La ejecuta"
+    }
+
+    private var roleSymbol: String {
+        if member.splits { return "paperplane" }
+        return member.rol == "APOYO" ? "person.2" : "person.crop.circle.badge.checkmark"
     }
 
     /// «Devolver este paso» solo con la evidencia enviada y si me toca revisarla.
@@ -303,9 +311,9 @@ private struct TeamEvidenceMemberCard: View {
     private var receivedText: String? {
         guard let when = CoreFormat.when(member.asignadoAt) else { return nil }
         guard let por = member.asignadoPor, !por.isEmpty, por != member.nombre else {
-            return "📥 Recibió \(when)"
+            return "Recibió \(when)"
         }
-        return "📥 Recibió \(when) de \(CoreFormat.shortName(por))"
+        return "Recibió \(when) de \(CoreFormat.shortName(por))"
     }
 
     var body: some View {
@@ -338,9 +346,9 @@ private struct TeamEvidenceMemberCard: View {
                     Text(puesto).font(.caption).foregroundStyle(.secondary)
                 }
                 CoreFlowLayout {
-                    CoreChip(text: roleLabel, color: member.splits ? CorePalette.purple : CorePalette.blue)
+                    CoreChip(icon: roleSymbol, text: roleLabel, color: member.splits ? CorePalette.purple : CorePalette.blue)
                     if !member.splits, let estado = TeamEvidenceUI.estado(evidence) {
-                        CoreChip(text: estado.label, color: estado.color)
+                        CoreChip(icon: estado.icon, text: estado.label, color: estado.color)
                     }
                     if let score = member.eficienciaScore, score > 0 {
                         CoreStars(value: score)
@@ -356,13 +364,13 @@ private struct TeamEvidenceMemberCard: View {
     private var chainLines: some View {
         VStack(alignment: .leading, spacing: 2) {
             if let receivedText {
-                Text(receivedText)
+                NxIconText(systemName: "tray.and.arrow.down", text: receivedText)
             }
             ForEach(Array((member.pasoA ?? []).enumerated()), id: \.offset) { _, passed in
-                Text("📨 La pasó a \(CoreFormat.shortName(passed.nombre)) · \(CoreFormat.when(passed.at) ?? "")")
+                NxIconText(systemName: "arrowshape.turn.up.right", text: "La pasó a \(CoreFormat.shortName(passed.nombre)) · \(CoreFormat.when(passed.at) ?? "")")
             }
             if let ev = evidence, ev.status == CoreEvidence.completed, let sent = CoreFormat.when(ev.completedAt) {
-                Text("📦 Envió \(sent)")
+                NxIconText(systemName: "paperplane", text: "Envió \(sent)")
             }
         }
         .font(.caption)
@@ -373,13 +381,17 @@ private struct TeamEvidenceMemberCard: View {
     private var reviewPrompt: some View {
         if TeamEvidenceUI.pendingReview(member) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(pendingText)
-                    .font(.footnote.weight(.semibold))
+                NxIconText(
+                    systemName: isCorrectionReview ? "arrow.triangle.2.circlepath" : "text.magnifyingglass",
+                    text: pendingText,
+                    tint: CorePalette.orange
+                )
+                .font(.footnote.weight(.semibold))
                 HStack(spacing: 8) {
-                    Button("✅ Aprobar") { onReview("aprobar", []) }
+                    Button { onReview("aprobar", []) } label: { Label("Aprobar", systemImage: "checkmark") }
                         .buttonStyle(.borderedProminent)
                         .tint(CorePalette.green)
-                    Button("↩️ Devolver") { onReview("devolver", []) }
+                    Button { onReview("devolver", []) } label: { Label("Devolver", systemImage: "arrow.uturn.backward") }
                         .buttonStyle(.borderedProminent)
                         .tint(CorePalette.orange)
                 }
@@ -390,15 +402,16 @@ private struct TeamEvidenceMemberCard: View {
             .background(CorePalette.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
         } else if member.canReview, let ev = evidence, ev.reviewStatus == "APPROVED" {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(approvedText(ev)).font(.footnote)
+                NxIconText(systemName: "checkmark.seal.fill", text: approvedText(ev), tint: CorePalette.green)
+                    .font(.footnote)
                 Spacer(minLength: 4)
-                Button("↩️ Devolver") { onReview("devolver", []) }
+                Button { onReview("devolver", []) } label: { Label("Devolver", systemImage: "arrow.uturn.backward") }
                     .buttonStyle(.bordered)
                     .font(.caption)
             }
         }
         if let ev = evidence, ev.reviewStatus == "REJECTED" {
-            Text(correctingText(ev))
+            NxIconText(systemName: "arrow.uturn.backward", text: correctingText(ev), tint: CorePalette.orange)
                 .font(.footnote)
                 .padding(8)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -407,7 +420,7 @@ private struct TeamEvidenceMemberCard: View {
     }
 
     private func approvedText(_ ev: TeamEvidenceData) -> String {
-        var text = "✅ Aprobada"
+        var text = "Aprobada"
         if let by = ev.reviewedBy, !by.isEmpty {
             text += " por \(CoreFormat.shortName(by))"
         }
@@ -419,7 +432,7 @@ private struct TeamEvidenceMemberCard: View {
 
     private func correctingText(_ ev: TeamEvidenceData) -> String {
         let steps = TeamEvidenceUI.stepList(member.rejectedSteps ?? [])
-        var text = "↩️ Está corrigiendo: \(steps.isEmpty ? "toda la actividad" : steps)"
+        var text = "Está corrigiendo: \(steps.isEmpty ? "toda la actividad" : steps)"
         if let notes = ev.reviewNotes, !notes.isEmpty {
             text += " · «\(notes)»"
         }
@@ -432,7 +445,7 @@ private struct TeamEvidenceMemberCard: View {
     private var detail: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let indicaciones = member.indicaciones, !indicaciones.isEmpty {
-                Text("💬 \(indicaciones)").font(.footnote)
+                NxIconText(systemName: "text.bubble", text: indicaciones).font(.footnote)
             }
             if member.splits {
                 Text("Su parte es pasarla a quien la ejecuta; no sube evidencias.")
@@ -473,7 +486,7 @@ private struct TeamEvidenceContent: View {
     let coreKind: String?
     let nombre: String
     var onReturnStep: ((String) -> Void)? = nil
-    /// Pasos que rehízo en la corrección por revisar («🔁 Corregido · hora»).
+    /// Pasos que rehízo en la corrección por revisar («Corregido · hora»).
     var correctedSteps: [String] = []
     /// Pasos devueltos que todavía está corrigiendo.
     var stepsToFix: [String] = []
@@ -517,7 +530,7 @@ private struct TeamEvidenceContent: View {
         }
     }
 
-    /// Pasos con su estado: ✓ hora · ↩️ Por corregir · 🔁 Corregido · hora · ○ Pendiente.
+    /// Pasos con su estado (icono SF Symbol): hecho · hora, por corregir, corregido · hora, pendiente.
     private var stepChecklist: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 8)], alignment: .leading, spacing: 8) {
             ForEach(CoreEvidence.steps(for: coreKind), id: \.self) { step in
@@ -532,7 +545,9 @@ private struct TeamEvidenceContent: View {
         let toFix = stepsToFix.contains(step)
         let corrected = !toFix && done && correctedSteps.contains(step)
         let tone: Color? = toFix ? CorePalette.orange : (corrected ? CorePalette.blue : (done ? CorePalette.green : nil))
-        let icon = toFix ? "↩️" : (corrected ? "🔁" : (done ? "✓" : "○"))
+        let icon = toFix
+            ? "arrow.uturn.backward.circle.fill"
+            : (corrected ? "arrow.triangle.2.circlepath.circle.fill" : (done ? "checkmark.circle.fill" : "circle"))
         let when = CoreFormat.when(time) ?? ""
         let detail: String
         if toFix {
@@ -546,9 +561,14 @@ private struct TeamEvidenceContent: View {
         }
         let detailColor: Color = toFix ? CorePalette.orange : (corrected ? CorePalette.blue : Color.secondary)
         return VStack(alignment: .leading, spacing: 2) {
-            Text("\(icon) \(CoreEvidence.label(step))")
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(tone ?? Color.secondary)
+                Text(CoreEvidence.label(step))
+            }
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
             Text(detail)
                 .font(.caption2.weight(corrected ? .semibold : .regular))
                 .foregroundStyle(detailColor)
@@ -573,7 +593,9 @@ private struct TeamEvidenceContent: View {
                 }
                 Spacer(minLength: 4)
                 if let onReturnStep {
-                    Button("↩️ Devolver este paso") { onReturnStep(step) }
+                    Button { onReturnStep(step) } label: {
+                        Label("Devolver este paso", systemImage: "arrow.uturn.backward")
+                    }
                         .font(.caption2.weight(.semibold))
                         .buttonStyle(.borderless)
                 }
@@ -694,7 +716,7 @@ private struct TeamEvidenceContent: View {
     }
 
     private func missing(_ text: String) -> some View {
-        Text("📭 \(text)")
+        NxIconText(systemName: "tray", text: text)
             .font(.caption)
             .foregroundStyle(.secondary)
     }
@@ -722,7 +744,7 @@ private struct TeamEvidenceReviewRow: View {
         let decision = TeamEvidenceUI.decision(review.decision)
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                CoreChip(text: decision.label, color: decision.color)
+                CoreChip(icon: decision.icon, text: decision.label, color: decision.color)
                 if let score = review.calificacion, score > 0 {
                     CoreStars(value: score)
                 }
@@ -791,12 +813,12 @@ private struct TeamEvidenceReviewSheet: View {
     }
 
     private var submitLabel: String {
-        if decision == "aprobar" { return "✅ Aprobar" }
-        if todo { return "↩️ Devolver todo" }
+        if decision == "aprobar" { return "Aprobar" }
+        if todo { return "Devolver todo" }
         let count = markedSteps.count
         let number = count > 0 ? " \(count)" : ""
         let plural = count == 1 ? "" : "s"
-        return "↩️ Devolver\(number) paso\(plural)"
+        return "Devolver\(number) paso\(plural)"
     }
 
     private func stepBinding(_ step: String) -> Binding<Bool> {
@@ -817,8 +839,8 @@ private struct TeamEvidenceReviewSheet: View {
             Form {
                 Section {
                     Picker("Decisión", selection: $decision) {
-                        Text("✅ Aprobar").tag("aprobar")
-                        Text("↩️ Devolver").tag("devolver")
+                        Text("Aprobar").tag("aprobar")
+                        Text("Devolver").tag("devolver")
                     }
                     .pickerStyle(.segmented)
                 } footer: {
@@ -909,10 +931,10 @@ private struct TeamEvidenceReviewSheet: View {
     }
 
     private func doneMessage(returning: Bool) -> String {
-        if !returning { return "✅ Aprobaste la evidencia de \(name)." }
-        if todo { return "↩️ Le devolviste toda la actividad a \(name)." }
+        if !returning { return "Aprobaste la evidencia de \(name)." }
+        if todo { return "Le devolviste toda la actividad a \(name)." }
         let count = markedSteps.count
-        return "↩️ Le devolviste \(count) paso\(count == 1 ? "" : "s") a \(name)."
+        return "Le devolviste \(count) paso\(count == 1 ? "" : "s") a \(name)."
     }
 
     @MainActor
@@ -965,8 +987,10 @@ struct CorePhotoViewer: View {
                     }
                     Spacer()
                     if let mapUrl = CoreMaps.url(latitude: item.latitude, longitude: item.longitude, label: item.title) {
-                        Link("📍 Ver en mapa", destination: mapUrl)
-                            .font(.caption.weight(.semibold))
+                        Link(destination: mapUrl) {
+                            Label("Ver en mapa", systemImage: "mappin.and.ellipse")
+                        }
+                        .font(.caption.weight(.semibold))
                     }
                 }
                 .padding(.horizontal)

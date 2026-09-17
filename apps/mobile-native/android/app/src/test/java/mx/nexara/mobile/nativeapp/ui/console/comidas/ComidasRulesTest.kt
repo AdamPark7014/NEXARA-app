@@ -71,12 +71,12 @@ class ComidasRulesTest {
     @Test
     fun revisionAndRowLabels() {
         assertNull(ComidasRules.estadoRevision(null))
-        assertEquals("⏳ Por aprobar", ComidasRules.estadoRevision("PENDIENTE")?.label)
-        assertEquals("✅ Justificación aprobada", ComidasRules.estadoRevision("APROBADA")?.label)
-        assertEquals("❌ Justificación rechazada", ComidasRules.estadoRevision("RECHAZADA")?.label)
+        assertEquals("Por aprobar", ComidasRules.estadoRevision("PENDIENTE")?.label)
+        assertEquals("Justificación aprobada", ComidasRules.estadoRevision("APROBADA")?.label)
+        assertEquals("Justificación rechazada", ComidasRules.estadoRevision("RECHAZADA")?.label)
         assertEquals("Sin registrar", ComidasRules.estadoFila(null).label)
-        assertEquals("🍽️ En comida", ComidasRules.estadoFila(ComidaRegistroDto(id = 1, checkinTime = "x")).label)
-        assertEquals("✓ Completa", ComidasRules.estadoFila(ComidaRegistroDto(id = 1, checkinTime = "x", checkoutTime = "y")).label)
+        assertEquals("En comida", ComidasRules.estadoFila(ComidaRegistroDto(id = 1, checkinTime = "x")).label)
+        assertEquals("Completa", ComidasRules.estadoFila(ComidaRegistroDto(id = 1, checkinTime = "x", checkoutTime = "y")).label)
     }
 
     @Test

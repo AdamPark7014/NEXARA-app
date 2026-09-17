@@ -201,7 +201,7 @@ struct ChatView: View {
                         }
                         .listRowBackground(
                             id == selectedChannelId
-                                ? Color.teal.opacity(0.12)
+                                ? NxBrand.primary.opacity(0.12)
                                 : Color(.systemBackground)
                         )
                 }
@@ -225,14 +225,14 @@ struct ChatView: View {
         return HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text("\(ChatChannelFormat.prefix(kind))\(name.isEmpty ? "Canal" : name)")
+                    ChatChannelFormat.title(kind, name.isEmpty ? "Canal" : name)
                         .font(.subheadline.weight(unread > 0 ? .bold : .semibold))
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     if !lastAt.isEmpty {
                         Text(ChatChannelFormat.channelTime(lastAt))
                             .font(.caption2)
-                            .foregroundStyle(unread > 0 ? Color.teal : Color.secondary)
+                            .foregroundStyle(unread > 0 ? NxBrand.primary : Color.secondary)
                     }
                 }
                 let subtitle = ChatChannelFormat.kindLabel(kind)
@@ -253,7 +253,7 @@ struct ChatView: View {
                 } label: {
                     Image(systemName: isFav ? "star.fill" : "star")
                         .font(.caption)
-                        .foregroundStyle(isFav ? Color.teal : Color.secondary.opacity(0.5))
+                        .foregroundStyle(isFav ? NxBrand.primary : Color.secondary.opacity(0.5))
                 }
                 .buttonStyle(.plain)
                 if unread > 0 {
@@ -262,7 +262,7 @@ struct ChatView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.teal)
+                        .background(NxBrand.primary)
                         .clipShape(Capsule())
                 }
             }
@@ -313,7 +313,7 @@ struct ChatView: View {
                                     .id(mid)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10)
-                                            .stroke(Color.teal, lineWidth: highlightedMessageId == mid ? 2 : 0)
+                                            .stroke(NxBrand.primary, lineWidth: highlightedMessageId == mid ? 2 : 0)
                                     )
                             }
                         }
@@ -367,7 +367,7 @@ struct ChatView: View {
         let isDirect = kind.uppercased() == "DIRECT"
         return HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(ChatChannelFormat.prefix(kind))\(name)")
+                ChatChannelFormat.title(kind, name)
                     .font(.headline)
                 if !topic.isEmpty {
                     Text(topic).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -422,7 +422,7 @@ struct ChatView: View {
                         Button {
                             // scroll target would need id; opening is enough UX for now
                         } label: {
-                            Text("📌 \(body.prefix(48))")
+                            NxIconText(systemName: "pin.fill", text: String(body.prefix(48)))
                                 .font(.caption)
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(Color.yellow.opacity(0.2))
@@ -442,7 +442,7 @@ struct ChatView: View {
         let body = ConsoleHelpers.mapStr(msg, "body", "message")
         return HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Respondiendo a \(author)").font(.caption.bold()).foregroundStyle(.teal)
+                Text("Respondiendo a \(author)").font(.caption.bold()).foregroundStyle(NxBrand.primary)
                 Text(body).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
@@ -451,7 +451,7 @@ struct ChatView: View {
             }
         }
         .padding(8)
-        .background(Color.teal.opacity(0.08))
+        .background(NxBrand.primary.opacity(0.08))
     }
 
     private var composeBar: some View {
@@ -621,9 +621,11 @@ struct ChatView: View {
             HStack {
                 Text(author.isEmpty ? "Usuario" : author)
                     .font(.caption.bold())
-                    .foregroundStyle(isOwn ? Color.teal : Color.primary)
+                    .foregroundStyle(isOwn ? NxBrand.primary : Color.primary)
                 Spacer()
-                if !pinnedAt.isEmpty { Text("📌").font(.caption2) }
+                if !pinnedAt.isEmpty {
+                    Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary)
+                }
                 Menu {
                     Button("Responder") { replyTo = m }
                     if canThread {
@@ -668,7 +670,7 @@ struct ChatView: View {
                             Text("\(r.emoji) \(r.count)")
                                 .font(.caption2)
                                 .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(r.mine ? Color.teal.opacity(0.25) : Color(.tertiarySystemFill))
+                                .background(r.mine ? NxBrand.primary.opacity(0.25) : Color(.tertiarySystemFill))
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -694,7 +696,7 @@ struct ChatView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: isOwn ? .trailing : .leading)
-        .background(isOwn ? Color.teal.opacity(0.12) : Color(.secondarySystemBackground))
+        .background(isOwn ? NxBrand.primary.opacity(0.12) : Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
@@ -1359,10 +1361,17 @@ private enum ChatListBuilder {
 private enum ChatChannelFormat {
     static func prefix(_ kind: String) -> String {
         switch kind.uppercased() {
-        case "DIRECT": return ""
-        case "PRIVATE": return "🔒 "
+        case "DIRECT", "PRIVATE": return ""
         default: return "# "
         }
+    }
+
+    /// Nombre del canal con su marca: candado (SF Symbol) si es privado, «# » si es canal.
+    static func title(_ kind: String, _ name: String) -> Text {
+        if kind.uppercased() == "PRIVATE" {
+            return Text(Image(systemName: "lock.fill")) + Text(" " + name)
+        }
+        return Text(Self.prefix(kind) + name)
     }
 
     static func kindLabel(_ kind: String) -> String {

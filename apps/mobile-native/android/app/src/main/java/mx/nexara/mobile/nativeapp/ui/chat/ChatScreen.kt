@@ -1979,7 +1979,7 @@ fun ChatScreen(
             if (totalUnread > 0) {
                 Badge(
                     modifier = Modifier.padding(end = 4.dp),
-                    containerColor = NxColors.Teal,
+                    containerColor = NxColors.Brand,
                 ) { Text("$totalUnread") }
             }
             IconButton(onClick = { vm.toggleSearch() }) {
@@ -2066,7 +2066,7 @@ fun ChatScreen(
         modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(16.dp),
-        containerColor = NxColors.Teal,
+        containerColor = NxColors.Brand,
     ) {
         Icon(Icons.Default.Add, "Crear canal")
     }
@@ -2295,7 +2295,7 @@ private fun ChannelListItem(
                         Text(
                             formatChannelTime(at),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (hasUnread) NxColors.Teal else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (hasUnread) NxColors.Brand else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                         )
                     }
@@ -2337,7 +2337,7 @@ private fun ChannelListItem(
                         Icons.Default.Star,
                         contentDescription = if (isFavorite) "Quitar de favoritos" else "Añadir a favoritos",
                         tint = if (isFavorite) {
-                            NxColors.Teal
+                            NxColors.Brand
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                         },
@@ -2347,7 +2347,7 @@ private fun ChannelListItem(
                     Box(
                         Modifier
                             .clip(CircleShape)
-                            .background(NxColors.Teal)
+                            .background(NxColors.Brand)
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
                         Text(
@@ -2523,7 +2523,7 @@ private fun ChatComposeBar(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(if (canSend) NxColors.Teal else MaterialTheme.colorScheme.surfaceVariant)
+                    .background(if (canSend) NxColors.Brand else MaterialTheme.colorScheme.surfaceVariant)
                     .clickable(enabled = canSend, onClick = onSend),
                 contentAlignment = Alignment.Center,
             ) {
@@ -2552,7 +2552,7 @@ private fun ReplyPreviewBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(Icons.Default.Reply, contentDescription = "Respondiendo", tint = NxColors.Teal)
+        Icon(Icons.Default.Reply, contentDescription = "Respondiendo", tint = NxColors.Brand)
         Column(Modifier.weight(1f)) {
             Text("Respondiendo a $author", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
             Text(
@@ -2704,7 +2704,7 @@ private fun PinnedMessagesSection(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = NxColors.Teal.copy(alpha = 0.08f),
+            containerColor = NxColors.Brand.copy(alpha = 0.08f),
         ),
     ) {
         Column(
@@ -2718,16 +2718,16 @@ private fun PinnedMessagesSection(
                 Icon(
                     Icons.Default.PushPin,
                     contentDescription = "Mensajes fijados",
-                    tint = NxColors.Teal,
+                    tint = NxColors.Brand,
                     modifier = Modifier.padding(0.dp),
                 )
                 Text(
                     "Mensajes fijados",
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleSmall,
-                    color = NxColors.Teal,
+                    color = NxColors.Brand,
                 )
-                Badge(containerColor = NxColors.Teal) {
+                Badge(containerColor = NxColors.Brand) {
                     Text("${messages.size}")
                 }
             }
@@ -2810,7 +2810,7 @@ private fun ChatMessageCard(
     val canThread = msg.parentId == null
     val isOwn = msg.authorId == currentUserId
     val isEdited = !msg.editedAt.isNullOrBlank()
-    val bubbleColor = if (isOwn) NxColors.Teal else Color(0xFFE2E8F0)
+    val bubbleColor = if (isOwn) NxColors.Brand else Color(0xFFE2E8F0)
     val primaryTextColor = if (isOwn) Color.White else MaterialTheme.colorScheme.onSurface
     val metaTextColor = if (isOwn) {
         Color.White.copy(alpha = 0.78f)
@@ -2853,7 +2853,7 @@ private fun ChatMessageCard(
                         msg.author?.nombre ?: "Usuario",
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.labelMedium,
-                        color = NxColors.Teal,
+                        color = NxColors.Brand,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -2916,8 +2916,8 @@ private fun ChatMessageCard(
                 ChatMessageBodyText(
                     body = msg.body,
                     primaryColor = primaryTextColor,
-                    linkColor = if (isOwn) Color.White else NxColors.Teal,
-                    mentionColor = if (isOwn) Color.White else NxColors.Teal,
+                    linkColor = if (isOwn) Color.White else NxColors.Brand,
+                    mentionColor = if (isOwn) Color.White else NxColors.Brand,
                     onOpenEntityLink = onOpenEntityLink,
                 )
             }
@@ -2938,7 +2938,7 @@ private fun ChatMessageCard(
                     Text(
                         "📎 $name",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isOwn) Color.White else NxColors.Teal,
+                        color = if (isOwn) Color.White else NxColors.Brand,
                         modifier = Modifier.clickable { onOpenAttachment(url, msg.attachmentName) },
                     )
                 }
@@ -2946,7 +2946,7 @@ private fun ChatMessageCard(
                 Text(
                     "📎 $name",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isOwn) Color.White else NxColors.Teal,
+                    color = if (isOwn) Color.White else NxColors.Brand,
                 )
             }
             if (msg.reactions.isNotEmpty()) {
@@ -2988,7 +2988,7 @@ private fun ChatMessageCard(
                     Text(
                         "${msg.replyCount} ${if (msg.replyCount == 1) "respuesta" else "respuestas"} · Ver hilo",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isOwn) Color.White else NxColors.Teal,
+                        color = if (isOwn) Color.White else NxColors.Brand,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.clickable { onOpenThread(msg) },
                     )
@@ -3054,12 +3054,12 @@ private fun ReactionChips(
         reactions.forEach { reaction ->
             val mine = reaction.userIds.contains(currentUserId)
             val chipBg = when {
-                mine -> NxColors.Teal.copy(alpha = if (onDarkBubble) 0.28f else 0.15f)
+                mine -> NxColors.Brand.copy(alpha = if (onDarkBubble) 0.28f else 0.15f)
                 onDarkBubble -> Color.White.copy(alpha = 0.16f)
                 else -> MaterialTheme.colorScheme.surfaceVariant
             }
             val chipBorder = when {
-                mine -> NxColors.Teal.copy(alpha = if (onDarkBubble) 0.65f else 0.5f)
+                mine -> NxColors.Brand.copy(alpha = if (onDarkBubble) 0.65f else 0.5f)
                 onDarkBubble -> Color.White.copy(alpha = 0.25f)
                 else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
             }
@@ -3284,7 +3284,7 @@ private fun MentionsPanel(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        Text(m.kind, style = MaterialTheme.typography.labelSmall, color = NxColors.Teal)
+                        Text(m.kind, style = MaterialTheme.typography.labelSmall, color = NxColors.Brand)
                     }
                 }
             }
@@ -3396,7 +3396,7 @@ private fun ChatSearchPanel(
                                         Text(
                                             "${channelPrefix(ch.kind)}${ch.name}",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = NxColors.Teal,
+                                            color = NxColors.Brand,
                                         )
                                     }
                                     Text(

@@ -13,6 +13,9 @@ import {
   type ActivityKind,
 } from "@/lib/activity-kinds";
 import { resolveV2RoleKey } from "@/lib/user-access";
+import PanToolOutlinedIcon from "@mui/icons-material/PanToolOutlined";
+import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
+import { IconLabel } from "@/components/ui/IconBadge";
 
 const OpsActivityForm = dynamic(() => import("@/components/ops/OpsActivityForm"), { ssr: false });
 
@@ -90,7 +93,9 @@ export default function AutoAsignarmePage() {
         }}
       >
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em" }}>
-          🙋 Auto-asignarme una actividad
+          <IconLabel icon={PanToolOutlinedIcon} size={22} gap={8} iconColor="var(--primary)">
+            Auto-asignarme una actividad
+          </IconLabel>
         </h1>
         <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
           Queda solo a tu nombre, como ejecución directa. Ponle día, hora y cuánto te va a tomar; después la acomodas
@@ -123,7 +128,7 @@ export default function AutoAsignarmePage() {
                   minHeight: 100,
                 }}
               >
-                <div style={{ fontSize: 22 }}>{opt.emoji}</div>
+                <ActivityKindIcon kind={opt.icon} variant="badge" size={36} />
                 <div style={{ marginTop: 8, fontWeight: 800, fontSize: 14 }}>{opt.title}</div>
                 <div style={{ marginTop: 4, fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.35 }}>
                   {opt.help}
@@ -139,7 +144,7 @@ export default function AutoAsignarmePage() {
           style={{ padding: 16, borderRadius: 16, border: "1px solid var(--border)", background: "var(--surface)" }}
         >
           <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 12, color: "var(--text-secondary)" }}>
-            2 · {kindMeta.emoji} {kindMeta.title} · para ti
+            2 · <ActivityKindIcon kind={kindMeta.icon} size={16} /> {kindMeta.title} · para ti
           </div>
           <OpsActivityForm
             key={kind}

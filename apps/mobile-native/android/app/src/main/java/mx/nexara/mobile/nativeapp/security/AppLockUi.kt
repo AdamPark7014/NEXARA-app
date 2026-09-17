@@ -48,8 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import mx.nexara.mobile.nativeapp.R
 
-private val NexaraTeal = Color(0xFF0D9488)
-private val NexaraTealDark = Color(0xFF0F766E)
+private val NexaraBrand = Color(0xFF2563EB)
+private val NexaraBrandDark = Color(0xFF1E40AF)
 private val Slate = Color(0xFF0F172A)
 private val Sub = Color(0xFF64748B)
 
@@ -64,7 +64,7 @@ fun AppLockScreen(
             .fillMaxSize()
             .background(
                 Brush.linearGradient(
-                    colors = listOf(Color(0xFFE6F7F6), Color(0xFFEFF6FF)),
+                    colors = listOf(Color(0xFFDBEAFE), Color(0xFFF8FAFC)),
                 ),
             ),
         contentAlignment = Alignment.Center,
@@ -88,7 +88,7 @@ fun AppLockScreen(
                         .size(90.dp)
                         .clip(RoundedCornerShape(22.dp))
                         // Verde fuerte, como en el login: el logo lleva «NEXARA» en blanco.
-                        .background(Color(0xFF0F766E)),
+                        .background(Color(0xFF1E40AF)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
@@ -105,7 +105,7 @@ fun AppLockScreen(
                     "NEXARA",
                     style = MaterialTheme.typography.labelLarge.copy(
                         letterSpacing = 3.sp,
-                        color = NexaraTeal,
+                        color = NexaraBrand,
                         fontWeight = FontWeight.SemiBold,
                     ),
                 )
@@ -116,13 +116,13 @@ fun AppLockScreen(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFFF0FDFA)),
+                        .background(Color(0xFFEFF6FF)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Lock,
                         contentDescription = null,
-                        tint = NexaraTeal,
+                        tint = NexaraBrand,
                         modifier = Modifier.size(28.dp),
                     )
                 }
@@ -150,7 +150,7 @@ fun AppLockScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = NexaraTeal,
+                        containerColor = NexaraBrand,
                         contentColor = Color.White,
                     ),
                 ) {
@@ -246,8 +246,8 @@ fun AppLockSettingsCard(
                             },
                             label = { Text(option.label) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFCCFBF1),
-                                selectedLabelColor = NexaraTealDark,
+                                selectedContainerColor = Color(0xFFDBEAFE),
+                                selectedLabelColor = NexaraBrandDark,
                             ),
                         )
                     }

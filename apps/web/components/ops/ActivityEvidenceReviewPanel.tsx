@@ -12,6 +12,11 @@ import {
 } from "@/lib/evidence-display";
 import type { ActivityDetail } from "@/lib/ops-activities-api";
 import { activityDisplayLabel, activityDisplayVariant } from "@/lib/activity-status";
+import { IconLabel } from "@/components/ui/IconBadge";
+import CheckIcon from "@mui/icons-material/Check";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 
 type Props = {
   activity: ActivityDetail;
@@ -141,9 +146,13 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
                     background: step.done ? "color-mix(in srgb, var(--success) 10%, transparent)" : "var(--surface-2)",
                   }}
                 >
-                  <span style={{ fontSize: 13, fontWeight: step.done ? 600 : 500 }}>
-                    {step.done ? "✓" : "○"} {step.label}
-                  </span>
+                  <IconLabel
+                    icon={step.done ? CheckIcon : RadioButtonUncheckedIcon}
+                    iconColor={step.done ? "var(--success)" : "var(--text-tertiary)"}
+                    style={{ fontSize: 13, fontWeight: step.done ? 600 : 500 }}
+                  >
+                    {step.label}
+                  </IconLabel>
                   <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
                     {step.at ? formatDateTime(step.at) : step.done ? "Completado" : "Pendiente"}
                   </span>
@@ -155,12 +164,12 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
               <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                 {entryMap && (
                   <Link href={entryMap} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>
-                    📍 GPS entrada
+                    <IconLabel icon={PlaceOutlinedIcon} gap={4}>GPS entrada</IconLabel>
                   </Link>
                 )}
                 {exitMap && (
                   <Link href={exitMap} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>
-                    📍 GPS salida
+                    <IconLabel icon={PlaceOutlinedIcon} gap={4}>GPS salida</IconLabel>
                   </Link>
                 )}
               </div>
@@ -187,7 +196,7 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
               rel="noreferrer"
               style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}
             >
-              📄 Ver hoja de servicio (PDF)
+              <IconLabel icon={DescriptionOutlinedIcon}>Ver hoja de servicio (PDF)</IconLabel>
             </a>
             {ev.serviceSheetUploadedAt && (
               <span style={{ marginLeft: 8, fontSize: 12, color: "var(--text-tertiary)" }}>

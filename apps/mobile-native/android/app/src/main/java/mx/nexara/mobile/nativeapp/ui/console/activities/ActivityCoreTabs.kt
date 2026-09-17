@@ -178,7 +178,7 @@ private fun TimelineEventCard(ev: Map<String, Any?>, highlighted: Boolean) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (highlighted) NxColors.TealSoft.copy(alpha = 0.35f) else Color.White,
+            containerColor = if (highlighted) NxColors.BrandSoft.copy(alpha = 0.35f) else Color.White,
         ),
         border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
     ) {
@@ -186,7 +186,7 @@ private fun TimelineEventCard(ev: Map<String, Any?>, highlighted: Boolean) {
             modifier = Modifier
                 .drawBehind {
                     drawRect(
-                        color = color?.let { Color(it) } ?: NxColors.Teal,
+                        color = color?.let { Color(it) } ?: NxColors.Brand,
                         size = Size(3.dp.toPx(), size.height),
                     )
                 }

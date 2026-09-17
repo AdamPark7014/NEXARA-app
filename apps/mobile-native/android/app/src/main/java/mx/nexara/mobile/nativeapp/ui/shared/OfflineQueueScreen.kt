@@ -77,10 +77,10 @@ enum class OfflineMutationKind(
     val tint: Color,
 ) {
     Evidence("Evidencia", Icons.Outlined.PhotoCamera, NxColors.Info),
-    Activity("Actividad", Icons.Outlined.Event, NxColors.Teal),
+    Activity("Actividad", Icons.Outlined.Event, NxColors.Brand),
     Chat("Chat", Icons.Outlined.Chat, Color(0xFF6366F1)),
-    Attendance("Asistencia", Icons.AutoMirrored.Outlined.Assignment, Color(0xFF0891B2)),
-    Gps("GPS", Icons.Outlined.GpsFixed, Color(0xFF059669)),
+    Attendance("Asistencia", Icons.AutoMirrored.Outlined.Assignment, NxColors.BrandDark),
+    Gps("GPS", Icons.Outlined.GpsFixed, NxColors.Accent),
     Generic("Mutación", Icons.Outlined.CloudSync, NxColors.Muted),
 }
 
@@ -254,16 +254,16 @@ private fun AutoSyncIndicator() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(NxColors.TealSoft, MaterialTheme.shapes.small)
+            .background(NxColors.BrandSoft, MaterialTheme.shapes.small)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = NxColors.Teal, strokeWidth = 2.dp)
+        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = NxColors.Brand, strokeWidth = 2.dp)
         Text(
             "Sincronizando al recuperar conexión…",
             style = MaterialTheme.typography.labelMedium,
-            color = NxColors.Teal,
+            color = NxColors.Brand,
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -396,7 +396,7 @@ private fun OfflineTimelineItem(
             backgroundContent = {
                 val direction = dismissState.dismissDirection
                 val color = when (direction) {
-                    SwipeToDismissBoxValue.StartToEnd -> NxColors.Teal
+                    SwipeToDismissBoxValue.StartToEnd -> NxColors.Brand
                     SwipeToDismissBoxValue.EndToStart -> NxColors.Danger
                     else -> Color.Transparent
                 }
@@ -429,7 +429,7 @@ private fun OfflineTimelineItem(
                                 Text(
                                     item.method,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = NxColors.Teal,
+                                    color = NxColors.Brand,
                                     fontWeight = FontWeight.Bold,
                                 )
                             }

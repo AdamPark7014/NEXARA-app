@@ -2,7 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import type { SvgIconComponent } from "@mui/icons-material";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import RestaurantOutlinedIcon from "@mui/icons-material/RestaurantOutlined";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import UndoIcon from "@mui/icons-material/Undo";
 import SessionImage from "@/components/SessionImage";
+import { IconBadge, IconLabel } from "@/components/ui/IconBadge";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -114,7 +128,7 @@ const btn: CSSProperties = {
 
 const btnLleno = (color: string): CSSProperties => ({ ...btn, border: 0, color: "#fff", background: color });
 
-function Chip({ children, color }: { children: ReactNode; color?: string }) {
+function Chip({ children, color, icon: Icon }: { children: ReactNode; color?: string; icon?: SvgIconComponent }) {
   return (
     <span
       style={{
@@ -131,16 +145,27 @@ function Chip({ children, color }: { children: ReactNode; color?: string }) {
         color: color ?? "var(--text-secondary)",
       }}
     >
+      {Icon ? <Icon aria-hidden="true" sx={{ fontSize: 16, flex: "0 0 auto" }} /> : null}
       {children}
     </span>
   );
 }
 
-function estadoRevision(r: Registro | null): { label: string; color: string } | null {
+/** Línea de texto con icono alineado a la primera línea (textos que pueden partirse). */
+function ConIcono({ icon: Icon, color, children }: { icon: SvgIconComponent; color?: string; children: ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+      <Icon aria-hidden="true" sx={{ fontSize: 16, flex: "0 0 auto", mt: "2px", color: color ?? "var(--text-secondary)" }} />
+      <span style={{ minWidth: 0 }}>{children}</span>
+    </div>
+  );
+}
+
+function estadoRevision(r: Registro | null): { label: string; color: string; icon: SvgIconComponent } | null {
   if (!r?.revisionEstado) return null;
-  if (r.revisionEstado === "APROBADA") return { label: "✅ Justificación aprobada", color: VERDE };
-  if (r.revisionEstado === "RECHAZADA") return { label: "❌ Justificación rechazada", color: ROJO };
-  return { label: "⏳ Por aprobar", color: NARANJA };
+  if (r.revisionEstado === "APROBADA") return { label: "Justificación aprobada", color: VERDE, icon: TaskAltIcon };
+  if (r.revisionEstado === "RECHAZADA") return { label: "Justificación rechazada", color: ROJO, icon: CancelOutlinedIcon };
+  return { label: "Por aprobar", color: NARANJA, icon: HourglassTopIcon };
 }
 
 /** Foto de comida (protegida) con visor grande al tocarla. */
@@ -186,8 +211,13 @@ function Visor({ foto, onClose }: { foto: { url: string; titulo: string }; onClo
       <div onClick={(e) => e.stopPropagation()} style={{ display: "grid", gap: 10, maxWidth: "min(96vw, 900px)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", color: "#fff", gap: 10, alignItems: "center" }}>
           <strong>{foto.titulo}</strong>
-          <button type="button" onClick={onClose} style={{ ...btn, background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)" }}>
-            ✕
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            style={{ ...btn, background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)" }}
+          >
+            <CloseIcon aria-hidden="true" sx={{ fontSize: 20 }} />
           </button>
         </div>
         <SessionImage
@@ -317,7 +347,7 @@ function RegistroModal({
   };
 
   if (typeof document === "undefined") return null;
-  const titulo = momento === "salida" ? "📸 Foto de salida a comer" : "📸 Foto de regreso de comer";
+  const titulo = momento === "salida" ? "Foto de salida a comer" : "Foto de regreso de comer";
   return createPortal(
     <div
       role="dialog"
@@ -343,7 +373,11 @@ function RegistroModal({
         }}
       >
         <header>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>{titulo}</h3>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>
+            <IconLabel icon={PhotoCameraOutlinedIcon} size={20} gap={8} iconColor="var(--primary)">
+              {titulo}
+            </IconLabel>
+          </h3>
           <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
             {momento === "salida"
               ? "Acomódate y toma la foto: se guarda con la hora en que sales."
@@ -383,6 +417,9 @@ function RegistroModal({
           <label style={{ display: "grid", gap: 6 }}>
             <span
               style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "flex-start",
                 fontSize: 13,
                 lineHeight: 1.45,
                 padding: "8px 12px",
@@ -391,8 +428,11 @@ function RegistroModal({
                 border: `1px solid color-mix(in srgb, ${NARANJA} 35%, var(--border))`,
               }}
             >
-              ⏰ Estás fuera del horario de comida ({ventanaTexto}). Escribe por qué; tu jefe lo aprobará o rechazará y queda en
-              el registro.
+              <AccessTimeIcon aria-hidden="true" sx={{ fontSize: 18, flex: "0 0 auto", color: NARANJA }} />
+              <span>
+                Estás fuera del horario de comida ({ventanaTexto}). Escribe por qué; tu jefe lo aprobará o rechazará y queda en
+                el registro.
+              </span>
             </span>
             <textarea
               value={motivo}
@@ -433,19 +473,29 @@ function RegistroModal({
           {foto ? (
             <>
               <button type="button" style={btn} onClick={() => setFoto(null)} disabled={enviando}>
-                📷 Tomar otra
+                <CameraswitchIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                Tomar otra
               </button>
               <button type="button" style={btnLleno(pideMotivo ? NARANJA : VERDE)} onClick={() => void registrar()} disabled={enviando}>
-                {enviando ? "Registrando…" : momento === "salida" ? "✓ Registrar salida" : "✓ Registrar regreso"}
+                {enviando ? (
+                  "Registrando…"
+                ) : (
+                  <>
+                    <CheckIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    {momento === "salida" ? "Registrar salida" : "Registrar regreso"}
+                  </>
+                )}
               </button>
             </>
           ) : (
             <>
               <button type="button" style={btn} onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}>
-                🔄 {facing === "user" ? "Usar trasera" : "Usar frontal"}
+                <CameraswitchIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                {facing === "user" ? "Usar trasera" : "Usar frontal"}
               </button>
               <button type="button" style={btnLleno(AZUL)} onClick={tomar} disabled={!lista}>
-                📸 Tomar foto
+                <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                Tomar foto
               </button>
             </>
           )}
@@ -524,8 +574,8 @@ function RevisionModal({
       >
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Comida a destiempo de {corto(fila.nombre)}</h3>
         <div style={{ display: "grid", gap: 8, fontSize: 13.5, lineHeight: 1.45 }}>
-          <div>
-            🍽️ Salió <strong>{hora(r.checkinTime)}</strong>
+          <ConIcono icon={RestaurantOutlinedIcon}>
+            Salió <strong>{hora(r.checkinTime)}</strong>
             {r.checkoutTime ? (
               <>
                 {" "}
@@ -535,9 +585,9 @@ function RevisionModal({
             ) : (
               " · sigue en comida"
             )}
-          </div>
-          {r.checkinJustificacion ? <div>💬 Salida: «{r.checkinJustificacion}»</div> : null}
-          {r.checkoutJustificacion ? <div>💬 Regreso: «{r.checkoutJustificacion}»</div> : null}
+          </ConIcono>
+          {r.checkinJustificacion ? <ConIcono icon={ChatBubbleOutlineIcon}>Salida: «{r.checkinJustificacion}»</ConIcono> : null}
+          {r.checkoutJustificacion ? <ConIcono icon={ChatBubbleOutlineIcon}>Regreso: «{r.checkoutJustificacion}»</ConIcono> : null}
         </div>
         <div role="radiogroup" aria-label="Decisión" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {(["aprobar", "rechazar"] as const).map((d) => {
@@ -558,7 +608,17 @@ function RevisionModal({
                   color: on ? color : "inherit",
                 }}
               >
-                {d === "aprobar" ? "✅ Aprobar" : "❌ Rechazar"}
+                {d === "aprobar" ? (
+                  <>
+                    <TaskAltIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    Aprobar
+                  </>
+                ) : (
+                  <>
+                    <CancelOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    Rechazar
+                  </>
+                )}
               </button>
             );
           })}
@@ -596,7 +656,19 @@ function RevisionModal({
             Cancelar
           </button>
           <button type="button" style={btnLleno(decision === "aprobar" ? VERDE : ROJO)} onClick={() => void guardar()} disabled={enviando}>
-            {enviando ? "Guardando…" : decision === "aprobar" ? "✅ Aprobar" : "❌ Rechazar"}
+            {enviando ? (
+              "Guardando…"
+            ) : decision === "aprobar" ? (
+              <>
+                <TaskAltIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                Aprobar
+              </>
+            ) : (
+              <>
+                <CancelOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                Rechazar
+              </>
+            )}
           </button>
         </footer>
       </div>
@@ -633,13 +705,18 @@ function MiComida({
     return (
       <article style={{ ...tarjeta, borderLeft: `4px solid ${destiempo ? NARANJA : VERDE}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 800 }}>🍽️ Tu hora de comida</div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-              Horario: {mi.ventana.texto} · registra tu salida y tu regreso con foto.
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <IconBadge icon={RestaurantOutlinedIcon} size={32} />
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>Tu hora de comida</div>
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
+                Horario: {mi.ventana.texto} · registra tu salida y tu regreso con foto.
+              </div>
             </div>
           </div>
-          <Chip color={destiempo ? NARANJA : VERDE}>{destiempo ? "⏰ Fuera de horario" : "✓ Es tu horario"}</Chip>
+          <Chip color={destiempo ? NARANJA : VERDE} icon={destiempo ? AccessTimeIcon : CheckIcon}>
+            {destiempo ? "Fuera de horario" : "Es tu horario"}
+          </Chip>
         </div>
         {destiempo ? (
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: "var(--text-secondary)" }}>
@@ -647,7 +724,8 @@ function MiComida({
           </p>
         ) : null}
         <button type="button" style={{ ...btnLleno(destiempo ? NARANJA : VERDE), justifySelf: "start" }} onClick={() => onRegistrar("salida", destiempo)}>
-          🍽️ Salir a comer
+          <RestaurantOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+          Salir a comer
         </button>
       </article>
     );
@@ -661,22 +739,39 @@ function MiComida({
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <FotoComida url={r.checkinPhotoUrl} titulo="Tu foto de salida" onOpen={onVerFoto} />
+            <IconBadge icon={RestaurantOutlinedIcon} size={32} />
             <div>
-              <div style={{ fontSize: 17, fontWeight: 800 }}>🍽️ Estás en tu hora de comida</div>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>Estás en tu hora de comida</div>
               <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
                 Saliste a las {hora(r.checkinTime)} · llevas {minutos} min
               </div>
             </div>
           </div>
-          {revision ? <Chip color={revision.color}>{revision.label}</Chip> : null}
+          {revision ? (
+            <Chip color={revision.color} icon={revision.icon}>
+              {revision.label}
+            </Chip>
+          ) : null}
         </div>
         {destiempo ? (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: "var(--text-secondary)" }}>
-            ⏰ Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              lineHeight: 1.45,
+              color: "var(--text-secondary)",
+              display: "flex",
+              gap: 6,
+              alignItems: "flex-start",
+            }}
+          >
+            <AccessTimeIcon aria-hidden="true" sx={{ fontSize: 16, flex: "0 0 auto", mt: "1px", color: NARANJA }} />
+            <span>Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.</span>
           </p>
         ) : null}
         <button type="button" style={{ ...btnLleno(destiempo ? NARANJA : AZUL), justifySelf: "start" }} onClick={() => onRegistrar("regreso", destiempo)}>
-          ↩️ Ya regresé
+          <UndoIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+          Ya regresé
         </button>
       </article>
     );
@@ -688,14 +783,19 @@ function MiComida({
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <FotoComida url={r.checkinPhotoUrl} titulo="Tu foto de salida" onOpen={onVerFoto} />
           <FotoComida url={r.checkoutPhotoUrl} titulo="Tu foto de regreso" onOpen={onVerFoto} />
-          <div style={{ flex: "1 1 200px" }}>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>✅ Comida registrada</div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-              {hora(r.checkinTime)} → {hora(r.checkoutTime)}
-              {r.minutos != null ? ` · ${r.minutos} min` : ""}
+          <div style={{ flex: "1 1 200px", display: "flex", gap: 12, alignItems: "center" }}>
+            <IconBadge icon={TaskAltIcon} size={32} />
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>Comida registrada</div>
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
+                {hora(r.checkinTime)} → {hora(r.checkoutTime)}
+                {r.minutos != null ? ` · ${r.minutos} min` : ""}
+              </div>
             </div>
           </div>
-          <Chip color={revision ? revision.color : VERDE}>{revision ? revision.label : "A tiempo"}</Chip>
+          <Chip color={revision ? revision.color : VERDE} icon={revision?.icon}>
+            {revision ? revision.label : "A tiempo"}
+          </Chip>
         </div>
         {r.revisionEstado && r.revisionEstado !== "PENDIENTE" ? (
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
@@ -721,11 +821,11 @@ function FilaPersona({
 }) {
   const r = fila.registro;
   const revision = estadoRevision(r);
-  const estado = !r
-    ? { label: "Sin registrar", color: undefined as string | undefined }
+  const estado: { label: string; color: string | undefined; icon?: SvgIconComponent } = !r
+    ? { label: "Sin registrar", color: undefined }
     : !r.checkoutTime
-      ? { label: "🍽️ En comida", color: AZUL }
-      : { label: "✓ Completa", color: VERDE };
+      ? { label: "En comida", color: AZUL, icon: RestaurantOutlinedIcon }
+      : { label: "Completa", color: VERDE, icon: TaskAltIcon };
   const color = revision?.color ?? (r ? (r.checkoutTime ? VERDE : AZUL) : "var(--border)");
 
   return (
@@ -753,8 +853,14 @@ function FilaPersona({
           {fila.puesto ? <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{fila.puesto}</div> : null}
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <Chip color={estado.color}>{estado.label}</Chip>
-          {revision ? <Chip color={revision.color}>{revision.label}</Chip> : null}
+          <Chip color={estado.color} icon={estado.icon}>
+            {estado.label}
+          </Chip>
+          {revision ? (
+            <Chip color={revision.color} icon={revision.icon}>
+              {revision.label}
+            </Chip>
+          ) : null}
         </div>
       </div>
 
@@ -783,8 +889,16 @@ function FilaPersona({
             background: "color-mix(in srgb, var(--text-secondary) 6%, var(--surface))",
           }}
         >
-          {r.checkinJustificacion ? <div>💬 Salida a las {hora(r.checkinTime)}: «{r.checkinJustificacion}»</div> : null}
-          {r.checkoutJustificacion ? <div>💬 Regreso a las {hora(r.checkoutTime)}: «{r.checkoutJustificacion}»</div> : null}
+          {r.checkinJustificacion ? (
+            <ConIcono icon={ChatBubbleOutlineIcon}>
+              Salida a las {hora(r.checkinTime)}: «{r.checkinJustificacion}»
+            </ConIcono>
+          ) : null}
+          {r.checkoutJustificacion ? (
+            <ConIcono icon={ChatBubbleOutlineIcon}>
+              Regreso a las {hora(r.checkoutTime)}: «{r.checkoutJustificacion}»
+            </ConIcono>
+          ) : null}
           {r.revisionEstado && r.revisionEstado !== "PENDIENTE" ? (
             <div style={{ color: "var(--text-secondary)" }}>
               {corto(r.revisadoPor) || "—"} {r.revisionEstado === "APROBADA" ? "aprobó" : "rechazó"}
@@ -799,10 +913,12 @@ function FilaPersona({
           {r.revisionEstado === "PENDIENTE" ? (
             <>
               <button type="button" style={btnLleno(VERDE)} onClick={() => onRevisar(fila, "aprobar")}>
-                ✅ Aprobar
+                <TaskAltIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                Aprobar
               </button>
               <button type="button" style={btnLleno(ROJO)} onClick={() => onRevisar(fila, "rechazar")}>
-                ❌ Rechazar
+                <CancelOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                Rechazar
               </button>
             </>
           ) : (
@@ -946,7 +1062,14 @@ export default function ComidasPanel({ fecha }: { fecha: string }) {
               </p>
             </div>
             <button type="button" style={{ ...btn, minHeight: 38, fontSize: 13 }} onClick={() => void cargar()} disabled={cargando}>
-              {cargando ? "Actualizando…" : "↻ Actualizar"}
+              {cargando ? (
+                "Actualizando…"
+              ) : (
+                <>
+                  <RefreshIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+                  Actualizar
+                </>
+              )}
             </button>
           </div>
 
@@ -960,9 +1083,15 @@ export default function ComidasPanel({ fecha }: { fecha: string }) {
                 fontWeight: 650,
                 background: `color-mix(in srgb, ${NARANJA} 10%, var(--surface))`,
                 border: `1px solid color-mix(in srgb, ${NARANJA} 35%, var(--border))`,
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
               }}
             >
-              ⏳ Tienes {resumen.pendientes} comida{resumen.pendientes === 1 ? "" : "s"} a destiempo por aprobar.
+              <HourglassTopIcon aria-hidden="true" sx={{ fontSize: 18, flex: "0 0 auto", color: NARANJA }} />
+              <span>
+                Tienes {resumen.pendientes} comida{resumen.pendientes === 1 ? "" : "s"} a destiempo por aprobar.
+              </span>
             </p>
           ) : null}
 

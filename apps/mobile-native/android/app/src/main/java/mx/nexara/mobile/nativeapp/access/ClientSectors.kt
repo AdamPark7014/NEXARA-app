@@ -1,5 +1,7 @@
 package mx.nexara.mobile.nativeapp.access
 
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+
 /**
  * Sectores del padrón de clientes — espejo de `apps/web/lib/client-sectors.ts`
  * (y de `apps/api/src/ventas/client-sectors.ts`, que es quien lo hace cumplir).
@@ -10,25 +12,25 @@ package mx.nexara.mobile.nativeapp.access
 enum class ClientSector(
     val slug: String,
     val title: String,
-    val emoji: String,
+    val glyph: NxGlyph,
     val help: String,
 ) {
     PROYECTO(
         slug = "proyecto",
         title = "Clientes de proyecto",
-        emoji = "📁",
+        glyph = NxGlyph.PROJECT,
         help = "Se usan en actividades de tipo proyecto u obra. Aquí también creas sus proyectos.",
     ),
     CORPORATIVO(
         slug = "corporativo",
         title = "Clientes corporativos",
-        emoji = "🏢",
+        glyph = NxGlyph.CORPORATE,
         help = "Se usan en actividades de tipo servicio.",
     ),
     COMERCIAL(
         slug = "comercial",
         title = "Clientes comerciales",
-        emoji = "🤝",
+        glyph = NxGlyph.CLIENT,
         help = "Se usan en actividades de tipo comercial (también puedes sumarlos a otros sectores).",
     ),
     ;

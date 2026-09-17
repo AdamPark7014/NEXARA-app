@@ -105,7 +105,8 @@ struct MiJornadaCard: View {
     @ViewBuilder
     private var gpsCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("📡 GPS de jornada").font(.subheadline.weight(.semibold))
+            NxIconText(systemName: "location.circle", text: "GPS de jornada", tint: NxBrand.primary)
+                .font(.subheadline.weight(.semibold))
             Text("Mientras tu jornada esté abierta, la app manda tu ubicación a tu encargado cada ~100 m, aunque la tengas cerrada. Al marcar Salida se detiene.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -152,8 +153,12 @@ struct MiJornadaCard: View {
                 Text("Hoy").font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 ForEach(vm.myPunches) { punch in
                     HStack(spacing: 10) {
-                        Text(punch.isEntry ? "📍 Entrada" : "🏁 Salida")
-                            .font(.caption.weight(.semibold))
+                        NxIconText(
+                            systemName: punch.isEntry ? "arrow.right.circle" : "rectangle.portrait.and.arrow.right",
+                            text: punch.isEntry ? "Entrada" : "Salida",
+                            tint: NxBrand.primary
+                        )
+                        .font(.caption.weight(.semibold))
                         Text(AttendanceClock.time(punch.timestamp))
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)

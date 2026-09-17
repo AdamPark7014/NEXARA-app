@@ -94,14 +94,17 @@ struct ClientesHomeView: View {
                 Section {
                     Picker("Sector", selection: $sector) {
                         ForEach(allowed) { s in
-                            Text("\(s.emoji) \(s.shortTitle)").tag(Optional(s))
+                            // Segmentado: UISegmentedControl no pinta icono + texto a la vez.
+                            Text(s.shortTitle).tag(Optional(s))
                         }
                     }
                     .pickerStyle(.segmented)
                 }
             } else if let sector {
                 Section {
-                    Text("\(sector.emoji) \(sector.title)").font(.subheadline.weight(.semibold))
+                    Label(sector.title, systemImage: sector.symbol)
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.subheadline.weight(.semibold))
                 }
             }
 

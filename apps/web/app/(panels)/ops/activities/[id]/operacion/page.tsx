@@ -7,6 +7,10 @@ import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { openExternalUrl } from "@/lib/open-external-url";
+import TimerOutlinedIcon from "@mui/icons-material/TimerOutlined";
+import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 
 function mapsUrl(lat?: number | string | null, lng?: number | string | null) {
   const a = Number(lat);
@@ -50,15 +54,15 @@ export default function ActivityOperacionPage() {
           label="SLA"
           value={overdue ? "Vencida" : dueDate ? dueDate.toLocaleDateString("es-MX") : "Sin fecha"}
           variant={overdue ? "danger" : dueDate ? "warning" : "default"}
-          icon="⏱️"
+          icon={<TimerOutlinedIcon fontSize="inherit" aria-hidden="true" />}
         />
-        <KpiCard label="Prioridad" value={activity.prioridad ?? "—"} icon="🎯" />
-        <KpiCard label="Tiempo máx." value={maxMin ? `${maxMin} min` : "—"} icon="⌛" />
+        <KpiCard label="Prioridad" value={activity.prioridad ?? "—"} icon={<BoltOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+        <KpiCard label="Tiempo máx." value={maxMin ? `${maxMin} min` : "—"} icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} />
         <KpiCard
           label="Evidencia"
           value={activity.activityEvidence?.reviewStatus ?? "Pendiente"}
           variant={activity.activityEvidence?.reviewStatus === "APPROVED" ? "positive" : "default"}
-          icon="📸"
+          icon={<PhotoCameraOutlinedIcon fontSize="inherit" aria-hidden="true" />}
         />
       </div>
 

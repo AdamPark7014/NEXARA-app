@@ -17,6 +17,8 @@ import { getSocketBaseUrl } from "@/lib/api-base";
 import OpsActivitiesImport from "@/components/ops/OpsActivitiesImport";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { toast } from "@/components/Toast";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
 type ActivityRow = {
   id: number;
@@ -297,13 +299,13 @@ export default function OpsActivitiesBoard({
   ];
 
   if (loading) {
-    return <EmptyState icon="⏳" title="Cargando OT…" description="Sincronizando actividades de campo." />;
+    return <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando OT…" description="Sincronizando actividades de campo." />;
   }
 
   if (error) {
     return (
       <EmptyState
-        icon="⚠️"
+        icon={<ErrorOutlineIcon fontSize="inherit" aria-hidden="true" />}
         title="No se pudieron cargar las OT"
         description={error}
         action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}

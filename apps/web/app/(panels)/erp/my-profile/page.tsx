@@ -10,6 +10,14 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import PhoneField from "@/components/PhoneField";
 import KpiCard from "@/components/ui/KpiCard";
+import { IconLabel } from "@/components/ui/IconBadge";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
+import CheckIcon from "@mui/icons-material/Check";
 
 interface Profile {
   telefono?: string | null;
@@ -155,18 +163,18 @@ export default function MyProfilePage() {
         )}
       />
 
-      {loading && <EmptyState icon="⏳" title="Cargando perfil…" description="Consultando tus datos." />}
-      {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+      {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando perfil…" description="Consultando tus datos." />}
+      {!loading && error && <EmptyState icon={<ErrorOutlineIcon fontSize="inherit" aria-hidden="true" />} title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 
       {!loading && !error && profile && (() => {
         const filled = [form.telefono, form.curp, form.rfc, form.nss, form.fechaNacimiento, form.ciudad, form.estado].filter(Boolean).length;
         const completeness = Math.round((filled / 7) * 100);
         return (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <KpiCard label="Departamento" value={profile.department?.nombre ?? "—"} icon="🏢" />
-            <KpiCard label="Rol" value={profile.role?.nombre ?? "—"} icon="🎭" variant="accent" />
-            <KpiCard label="Perfil completo" value={`${completeness}%`} icon="📋" variant={completeness >= 80 ? "positive" : completeness >= 50 ? "warning" : "danger"} hint="Campos personales" />
-            <KpiCard label="Email" value={profile.email} icon="✉️" />
+            <KpiCard label="Departamento" value={profile.department?.nombre ?? "—"} icon={<BusinessOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+            <KpiCard label="Rol" value={profile.role?.nombre ?? "—"} icon={<BadgeOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant="accent" />
+            <KpiCard label="Perfil completo" value={`${completeness}%`} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={completeness >= 80 ? "positive" : completeness >= 50 ? "warning" : "danger"} hint="Campos personales" />
+            <KpiCard label="Email" value={profile.email} icon={<MailOutlineIcon fontSize="inherit" aria-hidden="true" />} />
           </div>
         );
       })()}
@@ -313,7 +321,7 @@ export default function MyProfilePage() {
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
-            {saved && <span style={{ fontSize: 12.5, color: "var(--success)" }}>✓ Guardado — pendiente de revisión por RH</span>}
+            {saved && <IconLabel icon={CheckIcon} style={{ fontSize: 12.5, color: "var(--success)" }}>Guardado — pendiente de revisión por RH</IconLabel>}
           </div>
         </>
       )}

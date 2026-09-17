@@ -232,15 +232,15 @@ private struct AttendancePersonCard: View {
     private var fotos: some View {
         if row.entryPunch != nil || row.exitPunch != nil {
             HStack(spacing: 10) {
-                foto("📍 Entrada", row.entryPunch)
-                foto("🏁 Salida", row.exitPunch)
+                foto("Entrada", symbol: "arrow.right.circle", row.entryPunch)
+                foto("Salida", symbol: "rectangle.portrait.and.arrow.right", row.exitPunch)
                 Spacer(minLength: 0)
             }
         }
     }
 
     @ViewBuilder
-    private func foto(_ label: String, _ punch: AttendancePunch?) -> some View {
+    private func foto(_ label: String, symbol: String, _ punch: AttendancePunch?) -> some View {
         if let punch {
             VStack(spacing: 4) {
                 if punch.photoUrl.isEmpty {
@@ -267,7 +267,7 @@ private struct AttendancePersonCard: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Text(label).font(.caption2).foregroundStyle(.secondary)
+                NxIconText(systemName: symbol, text: label).font(.caption2).foregroundStyle(.secondary)
             }
         }
     }

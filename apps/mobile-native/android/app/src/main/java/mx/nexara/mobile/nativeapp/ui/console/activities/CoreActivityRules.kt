@@ -13,6 +13,7 @@ import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceReviewDto
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 
 /**
  * Reglas de Core (/erp) sin nada de Android, para poder probarlas en JVM.
@@ -42,7 +43,8 @@ object CoreActivityRules {
 
     private val ES_MX: Locale = Locale("es", "MX")
 
-    data class Tone(val label: String, val color: Long? = null)
+    /** Etiqueta sin emoji + color de la web + ícono opcional ([NxGlyph], se pinta en la UI). */
+    data class Tone(val label: String, val color: Long? = null, val glyph: NxGlyph? = null)
 
     fun norm(email: String?): String = email?.trim()?.lowercase().orEmpty()
 
@@ -129,7 +131,7 @@ object CoreActivityRules {
             val text = v.toString().trim()
             when {
                 text.isEmpty() -> null
-                text.startsWith("data:image", ignoreCase = true) -> humanizeKey(key) to "✍️ Firma capturada"
+                text.startsWith("data:image", ignoreCase = true) -> humanizeKey(key) to "Firma capturada"
                 else -> humanizeKey(key) to text
             }
         }
@@ -220,12 +222,12 @@ object CoreActivityRules {
 
     fun kindLabel(coreKind: String?, ticketTypeCustom: String?): String {
         val base = when (coreKind?.trim()?.lowercase()) {
-            "tarea" -> "✅ Tarea"
-            "proyecto" -> "📁 Proyecto"
-            "obra" -> "🏗️ Obra"
-            "servicio" -> "🛠️ Servicio"
-            "comercial" -> "💼 Comercial"
-            else -> "📌 Actividad"
+            "tarea" -> "Tarea"
+            "proyecto" -> "Proyecto"
+            "obra" -> "Obra"
+            "servicio" -> "Servicio"
+            "comercial" -> "Comercial"
+            else -> "Actividad"
         }
         return if (coreKind.equals("tarea", ignoreCase = true) && !ticketTypeCustom.isNullOrBlank()) {
             "$base · $ticketTypeCustom"
@@ -233,6 +235,20 @@ object CoreActivityRules {
             base
         }
     }
+
+    /** Ícono del tipo de actividad (acompaña a [kindLabel]). */
+    fun kindGlyph(coreKind: String?): NxGlyph = when (coreKind?.trim()?.lowercase()) {
+        "tarea" -> NxGlyph.TASK
+        "proyecto" -> NxGlyph.PROJECT
+        "obra" -> NxGlyph.WORKSITE
+        "servicio" -> NxGlyph.SERVICE
+        "comercial" -> NxGlyph.COMMERCIAL
+        else -> NxGlyph.ACTIVITY
+    }
+
+    /** Chip del tipo: «Tarea · Junta» con su ícono. */
+    fun kindTone(coreKind: String?, ticketTypeCustom: String?): Tone =
+        Tone(kindLabel(coreKind, ticketTypeCustom), glyph = kindGlyph(coreKind))
 
     /** Mueve un elemento de la cola; null si el movimiento no aplica. */
     fun reorderIds(ids: List<Long>, from: Int, to: Int): List<Long>? {
@@ -245,7 +261,7 @@ object CoreActivityRules {
 
     // ── Pizarra y despacho ──────────────────────────────────────────────────
 
-    const val CIAN = 0xFF0891B2L
+    const val CIAN = 0xFF0284C7L
 
     /** `inactivo` ya no lo produce el API; solo se pinta si una API vieja lo manda. */
     val BOARD_STATUS_ORDER = listOf("activo", "atrasado", "libre", "sin_actividad")
@@ -306,7 +322,7 @@ object CoreActivityRules {
     }
 
     fun boardEnEsperaTexto(count: Int): String =
-        if (count > 1) "⏳ $count en espera de aprobación" else "⏳ En espera de aprobación"
+        if (count > 1) "$count en espera de aprobación" else "En espera de aprobación"
 
     private val INSTALADORES = listOf(
         "joan.sanchez@nexara.com.mx",
@@ -358,19 +374,19 @@ object CoreActivityRules {
 
     /** Estado de la actividad según quienes la ejecutan. */
     fun teamActivityState(ejecutores: Int, terminaron: Int, aprobadas: Int): Tone = when {
-        ejecutores > 0 && aprobadas >= ejecutores -> Tone("✅ Finalizada: todo aprobado", VERDE)
-        ejecutores > 0 && terminaron >= ejecutores -> Tone("🔎 Por validar", NARANJA)
-        else -> Tone("⏳ En curso", AZUL)
+        ejecutores > 0 && aprobadas >= ejecutores -> Tone("Finalizada: todo aprobado", VERDE, NxGlyph.APPROVED)
+        ejecutores > 0 && terminaron >= ejecutores -> Tone("Por validar", NARANJA, NxGlyph.TO_REVIEW)
+        else -> Tone("En curso", AZUL, NxGlyph.IN_PROGRESS)
     }
 
     fun isTeamFinalizada(ejecutores: Int, aprobadas: Int): Boolean = ejecutores > 0 && aprobadas >= ejecutores
 
     fun memberEstadoUi(status: String?, reviewStatus: String?, correctionSubmittedAt: String? = null): Tone = when {
-        reviewStatus == "APPROVED" -> Tone("✅ Aprobada", VERDE)
-        reviewStatus == "REJECTED" -> Tone("↩️ Corrigiendo", NARANJA)
-        status == STEP_COMPLETED && !correctionSubmittedAt.isNullOrBlank() -> Tone("🔁 Corrección por revisar", NARANJA)
-        status == STEP_COMPLETED -> Tone("🔎 Por revisar", NARANJA)
-        else -> Tone("⏳ En curso", AZUL)
+        reviewStatus == "APPROVED" -> Tone("Aprobada", VERDE, NxGlyph.APPROVED)
+        reviewStatus == "REJECTED" -> Tone("Corrigiendo", NARANJA, NxGlyph.RETURNED)
+        status == STEP_COMPLETED && !correctionSubmittedAt.isNullOrBlank() -> Tone("Corrección por revisar", NARANJA, NxGlyph.CORRECTION)
+        status == STEP_COMPLETED -> Tone("Por revisar", NARANJA, NxGlyph.TO_REVIEW)
+        else -> Tone("En curso", AZUL, NxGlyph.IN_PROGRESS)
     }
 
     /** La devolución más reciente (revisiones vienen de la más nueva a la más vieja). */
@@ -400,25 +416,25 @@ object CoreActivityRules {
             " (rehízo toda la actividad)"
         }
         val cuando = formatWhen(correctionSubmittedAt, zone)?.let { " · $it" }.orEmpty()
-        return "🔁 Corrigió lo que se le devolvió$que$cuando. Revisa la corrección y apruébala o devuélvela de nuevo."
+        return "Corrigió lo que se le devolvió$que$cuando. Revisa la corrección y apruébala o devuélvela de nuevo."
     }
 
     fun corrigiendoTexto(pasos: List<String>, reviewNotes: String?, avisarReenvio: Boolean): String {
         val notas = reviewNotes?.takeIf { it.isNotBlank() }?.let { " · «$it»" }.orEmpty()
         val aviso = if (avisarReenvio) ". Cuando envíe la corrección podrás aprobarla o devolverla otra vez." else ""
-        return "↩️ Está corrigiendo: ${pasos.joinToString(", ") { stepLabel(it) }}$notas$aviso"
+        return "Está corrigiendo: ${pasos.joinToString(", ") { stepLabel(it) }}$notas$aviso"
     }
 
     fun memberRolUi(reparte: Boolean, rol: String?): Tone = when {
-        reparte -> Tone("📨 La reparte", MORADO)
-        rol.equals("APOYO", ignoreCase = true) -> Tone("🤝 Apoyo", AZUL)
-        else -> Tone("👷 La ejecuta", AZUL)
+        reparte -> Tone("La reparte", MORADO, NxGlyph.DISPATCH)
+        rol.equals("APOYO", ignoreCase = true) -> Tone("Apoyo", AZUL, NxGlyph.SUPPORT)
+        else -> Tone("La ejecuta", AZUL, NxGlyph.EXECUTES)
     }
 
     fun reviewDecisionUi(decision: String?): Tone = when (decision) {
-        "APROBADA" -> Tone("✅ Aprobada", VERDE)
-        "DEVUELTA_TODO" -> Tone("↩️ Devuelta completa", ROJO)
-        else -> Tone("↩️ Devuelta para corregir", NARANJA)
+        "APROBADA" -> Tone("Aprobada", VERDE, NxGlyph.APPROVED)
+        "DEVUELTA_TODO" -> Tone("Devuelta completa", ROJO, NxGlyph.RETURNED)
+        else -> Tone("Devuelta para corregir", NARANJA, NxGlyph.RETURNED)
     }
 
     /** «Luis → Antonio → Alejandro»: quien asignó a la primera persona y luego el equipo. */
@@ -429,10 +445,17 @@ object CoreActivityRules {
             .distinct()
             .map { shortName(it) }
 
-    const val FOTO_ENTRADA = "📍 Entrada"
-    const val FOTO_SALIDA = "🏁 Salida"
+    const val FOTO_ENTRADA = "Entrada"
+    const val FOTO_SALIDA = "Salida"
 
-    fun fotoEvidenciaLabel(n: Int): String = "📷 Evidencia $n"
+    fun fotoEvidenciaLabel(n: Int): String = "Evidencia $n"
+
+    /** Ícono de una foto según su etiqueta ([FOTO_ENTRADA], [FOTO_SALIDA] o en sitio). */
+    fun fotoGlyph(etiqueta: String): NxGlyph = when (etiqueta) {
+        FOTO_ENTRADA -> NxGlyph.ENTRY
+        FOTO_SALIDA -> NxGlyph.EXIT
+        else -> NxGlyph.PHOTO
+    }
 
     data class EvidencePhoto(
         val url: String,
@@ -440,7 +463,7 @@ object CoreActivityRules {
         val at: String?,
         val lat: Double?,
         val lng: Double?,
-        /** Nombre corto de la foto: «📍 Entrada», «📷 Evidencia 2», «🏁 Salida». */
+        /** Nombre corto de la foto: «Entrada», «Evidencia 2», «Salida». */
         val etiqueta: String = titulo,
     )
 

@@ -16,6 +16,11 @@ import { ROLES } from "@/lib/rbac";
 import { assignViatico, postViatico } from "@/lib/viatics-api";
 import { listUsers, type ApiUserRow } from "@/lib/users-api";
 import { buildApiUrl } from "@/lib/api-base";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 
 const CONCEPTOS = [
   { label: "Gasolina", categoria: "COMBUSTIBLE" },
@@ -211,10 +216,10 @@ export default function ActivityViaticsPage() {
     <>
       {viatics.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-          <KpiCard label="Total viáticos" value={<Money value={totalMonto} compact />} variant="accent" icon="💰" />
-          <KpiCard label="Registros" value={viatics.length} icon="📋" />
-          <KpiCard label="Aprobados" value={aprobados} variant={aprobados > 0 ? "positive" : "default"} icon="✅" />
-          <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
+          <KpiCard label="Total viáticos" value={<Money value={totalMonto} compact />} variant="accent" icon={<PaymentsOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+          <KpiCard label="Registros" value={viatics.length} icon={<ReceiptLongOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+          <KpiCard label="Aprobados" value={aprobados} variant={aprobados > 0 ? "positive" : "default"} icon={<TaskAltIcon fontSize="inherit" aria-hidden="true" />} />
+          <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} />
         </div>
       )}
       <DetailSection title="Viáticos vinculados">
@@ -241,7 +246,7 @@ export default function ActivityViaticsPage() {
         {loading ? (
           <div style={{ padding: 24, textAlign: "center", color: "var(--text-secondary)" }}>Cargando viáticos…</div>
         ) : viatics.length === 0 ? (
-          <EmptyState icon="💳" title="Sin viáticos"
+          <EmptyState icon={<CreditCardOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin viáticos"
             description={
               canAssign
                 ? "Asigna un viático al responsable o solicita uno para esta actividad."

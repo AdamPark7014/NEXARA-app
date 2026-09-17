@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,10 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -30,10 +31,12 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
-/** Chip de estado con el color de la web (fondo 10 %, borde 35 %). */
+/** Chip de estado con el color de la web (fondo 10 %, borde 35 %) y, si lo hay, su ícono. */
 @Composable
-fun ToneChip(text: String, color: Long? = null, modifier: Modifier = Modifier) {
+fun ToneChip(text: String, color: Long? = null, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     val c = color?.let { Color(it) }
     val shape = RoundedCornerShape(999.dp)
     Box(
@@ -43,11 +46,14 @@ fun ToneChip(text: String, color: Long? = null, modifier: Modifier = Modifier) {
             .border(1.dp, c?.copy(alpha = 0.35f) ?: Color(0xFFE2E8F0), shape)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
-        Text(
-            text,
+        NxIconText(
+            text = text,
+            icon = icon,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             color = c ?: NxColors.Muted,
+            iconSize = 14.dp,
+            spacing = 4.dp,
             maxLines = 1,
         )
     }
@@ -55,7 +61,7 @@ fun ToneChip(text: String, color: Long? = null, modifier: Modifier = Modifier) {
 
 @Composable
 fun ToneChip(tone: CoreActivityRules.Tone, modifier: Modifier = Modifier) {
-    ToneChip(text = tone.label, color = tone.color, modifier = modifier)
+    ToneChip(text = tone.label, color = tone.color, modifier = modifier, icon = tone.glyph?.icon)
 }
 
 /** Foto protegida en círculo o iniciales. */
@@ -69,12 +75,12 @@ fun PersonAvatar(nombre: String?, url: String?, size: Dp = 44.dp) {
         )
     } else {
         Box(
-            modifier = Modifier.size(size).clip(CircleShape).background(NxColors.TealSoft),
+            modifier = Modifier.size(size).clip(CircleShape).background(NxColors.BrandSoft),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 CoreActivityRules.initials(nombre),
-                color = NxColors.Teal,
+                color = NxColors.Brand,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = (size.value * 0.34f).sp,
             )
@@ -82,18 +88,21 @@ fun PersonAvatar(nombre: String?, url: String?, size: Dp = 44.dp) {
     }
 }
 
-/** ★★★☆☆ en ámbar. */
+/** Cinco estrellas (ícono Material): las de la calificación en ámbar, el resto en gris. */
 @Composable
 fun StarsText(valor: Double?, fontSize: TextUnit = 14.sp) {
     val v = (valor ?: 0.0).roundToInt().coerceIn(0, 5)
-    Text(
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = Color(0xFFF59E0B))) { append("★".repeat(v)) }
-            withStyle(SpanStyle(color = Color(0xFFCBD5E1))) { append("★".repeat(5 - v)) }
-        },
-        fontSize = fontSize,
-        letterSpacing = 1.sp,
-    )
+    val starSize = (fontSize.value * 1.15f).dp
+    Row(horizontalArrangement = Arrangement.spacedBy(1.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(5) { i ->
+            Icon(
+                Icons.Rounded.Star,
+                contentDescription = null,
+                tint = if (i < v) Color(0xFFF59E0B) else Color(0xFFCBD5E1),
+                modifier = Modifier.size(starSize),
+            )
+        }
+    }
 }
 
 @Composable
@@ -107,7 +116,7 @@ fun ProgressWithPct(pct: Double?, modifier: Modifier = Modifier) {
         LinearProgressIndicator(
             progress = { (v / 100.0).toFloat() },
             modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(999.dp)),
-            color = if (v >= 100.0) Color(CoreActivityRules.VERDE) else NxColors.Teal,
+            color = if (v >= 100.0) Color(CoreActivityRules.VERDE) else NxColors.Brand,
             trackColor = Color(0xFFE2E8F0),
         )
         Text("${v.roundToInt()}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
@@ -121,8 +130,34 @@ fun SoftNote(
     modifier: Modifier = Modifier,
     title: String? = null,
     color: Long? = null,
+    icon: ImageVector? = null,
 ) {
     val c = color?.let { Color(it) }
+    if (icon != null) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(c?.copy(alpha = 0.09f) ?: Color(0xFFF1F5F9))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = c ?: NxColors.Muted,
+                modifier = Modifier.padding(top = 1.dp).size(18.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                if (!title.isNullOrBlank()) {
+                    Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
+                }
+                Text(text, fontSize = 13.sp, color = NxColors.Slate, lineHeight = 18.sp)
+            }
+        }
+        return
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()

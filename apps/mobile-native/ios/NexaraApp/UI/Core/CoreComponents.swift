@@ -45,20 +45,18 @@ enum CoreStatusUI {
         }
     }
 
+    /// Nombre del tipo de actividad, sin icono (el icono va en `kindSymbol`).
     static func kind(_ coreKind: String?, ticketTypeCustom: String? = nil) -> String {
-        let base: String
-        switch (coreKind ?? "").lowercased() {
-        case "tarea": base = "✅ Tarea"
-        case "proyecto": base = "📁 Proyecto"
-        case "obra": base = "🏗️ Obra"
-        case "servicio": base = "🛠️ Servicio"
-        case "comercial": base = "💼 Comercial"
-        default: base = "📌 Actividad"
-        }
+        let base = CoreActivityKind(rawValue: (coreKind ?? "").lowercased())?.title ?? "Actividad"
         if (coreKind ?? "").lowercased() == "tarea", let custom = ticketTypeCustom, !custom.isEmpty {
             return "\(base) · \(custom)"
         }
         return base
+    }
+
+    /// SF Symbol del tipo de actividad (tarea, proyecto, obra…).
+    static func kindSymbol(_ coreKind: String?) -> String {
+        CoreActivityKind(rawValue: (coreKind ?? "").lowercased())?.symbol ?? "list.bullet.rectangle"
     }
 
     /// Estados del tablero (`STATUS_LABELS`/`STATUS_COLORS` web). «inactivo» ya no
@@ -114,17 +112,27 @@ enum CoreBoardText {
 }
 
 struct CoreChip: View {
+    /// SF Symbol opcional al frente del texto.
+    var icon: String? = nil
     let text: String
     var color: Color? = nil
 
     var body: some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .lineLimit(1)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .foregroundStyle(color ?? Color.secondary)
-            .background((color ?? Color.secondary).opacity(0.12), in: Capsule())
+        HStack(spacing: 4) {
+            if let icon {
+                Image(systemName: icon)
+                    .symbolRenderingMode(.hierarchical)
+                    .imageScale(.small)
+                    .accessibilityHidden(true)
+            }
+            Text(text)
+        }
+        .font(.caption.weight(.semibold))
+        .lineLimit(1)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .foregroundStyle(color ?? Color.secondary)
+        .background((color ?? Color.secondary).opacity(0.12), in: Capsule())
     }
 }
 

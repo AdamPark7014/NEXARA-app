@@ -161,7 +161,7 @@ struct PortalHomeView: View {
                                 Task { portalReportData = try? await TicketsRepository.shared.portalReportPdf() }
                             } label: {
                                 HStack(spacing: 14) {
-                                    Image(systemName: "doc.richtext").font(.title3).foregroundColor(.teal).frame(width: 28)
+                                    Image(systemName: "doc.richtext").font(.title3).foregroundColor(NxBrand.primary).frame(width: 28)
                                     Text("Reporte del portal").font(.body)
                                     Spacer()
                                     Image(systemName: "chevron.right").foregroundColor(.secondary)
@@ -213,7 +213,7 @@ struct PortalHomeView: View {
     private func portalBtn(_ icon: String, _ label: String, _ route: PortalRoute) -> some View {
         Button { onNavigate(route) } label: {
             HStack(spacing: 14) {
-                Image(systemName: icon).font(.title3).foregroundColor(.teal).frame(width: 28)
+                Image(systemName: icon).font(.title3).foregroundColor(NxBrand.primary).frame(width: 28)
                 Text(label).font(.body)
                 Spacer()
                 Image(systemName: "chevron.right").foregroundColor(.secondary)

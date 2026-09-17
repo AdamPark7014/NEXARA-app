@@ -136,7 +136,7 @@ internal fun ReprogramarDespachoInline(
                             }
                         },
                         enabled = !saving,
-                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                     ) { Text(if (saving) "Guardando…" else "Guardar nueva fecha") }
                     OutlinedButton(onClick = { open = false }, enabled = !saving) { Text("Cancelar") }
                 }
@@ -250,10 +250,10 @@ internal fun DespachoPendingPanel(
                                     .fillMaxWidth()
                                     .heightIn(min = 48.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (checked) NxColors.TealSoft.copy(alpha = 0.5f) else Color.White)
+                                    .background(if (checked) NxColors.BrandSoft.copy(alpha = 0.5f) else Color.White)
                                     .border(
                                         1.dp,
-                                        if (checked) NxColors.Teal else Color(0xFFE2E8F0),
+                                        if (checked) NxColors.Brand else Color(0xFFE2E8F0),
                                         RoundedCornerShape(10.dp),
                                     )
                                     .clickable(enabled = !saving) {
@@ -294,7 +294,7 @@ internal fun DespachoPendingPanel(
                                 }
                             },
                             enabled = !saving && candidates.isNotEmpty(),
-                            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                         ) { Text(if (saving) "Asignando…" else "Asignar al equipo") }
                         OutlinedButton(
                             onClick = {
@@ -312,7 +312,7 @@ internal fun DespachoPendingPanel(
                             selected = emptySet()
                             msg = null
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                     ) { Text("Despachar al equipo") }
                 }
             }

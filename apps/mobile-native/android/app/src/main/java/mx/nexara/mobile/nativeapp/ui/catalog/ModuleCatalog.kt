@@ -22,6 +22,7 @@ object ParityStatus {
 data class ModuleEntry(
     val key: String,
     val label: String,
+    /** Id de Material Symbols del ícono del módulo (sin emojis). */
     val icon: String,
     val webPath: String,
     val parityStatus: String = ParityStatus.AUSENTE,
@@ -45,12 +46,12 @@ object ModuleCatalog {
      * («Actividades»); la vista «Mis actividades» vive dentro de ella.
      */
     val core: List<ModuleEntry> = listOf(
-        mod("activities", "Actividades", "📋", "/erp/pizarra", ParityStatus.NATIVO),
-        mod("attendance", "Asistencias", "🗓️", "/erp/asistencias", ParityStatus.NATIVO),
-        mod("chat", "Chat", "💬", "/erp/chat", ParityStatus.NATIVO),
-        mod("erp-clients", "Clientes", "🤝", "/erp/clientes", ParityStatus.NATIVO),
-        mod("my-profile", "Mi perfil", "👤", "/erp/my-profile", ParityStatus.NATIVO),
-        mod("notifications-center", "Notificaciones", "🔔", "/erp/notifications-center", ParityStatus.NATIVO),
+        mod("activities", "Actividades", "assignment", "/erp/pizarra", ParityStatus.NATIVO),
+        mod("attendance", "Asistencias", "event_available", "/erp/asistencias", ParityStatus.NATIVO),
+        mod("chat", "Chat", "chat", "/erp/chat", ParityStatus.NATIVO),
+        mod("erp-clients", "Clientes", "handshake", "/erp/clientes", ParityStatus.NATIVO),
+        mod("my-profile", "Mi perfil", "person", "/erp/my-profile", ParityStatus.NATIVO),
+        mod("notifications-center", "Notificaciones", "notifications", "/erp/notifications-center", ParityStatus.NATIVO),
     )
 
     fun byKey(key: String): ModuleEntry? = core.firstOrNull { it.key == key }

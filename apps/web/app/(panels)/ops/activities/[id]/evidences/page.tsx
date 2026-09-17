@@ -12,6 +12,8 @@ import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import KpiCard from "@/components/ui/KpiCard";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import UploadOutlinedIcon from "@mui/icons-material/UploadOutlined";
 
 const ActivityEvidenceFlow = dynamic(() => import("@/components/ActivityEvidenceFlow"), { ssr: false });
 
@@ -47,8 +49,8 @@ export default function ActivityEvidencesPage() {
     <>
       {!core && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-          <KpiCard label="Archivos" value={files.length} icon="📎" variant={files.length > 0 ? "accent" : "default"} />
-          <KpiCard label="Puede cargar" value={canUpload ? "Sí" : "No"} icon="⬆️" variant={canUpload ? "positive" : "default"} />
+          <KpiCard label="Archivos" value={files.length} icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={files.length > 0 ? "accent" : "default"} />
+          <KpiCard label="Puede cargar" value={canUpload ? "Sí" : "No"} icon={<UploadOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={canUpload ? "positive" : "default"} />
         </div>
       )}
       {reparte && (
@@ -75,7 +77,7 @@ export default function ActivityEvidencesPage() {
       {(files.length > 0 || !core) && (
       <DetailSection title={`Otros archivos (${files.length})`}>
         {files.length === 0 ? (
-          <EmptyState icon="📎" title="Sin otros archivos" description="Aquí aparecen archivos sueltos adjuntos a la actividad." />
+          <EmptyState icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} title="Sin otros archivos" description="Aquí aparecen archivos sueltos adjuntos a la actividad." />
         ) : (
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
             {files.map((ev) => (

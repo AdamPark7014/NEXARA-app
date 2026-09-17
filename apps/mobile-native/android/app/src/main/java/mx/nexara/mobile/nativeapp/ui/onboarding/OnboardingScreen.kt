@@ -49,8 +49,8 @@ private val slides = listOf(
         emoji = "🏗️",
         title = "Tus actividades",
         subtitle = "Recibe tus servicios y proyectos, registra entrada y salida con ubicación, y sube evidencias con foto y PDF.",
-        accent = NxColors.Teal,
-        accentSoft = NxColors.TealSoft,
+        accent = NxColors.Brand,
+        accentSoft = NxColors.BrandSoft,
     ),
     OnboardingSlide(
         emoji = "🕒",
@@ -82,7 +82,7 @@ fun OnboardingScreen(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(Color(0xFFE6F7F6), NxColors.Surface, Color.White),
+                    colors = listOf(NxColors.BrandSoft, NxColors.Surface, Color.White),
                 ),
             ),
     ) {
@@ -149,7 +149,7 @@ fun OnboardingScreen(
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = NxColors.Teal,
+                    containerColor = NxColors.Brand,
                     contentColor = Color.White,
                 ),
             ) {

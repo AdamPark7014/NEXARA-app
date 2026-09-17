@@ -122,7 +122,7 @@ fun CoreActivityFormScreen(
                     color = NxColors.Muted,
                 )
                 TextButton(onClick = onCancel) {
-                    Text("← Volver a Mis actividades", color = NxColors.Teal, fontWeight = FontWeight.Bold)
+                    Text("← Volver a Mis actividades", color = NxColors.Brand, fontWeight = FontWeight.Bold)
                 }
             }
             !selfAssign && (targetUserId == null || targetUserId <= 0L) ->
@@ -295,7 +295,7 @@ private fun AssignFlow(
     teamError?.let { Text(it, color = WarningText, fontSize = 13.sp) }
     if (exitReady) {
         TextButton(onClick = { onCreated(exitId) }) {
-            Text("Volver al perfil →", color = NxColors.Teal, fontWeight = FontWeight.Bold)
+            Text("Volver al perfil →", color = NxColors.Brand, fontWeight = FontWeight.Bold)
         }
     }
 
@@ -385,7 +385,7 @@ private fun AssignFlow(
         if (antonioOnBoard != null) {
             Button(
                 onClick = { onAssignOther(antonioOnBoard.id) },
-                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                 modifier = Modifier.heightIn(min = 48.dp),
             ) { Text("Ir a asignar a ${k.firstTwoWords(antonioOnBoard.nombre)} →", fontWeight = FontWeight.Bold) }
         } else {
@@ -850,7 +850,7 @@ private fun ActivityFormPanel(
             Button(
                 onClick = { submit() },
                 enabled = !saving && !done,
-                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp),
             ) {
                 Text(if (saving) "Guardando…" else "Asignar actividad", fontWeight = FontWeight.Bold)
@@ -935,8 +935,8 @@ private fun ChoiceCard(
     Column(
         modifier = modifier
             .clip(shape)
-            .border(if (selected) 2.dp else 1.dp, if (selected) NxColors.Teal else BorderGray, shape)
-            .background(if (selected) NxColors.Teal.copy(alpha = 0.10f) else NxColors.Card)
+            .border(if (selected) 2.dp else 1.dp, if (selected) NxColors.Brand else BorderGray, shape)
+            .background(if (selected) NxColors.Brand.copy(alpha = 0.10f) else NxColors.Card)
             .clickable(onClick = onClick)
             .heightIn(min = 88.dp)
             .padding(12.dp),
@@ -960,7 +960,7 @@ private fun Pill(
     hint: String? = null,
 ) {
     val shape = RoundedCornerShape(999.dp)
-    val accent = dotColor ?: NxColors.Teal
+    val accent = dotColor ?: NxColors.Brand
     Row(
         modifier = Modifier
             .clip(shape)
@@ -993,8 +993,8 @@ private fun PersonPill(person: TeamBoardUserDto, selected: Boolean, onClick: () 
     Row(
         modifier = Modifier
             .clip(shape)
-            .border(if (selected) 2.dp else 1.dp, if (selected) NxColors.Teal else BorderGray, shape)
-            .background(if (selected) NxColors.Teal.copy(alpha = 0.12f) else NxColors.Card)
+            .border(if (selected) 2.dp else 1.dp, if (selected) NxColors.Brand else BorderGray, shape)
+            .background(if (selected) NxColors.Brand.copy(alpha = 0.12f) else NxColors.Card)
             .clickable(onClick = onClick)
             .heightIn(min = 40.dp)
             .padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
