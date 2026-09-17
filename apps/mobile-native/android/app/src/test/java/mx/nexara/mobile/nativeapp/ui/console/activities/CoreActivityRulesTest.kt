@@ -2,6 +2,8 @@ package mx.nexara.mobile.nativeapp.ui.console.activities
 
 import java.time.Instant
 import java.time.ZoneId
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotosDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
@@ -415,5 +417,115 @@ class CoreActivityRulesTest {
         assertEquals("mias", CoreActivityRules.normalizeVista("MIAS"))
         assertEquals("equipo", CoreActivityRules.normalizeVista("equipo"))
         assertNull(CoreActivityRules.normalizeVista("otra"))
+    }
+
+    // ── Evidencia por campos ────────────────────────────────────────────────
+
+    private fun campo(
+        id: Long,
+        nombre: String,
+        orden: Int? = null,
+        momentos: List<String>? = listOf("antes", "despues"),
+        antes: String? = null,
+        progreso: String? = null,
+        despues: String? = null,
+    ) = EvidenceCampoDto(
+        id = id,
+        nombre = nombre,
+        orden = orden,
+        momentos = momentos,
+        fotos = EvidenceCampoFotosDto(antes = antes, progreso = progreso, despues = despues),
+    )
+
+    @Test
+    fun `sin campos nada bloquea la salida`() {
+        // La API de hoy no manda campos: la captura es la de siempre.
+        assertTrue(CoreActivityRules.camposListos(null))
+        assertTrue(CoreActivityRules.camposListos(emptyList()))
+        assertNull(CoreActivityRules.camposBloqueoSalida(null))
+        assertEquals(0, CoreActivityRules.camposRequeridos(null))
+    }
+
+    @Test
+    fun `los momentos se normalizan y se ordenan`() {
+        assertEquals("antes", CoreActivityRules.normMomento(" ANTES "))
+        assertEquals("progreso", CoreActivityRules.normMomento("en progreso"))
+        assertEquals("despues", CoreActivityRules.normMomento("después"))
+        assertNull(CoreActivityRules.normMomento("al rato"))
+        assertEquals("En progreso", CoreActivityRules.momentoLabel("progreso"))
+        assertEquals("Después", CoreActivityRules.momentoLabel("DESPUES"))
+        // Llegue como llegue, siempre se pide en el mismo orden y sin repetidos.
+        val c = campo(1, "Cámara 1", momentos = listOf("despues", "antes", "ANTES", "al rato"))
+        assertEquals(listOf("antes", "despues"), CoreActivityRules.momentosDeCampo(c))
+    }
+
+    @Test
+    fun `la salida espera a que no falte ninguna foto de campo`() {
+        val campos = listOf(
+            campo(1, "Cámara 1", orden = 1, momentos = listOf("antes", "despues"), antes = "https://a.jpg"),
+            campo(2, "Rack", orden = 2, momentos = listOf("progreso")),
+        )
+        assertEquals(3, CoreActivityRules.camposRequeridos(campos))
+        assertEquals(2, CoreActivityRules.camposFaltantes(campos))
+        assertFalse(CoreActivityRules.camposListos(campos))
+        assertEquals("1 de 3 fotos por campo", CoreActivityRules.camposResumen(campos))
+        assertEquals(
+            "Faltan 2 fotos por campo antes de cerrar la actividad.",
+            CoreActivityRules.camposBloqueoSalida(campos),
+        )
+
+        val completos = listOf(
+            campo(1, "Cámara 1", momentos = listOf("antes"), antes = "https://a.jpg"),
+            campo(2, "Rack", momentos = listOf("progreso"), progreso = "https://b.jpg"),
+        )
+        assertTrue(CoreActivityRules.camposListos(completos))
+        assertNull(CoreActivityRules.camposBloqueoSalida(completos))
+        assertEquals(listOf("https://a.jpg", "https://b.jpg"), CoreActivityRules.camposFotoUrls(completos))
+    }
+
+    @Test
+    fun `una sola foto pendiente se dice en singular`() {
+        val campos = listOf(campo(1, "Rack", momentos = listOf("antes")))
+        assertEquals(
+            "Falta 1 foto por campo antes de cerrar la actividad.",
+            CoreActivityRules.camposBloqueoSalida(campos),
+        )
+    }
+
+    @Test
+    fun `los campos se pintan por orden y con nombre`() {
+        val campos = listOf(campo(9, "Rack", orden = 2), campo(4, "Cámara 1", orden = 1))
+        assertEquals(listOf("Cámara 1", "Rack"), CoreActivityRules.camposOrdenados(campos).map { it.nombre })
+        // Sin nombre no se pinta un hueco vacío.
+        assertEquals("Campo 7", CoreActivityRules.campoNombre(EvidenceCampoDto(id = 7)))
+        assertEquals("Campo", CoreActivityRules.campoNombre(EvidenceCampoDto(nombre = "  ")))
+    }
+
+    @Test
+    fun `la respuesta del POST no borra lo que ya estaba`() {
+        val previo = campo(1, "Cámara 1", orden = 1, momentos = listOf("antes", "despues"), antes = "https://a.jpg")
+        val nuevo = EvidenceCampoDto(id = 1, fotos = EvidenceCampoFotosDto(despues = "https://d.jpg"))
+        val mezcla = CoreActivityRules.mezclaCampo(previo, nuevo)
+        assertEquals("Cámara 1", mezcla.nombre)
+        assertEquals(listOf("antes", "despues"), mezcla.momentos)
+        assertEquals("https://a.jpg", CoreActivityRules.fotoDeCampo(mezcla, "antes"))
+        assertEquals("https://d.jpg", CoreActivityRules.fotoDeCampo(mezcla, "despues"))
+        assertTrue(CoreActivityRules.campoListo(mezcla))
+        // Sin respuesta (cola sin conexión) se queda lo que había.
+        assertEquals(previo, CoreActivityRules.mezclaCampo(previo, null))
+    }
+
+    @Test
+    fun `sin conexion el hueco igual se marca tomado`() {
+        val vacio = campo(1, "Rack", momentos = listOf("progreso"))
+        val marcado = CoreActivityRules.conFoto(vacio, "progreso", "data:image/jpeg;base64,xx")
+        assertEquals("data:image/jpeg;base64,xx", CoreActivityRules.fotoDeCampo(marcado, "progreso"))
+        assertTrue(CoreActivityRules.campoListo(marcado))
+        // Lo que ya venía del servidor manda sobre la copia local.
+        val servido = campo(1, "Rack", momentos = listOf("progreso"), progreso = "https://real.jpg")
+        assertEquals(
+            "https://real.jpg",
+            CoreActivityRules.fotoDeCampo(CoreActivityRules.conFoto(servido, "progreso", "data:x"), "progreso"),
+        )
     }
 }

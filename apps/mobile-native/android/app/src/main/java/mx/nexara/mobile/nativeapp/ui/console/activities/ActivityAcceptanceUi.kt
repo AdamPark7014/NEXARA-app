@@ -34,11 +34,15 @@ import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 
 /**
- * Aceptar o rechazar lo que te asignaron (contrato B).
+ * Comenzar lo que te asignaron (contrato B).
+ *
+ * Quien la recibe no decide si la acepta: la comienza. Por eso la acción
+ * principal dice «Comenzar actividad». La salida es «No puedo tomarla», que
+ * sigue llamando al endpoint de rechazo con su motivo.
  *
  * Mientras esté `aceptacion = PENDIENTE` la actividad se puede trabajar igual:
  * esto no bloquea nada, solo deja constancia de que la persona la vio y la
- * tomó — o de por qué no.
+ * comenzó — o de por qué no pudo.
  */
 @Composable
 fun AceptacionBanner(
@@ -64,7 +68,7 @@ fun AceptacionBanner(
             color = NxColors.Slate,
         )
         Text(
-            "Dile a quien te la asignó si la tomas. Si no puedes, recházala con el motivo.",
+            "Comiénzala para que quien te la asignó sepa que vas. Si de plano no puedes tomarla, dilo con el motivo.",
             fontSize = 12.5.sp,
             color = NxColors.Muted,
         )
@@ -75,18 +79,26 @@ fun AceptacionBanner(
                 enabled = !guardando,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(CoreActivityRules.VERDE)),
                 modifier = Modifier.heightIn(min = 48.dp),
-            ) { Text(if (guardando) "Guardando…" else "Aceptar", fontWeight = FontWeight.Bold) }
+            ) {
+                Text(
+                    if (guardando) "Guardando…" else ActivitySemaforo.ACCION_COMENZAR,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             OutlinedButton(
                 onClick = onRechazar,
                 enabled = !guardando,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(CoreActivityRules.ROJO)),
                 modifier = Modifier.heightIn(min = 48.dp),
-            ) { Text("Rechazar", fontWeight = FontWeight.SemiBold) }
+            ) { Text(ActivitySemaforo.ACCION_NO_PUEDO, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
 
-/** Rechazo con motivo: el API pide 10 caracteres mínimo y avisa a los jefes. */
+/**
+ * «No puedo tomarla»: el motivo es obligatorio (10 caracteres mínimo, como el
+ * API) y avisa a los jefes. Por dentro sigue siendo el rechazo de contrato B.
+ */
 @Composable
 fun RechazarActividadDialog(
     titulo: String?,
@@ -104,7 +116,12 @@ fun RechazarActividadDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = {
             Column {
-                Text("RECHAZAR", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Muted)
+                Text(
+                    ActivitySemaforo.ACCION_NO_PUEDO.uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = NxColors.Muted,
+                )
                 Text(
                     titulo?.takeIf { it.isNotBlank() } ?: "Esta actividad",
                     fontSize = 17.sp,
@@ -117,6 +134,11 @@ fun RechazarActividadDialog(
                 Text(
                     "Se avisa a quien te la asignó y a tus jefes. La actividad sigue siendo tuya " +
                         "hasta que alguien la pase o la cancele.",
+                    fontSize = 12.5.sp,
+                    color = NxColors.Muted,
+                )
+                Text(
+                    "¿Sí puedes? Cierra esto y toca «${ActivitySemaforo.ACCION_COMENZAR}».",
                     fontSize = 12.5.sp,
                     color = NxColors.Muted,
                 )
@@ -148,7 +170,7 @@ fun RechazarActividadDialog(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            error = e.toUserMessage("No se pudo rechazar la actividad")
+                            error = e.toUserMessage("No se pudo enviar tu motivo")
                         } finally {
                             saving = false
                         }
@@ -156,7 +178,7 @@ fun RechazarActividadDialog(
                 },
                 enabled = ok && !saving,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(CoreActivityRules.ROJO)),
-            ) { Text(if (saving) "Enviando…" else "Rechazar") }
+            ) { Text(if (saving) "Enviando…" else "Enviar motivo") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancelar") }

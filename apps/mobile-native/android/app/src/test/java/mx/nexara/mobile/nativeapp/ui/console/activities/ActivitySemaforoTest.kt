@@ -42,7 +42,7 @@ class ActivitySemaforoTest {
     }
 
     @Test
-    fun `aceptar o rechazar solo cuando esta pendiente`() {
+    fun `comenzar o decir que no puedes solo cuando esta pendiente`() {
         assertTrue(ActivitySemaforo.estaPendienteDeAceptar("PENDIENTE"))
         assertTrue(ActivitySemaforo.estaPendienteDeAceptar(" pendiente "))
         assertFalse(ActivitySemaforo.estaPendienteDeAceptar("ACEPTADA"))
@@ -51,17 +51,25 @@ class ActivitySemaforoTest {
     }
 
     @Test
-    fun `el rechazo se lee con su motivo`() {
-        assertTrue(ActivitySemaforo.fueRechazada("RECHAZADA"))
-        assertEquals(
-            "Rechazada: no tengo la llave del site",
-            ActivitySemaforo.rechazadaTexto("no tengo la llave del site"),
-        )
-        assertEquals("Rechazada", ActivitySemaforo.rechazadaTexto("  "))
+    fun `la persona no decide si acepta, comienza`() {
+        // Adam: quien recibe la actividad no la «acepta», la comienza.
+        assertEquals("Comenzar actividad", ActivitySemaforo.ACCION_COMENZAR)
+        assertEquals("No puedo tomarla", ActivitySemaforo.ACCION_NO_PUEDO)
+        assertEquals("Sin comenzar", ActivitySemaforo.CHIP_SIN_COMENZAR)
     }
 
     @Test
-    fun `el motivo del rechazo pide diez caracteres`() {
+    fun `cuando no pudo tomarla se lee con su motivo`() {
+        assertTrue(ActivitySemaforo.fueRechazada("RECHAZADA"))
+        assertEquals(
+            "No la tomaste: no tengo la llave del site",
+            ActivitySemaforo.rechazadaTexto("no tengo la llave del site"),
+        )
+        assertEquals("No la tomaste", ActivitySemaforo.rechazadaTexto("  "))
+    }
+
+    @Test
+    fun `el motivo de no poder tomarla pide diez caracteres`() {
         assertFalse(ActivitySemaforo.motivoRechazoOk("no puedo"))
         assertFalse(ActivitySemaforo.motivoRechazoOk(null))
         assertTrue(ActivitySemaforo.motivoRechazoOk("  estoy en otra sucursal  "))

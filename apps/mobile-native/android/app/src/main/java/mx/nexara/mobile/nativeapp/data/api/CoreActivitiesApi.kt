@@ -501,6 +501,44 @@ data class EvidenceFlowDto(
     val stepsForKind: List<String>? = null,
     /** Lo que dejó quien la tenía antes de que te la pasaran (solo lectura). Solo en el GET. */
     val avancesAnteriores: List<AvanceAnteriorDto>? = null,
+    /**
+     * Evidencia por campos. Nulo o vacío contra la API de hoy: entonces la
+     * captura sigue siendo la de siempre (fotos libres).
+     */
+    val campos: List<EvidenceCampoDto>? = null,
+)
+
+/**
+ * Un «campo» es una cosa concreta que hay que fotografiar («Cámara 1»,
+ * «Rack»). `momentos` dice en qué momentos pide foto — antes, progreso,
+ * después — en cualquier combinación.
+ */
+data class EvidenceCampoDto(
+    val id: Long? = null,
+    val nombre: String? = null,
+    val orden: Int? = null,
+    /** antes | progreso | despues */
+    val momentos: List<String>? = null,
+    val fotos: EvidenceCampoFotosDto? = null,
+)
+
+/** URL de lo ya guardado en cada momento; el hueco que falta viene nulo. */
+data class EvidenceCampoFotosDto(
+    val antes: String? = null,
+    val progreso: String? = null,
+    val despues: String? = null,
+)
+
+/**
+ * `POST activity-evidence/:id/campos/:campoId/foto` — responde con el campo
+ * actualizado (no con el flujo completo).
+ */
+data class EvidenceCampoFotoRequest(
+    /** antes | progreso | despues */
+    val momento: String,
+    val fotoBase64: String,
+    val lat: Double? = null,
+    val lng: Double? = null,
 )
 
 /**
@@ -718,6 +756,14 @@ interface CoreActivitiesApi {
         @Path("id") activityId: Long,
         @Body body: EvidencePhotosWithGeoRequest,
     ): EvidenceFlowDto
+
+    /** Evidencia por campos: una foto de un campo en un momento. Devuelve el campo. */
+    @POST("activity-evidence/{id}/campos/{campoId}/foto")
+    suspend fun evidenceCampoFoto(
+        @Path("id") activityId: Long,
+        @Path("campoId") campoId: Long,
+        @Body body: EvidenceCampoFotoRequest,
+    ): EvidenceCampoDto
 
     @POST("activity-evidence/{id}/service-sheet-pdf")
     suspend fun serviceSheetPdf(

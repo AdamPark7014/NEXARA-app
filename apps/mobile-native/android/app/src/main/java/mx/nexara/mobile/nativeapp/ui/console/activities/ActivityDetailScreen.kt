@@ -146,7 +146,7 @@ fun ActivityDetailScreen(
     /** Sube tras cancelar o pasar la actividad: se vuelve a pedir el detalle y las acciones. */
     var recarga by remember(activity.id) { mutableIntStateOf(0) }
 
-    // Contrato B: aceptar o rechazar desde el detalle (es donde cae el push «actividad nueva»).
+    // Contrato B: comenzarla desde el detalle (es donde cae el push «actividad nueva»).
     val coreRepo = remember(context) { CoreActivitiesRepository(context) }
     var aceptando by remember(activity.id) { mutableStateOf(false) }
     var aceptacionError by remember(activity.id) { mutableStateOf<String?>(null) }
@@ -291,7 +291,7 @@ fun ActivityDetailScreen(
                             onFechaFinChange = { editFechaFin = it },
                             onSave = { saveActivityEdits() },
                             topContent = {
-                                // Contrato B: aceptar o rechazar desde el detalle (aquí cae el push).
+                                // Contrato B: comenzarla desde el detalle (aquí cae el push).
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     if (ActivitySemaforo.estaPendienteDeAceptar(detail.aceptacion)) {
                                         AceptacionBanner(
@@ -304,9 +304,9 @@ fun ActivityDetailScreen(
                                                             coreRepo.aceptarActividad(detail.id)
                                                         }
                                                         recarga++
-                                                        snackbarHostState.showSnackbar("Actividad aceptada")
+                                                        snackbarHostState.showSnackbar("Actividad comenzada")
                                                     } catch (e: Exception) {
-                                                        aceptacionError = e.toUserMessage("No se pudo aceptar")
+                                                        aceptacionError = e.toUserMessage("No se pudo comenzar")
                                                     } finally {
                                                         aceptando = false
                                                     }
