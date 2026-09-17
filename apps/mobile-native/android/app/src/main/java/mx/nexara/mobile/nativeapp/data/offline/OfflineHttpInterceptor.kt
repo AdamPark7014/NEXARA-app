@@ -38,7 +38,7 @@ class OfflineHttpInterceptor(
                         .body(hit.toResponseBody("application/json".toMediaType()))
                         .build()
                 }
-            } else if (method in MUTATING && isQueueable(url)) {
+            } else if (method in MUTATING && isQueueable(url, method)) {
                 enqueue(request)
                 return queuedResponse(request)
             }
@@ -64,7 +64,7 @@ class OfflineHttpInterceptor(
                         .body(hit.toResponseBody("application/json".toMediaType()))
                         .build()
                 }
-            } else if (method in MUTATING && isQueueable(url)) {
+            } else if (method in MUTATING && isQueueable(url, method)) {
                 enqueue(request)
                 return queuedResponse(request)
             }
@@ -117,7 +117,21 @@ class OfflineHttpInterceptor(
          */
         private val NOT_QUEUEABLE = listOf("/auth/", "/devices/push-token")
 
-        fun isQueueable(url: String): Boolean = NOT_QUEUEABLE.none { url.contains(it) }
+        /**
+         * Decisiones de un superior (desactivar/eliminar clientes y proyectos, cancelar o pasar
+         * actividades, justificar faltas): sin conexión deben fallar a la vista, no quedar en cola
+         * dando por hecho algo que la API todavía puede rechazar.
+         */
+        private val SOLO_EN_LINEA = listOf("/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones")
+        private val BORRADO_SOLO_EN_LINEA = listOf("/ventas/clientes/", "/operational-projects/")
+
+        fun isQueueable(url: String, method: String = "POST"): Boolean {
+            val ruta = url.substringBefore('?')
+            if (NOT_QUEUEABLE.any { ruta.contains(it) }) return false
+            if (SOLO_EN_LINEA.any { ruta.contains(it) }) return false
+            if (method.equals("DELETE", ignoreCase = true) && BORRADO_SOLO_EN_LINEA.any { ruta.contains(it) }) return false
+            return true
+        }
 
         /** Full-token hash — take(48) collided across users on the same device. */
         fun stableAuthTag(authorization: String?): String {
