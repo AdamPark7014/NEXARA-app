@@ -412,6 +412,9 @@ export class ActivityTeamService {
         acsLeftSite: true,
         acsEntryDoor: true,
         acsEnteredByUser: { select: { nombre: true } },
+        cancelReason: true,
+        cancelledAt: true,
+        cancelledBy: { select: { nombre: true } },
       },
     });
     if (!activity) throw new NotFoundException('Actividad no encontrada');
@@ -593,13 +596,28 @@ export class ActivityTeamService {
       });
     }
 
+    // Cancelación documentada: quién, cuándo y por qué.
+    if (activity.cancelledAt) {
+      events.push({
+        id: 'cancelled',
+        at: new Date(activity.cancelledAt).toISOString(),
+        kind: 'cancelada',
+        title: `Cancelada por ${activity.cancelledBy?.nombre ?? 'un superior'}`,
+        subtitle: activity.cancelReason ? `Motivo: ${activity.cancelReason}` : undefined,
+        icon: '🚫',
+      });
+    }
+
     for (const r of reassignments) {
+      const a = r.aUsuario?.nombre ?? 'otro compañero';
       events.push({
         id: `reassign-${r.id}`,
         at: new Date(r.createdAt).toISOString(),
         kind: 'reasignación',
-        title: `Reasignada a ${r.aUsuario?.nombre ?? 'técnico'}`,
-        subtitle: r.motivo ?? (r.deUsuario ? `Desde ${r.deUsuario.nombre}` : undefined),
+        title: r.deUsuario
+          ? `${r.movidaPor?.nombre ?? 'Un superior'} la pasó de ${r.deUsuario.nombre} a ${a}`
+          : `Reasignada a ${a}`,
+        subtitle: r.motivo ? `Motivo: ${r.motivo}` : undefined,
         icon: '👤',
       });
     }

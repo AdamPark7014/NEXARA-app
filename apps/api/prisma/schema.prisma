@@ -555,6 +555,7 @@ model User {
   actividadesCreadas        Activity[]                 @relation("CreadorActividades")
   actividadesAsignadas      Activity[]                 @relation("ResponsableActividades")
   actividadesAcsEntrada     Activity[]                 @relation("ActivityAcsEnteredBy")
+  actividadesCanceladas     Activity[]                 @relation("ActivityCancelledBy")
   evidencias                Evidence[]
   evidenciasAprobadas       Evidence[]                 @relation("EvidenceApprover")
   vehiculosRevisados        VehicleControl[]           @relation("VehicleDeliveryReviewer")
@@ -916,6 +917,11 @@ model Activity {
   /// Salida ACS / bandera «salió del sitio».
   acsExitedAt             DateTime?
   acsLeftSite             Boolean                  @default(false)
+  /// Cancelación documentada: solo superiores de quien la ejecuta, con motivo obligatorio.
+  cancelReason            String?                  @db.Text
+  cancelledAt             DateTime?
+  cancelledById           Int?
+  cancelledBy             User?                    @relation("ActivityCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
   deletedAt               DateTime?
   companyId               Int
   company                 CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -2402,6 +2408,8 @@ enum NotificationType {
   SLA_BREACH
   // Actividad: la persona salió del radio del punto donde inició
   ACTIVITY_OUT_OF_ZONE
+  /// Un superior canceló la actividad (con motivo).
+  ACTIVITY_CANCELLED
   STOCK_ALERT
 
   // ACS → Operaciones (acceso denegado en puerta)
