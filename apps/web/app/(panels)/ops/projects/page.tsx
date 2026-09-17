@@ -254,7 +254,7 @@ export default function OpsProjectsPage() {
       {!loading && !error && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
           <KpiCard label="Proyectos activos" value={kpis.activos} variant={kpis.activos > 0 ? "accent" : "default"} icon="🟢" hint={`${kpis.clientes} clientes distintos`} />
-          <KpiCard label="En pausa" value={kpis.enPausa} variant={kpis.enPausa > 0 ? "warning" : "default"} icon="⏸️" hint={kpis.enPausa > 0 ? "Requieren seguimiento" : "Sin proyectos pausados"} />
+          <KpiCard label="Inactivos" value={kpis.enPausa} variant={kpis.enPausa > 0 ? "warning" : "default"} icon="⏸️" hint={kpis.enPausa > 0 ? "Desactivados por Dirección General" : "Sin proyectos inactivos"} />
           <KpiCard label="Completados" value={kpis.completados} variant={kpis.completados > 0 ? "positive" : "default"} icon="✅" />
           <KpiCard label="OTs registradas" value={kpis.totalOTs} icon="📋" hint="Actividades en todos los proyectos" />
         </div>
@@ -264,7 +264,7 @@ export default function OpsProjectsPage() {
         const byStatus: Record<string, number> = {};
         for (const p of items) { const s = p.status ?? "ACTIVE"; byStatus[s] = (byStatus[s] ?? 0) + 1; }
         const statusColors: Record<string, string> = { ACTIVE: "var(--success)", ON_HOLD: "var(--warning)", COMPLETED: "var(--primary)", CANCELLED: "var(--danger)" };
-        const statusLabels: Record<string, string> = { ACTIVE: "Activo", ON_HOLD: "En pausa", COMPLETED: "Completado", CANCELLED: "Cancelado" };
+        const statusLabels: Record<string, string> = { ACTIVE: "Activo", ON_HOLD: "Inactivo", COMPLETED: "Completado", CANCELLED: "Cancelado" };
         const total = items.length;
         return (
           <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
@@ -292,7 +292,7 @@ export default function OpsProjectsPage() {
           onChange: setFilterStatus,
           options: [
             { value: "ACTIVE", label: "Activo" },
-            { value: "ON_HOLD", label: "En pausa" },
+            { value: "ON_HOLD", label: "Inactivo" },
             { value: "COMPLETED", label: "Completado" },
             { value: "CANCELLED", label: "Cancelado" },
           ],
