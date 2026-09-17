@@ -54,6 +54,7 @@ import {
   type Segmento,
 } from './terminos-segmento.js';
 import { avanceActividadPorEstado } from './estado-cotizacion.js';
+import { isPdfUrl, pasoCubiertoPorCotizacion } from '../activities/evidence/evidence-flow.helpers.js';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -415,10 +416,11 @@ export class CotizacionesService {
     const estado = estadoDesdeDb(quote.status);
     const segmento = normalizarSegmento(quote.segmento);
 
-    const [participantes, actividades, cadena] = await Promise.all([
+    const [participantes, actividades, cadena, planos] = await Promise.all([
       this.core.participantesParaApi(quote.id),
       this.actividadesLigadas(quote.id),
       this.core.cadenaDeParticipantes(quote.id, quote.createdById ?? null),
+      this.planosDePropuesta(quote),
     ]);
 
     return {
@@ -442,6 +444,8 @@ export class CotizacionesService {
       totalesPorGrupo: totalesPorGrupo(partidas),
       participantes,
       actividades,
+      // 03 Planos: los propios más la evidencia de la actividad comercial ligada.
+      planos,
     };
   }
 
@@ -1200,12 +1204,96 @@ export class CotizacionesService {
   private async sincronizarActividad(cotizacionId: number, status: unknown) {
     const estatus = avanceActividadPorEstado(status);
     if (!estatus) return;
-    await this.db.activity.updateMany({
+
+    const actividades = await this.db.activity.findMany({
       where: { cotizacionId, deletedAt: null, estatus: { notIn: ['Finalizada', 'Cancelada'] } },
+      select: { id: true, coreKind: true },
+    });
+    if (!actividades.length) return;
+
+    await this.db.activity.updateMany({
+      where: { id: { in: actividades.map((a) => a.id) } },
       data: {
         estatus,
         ...(estatus === 'Finalizada' ? { fechaFinalizacion: new Date() } : {}),
       },
+    });
+
+    if (estadoDesdeDb(status) === ESTADO.ENVIADA) {
+      const quote = await this.db.cotizacion.findUnique({
+        where: { id: cotizacionId },
+        select: { quoteNumber: true, sentAt: true },
+      });
+      for (const actividad of actividades) {
+        if (!pasoCubiertoPorCotizacion(actividad.coreKind)) continue;
+        // La cotización enviada **es** la hoja de servicio de una actividad comercial: el paso del
+        // formulario se da por cubierto y el flujo salta a la foto de salida.
+        await this.db.activityEvidence
+          .updateMany({
+            where: { activityId: actividad.id, status: 'SERVICE_SHEET_DATA' },
+            data: {
+              serviceSheetData: {
+                tipo: 'cotizacion',
+                cotizacionId,
+                folio: quote?.quoteNumber ?? null,
+                enviadaAt: quote?.sentAt ?? new Date(),
+              } as Prisma.InputJsonValue,
+              serviceSheetCompletedAt: new Date(),
+              status: 'EXIT_PHOTO',
+            },
+          })
+          .catch(() => undefined);
+      }
+    }
+  }
+
+  /**
+   * Anexos de la propuesta (03 Planos): los que se subieron a la cotización más la evidencia de la
+   * actividad comercial —fotos del levantamiento y planos de quien la atendió— sin volver a subirla.
+   */
+  async planosDePropuesta(quote: { id: number; planos?: unknown }) {
+    const propios = Array.isArray(quote.planos) ? (quote.planos as any[]) : [];
+    const evidencias = await this.db.activityEvidence.findMany({
+      where: { activity: { cotizacionId: quote.id, deletedAt: null } },
+      select: {
+        activityId: true,
+        evidencePhotos: true,
+        serviceSheetPdfUrl: true,
+        evidencePhotosUploadedAt: true,
+        user: { select: { nombre: true } },
+      },
+    });
+
+    const heredados: Array<Record<string, unknown>> = [];
+    for (const ev of evidencias) {
+      for (const [i, url] of (ev.evidencePhotos ?? []).entries()) {
+        if (!url) continue;
+        heredados.push({
+          url,
+          nombre: `Levantamiento ${i + 1}${ev.user?.nombre ? ` · ${ev.user.nombre}` : ''}`,
+          tipo: isPdfUrl(url) ? 'pdf' : 'imagen',
+          origen: 'actividad',
+          activityId: ev.activityId,
+          at: ev.evidencePhotosUploadedAt,
+        });
+      }
+      if (ev.serviceSheetPdfUrl) {
+        heredados.push({
+          url: ev.serviceSheetPdfUrl,
+          nombre: 'Plano del levantamiento',
+          tipo: 'pdf',
+          origen: 'actividad',
+          activityId: ev.activityId,
+        });
+      }
+    }
+
+    const vistos = new Set<string>();
+    return [...propios, ...heredados].filter((p: any) => {
+      const url = String(p?.url ?? '');
+      if (!url || vistos.has(url)) return false;
+      vistos.add(url);
+      return true;
     });
   }
 
