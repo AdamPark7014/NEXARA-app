@@ -216,7 +216,18 @@ export default function AppShell({ panel, children }: AppShellProps) {
       });
       if (!res.ok) return;
       const data = await res.json();
-      setNotifPreview(Array.isArray(data) ? data : (data?.data ?? []));
+      const items: NotifPreviewItem[] = Array.isArray(data) ? data : (data?.data ?? []);
+      // Abrir la campana cuenta como «ya las vi»: se marcan todas como leídas en el servidor y el
+      // contador baja a 0, pero en esta vista las nuevas siguen resaltadas para distinguirlas.
+      setNotifPreview(items);
+      if (items.some((n) => !n.isRead) || unreadNotifs > 0) {
+        setUnreadNotifs(0);
+        void fetch(buildApiUrl("notifications/read/all"), {
+          method: "PATCH",
+          credentials: "include",
+          headers: { Authorization: `Bearer ${user.token}` },
+        }).catch(() => undefined);
+      }
     } catch {
       /* non-critical */
     } finally {
