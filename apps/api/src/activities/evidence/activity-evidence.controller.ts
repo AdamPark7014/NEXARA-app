@@ -17,6 +17,8 @@ import { RBAC, RbacGuard } from '../../common/rbac.guard.js';
 import { UrlAccessGuard } from '../../common/rbac/url-access.guard.js';
 import { saveBase64Photo, saveBase64Pdf } from '../../common/file-upload.util';
 import { materializarAdjuntosDeCorreccion } from './evidence-flow.helpers.js';
+import { ActivityEvidenceFieldsService } from './activity-evidence-fields.service.js';
+import { ActivityEvidenceZipService } from './activity-evidence-zip.service.js';
 import { CurrentCompanyId } from '../../common/tenant/current-company.decorator.js';
 import { CurrentUser } from '../../common/current-user.decorator.js';
 import { PERMISSIONS } from '../../common/permissions.js';
@@ -28,6 +30,8 @@ export class ActivityEvidenceController {
   constructor(
     private service: ActivityEvidenceService,
     private geofence: ActivityGeofenceService,
+    private campos: ActivityEvidenceFieldsService,
+    private zip: ActivityEvidenceZipService,
   ) {}
 
   @Get('history')
@@ -69,6 +73,105 @@ export class ActivityEvidenceController {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=reporte-ticket-${parsedId}.pdf`);
     return res.send(result.pdf);
+  }
+
+  /**
+   * «Descargar evidencia»: la actividad entera como carpeta comprimida.
+   * Se manda por partes para no juntar todas las fotos en memoria.
+   */
+  @Get(':activityId/evidencia.zip')
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.EVIDENCES_VIEW,
+      PERMISSIONS.EVIDENCES_REVIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+    ],
+  })
+  async descargarEvidencia(
+    @Param('activityId') activityId: string,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    const parsedId = parseInt(activityId, 10);
+    if (!Number.isFinite(parsedId) || parsedId <= 0) {
+      throw new BadRequestException('ID de actividad inválido');
+    }
+
+    const { generador, nombreArchivo } = await this.zip.construir(parsedId, companyId);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${nombreArchivo.replace(/[^\x20-\x7e]/g, '_')}"; ` +
+        `filename*=UTF-8''${encodeURIComponent(nombreArchivo)}`,
+    );
+    // Se arma sobre la marcha: no se puede anunciar el tamaño por adelantado.
+    res.setHeader('Cache-Control', 'no-store');
+
+    for await (const parte of generador) {
+      if (!res.write(parte)) {
+        await new Promise<void>((listo) => res.once('drain', listo));
+      }
+    }
+    res.end();
+  }
+
+  /** Qué hay que documentar en esta actividad, con lo que ya se documentó de cada cosa. */
+  @Get(':activityId/campos')
+  async listarCampos(
+    @Param('activityId') activityId: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.campos.listarCampos(parseInt(activityId, 10), companyId);
+  }
+
+  /** La foto de un campo en un momento. Volver a mandarla reemplaza la anterior. */
+  @Post(':activityId/campos/:fieldId/foto')
+  async guardarFotoDeCampo(
+    @Param('activityId') activityId: string,
+    @Param('fieldId') fieldId: string,
+    @Body()
+    body: {
+      momento: string;
+      photoUrl: string;
+      latitude?: number;
+      longitude?: number;
+      capturedAt?: string | null;
+    },
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    let fileUrl = body?.photoUrl;
+    if (fileUrl && (fileUrl.startsWith('data:') || fileUrl.includes(';base64,'))) {
+      fileUrl = saveBase64Photo(fileUrl, __dirname, 'activities');
+    }
+
+    return this.campos.guardarFoto({
+      activityId: parseInt(activityId, 10),
+      fieldId: parseInt(fieldId, 10),
+      momento: body?.momento,
+      photoUrl: fileUrl,
+      latitude: body?.latitude,
+      longitude: body?.longitude,
+      capturedAt: body?.capturedAt ?? null,
+      userId: req.user.id,
+      companyId,
+    });
+  }
+
+  /** Quitar la foto de un campo deja el hueco pendiente otra vez. */
+  @Post(':activityId/campos/:fieldId/foto/quitar')
+  async quitarFotoDeCampo(
+    @Param('activityId') activityId: string,
+    @Param('fieldId') fieldId: string,
+    @Body() body: { momento: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.campos.borrarFoto({
+      activityId: parseInt(activityId, 10),
+      fieldId: parseInt(fieldId, 10),
+      momento: body?.momento,
+      companyId,
+    });
   }
 
   @Get(':activityId')
