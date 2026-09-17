@@ -34,6 +34,43 @@ struct CoreSalesClient: Decodable, Identifiable, Hashable {
         let raw = Set((sectors ?? []).map { $0.sector.uppercased() })
         return ClientSector.allCases.filter { raw.contains($0.rawValue) }
     }
+
+    /// «Inactivo» sin importar mayúsculas (`isInactiveClientStatus` del API).
+    var isInactive: Bool {
+        ["inactivo", "inactiva", "inactive"].contains((status ?? "").trimmingCharacters(in: .whitespaces).lowercased())
+    }
+}
+
+/// `GET ventas/clientes/permisos`: qué puede hacer quien consulta con el padrón.
+/// Agregar y editar: jefes con personal a cargo, administración y dirección.
+/// Desactivar, reactivar y eliminar: solo Christian. La app solo esconde; decide el API.
+struct CoreClientPermissions: Decodable, Equatable {
+    var puedeAgregar: Bool
+    var puedeEditar: Bool
+    var puedeDesactivar: Bool
+    var puedeEliminar: Bool
+
+    /// Mientras carga o si falla la consulta: nada visible.
+    static let ninguno = CoreClientPermissions(puedeAgregar: false, puedeEditar: false, puedeDesactivar: false, puedeEliminar: false)
+
+    init(puedeAgregar: Bool, puedeEditar: Bool, puedeDesactivar: Bool, puedeEliminar: Bool) {
+        self.puedeAgregar = puedeAgregar
+        self.puedeEditar = puedeEditar
+        self.puedeDesactivar = puedeDesactivar
+        self.puedeEliminar = puedeEliminar
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case puedeAgregar, puedeEditar, puedeDesactivar, puedeEliminar
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        puedeAgregar = (try? container.decode(Bool.self, forKey: .puedeAgregar)) ?? false
+        puedeEditar = (try? container.decode(Bool.self, forKey: .puedeEditar)) ?? false
+        puedeDesactivar = (try? container.decode(Bool.self, forKey: .puedeDesactivar)) ?? false
+        puedeEliminar = (try? container.decode(Bool.self, forKey: .puedeEliminar)) ?? false
+    }
 }
 
 /// `GET ventas/clientes/fiscal-lookup?rfc=` — `FiscalLookupResult` de la web.
@@ -124,6 +161,44 @@ final class ClientesRepository {
     func detail(id: Int) async throws -> CoreSalesClient {
         let data = try await api.get("ventas/clientes/\(id)")
         return try JSONDecoder().decode(CoreSalesClient.self, from: data)
+    }
+
+    /// `GET ventas/clientes/permisos`.
+    func permissions() async throws -> CoreClientPermissions {
+        let data = try await api.get("ventas/clientes/permisos")
+        return try JSONDecoder().decode(CoreClientPermissions.self, from: data)
+    }
+
+    /// Desactivar, reactivar y eliminar no van a la cola sin conexión: solo Christian
+    /// puede hacerlos y, si el API los rechaza al reenviarlos, nadie se entera.
+    private func requireOnline() async throws {
+        guard await NetworkMonitor.shared.isOnline else {
+            throw CoreError.message("Sin conexión: esta acción necesita señal. Intenta de nuevo cuando regrese.")
+        }
+    }
+
+    /// `POST ventas/clientes/:id/desactivar` (queda «Inactivo»). `nil` si la respuesta no se pudo leer.
+    func deactivate(id: Int) async throws -> CoreSalesClient? {
+        try await setActive(id: id, active: false)
+    }
+
+    /// `POST ventas/clientes/:id/reactivar` (vuelve a «Activo»). `nil` si la respuesta no se pudo leer.
+    func reactivate(id: Int) async throws -> CoreSalesClient? {
+        try await setActive(id: id, active: true)
+    }
+
+    private func setActive(id: Int, active: Bool) async throws -> CoreSalesClient? {
+        struct Body: Encodable {}
+        try await requireOnline()
+        let data = try await api.postJSON("ventas/clientes/\(id)/\(active ? "reactivar" : "desactivar")", body: Body())
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+        return try? JSONDecoder().decode(CoreSalesClient.self, from: data)
+    }
+
+    /// `DELETE ventas/clientes/:id`.
+    func delete(id: Int) async throws {
+        try await requireOnline()
+        try await api.delete("ventas/clientes/\(id)")
     }
 
     /// `POST ventas/clientes`. `nil` = sin red: quedó en la cola offline.
