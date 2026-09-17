@@ -61,7 +61,7 @@ object OfflineSyncCoordinator {
         withContext(Dispatchers.IO) {
             for (item in pending) {
                 // De otro servidor (otra compilación) o de lo que ya no se encola: nunca saldrán.
-                if (!item.url.startsWith(apiBaseUrl()) || !OfflineHttpInterceptor.isQueueable(item.url)) {
+                if (!item.url.startsWith(apiBaseUrl()) || !OfflineHttpInterceptor.isQueueable(item.url, item.method)) {
                     done.add(item.id)
                     NexaraOffline.mediaStore().purgeRefsInBody(item.body)
                     Log.w("OfflineSync", "Dropping ${item.id}: not for this API")
