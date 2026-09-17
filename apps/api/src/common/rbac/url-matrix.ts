@@ -172,6 +172,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // Faltas justificadas: solo Christian (el servicio lo vuelve a exigir por correo).
     { path: '/api/attendance/justificaciones', methods: ['GET', 'POST'], scope: 'approve' },
     { path: '/api/attendance/justificaciones/*', methods: ['DELETE'], scope: 'approve' },
+    // Corregir la hora de una checada: dirección y RH (el servicio lo vuelve a exigir).
+    { path: '/api/attendance/*/correccion', methods: ['PATCH'], scope: 'approve' },
     // Rutas específicas primero (first-match-wins)
     { path: '/erp/approvals/**', scope: 'approve' },
     { path: '/api/workflow/**', methods: ['POST'], scope: 'approve' },

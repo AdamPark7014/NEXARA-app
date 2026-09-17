@@ -28,6 +28,7 @@ export type NotificationKind =
   | "fuera_zona"
   | "cancelada"
   | "falta_justificada"
+  | "asistencia_alerta"
   | "cumpleanos"
   | "aniversario"
   | "cliente"
@@ -89,6 +90,17 @@ export function notificationKind(category?: string | null, title?: string | null
   if (c === "sla-breach" || t.includes("vencid")) return "vencida";
   if (c === "sla-alert" || t.includes("atras") || t.includes("retras")) return "atraso";
   if (c === "attendance") {
+    // ATTENDANCE_FLAGGED (push `icon: asistencia_alerta`): checada fuera de sitio, por revisar,
+    // intento con ubicación simulada, cierre automático de jornada o corrección de hora.
+    if (
+      t.includes("fuera de sitio") ||
+      t.includes("por revisar") ||
+      t.includes("ubicacion simulada") ||
+      t.includes("cerrada automaticamente") ||
+      t.includes("corrigieron")
+    ) {
+      return "asistencia_alerta";
+    }
     if (t.includes("salida")) return "salida";
     if (t.includes("ubicaci") || t.includes("gps")) return "ubicacion";
     return "entrada";

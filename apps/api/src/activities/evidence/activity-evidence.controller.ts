@@ -183,7 +183,8 @@ export class ActivityEvidenceController {
   /** Geocerca de la actividad para quien la ejecuta: punto de inicio, recorrido y salidas de zona. */
   @Get(':activityId/geocerca')
   geocerca(@Param('activityId') activityId: string, @Req() req: any) {
-    return this.geofence.estado(parseInt(activityId, 10), req.user.id);
+    // `puntos` (el recorrido) solo va para dirección; las alertas, para todos.
+    return this.geofence.estado(parseInt(activityId, 10), req.user.id, req.user);
   }
 
   /** Justificar una salida de zona con motivo y foto. */

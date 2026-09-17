@@ -116,13 +116,63 @@ describe('entrada duplicada', () => {
     expect(prisma.attendance.create).not.toHaveBeenCalled();
   });
 
-  it('no deja abrir jornada nueva con una anterior sin cerrar', async () => {
+  it('no deja abrir jornada nueva con otra del MISMO día sin cerrar', async () => {
+    const hoy = new Date(
+      Date.UTC(
+        new Date().getUTCFullYear(),
+        new Date().getUTCMonth(),
+        new Date().getUTCDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+    );
+    // El día laboral de México puede ir un día por detrás del UTC; se calcula igual que el servicio.
     const { service } = build({
       attendance: { findFirst: jest.fn().mockResolvedValue(null) },
-      attendanceDay: { findFirst: jest.fn().mockResolvedValue({ id: 5, isOpen: true }) },
+      attendanceDay: {
+        findFirst: jest.fn().mockResolvedValue({ id: 5, isOpen: true, date: hoy }),
+        upsert: jest.fn().mockResolvedValue({ id: 5 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
     });
+    const service2 = service as any;
+    const diaDeHoy = service2.getDateOnly(new Date());
+    service2.prisma.attendanceDay.findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 5, isOpen: true, date: diaDeHoy });
+
     await expect(service.register(entrada as any, 3, undefined, 7)).rejects.toThrow(
       /jornada abierta/,
     );
+  });
+
+  it('pero una jornada abierta de AYER se cierra sola y la entrada de hoy pasa', async () => {
+    // Antes esto dejaba a la persona sin poder checar hasta que alguien tocaba la base.
+    const ayer = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const { service, prisma } = build({
+      attendance: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 1, user: { nombre: 'Ana' } }),
+        delete: jest.fn().mockResolvedValue({}),
+      },
+      attendanceDay: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 5, userId: 3, isOpen: true, date: ayer, lastEntryAt: ayer }),
+        upsert: jest.fn().mockResolvedValue({ id: 6, isOpen: true }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    });
+
+    await expect(service.register(entrada as any, 3, undefined, 7)).resolves.toMatchObject({
+      message: expect.stringContaining('Entrada'),
+    });
+    // La salida inventada queda marcada como cierre automático y a revisión.
+    const cierre = prisma.attendance.create.mock.calls
+      .map((c: any[]) => c[0].data)
+      .find((d: any) => d.cierreAutomatico);
+    expect(cierre).toMatchObject({ type: 'salida', validacion: 'REVISAR' });
   });
 });

@@ -20,6 +20,8 @@ type Props = {
   hasCheckIn?: boolean;
   viewerUserId?: number;
   canViewOwnTrajectory?: boolean;
+  /** El recorrido del día (`gps/trajectory`) es solo para dirección; los mapas de checada, no. */
+  canViewTrajectory?: boolean;
 };
 
 type TrajectoryPoint = {
@@ -29,7 +31,16 @@ type TrajectoryPoint = {
   ultimaActualizacion?: string;
 };
 
-export default function AttendanceGpsDayPanel({ token, userId, date, attendances, hasCheckIn, viewerUserId, canViewOwnTrajectory = false }: Props) {
+export default function AttendanceGpsDayPanel({
+  token,
+  userId,
+  date,
+  attendances,
+  hasCheckIn,
+  viewerUserId,
+  canViewOwnTrajectory = false,
+  canViewTrajectory = false,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,8 +67,8 @@ export default function AttendanceGpsDayPanel({ token, userId, date, attendances
   }, [token, userId, date]);
 
   useEffect(() => {
-    if (open && !loaded) void load();
-  }, [open, loaded, load]);
+    if (open && !loaded && canViewTrajectory) void load();
+  }, [open, loaded, load, canViewTrajectory]);
 
   const entryUrl = attendanceMapUrl(attendances, "entrada");
   const exitUrl = attendanceMapUrl(attendances, "salida", trajectory);
@@ -81,6 +92,7 @@ export default function AttendanceGpsDayPanel({ token, userId, date, attendances
         ) : hasCheckIn && attendances?.some((a) => a.type === "salida") ? (
           <span style={{ color: "var(--text-tertiary)" }}>↑ Salida sin GPS</span>
         ) : null}
+        {canViewTrajectory ? (
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -96,9 +108,10 @@ export default function AttendanceGpsDayPanel({ token, userId, date, attendances
         >
           {open ? "Ocultar GPS del día" : "GPS del día · recorrido"}
         </button>
+        ) : null}
       </div>
 
-      {open ? (
+      {open && canViewTrajectory ? (
         loading ? (
           <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", padding: "6px 0" }}>Cargando trayecto…</div>
         ) : (

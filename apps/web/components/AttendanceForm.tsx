@@ -467,6 +467,7 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
       // Obtener ubicación GPS actual
       let latitude: number | undefined;
       let longitude: number | undefined;
+      let accuracyM: number | undefined;
       
       if (navigator.geolocation) {
         try {
@@ -478,18 +479,24 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
           });
           latitude = position.coords.latitude;
           longitude = position.coords.longitude;
+          // Precisión real del navegador: peor que 200 m el servidor lo marca para revisar.
+          accuracyM = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : undefined;
         } catch (gpsErr) {
           // Si no puede obtener GPS, continúa sin él
           console.warn('⚠️ No se pudo obtener ubicación GPS:', gpsErr);
         }
       }
 
-      const payload = { 
-        type: tipo, 
-        timestamp: new Date().toISOString(),
+      // La hora la pone el servidor: la web no manda `timestamp` (contrato del
+      // viernes 18-09, sección A). `offline: false` porque este formulario solo
+      // checa con la API delante; lo que se captura sin red es cosa del teléfono.
+      const payload = {
+        type: tipo,
         photoBase64: photoBase64 || undefined,
         latitude,
         longitude,
+        accuracyM,
+        offline: false,
       };
 
 

@@ -88,6 +88,7 @@ export const NOTIFICATION_ICONS = [
   'tiempo_excedido',
   'inicio_marcado',
   'falta_justificada',
+  'asistencia_alerta',
   'cliente',
   'cumpleanos',
   'aniversario',
@@ -102,6 +103,7 @@ export type NotificationIcon = (typeof NOTIFICATION_ICONS)[number];
 const ICON_BY_TYPE: Record<string, NotificationIcon> = {
   ATTENDANCE_CHECKIN: 'entrada',
   ATTENDANCE_CHECKOUT: 'salida',
+  ATTENDANCE_FLAGGED: 'asistencia_alerta',
   LUNCH_CHECKIN: 'comida_sale',
   LUNCH_CHECKOUT: 'comida_regresa',
   ACTIVITY_ASSIGNED: 'actividad_nueva',
