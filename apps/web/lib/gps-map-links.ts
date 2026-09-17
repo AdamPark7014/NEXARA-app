@@ -27,30 +27,10 @@ export function googleMapsRouteUrl(points: { lat: number; lng: number }[]): stri
   return `https://www.google.com/maps/dir/${path}`;
 }
 
-/** Imagen estática con polyline del recorrido (requiere API key pública). */
-export function googleStaticMapPathUrl(
-  points: { lat: number; lng: number }[],
-  apiKey: string,
-  opts?: { width?: number; height?: number },
-): string | null {
-  if (!apiKey || points.length === 0) return null;
-  const sampled = samplePathPoints(points, 80);
-  const pathCoords = sampled.map((p) => `${p.lat},${p.lng}`).join("|");
-  const w = opts?.width ?? 640;
-  const h = opts?.height ?? 280;
-  const markers: string[] = [];
-  const first = sampled[0];
-  const last = sampled[sampled.length - 1];
-  if (first) markers.push(`color:green|label:S|${first.lat},${first.lng}`);
-  if (last && last !== first) markers.push(`color:red|label:F|${last.lat},${last.lng}`);
-  const params = new URLSearchParams({
-    size: `${w}x${h}`,
-    path: `color:0x2563eb|weight:4|${pathCoords}`,
-    key: apiKey,
-  });
-  for (const m of markers) params.append("markers", m);
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
-}
+// `googleStaticMapPathUrl` vivía aquí y armaba la URL de Google con la clave
+// pública metida en el `<img>`: una petición facturada por vista y la clave a
+// la vista de cualquiera. La imagen del recorrido ahora la sirve
+// `lib/static-map.ts` desde `/api/static-map`, que la cachea en disco.
 
 function samplePathPoints(points: { lat: number; lng: number }[], max: number): { lat: number; lng: number }[] {
   if (points.length <= max) return points;
