@@ -706,6 +706,7 @@ model User {
   projectEngineers ProjectEngineer[]    @relation("ProjectEngineers")
 
   geofenceAlerts          ActivityGeofenceAlert[] @relation("GeofenceAlertUser")
+  evidenceFieldPhotos     ActivityEvidenceFieldPhoto[] @relation("EvidenceFieldPhotoAuthor")
   @@unique([oidcProvider, oidcSubject])
   @@index([lastLoginAt])
   @@index([isActive, lastLoginAt])
@@ -936,6 +937,9 @@ model Activity {
   company                 CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   geofenceAlerts          ActivityGeofenceAlert[]
+  /// Qué hay que documentar en esta actividad («Cámara 1», «Rack») y en qué momentos.
+  evidenceFields          ActivityEvidenceField[]
+  evidenceFieldPhotos     ActivityEvidenceFieldPhoto[]
   @@unique([companyId, anNumber])
   @@index([cotizacionId])
   @@index([projectId])
@@ -5313,6 +5317,8 @@ model CompanyProfile {
   integraCameraCapabilities  IntegraCameraCapability[]
 
   activityGeofenceAlerts  ActivityGeofenceAlert[]
+  activityEvidenceFields  ActivityEvidenceField[]
+  activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
   @@map("company_profile")
 }
 
@@ -5775,6 +5781,61 @@ model ActivityGeofenceAlert {
   @@index([activityId, userId])
   @@index([companyId])
   @@map("activity_geofence_alerts")
+}
+
+/// Una cosa que hay que documentar en la actividad: «Cámara 1», «Rack», «Canalización».
+/// Quien asigna o despacha define los campos y, por cada uno, en qué momentos se exige foto.
+/// Una actividad sin campos conserva el flujo viejo de N fotos libres.
+model ActivityEvidenceField {
+  id         Int    @id @default(autoincrement())
+  activityId Int
+  nombre     String @db.VarChar(120)
+  /// Momentos obligatorios: ANTES | EN_PROGRESO | DESPUES (cualquier combinación).
+  momentos   String[] @default([])
+  /// Orden en que se le presentan a quien ejecuta.
+  orden      Int    @default(0)
+  /// Indicación opcional para ese campo («la del pasillo, no la de la entrada»).
+  notas      String? @db.VarChar(500)
+  companyId  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  activity Activity                     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  company  CompanyProfile               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  fotos    ActivityEvidenceFieldPhoto[]
+
+  @@unique([activityId, nombre])
+  @@index([activityId])
+  @@index([companyId])
+  @@map("activity_evidence_fields")
+}
+
+/// La foto de un campo en un momento. Es del equipo, no de una persona: `userId` dice
+/// quién la tomó. Volver a tomarla reemplaza la anterior (un campo+momento, una foto).
+model ActivityEvidenceFieldPhoto {
+  id         Int    @id @default(autoincrement())
+  fieldId    Int
+  activityId Int
+  userId     Int
+  /// ANTES | EN_PROGRESO | DESPUES
+  momento    String @db.VarChar(20)
+  photoUrl   String @db.VarChar(500)
+  latitude   Decimal?  @db.Decimal(10, 8)
+  longitude  Decimal?  @db.Decimal(11, 8)
+  capturedAt DateTime?
+  companyId  Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  field    ActivityEvidenceField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  activity Activity              @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User                  @relation("EvidenceFieldPhotoAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  company  CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([fieldId, momento])
+  @@index([activityId, userId])
+  @@index([companyId])
+  @@map("activity_evidence_field_photos")
 }
 
 /// Reasignación de una actividad inconclusa.
