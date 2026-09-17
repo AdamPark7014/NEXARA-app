@@ -13,6 +13,8 @@ import { ActivitiesService } from '../activities.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { ActivityGeofenceService } from '../geofence/activity-geofence.service.js';
+import { ActivityEvidenceFieldsService } from './activity-evidence-fields.service.js';
+import { progresoDeCampos } from './evidence-fields.helpers.js';
 import {
   debeAutoAceptar,
   esCerrada,
@@ -35,6 +37,45 @@ import fs from 'fs';
 import path from 'path';
 
 type ActivityEvidenceStatus = EvidenceStep;
+
+/** Largo de `entryPhotoUrl` / `exitPhotoUrl` en la base (VARCHAR(500)). */
+const LARGO_MAX_URL_FOTO = 500;
+
+/**
+ * Coordenadas de una foto, vengan como número o como texto ("19.0414"): las apps y la
+ * web mandan números, pero un cliente viejo o un reenvío en JSON pueden traer cadenas y
+ * `Number.isFinite('19.04')` es `false`. Devuelve `null` si no es una lectura real.
+ */
+export function coordenadasDeFoto(
+  latitude: unknown,
+  longitude: unknown,
+): { latitude: number; longitude: number } | null {
+  const lat = latitude == null || latitude === '' ? NaN : Number(latitude);
+  const lng = longitude == null || longitude === '' ? NaN : Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  // El (0,0) exacto es un teléfono sin permiso de ubicación, no un punto del golfo de Guinea.
+  if (lat === 0 && lng === 0) return null;
+  return { latitude: lat, longitude: lng };
+}
+
+/**
+ * La columna guarda una **ruta**, nunca la imagen. Si llega un data URL (el controlador
+ * no lo convirtió) se rechaza con un mensaje que se entiende, en vez de dejar que
+ * Postgres tire `value too long for type character varying(500)` y el paso muera con un 500.
+ */
+export function urlDeFotoGuardable(photoUrl: unknown, paso: string): string {
+  const url = typeof photoUrl === 'string' ? photoUrl.trim() : '';
+  if (!url) {
+    throw new BadRequestException(`No llegó la foto de ${paso}: vuelve a tomarla.`);
+  }
+  if (url.startsWith('data:') || url.includes(';base64,') || url.length > LARGO_MAX_URL_FOTO) {
+    throw new BadRequestException(
+      `No se pudo guardar la foto de ${paso}: la imagen no se subió correctamente. Vuelve a tomarla.`,
+    );
+  }
+  return url;
+}
 
 const EVIDENCE_STEP_ORDER: ActivityEvidenceStatus[] = [
   'ENTRY_PHOTO',
@@ -86,6 +127,7 @@ export class ActivityEvidenceService {
     private activitiesService: ActivitiesService,
     private notificationHierarchy: NotificationHierarchyService,
     @Optional() private geofence?: ActivityGeofenceService,
+    @Optional() private campos?: ActivityEvidenceFieldsService,
   ) {}
 
   private async notifyEvidenceReadyForReview(
@@ -711,7 +753,20 @@ export class ActivityEvidenceService {
       throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
     }
 
-    if (isInventoryFlow) {
+    // Con campos definidos, lo que se exige son los huecos que pidió quien asignó
+    // («Cámara 1 antes», «Rack después»), no un número de fotos sueltas. Las libres
+    // quedan como extra opcional. Sin campos, todo sigue como antes.
+    const campos = await this.camposDeActividad(activityId, activity.companyId);
+    const porCampos = progresoDeCampos(campos);
+
+    if (porCampos.requeridas > 0) {
+      if (!porCampos.completo) {
+        throw new BadRequestException(
+          `Falta documentar: ${porCampos.faltantes.slice(0, 6).join(', ')}` +
+            (porCampos.faltantes.length > 6 ? ` y ${porCampos.faltantes.length - 6} más` : ''),
+        );
+      }
+    } else if (isInventoryFlow) {
       if (photoUrls.length < 1) {
         throw new BadRequestException('Para mantenimiento e inventario se requiere al menos 1 evidencia visual');
       }
@@ -815,18 +870,20 @@ export class ActivityEvidenceService {
       throw new BadRequestException('No estás en el paso correcto para guardar la foto de salida');
     }
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) {
+    const punto = coordenadasDeFoto(latitude, longitude);
+    if (!punto) {
       throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
     }
+    const urlFoto = urlDeFotoGuardable(photoUrl, 'salida');
     // Geocerca: la salida solo se registra a menos de 100 m de donde inició.
-    await this.geofence?.validarSalida(activityId, userId, latitude, longitude);
+    await this.geofence?.validarSalida(activityId, userId, punto.latitude, punto.longitude);
 
     const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
       data: {
-        exitPhotoUrl: photoUrl,
-        exitLatitude: latitude,
-        exitLongitude: longitude,
+        exitPhotoUrl: urlFoto,
+        exitLatitude: punto.latitude,
+        exitLongitude: punto.longitude,
         exitPhotoUploadedAt: new Date(),
         status: 'COMPLETED',
         completedAt: new Date(),
@@ -917,13 +974,32 @@ export class ActivityEvidenceService {
     }
 
     const coreKind = evidence.activity.coreKind;
+    // Qué hay que documentar en esta actividad. Sin campos, `campos: []` y la persona
+    // ve el flujo de siempre: N fotos libres.
+    const campos = await this.camposDeActividad(activityId, evidence.activity.companyId);
     return {
       ...evidence,
       assigneeIndicaciones: evidence.activity.assignees[0]?.indicaciones ?? null,
       stepsForKind: evidenceStepsForKind(coreKind),
       progressPct: evidenceProgressPct(evidence.status, coreKind),
+      campos,
+      camposProgreso: progresoDeCampos(campos),
       avancesAnteriores: await this.previousProgress(activityId, evidence.userId),
     };
+  }
+
+  /**
+   * Campos de evidencia de la actividad. Nunca tumba el flujo: si algo falla se
+   * devuelve vacío y la persona sigue con las fotos libres de siempre.
+   */
+  private async camposDeActividad(activityId: number, companyId: number) {
+    if (!this.campos) return [];
+    try {
+      return await this.campos.listarCamposDeActividad(activityId, companyId);
+    } catch (error) {
+      this.logger.warn(`camposDeActividad ${activityId}: ${String(error)}`);
+      return [];
+    }
   }
 
   /**
@@ -1971,6 +2047,12 @@ export class ActivityEvidenceService {
     data: any,
     companyId?: number | null,
   ) {
+    // Sin cuerpo no se puede corregir nada: antes se leía `data.latitude` sobre `undefined`
+    // y el paso moría con un 500 sin explicación («no se cargaron los parámetros»).
+    if (!data || typeof data !== 'object') {
+      throw new BadRequestException('No llegaron los datos de la corrección: vuelve a intentarlo.');
+    }
+
     const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
     if (evidence.reviewStatus !== 'REJECTED') {
@@ -1993,25 +2075,35 @@ export class ActivityEvidenceService {
     };
 
     switch (step) {
-      case 'ENTRY_PHOTO':
-        if (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) {
+      case 'ENTRY_PHOTO': {
+        const punto = coordenadasDeFoto(data.latitude, data.longitude);
+        if (!punto) {
           throw new BadRequestException('La ubicación GPS es obligatoria para la foto de entrada');
         }
         updateData = {
           ...updateData,
-          entryPhotoUrl: data.photoUrl,
-          entryLatitude: data.latitude,
-          entryLongitude: data.longitude,
+          entryPhotoUrl: urlDeFotoGuardable(data.photoUrl, 'entrada'),
+          entryLatitude: punto.latitude,
+          entryLongitude: punto.longitude,
           entryPhotoUploadedAt: new Date(),
         };
         break;
+      }
 
       case 'EVIDENCE_PHOTOS': {
         const activity = await this.loadActivityForTenant(activityId, companyId);
         const isInventoryFlow = activity?.workType === 'PREVENTIVE_INVENTORY';
         const required = clampEvidencePhotoRequired(activity.evidencePhotoRequired);
+        const porCampos = progresoDeCampos(
+          await this.camposDeActividad(activityId, activity.companyId),
+        );
 
-        if (isInventoryFlow) {
+        if (porCampos.requeridas > 0) {
+          if (!porCampos.completo) {
+            throw new BadRequestException(`Falta documentar: ${porCampos.faltantes.join(', ')}`);
+          }
+          if (!Array.isArray(data.photoUrls)) data.photoUrls = [];
+        } else if (isInventoryFlow) {
           if (!Array.isArray(data.photoUrls) || data.photoUrls.length < 1) {
             throw new BadRequestException('Requiere al menos 1 evidencia visual');
           }
@@ -2049,26 +2141,25 @@ export class ActivityEvidenceService {
         };
         break;
 
-      case 'EXIT_PHOTO':
-        if (
-          !Number.isFinite(data.latitude) ||
-          !Number.isFinite(data.longitude) ||
-          (data.latitude === 0 && data.longitude === 0)
-        ) {
+      case 'EXIT_PHOTO': {
+        const punto = coordenadasDeFoto(data.latitude, data.longitude);
+        if (!punto) {
           throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
         }
-        await this.geofence?.validarSalida(activityId, userId, data.latitude, data.longitude);
+        const urlFoto = urlDeFotoGuardable(data.photoUrl, 'salida');
+        await this.geofence?.validarSalida(activityId, userId, punto.latitude, punto.longitude);
         updateData = {
           ...updateData,
-          exitPhotoUrl: data.photoUrl,
-          exitLatitude: data.latitude,
-          exitLongitude: data.longitude,
+          exitPhotoUrl: urlFoto,
+          exitLatitude: punto.latitude,
+          exitLongitude: punto.longitude,
           exitPhotoUploadedAt: new Date(),
         };
         if (transition.status === 'COMPLETED') {
           updateData.completedAt = new Date();
         }
         break;
+      }
 
       default:
         throw new BadRequestException('Paso inválido');
@@ -2080,6 +2171,8 @@ export class ActivityEvidenceService {
     });
 
     if (transition.status === 'COMPLETED') {
+      // Igual que la foto de salida normal: corregirla también cierra el tiempo real.
+      await this.registrarFinReal(activityId, userId, updated.exitPhotoUploadedAt ?? new Date());
       await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
       // Corrigió todo lo devuelto: vuelve a «Por revisar» y sus superiores pueden aprobar o devolver otra vez.
       void this.notifyEvidenceReadyForReview(activityId, updated.userId, true);
