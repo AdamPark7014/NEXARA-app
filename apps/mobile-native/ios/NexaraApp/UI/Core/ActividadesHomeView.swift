@@ -7,6 +7,7 @@ let coreActividadesVistaKey = "nx-actividades-vista"
 /// - CEO: solo el tablero del equipo (asigna, no ejecuta).
 /// - Quien tiene gente en su tablero: «Mis actividades» / «Mi equipo» (se recuerda la última).
 /// - Los demás: su lista directo.
+/// Arriba de todo, el aviso de cumpleaños y aniversarios del día.
 struct ActividadesHomeView: View {
     @ObservedObject private var session = SessionStore.shared
     @AppStorage(coreActividadesVistaKey) private var vista: String = "mias"
@@ -19,6 +20,24 @@ struct ActividadesHomeView: View {
     private var teamMates: [TeamBoardUser] { (board?.users ?? []).filter { $0.id != myId } }
 
     var body: some View {
+        VStack(spacing: 0) {
+            CelebracionesBanner()
+            content
+        }
+        .navigationTitle("Actividades")
+        .task {
+            await loadBoard()
+            // Como la web: el tablero se refresca solo cada 30 s.
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                if Task.isCancelled { break }
+                await loadBoard()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         Group {
             if isCeo {
                 TeamBoardView(board: board, error: boardError, loading: !loaded, myId: myId, onReload: { await loadBoard() })
@@ -45,16 +64,7 @@ struct ActividadesHomeView: View {
                 }
             }
         }
-        .navigationTitle("Actividades")
-        .task {
-            await loadBoard()
-            // Como la web: el tablero se refresca solo cada 30 s.
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
-                if Task.isCancelled { break }
-                await loadBoard()
-            }
-        }
+        .frame(maxHeight: .infinity)
     }
 
     @MainActor
