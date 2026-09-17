@@ -33,6 +33,7 @@ enum NotificationIcon {
         case "finalizada": return "flag.checkered"
         case "atraso": return "hourglass"
         case "vencida": return "exclamationmark.triangle"
+        case "fuera_zona": return "location.slash"
         case "chat": return "bubble.left.and.bubble.right"
         case "mencion": return "at"
         case "seguridad": return "lock.shield"
@@ -53,6 +54,7 @@ enum NotificationIcon {
         case "ACTIVITY_ASSIGNED": return "doc.badge.plus"
         case "ACTIVITY_STARTED": return "play.circle"
         case "ACTIVITY_RESCHEDULED": return "calendar.badge.clock"
+        case "ACTIVITY_OUT_OF_ZONE": return "location.slash"
         case "ACTIVITY_COMPLETED", "PROJECT_COMPLETED": return "flag.checkered"
         case "ACTIVITY_APPROVED", "EVIDENCE_APPROVED": return "checkmark.seal"
         case "ACTIVITY_REJECTED", "EVIDENCE_REJECTED": return "arrow.uturn.left"
@@ -125,7 +127,7 @@ enum NotificationIcon {
              "arrow.uturn.backward", "arrow.uturn.left", "person.crop.circle.badge.exclamationmark",
              "chart.line.downtrend.xyaxis":
             return CorePalette.orange
-        case "xmark.circle", "lock.shield":
+        case "xmark.circle", "lock.shield", "location.slash":
             return CorePalette.red
         default:
             return NxBrand.primary

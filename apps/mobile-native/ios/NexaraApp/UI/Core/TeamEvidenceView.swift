@@ -308,6 +308,22 @@ private struct TeamEvidenceMemberCard: View {
         return { step in review("devolver", [step]) }
     }
 
+    /// Resumen de salidas de zona para la cabecera (se ve aunque la tarjeta esté plegada).
+    private var zoneChip: (text: String, color: Color)? {
+        let alerts = member.zoneAlerts
+        guard !alerts.isEmpty else { return nil }
+        let count = alerts.count
+        let base = count == 1 ? "1 salida de zona" : "\(count) salidas de zona"
+        if alerts.contains(where: { $0.abierta }) {
+            return ("\(base) · fuera ahora", CorePalette.red)
+        }
+        let pending = alerts.filter { !$0.isJustified }.count
+        if pending > 0 {
+            return ("\(base) · \(pending) sin justificar", CorePalette.orange)
+        }
+        return (base, CorePalette.slate)
+    }
+
     private var receivedText: String? {
         guard let when = CoreFormat.when(member.asignadoAt) else { return nil }
         guard let por = member.asignadoPor, !por.isEmpty, por != member.nombre else {
@@ -355,6 +371,9 @@ private struct TeamEvidenceMemberCard: View {
                     }
                     if member.retiradoAt != nil {
                         CoreChip(text: "Salió del equipo")
+                    }
+                    if let zone = zoneChip {
+                        CoreChip(icon: "location.slash", text: zone.text, color: zone.color)
                     }
                 }
             }
@@ -467,6 +486,9 @@ private struct TeamEvidenceMemberCard: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            if !member.zoneAlerts.isEmpty {
+                zoneAlertsSection
+            }
             if let reviews = member.revisiones, !reviews.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Historial de revisiones").font(.caption.weight(.bold))
@@ -474,6 +496,31 @@ private struct TeamEvidenceMemberCard: View {
                         TeamEvidenceReviewRow(review: item, coreKind: coreKind, nombre: member.nombre, onPhoto: onPhoto, onPdf: onPdf)
                     }
                 }
+            }
+        }
+    }
+
+    /// Salidas de la zona de 100 m alrededor de su foto de entrada, la más reciente primero.
+    private var zoneAlertsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "location.slash")
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(CorePalette.red)
+                    .accessibilityHidden(true)
+                Text("Salidas de zona").font(.caption.weight(.bold))
+                Spacer(minLength: 4)
+                Text("Radio de \(member.zoneAlerts.first?.radioM ?? ActivityGeofence.radioM) m")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(member.zoneAlerts) { alert in
+                ActivityGeofenceAlertRow(
+                    alert: alert,
+                    firstPerson: false,
+                    photoTitle: "\(CoreFormat.shortName(member.nombre)) · Justificación de salida",
+                    onPhoto: onPhoto
+                )
             }
         }
     }

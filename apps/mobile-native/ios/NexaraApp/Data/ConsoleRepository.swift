@@ -147,17 +147,20 @@ final class ConsoleRepository {
 
     /// `POST gps` (`CreateGpsDto`). `estaActivo` va en true como en la web: es
     /// lo que hace que el punto salga en `gps/team` y en el recorrido del día.
-    func gpsPost(lat: Double, lng: Double, speedKmh: Double? = nil) async throws {
+    /// `actividadId` liga el punto a la actividad en curso (geocerca de 100 m).
+    func gpsPost(lat: Double, lng: Double, speedKmh: Double? = nil, actividadId: Int? = nil) async throws {
         struct Body: Encodable {
             let latitud: Double
             let longitud: Double
             let velocidadKmh: Double?
             let estaActivo: Bool
             let ultimaActualizacion: String
+            let actividadId: Int?
         }
         _ = try await api.postJSON("gps", body: Body(
             latitud: lat, longitud: lng, velocidadKmh: speedKmh, estaActivo: true,
-            ultimaActualizacion: ConsoleHelpers.isoNow()
+            ultimaActualizacion: ConsoleHelpers.isoNow(),
+            actividadId: actividadId
         ))
     }
 }

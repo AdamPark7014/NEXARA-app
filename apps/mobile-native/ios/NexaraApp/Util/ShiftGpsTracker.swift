@@ -22,6 +22,11 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
     private static let minSeconds: TimeInterval = 45
     private static let minMeters: CLLocationDistance = 100
 
+    /// Actividad en curso (foto de entrada enviada, sin foto de salida): los
+    /// puntos viajan con `actividadId` para la geocerca. Solo en memoria: la
+    /// pone la foto de entrada y la quita la de salida.
+    static var currentActivityId: Int?
+
     private let manager = CLLocationManager()
     private var lastSent: Date?
     private var lastPoint: CLLocation?
@@ -155,6 +160,7 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
         }
 
         sending = true
+        let actividadId = ShiftGpsTracker.currentActivityId
         Task { @MainActor in
             defer { self.sending = false }
             // Sin red no se encola: un día entero de pings en la cola sin
@@ -164,7 +170,8 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
                 try await ConsoleRepository.shared.gpsPost(
                     lat: coordinate.latitude,
                     lng: coordinate.longitude,
-                    speedKmh: location.speed >= 0 ? location.speed * 3.6 : nil
+                    speedKmh: location.speed >= 0 ? location.speed * 3.6 : nil,
+                    actividadId: actividadId
                 )
                 self.lastSent = Date()
                 self.lastSentAt = self.lastSent
