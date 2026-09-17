@@ -7,6 +7,7 @@ import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helper
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
+import { tiposVisibles } from './equipo-alcance.js';
 
 const CEO_EMAIL = 'gerencia@nexara.com.mx';
 
@@ -660,12 +661,14 @@ export class MyActivitiesService {
 
   async list(viewer: MyActivitiesViewer, companyId: number | null): Promise<MyActivitiesResponse> {
     this.assertNotCeo(viewer);
+    // Luis coordina servicios: en su lista solo entran actividades de ese tipo.
+    const tipos = tiposVisibles({ id: viewer.id, email: viewer.email ?? null });
     const rows = await this.prisma.activityAssignee.findMany({
       where: {
         userId: viewer.id,
         retiradoAt: null,
         ...(companyId != null ? { companyId } : {}),
-        activity: { deletedAt: null },
+        activity: { deletedAt: null, ...(tipos ? { coreKind: { in: tipos } } : {}) },
       },
       select: {
         rol: true,
