@@ -1,0 +1,65 @@
+{
+ "id": 201,
+ "kind": "PUBLIC",
+ "slug": "operaciones",
+ "name": "operaciones",
+ "topic": "Coordinación del trabajo en campo",
+ "description": null,
+ "peer": null,
+ "memberCount": 12,
+ "lastMessageAt": "2026-09-17T05:28:50.000Z",
+ "muted": false,
+ "mutedUntil": null,
+ "supervised": false,
+ "readOnly": false,
+ "members": [
+  {
+   "id": 901,
+   "nombre": "Mariana López Herrera",
+   "email": "mariana.lopez@demo.nexara.mx",
+   "avatarUrl": null,
+   "role": "member",
+   "lastReadAt": "2026-09-17T05:29:50.000Z"
+  },
+  {
+   "id": 902,
+   "nombre": "Diego Ramírez Soto",
+   "email": "diego.ramirez@demo.nexara.mx",
+   "avatarUrl": null,
+   "role": "member",
+   "lastReadAt": "2026-09-17T05:29:50.000Z"
+  },
+  {
+   "id": 903,
+   "nombre": "Fernanda Cruz Molina",
+   "email": "fernanda.cruz@demo.nexara.mx",
+   "avatarUrl": null,
+   "role": "member",
+   "lastReadAt": "2026-09-17T05:29:50.000Z"
+  },
+  {
+   "id": 904,
+   "nombre": "Javier Morales Ortega",
+   "email": "javier.morales@demo.nexara.mx",
+   "avatarUrl": null,
+   "role": "member",
+   "lastReadAt": "2026-09-17T05:29:50.000Z"
+  },
+  {
+   "id": 905,
+   "nombre": "Sofía Martínez Ruiz",
+   "email": "sofia.martinez@demo.nexara.mx",
+   "avatarUrl": null,
+   "role": "member",
+   "lastReadAt": "2026-09-17T05:29:50.000Z"
+  },
+  {
+   "id": 906,
+   "nombre": "Ricardo Hernández Vega",
+   "email": "ricardo.hernandez@demo.nexara.mx",
+   "avatarUrl": null,
+   "role": "member",
+   "lastReadAt": "2026-09-17T05:29:50.000Z"
+  }
+ ]
+}

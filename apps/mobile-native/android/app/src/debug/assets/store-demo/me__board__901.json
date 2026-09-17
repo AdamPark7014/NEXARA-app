@@ -1,0 +1,44 @@
+{
+ "id": 901,
+ "nombre": "Mariana López Herrera",
+ "email": "mariana.lopez@demo.nexara.mx",
+ "avatarUrl": null,
+ "puesto": "Coordinadora de Operaciones",
+ "status": "activo",
+ "currentActivity": {
+  "id": 5142,
+  "anNumber": null,
+  "titulo": "Instalación de 8 cámaras IP · Corporativo Atlixco",
+  "estatus": "En Proceso",
+  "fechaMaxima": "2026-09-17T08:34:50.000Z",
+  "bucket": "projects"
+ },
+ "openActivities": [
+  {
+   "id": 5142,
+   "anNumber": null,
+   "titulo": "Instalación de 8 cámaras IP · Corporativo Atlixco",
+   "estatus": "En Proceso",
+   "evidenceStatus": "EVIDENCE_PHOTOS",
+   "progressPct": 65,
+   "coreKind": "proyecto",
+   "assignmentCharge": "ejecucion",
+   "fechaFinalizacion": null,
+   "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+   "teamEmails": [
+    "mariana.lopez@demo.nexara.mx"
+   ],
+   "reparte": false,
+   "fechaInicio": "2026-09-17T03:24:50.000Z"
+  }
+ ],
+ "clockInAt": "2026-09-17T02:32:50.000Z",
+ "workedMinutes": 182,
+ "activityStartedAt": "2026-09-17T03:24:50.000Z",
+ "activityElapsedMinutes": 130,
+ "currentLateMinutes": null,
+ "idleSinceAt": null,
+ "lastFinished": null,
+ "enEsperaAprobacion": 0,
+ "enCorreccion": 0
+}

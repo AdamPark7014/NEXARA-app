@@ -9,5 +9,11 @@
                 <action android:name="mx.nexara.DEBUG_PUSH" />
             </intent-filter>
         </receiver>
+
+        <!-- Solo debug: datos ficticios para las capturas de Google Play (ver StoreDemoInterceptor). -->
+        <provider
+            android:name=".storedemo.StoreDemoProvider"
+            android:authorities="${applicationId}.storedemo"
+            android:exported="false" />
     </application>
 </manifest>

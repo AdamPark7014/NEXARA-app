@@ -1,0 +1,44 @@
+{
+ "id": 902,
+ "nombre": "Diego Ramírez Soto",
+ "email": "diego.ramirez@demo.nexara.mx",
+ "avatarUrl": null,
+ "puesto": "Ingeniero de Campo",
+ "status": "activo",
+ "currentActivity": {
+  "id": 5143,
+  "anNumber": null,
+  "titulo": "Mantenimiento preventivo CCTV · Hotel Casa Azul",
+  "estatus": "En Proceso",
+  "fechaMaxima": "2026-09-17T07:34:50.000Z",
+  "bucket": "services"
+ },
+ "openActivities": [
+  {
+   "id": 5143,
+   "anNumber": null,
+   "titulo": "Mantenimiento preventivo CCTV · Hotel Casa Azul",
+   "estatus": "En Proceso",
+   "evidenceStatus": "EVIDENCE_PHOTOS",
+   "progressPct": 40,
+   "coreKind": "servicio",
+   "assignmentCharge": "ejecucion",
+   "fechaFinalizacion": null,
+   "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+   "teamEmails": [
+    "diego.ramirez@demo.nexara.mx"
+   ],
+   "reparte": false,
+   "fechaInicio": "2026-09-17T03:59:50.000Z"
+  }
+ ],
+ "clockInAt": "2026-09-17T02:46:50.000Z",
+ "workedMinutes": 168,
+ "activityStartedAt": "2026-09-17T03:59:50.000Z",
+ "activityElapsedMinutes": 95,
+ "currentLateMinutes": null,
+ "idleSinceAt": null,
+ "lastFinished": null,
+ "enEsperaAprobacion": 0,
+ "enCorreccion": 0
+}

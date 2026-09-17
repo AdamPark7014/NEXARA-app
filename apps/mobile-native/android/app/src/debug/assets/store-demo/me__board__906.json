@@ -1,0 +1,19 @@
+{
+ "id": 906,
+ "nombre": "Ricardo Hernández Vega",
+ "email": "ricardo.hernandez@demo.nexara.mx",
+ "avatarUrl": null,
+ "puesto": "Técnico de Servicio",
+ "status": "sin_actividad",
+ "currentActivity": null,
+ "openActivities": [],
+ "clockInAt": null,
+ "workedMinutes": null,
+ "activityStartedAt": null,
+ "activityElapsedMinutes": null,
+ "currentLateMinutes": null,
+ "idleSinceAt": null,
+ "lastFinished": null,
+ "enEsperaAprobacion": 0,
+ "enCorreccion": 0
+}

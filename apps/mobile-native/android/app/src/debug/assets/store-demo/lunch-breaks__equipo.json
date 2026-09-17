@@ -1,0 +1,77 @@
+{
+ "fecha": "2026-09-17T00:00:00.000Z",
+ "alcance": "todo",
+ "filas": [
+  {
+   "userId": 901,
+   "nombre": "Mariana López Herrera",
+   "puesto": "Coordinadora de Operaciones",
+   "avatarUrl": null,
+   "registro": null,
+   "puedoRevisar": true
+  },
+  {
+   "userId": 902,
+   "nombre": "Diego Ramírez Soto",
+   "puesto": "Ingeniero de Campo",
+   "avatarUrl": null,
+   "registro": null,
+   "puedoRevisar": true
+  },
+  {
+   "userId": 903,
+   "nombre": "Fernanda Cruz Molina",
+   "puesto": "Ingeniera de Soporte",
+   "avatarUrl": null,
+   "registro": null,
+   "puedoRevisar": true
+  },
+  {
+   "userId": 904,
+   "nombre": "Javier Morales Ortega",
+   "puesto": "Técnico Instalador",
+   "avatarUrl": null,
+   "registro": null,
+   "puedoRevisar": true
+  },
+  {
+   "userId": 905,
+   "nombre": "Sofía Martínez Ruiz",
+   "puesto": "Diseñadora de Proyectos",
+   "avatarUrl": null,
+   "registro": null,
+   "puedoRevisar": true
+  },
+  {
+   "userId": 906,
+   "nombre": "Ricardo Hernández Vega",
+   "puesto": "Técnico de Servicio",
+   "avatarUrl": null,
+   "registro": null,
+   "puedoRevisar": true
+  },
+  {
+   "userId": 907,
+   "nombre": "Paola Jiménez Castro",
+   "puesto": "Coordinadora Administrativa",
+   "avatarUrl": null,
+   "registro": null,
+   "puedoRevisar": true
+  },
+  {
+   "userId": 908,
+   "nombre": "Luis Fernando Torres",
+   "puesto": "Ingeniero de Redes",
+   "avatarUrl": null,
+   "registro": null,
+   "puedoRevisar": true
+  }
+ ],
+ "resumen": {
+  "total": 8,
+  "registraron": 0,
+  "enComida": 0,
+  "aDestiempo": 0,
+  "pendientes": 0
+ }
+}

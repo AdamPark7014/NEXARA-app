@@ -1,0 +1,44 @@
+{
+ "id": 908,
+ "nombre": "Luis Fernando Torres",
+ "email": "luis.torres@demo.nexara.mx",
+ "avatarUrl": null,
+ "puesto": "Ingeniero de Redes",
+ "status": "activo",
+ "currentActivity": {
+  "id": 5148,
+  "anNumber": null,
+  "titulo": "Configuración de red y NVR · Grupo Textil del Valle",
+  "estatus": "En Proceso",
+  "fechaMaxima": "2026-09-17T10:34:50.000Z",
+  "bucket": "services"
+ },
+ "openActivities": [
+  {
+   "id": 5148,
+   "anNumber": null,
+   "titulo": "Configuración de red y NVR · Grupo Textil del Valle",
+   "estatus": "En Proceso",
+   "evidenceStatus": "SERVICE_SHEET_PDF",
+   "progressPct": 50,
+   "coreKind": "servicio",
+   "assignmentCharge": "ejecucion",
+   "fechaFinalizacion": null,
+   "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+   "teamEmails": [
+    "luis.torres@demo.nexara.mx"
+   ],
+   "reparte": false,
+   "fechaInicio": "2026-09-17T04:29:50.000Z"
+  }
+ ],
+ "clockInAt": "2026-09-17T02:39:50.000Z",
+ "workedMinutes": 175,
+ "activityStartedAt": "2026-09-17T04:29:50.000Z",
+ "activityElapsedMinutes": 65,
+ "currentLateMinutes": null,
+ "idleSinceAt": null,
+ "lastFinished": null,
+ "enEsperaAprobacion": 0,
+ "enCorreccion": 0
+}

@@ -1,0 +1,44 @@
+{
+ "id": 905,
+ "nombre": "Sofía Martínez Ruiz",
+ "email": "sofia.martinez@demo.nexara.mx",
+ "avatarUrl": null,
+ "puesto": "Diseñadora de Proyectos",
+ "status": "activo",
+ "currentActivity": {
+  "id": 5146,
+  "anNumber": null,
+  "titulo": "Levantamiento de sitio · Colegio Montebello",
+  "estatus": "En Proceso",
+  "fechaMaxima": "2026-09-17T09:34:50.000Z",
+  "bucket": "projects"
+ },
+ "openActivities": [
+  {
+   "id": 5146,
+   "anNumber": null,
+   "titulo": "Levantamiento de sitio · Colegio Montebello",
+   "estatus": "En Proceso",
+   "evidenceStatus": "EVIDENCE_PHOTOS",
+   "progressPct": 25,
+   "coreKind": "proyecto",
+   "assignmentCharge": "ejecucion",
+   "fechaFinalizacion": null,
+   "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+   "teamEmails": [
+    "sofia.martinez@demo.nexara.mx"
+   ],
+   "reparte": false,
+   "fechaInicio": "2026-09-17T04:39:50.000Z"
+  }
+ ],
+ "clockInAt": "2026-09-17T03:04:50.000Z",
+ "workedMinutes": 150,
+ "activityStartedAt": "2026-09-17T04:39:50.000Z",
+ "activityElapsedMinutes": 55,
+ "currentLateMinutes": null,
+ "idleSinceAt": null,
+ "lastFinished": null,
+ "enEsperaAprobacion": 0,
+ "enCorreccion": 0
+}

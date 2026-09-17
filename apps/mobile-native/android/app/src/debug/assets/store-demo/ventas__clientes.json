@@ -1,0 +1,229 @@
+[
+ {
+  "id": 3101,
+  "name": "Corporativo Atlixco",
+  "legalName": "Corporativo Atlixco S.A. de C.V.",
+  "taxId": null,
+  "fiscalAddress": "Puebla, Pue.",
+  "fiscalZipCode": null,
+  "fiscalRegime": null,
+  "billingEmail": null,
+  "billingPhone": null,
+  "industry": null,
+  "website": null,
+  "status": "Activo",
+  "notes": null,
+  "ownerId": 901,
+  "serviceClientId": 4101,
+  "companyId": 1,
+  "createdAt": "2026-08-18T05:34:50.000Z",
+  "updatedAt": "2026-09-15T05:34:50.000Z",
+  "documents": [],
+  "opportunities": [],
+  "sectors": [
+   {
+    "id": 31010,
+    "salesClientId": 3101,
+    "sector": "PROYECTO",
+    "companyId": 1,
+    "createdAt": "2026-08-18T05:34:50.000Z"
+   },
+   {
+    "id": 31011,
+    "salesClientId": 3101,
+    "sector": "CORPORATIVO",
+    "companyId": 1,
+    "createdAt": "2026-08-18T05:34:50.000Z"
+   }
+  ],
+  "owner": {
+   "id": 901,
+   "nombre": "Mariana López Herrera",
+   "email": "mariana.lopez@demo.nexara.mx"
+  },
+  "serviceClient": {
+   "id": 4101,
+   "name": "Corporativo Atlixco",
+   "isActive": true,
+   "accountCode": null
+  }
+ },
+ {
+  "id": 3102,
+  "name": "Hotel Casa Azul",
+  "legalName": "Operadora Hotelera Casa Azul S.A. de C.V.",
+  "taxId": null,
+  "fiscalAddress": "Puebla, Pue.",
+  "fiscalZipCode": null,
+  "fiscalRegime": null,
+  "billingEmail": null,
+  "billingPhone": null,
+  "industry": null,
+  "website": null,
+  "status": "Activo",
+  "notes": null,
+  "ownerId": 902,
+  "serviceClientId": 4102,
+  "companyId": 1,
+  "createdAt": "2026-08-18T05:34:50.000Z",
+  "updatedAt": "2026-09-15T05:34:50.000Z",
+  "documents": [],
+  "opportunities": [],
+  "sectors": [
+   {
+    "id": 31020,
+    "salesClientId": 3102,
+    "sector": "PROYECTO",
+    "companyId": 1,
+    "createdAt": "2026-08-18T05:34:50.000Z"
+   },
+   {
+    "id": 31021,
+    "salesClientId": 3102,
+    "sector": "COMERCIAL",
+    "companyId": 1,
+    "createdAt": "2026-08-18T05:34:50.000Z"
+   }
+  ],
+  "owner": {
+   "id": 902,
+   "nombre": "Diego Ramírez Soto",
+   "email": "diego.ramirez@demo.nexara.mx"
+  },
+  "serviceClient": {
+   "id": 4102,
+   "name": "Hotel Casa Azul",
+   "isActive": true,
+   "accountCode": null
+  }
+ },
+ {
+  "id": 3103,
+  "name": "Colegio Montebello",
+  "legalName": "Educación Montebello A.C.",
+  "taxId": null,
+  "fiscalAddress": "Puebla, Pue.",
+  "fiscalZipCode": null,
+  "fiscalRegime": null,
+  "billingEmail": null,
+  "billingPhone": null,
+  "industry": null,
+  "website": null,
+  "status": "Activo",
+  "notes": null,
+  "ownerId": 905,
+  "serviceClientId": 4103,
+  "companyId": 1,
+  "createdAt": "2026-08-18T05:34:50.000Z",
+  "updatedAt": "2026-09-15T05:34:50.000Z",
+  "documents": [],
+  "opportunities": [],
+  "sectors": [
+   {
+    "id": 31030,
+    "salesClientId": 3103,
+    "sector": "PROYECTO",
+    "companyId": 1,
+    "createdAt": "2026-08-18T05:34:50.000Z"
+   }
+  ],
+  "owner": {
+   "id": 905,
+   "nombre": "Sofía Martínez Ruiz",
+   "email": "sofia.martinez@demo.nexara.mx"
+  },
+  "serviceClient": {
+   "id": 4103,
+   "name": "Colegio Montebello",
+   "isActive": true,
+   "accountCode": null
+  }
+ },
+ {
+  "id": 3104,
+  "name": "Grupo Textil del Valle",
+  "legalName": "Textiles del Valle de Puebla S.A. de C.V.",
+  "taxId": null,
+  "fiscalAddress": "Puebla, Pue.",
+  "fiscalZipCode": null,
+  "fiscalRegime": null,
+  "billingEmail": null,
+  "billingPhone": null,
+  "industry": null,
+  "website": null,
+  "status": "Activo",
+  "notes": null,
+  "ownerId": 908,
+  "serviceClientId": 4104,
+  "companyId": 1,
+  "createdAt": "2026-08-18T05:34:50.000Z",
+  "updatedAt": "2026-09-15T05:34:50.000Z",
+  "documents": [],
+  "opportunities": [],
+  "sectors": [
+   {
+    "id": 31040,
+    "salesClientId": 3104,
+    "sector": "PROYECTO",
+    "companyId": 1,
+    "createdAt": "2026-08-18T05:34:50.000Z"
+   },
+   {
+    "id": 31041,
+    "salesClientId": 3104,
+    "sector": "CORPORATIVO",
+    "companyId": 1,
+    "createdAt": "2026-08-18T05:34:50.000Z"
+   }
+  ],
+  "owner": {
+   "id": 908,
+   "nombre": "Luis Fernando Torres",
+   "email": "luis.torres@demo.nexara.mx"
+  },
+  "serviceClient": {
+   "id": 4104,
+   "name": "Grupo Textil del Valle",
+   "isActive": true,
+   "accountCode": null
+  }
+ },
+ {
+  "id": 3105,
+  "name": "Parque Industrial San José",
+  "legalName": "Desarrollos Industriales San José S.A.P.I.",
+  "taxId": null,
+  "fiscalAddress": "Puebla, Pue.",
+  "fiscalZipCode": null,
+  "fiscalRegime": null,
+  "billingEmail": null,
+  "billingPhone": null,
+  "industry": null,
+  "website": null,
+  "status": "Activo",
+  "notes": null,
+  "ownerId": null,
+  "serviceClientId": 4105,
+  "companyId": 1,
+  "createdAt": "2026-08-18T05:34:50.000Z",
+  "updatedAt": "2026-09-15T05:34:50.000Z",
+  "documents": [],
+  "opportunities": [],
+  "sectors": [
+   {
+    "id": 31050,
+    "salesClientId": 3105,
+    "sector": "PROYECTO",
+    "companyId": 1,
+    "createdAt": "2026-08-18T05:34:50.000Z"
+   }
+  ],
+  "owner": null,
+  "serviceClient": {
+   "id": 4105,
+   "name": "Parque Industrial San José",
+   "isActive": true,
+   "accountCode": null
+  }
+ }
+]
