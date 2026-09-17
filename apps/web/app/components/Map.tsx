@@ -3,8 +3,9 @@ import React, { useEffect, useRef, useState } from "react";
 import styles from "./Map.module.css";
 
 const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
-const GOOGLE_MAPS_API_KEY =
-  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE";
+// La clave va SOLO en la variable de entorno: escrita aquí viajaba en el bundle público y
+// cualquiera podía gastarla (el consumo de Places del 17-09 se cobró a NEXARA).
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "";
 
 const NEXARA_MAP_STYLES = [
