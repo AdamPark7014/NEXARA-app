@@ -95,6 +95,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   chat: "Chat",
   profile: "Perfil",
   confirmations: "Confirmación",
+  celebraciones: "Celebración",
 };
 
 export default function NotificationsCenterPage() {
