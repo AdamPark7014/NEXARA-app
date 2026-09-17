@@ -2,6 +2,7 @@ import { getApiBase } from "./api-base";
 import { fetchWithOfflineQueue } from "./fetch-offline";
 import {
   authCacheTag,
+  borrarCacheApi,
   readApiGetCache,
   responseFromApiCache,
   shouldCacheApiGet,
@@ -9,6 +10,7 @@ import {
 } from "./offline-api-cache";
 import { setNativeFetch } from "./native-fetch";
 import { isNeverQueuePath } from "@nexara/offline-shared";
+import { isCapacitorNative } from "./capacitor-env";
 
 const INSTALLED_KEY = "__nexaraOfflineFetchInstalled";
 
@@ -94,10 +96,32 @@ function getPanelAuthToken(): string | undefined {
   return undefined;
 }
 
+/** Usuario de ESTA pestaña: la caché se separa por persona, no solo por token. */
+function getPanelUserId(): number | string | undefined {
+  if (typeof window === "undefined") return undefined;
+  for (const [almacen, clave] of [
+    [window.sessionStorage, "nexara_user"],
+    [window.sessionStorage, "clientSession"],
+    [window.sessionStorage, "branchSession"],
+    [window.localStorage, "nexara_user"],
+  ] as const) {
+    try {
+      const raw = almacen.getItem(clave);
+      if (!raw) continue;
+      const p = JSON.parse(raw) as { id?: number | string; client?: { id?: number }; branch?: { id?: number } };
+      const id = p?.id ?? p?.client?.id ?? p?.branch?.id;
+      if (id != null) return id;
+    } catch {
+      /* ignore */
+    }
+  }
+  return undefined;
+}
+
 async function getWithApiCache(abs: string, nativeExec: () => Promise<Response>): Promise<Response> {
   if (!shouldCacheApiGet(abs)) return nativeExec();
   const token = getPanelAuthToken();
-  const tag = authCacheTag(token);
+  const tag = authCacheTag(token, getPanelUserId());
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
   if (offline) {
     const hit = await readApiGetCache(abs, tag);
@@ -128,6 +152,15 @@ export function installOfflineFetchGlobal(): void {
   if (typeof window === "undefined") return;
   const w = window as unknown as Record<string, unknown>;
   if (w[INSTALLED_KEY]) return;
+
+  // Sin conexión solo tiene sentido en la app del teléfono: el navegador no se usa así (Adam, 17-09).
+  // Además, guardar respuestas en el navegador mezclaba cuentas cuando hay varias pestañas abiertas,
+  // así que aquí se apaga y se borra lo que quedó guardado.
+  if (!isCapacitorNative()) {
+    void borrarCacheApi().catch(() => undefined);
+    w[INSTALLED_KEY] = true;
+    return;
+  }
 
   const native = window.fetch.bind(window);
   setNativeFetch(native);
