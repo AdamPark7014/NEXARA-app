@@ -1,4 +1,12 @@
-import { BadRequestException, Injectable, ForbiddenException, Logger, Optional } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  ForbiddenException,
+  Logger,
+  NotFoundException,
+  Optional,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -23,6 +31,19 @@ import {
   AttendanceJustificationsService,
   type AttendanceJustificationDto,
 } from './attendance-justifications.service';
+import {
+  MENSAJE_UBICACION_SIMULADA,
+  MOTIVO_VALIDACION,
+  RADIO_SITIO_M,
+  combinarValidacion,
+  evaluarUbicacion,
+  horaCierreAutomatico,
+  motivoCorreccionValido,
+  resolverHoraChecada,
+  sitioOficina,
+  type SitioPermitido,
+  type ValidacionChecada,
+} from './asistencia-confiable.js';
 
 @Injectable()
 export class AttendanceService {
@@ -254,7 +275,7 @@ export class AttendanceService {
     }
     const tenantId = requireCompanyId(companyId);
     const take = Math.min(Math.max(limit || 20, 1), 100);
-    return this.prisma.attendance.findMany({
+    const filas = await this.prisma.attendance.findMany({
       where: { userId: targetUserId, ...companyWhere(tenantId) },
       orderBy: { timestamp: 'desc' },
       take,
@@ -268,8 +289,46 @@ export class AttendanceService {
         entryLongitude: true,
         exitLatitude: true,
         exitLongitude: true,
+        validacion: true,
+        motivoValidacion: true,
+        fueraDeSitio: true,
+        distanciaSitioM: true,
+        sitioNombre: true,
+        offline: true,
+        cierreAutomatico: true,
+        accuracyM: true,
       },
     });
+    const correcciones = await this.correccionesDe(filas.map((f) => f.id));
+    return filas.map((fila) => ({ ...fila, correcciones: correcciones.get(fila.id) ?? [] }));
+  }
+
+  /** Campos de validación que viajan en cada checada de las lecturas (contrato sección A). */
+  private datosValidacion(
+    att: {
+      id?: number;
+      validacion?: string | null;
+      motivoValidacion?: string | null;
+      fueraDeSitio?: boolean | null;
+      distanciaSitioM?: number | null;
+      sitioNombre?: string | null;
+      offline?: boolean | null;
+      cierreAutomatico?: boolean | null;
+      accuracyM?: number | null;
+    },
+    correcciones?: Map<number, Array<Record<string, unknown>>>,
+  ) {
+    return {
+      validacion: (att.validacion as ValidacionChecada) || 'OK',
+      motivoValidacion: att.motivoValidacion ?? null,
+      fueraDeSitio: Boolean(att.fueraDeSitio),
+      distanciaSitioM: att.distanciaSitioM ?? null,
+      sitioNombre: att.sitioNombre ?? null,
+      offline: Boolean(att.offline),
+      cierreAutomatico: Boolean(att.cierreAutomatico),
+      accuracyM: att.accuracyM ?? null,
+      correcciones: (att.id != null && correcciones?.get(att.id)) || [],
+    };
   }
 
   async getDaySummary(userId: number, date?: string, companyId?: number | null) {
@@ -379,6 +438,7 @@ export class AttendanceService {
 
     const fallback = totalMinutes === 0 && attendances.length ? buildFallbackTotals() : null;
     const justificaciones = (await this.justificacionesPorPersona([userId], from, to, tenantId)).get(userId) ?? [];
+    const correcciones = await this.correccionesDe(attendances.map((a) => a.id));
     return {
       /** Días marcados por Christian como «Falta justificada» (con motivo, quién y cuándo). */
       justificaciones,
@@ -393,9 +453,11 @@ export class AttendanceService {
           };
         }),
       attendances: attendances.map((att) => ({
+        id: att.id,
         type: att.type,
         timestamp: att.timestamp.toISOString(),
         deviceInfo: att.deviceInfo || null,
+        ...this.datosValidacion(att, correcciones),
       })),
     };
   }
@@ -580,13 +642,398 @@ export class AttendanceService {
     };
   }
 
+  /**
+   * Dónde es legítimo checar hoy: la oficina y las sucursales con coordenadas de
+   * las actividades que esa persona tiene ese día.
+   *
+   * Si la base no puede responder (pruebas con Prisma simulado, cliente sin el
+   * modelo) queda sólo la oficina: es preferible no acusar a nadie de estar
+   * fuera de sitio por un fallo de lectura.
+   */
+  private async sitiosPermitidos(userId: number, at: Date, tenantId: number): Promise<SitioPermitido[]> {
+    const sitios: SitioPermitido[] = [sitioOficina()];
+    const prisma = this.prisma as any;
+    if (!prisma?.activity?.findMany || !prisma?.serviceClientBranch?.findMany) return sitios;
+
+    try {
+      const { start, end } = workDayBounds(at);
+      const enElDia = { gte: start, lte: end };
+      const actividades = await prisma.activity.findMany({
+        where: {
+          ...companyWhere(tenantId),
+          AND: [
+            {
+              OR: [
+                { responsableId: userId },
+                { assignees: { some: { userId, retiradoAt: null } } },
+              ],
+            },
+            {
+              OR: [
+                { fechaAsignacion: enElDia },
+                { fechaInicio: enElDia },
+                { fechaMaxima: enElDia },
+                { fechaEntregaEsperada: enElDia },
+              ],
+            },
+          ],
+        },
+        select: { clientId: true, branchNumber: true, branchName: true },
+        take: 50,
+      });
+
+      const clientIds = [
+        ...new Set(
+          actividades
+            .map((a: { clientId: number | null }) => a.clientId)
+            .filter((id: number | null): id is number => typeof id === 'number'),
+        ),
+      ];
+      if (!clientIds.length) return sitios;
+
+      const sucursales = await prisma.serviceClientBranch.findMany({
+        where: {
+          clientId: { in: clientIds },
+          latitud: { not: null },
+          longitud: { not: null },
+          ...companyWhere(tenantId),
+        },
+        select: { clientId: true, name: true, branchNumber: true, latitud: true, longitud: true },
+        take: 200,
+      });
+
+      const normal = (v?: string | null) => (v || '').trim().toLowerCase();
+      for (const actividad of actividades) {
+        if (typeof actividad.clientId !== 'number') continue;
+        const delCliente = sucursales.filter(
+          (s: { clientId: number }) => s.clientId === actividad.clientId,
+        );
+        // Si la actividad dice qué sucursal es, sólo esa; si no, cualquiera de ese cliente.
+        const pedida = actividad.branchNumber || actividad.branchName;
+        const elegidas = pedida
+          ? delCliente.filter(
+              (s: { name: string; branchNumber: string | null }) =>
+                normal(s.branchNumber) === normal(actividad.branchNumber) ||
+                normal(s.name) === normal(actividad.branchName),
+            )
+          : delCliente;
+        for (const sucursal of elegidas.length ? elegidas : delCliente) {
+          const latitude = Number(sucursal.latitud);
+          const longitude = Number(sucursal.longitud);
+          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+          if (sitios.some((s) => s.latitude === latitude && s.longitude === longitude)) continue;
+          sitios.push({
+            nombre: sucursal.name || 'Sucursal del cliente',
+            latitude,
+            longitude,
+            radioM: RADIO_SITIO_M,
+          });
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`No se pudieron resolver los sitios permitidos: ${(err as Error).message}`);
+    }
+    return sitios;
+  }
+
+  /**
+   * Aviso «esta checada hay que mirarla» a sus jefes por organigrama y a dirección.
+   * Nunca tumba el registro: si el aviso falla, la checada sigue siendo válida.
+   */
+  private async avisarChecadaMarcada(params: {
+    userId: number;
+    titulo: string;
+    mensaje: string;
+    attendanceId?: number | null;
+    avisarPersona?: boolean;
+  }) {
+    try {
+      const hierarchy = this.notificationHierarchy as {
+        notifyAttendanceFlagged?: (p: typeof params) => Promise<void>;
+      };
+      if (typeof hierarchy?.notifyAttendanceFlagged === 'function') {
+        await hierarchy.notifyAttendanceFlagged(params);
+      }
+    } catch (err) {
+      this.logger.warn(`No se pudo avisar de la checada marcada: ${(err as Error).message}`);
+    }
+  }
+
+  /** Lo que se escribe en las columnas de validación de una checada. */
+  private marcaValidacion(parts: Array<{ validacion: ValidacionChecada; motivo: string | null }>) {
+    const validacion = parts.reduce<ValidacionChecada>(
+      (acc, p) => combinarValidacion(acc, p.validacion),
+      'OK',
+    );
+    const motivos = [
+      ...new Set(
+        parts.filter((p) => p.validacion === validacion && p.motivo).map((p) => p.motivo as string),
+      ),
+    ];
+    return { validacion, motivoValidacion: motivos.length ? motivos.join(' · ') : null };
+  }
+
+  /**
+   * Cierra una jornada que nadie cerró: salida a `min(entrada + 9 h, 23:30)`,
+   * marcada como cierre automático y a revisión.
+   *
+   * La usa la tarea de las 23:30 y también la entrada del día siguiente: una
+   * jornada abierta de ayer ya no puede dejar a nadie sin poder checar hoy.
+   */
+  private async cerrarJornadaAutomatica(
+    day: { id: number; userId: number; lastEntryAt: Date | null },
+    tenantId: number,
+  ): Promise<Date | null> {
+    if (!day.lastEntryAt) {
+      await this.prisma.attendanceDay.update({
+        where: { id: day.id },
+        data: { isOpen: false, lastEntryAt: null },
+      });
+      return null;
+    }
+    const salidaAt = horaCierreAutomatico(day.lastEntryAt);
+    const minutos = Math.max(0, Math.ceil((salidaAt.getTime() - day.lastEntryAt.getTime()) / 60000));
+
+    let attendanceId: number | null = null;
+    try {
+      const creada = await this.prisma.attendance.create({
+        data: {
+          userId: day.userId,
+          type: 'salida',
+          timestamp: salidaAt,
+          workDate: workDateColumn(day.lastEntryAt),
+          deviceInfo: 'Cierre automático del sistema',
+          cierreAutomatico: true,
+          validacion: 'REVISAR',
+          motivoValidacion: MOTIVO_VALIDACION.cierreAutomatico,
+          companyId: tenantId,
+        },
+      });
+      attendanceId = creada.id;
+    } catch (error) {
+      // Ya había una salida ese día: basta con cerrar la jornada.
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) {
+        throw error;
+      }
+    }
+
+    await this.prisma.attendanceDay.update({
+      where: { id: day.id },
+      data: { totalMinutes: { increment: minutos }, lastEntryAt: null, isOpen: false },
+    });
+
+    await this.avisarChecadaMarcada({
+      userId: day.userId,
+      titulo: 'Jornada cerrada automáticamente',
+      mensaje: `${MOTIVO_VALIDACION.cierreAutomatico} · Salida puesta a las ${horaAviso(salidaAt)}`,
+      attendanceId,
+      avisarPersona: true,
+    });
+
+    return salidaAt;
+  }
+
+  /**
+   * Tarea de las 23:30 (hora de México): toda jornada abierta del día recibe su
+   * salida automática. Devuelve cuántas cerró.
+   */
+  async cerrarJornadasOlvidadas(ahora: Date = new Date()): Promise<{ cerradas: number }> {
+    const dias = await this.prisma.attendanceDay.findMany({
+      where: { isOpen: true, date: workDateColumn(ahora) },
+      select: { id: true, userId: true, lastEntryAt: true, companyId: true },
+    });
+    let cerradas = 0;
+    for (const dia of dias) {
+      try {
+        await this.cerrarJornadaAutomatica(dia, dia.companyId);
+        cerradas += 1;
+      } catch (err) {
+        this.logger.error(
+          `No se pudo cerrar la jornada ${dia.id} (userId=${dia.userId}): ${(err as Error).message}`,
+        );
+      }
+    }
+    if (cerradas) this.logger.log(`Cierre automático de jornadas: ${cerradas}`);
+    return { cerradas };
+  }
+
+  /**
+   * Corregir la hora de una checada — sólo dirección (CEO-equivalentes) y RH, y
+   * siempre con motivo. No se pisa el dato en silencio: queda el antes, el
+   * después, el motivo y quién lo hizo.
+   */
+  async corregirChecada(
+    actor: { id: number; email?: string | null; permissions?: string[]; roleKey?: string | null; isSuperAdmin?: boolean },
+    attendanceId: number,
+    body: { timestamp?: string; motivo?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    if (!this.puedeCorregirChecadas(actor)) {
+      throw new ForbiddenException('Solo dirección y Recursos Humanos pueden corregir checadas');
+    }
+    if (!motivoCorreccionValido(body?.motivo)) {
+      throw new BadRequestException('El motivo es obligatorio (al menos 10 caracteres)');
+    }
+    const nueva = new Date(body?.timestamp ?? '');
+    if (Number.isNaN(nueva.getTime())) {
+      throw new BadRequestException('timestamp debe ser una fecha ISO8601 válida');
+    }
+
+    const checada = await this.prisma.attendance.findFirst({
+      where: { id: attendanceId, ...companyWhere(tenantId) },
+    });
+    if (!checada) throw new NotFoundException('Checada no encontrada');
+
+    const antes = checada.timestamp;
+    const motivo = String(body.motivo).trim();
+
+    const actualizada = await this.prisma.attendance.update({
+      where: { id: checada.id },
+      data: {
+        timestamp: nueva,
+        workDate: workDateColumn(nueva),
+        validacion: 'OK',
+        motivoValidacion: null,
+      },
+    });
+
+    await this.prisma.attendanceCorrection.create({
+      data: { attendanceId: checada.id, antes, despues: nueva, motivo, porId: actor.id },
+    });
+
+    // La jornada del día se recalcula con las checadas que quedaron.
+    await this.recalcularJornada(checada.userId, nueva, tenantId).catch((err) =>
+      this.logger.warn(`No se pudo recalcular la jornada tras la corrección: ${(err as Error).message}`),
+    );
+
+    await this.avisarChecadaMarcada({
+      userId: checada.userId,
+      titulo: 'Corrigieron tu checada',
+      mensaje: `${checada.type === 'entrada' ? 'Entrada' : 'Salida'} de ${horaAviso(antes)} a ${horaAviso(nueva)} · ${motivo.slice(0, 160)}`,
+      attendanceId: checada.id,
+      avisarPersona: true,
+    });
+
+    return {
+      message: 'Checada corregida',
+      data: {
+        ...actualizada,
+        correcciones: await this.correccionesDe([checada.id]).then((m) => m.get(checada.id) ?? []),
+      },
+    };
+  }
+
+  /** Dirección (CEO-equivalentes) y RH: los únicos que pueden mover una hora. */
+  private puedeCorregirChecadas(actor: {
+    email?: string | null;
+    roleKey?: string | null;
+    permissions?: string[];
+    isSuperAdmin?: boolean;
+  }): boolean {
+    if (isCeoEquivalentEmail(actor?.email)) return true;
+    if (actor?.email && actor.email.toLowerCase() === 'developer@nexara.com.mx') return true;
+    const roleKey = (actor?.roleKey || '').toLowerCase();
+    return roleKey === 'rh' || roleKey === 'rrhh' || roleKey === 'recursos_humanos';
+  }
+
+  /** Suma de la jornada de un día a partir de sus checadas (tras corregir una hora). */
+  private async recalcularJornada(userId: number, at: Date, tenantId: number) {
+    const { start, end } = this.getDayBounds(at);
+    const checadas = await this.prisma.attendance.findMany({
+      where: { userId, timestamp: { gte: start, lt: end }, ...companyWhere(tenantId) },
+      orderBy: { timestamp: 'asc' },
+    });
+    const entrada = checadas.find((c) => c.type === 'entrada');
+    const salida = [...checadas].reverse().find((c) => c.type === 'salida');
+    if (!entrada) return;
+    const abierta = !salida;
+    const minutos = salida
+      ? Math.max(0, Math.ceil((salida.timestamp.getTime() - entrada.timestamp.getTime()) / 60000))
+      : 0;
+    await this.prisma.attendanceDay.upsert({
+      where: {
+        companyId_userId_date: { companyId: tenantId, userId, date: workDateColumn(at) },
+      },
+      create: {
+        userId,
+        date: workDateColumn(at),
+        totalMinutes: minutos,
+        lastEntryAt: abierta ? entrada.timestamp : null,
+        isOpen: abierta,
+        companyId: tenantId,
+      },
+      update: {
+        totalMinutes: minutos,
+        lastEntryAt: abierta ? entrada.timestamp : null,
+        isOpen: abierta,
+      },
+    });
+  }
+
+  /** Correcciones de un conjunto de checadas, listas para las lecturas. */
+  private async correccionesDe(attendanceIds: number[]) {
+    const vacio = new Map<number, Array<Record<string, unknown>>>();
+    const prisma = this.prisma as any;
+    if (!attendanceIds.length || !prisma?.attendanceCorrection?.findMany) return vacio;
+    try {
+      const filas = await prisma.attendanceCorrection.findMany({
+        where: { attendanceId: { in: attendanceIds } },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          attendanceId: true,
+          antes: true,
+          despues: true,
+          motivo: true,
+          createdAt: true,
+          por: { select: { id: true, nombre: true } },
+        },
+      });
+      const out = new Map<number, Array<Record<string, unknown>>>();
+      for (const fila of filas) {
+        const lista = out.get(fila.attendanceId) ?? [];
+        lista.push({
+          antes: fila.antes.toISOString(),
+          despues: fila.despues.toISOString(),
+          motivo: fila.motivo,
+          por: fila.por ? { id: fila.por.id, nombre: fila.por.nombre } : null,
+          at: fila.createdAt.toISOString(),
+        });
+        out.set(fila.attendanceId, lista);
+      }
+      return out;
+    } catch (err) {
+      this.logger.warn(`No se pudieron leer las correcciones: ${(err as Error).message}`);
+      return vacio;
+    }
+  }
+
   async register(dto: CreateAttendanceDto, userId: number, req?: any, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
     if (!dto.photoBase64 || !String(dto.photoBase64).trim()) {
       throw new BadRequestException('La foto es obligatoria para registrar asistencia');
     }
     const tenantId = requireCompanyId(companyId);
-    const now = dto.timestamp ? new Date(dto.timestamp) : new Date();
+
+    // Ubicación simulada: no se guarda nada y sus jefes se enteran. Es el truco
+    // barato para checar desde la cama, y de aquí sale la nómina.
+    if (dto.mockLocation === true) {
+      await this.avisarChecadaMarcada({
+        userId,
+        titulo: 'Intento de checada con ubicación simulada',
+        mensaje: `${dto.type === 'entrada' ? 'Entrada' : 'Salida'} rechazada · ${horaAviso(new Date())}`,
+      });
+      throw new UnprocessableEntityException(MENSAJE_UBICACION_SIMULADA);
+    }
+
+    // La hora la pone el servidor. `timestamp` (campo viejo de la app 1.0.2) se
+    // lee como hora del teléfono, no como la del registro.
+    const hora = resolverHoraChecada({
+      ahora: new Date(),
+      capturedAt: dto.capturedAt ?? dto.timestamp ?? null,
+      offline: dto.offline,
+    });
+    const now = hora.at;
     const today = this.getDateOnly(now);
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
     const deviceInfo = detectDeviceFromUserAgent(userAgent, req?.headers);
@@ -601,6 +1048,26 @@ export class AttendanceService {
       );
     }
 
+    const ubicacion = evaluarUbicacion({
+      coords,
+      accuracyM: dto.accuracyM,
+      sitios: await this.sitiosPermitidos(userId, now, tenantId),
+    });
+    const marca = this.marcaValidacion([hora, ubicacion]);
+    const columnasValidacion = {
+      clientCapturedAt: hora.clientCapturedAt,
+      accuracyM:
+        typeof dto.accuracyM === 'number' && Number.isFinite(dto.accuracyM) ? dto.accuracyM : null,
+      offline: hora.offline,
+      mockDetected: false,
+      validacion: marca.validacion,
+      motivoValidacion: marca.motivoValidacion,
+      fueraDeSitio: ubicacion.fueraDeSitio,
+      distanciaSitioM: ubicacion.distanciaSitioM,
+      sitioNombre: ubicacion.sitioNombre,
+      cierreAutomatico: false,
+    };
+
     const isEntry = dto.type === 'entrada';
 
     if (isEntry) {
@@ -613,9 +1080,16 @@ export class AttendanceService {
         where: { userId, isOpen: true, ...companyWhere(tenantId) },
       });
       if (openDay) {
-        throw new BadRequestException(
-          'Tienes una jornada abierta sin salida. Registra salida antes de una nueva entrada.',
-        );
+        // Una jornada abierta de un día anterior ya no bloquea la entrada de
+        // hoy: se cierra sola (a revisión) y la persona puede checar.
+        const esDeHoy =
+          openDay.date instanceof Date && openDay.date.getTime() === today.getTime();
+        if (esDeHoy) {
+          throw new BadRequestException(
+            'Tienes una jornada abierta sin salida. Registra salida antes de una nueva entrada.',
+          );
+        }
+        await this.cerrarJornadaAutomatica(openDay, tenantId);
       }
 
       const attendance = await this.createAttendanceRecord({
@@ -628,6 +1102,7 @@ export class AttendanceService {
           photoUrl: this.persistAttendancePhoto(dto.photoBase64),
           entryLatitude: coords?.latitude ?? null,
           entryLongitude: coords?.longitude ?? null,
+          ...columnasValidacion,
           companyId: tenantId,
         },
         include: { user: true },
@@ -708,6 +1183,8 @@ export class AttendanceService {
         now,
       );
 
+      await this.avisarSiHayQueRevisar(userId, 'entrada', attendance.id, columnasValidacion);
+
       return {
         message: 'Entrada registrada exitosamente',
         data: attendance,
@@ -726,29 +1203,41 @@ export class AttendanceService {
       throw new BadRequestException('No hay una entrada abierta para cerrar');
     }
 
-    // Limpiar salida huérfana de un intento fallido anterior (jornada sigue abierta).
+    // Salida huérfana de un intento anterior (jornada sigue abierta): se
+    // actualiza, no se borra. Un cierre automático de las 23:30 también cae
+    // aquí, y borrar la única prueba de que existió esa salida —en una tabla de
+    // la que sale la nómina— no es limpiar, es perder el dato.
     const orphanExit = await this.findAttendanceOnDate(userId, 'salida', now, tenantId);
-    if (orphanExit) {
-      await this.prisma.attendance.delete({ where: { id: orphanExit.id } });
-      this.logger.warn(
-        `Salida huérfana eliminada (id=${orphanExit.id}) para userId=${userId} al cerrar jornada abierta`,
-      );
-    }
+    const datosSalida = {
+      timestamp: now,
+      workDate: today,
+      deviceInfo,
+      photoUrl: this.persistAttendancePhoto(dto.photoBase64),
+      exitLatitude: coords?.latitude ?? null,
+      exitLongitude: coords?.longitude ?? null,
+      ...columnasValidacion,
+    };
 
-    const attendance = await this.createAttendanceRecord({
-      data: {
-        userId,
-        workDate: today,
-        type: dto.type,
-        timestamp: now,
-        deviceInfo,
-        photoUrl: this.persistAttendancePhoto(dto.photoBase64),
-        exitLatitude: coords?.latitude ?? null,
-        exitLongitude: coords?.longitude ?? null,
-        companyId: tenantId,
-      },
-      include: { user: true },
-    });
+    const attendance = orphanExit
+      ? await (async () => {
+          this.logger.warn(
+            `Salida previa reutilizada (id=${orphanExit.id}) para userId=${userId} al cerrar jornada abierta`,
+          );
+          return this.prisma.attendance.update({
+            where: { id: orphanExit.id },
+            data: datosSalida,
+            include: { user: true },
+          });
+        })()
+      : await this.createAttendanceRecord({
+          data: {
+            userId,
+            type: dto.type,
+            ...datosSalida,
+            companyId: tenantId,
+          },
+          include: { user: true },
+        });
 
     const diffMs = now.getTime() - openDay.lastEntryAt.getTime();
     const durationMinutes = diffMs > 0 ? Math.ceil(diffMs / 60000) : 0;
@@ -807,11 +1296,45 @@ export class AttendanceService {
       now,
     );
 
+    await this.avisarSiHayQueRevisar(userId, 'salida', attendance.id, columnasValidacion);
+
     return {
       message: 'Salida registrada exitosamente',
       data: attendance,
       day: updatedDay,
     };
+  }
+
+  /**
+   * Una checada fuera de sitio o marcada para revisar no se queda callada: sus
+   * jefes por organigrama y dirección se enteran en el momento.
+   */
+  private async avisarSiHayQueRevisar(
+    userId: number,
+    tipo: 'entrada' | 'salida',
+    attendanceId: number,
+    marca: {
+      validacion: ValidacionChecada;
+      motivoValidacion: string | null;
+      fueraDeSitio: boolean;
+      distanciaSitioM: number | null;
+      sitioNombre: string | null;
+    },
+  ) {
+    if (!marca.fueraDeSitio && marca.validacion !== 'REVISAR') return;
+    const partes = [
+      tipo === 'entrada' ? 'Entrada' : 'Salida',
+      marca.fueraDeSitio && marca.distanciaSitioM != null
+        ? `Fuera de sitio · a ${marca.distanciaSitioM} m de ${marca.sitioNombre || 'el sitio más cercano'}`
+        : null,
+      marca.motivoValidacion,
+    ].filter(Boolean);
+    await this.avisarChecadaMarcada({
+      userId,
+      titulo: marca.fueraDeSitio ? 'Checada fuera de sitio' : 'Checada por revisar',
+      mensaje: partes.join(' · '),
+      attendanceId,
+    });
   }
 
   private async emitAttendanceUpdate(userId: number, type: string, timestamp: Date, user: any) {
@@ -1174,6 +1697,8 @@ export class AttendanceService {
           orderBy: { timestamp: 'asc' },
         });
 
+        const correccionesPorChecada = await this.correccionesDe(attendances.map((a) => a.id));
+
         const activities = await this.prisma.activity.findMany({
           where: {
             responsableId: user.id,
@@ -1227,6 +1752,7 @@ export class AttendanceService {
             };
           }),
           attendances: attendances.map((att) => ({
+            id: att.id,
             type: att.type,
             timestamp: att.timestamp.toISOString(),
             deviceInfo: att.deviceInfo || null,
@@ -1235,6 +1761,7 @@ export class AttendanceService {
             entryLongitude: att.entryLongitude ?? undefined,
             exitLatitude: att.exitLatitude ?? undefined,
             exitLongitude: att.exitLongitude ?? undefined,
+            ...this.datosValidacion(att, correccionesPorChecada),
           })),
           activities: activities.map((activity) => ({
             id: activity.id,

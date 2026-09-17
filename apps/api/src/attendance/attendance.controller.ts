@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req, UseGuards, Get, Query, Res, Delete, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards, Get, Patch, Query, Res, Delete, Param, ParseIntPipe } from '@nestjs/common';
 import type { Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import { AttendanceHybridService } from './attendance-hybrid.service';
@@ -62,9 +62,26 @@ export class AttendanceController {
     return {
       id: Number(u.id),
       email: u.email ?? null,
+      roleKey: u.roleKey ?? null,
       isSuperAdmin: Boolean(u.isSuperAdmin),
       permissions: Array.isArray(u.permissions) ? u.permissions : [],
     };
+  }
+
+  /**
+   * Corregir la hora de una checada: sólo dirección (CEO-equivalentes) y RH, con
+   * motivo de al menos 10 caracteres. Queda el antes, el después y quién lo hizo.
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  @Patch(':id/correccion')
+  correccion(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { timestamp?: string; motivo?: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.attendanceService.corregirChecada(this.actor(req), id, body, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
