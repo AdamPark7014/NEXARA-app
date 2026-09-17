@@ -72,12 +72,15 @@ enum AsistenciasAccess {
 enum AttendanceEstado: String, CaseIterable {
     case presente = "PRESENTE"
     case completo = "COMPLETO"
+    /// Sin checada, pero Christian justificó el día.
+    case justificada = "JUSTIFICADA"
     case ausente = "AUSENTE"
 
     var label: String {
         switch self {
         case .presente: return "En jornada"
         case .completo: return "Completó"
+        case .justificada: return "Falta justificada"
         case .ausente: return "Sin checada"
         }
     }
@@ -86,6 +89,7 @@ enum AttendanceEstado: String, CaseIterable {
         switch self {
         case .presente: return CorePalette.green
         case .completo: return CorePalette.blue
+        case .justificada: return CorePalette.purple
         case .ausente: return CorePalette.slate
         }
     }
@@ -94,7 +98,8 @@ enum AttendanceEstado: String, CaseIterable {
         switch self {
         case .presente: return 0
         case .completo: return 1
-        case .ausente: return 2
+        case .justificada: return 2
+        case .ausente: return 3
         }
     }
 }

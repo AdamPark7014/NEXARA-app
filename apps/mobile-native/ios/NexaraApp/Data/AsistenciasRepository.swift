@@ -40,6 +40,77 @@ struct AttendancePunch: Hashable, Identifiable {
     }
 }
 
+/// Día sin checada que Christian justificó (`justificaciones[]` de `attendance/range` y
+/// `attendance/hierarchy/range`). No es checada ni suma horas: se muestra como
+/// «Falta justificada · motivo» en lugar de «Sin checada».
+struct AttendanceJustification: Hashable, Identifiable {
+    /// Mínimo del motivo (`JUSTIFICATION_MOTIVO_MINIMO`).
+    static let motivoMinimo = 10
+    static let motivoMaximo = 1000
+
+    let id: Int
+    let userId: Int
+    /// `AAAA-MM-DD`.
+    let fecha: String
+    let motivo: String
+    /// «Falta justificada · motivo» tal como lo arma el API.
+    let etiqueta: String
+    let justificadaPor: String
+    let justificadaAt: String
+
+    /// Si el API no mandó `etiqueta`, se arma igual que él.
+    var texto: String {
+        etiqueta.isEmpty ? "Falta justificada · \(motivo)" : etiqueta
+    }
+
+    /// «Justificó Christian · jue 17 sep, 10:30».
+    var detalle: String {
+        let quien = justificadaPor.isEmpty ? "Justificada" : "Justificó \(justificadaPor)"
+        guard let when = CoreFormat.when(justificadaAt) else { return quien }
+        return "\(quien) · \(when)"
+    }
+
+    private static let diaEntrada: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let diaSalida: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "es_MX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "EEE d MMM"
+        return formatter
+    }()
+
+    /// «jue 17 sep» del día `AAAA-MM-DD` (la columna es DATE: se lee sin zona, como el API).
+    static func diaCorto(_ fecha: String) -> String {
+        guard let date = diaEntrada.date(from: String(fecha.prefix(10))) else { return fecha }
+        return diaSalida.string(from: date)
+    }
+
+    var fechaCorta: String { Self.diaCorto(fecha) }
+
+    init(raw: [String: Any]) {
+        id = StockParse.int(raw["id"]) ?? 0
+        userId = StockParse.int(raw["userId"]) ?? 0
+        fecha = String(StockParse.str(raw["fecha"]).prefix(10))
+        motivo = StockParse.str(raw["motivo"])
+        etiqueta = StockParse.str(raw["etiqueta"])
+        let by = raw["justificadaPor"] as? [String: Any]
+        justificadaPor = StockParse.str(by?["nombre"])
+        justificadaAt = StockParse.str(raw["justificadaAt"])
+    }
+
+    static func list(_ value: Any?) -> [AttendanceJustification] {
+        (value as? [[String: Any]] ?? []).map { AttendanceJustification(raw: $0) }.filter { !$0.fecha.isEmpty }
+    }
+}
+
 /// Un día de `AttendanceDay` dentro del rango pedido.
 struct AttendanceTeamDay: Hashable {
     let date: String
@@ -63,6 +134,7 @@ struct AttendanceTeamMember: Hashable, Identifiable {
     let totalMinutes: Int
     let days: [AttendanceTeamDay]
     let punches: [AttendancePunch]
+    let justificaciones: [AttendanceJustification]
 
     var id: Int { userId }
     var displayName: String {
@@ -85,6 +157,12 @@ struct AttendanceTeamMember: Hashable, Identifiable {
         totalMinutes = StockParse.int(raw["totalMinutes"]) ?? 0
         days = (raw["days"] as? [[String: Any]] ?? []).map { AttendanceTeamDay(raw: $0) }
         punches = (raw["attendances"] as? [[String: Any]] ?? []).map { AttendancePunch(raw: $0) }
+        justificaciones = AttendanceJustification.list(raw["justificaciones"])
+    }
+
+    /// Falta justificada de ese día, si la hay (`faltaDelDia` de la web).
+    func justification(_ date: String) -> AttendanceJustification? {
+        justificaciones.first { $0.fecha == date }
     }
 
     /// Última checada del tipo pedido (el API las manda ascendentes, pero la web
@@ -169,6 +247,30 @@ final class AsistenciasRepository {
     func myPunches(date: String) async throws -> [AttendancePunch] {
         let data = try await api.get("attendance/history", query: ["date": date])
         return ApiClient.decodeMapList(data).map { AttendancePunch(raw: $0) }
+    }
+
+    // MARK: Faltas justificadas
+
+    /// Mis faltas justificadas del rango (`justificaciones` de `GET attendance/range`).
+    func myJustifications(from: String, to: String) async throws -> [AttendanceJustification] {
+        let range = try await ConsoleRepository.shared.attendanceRangeItem(from: from, to: to, hierarchy: false)
+        return range.justificaciones.sorted { $0.fecha > $1.fecha }
+    }
+
+    /// `POST attendance/justificaciones { userId, fecha, motivo }` — solo Christian.
+    /// No crea checadas: el día queda como «Falta justificada».
+    func justifyAbsence(userId: Int, fecha: String, motivo: String) async throws {
+        struct Body: Encodable {
+            let userId: Int
+            let fecha: String
+            let motivo: String
+        }
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON(
+            "attendance/justificaciones",
+            body: Body(userId: userId, fecha: fecha, motivo: motivo)
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 
     // MARK: GPS
