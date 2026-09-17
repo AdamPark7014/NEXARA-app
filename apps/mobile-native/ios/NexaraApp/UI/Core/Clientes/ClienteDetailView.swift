@@ -1,14 +1,20 @@
 import SwiftUI
 
-/// Lo que se confirma antes de tocar el estatus del cliente.
-private enum ClienteAccion: Identifiable {
+/// Lo que se confirma antes de tocar el estatus del cliente o de uno de sus proyectos.
+private enum ClienteAccion: Identifiable, Equatable {
     case desactivar, reactivar, eliminar
+    case desactivarProyecto(id: Int, titulo: String)
+    case reactivarProyecto(id: Int, titulo: String)
+    case eliminarProyecto(id: Int, titulo: String)
 
     var id: String {
         switch self {
         case .desactivar: return "desactivar"
         case .reactivar: return "reactivar"
         case .eliminar: return "eliminar"
+        case .desactivarProyecto(let id, _): return "desactivar-proyecto-\(id)"
+        case .reactivarProyecto(let id, _): return "reactivar-proyecto-\(id)"
+        case .eliminarProyecto(let id, _): return "eliminar-proyecto-\(id)"
         }
     }
 
@@ -17,26 +23,29 @@ private enum ClienteAccion: Identifiable {
         case .desactivar: return "Desactivar cliente"
         case .reactivar: return "Reactivar cliente"
         case .eliminar: return "Eliminar cliente"
+        case .desactivarProyecto: return "Desactivar proyecto"
+        case .reactivarProyecto: return "Reactivar proyecto"
+        case .eliminarProyecto: return "Eliminar proyecto"
         }
     }
 
     var boton: String {
         switch self {
-        case .desactivar: return "Desactivar"
-        case .reactivar: return "Reactivar"
-        case .eliminar: return "Eliminar"
+        case .desactivar, .desactivarProyecto: return "Desactivar"
+        case .reactivar, .reactivarProyecto: return "Reactivar"
+        case .eliminar, .eliminarProyecto: return "Eliminar"
         }
     }
 
     /// Como la web: desactivar y eliminar se confirman en rojo; reactivar no.
     var rol: ButtonRole? {
         switch self {
-        case .reactivar: return nil
-        case .desactivar, .eliminar: return .destructive
+        case .reactivar, .reactivarProyecto: return nil
+        case .desactivar, .eliminar, .desactivarProyecto, .eliminarProyecto: return .destructive
         }
     }
 
-    /// Mismos textos que el diálogo de `/erp/clientes/:id`.
+    /// Los del cliente, mismos textos que el diálogo de `/erp/clientes/:id`.
     func mensaje(_ nombre: String) -> String {
         switch self {
         case .desactivar:
@@ -45,6 +54,12 @@ private enum ClienteAccion: Identifiable {
             return "«\(nombre)» volverá a estar activo en el padrón."
         case .eliminar:
             return "¿Eliminar «\(nombre)» del padrón? Esta acción no se puede deshacer. Si solo ya no trabajan con él, mejor desactívalo."
+        case .desactivarProyecto(_, let titulo):
+            return "«\(titulo)» quedará inactivo. Sus actividades y su historial se conservan y podrás reactivarlo después."
+        case .reactivarProyecto(_, let titulo):
+            return "«\(titulo)» volverá a estar activo."
+        case .eliminarProyecto(_, let titulo):
+            return "¿Eliminar «\(titulo)»? Deja de aparecer en listas y buscadores; sus actividades conservan su historial. Si solo está detenido, mejor desactívalo."
         }
     }
 }
@@ -204,10 +219,7 @@ struct ClienteDetailView: View {
                     Text("Sin proyectos aún.").foregroundColor(.secondary)
                 } else {
                     ForEach(projects) { p in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(p.title).font(.subheadline.weight(.semibold))
-                            Text(p.statusLabel).font(.caption).foregroundColor(.secondary)
-                        }
+                        projectRow(p)
                     }
                 }
                 if mySectors.contains(.proyecto) {
@@ -219,6 +231,52 @@ struct ClienteDetailView: View {
                     }
                     .disabled(busy)
                 }
+            }
+        }
+    }
+
+    /// Proyecto con su estatus y, con permiso, el menú para desactivarlo, reactivarlo o eliminarlo.
+    private func projectRow(_ p: CoreOperationalProject) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(p.title).font(.subheadline.weight(.semibold))
+                if p.isInactive {
+                    CoreChip(icon: "pause.circle", text: "Inactivo")
+                } else {
+                    Text(p.statusLabel).font(.caption).foregroundColor(.secondary)
+                }
+            }
+            Spacer(minLength: 8)
+            if permisos.puedeDesactivar || permisos.puedeEliminar {
+                Menu {
+                    if permisos.puedeDesactivar {
+                        if p.isInactive {
+                            Button {
+                                accion = .reactivarProyecto(id: p.id, titulo: p.title)
+                            } label: {
+                                Label("Reactivar proyecto", systemImage: "play.circle")
+                            }
+                        } else {
+                            Button {
+                                accion = .desactivarProyecto(id: p.id, titulo: p.title)
+                            } label: {
+                                Label("Desactivar proyecto", systemImage: "pause.circle")
+                            }
+                        }
+                    }
+                    if permisos.puedeEliminar {
+                        Button(role: .destructive) {
+                            accion = .eliminarProyecto(id: p.id, titulo: p.title)
+                        } label: {
+                            Label("Eliminar proyecto", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .imageScale(.large)
+                        .accessibilityLabel("Opciones del proyecto")
+                }
+                .disabled(busy)
             }
         }
     }
@@ -285,11 +343,35 @@ struct ClienteDetailView: View {
                 try await ClientesRepository.shared.delete(id: clientId)
                 onChanged?()
                 dismiss()
+            case .desactivarProyecto(let id, _), .reactivarProyecto(let id, _):
+                let activar: Bool
+                if case .reactivarProyecto = pendiente { activar = true } else { activar = false }
+                try await ClientesRepository.shared.setProjectActive(id: id, active: activar)
+                await reloadProjects()
+                notice = activar ? "Proyecto reactivado." : "Proyecto desactivado. Sus actividades y su historial se conservan."
+            case .eliminarProyecto(let id, _):
+                try await ClientesRepository.shared.deleteProject(id: id)
+                projects.removeAll { $0.id == id }
+                await reloadProjects()
+                notice = "Proyecto eliminado."
             }
         } catch {
-            self.error = error.toUserMessage(fallback: pendiente == .eliminar
-                ? "No se pudo eliminar el cliente"
-                : "No se pudo cambiar el estatus del cliente")
+            let fallback: String
+            switch pendiente {
+            case .eliminar: fallback = "No se pudo eliminar el cliente"
+            case .desactivar, .reactivar: fallback = "No se pudo cambiar el estatus del cliente"
+            case .eliminarProyecto: fallback = "No se pudo eliminar el proyecto"
+            case .desactivarProyecto, .reactivarProyecto: fallback = "No se pudo cambiar el estatus del proyecto"
+            }
+            self.error = error.toUserMessage(fallback: fallback)
+        }
+    }
+
+    /// Solo la lista de proyectos; si falla se conserva la que ya estaba.
+    private func reloadProjects() async {
+        guard let serviceId = client?.serviceClientId else { return }
+        if let fresh = try? await ClientesRepository.shared.projects(serviceClientId: serviceId) {
+            projects = fresh
         }
     }
 

@@ -109,16 +109,18 @@ struct CoreOperationalProject: Decodable, Identifiable {
     let startDate: String?
     let client: ClientRef?
 
-    /// `formatOperationalProjectStatus`.
+    /// `formatOperationalProjectStatus`. `ON_HOLD` es lo que deja «Desactivar»: se lee «Inactivo».
     var statusLabel: String {
         switch (status ?? "").uppercased() {
         case "": return "—"
         case "ACTIVE": return "Activo"
-        case "ON_HOLD": return "En pausa"
+        case "ON_HOLD": return "Inactivo"
         case "COMPLETED": return "Completado"
         default: return (status ?? "").replacingOccurrences(of: "_", with: " ")
         }
     }
+
+    var isInactive: Bool { (status ?? "").uppercased() == "ON_HOLD" }
 }
 
 /// Cuerpo de `POST ventas/clientes` como lo arma `/erp/clientes/nuevo`.
@@ -228,6 +230,22 @@ final class ClientesRepository {
         let data = try await api.get("operational-projects")
         let all: [CoreOperationalProject] = decodeEach(data)
         return all.filter { $0.client?.id == serviceClientId }
+    }
+
+    /// `POST operational-projects/:id/desactivar` (queda `ON_HOLD`) o `.../reactivar` (`ACTIVE`).
+    /// Mismo permiso que el cliente (`puedeDesactivar`).
+    func setProjectActive(id: Int, active: Bool) async throws {
+        struct Body: Encodable {}
+        try await requireOnline()
+        let data = try await api.postJSON("operational-projects/\(id)/\(active ? "reactivar" : "desactivar")", body: Body())
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `DELETE operational-projects/:id` → `{ ok: true }`. Borrado lógico: las actividades
+    /// conservan su historial. Mismo permiso que el cliente (`puedeEliminar`).
+    func deleteProject(id: Int) async throws {
+        try await requireOnline()
+        try await api.delete("operational-projects/\(id)")
     }
 
     /// `POST operational-projects` con `projectType: "OTRO"`, como el detalle web.
