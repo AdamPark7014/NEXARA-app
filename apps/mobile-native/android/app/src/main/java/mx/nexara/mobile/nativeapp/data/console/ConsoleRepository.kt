@@ -8,8 +8,10 @@ import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityAccionesDto
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.AttendanceJustificacionDto
 import mx.nexara.mobile.nativeapp.data.api.CancelActivityRequest
 import mx.nexara.mobile.nativeapp.data.api.ConsoleApi
+import mx.nexara.mobile.nativeapp.data.api.JustificarFaltaRequest
 import mx.nexara.mobile.nativeapp.data.api.ReassignActivityRequest
 
 class ConsoleRepository(context: Context) {
@@ -245,6 +247,15 @@ class ConsoleRepository(context: Context) {
 
     /** Checadas propias del día (`yyyy-MM-dd`); null = hoy. */
     suspend fun attendanceHistory(date: String? = null) = api.getAttendanceHistory(date = date)
+
+    /** Faltas justificadas propias en el rango (`attendance/range`, sin jerarquía). */
+    suspend fun myAttendanceJustifications(from: String, to: String): List<AttendanceJustificacionDto> =
+        api.getAttendanceRange(from = from, to = to).justificaciones.orEmpty()
+
+    /** Solo Christian: el día queda «Falta justificada · motivo». */
+    suspend fun justificarFalta(userId: Long, fecha: String, motivo: String) {
+        api.justificarFalta(JustificarFaltaRequest(userId = userId, fecha = fecha, motivo = motivo.trim())).close()
+    }
 
     suspend fun attendanceCheckIn(
         type: String,
