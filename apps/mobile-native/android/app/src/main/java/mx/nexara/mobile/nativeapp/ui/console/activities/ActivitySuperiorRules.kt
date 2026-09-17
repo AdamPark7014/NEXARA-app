@@ -3,7 +3,9 @@ package mx.nexara.mobile.nativeapp.ui.console.activities
 import mx.nexara.mobile.nativeapp.data.api.ActivityAccionPersonaDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityAccionesDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
+import mx.nexara.mobile.nativeapp.data.api.AvanceAnteriorDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
+import kotlin.math.roundToInt
 
 /**
  * «Cancelar actividad» y «Pasar a otro compañero» (superiores de quien la ejecuta).
@@ -55,6 +57,19 @@ object ActivitySuperiorRules {
             p.rol.equals("APOYO", ignoreCase = true) -> "$nombre · apoyo"
             else -> nombre
         }
+    }
+
+    fun tituloAvanceAnterior(av: AvanceAnteriorDto): String =
+        av.titulo?.trim()?.takeIf { it.isNotBlank() }
+            ?: "Avance anterior de ${CoreActivityRules.shortName(av.nombre).ifBlank { "tu compañero" }}"
+
+    /** «Solo lectura · 40% avanzado · Luis Pérez te la pasó · Motivo: se enfermó.» */
+    fun detalleAvanceAnterior(av: AvanceAnteriorDto): String = buildString {
+        append("Solo lectura · ")
+        append((av.progressPct ?: 0.0).roundToInt().coerceIn(0, 100)).append("% avanzado")
+        av.movidaPor?.trim()?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it).append(" te la pasó") }
+        av.motivo?.trim()?.takeIf { it.isNotBlank() }?.let { append(" · Motivo: ").append(it.trimEnd('.')) }
+        append(". Continúa desde aquí con tu propia foto de entrada y de salida.")
     }
 
     fun estaCancelada(a: ActivityDto): Boolean =

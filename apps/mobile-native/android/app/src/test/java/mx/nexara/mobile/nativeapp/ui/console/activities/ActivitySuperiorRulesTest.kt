@@ -4,6 +4,7 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityAccionPersonaDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityAccionesDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityPersonRefDto
+import mx.nexara.mobile.nativeapp.data.api.AvanceAnteriorDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,6 +66,29 @@ class ActivitySuperiorRulesTest {
         assertEquals("Luis Pérez · responsable", ActivitySuperiorRules.etiquetaPersona(luis))
         assertEquals("Beto Ruiz · apoyo", ActivitySuperiorRules.etiquetaPersona(beto))
         assertEquals("Ana López", ActivitySuperiorRules.etiquetaPersona(ana))
+    }
+
+    @Test
+    fun avanceAnteriorSoloLectura() {
+        val av = AvanceAnteriorDto(
+            nombre = "Ana López Pérez",
+            titulo = "Avance anterior de Ana López",
+            motivo = "Se enfermó.",
+            movidaPor = "Luis Pérez",
+            progressPct = 39.6,
+        )
+        assertEquals("Avance anterior de Ana López", ActivitySuperiorRules.tituloAvanceAnterior(av))
+        assertEquals(
+            "Solo lectura · 40% avanzado · Luis Pérez te la pasó · Motivo: Se enfermó. " +
+                "Continúa desde aquí con tu propia foto de entrada y de salida.",
+            ActivitySuperiorRules.detalleAvanceAnterior(av),
+        )
+        val sinDatos = AvanceAnteriorDto(nombre = "Ana López Pérez")
+        assertEquals("Avance anterior de Ana López", ActivitySuperiorRules.tituloAvanceAnterior(sinDatos))
+        assertEquals(
+            "Solo lectura · 0% avanzado. Continúa desde aquí con tu propia foto de entrada y de salida.",
+            ActivitySuperiorRules.detalleAvanceAnterior(sinDatos),
+        )
     }
 
     @Test
