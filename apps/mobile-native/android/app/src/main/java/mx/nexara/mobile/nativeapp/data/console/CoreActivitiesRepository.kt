@@ -161,8 +161,22 @@ class CoreActivitiesRepository(context: Context) {
         if (e.code() == 404) null else throw e
     }
 
-    suspend fun entryPhoto(activityId: Long, photoUrl: String, lat: Double, lng: Double): EvidenceFlowDto =
-        api.entryPhoto(activityId, ActivityEvidencePhotoStepRequest(photoUrl, lat, lng))
+    /** @param justificacionOrden por qué empezó esta y no la de más prioridad (contrato B). */
+    suspend fun entryPhoto(
+        activityId: Long,
+        photoUrl: String,
+        lat: Double,
+        lng: Double,
+        justificacionOrden: String? = null,
+    ): EvidenceFlowDto = api.entryPhoto(
+        activityId,
+        ActivityEvidencePhotoStepRequest(
+            photoUrl = photoUrl,
+            latitude = lat,
+            longitude = lng,
+            justificacionOrden = justificacionOrden?.trim()?.takeIf { it.isNotEmpty() },
+        ),
+    )
 
     suspend fun evidencePhotos(
         activityId: Long,

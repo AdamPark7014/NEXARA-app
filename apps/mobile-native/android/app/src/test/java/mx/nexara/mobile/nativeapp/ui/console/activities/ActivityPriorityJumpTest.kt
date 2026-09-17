@@ -2,6 +2,8 @@ package mx.nexara.mobile.nativeapp.ui.console.activities
 
 import mx.nexara.mobile.nativeapp.ui.console.activities.ActivityPriorityJump.Pendiente
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -44,6 +46,17 @@ class ActivityPriorityJumpTest {
         assertEquals(0, ActivityPriorityJump.rango("Alta"))
         assertEquals(1, ActivityPriorityJump.rango(null))
         assertEquals(2, ActivityPriorityJump.rango("baja"))
+    }
+
+    @Test
+    fun `lo de manana no es salto de prioridad`() {
+        val hoy = java.time.LocalDate.of(2026, 9, 17)
+        val zone = java.time.ZoneId.of("America/Mexico_City")
+        assertTrue(ActivityPriorityJump.esDelDiaOAntes("2026-09-17T09:00:00-06:00", hoy, zone))
+        assertTrue(ActivityPriorityJump.esDelDiaOAntes("2026-09-15T09:00:00-06:00", hoy, zone))
+        assertFalse(ActivityPriorityJump.esDelDiaOAntes("2026-09-18T09:00:00-06:00", hoy, zone))
+        // Sin fecha no se puede descartar: cuenta.
+        assertTrue(ActivityPriorityJump.esDelDiaOAntes(null, hoy, zone))
     }
 
     @Test

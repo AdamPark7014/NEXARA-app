@@ -711,6 +711,11 @@ data class ActivityEvidencePhotoStepRequest(
     val photoUrl: String,
     val latitude: Double,
     val longitude: Double,
+    /**
+     * Contrato B: por qué empezó esta y no la de más prioridad que sigue
+     * pendiente. Es opcional — la foto de entrada nunca se bloquea por esto.
+     */
+    val justificacionOrden: String? = null,
 )
 
 data class ActivityEvidencePdfStepRequest(
