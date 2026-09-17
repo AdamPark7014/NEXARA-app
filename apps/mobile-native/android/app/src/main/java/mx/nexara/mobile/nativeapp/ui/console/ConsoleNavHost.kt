@@ -1,7 +1,5 @@
 package mx.nexara.mobile.nativeapp.ui.console
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -11,18 +9,14 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -38,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -148,7 +141,6 @@ fun ConsoleNavHost(
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
     val notificationsRepo = remember(context) { NotificationsRepository(context) }
-    var showLogoutDialog by remember { mutableStateOf(false) }
     val user = remember { authRepo.loadSession() }
     val navController = rememberNavController()
     var chatChannelId by remember { mutableStateOf<Long?>(null) }
@@ -170,7 +162,18 @@ fun ConsoleNavHost(
     val currentRoute = currentDestination?.route
 
     // Campana: al entrar, cada 45 s y al volver de cualquier pantalla.
+    val rutaAnterior = remember { arrayOfNulls<String>(1) }
     LaunchedEffect(currentRoute) {
+        val vieneDeBandeja = rutaAnterior[0] == ConsoleRoutes.Notifications
+        rutaAnterior[0] = currentRoute
+        // Abrir la bandeja la da por vista (NotificationsScreen llama a «leer todo»):
+        // el contador vuelve a cero y no se consulta mientras sigas ahí.
+        if (currentRoute == ConsoleRoutes.Notifications) {
+            unreadCount = 0
+            return@LaunchedEffect
+        }
+        // Al salir de la bandeja se da tiempo a que termine ese «leer todo» antes de contar.
+        if (vieneDeBandeja) delay(1_500)
         while (true) {
             runCatching { notificationsRepo.unreadCount() }
                 .onSuccess { unreadCount = it.unreadCount }
@@ -260,35 +263,26 @@ fun ConsoleNavHost(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { navController.navigate(ConsoleRoutes.Notifications) { launchSingleTop = true } },
-                    ) {
-                        BadgedBox(
-                            badge = {
-                                if (unreadCount > 0) {
-                                    Badge { Text(if (unreadCount > 99) "99+" else "$unreadCount") }
-                                }
-                            },
+                    // Sin «Salir» aquí: cerrar sesión vive al final de Mi perfil, con confirmación.
+                    // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
+                    if (currentRoute != ConsoleRoutes.Notifications) {
+                        IconButton(
+                            onClick = { navController.navigate(ConsoleRoutes.Notifications) { launchSingleTop = true } },
                         ) {
-                            Icon(
-                                Icons.Default.Notifications,
-                                contentDescription = if (unreadCount > 0) "Notificaciones, $unreadCount sin leer" else "Notificaciones",
-                                tint = Color.White,
-                            )
+                            BadgedBox(
+                                badge = {
+                                    if (unreadCount > 0) {
+                                        Badge { Text(if (unreadCount > 99) "99+" else "$unreadCount") }
+                                    }
+                                },
+                            ) {
+                                Icon(
+                                    Icons.Default.Notifications,
+                                    contentDescription = if (unreadCount > 0) "Notificaciones, $unreadCount sin leer" else "Notificaciones",
+                                    tint = Color.White,
+                                )
+                            }
                         }
-                    }
-                    FilledTonalButton(
-                        onClick = { showLogoutDialog = true },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Color(0xFFFFE4E6),
-                            contentColor = Color(0xFFDC2626),
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .heightIn(min = 48.dp),
-                    ) {
-                        Text("Salir", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
                     }
                 },
             )
@@ -403,11 +397,11 @@ fun ConsoleNavHost(
                     onOpenOfflineQueue = {
                         navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
                     },
+                    onLogout = onLogout,
                 )
             }
             nxComposable(ConsoleRoutes.Notifications, style = NxNavAnimStyle.Push) {
                 NotificationsScreen(
-                    onBack = { navController.popBackStack() },
                     // El destino pasa por el mismo camino que un push: abre detalle y pestaña.
                     onOpenDestination = { dest -> PendingDeepLink.publish(dest) },
                 )
@@ -435,22 +429,5 @@ fun ConsoleNavHost(
                 )
             }
         }
-    }
-
-    if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Cerrar sesión") },
-            text = { Text("¿Deseas cerrar tu sesión actual?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showLogoutDialog = false
-                    onLogout()
-                }) { Text("Cerrar sesión") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) { Text("Cancelar") }
-            },
-        )
     }
 }
