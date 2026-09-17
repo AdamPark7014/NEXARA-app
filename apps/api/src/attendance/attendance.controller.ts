@@ -73,7 +73,11 @@ export class AttendanceController {
    * motivo de al menos 10 caracteres. Queda el antes, el después y quién lo hizo.
    */
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    // RH no tiene `attendance.manage` (su permiso es `hr.manage`); el servicio
+    // vuelve a exigir que sea dirección o RH.
+    anyPermissions: [PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_MANAGE],
+  })
   @Patch(':id/correccion')
   correccion(
     @Req() req: any,
