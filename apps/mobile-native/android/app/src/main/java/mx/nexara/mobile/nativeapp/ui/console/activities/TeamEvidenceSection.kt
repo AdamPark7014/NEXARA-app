@@ -535,6 +535,16 @@ private fun TeamMemberCard(
                     nombre = m.nombre,
                     onOpenVisor = onOpenVisor,
                 )
+                val salidas = m.alertasZona.orEmpty()
+                if (salidas.isNotEmpty()) {
+                    Text(
+                        "Salidas de zona (${salidas.size})",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFFB91C1C),
+                    )
+                    salidas.forEach { AlertaZonaFila(it) }
+                }
             }
         }
     }

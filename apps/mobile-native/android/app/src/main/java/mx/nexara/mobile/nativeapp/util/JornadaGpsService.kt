@@ -75,6 +75,40 @@ object JornadaGps {
         }
     }
 
+    private const val PREFS = "nx_jornada_gps"
+    private const val KEY_ACTIVIDAD = "actividad_id"
+    private const val KEY_SOLO_ACTIVIDAD = "solo_actividad"
+
+    /**
+     * Actividad iniciada (foto de entrada) mientras corre el rastreo: los puntos se envían con su
+     * id y el servidor los mide contra la geocerca de 100 m. Sobrevive a que Android mate el proceso.
+     */
+    fun actividadActual(context: Context): Long? =
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getLong(KEY_ACTIVIDAD, -1L).takeIf { it > 0 }
+
+    /**
+     * Seguimiento de una actividad: arranca (o ajusta) el servicio para mandar puntos más seguido.
+     * Lo inicia la persona al tomar su foto de entrada, con la app abierta.
+     */
+    fun iniciarActividad(context: Context, activityId: Long) {
+        if (!canTrack(context)) return
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.edit()
+            .putLong(KEY_ACTIVIDAD, activityId)
+            .putBoolean(KEY_SOLO_ACTIVIDAD, !running)
+            .apply()
+        start(context)
+    }
+
+    /** Al registrar la salida: se deja de seguir la actividad; si el servicio solo corría por ella, se apaga. */
+    fun terminarActividad(context: Context) {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val soloActividad = prefs.getBoolean(KEY_SOLO_ACTIVIDAD, false)
+        prefs.edit().remove(KEY_ACTIVIDAD).remove(KEY_SOLO_ACTIVIDAD).apply()
+        if (soloActividad) stop(context) else if (running) start(context)
+    }
+
     fun stop(context: Context) {
         val app = context.applicationContext
         val intent = Intent(app, JornadaGpsService::class.java).setAction(ACTION_STOP)
@@ -92,6 +126,10 @@ object JornadaGps {
     internal const val INTERVAL_MS = 3 * 60_000L
     internal const val FASTEST_MS = 90_000L
     internal const val MIN_DISTANCE_M = 100f
+
+    /** Durante una actividad: cada ~2 min aunque no se mueva, para vigilar la geocerca de 100 m. */
+    internal const val ACTIVIDAD_INTERVAL_MS = 2 * 60_000L
+    internal const val ACTIVIDAD_FASTEST_MS = 60_000L
     internal const val NOTIFICATION_ID = 4711
 }
 
@@ -156,14 +194,20 @@ class JornadaGpsService : Service() {
 
     @SuppressLint("MissingPermission")
     private fun startTracking() {
-        if (client != null) return
+        // Cada arranque recalcula la frecuencia: con actividad en curso se mide más seguido.
+        client?.removeLocationUpdates(callback)
+        client = null
         val fused = LocationServices.getFusedLocationProviderClient(this)
-        val request = LocationRequest.Builder(
-            Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-            JornadaGps.INTERVAL_MS,
-        )
-            .setMinUpdateIntervalMillis(JornadaGps.FASTEST_MS)
-            .setMinUpdateDistanceMeters(JornadaGps.MIN_DISTANCE_M)
+        val enActividad = JornadaGps.actividadActual(this) != null
+        val request = if (enActividad) {
+            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, JornadaGps.ACTIVIDAD_INTERVAL_MS)
+                .setMinUpdateIntervalMillis(JornadaGps.ACTIVIDAD_FASTEST_MS)
+                .setMinUpdateDistanceMeters(0f)
+        } else {
+            LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, JornadaGps.INTERVAL_MS)
+                .setMinUpdateIntervalMillis(JornadaGps.FASTEST_MS)
+                .setMinUpdateDistanceMeters(JornadaGps.MIN_DISTANCE_M)
+        }
             .setWaitForAccurateLocation(false)
             .build()
         try {
@@ -197,7 +241,12 @@ class JornadaGpsService : Service() {
         val speedKmh = if (location.hasSpeed()) (location.speed * 3.6).toDouble() else null
         scope.launch {
             try {
-                repo.gpsPost(lat = lat, lng = lng, speedKmh = speedKmh)
+                repo.gpsPost(
+                    lat = lat,
+                    lng = lng,
+                    speedKmh = speedKmh,
+                    activityId = JornadaGps.actividadActual(this@JornadaGpsService),
+                )
             } catch (e: Exception) {
                 // Sin red la cola offline lo reenvía; aquí solo se anota.
                 Log.w(JornadaGps.TAG, "No se pudo enviar la ubicación: ${e.message}")

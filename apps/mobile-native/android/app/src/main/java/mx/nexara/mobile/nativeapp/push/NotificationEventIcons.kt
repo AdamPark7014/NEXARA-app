@@ -39,6 +39,7 @@ internal object NotificationEventIcons {
         "finalizada" to R.drawable.ic_nx_task_alt,
         "atraso" to R.drawable.ic_nx_hourglass_top,
         "vencida" to R.drawable.ic_nx_error_outline,
+        "fuera_zona" to R.drawable.ic_nx_wrong_location,
         "chat" to R.drawable.ic_nx_chat,
         "mencion" to R.drawable.ic_nx_alternate_email,
         "seguridad" to R.drawable.ic_nx_shield,
@@ -47,7 +48,7 @@ internal object NotificationEventIcons {
 
     private val AMBER_KEYS = setOf("entrada_tarde", "atraso", "comida_tarde")
     private val GREEN_KEYS = setOf("aprobada", "finalizada", "comida_aprobada")
-    private val RED_KEYS = setOf("devuelta", "vencida", "comida_rechazada", "seguridad")
+    private val RED_KEYS = setOf("devuelta", "vencida", "comida_rechazada", "seguridad", "fuera_zona")
 
     @DrawableRes
     fun glyphRes(icon: String): Int = GLYPHS[icon] ?: R.drawable.ic_nx_notifications

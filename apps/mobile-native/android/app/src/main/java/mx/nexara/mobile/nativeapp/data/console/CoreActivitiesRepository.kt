@@ -5,6 +5,9 @@ import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
 import mx.nexara.mobile.nativeapp.data.api.AddTeamMemberRequest
+import mx.nexara.mobile.nativeapp.data.api.GeocercaAlertaDto
+import mx.nexara.mobile.nativeapp.data.api.GeocercaDto
+import mx.nexara.mobile.nativeapp.data.api.JustificarZonaRequest
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
@@ -161,4 +164,10 @@ class CoreActivitiesRepository(context: Context) {
 
     suspend fun resubmit(activityId: Long, step: String, data: Any): EvidenceFlowDto =
         api.resubmit(activityId, EvidenceResubmitRequest(step = step, data = data))
+
+    /** Punto de inicio, recorrido y salidas de zona de quien ejecuta la actividad. */
+    suspend fun geocerca(activityId: Long): GeocercaDto = api.geocerca(activityId)
+
+    suspend fun justificarZona(activityId: Long, alertId: Long, motivo: String, fotoBase64: String?): GeocercaAlertaDto =
+        api.justificarZona(activityId, alertId, JustificarZonaRequest(motivo = motivo, fotoBase64 = fotoBase64))
 }

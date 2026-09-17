@@ -65,6 +65,8 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceFlowDto
+import mx.nexara.mobile.nativeapp.data.api.GeocercaDto
+import mx.nexara.mobile.nativeapp.util.JornadaGps
 import mx.nexara.mobile.nativeapp.data.api.EvidenceFormDataWrapper
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotoGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotosWithGeoRequest
@@ -173,6 +175,16 @@ fun EvidenceCaptureFlow(
         }
     }
 
+    // Geocerca (100 m del punto de inicio): la tarjeta la carga y aquí se usa para la foto de salida.
+    var geocerca by remember(activity.id) { mutableStateOf<GeocercaDto?>(null) }
+    LaunchedEffect(activity.id, flow?.status) {
+        val enCurso = !flow?.entryPhotoUrl.isNullOrBlank() && step != STEP_COMPLETED && !locked
+        // Si la app se reinició con la actividad a medias, el seguimiento vuelve solo.
+        if (enCurso && JornadaGps.actividadActual(context) != activity.id) {
+            JornadaGps.iniciarActividad(context, activity.id)
+        }
+    }
+
     var cameraKind by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf<GeoPhoto?>(null) }
     var pendingKind by remember { mutableStateOf<String?>(null) }
@@ -208,6 +220,16 @@ fun EvidenceCaptureFlow(
             pendingError = GPS_REQUIRED_MESSAGE
             return false
         }
+        if (kind == KIND_EXIT) {
+            val cerca = geocerca ?: runCatching { withContext(Dispatchers.IO) { repo.geocerca(activity.id) } }
+                .getOrNull()
+                ?.also { geocerca = it }
+            val distancia = ActivityGeofence.distanciaAlInicio(cerca, lat, lng)
+            if (distancia != null && distancia > (cerca?.radioM ?: ActivityGeofence.RADIO_M)) {
+                pendingError = ActivityGeofence.mensajeSalida(distancia, cerca?.radioM ?: ActivityGeofence.RADIO_M)
+                return false
+            }
+        }
         busy = true
         pendingError = null
         return try {
@@ -230,6 +252,14 @@ fun EvidenceCaptureFlow(
                 else -> "Foto de salida guardada."
             }
             applySaved(saved, message)
+            if (saved.status != null) {
+                // Seguimiento de ubicación mientras dura la actividad (se ve en la notificación permanente).
+                if (kind == KIND_ENTRY) {
+                    JornadaGps.iniciarActividad(context, activity.id)
+                } else {
+                    JornadaGps.terminarActividad(context)
+                }
+            }
             true
         } catch (e: Exception) {
             pendingError = e.toUserMessage("No se pudo guardar la foto")
@@ -371,6 +401,14 @@ fun EvidenceCaptureFlow(
             }
 
             StepProgress(steps = steps, flow = flow, current = step)
+
+            if (!flow?.entryPhotoUrl.isNullOrBlank()) {
+                GeocercaActividadCard(
+                    activityId = activity.id,
+                    refreshKey = reloadKey + (flow?.status?.hashCode() ?: 0),
+                    onEstado = { geocerca = it },
+                )
+            }
 
             success?.let {
                 NxIconText(
