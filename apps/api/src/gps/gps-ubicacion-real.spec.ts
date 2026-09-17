@@ -112,7 +112,8 @@ describe('"hoy" se compara contra una columna @db.Date', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-09T01:00:00Z'));
     const { service, prisma } = build();
 
-    await service.findTeamLocations({ id: 3, isSuperAdmin: true }, 7);
+    // El mapa del equipo ya solo lo ve dirección; el día que se consulta es el mismo.
+    await service.findTeamLocations({ id: 3, email: 'gerencia@nexara.com.mx' }, 7);
 
     const filtro = prisma.user.findMany.mock.calls[0][0].where;
     const fecha: Date = filtro.attendanceDays.some.date;

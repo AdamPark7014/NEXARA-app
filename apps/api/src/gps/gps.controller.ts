@@ -6,6 +6,7 @@ import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { puedeVerGpsDireccion } from '../attendance/asistencia-confiable.js';
 
 @Controller('gps')
 @UseGuards(UrlAccessGuard)
@@ -55,10 +56,9 @@ export class GpsController {
     @Query('date') date?: string,
     @Query('userId') userId?: string,
   ) {
-    const targetId = userId ? Number(userId) : user.id;
-    if (!Number.isFinite(targetId) || targetId <= 0) {
-      return this.gpsService.getMyTrajectory(user.id, date, companyId);
-    }
+    const pedido = userId ? Number(userId) : user.id;
+    const targetId = Number.isFinite(pedido) && pedido > 0 ? pedido : user.id;
+    // Incluido el recorrido propio: el permiso lo decide el servicio (solo dirección).
     return this.gpsService.getTrajectoryForUser(user, targetId, date, companyId);
   }
 
@@ -79,22 +79,25 @@ export class GpsController {
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
-  async findOne(@CurrentUser() user: any, @Param('id') id: string) {
-    const location = await this.gpsService.findOneWithUser(+id);
+  async findOne(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+  ) {
+    // Acotado a la empresa de quien pregunta: antes el id de otra empresa
+    // devolvía su punto con el usuario dentro.
+    const location = await this.gpsService.findOneWithUser(+id, companyId);
     if (!location) return null;
 
     if (location.usuarioId === user.id) return location;
 
-    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.GPS_MANAGE)) {
-      throw new ForbiddenException('No tienes permisos para ver esta ubicacion');
+    // Ubicación ajena: solo dirección (contrato del viernes 18-09, sección A).
+    if (!puedeVerGpsDireccion(user)) {
+      throw new ForbiddenException('El GPS en vivo del equipo es solo para dirección');
     }
 
     if (!location.usuario?.locationConsent) {
       throw new ForbiddenException('El usuario no comparte su ubicacion');
-    }
-
-    if (!user.isSuperAdmin && user.departmentId && location.usuario?.departmentId !== user.departmentId) {
-      throw new ForbiddenException('No puedes ver usuarios de otro departamento');
     }
 
     return location;
