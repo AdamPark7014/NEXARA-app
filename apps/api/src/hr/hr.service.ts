@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
+import { expectedStartHm, isLateVsSchedule } from '../attendance/attendance-hybrid.match.js';
+import { buildAccessScheduleAssignment } from '../integra/access-schedule-defaults.js';
 
 @Injectable()
 export class HrService {
@@ -334,6 +336,11 @@ export class HrService {
           estadoRRHH: true,
           fechaIngreso: true,
           fechaCreacion: true,
+          // Para la puntualidad: cada quien tiene su horario (oficina 09:00, contratista 08:00).
+          employeeNumber: true,
+          roleKey: true,
+          tipoContrato: true,
+          role: { select: { orgRoleKey: true } },
           department: { select: { nombre: true } },
         },
       }),
@@ -385,20 +392,43 @@ export class HrService {
       return d && d >= since12m;
     });
 
-    // Puntualidad: entrada antes de 09:15 = on time (configurable soft rule)
+    // Puntualidad, en hora de México y contra el horario de cada quien.
+    //
+    // Antes era `timestamp.getHours()` contra un 09:15 fijo. `getHours()` es la
+    // hora local del proceso, que en el contenedor es UTC: una entrada a las
+    // 08:30 de México se leía como las 14:30 y contaba retardo. Con eso, la
+    // plantilla entera salía impuntual. Ahora se usa la misma regla que los
+    // avisos: oficina 09:00, contratista 08:00, 15 min de gracia.
+    const horarioPorUsuario = new Map<number, ReturnType<typeof buildAccessScheduleAssignment>>();
+    for (const u of staff) {
+      horarioPorUsuario.set(
+        u.id,
+        buildAccessScheduleAssignment({
+          employeeNumber: u.employeeNumber,
+          isActive: u.isActive !== false,
+          roleKey: u.roleKey,
+          orgRoleKey: u.role?.orgRoleKey,
+          tipoContrato: u.tipoContrato,
+        }),
+      );
+    }
     const lateByUser = new Map<number, number>();
     const presentDaysByUser = new Map<number, number>();
+    let entradasConHorario = 0;
     for (const e of entries30) {
-      const localHour = e.timestamp.getHours();
-      const localMin = e.timestamp.getMinutes();
-      const late = localHour > 9 || (localHour === 9 && localMin > 15);
-      if (late) lateByUser.set(e.userId, (lateByUser.get(e.userId) ?? 0) + 1);
+      const plantilla = horarioPorUsuario.get(e.userId);
+      if (!plantilla || !expectedStartHm(plantilla.key)) continue; // 24/7 y visitantes no marcan retardo
+      entradasConHorario += 1;
+      if (isLateVsSchedule(e.timestamp.toISOString(), plantilla.key)) {
+        lateByUser.set(e.userId, (lateByUser.get(e.userId) ?? 0) + 1);
+      }
     }
     for (const d of attendanceDays30) {
       presentDaysByUser.set(d.userId, (presentDaysByUser.get(d.userId) ?? 0) + 1);
     }
 
-    const totalEntryEvents = entries30.length;
+    // Solo cuentan las entradas de quien tiene horario con retardo posible.
+    const totalEntryEvents = entradasConHorario;
     const totalLateEvents = [...lateByUser.values()].reduce((a, b) => a + b, 0);
     const punctualityPct = totalEntryEvents
       ? Math.round(((totalEntryEvents - totalLateEvents) / totalEntryEvents) * 1000) / 10
