@@ -129,6 +129,13 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
    - **Servidor:** se mató un bucle viejo `while pgrep -f deploy/update.sh` que se encontraba a sí mismo; para esperar despliegues usar `pgrep -f "[d]eploy/update\.sh"`.
    - **En curso (agentes, sin integrar):** Android e iOS: botones de Christian para clientes y proyectos, íconos y banner de cumpleaños, cancelar/pasar actividad, avance anterior y faltas justificadas.
 
+28. **17-09 (11:10–11:30): chat web, sesión por pestaña, Android e iOS integrados.**
+   - **Chat web sin scroll** (`044f9293`): la rejilla no tenía alto de fila; con los chats de la demo se notó (lista y mensajes sin desplazar, buscador escondido por scrollIntoView). `grid-template-rows: minmax(0,1fr)` + `min-height: 0`; bajar al último mensaje solo mueve la lista. No verificado en navegador (sin sesión).
+   - **Sesión por pestaña** (`21d8e20a`): la sesión web vivía en la cookie `HttpOnly` `nexara_token`, una por navegador. Ahora cada pestaña guarda su JWT en `sessionStorage` y lo manda como `Authorization` (la API ya lo prefería); extend renueva el JWT; realtime usa el de la pestaña; logout manda el JWT y la API solo borra la cookie si es de esa sesión (`logoutDebeBorrarCookie`); `nx_session` ya no se borra al cerrar sesión en navegador. Hay que volver a entrar una vez por pestaña. Contrapartida: el JWT vuelve a ser legible por JS (XSS).
+   - **iOS** (merge `dffa4da0`): clientes/proyectos de Christian, banner e íconos de cumpleaños, cancelar/pasar, avance anterior, faltas justificadas. Solo chequeo estático; falta compilar en Xcode.
+   - **Android** (merge de `feat/android-permisos-celebraciones` + cola offline): lo mismo que iOS; 249 pruebas en verde; instalado en el emulador (banner de cumpleaños y menú ⋮ de Christian en cliente verificados). Pendientes que reportó el agente: el selector de proyecto en nueva actividad aún lista los inactivos; no hay «quitar justificación».
+   - Servidor desplegado en `dffa4da0` (web + API).
+
 ### Falta probar a mano
 
 1. Antonio → actividad de Alejandro con evidencia enviada → Evidencias: ve fotos/PDF/formulario, «Aprobar» con estrellas y observaciones → actividad Finalizada; Luis y Christian reciben aviso.
