@@ -33,6 +33,8 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityKinds
 
 data class ClientsListUiState(
     val loading: Boolean = true,
+    /** Deslizar para actualizar: la lista actual se queda a la vista mientras llega la nueva. */
+    val refreshing: Boolean = false,
     val error: String? = null,
     val allowedSectors: List<ClientSector> = emptyList(),
     val sector: ClientSector? = null,
@@ -82,22 +84,26 @@ class ClientsListViewModel(app: Application) : AndroidViewModel(app) {
         load()
     }
 
-    fun load() {
+    fun load(refresh: Boolean = false) {
         val sector = _state.value.sector
         if (sector == null) {
-            _state.update { it.copy(loading = false, items = emptyList()) }
+            _state.update { it.copy(loading = false, refreshing = false, items = emptyList()) }
             return
         }
-        _state.update { it.copy(loading = true, error = null) }
+        _state.update {
+            if (refresh) it.copy(refreshing = true, error = null) else it.copy(loading = true, error = null)
+        }
         viewModelScope.launch {
             try {
                 val rows = withContext(Dispatchers.IO) { repo.bySector(sector) }
-                _state.update { it.copy(loading = false, items = rows, error = null) }
+                _state.update { it.copy(loading = false, refreshing = false, items = rows, error = null) }
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
                         loading = false,
-                        items = emptyList(),
+                        refreshing = false,
+                        // Si falla un refresco, lo que ya se veía se queda.
+                        items = if (refresh) it.items else emptyList(),
                         error = e.toUserMessage("No se pudieron cargar los clientes"),
                     )
                 }
