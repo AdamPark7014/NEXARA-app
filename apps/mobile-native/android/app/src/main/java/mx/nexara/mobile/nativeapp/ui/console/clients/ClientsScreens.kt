@@ -3,39 +3,50 @@ package mx.nexara.mobile.nativeapp.ui.console.clients
 import android.app.Application
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.nexara.mobile.nativeapp.access.ClientSector
 import mx.nexara.mobile.nativeapp.data.api.ClientDto
 import mx.nexara.mobile.nativeapp.ui.console.activities.DatePickerField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormTextField
@@ -61,6 +72,7 @@ private fun ClientDto.subtitleLine(): String =
 
 // ── Padrón ──────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClientsListScreen(
     onOpenClient: (Long) -> Unit,
@@ -78,106 +90,126 @@ fun ClientsListScreen(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(contentPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            NxSectionHeader(
-                title = "Clientes",
-                subtitle = "Un padrón, tres usos. Cambia de sector sin salir de aquí.",
-                trailing = {
-                    Button(onClick = { onNewClient(state.sector) }) { Text("Nuevo") }
-                },
-            )
-        }
+    // Sin encabezado repetido: la barra ya dice «Clientes». Arriba, lo que más se usa: buscar.
+    Box(Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = state.refreshing,
+            onRefresh = { vm.load(refresh = true) },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
+                    end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
+                    top = contentPadding.calculateTopPadding(),
+                    // Espacio para que el botón «Nuevo cliente» no tape la última fila.
+                    bottom = 96.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item {
+                    NxSearchField(
+                        value = state.query,
+                        onValueChange = vm::setQuery,
+                        placeholder = "Buscar nombre, RFC o razón social",
+                    )
+                }
 
-        if (state.allowedSectors.size > 1) {
-            item {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    state.allowedSectors.forEach { sector ->
-                        FilterChip(
-                            selected = state.sector == sector,
-                            onClick = { vm.selectSector(sector) },
-                            label = { Text(sector.shortLabel) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = sector.glyph.icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                if (state.allowedSectors.size > 1) {
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(state.allowedSectors, key = { it.name }) { sector ->
+                                FilterChip(
+                                    selected = state.sector == sector,
+                                    onClick = { vm.selectSector(sector) },
+                                    label = { Text(sector.shortLabel, maxLines = 1) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = sector.glyph.icon,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(FilterChipDefaults.IconSize),
+                                        )
+                                    },
                                 )
+                            }
+                        }
+                    }
+                }
+
+                state.sector?.let { sector ->
+                    item {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                sector.help,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = NxColors.Muted,
+                                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                            )
+                            Text(
+                                if (state.loading) "…" else "${state.visible.size}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                        }
+                    }
+                }
+
+                state.error?.let { err ->
+                    item { NxErrorBlock(err) { vm.load() } }
+                }
+
+                when {
+                    state.loading -> item { NxLoadingBlock("Cargando clientes…") }
+                    state.error != null && state.items.isEmpty() -> Unit
+                    state.items.isNotEmpty() && state.visible.isEmpty() -> item {
+                        NxEmptyState(
+                            title = "Sin coincidencias",
+                            subtitle = "Ningún cliente de este sector coincide con «${state.query.trim()}».",
+                            actionLabel = "Limpiar búsqueda",
+                            onAction = { vm.setQuery("") },
+                        )
+                    }
+                    state.visible.isEmpty() -> item {
+                        NxEmptyState(
+                            title = "Nadie en este sector todavía",
+                            subtitle = "Da de alta el primer cliente del sector.",
+                            actionLabel = "Crear el primero",
+                            onAction = { onNewClient(state.sector) },
+                        )
+                    }
+                    else -> items(state.visible, key = { it.id }) { client ->
+                        NxListRow(
+                            title = client.name.orEmpty().ifBlank { "Sin nombre" },
+                            subtitle = client.subtitleLine(),
+                            meta = client.sectorNames
+                                .mapNotNull { ClientSector.fromApi(it)?.shortLabel }
+                                .joinToString(" · ")
+                                .ifBlank { null },
+                            chipText = if (state.showOwner) {
+                                client.owner?.nombre?.split(Regex("\\s+"))?.take(2)?.joinToString(" ")
+                                    ?: "Sin encargado"
+                            } else {
+                                "Ver"
                             },
+                            onClick = { onOpenClient(client.id) },
                         )
                     }
                 }
             }
         }
 
-        item {
-            NxSearchField(
-                value = state.query,
-                onValueChange = vm::setQuery,
-                placeholder = "Buscar nombre, RFC…",
-            )
-        }
-
-        state.sector?.let { sector ->
-            item {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        sector.help,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f).padding(end = 8.dp),
-                    )
-                    Text(
-                        if (state.loading) "…" else "${state.visible.size}",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                    )
-                }
-            }
-        }
-
-        state.error?.let { err ->
-            item { NxErrorBlock(err) { vm.load() } }
-        }
-
-        when {
-            state.loading -> item { NxLoadingBlock("Cargando clientes…") }
-            state.visible.isEmpty() -> item {
-                NxEmptyState(
-                    title = "Nadie en este sector todavía",
-                    subtitle = "Da de alta el primer cliente del sector.",
-                    actionLabel = "Crear el primero",
-                    onAction = { onNewClient(state.sector) },
-                )
-            }
-            else -> items(state.visible, key = { it.id }) { client ->
-                NxListRow(
-                    title = client.name.orEmpty().ifBlank { "Sin nombre" },
-                    subtitle = client.subtitleLine(),
-                    meta = client.sectorNames
-                        .mapNotNull { ClientSector.fromApi(it)?.shortLabel }
-                        .joinToString(" · ")
-                        .ifBlank { null },
-                    chipText = if (state.showOwner) {
-                        client.owner?.nombre?.split(Regex("\\s+"))?.take(2)?.joinToString(" ")
-                            ?: "Sin encargado"
-                    } else {
-                        "Ver"
-                    },
-                    onClick = { onOpenClient(client.id) },
-                )
-            }
-        }
-
-        item { Spacer(Modifier.height(16.dp)) }
+        ExtendedFloatingActionButton(
+            onClick = { onNewClient(state.sector) },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            containerColor = NxColors.Brand,
+            contentColor = Color.White,
+            icon = { Icon(Icons.Default.Add, contentDescription = null) },
+            text = { Text("Nuevo cliente") },
+        )
     }
 }
 
@@ -186,7 +218,8 @@ fun ClientsListScreen(
 @Composable
 fun ClientDetailScreen(
     clientId: Long,
-    onBack: () -> Unit,
+    // La barra superior ya trae la flecha de volver; no se repite un «← Clientes».
+    @Suppress("UNUSED_PARAMETER") onBack: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
     val app = LocalContext.current.applicationContext as Application
@@ -201,10 +234,6 @@ fun ClientDetailScreen(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            TextButton(onClick = onBack) { Text("← Clientes") }
-        }
-
         if (state.loading && client == null) {
             item { NxLoadingBlock("Cargando cliente…") }
         }
@@ -348,7 +377,8 @@ private fun ClientFactRow(label: String, value: String?) {
 @Composable
 fun NewClientScreen(
     presetSector: ClientSector?,
-    onBack: () -> Unit,
+    // La barra superior («Nuevo cliente») ya trae título y flecha de volver.
+    @Suppress("UNUSED_PARAMETER") onBack: () -> Unit,
     onCreated: (Long) -> Unit,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
@@ -364,9 +394,6 @@ fun NewClientScreen(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { TextButton(onClick = onBack) { Text("← Clientes") } }
-        item { NxSectionHeader(title = "Nuevo cliente", subtitle = "Datos fiscales y sectores.") }
-
         item {
             Column {
                 Text("Sectores", fontWeight = FontWeight.SemiBold)
