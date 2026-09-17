@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import {
@@ -11,7 +11,7 @@ import {
   sectorFromSlug,
   type ClientSector,
 } from "@/lib/client-sectors";
-import { createSalesClient } from "@/lib/sales-api";
+import { createSalesClient, getClientPermissions } from "@/lib/sales-api";
 import { IconLabel } from "@/components/ui/IconBadge";
 import { CLIENT_SECTOR_ICONS } from "@/components/erp/ClientSectorIcon";
 import PhoneField, { isValidNexaraPhone } from "@/components/PhoneField";
@@ -44,9 +44,37 @@ function NuevoClienteForm() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** null = consultando; la API decide quién agrega (jefes con personal a cargo, administración, dirección). */
+  const [puedeAgregar, setPuedeAgregar] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let vivo = true;
+    getClientPermissions(token)
+      .then((p) => vivo && setPuedeAgregar(p.puedeAgregar))
+      .catch(() => vivo && setPuedeAgregar(false));
+    return () => {
+      vivo = false;
+    };
+  }, [token]);
 
   if (!canSeeClientesModule(user?.email)) {
     return <p className={styles.sub}>Sin acceso.</p>;
+  }
+  if (puedeAgregar === null) {
+    return <p className={styles.sub}>Cargando…</p>;
+  }
+  if (!puedeAgregar) {
+    return (
+      <div className={styles.wrap}>
+        <button type="button" className={styles.ghostBtn} onClick={() => router.push("/erp/clientes")}>
+          ← Clientes
+        </button>
+        <p className={styles.sub}>
+          Solo quien tiene personal a su cargo, Administración o Dirección puede agregar clientes.
+        </p>
+      </div>
+    );
   }
 
   const toggleSector = (s: ClientSector) => {

@@ -1674,8 +1674,30 @@ export class NotificationHierarchyService {
 
   async notifySalesClientCreated(actorId: number, clientId: number, clientName: string, actorName: string) {
     try {
-      const recipients = await this.getOperationalOversightRecipientIds(actorId);
-      const msg = `${actorName} registró el cliente comercial «${clientName}».`;
+      // El token no trae el nombre: sin él los avisos decían «Usuario registró…».
+      const nombreReal =
+        actorName && actorName !== 'Usuario' ? actorName : await this.resolveActorName(actorId);
+      const ceoIds = new Set(await this.getCeoUserIds());
+      // Christian recibe el aviso con su propio formato: «Ana López agregó el cliente Plaza Dorada».
+      for (const uid of ceoIds) {
+        if (uid === actorId) continue;
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'SALES_CLIENT_CREATED',
+          category: 'sales',
+          title: `${persona(nombreReal)} agregó el cliente ${String(clientName || '').trim() || 'sin nombre'}`,
+          message: 'Nuevo cliente en el padrón',
+          icon: 'cliente',
+          triggerUserId: actorId,
+          relatedEntityId: clientId,
+          entityType: 'SalesClient',
+          relatedUrl: `/erp/clientes/${clientId}`,
+          priority: 'normal',
+          dedupeSeconds: 0,
+        });
+      }
+      const recipients = (await this.getOperationalOversightRecipientIds(actorId)).filter((id) => !ceoIds.has(id));
+      const msg = `${nombreReal} registró el cliente comercial «${clientName}».`;
       for (const uid of recipients) {
         await this.notificationsService.createNotification({
           userId: uid,

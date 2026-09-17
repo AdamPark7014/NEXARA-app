@@ -112,6 +112,17 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', methods: ['GET'], scope: 'read' },
 ];
 
+/**
+ * Alta y edición de clientes para roles administrativos sin panel de ventas (RH, contabilidad).
+ * Quién puede de verdad (jefes con personal a cargo, administración, dirección) y qué clientes ve
+ * cada quien lo deciden `client-permissions.ts` y las reglas de sector del servicio.
+ */
+export const CLIENT_ADMIN_WRITE_URL_RULES: UrlRule[] = [
+  { path: '/api/ventas/clientes/permisos', methods: ['GET'], scope: 'read' },
+  { path: '/api/ventas/clientes', methods: ['POST'], scope: 'write' },
+  { path: '/api/ventas/clientes/*', methods: ['PATCH'], scope: 'write' },
+];
+
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
 export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', scope: 'write' },
@@ -733,6 +744,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/lunch-breaks/**', scope: 'write' },
     { path: '/api/users', methods: ['GET'], scope: 'read' },
     { path: '/api/documents/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    ...CLIENT_ADMIN_WRITE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -766,6 +778,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     { path: '/api/expenses/**', scope: 'write' },
     { path: '/api/employee-payments/**', methods: ['GET', 'POST'], scope: 'write' },
+    ...CLIENT_ADMIN_WRITE_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
   ],
 

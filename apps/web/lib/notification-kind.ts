@@ -26,6 +26,7 @@ export type NotificationKind =
   | "atraso"
   | "vencida"
   | "fuera_zona"
+  | "cliente"
   | "chat"
   | "ubicacion"
   | "viatico"
@@ -65,6 +66,8 @@ export function notificationKind(category?: string | null, title?: string | null
   ) {
     return "fuera_zona";
   }
+  // SALES_CLIENT_CREATED (push `icon: cliente`): «Ana López agregó el cliente Plaza Dorada».
+  if (t.includes("agrego el cliente") || (c === "sales" && t.includes("nuevo cliente"))) return "cliente";
   if (c.startsWith("lunch") || t.includes("comida")) return "comida";
   if (c === "sla-breach" || t.includes("vencid")) return "vencida";
   if (c === "sla-alert" || t.includes("atras") || t.includes("retras")) return "atraso";
