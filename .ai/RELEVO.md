@@ -143,6 +143,13 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
    - Datos en producción (con `audit_logs` action `ORG_JEFE`): Carolina, Alejandro, Roberto → José Antonio; Joan Sebastián e Iván → David. **Sin tocar y por confirmar con Adam:** Josué (Técnico Instalador, rol `arquitecto`) sigue como jefe de Luis y David; Iván (cuenta `administracion.ventas@`) quedó con instaladores.
    - En curso (agentes): chat tipo WhatsApp en web y Android (cámara, adjuntos con vista previa, menciones de personas/actividades como chips y tarjetas).
 
+30. **17-09 (11:50–12:05): decisiones de Adam y arranque de la entrega del viernes.**
+   - Organigrama en producción (`audit_logs` `ORG_JEFE`): Josué e Iván → José Antonio (pedido de Adam). Para que José Antonio no quedara encima de Luis y David, **Luis y David pasan a reportar a Christian** (antes colgaban de Josué). Resultado: Christian → Daniela G., Luis, David, José Antonio, Paulina; David → Joan, Israel, Juan José; José Antonio → Josué, Iván, Carolina, Alejandro, Roberto.
+   - GPS solo Christian y Claudia (Claudia prueba los permisos de Christian).
+   - Folio de cotización: `NEX000620005` no sigue ninguna nomenclatura de empleado (parece consecutivo). Diseño: `NEX-{S}{AAMM}-{####}` al crear y, al enviar, la cadena de quién intervino con las siglas de su nomenclatura (`-LJ.JA.CE`), `-R2`… por versión.
+   - Contrato común `.ai/CONTRATO-VIERNES.md` (`518aa5c7`): A asistencia no manipulable + GPS solo dirección; B aceptar/rechazar, tiempos plan/real, prioridad; C pizarra semáforo + KPI; D cotizaciones en Core. Migraciones reservadas `20260917210000`, `20260917211000`, `20260917212000`.
+   - Agentes en ramas: `feat/asistencia-confiable`, `feat/actividades-aceptacion-tiempos`, `feat/pizarra-kpi`, `feat/cotizaciones-core`, `feat/android-viernes`, `feat/ios-viernes` (+ chat tipo WhatsApp web/Android/iOS).
+
 ### Falta probar a mano
 
 1. Antonio → actividad de Alejandro con evidencia enviada → Evidencias: ve fotos/PDF/formulario, «Aprobar» con estrellas y observaciones → actividad Finalizada; Luis y Christian reciben aviso.
