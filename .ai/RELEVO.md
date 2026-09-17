@@ -136,6 +136,13 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
    - **Android** (merge de `feat/android-permisos-celebraciones` + cola offline): lo mismo que iOS; 249 pruebas en verde; instalado en el emulador (banner de cumpleaños y menú ⋮ de Christian en cliente verificados). Pendientes que reportó el agente: el selector de proyecto en nueva actividad aún lista los inactivos; no hay «quitar justificación».
    - Servidor desplegado en `dffa4da0` (web + API).
 
+29. **17-09 (11:30–11:40): a quién asigna cada coordinador y Luis solo servicios** (`e990f4f2`, desplegado).
+   - Reporte de Adam: David podía asignarle a Carolina. Causa: en producción Carolina, Alejandro y Roberto tenían `managerId` = David (su pizarra sale del organigrama) y `POST activities/:id/team` no validaba a quién se asigna (el reparto de despacho sí, con `DISPATCH_POOLS`).
+   - Flujo según Adam: Luis coordina servicios y los pasa a José Antonio; José Antonio reparte a soporte (Carolina, Alejandro, Roberto); David coordina instaladores.
+   - `apps/api/src/me/equipo-alcance.ts`: una regla para pizarra y asignación (dirección todo; organigrama; extras de despacho). `POST activities/:id/team` → 403 fuera de alcance. Luis (`direccion.operaciones@`) solo ve/asigna `coreKind = servicio` (pizarra, historial, Mis actividades).
+   - Datos en producción (con `audit_logs` action `ORG_JEFE`): Carolina, Alejandro, Roberto → José Antonio; Joan Sebastián e Iván → David. **Sin tocar y por confirmar con Adam:** Josué (Técnico Instalador, rol `arquitecto`) sigue como jefe de Luis y David; Iván (cuenta `administracion.ventas@`) quedó con instaladores.
+   - En curso (agentes): chat tipo WhatsApp en web y Android (cámara, adjuntos con vista previa, menciones de personas/actividades como chips y tarjetas).
+
 ### Falta probar a mano
 
 1. Antonio → actividad de Alejandro con evidencia enviada → Evidencias: ve fotos/PDF/formulario, «Aprobar» con estrellas y observaciones → actividad Finalizada; Luis y Christian reciben aviso.
