@@ -1,12 +1,14 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildDayRoutePoints,
   googleMapsRouteUrl,
-  googleStaticMapPathUrl,
   pointCoords,
   type GpsCoordPoint,
 } from "@/lib/gps-map-links";
+import { staticRouteMapUrl } from "@/lib/static-map";
+import { useVisibleOnce } from "@/lib/use-visible-once";
 
 type TrajectoryPoint = GpsCoordPoint & {
   id?: number;
@@ -28,19 +30,56 @@ type Props = {
   compact?: boolean;
 };
 
+/**
+ * Cada cambio de URL de la imagen es una imagen nueva que alguien tiene que
+ * pagar. Las pantallas de asistencia refrescan cada 15 s y la de GPS cada 30 s:
+ * sin este freno, un turno de ocho horas con la pestaña abierta pedía cientos
+ * de mapas del mismo recorrido. La imagen se renueva como mucho cada 5 minutos.
+ */
+const MAP_REFRESH_MS = 5 * 60_000;
+
 function fmtTime(iso?: string): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function GpsTrajectoryPreview({ trajectory, attendances, compact }: Props) {
-  const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-  const routePoints = buildDayRoutePoints(attendances, trajectory);
-  const staticMapUrl = googleStaticMapPathUrl(routePoints, mapsKey, {
-    width: compact ? 480 : 640,
-    height: compact ? 200 : 280,
-  });
-  const routeUrl = googleMapsRouteUrl(routePoints);
+  const [containerRef, visible] = useVisibleOnce<HTMLDivElement>();
+  const routePoints = useMemo(
+    () => buildDayRoutePoints(attendances, trajectory),
+    [attendances, trajectory],
+  );
+  const routeUrl = useMemo(() => googleMapsRouteUrl(routePoints), [routePoints]);
+
+  // La URL ya viene redondeada a 5 decimales y muestreada: si el recorrido no
+  // cambió de verdad, sale la misma cadena y el navegador no vuelve a pedirla.
+  const candidateUrl = useMemo(
+    () => staticRouteMapUrl(routePoints, {
+      width: compact ? 480 : 640,
+      height: compact ? 200 : 280,
+    }),
+    [routePoints, compact],
+  );
+
+  const [shownUrl, setShownUrl] = useState("");
+  const lastChangeRef = useRef(0);
+
+  useEffect(() => {
+    if (!visible || !candidateUrl) return;
+    if (candidateUrl === shownUrl) return;
+
+    const elapsed = Date.now() - lastChangeRef.current;
+    if (!shownUrl || elapsed >= MAP_REFRESH_MS) {
+      lastChangeRef.current = Date.now();
+      setShownUrl(candidateUrl);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      lastChangeRef.current = Date.now();
+      setShownUrl(candidateUrl);
+    }, MAP_REFRESH_MS - elapsed);
+    return () => window.clearTimeout(timer);
+  }, [visible, candidateUrl, shownUrl]);
 
   if (trajectory.length === 0 && routePoints.length === 0) {
     return (
@@ -51,12 +90,14 @@ export default function GpsTrajectoryPreview({ trajectory, attendances, compact 
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {staticMapUrl ? (
-        <a href={routeUrl ?? staticMapUrl} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}>
+    <div ref={containerRef} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {shownUrl ? (
+        <a href={routeUrl ?? shownUrl} target="_blank" rel="noopener noreferrer" style={{ display: "block" }}>
           <img
-            src={staticMapUrl}
+            src={shownUrl}
             alt="Recorrido GPS del día"
+            loading="lazy"
+            decoding="async"
             style={{
               width: "100%",
               maxHeight: compact ? 200 : 280,
@@ -66,7 +107,21 @@ export default function GpsTrajectoryPreview({ trajectory, attendances, compact 
             }}
           />
         </a>
-      ) : null}
+      ) : (
+        <div
+          style={{
+            height: compact ? 200 : 280,
+            borderRadius: 10,
+            border: "1px dashed var(--border)",
+            display: "grid",
+            placeItems: "center",
+            fontSize: 11.5,
+            color: "var(--text-tertiary)",
+          }}
+        >
+          {candidateUrl ? "Cargando mapa del recorrido…" : "Sin mapa del recorrido."}
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11 }}>
         {routeUrl ? (

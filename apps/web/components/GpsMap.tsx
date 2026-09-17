@@ -6,8 +6,8 @@ import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import styles from './GpsMap.module.css';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
-
-const GOOGLE_MAPS_SCRIPT_ID = 'google-maps-script';
+import { googleMapsMapId, isGoogleMapsConfigured, loadGoogleMaps, loadMapConstructor } from '@/lib/google-maps-loader';
+import { useVisibleOnce } from '@/lib/use-visible-once';
 
 type GpsUser = {
   id: number;
@@ -43,8 +43,6 @@ const GpsMap = () => {
 
   const watchIdRef = useRef<number | null>(null);
   const lastSentRef = useRef<number>(0);
-  const myMapRef = useRef<HTMLDivElement>(null);
-  const teamMapRef = useRef<HTMLDivElement>(null);
   const myMapInstance = useRef<any>(null);
   const teamMapInstance = useRef<any>(null);
   const myMarkersRef = useRef<Map<string, any>>(new Map());
@@ -52,84 +50,24 @@ const GpsMap = () => {
   /** Resultado de `importLibrary('marker')` — obligatorio si el mapa usa `mapId` (Advanced Markers). */
   const markerLibraryRef = useRef<{ AdvancedMarkerElement?: new (opts: object) => any } | null>(null);
 
-  const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-  const googleMapsMapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || '';
+  const mapId = googleMapsMapId();
 
-  const canUseMaps = useMemo(() => Boolean(googleMapsKey), [googleMapsKey]);
+  const canUseMaps = useMemo(() => isGoogleMapsConfigured(), []);
 
-  const resolveMapCtor = async () => {
-    const mapsAny = window.google?.maps as any;
-    if (!mapsAny) return null;
-    if (typeof mapsAny.Map === 'function') return mapsAny.Map;
-    if (typeof mapsAny.importLibrary === 'function') {
-      const mapsLibrary = await mapsAny.importLibrary('maps');
-      if (mapsLibrary?.Map) return mapsLibrary.Map;
-    }
-    return null;
-  };
-
-  const loadGoogleMaps = () => {
-    if (!canUseMaps) return Promise.reject(new Error('API key no configurada'));
-    if (window.google?.maps) return Promise.resolve();
-
-    const injectScript = () =>
-      new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
-        script.id = GOOGLE_MAPS_SCRIPT_ID;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&v=weekly&libraries=places,marker&loading=async`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-          window.setTimeout(() => {
-            if (window.google?.maps) {
-              resolve();
-            } else {
-              reject(new Error('Google Maps no se inicializó correctamente'));
-            }
-          }, 120);
-        };
-        script.onerror = () => reject(new Error('Error al cargar Google Maps'));
-        document.body.appendChild(script);
-      });
-
-    const removeExistingScript = () => {
-      const stale = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
-      stale?.parentElement?.removeChild(stale);
-    };
-
-    return new Promise<void>((resolve, reject) => {
-      const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
-      if (existing) {
-        if (window.google?.maps) {
-          resolve();
-          return;
-        }
-
-        const start = Date.now();
-        const checkGoogle = window.setInterval(() => {
-          if (window.google?.maps) {
-            window.clearInterval(checkGoogle);
-            resolve();
-            return;
-          }
-
-          if (Date.now() - start > 12000) {
-            window.clearInterval(checkGoogle);
-            removeExistingScript();
-            injectScript().then(resolve).catch(reject);
-          }
-        }, 120);
-
-        existing.addEventListener('error', () => {
-          window.clearInterval(checkGoogle);
-          removeExistingScript();
-          injectScript().then(resolve).catch(reject);
-        }, { once: true });
-        return;
-      }
-      injectScript().then(resolve).catch(reject);
-    });
-  };
+  /**
+   * Un mapa cuesta dinero en cuanto se instancia, así que se instancia solo si
+   * hay permiso, hay algo que pintar y el hueco llegó a verse. Un mapa vacío
+   * centrado en el Zócalo no le sirve a nadie y se paga igual.
+   */
+  const [myMapRef, myMapVisible] = useVisibleOnce<HTMLDivElement>({
+    enabled: canUseMaps && !isHighLevel && Boolean(myLocation),
+  });
+  const [teamMapRef, teamMapVisible] = useVisibleOnce<HTMLDivElement>({
+    enabled: canUseMaps && isAdmin && teamLocations.length > 0,
+  });
+  const showMyMap = myMapVisible;
+  const showTeamMap = teamMapVisible;
+  const wantsMaps = showMyMap || showTeamMap;
 
   const getInitials = (name?: string) => {
     if (!name) return 'U';
@@ -144,13 +82,13 @@ const GpsMap = () => {
   };
 
   const canUseAdvancedMarkers = () =>
-    Boolean(googleMapsMapId && markerLibraryRef.current?.AdvancedMarkerElement);
+    Boolean(mapId && markerLibraryRef.current?.AdvancedMarkerElement);
 
   const createMapMarker = (map: any, position: { lat: number; lng: number }, label?: string) => {
     const mapsLib = window.google?.maps as any;
     if (!mapsLib) return null;
     const Adv = markerLibraryRef.current?.AdvancedMarkerElement;
-    if (googleMapsMapId && Adv) {
+    if (mapId && Adv) {
       return new Adv({
         map,
         position,
@@ -368,32 +306,32 @@ const GpsMap = () => {
     return () => stopTracking();
   }, [consent]);
 
+  // El SDK no se descarga hasta que uno de los dos mapas está de verdad en
+  // pantalla y con algo que dibujar. Antes se cargaba siempre que hubiera clave,
+  // incluso para un usuario sin consentimiento y sin permiso de equipo.
   useEffect(() => {
-    if (!canUseMaps) return;
-    loadGoogleMaps()
-      .then(async () => {
-        let ctor: any = null;
-        for (let attempt = 0; attempt < 25; attempt += 1) {
-          ctor = await resolveMapCtor();
-          if (ctor) break;
-          await new Promise((resolve) => window.setTimeout(resolve, 120));
-        }
-        if (!ctor) {
-          throw new Error('Google Maps Map constructor no disponible');
-        }
+    if (!wantsMaps) return;
+    let cancelled = false;
+    // Sin `places`: aquí no se busca ninguna dirección.
+    loadMapConstructor()
+      .then(async (ctor) => {
+        if (cancelled) return;
         markerLibraryRef.current = null;
-        if (googleMapsMapId && window.google?.maps && typeof (window.google.maps as any).importLibrary === 'function') {
+        if (mapId) {
           try {
-            markerLibraryRef.current = await (window.google.maps as any).importLibrary('marker');
+            const maps = await loadGoogleMaps(['marker']);
+            markerLibraryRef.current = (maps['marker'] as typeof markerLibraryRef.current) ?? null;
           } catch {
             markerLibraryRef.current = null;
           }
         }
+        if (cancelled) return;
         setMapCtor(() => ctor);
         setMapsReady(true);
       })
-      .catch((err) => setError(err.message));
-  }, [canUseMaps, googleMapsMapId]);
+      .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el mapa'));
+    return () => { cancelled = true; };
+  }, [wantsMaps, mapId]);
 
   useEffect(() => {
     if (!mapsReady || !window.google?.maps || !mapCtor) return;
@@ -402,9 +340,9 @@ const GpsMap = () => {
       setError('Constructor de Google Maps no disponible. Reintentando...');
       return;
     }
-    const mapIdOpts = canUseAdvancedMarkers() ? { mapId: googleMapsMapId } : {};
+    const mapIdOpts = canUseAdvancedMarkers() ? { mapId } : {};
 
-    if (myMapRef.current && !myMapInstance.current) {
+    if (showMyMap && myMapRef.current && !myMapInstance.current) {
       try {
         myMapInstance.current = new mapCtor(myMapRef.current, {
           center: { lat: 19.4326, lng: -99.1332 },
@@ -421,7 +359,7 @@ const GpsMap = () => {
         return;
       }
     }
-    if (teamMapRef.current && !teamMapInstance.current) {
+    if (showTeamMap && teamMapRef.current && !teamMapInstance.current) {
       try {
         teamMapInstance.current = new mapCtor(teamMapRef.current, {
           center: { lat: 19.4326, lng: -99.1332 },
@@ -438,7 +376,7 @@ const GpsMap = () => {
         return;
       }
     }
-  }, [mapsReady, mapCtor, googleMapsMapId]);
+  }, [mapsReady, mapCtor, mapId, showMyMap, showTeamMap]);
 
   useEffect(() => {
     return () => {
@@ -585,11 +523,17 @@ const GpsMap = () => {
           </div>
         </div>
         <div ref={myMapRef} className={styles.mapShell}>
-          {!canUseMaps && (
+          {!canUseMaps ? (
             <span className={styles.mapHint}>
               Configura NEXT_PUBLIC_GOOGLE_MAPS_API_KEY para ver el mapa.
             </span>
-          )}
+          ) : !myLocation ? (
+            <span className={styles.mapHint}>
+              El mapa aparece en cuanto haya una ubicación registrada.
+            </span>
+          ) : !showMyMap ? (
+            <span className={styles.mapHint}>Desliza hasta aquí para cargar el mapa.</span>
+          ) : null}
         </div>
         </div>
       )}
@@ -608,11 +552,17 @@ const GpsMap = () => {
             </div>
           </div>
           <div ref={teamMapRef} className={styles.teamMapShell}>
-            {!canUseMaps && (
+            {!canUseMaps ? (
               <span className={styles.mapHint}>
                 Configura NEXT_PUBLIC_GOOGLE_MAPS_API_KEY para ver el mapa.
               </span>
-            )}
+            ) : teamLocations.length === 0 ? (
+              <span className={styles.mapHint}>
+                Sin ubicaciones compartidas: no hay nada que mostrar en el mapa.
+              </span>
+            ) : !showTeamMap ? (
+              <span className={styles.mapHint}>Desliza hasta aquí para cargar el mapa.</span>
+            ) : null}
           </div>
           <div className={styles.teamGrid}>
             {teamLocations.length ? (
