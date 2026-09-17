@@ -24,4 +24,11 @@ class OfflineQueueRulesTest {
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/attendance/justificaciones", "POST"))
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/auth/login", "POST"))
     }
+
+    @Test
+    fun `aceptar o rechazar una actividad solo en linea`() {
+        // Las dos avisan a quien asignó: encoladas mentirían en la tarjeta.
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/aceptar", "POST"))
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/rechazar", "POST"))
+    }
 }

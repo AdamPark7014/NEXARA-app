@@ -475,6 +475,12 @@ private fun MisActividadesContent(
     var showDone by remember { mutableStateOf(false) }
     var highlightId by remember(highlightActivityId) { mutableStateOf(highlightActivityId) }
     var pendingMove by remember { mutableStateOf<PendingMove?>(null) }
+    // Contrato B: aceptar o rechazar lo que te asignaron.
+    val scope = rememberCoroutineScope()
+    var aceptandoId by remember { mutableStateOf<Long?>(null) }
+    var aceptacionError by remember { mutableStateOf<String?>(null) }
+    var aceptacionErrorId by remember { mutableStateOf<Long?>(null) }
+    var rechazando by remember { mutableStateOf<MyActivityItemDto?>(null) }
 
     LaunchedEffect(reload) {
         try {
@@ -601,6 +607,24 @@ private fun MisActividadesContent(
                     total = open.size,
                     highlighted = highlightId == a.id,
                     canReorder = canReorder,
+                    aceptando = aceptandoId == a.id,
+                    aceptacionError = aceptacionError?.takeIf { aceptacionErrorId == a.id },
+                    onAceptar = {
+                        scope.launch {
+                            aceptandoId = a.id
+                            aceptacionError = null
+                            try {
+                                withContext(Dispatchers.IO) { repo.aceptarActividad(a.id) }
+                                reload++
+                            } catch (e: Exception) {
+                                aceptacionErrorId = a.id
+                                aceptacionError = e.toUserMessage("No se pudo aceptar la actividad")
+                            } finally {
+                                aceptandoId = null
+                            }
+                        }
+                    },
+                    onRechazar = { rechazando = a },
                     onOpen = { tab -> onOpenActivity(a.id, tab) },
                     onRepartir = { user?.id?.let(onOpenPerson) },
                     onMove = { from, to -> if (to in open.indices && to != from) pendingMove = PendingMove(a, from, to) },
@@ -677,6 +701,18 @@ private fun MisActividadesContent(
         }
     }
 
+    rechazando?.let { actividad ->
+        RechazarActividadDialog(
+            titulo = actividad.titulo,
+            onDismiss = { rechazando = null },
+            onConfirm = { motivo ->
+                withContext(Dispatchers.IO) { repo.rechazarActividad(actividad.id, motivo) }
+                rechazando = null
+                reload++
+            },
+        )
+    }
+
     pendingMove?.let { move ->
         ReorderDialog(
             move = move,
@@ -709,6 +745,10 @@ private fun OpenActivityCard(
     onOpen: (String?) -> Unit,
     onRepartir: () -> Unit,
     onMove: (Int, Int) -> Unit,
+    aceptando: Boolean = false,
+    aceptacionError: String? = null,
+    onAceptar: () -> Unit = {},
+    onRechazar: () -> Unit = {},
 ) {
     val pr = CoreActivityRules.priorityUi(a.prioridad)
     val first = index == 0
@@ -760,6 +800,21 @@ private fun OpenActivityCard(
                     Text(a.titulo.orEmpty(), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
                     a.anNumber?.let { Text("Folio $it", fontSize = 12.sp, color = NxColors.Muted) }
                 }
+                // Contrato B: sin aceptar todavía. No bloquea trabajarla.
+                if (ActivitySemaforo.estaPendienteDeAceptar(a.aceptacion)) {
+                    AceptacionBanner(
+                        onAceptar = onAceptar,
+                        onRechazar = onRechazar,
+                        guardando = aceptando,
+                        error = aceptacionError,
+                    )
+                }
+                if (ActivitySemaforo.fueRechazada(a.aceptacion)) {
+                    SoftNote(
+                        text = ActivitySemaforo.rechazadaTexto(a.motivoRechazo),
+                        color = CoreActivityRules.ROJO,
+                    )
+                }
                 // Una acción principal que dice el siguiente paso; el detalle queda como secundaria.
                 val accion = ActividadesUx.primaryAction(a)
                 Row(
@@ -801,17 +856,26 @@ private fun OpenActivityCard(
                     if (a.porRepartir == true) {
                         ToneChip("Te toca repartirla", CoreActivityRules.NARANJA, icon = NxGlyph.DISPATCH.icon)
                     }
+                    // Semáforo del servidor: primero, porque es el «cómo vas».
+                    ActivitySemaforo.luz(a.semaforo)?.let { luz ->
+                        ToneChip("● ${luz.etiqueta}", luz.color)
+                    }
                     ToneChip(CoreActivityRules.estatusUi(a.estatus))
                     ToneChip("● ${pr.label}", pr.color)
                     ToneChip(CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom))
                     ToneChip(
                         text = when {
                             a.autoAsignada == true -> "Auto-asignada"
-                            a.asignadaPor?.nombre != null -> "De ${CoreActivityRules.shortName(a.asignadaPor.nombre)}"
+                            a.quienAsigno?.nombre != null ->
+                                ActivitySemaforo.asignadaPorTexto(a.quienAsigno?.nombre).orEmpty()
                             else -> "Asignada"
                         },
                         icon = if (a.autoAsignada == true) NxGlyph.PERSON.icon else null,
                     )
+                    // «Plan 2 h · real 2 h 30 min», en rojo cuando ya se pasó.
+                    ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
+                        ToneChip(texto, ActivitySemaforo.planRealColor(a.excedida))
+                    }
                 }
                 val meta = buildList {
                     add(

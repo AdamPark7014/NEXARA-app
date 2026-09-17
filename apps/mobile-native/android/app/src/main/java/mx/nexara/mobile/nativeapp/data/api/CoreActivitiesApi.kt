@@ -122,6 +122,13 @@ data class ReorderMyActivitiesRequest(
 data class DispatchMyActivityRequest(
     val userIds: List<Long>,
     val indicaciones: String? = null,
+    /** Tiempo estimado en horas (contrato B); el API viejo lo ignora. */
+    val horasPlan: Double? = null,
+)
+
+/** `POST me/activities/:id/rechazar` — el motivo es obligatorio (≥ 10). */
+data class RechazarActividadRequest(
+    val motivo: String,
 )
 
 data class ReprogramarDespachoRequest(
@@ -572,6 +579,17 @@ interface CoreActivitiesApi {
     /** Encargados de área: actividad a su propio nombre (mismo cuerpo que POST activities). */
     @POST("me/activities")
     suspend fun selfAssign(@Body body: CreateActivityRequest): ResponseBody
+
+    /** Contrato B: quien la recibe acepta… */
+    @POST("me/activities/{id}/aceptar")
+    suspend fun aceptarActividad(@Path("id") activityId: Long): ResponseBody
+
+    /** …o la rechaza con motivo; sigue asignada hasta que un superior la mueva. */
+    @POST("me/activities/{id}/rechazar")
+    suspend fun rechazarActividad(
+        @Path("id") activityId: Long,
+        @Body body: RechazarActividadRequest,
+    ): ResponseBody
 
     @POST("me/activities/{id}/despacho")
     suspend fun dispatch(
