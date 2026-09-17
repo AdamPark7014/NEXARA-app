@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { TicketAlertsService } from './ticket-alerts.service.js';
+import { ActivityTimeAlertsService } from './activity-time-alerts.service.js';
 import { ActivityLifecycleService } from './activity-lifecycle.service.js';
 import { ActivityTeamService } from './activity-team.service.js';
 import { ActivityTeamController, ActivityReassignController } from './activity-team.controller.js';
@@ -38,6 +39,7 @@ import {
     ActivityIssuesService,
     ActivitiesService,
     TicketAlertsService,
+    ActivityTimeAlertsService,
     ActivityLifecycleService,
   ],
   exports: [ActivitiesService, ActivityLifecycleService, ActivityTeamService],
