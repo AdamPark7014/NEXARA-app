@@ -40,6 +40,7 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
@@ -144,6 +145,24 @@ fun ActivityDetailScreen(
 
     /** Sube tras cancelar o pasar la actividad: se vuelve a pedir el detalle y las acciones. */
     var recarga by remember(activity.id) { mutableIntStateOf(0) }
+
+    // Contrato B: aceptar o rechazar desde el detalle (es donde cae el push «actividad nueva»).
+    val coreRepo = remember(context) { CoreActivitiesRepository(context) }
+    var aceptando by remember(activity.id) { mutableStateOf(false) }
+    var aceptacionError by remember(activity.id) { mutableStateOf<String?>(null) }
+    var rechazando by remember(activity.id) { mutableStateOf(false) }
+
+    if (rechazando) {
+        RechazarActividadDialog(
+            titulo = detail.titulo,
+            onDismiss = { rechazando = false },
+            onConfirm = { motivo ->
+                withContext(Dispatchers.IO) { coreRepo.rechazarActividad(detail.id, motivo) }
+                rechazando = false
+                recarga++
+            },
+        )
+    }
 
     LaunchedEffect(activity.id, recarga) {
         loadingDetail = true
@@ -271,6 +290,56 @@ fun ActivityDetailScreen(
                             onFechaEntregaChange = { editFechaEntrega = it },
                             onFechaFinChange = { editFechaFin = it },
                             onSave = { saveActivityEdits() },
+                            topContent = {
+                                // Contrato B: aceptar o rechazar desde el detalle (aquí cae el push).
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (ActivitySemaforo.estaPendienteDeAceptar(detail.aceptacion)) {
+                                        AceptacionBanner(
+                                            onAceptar = {
+                                                scope.launch {
+                                                    aceptando = true
+                                                    aceptacionError = null
+                                                    try {
+                                                        withContext(Dispatchers.IO) {
+                                                            coreRepo.aceptarActividad(detail.id)
+                                                        }
+                                                        recarga++
+                                                        snackbarHostState.showSnackbar("Actividad aceptada")
+                                                    } catch (e: Exception) {
+                                                        aceptacionError = e.toUserMessage("No se pudo aceptar")
+                                                    } finally {
+                                                        aceptando = false
+                                                    }
+                                                }
+                                            },
+                                            onRechazar = { rechazando = true },
+                                            guardando = aceptando,
+                                            error = aceptacionError,
+                                        )
+                                    }
+                                    if (ActivitySemaforo.fueRechazada(detail.aceptacion)) {
+                                        SoftNote(
+                                            text = ActivitySemaforo.rechazadaTexto(detail.motivoRechazo),
+                                            color = CoreActivityRules.ROJO,
+                                        )
+                                    }
+                                    val luz = ActivitySemaforo.luz(detail.semaforo)
+                                    val planReal = ActivitySemaforo.planRealTexto(
+                                        detail.minutosPlan,
+                                        detail.minutosReales,
+                                    )
+                                    val asignadaPor = ActivitySemaforo.asignadaPorTexto(detail.asignadoPor?.nombre)
+                                    if (luz != null || planReal != null || asignadaPor != null) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            luz?.let { ToneChip("● ${it.etiqueta}", it.color) }
+                                            planReal?.let {
+                                                ToneChip(it, ActivitySemaforo.planRealColor(detail.excedida))
+                                            }
+                                            asignadaPor?.let { ToneChip(it) }
+                                        }
+                                    }
+                                }
+                            },
                             extraContent = {
                                 NxPanelShell {
                                     Text(

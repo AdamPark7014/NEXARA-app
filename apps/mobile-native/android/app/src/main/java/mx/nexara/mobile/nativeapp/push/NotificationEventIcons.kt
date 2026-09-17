@@ -45,6 +45,13 @@ internal object NotificationEventIcons {
         "fuera_zona" to R.drawable.ic_nx_wrong_location,
         "cancelada" to R.drawable.ic_nx_event_busy,
         "falta_justificada" to R.drawable.ic_nx_event_available,
+        // Contrato A: `ATTENDANCE_FLAGGED` (ubicación simulada, fuera de sitio, cierre automático).
+        "asistencia_alerta" to R.drawable.ic_nx_location_off,
+        // Contrato B: ACTIVITY_REJECTED_BY_ASSIGNEE y ACTIVITY_OVERTIME.
+        "actividad_rechazada" to R.drawable.ic_nx_event_busy,
+        "rechazada" to R.drawable.ic_nx_event_busy,
+        "exceso_tiempo" to R.drawable.ic_nx_hourglass_top,
+        "tiempo_excedido" to R.drawable.ic_nx_hourglass_top,
         "cliente" to R.drawable.ic_nx_business,
         // Celebraciones (type BIRTHDAY / WORK_ANNIVERSARY, categoría `celebraciones`).
         "cumpleanos" to R.drawable.ic_nx_cake,
@@ -55,9 +62,15 @@ internal object NotificationEventIcons {
         "aviso" to R.drawable.ic_nx_notifications,
     )
 
-    private val AMBER_KEYS = setOf("entrada_tarde", "atraso", "comida_tarde", "aniversario")
+    private val AMBER_KEYS = setOf(
+        "entrada_tarde", "atraso", "comida_tarde", "aniversario",
+        "exceso_tiempo", "tiempo_excedido",
+    )
     private val GREEN_KEYS = setOf("aprobada", "finalizada", "comida_aprobada")
-    private val RED_KEYS = setOf("devuelta", "vencida", "comida_rechazada", "seguridad", "fuera_zona", "cancelada")
+    private val RED_KEYS = setOf(
+        "devuelta", "vencida", "comida_rechazada", "seguridad", "fuera_zona", "cancelada",
+        "asistencia_alerta", "actividad_rechazada", "rechazada",
+    )
     private val PINK_KEYS = setOf("cumpleanos")
 
     @DrawableRes

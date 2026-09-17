@@ -178,6 +178,8 @@ internal fun DespachoPendingPanel(
     var selected by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var saving by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    /** «Tiempo estimado» del contrato B: viaja como `horasPlan`. */
+    var horasPlan by remember { mutableStateOf("") }
 
     LaunchedEffect(despachos.size) {
         try {
@@ -278,6 +280,22 @@ internal fun DespachoPendingPanel(
                             }
                         }
                     }
+                    OutlinedTextField(
+                        value = horasPlan,
+                        onValueChange = { horasPlan = ActivityPlanTime.filtrarEntrada(it) },
+                        label = { Text("Tiempo estimado en horas (opcional)") },
+                        placeholder = { Text("Ej. 1.5") },
+                        singleLine = true,
+                        enabled = !saving,
+                        supportingText = {
+                            Text(
+                                "Con esto la actividad avisa cuando se pasa del tiempo.",
+                                fontSize = 11.5.sp,
+                                color = NxColors.Muted,
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
                             onClick = {
@@ -289,10 +307,18 @@ internal fun DespachoPendingPanel(
                                         msg = null
                                         try {
                                             val ids = selected.toList()
-                                            withContext(Dispatchers.IO) { repo.dispatch(a.id, ids, a.indicaciones) }
+                                            withContext(Dispatchers.IO) {
+                                                repo.dispatch(
+                                                    activityId = a.id,
+                                                    userIds = ids,
+                                                    indicaciones = a.indicaciones,
+                                                    horasPlan = ActivityPlanTime.horas(horasPlan),
+                                                )
+                                            }
                                             msg = "Asignado a ${ids.size} persona(s)" to true
                                             activeId = null
                                             selected = emptySet()
+                                            horasPlan = ""
                                             onDone()
                                         } catch (e: Exception) {
                                             msg = e.toUserMessage("No se pudo asignar") to false

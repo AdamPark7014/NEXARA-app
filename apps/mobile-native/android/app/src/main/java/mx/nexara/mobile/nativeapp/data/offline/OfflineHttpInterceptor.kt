@@ -86,12 +86,20 @@ class OfflineHttpInterceptor(
                 media.externalizeDataUrls(buffer.readUtf8())
             }
         }
+        // Contrato A: la checada que sale de la cola lleva `offline: true`; la que
+        // sale en vivo, no. Quien lo sabe es la cola, no la pantalla.
+        val queuedBody = OfflineQueueBody.markOffline(
+            url = request.url.toString(),
+            method = request.method,
+            contentType = contentType,
+            body = bodyStr,
+        )
         queue.enqueue(
             QueuedMutation(
                 id = UUID.randomUUID().toString(),
                 method = request.method.uppercase(),
                 url = request.url.toString(),
-                body = bodyStr,
+                body = queuedBody,
                 contentType = contentType,
                 idempotencyKey = UUID.randomUUID().toString(),
             ),
@@ -121,8 +129,14 @@ class OfflineHttpInterceptor(
          * Decisiones de un superior (desactivar/eliminar clientes y proyectos, cancelar o pasar
          * actividades, justificar faltas): sin conexión deben fallar a la vista, no quedar en cola
          * dando por hecho algo que la API todavía puede rechazar.
+         *
+         * Aceptar o rechazar una actividad va en la misma lista: las dos avisan a quien la asignó
+         * y a los jefes, y encoladas dejarían la tarjeta diciendo «aceptada» sin que nadie lo sepa.
          */
-        private val SOLO_EN_LINEA = listOf("/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones")
+        private val SOLO_EN_LINEA = listOf(
+            "/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones",
+            "/aceptar", "/rechazar",
+        )
         private val BORRADO_SOLO_EN_LINEA = listOf("/ventas/clientes/", "/operational-projects/")
 
         fun isQueueable(url: String, method: String = "POST"): Boolean {

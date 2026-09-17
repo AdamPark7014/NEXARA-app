@@ -12,6 +12,7 @@ import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.BoardAsignadaPorMiDto
 import mx.nexara.mobile.nativeapp.data.api.CelebracionesHoyDto
 import mx.nexara.mobile.nativeapp.data.api.CoreActivitiesApi
 import mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest
@@ -21,6 +22,7 @@ import mx.nexara.mobile.nativeapp.data.api.EvidencePhotoGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotosWithGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceResubmitRequest
 import mx.nexara.mobile.nativeapp.data.api.MyActivitiesResponseDto
+import mx.nexara.mobile.nativeapp.data.api.RechazarActividadRequest
 import mx.nexara.mobile.nativeapp.data.api.ReorderMyActivitiesRequest
 import mx.nexara.mobile.nativeapp.data.api.ReprogramarDespachoRequest
 import mx.nexara.mobile.nativeapp.data.api.RevisarEvidenciaRequest
@@ -71,13 +73,21 @@ class CoreActivitiesRepository(context: Context) {
             ?.takeIf { it > 0L }
     }
 
-    suspend fun addTeamMember(activityId: Long, userId: Long, rol: String, indicaciones: String?) {
+    /** @param horasPlan «Tiempo estimado» de quien asigna (contrato B). */
+    suspend fun addTeamMember(
+        activityId: Long,
+        userId: Long,
+        rol: String,
+        indicaciones: String?,
+        horasPlan: Double? = null,
+    ) {
         api.addTeamMember(
             activityId,
             AddTeamMemberRequest(
                 userId = userId,
                 rol = rol,
                 indicaciones = indicaciones?.trim()?.takeIf { it.isNotEmpty() },
+                horasPlan = horasPlan?.takeIf { it > 0 },
             ),
         ).close()
     }
@@ -93,12 +103,24 @@ class CoreActivitiesRepository(context: Context) {
         return runCatching { org.json.JSONObject(raw).optString("next", "") }.getOrDefault("")
     }
 
-    suspend fun dispatch(activityId: Long, userIds: List<Long>, indicaciones: String?) {
+    /** Contrato B: aceptar lo que te asignaron (avisa a quien la asignó). */
+    suspend fun aceptarActividad(activityId: Long) {
+        api.aceptarActividad(activityId).close()
+    }
+
+    /** Rechazar con motivo (≥ 10). Sigue asignada hasta que un superior la mueva. */
+    suspend fun rechazarActividad(activityId: Long, motivo: String) {
+        api.rechazarActividad(activityId, RechazarActividadRequest(motivo.trim())).close()
+    }
+
+    /** @param horasPlan «Tiempo estimado» de quien reparte (contrato B). */
+    suspend fun dispatch(activityId: Long, userIds: List<Long>, indicaciones: String?, horasPlan: Double? = null) {
         api.dispatch(
             activityId,
             DispatchMyActivityRequest(
                 userIds = userIds,
                 indicaciones = indicaciones?.trim()?.takeIf { it.isNotEmpty() },
+                horasPlan = horasPlan?.takeIf { it > 0 },
             ),
         ).close()
     }
@@ -115,16 +137,57 @@ class CoreActivitiesRepository(context: Context) {
 
     // ── Pizarra ─────────────────────────────────────────────────────────────
 
-    /** Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados. */
-    suspend fun board(): TeamBoardResponseDto {
-        val raw = api.board()
+    /**
+     * Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados.
+     *
+     * @param desde/@param hasta rango `AAAA-MM-DD` (contrato C); sin ellos, hoy.
+     */
+    suspend fun board(desde: String? = null, hasta: String? = null): TeamBoardResponseDto {
+        val raw = api.board(desde = desde, hasta = hasta)
         return raw.copy(users = raw.users?.filter { !PlatformAccounts.isNonEmployeeEmail(it.email) })
     }
 
-    suspend fun boardUser(userId: Long): TeamBoardUserDto = api.boardUser(userId)
+    suspend fun boardUser(userId: Long, desde: String? = null, hasta: String? = null): TeamBoardUserDto =
+        api.boardUser(userId, desde = desde, hasta = hasta)
 
-    suspend fun boardUserHistory(userId: Long): List<TeamBoardHistoryItemDto> =
-        api.boardUserHistory(userId)
+    suspend fun boardUserHistory(
+        userId: Long,
+        desde: String? = null,
+        hasta: String? = null,
+    ): List<TeamBoardHistoryItemDto> = api.boardUserHistory(userId, desde = desde, hasta = hasta)
+
+    /**
+     * «Asignadas por mí» en el rango.
+     *
+     * Se lee crudo y se aceptan las dos formas que puede tomar el API mientras
+     * se construye: un arreglo suelto o `{ items: [...] }`. Si todavía no
+     * existe el endpoint, la lista sale vacía y la pantalla lo dice.
+     */
+    suspend fun boardAsignadasPorMi(desde: String? = null, hasta: String? = null): List<BoardAsignadaPorMiDto> {
+        val raw = api.boardAsignadasPorMi(desde = desde, hasta = hasta).string().trim()
+        if (raw.isEmpty()) return emptyList()
+        val moshi = com.squareup.moshi.Moshi.Builder()
+            .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+            .build()
+        val listType = com.squareup.moshi.Types.newParameterizedType(
+            List::class.java,
+            BoardAsignadaPorMiDto::class.java,
+        )
+        if (raw.startsWith("[")) {
+            return runCatching { moshi.adapter<List<BoardAsignadaPorMiDto>>(listType).fromJson(raw) }
+                .getOrNull()
+                .orEmpty()
+        }
+        val wrapperType = com.squareup.moshi.Types.newParameterizedType(
+            Map::class.java,
+            String::class.java,
+            listType,
+        )
+        val wrapper = runCatching {
+            moshi.adapter<Map<String, List<BoardAsignadaPorMiDto>>>(wrapperType).fromJson(raw)
+        }.getOrNull()
+        return wrapper?.get("items") ?: wrapper?.get("actividades") ?: emptyList()
+    }
 
     // ── Evidencias del equipo ───────────────────────────────────────────────
 
@@ -148,8 +211,22 @@ class CoreActivitiesRepository(context: Context) {
         if (e.code() == 404) null else throw e
     }
 
-    suspend fun entryPhoto(activityId: Long, photoUrl: String, lat: Double, lng: Double): EvidenceFlowDto =
-        api.entryPhoto(activityId, ActivityEvidencePhotoStepRequest(photoUrl, lat, lng))
+    /** @param justificacionOrden por qué empezó esta y no la de más prioridad (contrato B). */
+    suspend fun entryPhoto(
+        activityId: Long,
+        photoUrl: String,
+        lat: Double,
+        lng: Double,
+        justificacionOrden: String? = null,
+    ): EvidenceFlowDto = api.entryPhoto(
+        activityId,
+        ActivityEvidencePhotoStepRequest(
+            photoUrl = photoUrl,
+            latitude = lat,
+            longitude = lng,
+            justificacionOrden = justificacionOrden?.trim()?.takeIf { it.isNotEmpty() },
+        ),
+    )
 
     suspend fun evidencePhotos(
         activityId: Long,

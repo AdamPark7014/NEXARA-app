@@ -185,6 +185,42 @@ fun EvidenceCaptureFlow(
         }
     }
 
+    /**
+     * Contrato B: empezar esta teniendo otra de más prioridad sin terminar no
+     * bloquea; solo se le pregunta (una vez) si quiere decir por qué.
+     */
+    var avisoOrden by remember(activity.id) { mutableStateOf<String?>(null) }
+    var preguntaOrden by remember(activity.id) { mutableStateOf(false) }
+    var ordenResuelto by remember(activity.id) { mutableStateOf(false) }
+    LaunchedEffect(activity.id, step, isCorrection) {
+        if (step != STEP_ENTRY || isCorrection) {
+            avisoOrden = null
+            return@LaunchedEffect
+        }
+        val data = runCatching { withContext(Dispatchers.IO) { repo.myActivities() } }.getOrNull()
+            ?: return@LaunchedEffect
+        val abiertas = data.open.orEmpty()
+        val pendientes = abiertas
+            .filter { ActivityPriorityJump.esDelDiaOAntes(it.fechaInicio ?: it.fechaMaxima) }
+            .map {
+                ActivityPriorityJump.Pendiente(
+                    id = it.id,
+                    prioridad = it.prioridad,
+                    iniciada = it.inicioRealAt != null || !it.evidenceStatus.isNullOrBlank(),
+                    terminada = it.finRealAt != null || it.fechaFinalizacion != null,
+                )
+            }
+        val mia = abiertas.firstOrNull { it.id == activity.id }
+        val mayor = ActivityPriorityJump.mayorPendiente(
+            actualId = activity.id,
+            actualPrioridad = mia?.prioridad ?: activity.prioridad,
+            otras = pendientes,
+        )
+        avisoOrden = mayor?.let { m ->
+            ActivityPriorityJump.aviso(abiertas.firstOrNull { it.id == m.id }?.titulo, m.prioridad)
+        }
+    }
+
     /** Visor de las fotos del avance anterior. */
     var visor by remember { mutableStateOf<Pair<List<CoreActivityRules.EvidencePhoto>, Int>?>(null) }
     var cameraKind by remember { mutableStateOf<String?>(null) }
@@ -217,7 +253,7 @@ fun EvidenceCaptureFlow(
         onFlowChanged()
     }
 
-    suspend fun sendEntryOrExit(kind: String, photo: GeoPhoto): Boolean {
+    suspend fun sendEntryOrExit(kind: String, photo: GeoPhoto, justificacionOrden: String? = null): Boolean {
         val lat = photo.latitude
         val lng = photo.longitude
         if (lat == null || lng == null) {
@@ -245,7 +281,13 @@ fun EvidenceCaptureFlow(
                         stepKey,
                         ActivityEvidencePhotoStepRequest(photo.dataUrl, lat, lng),
                     )
-                    kind == KIND_ENTRY -> repo.entryPhoto(activity.id, photo.dataUrl, lat, lng)
+                    kind == KIND_ENTRY -> repo.entryPhoto(
+                        activityId = activity.id,
+                        photoUrl = photo.dataUrl,
+                        lat = lat,
+                        lng = lng,
+                        justificacionOrden = justificacionOrden,
+                    )
                     else -> repo.exitPhoto(activity.id, photo.dataUrl, lat, lng)
                 }
             }
@@ -602,6 +644,9 @@ fun EvidenceCaptureFlow(
                     success = "Foto agregada (${drafts.size} de $photoRequired)"
                     pending = null
                     pendingKind = null
+                } else if (kind == KIND_ENTRY && avisoOrden != null && !ordenResuelto) {
+                    // Hay otra de más prioridad sin empezar: se pregunta antes de mandar la foto.
+                    preguntaOrden = true
                 } else {
                     scope.launch {
                         if (sendEntryOrExit(kind, photo)) {
@@ -620,6 +665,28 @@ fun EvidenceCaptureFlow(
                 pending = null
                 pendingKind = null
                 pendingError = null
+            },
+        )
+    }
+
+    if (preguntaOrden) {
+        JustificarOrdenDialog(
+            aviso = avisoOrden.orEmpty(),
+            // «Mejor no»: se queda en la foto, por si prefiere ir a la otra actividad.
+            onDismiss = { preguntaOrden = false },
+            onContinuar = { justificacion ->
+                preguntaOrden = false
+                ordenResuelto = true
+                val foto = pending
+                val tipo = pendingKind
+                if (foto != null && tipo != null) {
+                    scope.launch {
+                        if (sendEntryOrExit(tipo, foto, justificacion)) {
+                            pending = null
+                            pendingKind = null
+                        }
+                    }
+                }
             },
         )
     }

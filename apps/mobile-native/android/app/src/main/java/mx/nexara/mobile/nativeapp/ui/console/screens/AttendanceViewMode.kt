@@ -117,6 +117,18 @@ fun attendanceIsCompanyWideViewer(user: SessionUser?): Boolean =
 fun attendanceScopeParam(user: SessionUser?): String? =
     if (attendanceIsCompanyWideViewer(user)) null else "subtree"
 
-/** La pestaña Trayectoria (gps/team + gps/trajectory) exige `gps.manage`. */
-fun attendanceCanSeeTrajectory(user: SessionUser?): Boolean =
-    user != null && (user.isSuperAdmin || user.permissions.contains("gps.manage"))
+/**
+ * La pestaña Trayectoria (mapa del equipo y recorrido del día) es **solo de
+ * dirección** — contrato A, «GPS solo dirección».
+ *
+ * Antes bastaba `gps.manage` o ser super admin, así que un coordinador veía por
+ * dónde anduvo su gente todo el día. Ahora el API contesta 403 en las rutas de
+ * GPS a
+ * quien no sea CEO-equivalente (Christian y Claudia) y manda `puntos: []` en la
+ * geocerca; la pestaña se esconde para que nadie choque contra ese 403. Las
+ * alertas de zona y su justificación siguen visibles para sus jefes, y mandar
+ * la propia ubicación (`POST gps`) no cambia para nadie.
+ */
+fun attendanceCanSeeTrajectory(email: String?): Boolean = PlatformAccounts.isCeoEquivalentEmail(email)
+
+fun attendanceCanSeeTrajectory(user: SessionUser?): Boolean = attendanceCanSeeTrajectory(user?.email)
