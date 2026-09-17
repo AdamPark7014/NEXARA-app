@@ -14,9 +14,21 @@ type SocketInitOptions = Partial<ManagerOptions & SocketOptions>;
  * Procedencia del token, por orden:
  *  1. `options.auth.token` si el llamador lo tiene (app nativa).
  *  2. Cookie de sesión legible por JS — solo existe en la app nativa.
- *  3. Nada: en navegador la cookie es `HttpOnly` y el navegador la adjunta sola
- *     al handshake; el gateway la lee de `handshake.headers.cookie`.
+ *  3. JWT de esta pestaña (`sessionStorage`): así cada pestaña escucha con su cuenta.
+ *  4. Nada: sesión anterior al cambio; el navegador adjunta la cookie `HttpOnly`
+ *     al handshake y el gateway la lee de `handshake.headers.cookie`.
  */
+function tokenDePestana(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = window.sessionStorage.getItem('nexara_user');
+    const token = raw ? (JSON.parse(raw) as { token?: unknown }).token : undefined;
+    return typeof token === 'string' && token.split('.').length === 3 ? token : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function createRealtimeSocket(url: string, options?: SocketInitOptions): Socket {
   const providedAuth =
     options?.auth && typeof options.auth === 'object'
@@ -28,7 +40,7 @@ export function createRealtimeSocket(url: string, options?: SocketInitOptions): 
       ? (providedAuth['token'] as string)
       : undefined;
 
-  const token = providedToken || getSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN) || undefined;
+  const token = providedToken || getSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN) || tokenDePestana();
 
   return io(url, {
     ...options,

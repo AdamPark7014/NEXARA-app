@@ -103,3 +103,22 @@ describe('parseExpiresToMs', () => {
     expect(parseExpiresToMs('')).toBe(14_400_000);
   });
 });
+
+describe('logoutDebeBorrarCookie (sesión por pestaña)', () => {
+  // JWT falsos: solo importa el payload, la función no verifica firma.
+  const jwt = (payload: object) => `x.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.y`;
+  const { logoutDebeBorrarCookie } = require('./session-cookie');
+
+  it('borra la cookie si es de la misma sesión o no hay con qué comparar', () => {
+    const a = jwt({ sub: 1, jti: 'a' });
+    expect(logoutDebeBorrarCookie({ authorization: `Bearer ${a}`, cookie: `nexara_token=${a}` })).toBe(true);
+    expect(logoutDebeBorrarCookie({ cookie: `nexara_token=${a}` })).toBe(true);
+    expect(logoutDebeBorrarCookie({ authorization: `Bearer ${a}` })).toBe(true);
+  });
+
+  it('conserva la cookie de otra cuenta abierta en otra pestaña', () => {
+    const a = jwt({ sub: 1, jti: 'a' });
+    const b = jwt({ sub: 2, jti: 'b' });
+    expect(logoutDebeBorrarCookie({ authorization: `Bearer ${a}`, cookie: `nexara_token=${b}` })).toBe(false);
+  });
+});

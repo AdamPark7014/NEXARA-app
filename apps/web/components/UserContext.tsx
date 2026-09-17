@@ -50,9 +50,8 @@ export interface User {
 	department: string;
 	departmentId: number;
 	/**
-	 * Antes el JWT en claro. Tras la migración a cookie `HttpOnly` contiene
-	 * `SESSION_COOKIE_SENTINEL` en el navegador: sigue sirviendo como bandera de
-	 * "hay sesión", pero ya no es un secreto robable por XSS.
+	 * JWT de ESTA pestaña (sesión por pestaña: cada una puede ser otra cuenta). Sesiones guardadas
+	 * antes del cambio traen `SESSION_COOKIE_SENTINEL` y siguen usando la cookie hasta volver a entrar.
 	 */
 	token: string;
 	/** Caducidad de la sesión (ISO). La envía el login; sustituye a decodificar el JWT. */
@@ -264,17 +263,11 @@ const safePersistUser = (user: User | null) => {
 	const write = (storage: Storage) => {
 		if (user) {
 			const { offlineDegraded: _omit, ...persistable } = user;
-			// En navegador el JWT NO se persiste: `sessionStorage` es tan legible
-			// por XSS como una cookie sin `HttpOnly`, así que guardar el token ahí
-			// anularía la migración. La sesión real viaja en la cookie `HttpOnly`
-			// que emite el servidor; aquí queda solo el marcador.
-			//
-			// La app nativa sí conserva el JWT: no usa cookie de sesión y autentica
-			// con la cabecera `Authorization`.
-			const safeToPersist = isCapacitorNative()
-				? persistable
-				: { ...persistable, token: SESSION_COOKIE_SENTINEL };
-			storage.setItem(USER_STORAGE_KEY, JSON.stringify(safeToPersist));
+			// Cada pestaña guarda SU JWT en `sessionStorage` (no se comparte entre pestañas) y lo
+			// manda como `Authorization`, que la API prefiere sobre la cookie `HttpOnly`. La cookie
+			// es una sola para todo el navegador: si mandara ella, entrar con otra cuenta en otra
+			// pestaña cambiaba de cuenta a esta, y cerrar sesión en una cerraba las demás.
+			storage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
 			return;
 		}
 		storage.removeItem(USER_STORAGE_KEY);
@@ -318,7 +311,10 @@ const safePersistUser = (user: User | null) => {
 		}
 	}
 
-	setSessionCookie(Boolean(user?.token));
+	// `nx_session` es de todo el navegador: al cerrar sesión en una pestaña otras pueden seguir
+	// dentro, así que en navegador no se borra (la pestaña sin sesión vuelve a /login desde AppShell).
+	if (user?.token) setSessionCookie(true);
+	else if (isCapacitorNative()) setSessionCookie(false);
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
@@ -349,9 +345,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 			if (!response.ok) return false;
 			const data = await response.json();
 			if (!data?.expiresAt) return false;
+			// El JWT renovado reemplaza al de la pestaña: con la sesión por pestaña ya no basta la cookie.
+			const renovado =
+				typeof data.access_token === 'string' && data.access_token.split('.').length === 3
+					? data.access_token
+					: null;
 			setUser((prev) => {
 				if (!prev || prev.token !== user.token) return prev;
-				return { ...prev, expiresAt: data.expiresAt };
+				return { ...prev, expiresAt: data.expiresAt, ...(renovado ? { token: renovado } : {}) };
 			});
 			setSessionExpiringSoon(false);
 			return true;
@@ -509,6 +510,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
 
 	const logout = () => {
+		const tokenPestana = user?.token;
 		clearActivePanel();
 		setSessionEndedMessage(null);
 		setUser(null);
@@ -519,9 +521,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		}
 		// La cookie de sesión es `HttpOnly`: solo el servidor puede borrarla.
 		// Sin esta llamada la sesión seguiría viva pese al logout en la UI.
+		// Con el JWT de esta pestaña la API solo borra la cookie si es de esta misma sesión, así
+		// otra pestaña con otra cuenta no se queda sin imágenes ni realtime.
 		void fetch(buildApiUrl('auth/logout'), {
 			method: 'POST',
 			credentials: 'include',
+			...(tokenPestana ? { headers: { Authorization: `Bearer ${tokenPestana}` } } : {}),
 		}).catch(() => {
 			/* el logout local no debe fallar por un error de red */
 		});

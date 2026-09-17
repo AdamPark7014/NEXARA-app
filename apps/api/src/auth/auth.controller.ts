@@ -18,6 +18,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import {
   clearSessionCookie,
+  logoutDebeBorrarCookie,
   sessionTokenFromHeaders,
   setSessionCookie,
 } from '../common/security/session-cookie.js';
@@ -56,8 +57,9 @@ export class AuthController {
    */
   @Post('logout')
   @HttpCode(200)
-  logout(@Res({ passthrough: true }) res: Response) {
-    clearSessionCookie(res);
+  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    // Sesión por pestaña: si la cookie es de otra cuenta abierta en otra pestaña, se conserva.
+    if (logoutDebeBorrarCookie(req.headers ?? {})) clearSessionCookie(res);
     return { ok: true };
   }
 
