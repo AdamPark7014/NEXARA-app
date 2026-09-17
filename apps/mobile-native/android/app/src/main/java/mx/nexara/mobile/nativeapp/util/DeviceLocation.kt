@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.Build
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -12,7 +13,16 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
-data class DeviceCoords(val lat: Double, val lng: Double, val accuracyM: Float? = null) {
+/**
+ * @param mock la lectura viene de una app de ubicación simulada (ver [MockLocation]).
+ * Se manda al servidor tal cual: él decide (asistencia: 422 y aviso a sus jefes).
+ */
+data class DeviceCoords(
+    val lat: Double,
+    val lng: Double,
+    val accuracyM: Float? = null,
+    val mock: Boolean = false,
+) {
     /** Sufijo para mensajes de UI: " · GPS ±12m" / " (sin GPS)". */
     fun messageSuffix(): String =
         if (accuracyM != null) " · GPS ±${accuracyM.toInt()}m" else " · GPS ok"
@@ -78,8 +88,25 @@ object DeviceLocation {
         if (!latitude.isFinite() || !longitude.isFinite()) return null
         if (latitude == 0.0 && longitude == 0.0) return null
         if (kotlin.math.abs(latitude) > 90.0 || kotlin.math.abs(longitude) > 180.0) return null
-        return DeviceCoords(latitude, longitude, if (hasAccuracy()) accuracy else null)
+        return DeviceCoords(
+            lat = latitude,
+            lng = longitude,
+            accuracyM = if (hasAccuracy()) accuracy else null,
+            mock = isSimulated(),
+        )
     }
+
+    /** `Location.isMock` (API 31+) o `isFromMockProvider`; ver [MockLocation]. */
+    @Suppress("DEPRECATION")
+    private fun Location.isSimulated(): Boolean = MockLocation.isSimulated(
+        sdkInt = Build.VERSION.SDK_INT,
+        isMock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching { isMock }.getOrNull()
+        } else {
+            null
+        },
+        isFromMockProvider = runCatching { isFromMockProvider }.getOrNull(),
+    )
 
     private suspend fun <T> awaitTask(block: () -> com.google.android.gms.tasks.Task<T>): T? =
         suspendCancellableCoroutine { cont ->

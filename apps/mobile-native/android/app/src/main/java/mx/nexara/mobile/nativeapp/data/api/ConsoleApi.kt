@@ -374,11 +374,24 @@ data class AttendanceCurrentDto(
     val lastEntryAt: String? = null,
 )
 
+/**
+ * `POST attendance` — contrato A (asistencia no manipulable).
+ *
+ * La hora que vale es la del servidor: ya no se manda `timestamp`. `capturedAt`
+ * es informativo (la hora del teléfono al capturar) y solo se respeta cuando la
+ * checada viene de la cola sin conexión, que es quien agrega `offline: true` al
+ * cuerpo al reenviarla (ver `OfflineQueueBody`).
+ */
 data class AttendanceRegisterRequest(
     val type: String, // "entrada" | "salida"
-    val timestamp: String? = null,
+    /** Hora del teléfono al capturar (ISO-8601). */
+    val capturedAt: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    /** Precisión del GPS en metros; el servidor marca «Ubicación imprecisa» arriba de 200. */
+    val accuracyM: Double? = null,
+    /** El teléfono detectó ubicación simulada; el servidor contesta 422 y avisa a sus jefes. */
+    val mockLocation: Boolean? = null,
     val photoBase64: String,
 )
 
@@ -387,6 +400,12 @@ data class AttendanceRegisterResponse(
     val type: String? = null,
     val timestamp: String? = null,
     val message: String? = null,
+    /** OK | PENDIENTE | REVISAR (contrato A); ausente en APIs viejas. */
+    val validacion: String? = null,
+    val motivoValidacion: String? = null,
+    val fueraDeSitio: Boolean? = null,
+    val distanciaSitioM: Int? = null,
+    val sitioNombre: String? = null,
 )
 
 /**

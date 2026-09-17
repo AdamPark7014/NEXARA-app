@@ -257,18 +257,29 @@ class ConsoleRepository(context: Context) {
         api.justificarFalta(JustificarFaltaRequest(userId = userId, fecha = fecha, motivo = motivo.trim())).close()
     }
 
+    /**
+     * Checada (contrato A): la hora que vale es la del servidor, así que ya no
+     * se manda `timestamp`. `capturedAt` viaja como referencia y solo se usa
+     * cuando la checada salió de la cola sin conexión — ahí es la cola quien
+     * agrega `offline: true` (ver `OfflineQueueBody`), nunca esta llamada.
+     */
     suspend fun attendanceCheckIn(
         type: String,
         lat: Double? = null,
         lng: Double? = null,
+        accuracyM: Float? = null,
+        mockLocation: Boolean = false,
         photoBase64: String,
+        capturedAt: String = java.time.Instant.now().toString(),
     ) =
         api.postAttendance(
             mx.nexara.mobile.nativeapp.data.api.AttendanceRegisterRequest(
                 type = type,
-                timestamp = java.time.Instant.now().toString(),
+                capturedAt = capturedAt,
                 latitude = lat,
                 longitude = lng,
+                accuracyM = accuracyM?.takeIf { it.isFinite() && it >= 0f }?.toDouble(),
+                mockLocation = mockLocation,
                 photoBase64 = photoBase64,
             )
         )
