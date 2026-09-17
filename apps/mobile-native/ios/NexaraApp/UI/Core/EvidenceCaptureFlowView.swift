@@ -41,6 +41,12 @@ struct EvidenceCaptureFlowView: View {
     @State private var formPrefilled = false
     @State private var showPdfImporter = false
     @State private var pdfSheet: CorePdfItem?
+    /// Sube para que la tarjeta de ubicación se recargue tras cada envío.
+    @State private var geofenceRefresh = 0
+    /// Leyendo el GPS antes de abrir la cámara de salida.
+    @State private var checkingExitZone = false
+    /// Motivo por el que no se puede tomar la salida (fuera de la zona o 400 del API).
+    @State private var exitBlocked: String?
 
     // MARK: Derivados
 
@@ -123,6 +129,9 @@ struct EvidenceCaptureFlowView: View {
                 }
                 ForEach(Array(steps.enumerated()), id: \.element) { index, step in
                     stepCard(step, number: index + 1)
+                }
+                if flow?.isDone(CoreEvidence.entryPhoto) == true {
+                    ActivityGeofenceCard(activityId: activityId, refreshToken: geofenceRefresh)
                 }
                 if let message {
                     NxIconText(systemName: "checkmark.circle.fill", text: message)
@@ -215,18 +224,35 @@ struct EvidenceCaptureFlowView: View {
         case CoreEvidence.entryPhoto, CoreEvidence.exitPhoto:
             let isEntry = step == CoreEvidence.entryPhoto
             VStack(alignment: .leading, spacing: 8) {
-                Text(isEntry ? "Tómala al llegar. Se guarda con tu ubicación." : "Tómala al terminar. Con esta foto envías tu evidencia.")
+                Text(isEntry
+                     ? "Tómala al llegar. Se guarda con tu ubicación y marca el centro de tu zona de \(ActivityGeofence.radioM) m."
+                     : "Tómala al terminar, a \(ActivityGeofence.radioM) m o menos de donde iniciaste. Con esta foto envías tu evidencia.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Button {
                     errorText = nil
-                    camera = CameraRequest(step: step)
+                    if isEntry {
+                        camera = CameraRequest(step: step)
+                    } else {
+                        Task { await openExitCamera() }
+                    }
                 } label: {
-                    Label(isEntry ? "Tomar foto de entrada" : "Tomar foto de salida", systemImage: "camera.fill")
-                        .frame(maxWidth: .infinity)
+                    Label(
+                        isEntry ? "Tomar foto de entrada" : (checkingExitZone ? "Verificando ubicación…" : "Tomar foto de salida"),
+                        systemImage: "camera.fill"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(busy)
+                .disabled(busy || checkingExitZone)
+                if !isEntry, let exitBlocked {
+                    NxIconText(systemName: "location.slash", text: exitBlocked, tint: CorePalette.red)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(CorePalette.red)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(CorePalette.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                }
             }
         case CoreEvidence.evidencePhotos:
             evidencePhotosAction
@@ -508,6 +534,7 @@ struct EvidenceCaptureFlowView: View {
         }
         // Las respuestas de guardado no traen `activity`: se recarga el flujo.
         await load()
+        geofenceRefresh += 1
         let status = saved.status ?? flow?.status ?? ""
         if status == CoreEvidence.completed {
             message = correction
@@ -521,9 +548,53 @@ struct EvidenceCaptureFlowView: View {
         onChanged?()
     }
 
+    // MARK: Geocerca de la salida
+
+    /// Hay punto de inicio real (foto de entrada con GPS) contra el cual medir.
+    private var hasEntryOrigin: Bool {
+        ActivityGeofence.esPuntoReal(latitude: flow?.entryLatitude?.value, longitude: flow?.entryLongitude?.value)
+    }
+
+    /// Mensaje de bloqueo si el punto queda a más de 100 m de la foto de entrada
+    /// (mismo texto que el API); `nil` si la salida se puede registrar ahí.
+    private func exitZoneMessage(latitude: Double?, longitude: Double?) -> String? {
+        guard let distancia = ActivityGeofence.distanciaAlOrigen(
+            origenLat: flow?.entryLatitude?.value,
+            origenLng: flow?.entryLongitude?.value,
+            latitude: latitude,
+            longitude: longitude
+        ), ActivityGeofence.fueraDeZona(distancia) else { return nil }
+        return ActivityGeofence.mensajeSalidaFueraDeZona(distancia: distancia)
+    }
+
+    /// Antes de abrir la cámara de salida se mide dónde está: fuera de la zona
+    /// no tiene caso tomar una foto que el API va a rechazar.
+    @MainActor
+    private func openExitCamera() async {
+        exitBlocked = nil
+        if hasEntryOrigin {
+            checkingExitZone = true
+            let coords = await DeviceLocation.shared.current()
+            checkingExitZone = false
+            if let blocked = exitZoneMessage(latitude: coords?.latitude, longitude: coords?.longitude) {
+                exitBlocked = blocked
+                geofenceRefresh += 1
+                return
+            }
+        }
+        camera = CameraRequest(step: CoreEvidence.exitPhoto)
+    }
+
     @MainActor
     private func sendGeoPhoto(step: String, photo: CapturedGeoPhoto) async -> String? {
         guard let coords = photo.coords else { return GeoPhotoCaptureView.locationError }
+        let isExit = step == CoreEvidence.exitPhoto
+        // La salida se mide con la misma ubicación que viaja en la foto, como el API.
+        if isExit, let blocked = exitZoneMessage(latitude: coords.latitude, longitude: coords.longitude) {
+            exitBlocked = blocked
+            geofenceRefresh += 1
+            return blocked
+        }
         busy = true
         defer { busy = false }
         let payload = GeoPhotoPayload(photoUrl: photo.dataUrl, latitude: coords.latitude, longitude: coords.longitude)
@@ -532,14 +603,26 @@ struct EvidenceCaptureFlowView: View {
             let saved: EvidenceFlowState?
             if step == CoreEvidence.entryPhoto {
                 saved = try await CoreRepository.shared.submitEntryPhoto(activityId: activityId, photo: payload, correction: correction)
+                // Los puntos del GPS de jornada viajan ligados a esta actividad hasta la salida.
+                if !correction { ShiftGpsTracker.currentActivityId = activityId }
             } else {
                 saved = try await CoreRepository.shared.submitExitPhoto(activityId: activityId, photo: payload, correction: correction)
+                if ShiftGpsTracker.currentActivityId == activityId {
+                    ShiftGpsTracker.currentActivityId = nil
+                }
             }
+            if isExit { exitBlocked = nil }
             camera = nil
             await afterSave(saved, step: step, correction: correction)
             return nil
         } catch {
-            return error.toUserMessage(fallback: "No se pudo guardar la foto")
+            let text = error.toUserMessage(fallback: "No se pudo guardar la foto")
+            if isExit {
+                // El 400 de «fuera de zona» (u otro rechazo) también queda visible al cerrar la cámara.
+                exitBlocked = text
+                geofenceRefresh += 1
+            }
+            return text
         }
     }
 

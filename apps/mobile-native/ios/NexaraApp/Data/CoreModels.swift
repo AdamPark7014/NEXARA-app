@@ -571,10 +571,13 @@ struct TeamEvidenceMember: Decodable, Identifiable, Hashable {
     let eficienciaScore: Int?
     let revisiones: [TeamEvidenceReview]?
     let evidence: TeamEvidenceData?
+    /// Salidas de la zona de 100 m alrededor de su punto de inicio, la más reciente primero.
+    let alertasZona: [ActivityGeofenceAlert]?
 
     var id: Int { userId }
     var splits: Bool { reparte == true }
     var canReview: Bool { puedoRevisar == true }
+    var zoneAlerts: [ActivityGeofenceAlert] { alertasZona ?? [] }
 }
 
 struct TeamEvidenceActivity: Decodable, Hashable {

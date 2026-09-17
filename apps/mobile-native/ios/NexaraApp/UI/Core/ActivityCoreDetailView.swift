@@ -309,7 +309,7 @@ struct ActivityCoreDetailView: View {
                 if canCapture {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Captura de evidencias").font(.headline)
-                        Text("Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida.")
+                        Text("Foto de entrada, evidencias en sitio, hoja de servicio y foto de salida. La salida se registra a \(ActivityGeofence.radioM) m o menos de donde iniciaste.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                         EvidenceCaptureFlowView(
