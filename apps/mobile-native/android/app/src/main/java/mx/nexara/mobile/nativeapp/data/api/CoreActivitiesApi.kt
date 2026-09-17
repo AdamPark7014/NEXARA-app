@@ -78,7 +78,28 @@ data class MyActivityItemDto(
     val porRepartir: Boolean? = null,
     val pasadaA: List<MyActivityPasadaDto>? = null,
     val ultimaReprogramacion: MyActivityReprogramacionDto? = null,
-)
+    // ── Contrato B (aceptación y tiempos); todo opcional: la API vieja no lo manda.
+    /** PENDIENTE | ACEPTADA | RECHAZADA. */
+    val aceptacion: String? = null,
+    val motivoRechazo: String? = null,
+    /** rojo | amarillo | verde (lo calcula el servidor). */
+    val semaforo: String? = null,
+    /** Tiempo planeado en minutos (`horasPlan` × 60). */
+    val minutosPlan: Double? = null,
+    /** Tiempo real: inicio → fin, o inicio → ahora si sigue en curso. */
+    val minutosReales: Double? = null,
+    val excedida: Boolean? = null,
+    val inicioRealAt: String? = null,
+    val finRealAt: String? = null,
+    /** Quién se la asignó (nombre del contrato; `asignadaPor` es el campo viejo). */
+    val asignadoPor: MyActivityRefDto? = null,
+    /** La empezó habiendo otra de más prioridad sin terminar. */
+    val saltoPrioridad: Boolean? = null,
+    val justificacionOrden: String? = null,
+) {
+    /** El contrato dice `asignadoPor`; las respuestas de hoy traen `asignadaPor`. */
+    val quienAsigno: MyActivityRefDto? get() = asignadoPor ?: asignadaPor
+}
 
 data class MyActivitiesResponseDto(
     /** Encargados de área: pueden reordenar su cola (con justificación). */
