@@ -15,7 +15,7 @@ import {
   REASSIGN_FORBIDDEN,
   type ChainActor,
 } from './activity-superiors.js';
-import { alcanzaA, esDeTodaLaEmpresa, tiposVisibles, type Alcanzador } from '../me/equipo-alcance.js';
+import { esDeTodaLaEmpresa, puedeAsignarA, tiposVisibles, type Alcanzador } from '../me/equipo-alcance.js';
 
 /**
  * Equipo de una actividad y su historial de reasignaciones.
@@ -155,7 +155,7 @@ export class ActivityTeamService {
       where: { isActive: true },
       select: { id: true, email: true, managerId: true },
     });
-    if (!alcanzaA(actor, users, userId)) {
+    if (!puedeAsignarA(actor, users, userId)) {
       throw new ForbiddenException('Solo puedes asignar a gente de tu equipo');
     }
   }
