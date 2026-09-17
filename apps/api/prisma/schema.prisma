@@ -2431,6 +2431,14 @@ enum NotificationType {
   ACTIVITY_OUT_OF_ZONE
   /// Un superior canceló la actividad (con motivo).
   ACTIVITY_CANCELLED
+  /// Quien la recibió la aceptó (aviso a quien la asignó).
+  ACTIVITY_ACCEPTED_BY_ASSIGNEE
+  /// Quien la recibió la rechazó con motivo (aviso a quien asignó, responsable y jefes).
+  ACTIVITY_REJECTED_BY_ASSIGNEE
+  /// Pasó del tiempo estimado (aviso a la persona y a sus superiores).
+  ACTIVITY_OVERTIME
+  /// Inició lejos del sitio del cliente o se saltó el orden de prioridad.
+  ACTIVITY_START_FLAGGED
   // Celebraciones del equipo (tarea diaria de las 8:00)
   BIRTHDAY
   WORK_ANNIVERSARY
@@ -5510,6 +5518,23 @@ model ActivityAssignee {
   asignadoPorId      Int?
   /// Fecha de salida del equipo; null mientras sigue asignado.
   retiradoAt         DateTime?
+  /// Aceptación de la asignación: quien la recibe confirma que la hará.
+  /// null en las dos = pendiente (la foto de entrada acepta sola, para apps viejas).
+  aceptadaAt         DateTime?
+  rechazadaAt        DateTime?
+  /// Por qué la rechazó (mínimo 10 caracteres); sigue asignada hasta que un superior la mueva.
+  motivoRechazo      String?              @db.VarChar(500)
+  /// Tiempo real: la foto de entrada fija el inicio y la de salida el fin.
+  inicioRealAt       DateTime?
+  finRealAt          DateTime?
+  /// Metros entre la foto de entrada y la sucursal/cliente de la actividad (si hay coordenadas).
+  distanciaSitioInicioM Int?
+  /// Inició teniendo otra del día con más prioridad sin terminar (no bloquea; avisa a jefes).
+  saltoPrioridad     Boolean              @default(false)
+  /// Por qué se saltó el orden de prioridad (viene en el cuerpo de la foto de entrada).
+  justificacionOrden String?              @db.VarChar(500)
+  /// Cuándo se avisó que excedió su tiempo estimado (una sola vez).
+  alertaExcesoAt     DateTime?
   /// Posición en la cola personal de ejecución (Mis actividades). null = sin ordenar.
   ordenEjecucion     Int?
   /// Por qué el encargado la puso en esa posición (obligatorio al reordenar).
