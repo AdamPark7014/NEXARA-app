@@ -555,7 +555,7 @@ export default function MisActividadesPage() {
                     <strong>Por qué va aquí:</strong> {a.ordenJustificacion}
                   </p>
                 ) : null}
-                {token && !a.despachador ? (
+                {token ? (
                   <AceptarRechazar
                     token={token}
                     activityId={a.id}
