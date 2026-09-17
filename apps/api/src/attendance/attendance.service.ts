@@ -40,6 +40,21 @@ export class AttendanceService {
     await this.prisma.notification.create({ data: { ...data, type: data.type as NotificationType } });
   }
 
+  /**
+   * Quien aún no tiene foto de perfil toma la de su checada (cámara en vivo): así su cara aparece
+   * en la pizarra, el chat y los avisos del teléfono. Los terminales de acceso no entregan la foto
+   * enrolada por ISAPI (404), así que esta es la fuente real disponible. Nunca reemplaza una foto
+   * que la persona ya subió.
+   */
+  private async usarFotoComoAvatarSiFalta(userId: number, photoUrl?: string | null, avatarActual?: string | null) {
+    if (!photoUrl || (avatarActual || '').trim()) return;
+    try {
+      await this.prisma.user.updateMany({ where: { id: userId, avatarUrl: null }, data: { avatarUrl: photoUrl } });
+    } catch (err) {
+      this.logger.warn(`No se pudo usar la foto de checada como avatar (userId=${userId}): ${(err as Error).message}`);
+    }
+  }
+
   private persistAttendancePhoto(photoBase64?: string | null): string | null {
     if (!photoBase64 || !photoBase64.trim()) return null;
     try {
@@ -587,6 +602,7 @@ export class AttendanceService {
         },
         include: { user: true },
       });
+      await this.usarFotoComoAvatarSiFalta(userId, attendance.photoUrl, attendance.user?.avatarUrl);
 
       const day = await this.prisma.attendanceDay.upsert({
         where: { companyId_userId_date: { companyId: tenantId, userId, date: today } },
