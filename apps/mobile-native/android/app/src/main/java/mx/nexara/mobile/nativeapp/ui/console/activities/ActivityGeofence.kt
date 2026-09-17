@@ -130,7 +130,7 @@ fun GeocercaActividadCard(
                 error = e.toUserMessage("No se pudo cargar la ubicación de la actividad")
             }
             if (estado?.seguimientoActivo != true) break
-            delay(60_000)
+            delay(120_000)
         }
     }
 
@@ -184,7 +184,7 @@ fun GeocercaActividadCard(
         val puntos = e.puntos.orEmpty()
         if (puntos.isNotEmpty()) {
             Text(
-                if (e.seguimientoActivo == true) "Seguimiento cada ~2 min" else "Recorrido registrado",
+                if (e.seguimientoActivo == true) "Seguimiento cada ~10 min" else "Recorrido registrado",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = NxColors.Muted,
