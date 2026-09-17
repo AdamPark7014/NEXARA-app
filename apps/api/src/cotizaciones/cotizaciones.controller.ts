@@ -1,4 +1,18 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { CotizacionesService } from './cotizaciones.service.js';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
@@ -187,6 +201,31 @@ export class CotizacionesController {
       userId: user?.id,
       companyId,
     });
+  }
+
+  /** 03 Planos: sube un plano o anexo propio de la cotización. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @UseInterceptors(FileInterceptor('file'))
+  @Post(':id/planos')
+  subirPlano(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: any,
+    @Body() body: { nombre?: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.agregarPlano(id, file, body?.nombre, companyId);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/planos/quitar')
+  quitarPlano(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { url: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.quitarPlano(id, String(body?.url ?? ''), companyId);
   }
 
   /** Agrega N paquetes: genera las partidas y cuadra el alcance. */
