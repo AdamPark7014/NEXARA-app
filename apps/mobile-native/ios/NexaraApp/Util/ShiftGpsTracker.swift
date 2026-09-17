@@ -19,8 +19,12 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
 
     /// Ni un punto por segundo (gasta batería y llena la tabla) ni uno por hora
     /// (el recorrido deja de ser un recorrido): 100 m o 45 s, lo que llegue.
-    private static let minSeconds: TimeInterval = 45
-    private static let minMeters: CLLocationDistance = 100
+    /// Trayecto de jornada: un punto cada ~30 min o al moverse 500 m (cuida datos y batería).
+    private static let minSeconds: TimeInterval = 30 * 60
+    private static let minMeters: CLLocationDistance = 500
+    /// Con actividad en curso: cada ~10 min o al moverse 100 m, para la geocerca de 100 m.
+    private static let actividadMinSeconds: TimeInterval = 10 * 60
+    private static let actividadMinMeters: CLLocationDistance = 100
 
     /// Actividad en curso (foto de entrada enviada, sin foto de salida): los
     /// puntos viajan con `actividadId` para la geocerca. Solo en memoria: la
@@ -42,7 +46,7 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        manager.distanceFilter = ShiftGpsTracker.minMeters
+        manager.distanceFilter = ShiftGpsTracker.actividadMinMeters
         manager.activityType = .automotiveNavigation
         manager.pausesLocationUpdatesAutomatically = false
         isTracking = UserDefaults.standard.bool(forKey: ShiftGpsTracker.activeKey)
@@ -154,9 +158,12 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
         // El (0,0) de un teléfono sin señal no es una lectura: el API lo tira.
         guard coordinate.latitude != 0 || coordinate.longitude != 0 else { return }
 
-        if let lastSent, Date().timeIntervalSince(lastSent) < ShiftGpsTracker.minSeconds {
+        let enActividad = ShiftGpsTracker.currentActivityId != nil
+        let esperaSeg = enActividad ? ShiftGpsTracker.actividadMinSeconds : ShiftGpsTracker.minSeconds
+        let esperaMetros = enActividad ? ShiftGpsTracker.actividadMinMeters : ShiftGpsTracker.minMeters
+        if let lastSent, Date().timeIntervalSince(lastSent) < esperaSeg {
             let moved = lastPoint.map { location.distance(from: $0) } ?? .greatestFiniteMagnitude
-            if moved < ShiftGpsTracker.minMeters { return }
+            if moved < esperaMetros { return }
         }
 
         sending = true

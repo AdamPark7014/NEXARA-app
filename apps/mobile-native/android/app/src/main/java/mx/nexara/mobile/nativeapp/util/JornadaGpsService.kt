@@ -122,14 +122,17 @@ object JornadaGps {
 
     internal const val TAG = "JornadaGps"
 
-    /** ~3 min o 100 m: suficiente para dibujar el trayecto sin vaciar la batería. */
-    internal const val INTERVAL_MS = 3 * 60_000L
-    internal const val FASTEST_MS = 90_000L
-    internal const val MIN_DISTANCE_M = 100f
+    /**
+     * Trayecto de jornada: un punto cada ~30 min (o al moverse 500 m). La ubicación del teléfono no
+     * cuesta en Google Cloud; así se cuida la batería y los datos de la persona (~48 envíos al día).
+     */
+    internal const val INTERVAL_MS = 30 * 60_000L
+    internal const val FASTEST_MS = 15 * 60_000L
+    internal const val MIN_DISTANCE_M = 500f
 
-    /** Durante una actividad: cada ~2 min aunque no se mueva, para vigilar la geocerca de 100 m. */
-    internal const val ACTIVIDAD_INTERVAL_MS = 2 * 60_000L
-    internal const val ACTIVIDAD_FASTEST_MS = 60_000L
+    /** Durante una actividad: cada ~10 min aunque no se mueva, para vigilar la geocerca de 100 m. */
+    internal const val ACTIVIDAD_INTERVAL_MS = 10 * 60_000L
+    internal const val ACTIVIDAD_FASTEST_MS = 5 * 60_000L
     internal const val NOTIFICATION_ID = 4711
 }
 
