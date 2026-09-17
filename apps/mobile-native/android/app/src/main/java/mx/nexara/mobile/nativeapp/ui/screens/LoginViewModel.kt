@@ -14,6 +14,7 @@ import mx.nexara.mobile.nativeapp.data.AuthErrorMapper
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.LoginPreferencesStore
 import mx.nexara.mobile.nativeapp.data.QuickProfile
+import mx.nexara.mobile.nativeapp.data.RememberMe
 import mx.nexara.mobile.nativeapp.push.PushRegistration
 import mx.nexara.mobile.nativeapp.security.AppLock
 
@@ -26,6 +27,8 @@ data class LoginUiState(
     val showBiometricOption: Boolean = false,
     val error: String? = null,
     val infoMessage: String? = null,
+    /** «Recordarme»: sesión abierta en este teléfono y correo guardado. */
+    val rememberMe: Boolean = true,
 )
 
 class LoginViewModel(app: Application) : AndroidViewModel(app) {
@@ -37,6 +40,7 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
             quickProfiles = repo.quickProfiles(),
             showBiometricOption = AppLock.canAuthenticate(app.applicationContext) &&
                 repo.quickProfiles().isNotEmpty(),
+            rememberMe = RememberMe.isEnabled(app.applicationContext),
         ),
     )
     val state: StateFlow<LoginUiState> = _state
@@ -59,6 +63,7 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setEmail(value: String) = _state.update { it.copy(email = value, error = null, infoMessage = null) }
     fun setPassword(value: String) = _state.update { it.copy(password = value, error = null, infoMessage = null) }
+    fun setRememberMe(value: Boolean) = _state.update { it.copy(rememberMe = value) }
 
     fun selectQuickProfile(profile: QuickProfile) {
         _state.update {
@@ -82,7 +87,8 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) {
                     repo.login(trimmedEmail, snapshot.password)
                 }
-                loginPrefs.saveLastEmail(trimmedEmail)
+                RememberMe.setEnabled(getApplication(), snapshot.rememberMe)
+                if (snapshot.rememberMe) loginPrefs.saveLastEmail(trimmedEmail) else loginPrefs.clearLastEmail()
                 PushRegistration.registerCurrentDeviceAsync(getApplication<Application>().applicationContext)
                 _state.update {
                     it.copy(

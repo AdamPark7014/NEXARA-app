@@ -61,6 +61,8 @@ class MainActivity : FragmentActivity() {
 
         NexaraNotifications.ensureChannels(this)
         NexaraOffline.install(applicationContext)
+        // «Recordarme» apagado: la sesión no sobrevive a cerrar la app. Antes de dibujar nada.
+        mx.nexara.mobile.nativeapp.data.RememberMe.endSessionOnColdStartIfNeeded(applicationContext)
         SessionRefresher.install(applicationContext)
         handleDeepLink(intent)
         askNotificationPermissionIfNeeded()

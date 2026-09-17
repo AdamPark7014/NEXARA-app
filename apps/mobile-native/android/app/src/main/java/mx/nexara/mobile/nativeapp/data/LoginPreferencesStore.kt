@@ -26,4 +26,9 @@ class LoginPreferencesStore(private val context: Context) {
             prefs[lastEmailKey] = trimmed
         }
     }
+
+    /** Sin «Recordarme» no se deja el correo escrito para quien use el teléfono después. */
+    suspend fun clearLastEmail() {
+        context.loginPreferencesDataStore.edit { prefs -> prefs.remove(lastEmailKey) }
+    }
 }
