@@ -106,6 +106,16 @@ data class ActivityDto(
     val cancelReason: String? = null,
     val cancelledAt: String? = null,
     val cancelledBy: ActivityPersonRefDto? = null,
+    // ── Contrato B en el detalle; opcionales (la API vieja no los manda).
+    /** PENDIENTE | ACEPTADA | RECHAZADA — lo de quien consulta. */
+    val aceptacion: String? = null,
+    val motivoRechazo: String? = null,
+    /** rojo | amarillo | verde */
+    val semaforo: String? = null,
+    val minutosPlan: Double? = null,
+    val minutosReales: Double? = null,
+    val excedida: Boolean? = null,
+    val asignadoPor: ActivityPersonRefDto? = null,
 )
 
 /** `{ id, nombre }` con nombre opcional: una persona borrada no debe tumbar el detalle. */

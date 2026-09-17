@@ -64,8 +64,13 @@ fun ActivityInfoTab(
     onSave: () -> Unit = {},
     /** Bloque extra al final del detalle (p. ej. resumen de evidencias del equipo). */
     extraContent: (@Composable () -> Unit)? = null,
+    /** Bloque arriba de todo (aceptar o rechazar, semáforo: contrato B). */
+    topContent: (@Composable () -> Unit)? = null,
 ) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (topContent != null) {
+            item { topContent() }
+        }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.clip(RoundedCornerShape(20.dp)).background(statusColor.copy(alpha = 0.13f)).padding(horizontal = 10.dp, vertical = 4.dp)) {
