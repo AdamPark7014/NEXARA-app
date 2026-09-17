@@ -73,7 +73,17 @@ export class UpdateOperationalProjectDto {
 
 export class ProjectStatusChangeDto {
   @IsString()
-  status!: 'ACTIVE' | 'ON_HOLD' | 'COMPLETED';
+  status!: 'PLANNED' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
+
+  /** Obligatorio al cancelar: un proyecto que se cae sin motivo no se puede explicar. */
+  @IsOptional()
+  @IsString()
+  cancelReason?: string;
+
+  /** Fin **real** al dar por terminado. Sin él se usa hoy. */
+  @IsOptional()
+  @IsDateString()
+  actualEndDate?: string;
 }
 
 export class AssignProjectEngineerDto {
