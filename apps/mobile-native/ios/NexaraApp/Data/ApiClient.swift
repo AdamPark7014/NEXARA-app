@@ -161,6 +161,11 @@ final class ApiClient {
         guard let url = comps?.url else { throw ApiError.invalidURL }
         var req = URLRequest(url: url)
         req.httpMethod = method
+        // Modelo y sistema del teléfono en cada petición (login incluido): el aviso de inicio de sesión
+        // dice «desde iPhone 16 Pro Max (iOS 18.1)».
+        for (header, value) in DeviceIdentity.headers {
+            req.setValue(value, forHTTPHeaderField: header)
+        }
         if let token = SessionStore.shared.token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }

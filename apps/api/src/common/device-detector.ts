@@ -20,6 +20,24 @@ export type DetectedDevice = {
   label: string;
   /** Texto compacto para auditoría / lastLoginDevice */
   summary: string;
+  /**
+   * Descripción para la persona, al estilo Instagram/Facebook:
+   * «iPhone 16 Pro Max (iOS 18.1) · app NEXARA», «Galaxy S24 Ultra (Android 14) · app NEXARA»,
+   * «Chrome en Windows».
+   */
+  friendly: string;
+  /** Viene de la app nativa (no de un navegador). */
+  isApp: boolean;
+};
+
+/** Nombre del teléfono: la app lo manda codificado en URL porque puede traer acentos. */
+const decodeHeader = (value: string): string => {
+  if (!value.includes('%')) return value;
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '));
+  } catch {
+    return value;
+  }
 };
 
 /** Detecta dispositivo desde UA + headers de identidad del cliente. */
@@ -30,7 +48,8 @@ export const detectDeviceDetails = (
   const ua = (userAgent || '').toLowerCase();
   const hintedModel = cleanClientHint(getHeaderValue(headers, 'sec-ch-ua-model'));
   const explicitModel = cleanClientHint(getHeaderValue(headers, 'x-device-model'));
-  const explicitName = cleanClientHint(getHeaderValue(headers, 'x-device-name'));
+  const explicitName = decodeHeader(cleanClientHint(getHeaderValue(headers, 'x-device-name')));
+  const explicitOs = cleanClientHint(getHeaderValue(headers, 'x-device-os'));
   const providedSerial = cleanClientHint(getHeaderValue(headers, 'x-device-serial'));
   const providedDeviceId = cleanClientHint(getHeaderValue(headers, 'x-device-id'));
   const platformHint = cleanClientHint(getHeaderValue(headers, 'sec-ch-ua-platform'));
@@ -99,6 +118,18 @@ export const detectDeviceDetails = (
   );
   const summary = (summaryParts.join(' · ') || label).slice(0, 255);
 
+  const isApp = /nexara app/i.test(browser) || /nexaraapp\//.test(ua);
+  const friendly = (() => {
+    if (isApp) {
+      // Android manda el nombre visible (Galaxy S24 Ultra) y el modelo técnico (samsung SM-S928B).
+      const equipo = explicitName || explicitModel || model;
+      const sistema = explicitOs || os;
+      return `${equipo}${sistema && !equipo.includes(sistema) ? ` (${sistema})` : ''} · app NEXARA`;
+    }
+    if (browser && os) return `${browser} en ${os === 'macOS' ? 'Mac' : os}`;
+    return label;
+  })().slice(0, 200);
+
   return {
     kind,
     model,
@@ -108,6 +139,8 @@ export const detectDeviceDetails = (
     deviceId: providedDeviceId || undefined,
     label,
     summary,
+    friendly,
+    isApp,
   };
 };
 

@@ -89,7 +89,14 @@ internal val NOTIFICATION_CATEGORY_LABEL: Map<String, String> = mapOf(
     "chat" to "Chat",
     "profile" to "Perfil",
     "confirmations" to "Confirmación",
+    "security" to "Seguridad",
 )
+
+/** Categorías de módulos retirados de Core: sus avisos viejos no se listan. */
+internal fun isLegacyNotificationCategory(category: String?): Boolean {
+    val c = category?.trim()?.lowercase().orEmpty()
+    return c in setOf("quotes", "sales", "crm", "tool", "tools", "viatics", "vehicles", "fines", "tickets", "orders", "stock-alert", "margin-alert", "workflow", "asc", "ops-acs", "finance")
+}
 
 enum class NotificationViewMode { BANDEJA, FEED }
 
@@ -264,8 +271,10 @@ fun NotificationsScreen(
         NotificationFilter.ALL -> state.rows
         NotificationFilter.UNREAD -> state.rows.filter { it.isRead != true }
     }.let { rows ->
-        if (state.category == NotificationCategory.TODAS) rows
-        else rows.filter { NotificationCategory.of(it.category) == state.category }
+        // Avisos de módulos que ya no existen en Core (cotizaciones, ventas, viáticos…) no se muestran.
+        val core = rows.filter { !isLegacyNotificationCategory(it.category) }
+        if (state.category == NotificationCategory.TODAS) core
+        else core.filter { NotificationCategory.of(it.category) == state.category }
     }
 
     Column(
@@ -462,9 +471,12 @@ fun NotificationsScreen(
                                     n.category?.takeIf { it.isNotBlank() }?.let { raw ->
                                         add(NOTIFICATION_CATEGORY_LABEL[raw.lowercase()] ?: raw)
                                     }
-                                    n.createdAt?.takeIf { it.isNotBlank() }?.let { add(it.take(16)) }
-                                    if (n.isRead == true) add("Leída") else add("No leída")
-                                    if (isNavigable) add("Abrir módulo")
+                                    // «Hace 12 min» en vez de la fecha ISO cruda.
+                                    mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
+                                        .relativeTime(n.createdAt)
+                                        .takeIf { it.isNotBlank() }
+                                        ?.let { add(it) }
+                                    if (n.isRead != true) add("Sin leer")
                                 }.joinToString(" · ")
                                 Text(
                                     meta,

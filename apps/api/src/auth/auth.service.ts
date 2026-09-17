@@ -15,6 +15,7 @@ import {
 } from '../common/platform-accounts.js';
 import { LEGACY_TO_V2, ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import { fechaAviso } from '../notifications/notification-push-meta.js';
 
 type UserWithRole = {
   roleKey?: string | null;
@@ -756,12 +757,17 @@ export class AuthService {
     }
   }
 
-  private async createLoginNotification(userId: number, detectedDevice: string) {
+  /**
+   * Aviso de inicio de sesión al estilo Instagram/Facebook: qué equipo, qué sistema y cuándo.
+   * «Iniciaste sesión desde iPhone 16 Pro Max (iOS 18.1) · app NEXARA — hoy a las 10:31 p. m.»
+   */
+  private async createLoginNotification(userId: number, device: string, at: Date = new Date()) {
+    const cuando = fechaAviso(at);
     const baseData = {
       userId,
       category: 'security',
-      title: 'Nuevo acceso detectado',
-      message: `Se inició sesión desde ${detectedDevice}.`,
+      title: `Nuevo inicio de sesión en ${device.split(' · ')[0].replace(/ \(.*\)$/, '')}`,
+      message: `Iniciaste sesión desde ${device} el ${cuando}. Si no fuiste tú, cambia tu contraseña y avisa a administración.`,
       entityType: 'auth',
       priority: 'normal' as const,
     };
@@ -994,7 +1000,7 @@ export class AuthService {
       this.logger.debug(sessionErr instanceof Error ? sessionErr.message : String(sessionErr));
     }
 
-    await this.createLoginNotification(user.id, detectedDevice);
+    await this.createLoginNotification(user.id, device.friendly || detectedDevice);
 
     try {
       await this.prisma.auditLog.create({
