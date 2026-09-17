@@ -11,6 +11,10 @@
 ALTER TYPE "CotizacionStatus" ADD VALUE IF NOT EXISTS 'REJECTED';
 ALTER TYPE "CotizacionStatus" ADD VALUE IF NOT EXISTS 'EXPIRED';
 
+-- Avisos de la cotización (enviada y rechazada por el cliente).
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'QUOTE_SENT';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'QUOTE_REJECTED';
+
 -- 2. Segmento y papel de cada participante.
 DO $$
 BEGIN
