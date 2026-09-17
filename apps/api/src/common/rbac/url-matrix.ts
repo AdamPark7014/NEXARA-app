@@ -101,6 +101,15 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/erp/actividades/servicios/**', scope: 'write' },
   { path: '/api/chat/**', scope: 'write' },
   { path: '/api/me/**', methods: ['GET'], scope: 'read' },
+  // APIs que usan las apps y la web Core para cualquier persona del equipo. Lo fino (solo lo
+  // propio, solo jefes aprueban, solo quien ejecuta sube evidencia) lo decide cada servicio.
+  ...SELF_ATTENDANCE_URL_RULES,
+  // Aprobar/rechazar comida a destiempo: el servicio solo deja a los jefes de esa persona.
+  { path: '/api/lunch-breaks/**', methods: ['PATCH'], scope: 'approve' },
+  { path: '/api/integra/identity/me', methods: ['GET'], scope: 'read' },
+  { path: '/api/activities/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+  { path: '/api/activity-evidence/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+  { path: '/api/operational-projects/**', methods: ['GET'], scope: 'read' },
 ];
 
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
@@ -633,6 +642,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.LIDER_DISENO]: [
     ...MEETINGS_LEAD_URL_RULES,
+    // Daniela (diseño) también es personal Core: actividades, asistencia, comida y chat.
+    ...CORE_OLA1_URL_RULES,
     { path: '/studio/**', scope: 'admin' },
     { path: '/erp/dashboard', scope: 'read' },
     // Material comercial: cotiza y mantiene catálogo y plantillas de marca.
