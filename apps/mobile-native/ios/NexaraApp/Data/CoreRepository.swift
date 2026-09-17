@@ -38,6 +38,15 @@ struct ServiceSheetPdfPayload: Encodable {
     let pdfUrl: String
 }
 
+/// `POST activity-evidence/:id/campos/:campoId/foto` (evidencia por campos).
+struct CampoPhotoPayload: Encodable {
+    /// antes | progreso | despues
+    let momento: String
+    let fotoBase64: String
+    let lat: Double?
+    let lng: Double?
+}
+
 struct ServiceSheetFormPayload: Encodable {
     let formData: [String: String]
 }
@@ -249,6 +258,29 @@ final class CoreRepository {
             )
         }
         return try await postEvidence("activity-evidence/\(activityId)/evidence-photos", body: photos)
+    }
+
+    /// Evidencia por campos: una foto de un campo en un momento. Responde con
+    /// el campo actualizado (no con el flujo); `nil` si quedó en la cola.
+    func submitCampoPhoto(
+        activityId: Int,
+        campoId: Int,
+        momento: String,
+        fotoBase64: String,
+        latitude: Double?,
+        longitude: Double?
+    ) async throws -> EvidenceCampo? {
+        let data = try await api.postJSON(
+            "activity-evidence/\(activityId)/campos/\(campoId)/foto",
+            body: CampoPhotoPayload(
+                momento: momento,
+                fotoBase64: fotoBase64,
+                lat: latitude,
+                lng: longitude
+            )
+        )
+        if CoreRepository.isQueuedOffline(data) { return nil }
+        return try decode(EvidenceCampo.self, from: data)
     }
 
     func submitServiceSheetPdf(activityId: Int, pdfDataUrl: String, correction: Bool) async throws -> EvidenceFlowState? {

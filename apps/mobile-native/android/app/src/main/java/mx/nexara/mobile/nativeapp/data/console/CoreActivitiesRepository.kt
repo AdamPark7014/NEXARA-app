@@ -17,6 +17,8 @@ import mx.nexara.mobile.nativeapp.data.api.CelebracionesHoyDto
 import mx.nexara.mobile.nativeapp.data.api.CoreActivitiesApi
 import mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest
 import mx.nexara.mobile.nativeapp.data.api.DispatchMyActivityRequest
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceFlowDto
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotoGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotosWithGeoRequest
@@ -233,6 +235,28 @@ class CoreActivitiesRepository(context: Context) {
         photoUrls: List<String>,
         photoGeo: List<EvidencePhotoGeoRequest?>,
     ): EvidenceFlowDto = api.evidencePhotos(activityId, EvidencePhotosWithGeoRequest(photoUrls, photoGeo))
+
+    /**
+     * Evidencia por campos: una foto de un campo en un momento
+     * (`antes | progreso | despues`). La API responde con el campo actualizado.
+     */
+    suspend fun campoFoto(
+        activityId: Long,
+        campoId: Long,
+        momento: String,
+        fotoBase64: String,
+        lat: Double? = null,
+        lng: Double? = null,
+    ): EvidenceCampoDto? {
+        val campo = api.evidenceCampoFoto(
+            activityId,
+            campoId,
+            EvidenceCampoFotoRequest(momento = momento, fotoBase64 = fotoBase64, lat = lat, lng = lng),
+        )
+        // Sin conexión el interceptor responde 202 `{"queued":true}` y Moshi lo
+        // decodifica como un campo vacío: eso no es el campo guardado.
+        return campo.takeIf { it.id != null || it.nombre != null || it.fotos != null }
+    }
 
     suspend fun serviceSheetPdf(activityId: Long, pdfDataUrl: String): EvidenceFlowDto =
         api.serviceSheetPdf(activityId, ActivityEvidencePdfStepRequest(pdfDataUrl))

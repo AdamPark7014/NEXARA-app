@@ -441,7 +441,7 @@ private fun AsignadaPorMiCard(a: BoardAsignadaPorMiDto, onClick: () -> Unit) {
                 ActivitySemaforo.luz(a.semaforo)?.let { luz -> ToneChip("● ${luz.etiqueta}", luz.color) }
                 ToneChip(CoreActivityRules.estatusUi(a.estatus))
                 if (ActivitySemaforo.estaPendienteDeAceptar(a.aceptacion)) {
-                    ToneChip("Sin aceptar", CoreActivityRules.NARANJA)
+                    ToneChip(ActivitySemaforo.CHIP_SIN_COMENZAR, CoreActivityRules.NARANJA)
                 }
                 ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
                     ToneChip(texto, ActivitySemaforo.planRealColor(a.excedida))
@@ -595,7 +595,7 @@ private fun MisActividadesContent(
     var showDone by remember { mutableStateOf(false) }
     var highlightId by remember(highlightActivityId) { mutableStateOf(highlightActivityId) }
     var pendingMove by remember { mutableStateOf<PendingMove?>(null) }
-    // Contrato B: aceptar o rechazar lo que te asignaron.
+    // Contrato B: comenzar lo que te asignaron (o decir que no puedes tomarla).
     val scope = rememberCoroutineScope()
     var aceptandoId by remember { mutableStateOf<Long?>(null) }
     var aceptacionError by remember { mutableStateOf<String?>(null) }
@@ -738,7 +738,7 @@ private fun MisActividadesContent(
                                 reload++
                             } catch (e: Exception) {
                                 aceptacionErrorId = a.id
-                                aceptacionError = e.toUserMessage("No se pudo aceptar la actividad")
+                                aceptacionError = e.toUserMessage("No se pudo comenzar la actividad")
                             } finally {
                                 aceptandoId = null
                             }

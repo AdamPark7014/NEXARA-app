@@ -64,7 +64,7 @@ fun ActivityInfoTab(
     onSave: () -> Unit = {},
     /** Bloque extra al final del detalle (p. ej. resumen de evidencias del equipo). */
     extraContent: (@Composable () -> Unit)? = null,
-    /** Bloque arriba de todo (aceptar o rechazar, semáforo: contrato B). */
+    /** Bloque arriba de todo (comenzar la actividad, semáforo: contrato B). */
     topContent: (@Composable () -> Unit)? = null,
 ) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
