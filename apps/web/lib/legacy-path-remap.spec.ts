@@ -17,6 +17,15 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     expect(normalizeLegacyPath('/erp/documentos')).toBe('/erp/documents');
   });
 
+  it('las cotizaciones de Core se quedan en /erp', () => {
+    // Antes `/erp/cotizaciones` se remapeaba a `/crm/quotes` y, en superficie Core, acababa
+    // rebotando a la pizarra: la página nueva del contrato del viernes era inalcanzable.
+    expect(normalizeLegacyPath('/erp/cotizaciones')).toBe('/erp/cotizaciones');
+    expect(normalizeLegacyPath('/erp/cotizaciones/12')).toBe('/erp/cotizaciones/12');
+    expect(normalizeLegacyPath('/erp/cotizaciones/nueva')).toBe('/erp/cotizaciones/nueva');
+    expect(normalizeLegacyPath('/erp/quotes')).toBe('/erp/cotizaciones');
+  });
+
   it('aplica los remapeos cross-panel conservando el resto de la ruta', () => {
     expect(normalizeLegacyPath('/core/cotizaciones/17')).toBe('/crm/quotes/17');
     // Regresión: el destino llevaba '$1' literal y salía '/tickets$1/9', que
