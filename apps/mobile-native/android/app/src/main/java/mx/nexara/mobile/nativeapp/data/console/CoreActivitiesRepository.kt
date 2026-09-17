@@ -12,6 +12,7 @@ import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.BoardAsignadaPorMiDto
 import mx.nexara.mobile.nativeapp.data.api.CelebracionesHoyDto
 import mx.nexara.mobile.nativeapp.data.api.CoreActivitiesApi
 import mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest
@@ -136,16 +137,57 @@ class CoreActivitiesRepository(context: Context) {
 
     // ── Pizarra ─────────────────────────────────────────────────────────────
 
-    /** Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados. */
-    suspend fun board(): TeamBoardResponseDto {
-        val raw = api.board()
+    /**
+     * Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados.
+     *
+     * @param desde/@param hasta rango `AAAA-MM-DD` (contrato C); sin ellos, hoy.
+     */
+    suspend fun board(desde: String? = null, hasta: String? = null): TeamBoardResponseDto {
+        val raw = api.board(desde = desde, hasta = hasta)
         return raw.copy(users = raw.users?.filter { !PlatformAccounts.isNonEmployeeEmail(it.email) })
     }
 
-    suspend fun boardUser(userId: Long): TeamBoardUserDto = api.boardUser(userId)
+    suspend fun boardUser(userId: Long, desde: String? = null, hasta: String? = null): TeamBoardUserDto =
+        api.boardUser(userId, desde = desde, hasta = hasta)
 
-    suspend fun boardUserHistory(userId: Long): List<TeamBoardHistoryItemDto> =
-        api.boardUserHistory(userId)
+    suspend fun boardUserHistory(
+        userId: Long,
+        desde: String? = null,
+        hasta: String? = null,
+    ): List<TeamBoardHistoryItemDto> = api.boardUserHistory(userId, desde = desde, hasta = hasta)
+
+    /**
+     * «Asignadas por mí» en el rango.
+     *
+     * Se lee crudo y se aceptan las dos formas que puede tomar el API mientras
+     * se construye: un arreglo suelto o `{ items: [...] }`. Si todavía no
+     * existe el endpoint, la lista sale vacía y la pantalla lo dice.
+     */
+    suspend fun boardAsignadasPorMi(desde: String? = null, hasta: String? = null): List<BoardAsignadaPorMiDto> {
+        val raw = api.boardAsignadasPorMi(desde = desde, hasta = hasta).string().trim()
+        if (raw.isEmpty()) return emptyList()
+        val moshi = com.squareup.moshi.Moshi.Builder()
+            .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+            .build()
+        val listType = com.squareup.moshi.Types.newParameterizedType(
+            List::class.java,
+            BoardAsignadaPorMiDto::class.java,
+        )
+        if (raw.startsWith("[")) {
+            return runCatching { moshi.adapter<List<BoardAsignadaPorMiDto>>(listType).fromJson(raw) }
+                .getOrNull()
+                .orEmpty()
+        }
+        val wrapperType = com.squareup.moshi.Types.newParameterizedType(
+            Map::class.java,
+            String::class.java,
+            listType,
+        )
+        val wrapper = runCatching {
+            moshi.adapter<Map<String, List<BoardAsignadaPorMiDto>>>(wrapperType).fromJson(raw)
+        }.getOrNull()
+        return wrapper?.get("items") ?: wrapper?.get("actividades") ?: emptyList()
+    }
 
     // ── Evidencias del equipo ───────────────────────────────────────────────
 
