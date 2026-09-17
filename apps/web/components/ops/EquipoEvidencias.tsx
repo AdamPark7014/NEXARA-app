@@ -1339,6 +1339,11 @@ function TarjetaPersona({
       <header style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <Avatar nombre={m.nombre} url={m.avatarUrl} />
         <div style={{ minWidth: 0, flex: "1 1 200px" }}>
+          {m.avanceAnterior ? (
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              {m.avanceAnterior} · solo lectura
+            </div>
+          ) : null}
           <div style={{ fontWeight: 800, fontSize: 15 }}>{m.nombre}</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4, alignItems: "center" }}>
             <Chip
@@ -1354,7 +1359,11 @@ function TarjetaPersona({
             ) : null}
             <ChipZona alertas={alertasZona} />
             {m.eficienciaScore ? <Estrellas valor={m.eficienciaScore} /> : null}
-            {m.retiradoAt ? <Chip>Salió del equipo</Chip> : null}
+            {m.pasadaA ? (
+              <Chip icon={SendOutlinedIcon}>La continúa {corto(m.pasadaA.nombre)}</Chip>
+            ) : m.retiradoAt ? (
+              <Chip>Salió del equipo</Chip>
+            ) : null}
           </div>
         </div>
         {!m.reparte ? (
@@ -1372,6 +1381,12 @@ function TarjetaPersona({
           Recibió {fmt(m.asignadoAt) ?? ""}
           {m.asignadoPor && m.asignadoPor !== m.nombre ? ` de ${corto(m.asignadoPor)}` : ""}
         </IconLabel>
+        {m.pasadaA ? (
+          <IconLabel icon={SendOutlinedIcon} size={16} gap={4}>
+            {m.pasadaA.por ? `${corto(m.pasadaA.por)} la pasó` : "Se la pasaron"} a {corto(m.pasadaA.nombre)} · {fmt(m.pasadaA.at)}
+            {m.pasadaA.motivo ? ` · Motivo: ${m.pasadaA.motivo}` : ""}
+          </IconLabel>
+        ) : null}
         {m.pasoA.map((p) => (
           <IconLabel key={`${p.nombre}-${p.at}`} icon={SendOutlinedIcon} size={16} gap={4}>
             La pasó a {corto(p.nombre)} · {fmt(p.at)}

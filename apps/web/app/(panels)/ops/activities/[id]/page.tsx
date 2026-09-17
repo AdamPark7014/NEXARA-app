@@ -9,6 +9,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
+import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -215,6 +216,34 @@ export default function ActivityDetailPage() {
 
   return (
     <>
+      <ActivitySuperiorActions activityId={activity.id} token={token} onDone={reload} />
+      {/cancel/i.test(activity.estatus) && (activity.cancelReason || activity.cancelledAt) ? (
+        <div
+          role="status"
+          style={{
+            marginBottom: 14,
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "1px solid color-mix(in srgb, var(--danger) 40%, var(--border))",
+            background: "color-mix(in srgb, var(--danger) 7%, var(--surface))",
+            display: "flex",
+            gap: 10,
+            alignItems: "flex-start",
+          }}
+        >
+          <CancelOutlinedIcon aria-hidden="true" sx={{ fontSize: 20, color: "var(--danger)", mt: "1px" }} />
+          <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 700 }}>
+              Cancelada
+              {activity.cancelledBy?.nombre ? ` por ${activity.cancelledBy.nombre}` : ""}
+              {activity.cancelledAt ? ` · ${formatDateTime(activity.cancelledAt)}` : ""}
+            </div>
+            {activity.cancelReason ? (
+              <div style={{ color: "var(--text-secondary)" }}>Motivo: {activity.cancelReason}</div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {missingEvidence && missingEvidence.length > 0 && (
         <div style={{ marginBottom: 14 }}>
           <InlineAlert
@@ -423,7 +452,10 @@ export default function ActivityDetailPage() {
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Estado *</span>
                 <select value={form.estatus} onChange={(e) => setForm((f) => ({ ...f, estatus: e.target.value }))} style={inp}>
-                  {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {/* Cancelar tiene su propio botón con motivo obligatorio (solo superiores). */}
+                  {STATUSES.filter((s) => s !== "Cancelada" || /cancel/i.test(activity.estatus)).map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
               </label>
               <div style={{ display: "grid", gap: 4 }}>
