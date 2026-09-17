@@ -11,6 +11,7 @@ import { ChatService } from '../chat/chat.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
+import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
 import {
   buildAccessScheduleAssignment,
   deviceMatchesDoorScope,
@@ -763,8 +764,8 @@ export class UsersService {
     try {
       const tenantId = requireCompanyId(companyId);
       const membership = this.companyMembershipFilter(tenantId);
-      // SuperAdmin emails (siempre excluir)
-      const superAdminEmails = this.superAdminEmails;
+      // Quien no es empleado nunca sale en «asignar a» (Christian, Adam, Claudia de pruebas, demo).
+      const superAdminEmails = [...NON_EMPLOYEE_EMAILS];
 
       // Cargar usuario actual de la BD para obtener rol actual
       const userInDb = await this.prisma['user'].findUnique({

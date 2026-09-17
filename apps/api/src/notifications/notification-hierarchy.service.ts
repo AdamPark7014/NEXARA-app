@@ -13,6 +13,7 @@ import {
   type PortalTicketClientAction,
 } from './portal-ticket-notify.js';
 import { fechaAviso, horaAviso, nombreCorto } from './notification-push-meta.js';
+import { CEO_EQUIVALENT_EMAILS } from '../common/platform-accounts.js';
 
 /**
  * Nombre de la actividad para el aviso. El folio (AN-0001) nunca es el identificador principal:
@@ -127,7 +128,8 @@ export class NotificationHierarchyService {
   private async getCeoUserIds(): Promise<number[]> {
     try {
       const rows = await this.prisma.user.findMany({
-        where: { email: 'gerencia@nexara.com.mx', isActive: true },
+        // Christian y su cuenta de pruebas (Claudia) reciben lo mismo.
+        where: { email: { in: [...CEO_EQUIVALENT_EMAILS] }, isActive: true },
         select: { id: true },
       });
       return rows.map((r) => r.id);

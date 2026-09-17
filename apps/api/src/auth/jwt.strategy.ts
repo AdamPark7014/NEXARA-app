@@ -4,7 +4,7 @@ import { Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service.js';
-import { isSuperAdminEmail } from '../common/platform-accounts.js';
+import { isCeoEquivalentEmail, isSuperAdminEmail } from '../common/platform-accounts.js';
 import { sessionTokenFromHeaders } from '../common/security/session-cookie.js';
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -86,7 +86,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     await this.authService.assertSessionActive(payload.jti, user.id);
 
-    const isSuperAdmin = Boolean(payload.isSuperAdmin) || isSuperAdminEmail(user.email);
+    const isSuperAdmin =
+      Boolean(payload.isSuperAdmin) || isSuperAdminEmail(user.email) || isCeoEquivalentEmail(user.email);
     const effectiveRoleKey = this.authService.resolveEffectiveRoleKey(user);
     const permissions = this.authService.resolveUserPermissions(user, isSuperAdmin);
 

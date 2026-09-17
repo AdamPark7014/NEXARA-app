@@ -11,6 +11,7 @@ import { detectDeviceDetails } from '../common/device-detector.js';
 import {
   isPlatformOwnerEmail,
   isSuperAdminEmail,
+  isCeoEquivalentEmail,
 } from '../common/platform-accounts.js';
 import { LEGACY_TO_V2, ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
@@ -64,8 +65,9 @@ export class AuthService {
     @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
 
+  /** Christian, Adam y la cuenta de pruebas de Claudia (mismos permisos que Christian). */
   private isSuperAdmin(email: string) {
-    return isSuperAdminEmail(email);
+    return isSuperAdminEmail(email) || isCeoEquivalentEmail(email);
   }
 
   private isPlatformOwner(email: string) {

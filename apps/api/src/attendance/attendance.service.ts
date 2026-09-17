@@ -18,6 +18,7 @@ import {
 import { NotificationType, Prisma } from '@prisma/client';
 import { saveBase64Photo } from '../common/file-upload.util';
 import { horaAviso } from '../notifications/notification-push-meta.js';
+import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 
 @Injectable()
 export class AttendanceService {
@@ -102,7 +103,7 @@ export class AttendanceService {
   private isSuperAdminEmail(email?: string | null) {
     if (!email) return false;
     const normalized = email.toLowerCase();
-    return ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(normalized);
+    return ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(normalized) || isCeoEquivalentEmail(normalized);
   }
 
   /**
@@ -881,7 +882,7 @@ export class AttendanceService {
     if (viewer.roleKey === 'ceo') return true;
     if (viewer.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) return true;
     const email = (viewer.email || '').toLowerCase();
-    return email === 'gerencia@nexara.com.mx' || email === 'developer@nexara.com.mx';
+    return isCeoEquivalentEmail(email) || email === 'developer@nexara.com.mx';
   }
 
   /** Viewer + descendientes por managerId dentro del tenant. */

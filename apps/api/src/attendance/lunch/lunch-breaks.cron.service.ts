@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
 import { WORKDAY_TIMEZONE, workDateColumn } from '../../common/time/workday.js';
 import { horaAviso, nombreCorto } from '../../notifications/notification-push-meta.js';
+import { isNonEmployeeEmail } from '../../common/platform-accounts.js';
 
 @Injectable()
 export class LunchBreaksCronService {
@@ -39,7 +40,7 @@ export class LunchBreaksCronService {
 
       // Crear notificaciones para cada usuario
       const notifications = users
-        .filter((u: any) => u.email !== 'developer@nexara.com.mx' && u.email !== 'gerencia@nexara.com.mx') // Excluir superadmins
+        .filter((u: any) => !isNonEmployeeEmail(u.email)) // Solo empleados
         .map((u: any) => ({
           userId: u.id,
           type: NotificationType.LUNCH_CHECKIN,
@@ -101,7 +102,7 @@ export class LunchBreaksCronService {
       }
 
       const notifications = usersWithoutCheckout
-        .filter((u: any) => u.user.email !== 'developer@nexara.com.mx' && u.user.email !== 'gerencia@nexara.com.mx')
+        .filter((u: any) => !isNonEmployeeEmail(u.user.email))
         .map((u: any) => ({
           userId: u.user.id,
           type: NotificationType.LUNCH_CHECKOUT,
@@ -140,7 +141,7 @@ export class LunchBreaksCronService {
         select: { id: true },
       });
 
-      const isSuperAdmin = userData.email === 'developer@nexara.com.mx' || userData.email === 'gerencia@nexara.com.mx';
+      const isSuperAdmin = isNonEmployeeEmail(userData.email);
       
       const nombre = nombreCorto(userData.nombre) || 'Alguien del equipo';
       const hora = horaAviso(new Date());

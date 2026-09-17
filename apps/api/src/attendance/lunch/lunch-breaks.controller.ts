@@ -18,9 +18,10 @@ import { CurrentCompanyId } from '../../common/tenant/current-company.decorator.
 import { PERMISSIONS } from '../../common/permissions.js';
 import { LunchBreaksService, type LunchViewer } from './lunch-breaks.service.js';
 import { CreateLunchBreakDto, RevisarComidaDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
+import { isCeoEquivalentEmail } from '../../common/platform-accounts.js';
 
 /** Christian supervisa: no registra hora de comida. */
-const esCeo = (user: any) => String(user?.email || '').trim().toLowerCase() === 'gerencia@nexara.com.mx';
+const esCeo = (user: any) => isCeoEquivalentEmail(user?.email);
 
 @Controller('lunch-breaks')
 @UseGuards(RbacGuard)

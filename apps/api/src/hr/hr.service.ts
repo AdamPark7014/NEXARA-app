@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
 
 @Injectable()
 export class HrService {
@@ -323,7 +324,7 @@ export class HrService {
       this.prisma.performanceReview.aggregate({ _avg: { overallRating: true } }),
       this.prisma.user.findMany({
         where: {
-          email: { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] },
+          email: { notIn: [...NON_EMPLOYEE_EMAILS] },
           companyMemberships: { some: { companyId: tenantId } },
         },
         select: {

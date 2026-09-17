@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { auditarNomenclatura, validarDatosRrhh, type EstadoNomenclatura } from './nomenclatura.js';
+import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
 
 export type FilaAuditoriaNomenclatura = {
   userId: number;
@@ -26,7 +27,7 @@ export class NomenclaturaAuditoriaService {
 
   async auditar(hoy = new Date()): Promise<{ resumen: Record<EstadoNomenclatura, number>; filas: FilaAuditoriaNomenclatura[] }> {
     const usuarios = await this.prisma.user.findMany({
-      where: { email: { notIn: ['play.review@nexara.com.mx'] } },
+      where: { email: { notIn: [...NON_EMPLOYEE_EMAILS] } },
       orderBy: { nombre: 'asc' },
       select: {
         id: true,
