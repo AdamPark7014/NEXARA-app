@@ -1,9 +1,29 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
-import { workDayBounds } from '../common/time/workday.js';
-import { isCeoEquivalentEmail, isNonEmployeeEmail } from '../common/platform-accounts.js';
+import {
+  parseWorkDate,
+  workDateColumn,
+  workDateKey,
+  workDayBounds,
+  workDayEnd,
+} from '../common/time/workday.js';
+import { isNonEmployeeEmail } from '../common/platform-accounts.js';
 import { esDeTodaLaEmpresa, extrasDeTablero, subarbolIds, tiposVisibles } from './equipo-alcance.js';
+import {
+  calculaActividad,
+  enRango,
+  kpisDePersona,
+  minutosAsistidos,
+  minutosPlanDeHoras,
+  tiemposReales,
+  type ActividadCalculada,
+  type Comida,
+  type Jornada,
+  type KpisPersona,
+  type Prioridad,
+  type Semaforo,
+} from './pizarra-kpi.js';
 
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
 /**
@@ -12,6 +32,11 @@ export type BoardActivityBucket = 'daily' | 'projects' | 'services';
  * inactivo: ya no se asigna (clientes viejos).
  */
 export type BoardUserStatus = 'activo' | 'inactivo' | 'atrasado' | 'libre' | 'sin_actividad';
+
+/** Rango de la pizarra, ya resuelto a instantes de la jornada mexicana. */
+export type BoardRange = { desde: Date; hasta: Date };
+
+export type BoardAceptacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
 
 export type TeamBoardActivity = {
   id: number;
@@ -39,6 +64,18 @@ export type TeamBoardOpenActivity = {
   reparte: boolean;
   /** Día/hora programada (reprogramable por quien reparte). */
   fechaInicio: Date | null;
+  /** Contrato C: semáforo y tiempos de cada tarjeta. */
+  prioridad: Prioridad;
+  semaforo: Semaforo;
+  minutosPlan: number | null;
+  minutosReales: number | null;
+  excedida: boolean;
+  /** Hora real de arranque (foto de entrada o `inicioRealAt`), no la programada. */
+  inicioRealAt: Date | null;
+  finRealAt: Date | null;
+  asignadoPor: { id: number; nombre: string } | null;
+  /** Sección B; sin sus columnas todo sale PENDIENTE. */
+  aceptacion: BoardAceptacion;
 };
 
 export type TeamBoardUser = {
@@ -70,10 +107,15 @@ export type TeamBoardUser = {
   enEsperaAprobacion: number;
   /** Actividades con evidencia devuelta que está corrigiendo. */
   enCorreccion: number;
+  /** Contrato C: cómo le fue en el rango consultado. */
+  kpis: KpisPersona;
 };
 
 export type TeamBoardResponse = {
   scope: 'company' | 'subtree';
+  /** Rango consultado, en `AAAA-MM-DD` (por omisión, hoy). */
+  desde: string;
+  hasta: string;
   users: TeamBoardUser[];
 };
 
@@ -88,6 +130,13 @@ export type TeamBoardHistoryItem = {
   assignmentCharge: string | null;
   fechaAsignacion: Date;
   fechaFinalizacion: Date | null;
+  /** La sacaron del equipo: sigue en su historial, no en sus KPI. */
+  retirado: boolean;
+  retiradoAt: Date | null;
+  prioridad: Prioridad;
+  semaforo: Semaforo;
+  minutosPlan: number | null;
+  minutosReales: number | null;
   evidence: {
     status: string;
     progressPct: number;
@@ -97,6 +146,35 @@ export type TeamBoardHistoryItem = {
     serviceSheetPdfUrl: string | null;
     serviceSheetData: unknown;
   } | null;
+};
+
+/** Contrato C: lo que el que mira repartió a su gente en el rango. */
+export type AsignadaPorMiItem = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  coreKind: string | null;
+  assignmentCharge: string | null;
+  fechaAsignacion: Date;
+  fechaMaxima: Date | null;
+  fechaFinalizacion: Date | null;
+  persona: { id: number; nombre: string; avatarUrl: string | null; puesto: string | null };
+  prioridad: Prioridad;
+  semaforo: Semaforo;
+  minutosPlan: number | null;
+  minutosReales: number | null;
+  excedida: boolean;
+  terminada: boolean;
+  retirado: boolean;
+  aceptacion: BoardAceptacion;
+  motivoRechazo: string | null;
+};
+
+export type AsignadasPorMiResponse = {
+  desde: string;
+  hasta: string;
+  items: AsignadaPorMiItem[];
 };
 
 type Viewer = {
@@ -115,51 +193,126 @@ type ScopedUser = {
   managerId: number | null;
 };
 
+/**
+ * Columnas de la sección B (`aceptadaAt`, `inicioRealAt`…): las añade la otra migración.
+ * Se leen a mano para que la pizarra funcione igual antes y después de que aterrice.
+ */
+function fechaOpcional(fila: unknown, campo: string): Date | null {
+  const v = (fila as Record<string, unknown> | null)?.[campo];
+  if (v instanceof Date) return v;
+  if (typeof v === 'string') {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+function textoOpcional(fila: unknown, campo: string): string | null {
+  const v = (fila as Record<string, unknown> | null)?.[campo];
+  return typeof v === 'string' && v.trim() ? v : null;
+}
+
+/** `Decimal` de Prisma → número normal. */
+function numero(valor: unknown): number | null {
+  if (valor == null) return null;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : null;
+}
+
+function aceptacionDe(fila: unknown): BoardAceptacion {
+  if (fechaOpcional(fila, 'rechazadaAt')) return 'RECHAZADA';
+  if (fechaOpcional(fila, 'aceptadaAt')) return 'ACEPTADA';
+  return 'PENDIENTE';
+}
+
 @Injectable()
 export class TeamBoardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getBoard(viewer: Viewer, companyId: number | null): Promise<TeamBoardResponse> {
+  /**
+   * `desde`/`hasta` en `AAAA-MM-DD`; por omisión, hoy. Se resuelven en la zona de la
+   * empresa: el contenedor corre en UTC y «hoy» cambiaba a las 18:00.
+   */
+  resolveRange(desde?: string | null, hasta?: string | null, now = new Date()): BoardRange {
+    const { start, end } = workDayBounds(now);
+    const valido = (v?: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) ? v.trim() : null);
+    const d = valido(desde);
+    const h = valido(hasta);
+    if (!d && !h) return { desde: start, hasta: end };
+    const inicio = d ? parseWorkDate(d) : start;
+    const fin = h ? workDayEnd(parseWorkDate(h)) : workDayEnd(inicio);
+    return fin.getTime() < inicio.getTime()
+      ? { desde: fin, hasta: workDayEnd(fin) }
+      : { desde: inicio, hasta: fin };
+  }
+
+  async getBoard(
+    viewer: Viewer,
+    companyId: number | null,
+    rango?: BoardRange,
+  ): Promise<TeamBoardResponse> {
     const { companyWide, scoped, now } = await this.resolveScope(viewer, companyId);
+    const rangoFinal = rango ?? this.resolveRange(null, null, now);
     const userIds = scoped.map((u) => u.id);
-    if (userIds.length === 0) {
-      return { scope: companyWide ? 'company' : 'subtree', users: [] };
-    }
-    const users = await this.buildCards(scoped, userIds, companyId, now, tiposVisibles(viewer));
-    return { scope: companyWide ? 'company' : 'subtree', users };
+    const base = {
+      scope: (companyWide ? 'company' : 'subtree') as 'company' | 'subtree',
+      desde: workDateKey(rangoFinal.desde),
+      hasta: workDateKey(rangoFinal.hasta),
+    };
+    if (userIds.length === 0) return { ...base, users: [] };
+    const users = await this.buildCards(
+      scoped,
+      userIds,
+      companyId,
+      now,
+      tiposVisibles(viewer),
+      rangoFinal,
+    );
+    return { ...base, users };
   }
 
   async getBoardUser(
     viewer: Viewer,
     companyId: number | null,
     userId: number,
+    rango?: BoardRange,
   ): Promise<TeamBoardUser> {
     const { scoped, now } = await this.resolveScope(viewer, companyId);
     const target = scoped.find((u) => u.id === userId);
     if (!target) throw new NotFoundException('Usuario fuera de tu alcance');
-    const [card] = await this.buildCards([target], [userId], companyId, now, tiposVisibles(viewer));
+    const [card] = await this.buildCards(
+      [target],
+      [userId],
+      companyId,
+      now,
+      tiposVisibles(viewer),
+      rango ?? this.resolveRange(null, null, now),
+    );
     return card;
   }
 
-  /** Historial de actividades del usuario (assignee o responsable), con evidencia propia. */
+  /**
+   * Historial de actividades del usuario (assignee o responsable), con evidencia propia.
+   * Incluye aquellas de las que lo retiraron: si no, desaparecía media semana de trabajo.
+   */
   async getUserHistory(
     viewer: Viewer,
     companyId: number | null,
     userId: number,
     take = 40,
   ): Promise<TeamBoardHistoryItem[]> {
-    const { scoped } = await this.resolveScope(viewer, companyId);
+    const { scoped, now } = await this.resolveScope(viewer, companyId);
     if (!scoped.some((u) => u.id === userId)) {
       throw new NotFoundException('Usuario fuera de tu alcance');
     }
     const assignees = await this.prisma.activityAssignee.findMany({
       where: {
         userId,
-        retiradoAt: null,
         ...(companyId != null ? { companyId } : {}),
       },
-      select: { activityId: true },
     });
+    const porActividad = new Map<number, (typeof assignees)[number]>();
+    for (const a of assignees) porActividad.set(a.activityId, a);
     const ids = new Set(assignees.map((a) => a.activityId));
     const asLead = await this.prisma.activity.findMany({
       where: {
@@ -180,18 +333,23 @@ export class TeamBoardService {
         anNumber: true,
         titulo: true,
         estatus: true,
+        prioridad: true,
         coreKind: true,
         ticketTypeCustom: true,
         assignmentCharge: true,
         fechaAsignacion: true,
+        fechaMaxima: true,
         fechaFinalizacion: true,
         activityEvidences: {
           where: { userId },
           select: {
             status: true,
             entryPhotoUrl: true,
+            entryPhotoUploadedAt: true,
             evidencePhotos: true,
             exitPhotoUrl: true,
+            exitPhotoUploadedAt: true,
+            completedAt: true,
             serviceSheetPdfUrl: true,
             serviceSheetData: true,
           },
@@ -204,6 +362,32 @@ export class TeamBoardService {
 
     return activities.map((a) => {
       const ev = a.activityEvidences[0] ?? null;
+      const fila = porActividad.get(a.id) ?? null;
+      const cerrada = /finalizada|completada|cancelada|aprobada/i.test(a.estatus || '');
+      const tiempos = tiemposReales({
+        inicioRealAt: fechaOpcional(fila, 'inicioRealAt'),
+        finRealAt: fechaOpcional(fila, 'finRealAt'),
+        entryPhotoUploadedAt: ev?.entryPhotoUploadedAt ?? null,
+        exitPhotoUploadedAt: ev?.exitPhotoUploadedAt ?? null,
+        evidenciaCompletedAt: ev?.completedAt ?? null,
+        fechaFinalizacion: a.fechaFinalizacion,
+        cerrada,
+      });
+      const calc = calculaActividad(
+        {
+          prioridad: a.prioridad,
+          estatus: a.estatus,
+          fechaMaxima: a.fechaMaxima,
+          terminada: cerrada || ev?.status === 'COMPLETED',
+          cancelada: /cancel/i.test(a.estatus || ''),
+          rechazadaAt: fechaOpcional(fila, 'rechazadaAt'),
+          retirado: fila?.retiradoAt != null,
+          minutosPlan: minutosPlanDeHoras(numero(fila?.horasPlan)),
+          inicio: tiempos.inicio,
+          fin: tiempos.fin,
+        },
+        now,
+      );
       return {
         id: a.id,
         anNumber: a.anNumber,
@@ -214,6 +398,12 @@ export class TeamBoardService {
         assignmentCharge: a.assignmentCharge,
         fechaAsignacion: a.fechaAsignacion,
         fechaFinalizacion: a.fechaFinalizacion,
+        retirado: fila?.retiradoAt != null,
+        retiradoAt: fila?.retiradoAt ?? null,
+        prioridad: calc.prioridad,
+        semaforo: calc.semaforo,
+        minutosPlan: calc.minutosPlan,
+        minutosReales: calc.minutosReales,
         evidence: ev
           ? {
               status: ev.status,
@@ -227,6 +417,130 @@ export class TeamBoardService {
           : null,
       };
     });
+  }
+
+  /**
+   * Lo que repartió quien consulta, en el rango. Incluye las filas viejas sin
+   * `asignadoPorId` cuando él creó la actividad (antes no se guardaba quién la pasó).
+   */
+  async getAssignedByMe(
+    viewer: Viewer,
+    companyId: number | null,
+    rango?: BoardRange,
+  ): Promise<AsignadasPorMiResponse> {
+    const now = new Date();
+    const r = rango ?? this.resolveRange(null, null, now);
+    const tipos = tiposVisibles(viewer);
+    const filas = await this.prisma.activityAssignee.findMany({
+      where: {
+        ...(companyId != null ? { companyId } : {}),
+        OR: [
+          { asignadoPorId: viewer.id },
+          { asignadoPorId: null, activity: { creadoPorId: viewer.id } },
+        ],
+        activity: {
+          deletedAt: null,
+          ...(tipos ? { coreKind: { in: tipos } } : {}),
+        },
+      },
+      include: {
+        user: { select: { id: true, nombre: true, avatarUrl: true, puesto: true } },
+        activity: {
+          select: {
+            id: true,
+            anNumber: true,
+            titulo: true,
+            estatus: true,
+            prioridad: true,
+            coreKind: true,
+            assignmentCharge: true,
+            fechaAsignacion: true,
+            fechaInicio: true,
+            fechaMaxima: true,
+            fechaFinalizacion: true,
+            activityEvidences: {
+              select: {
+                userId: true,
+                status: true,
+                entryPhotoUploadedAt: true,
+                exitPhotoUploadedAt: true,
+                completedAt: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { asignadoAt: 'desc' },
+      take: 400,
+    });
+
+    const items: AsignadaPorMiItem[] = [];
+    for (const fila of filas) {
+      const act = fila.activity;
+      if (!act) continue;
+      const ev = act.activityEvidences.find((e) => e.userId === fila.userId) ?? null;
+      const cerrada = /finalizada|completada|cancelada|aprobada/i.test(act.estatus || '');
+      const tiempos = tiemposReales({
+        inicioRealAt: fechaOpcional(fila, 'inicioRealAt'),
+        finRealAt: fechaOpcional(fila, 'finRealAt'),
+        entryPhotoUploadedAt: ev?.entryPhotoUploadedAt ?? null,
+        exitPhotoUploadedAt: ev?.exitPhotoUploadedAt ?? null,
+        evidenciaCompletedAt: ev?.completedAt ?? null,
+        fechaFinalizacion: act.fechaFinalizacion,
+        cerrada,
+      });
+      const terminada = cerrada || ev?.status === 'COMPLETED';
+      const dentro =
+        enRango(
+          [tiempos.inicio, tiempos.fin, act.fechaFinalizacion, act.fechaInicio, fila.asignadoAt],
+          r.desde,
+          r.hasta,
+        ) || (!terminada && fila.asignadoAt.getTime() <= r.hasta.getTime());
+      if (!dentro) continue;
+      const calc = calculaActividad(
+        {
+          prioridad: act.prioridad,
+          estatus: act.estatus,
+          fechaMaxima: act.fechaMaxima,
+          terminada,
+          cancelada: /cancel/i.test(act.estatus || ''),
+          rechazadaAt: fechaOpcional(fila, 'rechazadaAt'),
+          retirado: fila.retiradoAt != null,
+          minutosPlan: minutosPlanDeHoras(numero(fila.horasPlan)),
+          inicio: tiempos.inicio,
+          fin: tiempos.fin,
+        },
+        now,
+      );
+      items.push({
+        id: act.id,
+        anNumber: act.anNumber,
+        titulo: act.titulo,
+        estatus: act.estatus,
+        coreKind: act.coreKind,
+        assignmentCharge: act.assignmentCharge,
+        fechaAsignacion: fila.asignadoAt,
+        fechaMaxima: act.fechaMaxima,
+        fechaFinalizacion: act.fechaFinalizacion,
+        persona: {
+          id: fila.user.id,
+          nombre: fila.user.nombre,
+          avatarUrl: fila.user.avatarUrl,
+          puesto: fila.user.puesto,
+        },
+        prioridad: calc.prioridad,
+        semaforo: calc.semaforo,
+        minutosPlan: calc.minutosPlan,
+        minutosReales: calc.minutosReales,
+        excedida: calc.excedida,
+        terminada: calc.terminada,
+        retirado: calc.retirado,
+        aceptacion: aceptacionDe(fila),
+        motivoRechazo: textoOpcional(fila, 'motivoRechazo'),
+      });
+    }
+
+    return { desde: workDateKey(r.desde), hasta: workDateKey(r.hasta), items };
   }
 
   private async resolveScope(viewer: Viewer, companyId: number | null) {
@@ -298,9 +612,10 @@ export class TeamBoardService {
     now: Date,
     /** Solo estos tipos de actividad (`coreKind`); `null` = todos. */
     tipos: string[] | null = null,
+    rango?: BoardRange,
   ): Promise<TeamBoardUser[]> {
     // Día de México: el contenedor corre en UTC y el «hoy» cambiaba a las 18:00.
-    const { start: dayStart, end: dayEnd } = workDayBounds(now);
+    const { desde: dayStart, hasta: dayEnd } = rango ?? this.resolveRange(null, null, now);
     const gpsSince = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
     const closed = (estatus: string) => {
@@ -313,7 +628,9 @@ export class TeamBoardService {
       );
     };
 
-    const [assigneeRows, attendances, locationTrackings] = await Promise.all([
+    const [assigneeRows, attendances, lunchBreaks, locationTrackings] = await Promise.all([
+      // `include` en vez de `select`: así llegan también las columnas de la sección B
+      // (`inicioRealAt`, `aceptadaAt`…) en cuanto exista su migración, sin tocar esto.
       this.prisma.activityAssignee.findMany({
         where: {
           userId: { in: userIds },
@@ -321,16 +638,15 @@ export class TeamBoardService {
           ...(companyId != null ? { companyId } : {}),
           ...(tipos ? { activity: { coreKind: { in: tipos } } } : {}),
         },
-        select: {
-          userId: true,
-          rol: true,
-          indicaciones: true,
+        include: {
+          asignadoPor: { select: { id: true, nombre: true } },
           activity: {
             select: {
               id: true,
               anNumber: true,
               titulo: true,
               estatus: true,
+              prioridad: true,
               fechaMaxima: true,
               projectId: true,
               clientId: true,
@@ -347,21 +663,36 @@ export class TeamBoardService {
               },
               activityEvidences: {
                 where: { userId: { in: userIds } },
-                select: { userId: true, status: true, completedAt: true, reviewStatus: true },
+                select: {
+                  userId: true,
+                  status: true,
+                  completedAt: true,
+                  reviewStatus: true,
+                  entryPhotoUploadedAt: true,
+                  exitPhotoUploadedAt: true,
+                },
               },
             },
           },
         },
       }),
+      // Entradas **y** salidas: las horas trabajadas se cortan en la salida real.
       this.prisma.attendance.findMany({
         where: {
           userId: { in: userIds },
-          type: 'entrada',
           timestamp: { gte: dayStart, lte: dayEnd },
           ...(companyId != null ? { companyId } : {}),
         },
-        select: { userId: true, timestamp: true },
+        select: { userId: true, type: true, timestamp: true, workDate: true },
         orderBy: { timestamp: 'asc' },
+      }),
+      this.prisma.lunchBreak.findMany({
+        where: {
+          userId: { in: userIds },
+          date: { gte: workDateColumn(dayStart), lte: workDateColumn(dayEnd) },
+          ...(companyId != null ? { companyId } : {}),
+        },
+        select: { userId: true, checkinTime: true, checkoutTime: true },
       }),
       this.prisma.locationTracking.findMany({
         where: {
@@ -373,29 +704,95 @@ export class TeamBoardService {
       }),
     ]);
 
-    const clockInByUser = new Map<number, Date>();
+    // Una jornada por persona y día: primera entrada, última salida.
+    const jornadasPorUsuario = new Map<number, Map<string, Jornada>>();
     for (const a of attendances) {
-      if (!clockInByUser.has(a.userId)) clockInByUser.set(a.userId, a.timestamp);
+      // `workDate` es `@db.Date`: Prisma la entrega a medianoche **UTC**, así que se
+      // lee en UTC. Convertirla a hora de México la correría un día hacia atrás.
+      const dia = a.workDate
+        ? a.workDate.toISOString().slice(0, 10)
+        : workDateKey(a.timestamp);
+      const porDia = jornadasPorUsuario.get(a.userId) ?? new Map<string, Jornada>();
+      const actual = porDia.get(dia);
+      if (a.type === 'entrada') {
+        if (!actual) porDia.set(dia, { entrada: a.timestamp, salida: null });
+        else if (a.timestamp.getTime() < actual.entrada.getTime()) actual.entrada = a.timestamp;
+      } else if (a.type === 'salida' && actual) {
+        actual.salida = a.timestamp;
+      }
+      jornadasPorUsuario.set(a.userId, porDia);
+    }
+    const comidasPorUsuario = new Map<number, Comida[]>();
+    for (const c of lunchBreaks) {
+      const lista = comidasPorUsuario.get(c.userId) ?? [];
+      lista.push({ inicio: c.checkinTime, fin: c.checkoutTime ?? null });
+      comidasPorUsuario.set(c.userId, lista);
     }
     const present = new Set<number>([
-      ...clockInByUser.keys(),
+      ...jornadasPorUsuario.keys(),
       ...locationTrackings.map((lt) => lt.usuarioId),
     ]);
+
+    /** Lo calculado de cada fila (persona + actividad), para no repetir cuentas. */
+    type Calculo = {
+      calc: ActividadCalculada;
+      inicio: Date | null;
+      fin: Date | null;
+      asignadoPor: { id: number; nombre: string } | null;
+      aceptacion: BoardAceptacion;
+      dentroDelRango: boolean;
+    };
+    const calculoPorFila = new Map<string, Calculo>();
+    const clave = (userId: number, activityId: number) => `${userId}:${activityId}`;
 
     const openByUser = new Map<number, TeamBoardOpenActivity[]>();
     for (const row of assigneeRows) {
       const act = row.activity;
       if (!act || act.deletedAt) continue;
-      const isClosed = closed(act.estatus);
-      const finishedBeforeToday =
-        isClosed &&
-        act.fechaFinalizacion != null &&
-        act.fechaFinalizacion.getTime() < dayStart.getTime();
-      if (finishedBeforeToday) continue;
-
       const myEv =
-        act.activityEvidences.find((e) => e.userId === row.userId) ??
-        act.activityEvidences[0];
+        act.activityEvidences.find((e) => e.userId === row.userId) ?? act.activityEvidences[0];
+      const isClosed = closed(act.estatus);
+      const tiempos = tiemposReales({
+        inicioRealAt: fechaOpcional(row, 'inicioRealAt'),
+        finRealAt: fechaOpcional(row, 'finRealAt'),
+        entryPhotoUploadedAt: myEv?.entryPhotoUploadedAt ?? null,
+        exitPhotoUploadedAt: myEv?.exitPhotoUploadedAt ?? null,
+        evidenciaCompletedAt: myEv?.completedAt ?? null,
+        fechaFinalizacion: act.fechaFinalizacion,
+        cerrada: isClosed,
+      });
+      const terminada = isClosed || myEv?.status === 'COMPLETED';
+      const calc = calculaActividad(
+        {
+          prioridad: act.prioridad,
+          estatus: act.estatus,
+          fechaMaxima: act.fechaMaxima,
+          terminada,
+          cancelada: /cancel/i.test(act.estatus || ''),
+          rechazadaAt: fechaOpcional(row, 'rechazadaAt'),
+          minutosPlan: minutosPlanDeHoras(numero(row.horasPlan)),
+          inicio: tiempos.inicio,
+          fin: tiempos.fin,
+        },
+        now,
+      );
+      // Entra al rango lo que pasó dentro y lo que sigue abierto de antes.
+      const dentroDelRango =
+        enRango(
+          [tiempos.inicio, tiempos.fin, act.fechaFinalizacion, act.fechaInicio, act.fechaAsignacion],
+          dayStart,
+          dayEnd,
+        ) || (!terminada && act.fechaAsignacion.getTime() <= dayEnd.getTime());
+      calculoPorFila.set(clave(row.userId, act.id), {
+        calc,
+        inicio: tiempos.inicio,
+        fin: tiempos.fin,
+        asignadoPor: row.asignadoPor ? { id: row.asignadoPor.id, nombre: row.asignadoPor.nombre } : null,
+        aceptacion: aceptacionDe(row),
+        dentroDelRango,
+      });
+      if (!dentroDelRango) continue;
+
       const evidenceStatus = myEv?.status ?? 'ENTRY_PHOTO';
       const item: TeamBoardOpenActivity = {
         id: act.id,
@@ -413,6 +810,17 @@ export class TeamBoardService {
           .filter(Boolean),
         reparte: act.assignmentCharge === 'despacho' && String(row.rol) === 'LEAD',
         fechaInicio: act.fechaInicio,
+        prioridad: calc.prioridad,
+        semaforo: calc.semaforo,
+        minutosPlan: calc.minutosPlan,
+        minutosReales: calc.minutosReales,
+        excedida: calc.excedida,
+        inicioRealAt: tiempos.inicio,
+        finRealAt: tiempos.fin,
+        asignadoPor: row.asignadoPor
+          ? { id: row.asignadoPor.id, nombre: row.asignadoPor.nombre }
+          : null,
+        aceptacion: aceptacionDe(row),
       };
       const list = openByUser.get(row.userId) ?? [];
       if (!list.some((x) => x.id === item.id)) list.push(item);
@@ -434,30 +842,38 @@ export class TeamBoardService {
           const ev = a.activityEvidences.find((e) => e.userId === u.id) ?? null;
           const envio = ev?.status === 'COMPLETED';
           const cerrada = closed(a.estatus);
+          const calculo = calculoPorFila.get(clave(u.id, a.id)) ?? null;
           return {
             a,
+            calculo,
             envio,
             aprobada: ev?.reviewStatus === 'APPROVED',
             devuelta: ev?.reviewStatus === 'REJECTED',
             terminada: envio || cerrada,
             cancelada: /cancel/i.test(a.estatus || ''),
-            terminoAt: envio ? (ev?.completedAt ?? a.fechaFinalizacion) : cerrada ? a.fechaFinalizacion : null,
+            terminoAt: envio
+              ? (calculo?.fin ?? ev?.completedAt ?? a.fechaFinalizacion)
+              : cerrada
+                ? (calculo?.fin ?? a.fechaFinalizacion)
+                : null,
           };
         });
+      const enElRango = propias.filter((p) => p.calculo?.dentroDelRango);
       // En curso: primero lo que ya arrancó, luego lo que vence antes.
       const arranco = (estatus: string) => (/proceso|validar/i.test(estatus || '') ? 0 : 1);
-      const act =
-        propias
+      const enCurso =
+        enElRango
           .filter((p) => !p.terminada)
           .sort(
             (x, y) =>
               arranco(x.a.estatus) - arranco(y.a.estatus) ||
               (x.a.fechaMaxima?.getTime() ?? Number.MAX_SAFE_INTEGER) -
                 (y.a.fechaMaxima?.getTime() ?? Number.MAX_SAFE_INTEGER),
-          )[0]?.a ?? null;
+          )[0] ?? null;
+      const act = enCurso?.a ?? null;
       // Entregó y nadie ha aprobado todavía / le devolvieron evidencia y la está corrigiendo.
-      const enEsperaAprobacion = propias.filter((p) => p.envio && !p.aprobada && !p.cancelada).length;
-      const enCorreccion = propias.filter((p) => p.devuelta && !p.terminada && !p.cancelada).length;
+      const enEsperaAprobacion = enElRango.filter((p) => p.envio && !p.aprobada && !p.cancelada).length;
+      const enCorreccion = enElRango.filter((p) => p.devuelta && !p.terminada && !p.cancelada).length;
       let status: BoardUserStatus = 'sin_actividad';
       let currentActivity: TeamBoardActivity | null = null;
       let activityStartedAt: Date | null = null;
@@ -479,19 +895,12 @@ export class TeamBoardService {
           fechaMaxima: act.fechaMaxima,
           bucket: act.projectId ? 'projects' : act.clientId ? 'services' : 'daily',
         };
-        // fechaInicio es la hora programada: solo cuenta como «en actividad» si ya arrancó.
-        activityStartedAt = /proceso|validar/i.test(act.estatus || '')
-          ? act.fechaInicio ?? act.fechaAsignacion ?? null
-          : null;
-        if (activityStartedAt) {
-          activityElapsedMinutes = Math.max(
-            0,
-            Math.floor((now.getTime() - activityStartedAt.getTime()) / 60_000),
-          );
-        }
+        // El inicio es el real (foto de entrada / `inicioRealAt`), no la hora a la que la citaron.
+        activityStartedAt = enCurso?.calculo?.inicio ?? null;
+        activityElapsedMinutes = enCurso?.calculo?.calc.minutosReales ?? null;
       } else {
         // Hoy terminó algo y no tiene nada abierto: «sin actividad desde hace…» y con cuánto atraso.
-        const ultima = propias
+        const ultima = enElRango
           .filter(
             (p) => p.terminada && !p.cancelada && p.terminoAt != null && p.terminoAt.getTime() >= dayStart.getTime(),
           )
@@ -512,10 +921,17 @@ export class TeamBoardService {
       }
       void present; // la presencia ya no define el estado (se sigue calculando la entrada del día)
 
-      const clockInAt = clockInByUser.get(u.id) ?? null;
-      const workedMinutes = clockInAt
-        ? Math.max(0, Math.floor((now.getTime() - clockInAt.getTime()) / 60_000))
-        : null;
+      const jornadas = [...(jornadasPorUsuario.get(u.id)?.values() ?? [])].sort(
+        (a, b) => a.entrada.getTime() - b.entrada.getTime(),
+      );
+      const comidas = comidasPorUsuario.get(u.id) ?? [];
+      const clockInAt = jornadas.length ? jornadas[jornadas.length - 1].entrada : null;
+      // Antes se contaba de la entrada hasta ahora aunque ya se hubiera ido.
+      const workedMinutes = minutosAsistidos(jornadas, comidas, now);
+      const kpis = kpisDePersona(
+        enElRango.map((p) => p.calculo!.calc),
+        workedMinutes,
+      );
 
       return {
         id: u.id,
@@ -535,6 +951,7 @@ export class TeamBoardService {
         lastFinished,
         enEsperaAprobacion,
         enCorreccion,
+        kpis,
       };
     });
   }

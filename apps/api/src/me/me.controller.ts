@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -175,9 +176,17 @@ export class MeController {
     return this.me.navigation(Number(user.id));
   }
 
-  /** Pizarra corporativa: equipo en scope company (CEO) o subtree (managerId). */
+  /**
+   * Pizarra corporativa: equipo en scope company (CEO) o subtree (managerId).
+   * `desde`/`hasta` en `AAAA-MM-DD`; por omisión, hoy.
+   */
   @Get('board')
-  board(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+  board(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
       throw new UnauthorizedException('Token de usuario inválido');
     }
@@ -189,6 +198,33 @@ export class MeController {
         isSuperAdmin: Boolean(user.isSuperAdmin),
       },
       companyId,
+      this.teamBoard.resolveRange(desde, hasta),
+    );
+  }
+
+  /**
+   * Lo que repartió quien consulta, en el rango.
+   * Va antes de `board/:userId`: si no, Nest intentaría leer «asignadas-por-mi» como id.
+   */
+  @Get('board/asignadas-por-mi')
+  boardAsignadasPorMi(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.teamBoard.getAssignedByMe(
+      {
+        id: Number(user.id),
+        roleKey: user.roleKey ?? null,
+        email: user.email ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+      },
+      companyId,
+      this.teamBoard.resolveRange(desde, hasta),
     );
   }
 
@@ -219,6 +255,8 @@ export class MeController {
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Param('userId', ParseIntPipe) userId: number,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
   ) {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
       throw new UnauthorizedException('Token de usuario inválido');
@@ -232,6 +270,7 @@ export class MeController {
       },
       companyId,
       userId,
+      this.teamBoard.resolveRange(desde, hasta),
     );
   }
 }
