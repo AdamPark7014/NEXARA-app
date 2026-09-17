@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -51,6 +53,7 @@ import mx.nexara.mobile.nativeapp.data.api.ClientPortalTicketDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
@@ -358,8 +361,9 @@ fun TicketsTicketsScreen(
                                     Text(meta, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                                 }
                                 if (t.isOpen() && ageH >= 48) {
-                                    Text(
-                                        "⚠ Fuera de ventana operativa (>48h)",
+                                    NxIconText(
+                                        text = "Fuera de ventana operativa (>48h)",
+                                        icon = Icons.Outlined.WarningAmber,
                                         color = Color(0xFFEF4444),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,

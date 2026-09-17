@@ -191,7 +191,7 @@ export function servicioDelegateEmails(): string[] {
 }
 
 export function soporteTeamEmails(): string[] {
-  return [ORG_EMAILS.antonio, ORG_EMAILS.carolina, ORG_EMAILS.alejandro, ORG_EMAILS.roberto];
+  return [ORG_EMAILS.antonio, ORG_EMAILS.carolina, ORG_EMAILS.alejandro];
 }
 
 export function fieldInstallerEmails(): string[] {
@@ -375,7 +375,8 @@ export function labelForAssignmentCharge(charge?: string | null): AssignmentChar
 }
 
 export function extrasEmailsForKind(kind: ActivityKind | null | undefined): string[] | null {
-  if (kind === 'servicio') return soporteTeamEmails();
+  // Roberto solo atiende servicios: entra aquí y no en proyectos.
+  if (kind === 'servicio') return [...soporteTeamEmails(), ORG_EMAILS.roberto];
   if (kind === 'obra') return fieldInstallerEmails();
   if (kind === 'proyecto') return [...fieldInstallerEmails(), ...soporteTeamEmails()];
   if (kind === 'tarea' || kind === 'comercial' || kind === null || kind === undefined) return null;

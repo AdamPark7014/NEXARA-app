@@ -148,6 +148,7 @@ object CoreActivityKinds {
         OrgEmails.JUAN to listOf(TAREA),
         OrgEmails.CAROLINA to listOf(TAREA),
         OrgEmails.ALEJANDRO to listOf(TAREA),
+        OrgEmails.ROBERTO to emptyList(),
         OrgEmails.JOSUE to listOf(TAREA, PROYECTO, OBRA, COMERCIAL),
     )
 
@@ -164,6 +165,8 @@ object CoreActivityKinds {
         // Soporte de Antonio
         OrgEmails.CAROLINA to listOf(TAREA, PROYECTO, SERVICIO),
         OrgEmails.ALEJANDRO to listOf(TAREA, PROYECTO, SERVICIO),
+        // Roberto: solo atiende servicios.
+        OrgEmails.ROBERTO to listOf(SERVICIO),
         // Comercial / admin
         OrgEmails.DANIELA to listOf(TAREA, COMERCIAL),
         OrgEmails.MONICA to listOf(TAREA, COMERCIAL),
@@ -228,7 +231,7 @@ object CoreActivityKinds {
 
     fun isServicioBridgeEmail(email: String?): Boolean = norm(email) == OrgEmails.ANTONIO
 
-    fun servicioDelegateEmails(): List<String> = listOf(OrgEmails.CAROLINA, OrgEmails.ALEJANDRO)
+    fun servicioDelegateEmails(): List<String> = listOf(OrgEmails.CAROLINA, OrgEmails.ALEJANDRO, OrgEmails.ROBERTO)
 
     fun soporteTeamEmails(): List<String> = listOf(OrgEmails.ANTONIO, OrgEmails.CAROLINA, OrgEmails.ALEJANDRO)
 
@@ -262,7 +265,8 @@ object CoreActivityKinds {
     }
 
     fun extrasEmailsForKind(kind: String?): List<String>? = when (kind) {
-        SERVICIO -> soporteTeamEmails()
+        // Roberto solo atiende servicios: entra aquí y no en proyectos.
+        SERVICIO -> soporteTeamEmails() + OrgEmails.ROBERTO
         OBRA -> fieldInstallerEmails()
         PROYECTO -> fieldInstallerEmails() + soporteTeamEmails()
         else -> null
@@ -320,7 +324,7 @@ object CoreActivityKinds {
                 "Como despacho, suma a quien debe ejecutarla bajo $short. Si no eliges a nadie, queda pendiente de que él la asigne."
             kind == SERVICIO && isServicioBridgeEmail(personEmail) ->
                 "Como puente, suma a Carolina o Alejandro (día/hora ya van en el formulario)."
-            kind == SERVICIO -> "Solo soporte (Antonio, Carolina, Alejandro)."
+            kind == SERVICIO -> "Solo soporte (Antonio, Carolina, Alejandro, Roberto)."
             kind == OBRA -> "Solo instaladores de campo (Joan, Israel, Juan José)."
             kind == PROYECTO ->
                 "Soporte e instaladores pueden colaborar en el proyecto. Si hay ambos lados, se suman ambos coordinadores."

@@ -44,8 +44,12 @@ import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIcons
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 /**
  * Pestaña «Evidencias» de Core: quien ejecuta captura aquí; quien reparte ve el
@@ -82,8 +86,9 @@ fun ActivityEvidenciasTab(activity: ActivityDto) {
     ) {
         if (role == CoreActivityRules.CaptureRole.REPARTE) {
             NxPanelShell {
-                Text(
-                    "📨 Tú repartes esta actividad",
+                NxIconText(
+                    text = "Tú repartes esta actividad",
+                    icon = NxGlyph.DISPATCH.icon,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = NxColors.Slate,
                 )
@@ -133,7 +138,7 @@ fun ActivityHistorialTab(activity: ActivityDto) {
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ToneChip("📅 ${events.size} evento${if (events.size == 1) "" else "s"}")
+                ToneChip("${events.size} evento${if (events.size == 1) "" else "s"}", icon = NxIcons.Calendar)
                 val cerrada = !activity.fechaFinalizacion.isNullOrBlank()
                 ToneChip(
                     if (cerrada) "Finalizada" else activity.estatus.ifBlank { "Sin estado" },

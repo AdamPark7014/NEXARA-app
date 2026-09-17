@@ -27,6 +27,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +39,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -75,7 +81,12 @@ import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconBadge
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIcons
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
 private const val ACTIVIDADES_PREFS = "nexara_actividades"
@@ -210,7 +221,10 @@ private fun VistaTabs(vista: String, onChange: (String) -> Unit) {
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        listOf(VISTA_MIAS to "✅ Mis actividades", VISTA_EQUIPO to "👥 Mi equipo").forEach { (id, label) ->
+        listOf(
+            Triple(VISTA_MIAS, "Mis actividades", NxGlyph.APPROVED.icon),
+            Triple(VISTA_EQUIPO, "Mi equipo", Icons.Outlined.Groups),
+        ).forEach { (id, label, icon) ->
             val on = vista == id
             Box(
                 modifier = Modifier
@@ -221,8 +235,9 @@ private fun VistaTabs(vista: String, onChange: (String) -> Unit) {
                     .clickable { onChange(id) },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    label,
+                NxIconText(
+                    text = label,
+                    icon = icon,
                     fontSize = 14.sp,
                     fontWeight = if (on) FontWeight.ExtraBold else FontWeight.SemiBold,
                     color = if (on) Color.White else NxColors.Slate,
@@ -556,7 +571,7 @@ private fun MisActividadesContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text("🎉", fontSize = 34.sp)
+                        NxIconBadge(icon = NxGlyph.APPROVED.icon, size = 56.dp)
                         Text("Todo al día", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
                         Text("Cuando te asignen algo aparecerá aquí.", fontSize = 13.sp, color = NxColors.Muted)
                         if (canSelfAssign) {
@@ -585,8 +600,9 @@ private fun MisActividadesContent(
             if (seguimiento.isNotEmpty()) {
                 item {
                     Column {
-                        Text(
-                            "👀 En seguimiento (${seguimiento.size})",
+                        NxIconText(
+                            text = "En seguimiento (${seguimiento.size})",
+                            icon = Icons.Outlined.Visibility,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = NxColors.Slate,
@@ -610,7 +626,9 @@ private fun MisActividadesContent(
             if (done.isNotEmpty()) {
                 item {
                     OutlinedButton(onClick = { showDone = !showDone }) {
-                        Text("✅ Hechas hoy (${done.size}) ${if (showDone) "▲" else "▼"}")
+                        Icon(NxGlyph.DONE.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("Hechas hoy (${done.size}) ${if (showDone) "▲" else "▼"}")
                     }
                 }
                 if (showDone) {
@@ -624,9 +642,11 @@ private fun MisActividadesContent(
                                 .clickable { onOpenActivity(a.id, null) }
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                "✔ ${a.titulo.orEmpty()}",
+                            NxIconText(
+                                text = a.titulo.orEmpty(),
+                                icon = NxGlyph.DONE.icon,
                                 fontSize = 13.sp,
                                 color = NxColors.Slate,
                                 maxLines = 1,
@@ -761,32 +781,43 @@ private fun OpenActivityCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    if (a.porRepartir == true) ToneChip("📨 Te toca repartirla", CoreActivityRules.NARANJA)
+                    if (a.porRepartir == true) {
+                        ToneChip("Te toca repartirla", CoreActivityRules.NARANJA, icon = NxGlyph.DISPATCH.icon)
+                    }
                     ToneChip(CoreActivityRules.estatusUi(a.estatus))
                     ToneChip("● ${pr.label}", pr.color)
                     ToneChip(CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom))
                     ToneChip(
-                        when {
-                            a.autoAsignada == true -> "🙋 Auto-asignada"
+                        text = when {
+                            a.autoAsignada == true -> "Auto-asignada"
                             a.asignadaPor?.nombre != null -> "De ${CoreActivityRules.shortName(a.asignadaPor.nombre)}"
                             else -> "Asignada"
                         },
+                        icon = if (a.autoAsignada == true) NxGlyph.PERSON.icon else null,
                     )
                 }
                 val meta = buildList {
-                    add("📅 ${CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima) ?: "Sin fecha"}")
+                    add(
+                        (CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima) ?: "Sin fecha") to
+                            NxIcons.Calendar,
+                    )
                     a.tiempoEstimadoMin?.takeIf { it > 0 }?.let { est ->
                         val tope = a.tiempoMaximoMin?.takeIf { it > 0 }?.let { " · tope ${CoreActivityRules.formatMinutes(it)}" }.orEmpty()
-                        add("⏱ ${CoreActivityRules.formatMinutes(est)}$tope")
+                        add("${CoreActivityRules.formatMinutes(est)}$tope" to Icons.Outlined.Schedule)
                     }
-                    (a.cliente ?: a.proyecto)?.takeIf { it.isNotBlank() }?.let { add("📍 $it") }
+                    (a.cliente ?: a.proyecto)?.takeIf { it.isNotBlank() }?.let { add(it to Icons.Outlined.LocationOn) }
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    meta.forEach { Text(it, fontSize = 13.sp, color = NxColors.Muted) }
+                    meta.forEach { (text, icon) -> NxIconText(text = text, icon = icon, fontSize = 13.sp, color = NxColors.Muted) }
                 }
                 a.indicaciones?.takeIf { it.isNotBlank() }?.let { SoftNote(text = it) }
                 a.ordenJustificacion?.takeIf { it.isNotBlank() }?.let {
-                    Text("📝 Por qué va aquí: $it", fontSize = 12.5.sp, color = NxColors.Muted)
+                    NxIconText(
+                        text = "Por qué va aquí: $it",
+                        icon = NxGlyph.DOCUMENTATION.icon,
+                        fontSize = 12.5.sp,
+                        color = NxColors.Muted,
+                    )
                 }
                 if (canReorder) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -837,17 +868,19 @@ private fun SeguimientoCard(
                 }
             }
             if (pasadaA.isNotEmpty()) {
-                Text(
-                    "📨 Enviada a ${pasadaA.joinToString(" → ") { CoreActivityRules.shortName(it.nombre) }}" +
+                NxIconText(
+                    text = "Enviada a ${pasadaA.joinToString(" → ") { CoreActivityRules.shortName(it.nombre) }}" +
                         (primera?.at?.let { CoreActivityRules.formatWhen(it) }?.let { " · $it" } ?: ""),
+                    icon = NxGlyph.DISPATCH.icon,
                     fontSize = 13.sp,
                     color = NxColors.Muted,
                 )
             }
             s.ultimaReprogramacion?.let { r ->
-                Text(
-                    "🕑 Reprogramada por ${CoreActivityRules.shortName(r.por).ifBlank { "alguien" }} · " +
+                NxIconText(
+                    text = "Reprogramada por ${CoreActivityRules.shortName(r.por).ifBlank { "alguien" }} · " +
                         CoreActivityRules.formatWhen(r.at).orEmpty(),
+                    icon = Icons.Outlined.Schedule,
                     fontSize = 12.5.sp,
                     color = NxColors.Muted,
                 )

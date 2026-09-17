@@ -26,10 +26,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -51,6 +56,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -77,7 +83,10 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.PersonAvatar
 import mx.nexara.mobile.nativeapp.ui.console.activities.SoftNote
 import mx.nexara.mobile.nativeapp.ui.console.activities.ToneChip
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 private data class RegistroEnCurso(val momento: String, val aDestiempo: Boolean)
 
@@ -102,6 +111,7 @@ fun ComidasPanel(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var aviso by remember { mutableStateOf<String?>(null) }
+    var avisoIcon by remember { mutableStateOf<ImageVector>(NxGlyph.DONE.icon) }
     var reload by remember { mutableIntStateOf(0) }
     var offsetMs by remember { mutableLongStateOf(0L) }
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -200,10 +210,12 @@ fun ComidasPanel(
                         repo.registrarRegreso(hora, f.dataUrl, texto)
                     }
                 }
-                aviso = if (enviado) {
-                    ComidasRules.mensajeRegistro(r.momento, pideMotivo)
+                if (enviado) {
+                    avisoIcon = NxGlyph.DONE.icon
+                    aviso = ComidasRules.mensajeRegistro(r.momento, pideMotivo)
                 } else {
-                    "📶 Sin conexión: tu registro se enviará en cuanto vuelva la red."
+                    avisoIcon = Icons.Outlined.CloudOff
+                    aviso = "Sin conexión: tu registro se enviará en cuanto vuelva la red."
                 }
                 cerrarRegistro()
                 reload++
@@ -232,7 +244,7 @@ fun ComidasPanel(
                 }
             }
         }
-        aviso?.let { item { SoftNote(text = it, color = CoreActivityRules.VERDE) } }
+        aviso?.let { item { SoftNote(text = it, color = CoreActivityRules.VERDE, icon = avisoIcon) } }
 
         if (loading && dia == null && eq == null) {
             item { NxLoadingBlock("Cargando comidas…") }
@@ -270,8 +282,9 @@ fun ComidasPanel(
             if (pendientes > 0) {
                 item {
                     SoftNote(
-                        text = "⏳ Tienes $pendientes comida${if (pendientes == 1) "" else "s"} a destiempo por aprobar.",
+                        text = "Tienes $pendientes comida${if (pendientes == 1) "" else "s"} a destiempo por aprobar.",
                         color = CoreActivityRules.NARANJA,
+                        icon = NxGlyph.WAITING.icon,
                     )
                 }
             }
@@ -331,7 +344,7 @@ fun ComidasPanel(
     val enCurso = registro
     if (enCurso != null && camaraAbierta) {
         LiveCameraCaptureDialog(
-            title = if (enCurso.momento == ComidasRules.SALIDA) "📸 Foto de salida a comer" else "📸 Foto de regreso de comer",
+            title = if (enCurso.momento == ComidasRules.SALIDA) "Foto de salida a comer" else "Foto de regreso de comer",
             requireLocation = false,
             captureLocation = false,
             frontCamera = true,
@@ -388,7 +401,9 @@ fun ComidasPanel(
                 Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(titulo, color = Color.White, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { visor = null }) { Text("✕", color = Color.White, fontSize = 20.sp) }
+                        TextButton(onClick = { visor = null }) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Cerrar", tint = Color.White)
+                        }
                     }
                     ProtectedImage(
                         url = url,
@@ -450,7 +465,13 @@ private fun MiComidaCard(
             CardConBorde(if (destiempo) CoreActivityRules.NARANJA else CoreActivityRules.VERDE) {
                 Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text("🍽️ Tu hora de comida", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
+                        NxIconText(
+                            text = "Tu hora de comida",
+                            icon = NxGlyph.MEAL.icon,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = NxColors.Slate,
+                        )
                         Text(
                             "Horario: ${mi.ventana?.texto ?: "3:00 a 4:00 p.m."} · registra tu salida y tu regreso con foto.",
                             fontSize = 13.sp,
@@ -458,8 +479,9 @@ private fun MiComidaCard(
                         )
                     }
                     ToneChip(
-                        if (destiempo) "⏰ Fuera de horario" else "✓ Es tu horario",
-                        if (destiempo) CoreActivityRules.NARANJA else CoreActivityRules.VERDE,
+                        text = if (destiempo) "Fuera de horario" else "Es tu horario",
+                        color = if (destiempo) CoreActivityRules.NARANJA else CoreActivityRules.VERDE,
+                        icon = if (destiempo) Icons.Outlined.AccessTime else NxGlyph.DONE.icon,
                     )
                 }
                 if (destiempo) {
@@ -475,7 +497,11 @@ private fun MiComidaCard(
                         containerColor = Color(if (destiempo) CoreActivityRules.NARANJA else CoreActivityRules.VERDE),
                     ),
                     modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text("🍽️ Salir a comer", fontWeight = FontWeight.Bold) }
+                ) {
+                    Icon(NxGlyph.MEAL.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Salir a comer", fontWeight = FontWeight.Bold)
+                }
             }
         }
         mi.siguiente == "regreso" && r != null -> {
@@ -485,7 +511,13 @@ private fun MiComidaCard(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FotoComida(r.checkinPhotoUrl, "Tu foto de salida", onVerFoto)
                     Column(Modifier.weight(1f)) {
-                        Text("🍽️ Estás en tu hora de comida", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
+                        NxIconText(
+                            text = "Estás en tu hora de comida",
+                            icon = NxGlyph.MEAL.icon,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = NxColors.Slate,
+                        )
                         Text(
                             "Saliste a las ${CoreActivityRules.formatClock(r.checkinTime)} · llevas $minutos min",
                             fontSize = 13.sp,
@@ -495,8 +527,9 @@ private fun MiComidaCard(
                 }
                 revision?.let { ToneChip(it) }
                 if (destiempo) {
-                    Text(
-                        "⏰ Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.",
+                    NxIconText(
+                        text = "Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.",
+                        icon = Icons.Outlined.AccessTime,
                         fontSize = 13.sp,
                         color = NxColors.Muted,
                     )
@@ -507,7 +540,11 @@ private fun MiComidaCard(
                         containerColor = Color(if (destiempo) CoreActivityRules.NARANJA else CoreActivityRules.AZUL),
                     ),
                     modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text("↩️ Ya regresé", fontWeight = FontWeight.Bold) }
+                ) {
+                    Icon(NxGlyph.ENTRY.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Ya regresé", fontWeight = FontWeight.Bold)
+                }
             }
         }
         mi.siguiente == "listo" && r != null -> {
@@ -521,7 +558,13 @@ private fun MiComidaCard(
                     FotoComida(r.checkinPhotoUrl, "Tu foto de salida", onVerFoto)
                     FotoComida(r.checkoutPhotoUrl, "Tu foto de regreso", onVerFoto)
                     Column(Modifier.weight(1f)) {
-                        Text("✅ Comida registrada", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
+                        NxIconText(
+                            text = "Comida registrada",
+                            icon = NxGlyph.DONE.icon,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = NxColors.Slate,
+                        )
                         Text(
                             "${CoreActivityRules.formatClock(r.checkinTime)} → ${CoreActivityRules.formatClock(r.checkoutTime)}" +
                                 (r.minutos?.let { " · ${it.toLong()} min" } ?: ""),
@@ -584,15 +627,15 @@ private fun FilaComidaCard(
             }
             val justificaciones = listOfNotNull(
                 r.checkinJustificacion?.takeIf { it.isNotBlank() }?.let {
-                    "💬 Salida a las ${CoreActivityRules.formatClock(r.checkinTime)}: «$it»"
+                    "Salida a las ${CoreActivityRules.formatClock(r.checkinTime)}: «$it»"
                 },
                 r.checkoutJustificacion?.takeIf { it.isNotBlank() }?.let {
-                    "💬 Regreso a las ${CoreActivityRules.formatClock(r.checkoutTime)}: «$it»"
+                    "Regreso a las ${CoreActivityRules.formatClock(r.checkoutTime)}: «$it»"
                 },
                 ComidasRules.decisionEquipo(r),
             )
             if (justificaciones.isNotEmpty()) {
-                SoftNote(text = justificaciones.joinToString("\n"))
+                SoftNote(text = justificaciones.joinToString("\n"), icon = NxGlyph.CHAT.icon)
             }
             if (fila.puedoRevisar == true) {
                 if (r.revisionEstado == "PENDIENTE") {
@@ -601,12 +644,20 @@ private fun FilaComidaCard(
                             onClick = { onRevisar(fila, true) },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(CoreActivityRules.VERDE)),
                             modifier = Modifier.weight(1f).heightIn(min = 44.dp),
-                        ) { Text("✅ Aprobar", fontWeight = FontWeight.Bold) }
+                        ) {
+                            Icon(NxGlyph.APPROVED.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Aprobar", fontWeight = FontWeight.Bold)
+                        }
                         Button(
                             onClick = { onRevisar(fila, false) },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(CoreActivityRules.ROJO)),
                             modifier = Modifier.weight(1f).heightIn(min = 44.dp),
-                        ) { Text("❌ Rechazar", fontWeight = FontWeight.Bold) }
+                        ) {
+                            Icon(NxGlyph.REJECTED.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Rechazar", fontWeight = FontWeight.Bold)
+                        }
                     }
                 } else if (!r.revisionEstado.isNullOrBlank()) {
                     OutlinedButton(onClick = { onRevisar(fila, r.revisionEstado != "APROBADA") }) {
@@ -643,8 +694,9 @@ private fun ComidaRegistroDialog(
                 modifier = Modifier.padding(18.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    if (salida) "📸 Tu foto de salida a comer" else "📸 Tu foto de regreso de comer",
+                NxIconText(
+                    text = if (salida) "Tu foto de salida a comer" else "Tu foto de regreso de comer",
+                    icon = NxGlyph.PHOTO.icon,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = NxColors.Slate,
@@ -661,9 +713,10 @@ private fun ComidaRegistroDialog(
                 )
                 if (pideMotivo) {
                     SoftNote(
-                        text = "⏰ Estás fuera del horario de comida ($ventanaTexto). Escribe por qué; " +
+                        text = "Estás fuera del horario de comida ($ventanaTexto). Escribe por qué; " +
                             "tu jefe lo aprobará o rechazará y queda en el registro.",
                         color = CoreActivityRules.NARANJA,
+                        icon = Icons.Outlined.AccessTime,
                     )
                     OutlinedTextField(
                         value = motivo,
@@ -692,18 +745,24 @@ private fun ComidaRegistroDialog(
                     ),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) {
+                    if (!enviando) {
+                        Icon(NxGlyph.DONE.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                    }
                     Text(
                         when {
                             enviando -> "Registrando…"
-                            salida -> "✓ Registrar salida"
-                            else -> "✓ Registrar regreso"
+                            salida -> "Registrar salida"
+                            else -> "Registrar regreso"
                         },
                         fontWeight = FontWeight.Bold,
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onOtra, enabled = !enviando, modifier = Modifier.weight(1f)) {
-                        Text("📷 Tomar otra")
+                        Icon(NxGlyph.PHOTO.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Tomar otra")
                     }
                     TextButton(onClick = onCancelar, enabled = !enviando) { Text("Cancelar", color = NxColors.Muted) }
                 }
@@ -739,40 +798,42 @@ private fun ComidaRevisionDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text("Comida a destiempo de $corto", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
-                Text(
-                    "🍽️ Salió ${CoreActivityRules.formatClock(r.checkinTime)}" +
+                NxIconText(
+                    text = "Salió ${CoreActivityRules.formatClock(r.checkinTime)}" +
                         if (!r.checkoutTime.isNullOrBlank()) {
                             " · regresó ${CoreActivityRules.formatClock(r.checkoutTime)}" +
                                 (r.minutos?.let { " (${it.toLong()} min)" } ?: "")
                         } else {
                             " · sigue en comida"
                         },
+                    icon = NxGlyph.MEAL.icon,
                     fontSize = 13.5.sp,
                     color = NxColors.Slate,
                 )
                 r.checkinJustificacion?.takeIf { it.isNotBlank() }?.let {
-                    Text("💬 Salida: «$it»", fontSize = 13.5.sp, color = NxColors.Slate)
+                    NxIconText(text = "Salida: «$it»", icon = NxGlyph.CHAT.icon, fontSize = 13.5.sp, color = NxColors.Slate)
                 }
                 r.checkoutJustificacion?.takeIf { it.isNotBlank() }?.let {
-                    Text("💬 Regreso: «$it»", fontSize = 13.5.sp, color = NxColors.Slate)
+                    NxIconText(text = "Regreso: «$it»", icon = NxGlyph.CHAT.icon, fontSize = 13.5.sp, color = NxColors.Slate)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(true to "✅ Aprobar", false to "❌ Rechazar").forEach { (valor, label) ->
-                        val on = aprobar == valor
-                        val c = Color(if (valor) CoreActivityRules.VERDE else CoreActivityRules.ROJO)
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (on) c.copy(alpha = 0.12f) else Color.White)
-                                .border(2.dp, if (on) c else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                                .clickable { aprobar = valor },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(label, fontWeight = FontWeight.Bold, color = if (on) c else NxColors.Slate)
+                    listOf(Triple(true, "Aprobar", NxGlyph.APPROVED.icon), Triple(false, "Rechazar", NxGlyph.REJECTED.icon))
+                        .forEach { (valor, label, icon) ->
+                            val on = aprobar == valor
+                            val c = Color(if (valor) CoreActivityRules.VERDE else CoreActivityRules.ROJO)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (on) c.copy(alpha = 0.12f) else Color.White)
+                                    .border(2.dp, if (on) c else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                                    .clickable { aprobar = valor },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                NxIconText(text = label, icon = icon, fontWeight = FontWeight.Bold, color = if (on) c else NxColors.Slate)
+                            }
                         }
-                    }
                 }
                 OutlinedTextField(
                     value = notas,
@@ -818,11 +879,19 @@ private fun ComidaRevisionDialog(
                         ),
                         modifier = Modifier.weight(1f),
                     ) {
+                        if (!enviando) {
+                            Icon(
+                                if (aprobar) NxGlyph.APPROVED.icon else NxGlyph.REJECTED.icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                        }
                         Text(
                             when {
                                 enviando -> "Guardando…"
-                                aprobar -> "✅ Aprobar"
-                                else -> "❌ Rechazar"
+                                aprobar -> "Aprobar"
+                                else -> "Rechazar"
                             },
                             fontWeight = FontWeight.Bold,
                         )

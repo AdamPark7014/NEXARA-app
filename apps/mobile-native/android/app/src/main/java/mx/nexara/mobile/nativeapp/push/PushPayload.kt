@@ -30,6 +30,8 @@ internal data class PushPayload(
     val threadTitle: String,
     val messageId: String,
     val sentAtMillis: Long,
+    /** Tipo de evento del servidor (`entrada`, `aprobada`, `chat`…): decide el glifo y el color de la insignia. */
+    val icon: String,
 ) {
     enum class Kind { CHAT, EVENT }
 
@@ -74,6 +76,7 @@ internal data class PushPayload(
                 sentAtMillis = parseTimestamp(v("sent_at"))
                     ?: fallbackSentAt.takeIf { it > 0L }
                     ?: System.currentTimeMillis(),
+                icon = v("icon").lowercase(),
             )
         }
 

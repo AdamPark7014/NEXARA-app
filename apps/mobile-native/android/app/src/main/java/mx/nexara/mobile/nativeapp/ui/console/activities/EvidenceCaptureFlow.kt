@@ -26,8 +26,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -45,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -75,8 +83,11 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_E
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_PDF
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_PHOTOS
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 private const val KIND_ENTRY = "entry"
 private const val KIND_EVIDENCE = "evidence"
@@ -119,6 +130,7 @@ fun EvidenceCaptureFlow(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf<String?>(null) }
+    var successIcon by remember { mutableStateOf<ImageVector>(NxGlyph.DONE.icon) }
 
     LaunchedEffect(activity.id, reloadKey) {
         loading = true
@@ -167,15 +179,16 @@ fun EvidenceCaptureFlow(
     var pendingError by remember { mutableStateOf<String?>(null) }
 
     fun correctionMessage(saved: EvidenceFlowDto): String = when {
-        saved.status == STEP_COMPLETED -> "🎉 ¡Corrección enviada! Tu evidencia será revisada nuevamente."
-        !saved.status.isNullOrBlank() -> "✅ Paso corregido. Siguiente: ${CoreActivityRules.stepLabel(saved.status)}"
-        else -> "✅ Corrección enviada."
+        saved.status == STEP_COMPLETED -> "¡Corrección enviada! Tu evidencia será revisada nuevamente."
+        !saved.status.isNullOrBlank() -> "Paso corregido. Siguiente: ${CoreActivityRules.stepLabel(saved.status)}"
+        else -> "Corrección enviada."
     }
 
     fun applySaved(saved: EvidenceFlowDto, message: String) {
         if (saved.status == null) {
             // El interceptor offline respondió «en cola»: no hay fila nueva que pintar.
-            success = "📶 Sin conexión: se enviará solo en cuanto vuelva la red."
+            successIcon = Icons.Outlined.CloudOff
+            success = "Sin conexión: se enviará solo en cuanto vuelva la red."
             return
         }
         flow = saved.copy(
@@ -183,6 +196,7 @@ fun EvidenceCaptureFlow(
             assigneeIndicaciones = saved.assigneeIndicaciones ?: flow?.assigneeIndicaciones,
         )
         error = null
+        successIcon = if (saved.status == STEP_COMPLETED) NxGlyph.APPROVED.icon else NxGlyph.DONE.icon
         success = message
         onFlowChanged()
     }
@@ -211,9 +225,9 @@ fun EvidenceCaptureFlow(
             }
             val message = when {
                 isCorrection -> correctionMessage(saved)
-                kind == KIND_ENTRY -> "✅ Foto de entrada guardada. Siguiente: toma $photoRequired fotos de evidencia."
-                saved.status == STEP_COMPLETED -> "🎉 ¡Listo! Tus evidencias quedaron enviadas a revisión."
-                else -> "✅ Foto de salida guardada."
+                kind == KIND_ENTRY -> "Foto de entrada guardada. Siguiente: toma $photoRequired fotos de evidencia."
+                saved.status == STEP_COMPLETED -> "¡Listo! Tus evidencias quedaron enviadas a revisión."
+                else -> "Foto de salida guardada."
             }
             applySaved(saved, message)
             true
@@ -247,8 +261,8 @@ fun EvidenceCaptureFlow(
                     saved,
                     when {
                         isCorrection -> correctionMessage(saved)
-                        needsPdf -> "✅ Evidencias guardadas. Siguiente: carga la hoja de servicio (PDF)."
-                        else -> "✅ Evidencias guardadas. Siguiente: completa el formulario."
+                        needsPdf -> "Evidencias guardadas. Siguiente: carga la hoja de servicio (PDF)."
+                        else -> "Evidencias guardadas. Siguiente: completa el formulario."
                     },
                 )
             } catch (e: Exception) {
@@ -281,7 +295,7 @@ fun EvidenceCaptureFlow(
                 applySaved(
                     saved,
                     if (isCorrection) correctionMessage(saved)
-                    else "✅ Formulario guardado. Siguiente: toma la foto de salida.",
+                    else "Formulario guardado. Siguiente: toma la foto de salida.",
                 )
             } catch (e: Exception) {
                 error = e.toUserMessage("No se pudo guardar el formulario")
@@ -308,7 +322,7 @@ fun EvidenceCaptureFlow(
                 applySaved(
                     saved,
                     if (isCorrection) correctionMessage(saved)
-                    else "✅ PDF guardado. Siguiente: completa el formulario.",
+                    else "PDF guardado. Siguiente: completa el formulario.",
                 )
             } catch (e: Exception) {
                 error = e.toUserMessage("No se pudo cargar el PDF")
@@ -319,8 +333,9 @@ fun EvidenceCaptureFlow(
     }
 
     NxPanelShell {
-        Text(
-            "📸 Captura de evidencias",
+        NxIconText(
+            text = "Captura de evidencias",
+            icon = NxGlyph.PHOTO.icon,
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
             color = NxColors.Slate,
         )
@@ -357,8 +372,18 @@ fun EvidenceCaptureFlow(
 
             StepProgress(steps = steps, flow = flow, current = step)
 
-            success?.let { Text(it, fontSize = 13.sp, color = Color(CoreActivityRules.VERDE), fontWeight = FontWeight.SemiBold) }
-            error?.let { Text("❌ $it", fontSize = 13.sp, color = Color(0xFFB91C1C)) }
+            success?.let {
+                NxIconText(
+                    text = it,
+                    icon = successIcon,
+                    fontSize = 13.sp,
+                    color = Color(CoreActivityRules.VERDE),
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            error?.let {
+                NxIconText(text = it, icon = Icons.Outlined.ErrorOutline, fontSize = 13.sp, color = Color(0xFFB91C1C))
+            }
 
             val stepNumber = steps.indexOf(step) + 1
             val stepPrefix = if (stepNumber > 0) "Paso $stepNumber de ${steps.size}" else "Paso"
@@ -367,10 +392,11 @@ fun EvidenceCaptureFlow(
                 step == STEP_COMPLETED || locked -> CompletedCard(locked = locked, reviewStatus = reviewStatus)
 
                 step == STEP_ENTRY -> StepCard(
-                    title = "📸 $stepPrefix: Foto de entrada",
+                    title = "$stepPrefix: Foto de entrada",
                     description = "Tómala al llegar al sitio. Se guarda con tu ubicación GPS (obligatoria).",
+                    icon = NxGlyph.ENTRY.icon,
                 ) {
-                    PrimaryAction("📷 Tomar foto de entrada", enabled = !busy) {
+                    PrimaryAction("Tomar foto de entrada", icon = NxGlyph.PHOTO.icon, enabled = !busy) {
                         success = null
                         error = null
                         cameraKind = KIND_ENTRY
@@ -378,8 +404,9 @@ fun EvidenceCaptureFlow(
                 }
 
                 step == STEP_PHOTOS -> StepCard(
-                    title = "📷 $stepPrefix: Fotos en sitio (${drafts.size}/$photoRequired)",
+                    title = "$stepPrefix: Fotos en sitio (${drafts.size}/$photoRequired)",
                     description = "Toma al menos $photoRequired fotos del trabajo. Cada una guarda dónde se tomó.",
+                    icon = NxGlyph.PHOTO.icon,
                 ) {
                     DraftGrid(
                         drafts = drafts,
@@ -395,13 +422,23 @@ fun EvidenceCaptureFlow(
                             },
                             enabled = !busy && drafts.size < MAX_EVIDENCE_PHOTOS,
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        ) { Text("📷 Agregar foto") }
+                        ) {
+                            Icon(NxGlyph.PHOTO.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Agregar foto")
+                        }
                         Button(
                             onClick = { savePhotos() },
                             enabled = !busy && drafts.size >= photoRequired,
                             colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        ) { Text(if (busy) "⏳ Guardando…" else "✓ Siguiente paso →") }
+                        ) {
+                            if (busy) {
+                                Text("Guardando…")
+                            } else {
+                                Text("Siguiente paso →")
+                            }
+                        }
                     }
                     if (drafts.size < photoRequired) {
                         Text(
@@ -413,22 +450,28 @@ fun EvidenceCaptureFlow(
                 }
 
                 step == STEP_PDF -> StepCard(
-                    title = "📄 $stepPrefix: Hoja de servicio (PDF)",
+                    title = "$stepPrefix: Hoja de servicio (PDF)",
                     description = "Carga el PDF de la hoja de servicio firmada. Solo PDF.",
+                    icon = NxGlyph.PROCEDURE.icon,
                 ) {
-                    PrimaryAction(if (busy) "⏳ Subiendo…" else "📄 Seleccionar PDF", enabled = !busy) {
+                    PrimaryAction(
+                        if (busy) "Subiendo…" else "Seleccionar PDF",
+                        icon = if (busy) null else NxGlyph.PROCEDURE.icon,
+                        enabled = !busy,
+                    ) {
                         success = null
                         error = null
                         pdfPicker.launch(arrayOf("application/pdf"))
                     }
                     flow?.serviceSheetPdfUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                        ProtectedPdfButton(url = url, label = "📄 Ver PDF cargado")
+                        ProtectedPdfButton(url = url, label = "Ver PDF cargado")
                     }
                 }
 
                 step == STEP_DATA -> StepCard(
-                    title = "📝 $stepPrefix: Formulario",
+                    title = "$stepPrefix: Formulario",
                     description = "Completa los datos de esta actividad.",
+                    icon = NxGlyph.DOCUMENTATION.icon,
                 ) {
                     CoreActivityRules.digitalFormLabels(coreKind).forEach { field ->
                         OutlinedTextField(
@@ -441,16 +484,17 @@ fun EvidenceCaptureFlow(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    PrimaryAction(if (busy) "⏳ Guardando…" else "✓ Siguiente paso →", enabled = !busy) {
+                    PrimaryAction(if (busy) "Guardando…" else "Siguiente paso →", enabled = !busy) {
                         saveForm()
                     }
                 }
 
                 step == STEP_EXIT -> StepCard(
-                    title = "🚪 $stepPrefix: Foto de salida",
+                    title = "$stepPrefix: Foto de salida",
                     description = "Tómala en el sitio al terminar. Tu ubicación GPS es obligatoria para cerrar.",
+                    icon = NxGlyph.EXIT.icon,
                 ) {
-                    PrimaryAction("📷 Tomar foto de salida", enabled = !busy) {
+                    PrimaryAction("Tomar foto de salida", icon = NxGlyph.PHOTO.icon, enabled = !busy) {
                         success = null
                         error = null
                         cameraKind = KIND_EXIT
@@ -488,7 +532,7 @@ fun EvidenceCaptureFlow(
                 else -> "Tu foto de evidencia ${drafts.size + 1} de $photoRequired"
             },
             photo = photo,
-            confirmLabel = if (kind == KIND_EVIDENCE) "✓ Usar esta foto" else "✓ Enviar esta foto",
+            confirmLabel = if (kind == KIND_EVIDENCE) "Usar esta foto" else "Enviar esta foto",
             sending = busy,
             error = pendingError,
             onConfirm = {
@@ -499,7 +543,8 @@ fun EvidenceCaptureFlow(
                         null
                     }
                     drafts = drafts + DraftPhoto(photo.dataUrl, geo, thumbnailOf(photo.preview))
-                    success = "📷 Foto agregada (${drafts.size} de $photoRequired)"
+                    successIcon = NxGlyph.PHOTO.icon
+                    success = "Foto agregada (${drafts.size} de $photoRequired)"
                     pending = null
                     pendingKind = null
                 } else {
@@ -565,6 +610,7 @@ private fun readPdfAsDataUrl(context: Context, uri: Uri): String {
 private fun StepCard(
     title: String,
     description: String,
+    icon: ImageVector? = null,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -576,20 +622,24 @@ private fun StepCard(
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
+        NxIconText(text = title, icon = icon, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
         Text(description, fontSize = 13.sp, color = NxColors.Muted)
         content()
     }
 }
 
 @Composable
-private fun PrimaryAction(label: String, enabled: Boolean, onClick: () -> Unit) {
+private fun PrimaryAction(label: String, enabled: Boolean, icon: ImageVector? = null, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
     ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+        }
         Text(label, fontWeight = FontWeight.Bold, fontSize = 15.sp)
     }
 }
@@ -627,12 +677,21 @@ private fun StepProgress(steps: List<String>, flow: EvidenceFlowDto?, current: S
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        if (done) "✓" else "${index + 1}",
-                        color = if (done || active) Color.White else NxColors.Muted,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    if (done) {
+                        Icon(
+                            NxGlyph.DONE.icon,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    } else {
+                        Text(
+                            "${index + 1}",
+                            color = if (active) Color.White else NxColors.Muted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
                 Text(
                     CoreActivityRules.stepLabel(s),
@@ -691,7 +750,7 @@ private fun DraftGrid(
                                 .clickable(enabled = enabled) { onRemove(index) },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("✕", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Outlined.Close, contentDescription = "Quitar", tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                         Text(
                             CoreActivityRules.fotoEvidenciaLabel(index + 1),
@@ -724,8 +783,9 @@ private fun CorrectionBanner(rejected: List<String>, steps: List<String>, notes:
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(
-            if (todo) "⚠️ Te devolvieron toda la evidencia" else "⚠️ Te devolvieron tu evidencia",
+        NxIconText(
+            text = if (todo) "Te devolvieron toda la evidencia" else "Te devolvieron tu evidencia",
+            icon = Icons.Outlined.WarningAmber,
             fontSize = 15.sp,
             fontWeight = FontWeight.ExtraBold,
             color = Color(0xFF9A3412),
@@ -745,12 +805,13 @@ private fun CorrectionBanner(rejected: List<String>, steps: List<String>, notes:
             fontSize = 13.sp,
             color = NxColors.Slate,
         )
-        Text(
-            "💡 Corrige el paso actual. " + if (rejected.size > 1) {
+        NxIconText(
+            text = "Corrige el paso actual. " + if (rejected.size > 1) {
                 "Luego sigues con los demás pasos indicados."
             } else {
                 "Al terminar, se envía de nuevo a revisión."
             },
+            icon = Icons.Outlined.Lightbulb,
             fontSize = 12.5.sp,
             color = NxColors.Muted,
         )
@@ -759,11 +820,15 @@ private fun CorrectionBanner(rejected: List<String>, steps: List<String>, notes:
 
 @Composable
 private fun CompletedCard(locked: Boolean, reviewStatus: String?) {
-    val (title, text) = when {
-        reviewStatus == "APPROVED" -> "✅ Evidencia aprobada" to "Tu superior ya la revisó y la aprobó."
-        locked -> "⏳ Evidencias enviadas a revisión" to
-            "Tus pasos están guardados. Tu superior la aprueba o te la devuelve con observaciones."
-        else -> "🎉 ¡Listo!" to "Todos los pasos quedaron guardados."
+    val (title, text, icon) = when {
+        reviewStatus == "APPROVED" ->
+            Triple("Evidencia aprobada", "Tu superior ya la revisó y la aprobó.", NxGlyph.APPROVED.icon)
+        locked -> Triple(
+            "Evidencias enviadas a revisión",
+            "Tus pasos están guardados. Tu superior la aprueba o te la devuelve con observaciones.",
+            NxGlyph.IN_PROGRESS.icon,
+        )
+        else -> Triple("¡Listo!", "Todos los pasos quedaron guardados.", NxGlyph.APPROVED.icon)
     }
-    SoftNote(title = title, text = text, color = CoreActivityRules.VERDE)
+    SoftNote(title = title, text = text, color = CoreActivityRules.VERDE, icon = icon)
 }

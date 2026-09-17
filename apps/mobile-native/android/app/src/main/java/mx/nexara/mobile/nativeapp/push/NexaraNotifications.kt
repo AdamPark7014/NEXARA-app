@@ -37,8 +37,8 @@ object NexaraNotifications {
 
     const val CHANNEL_GROUP = "nexara"
 
-    /** Teal de marca (#0F766E): acento de notificaciones y luz LED. */
-    const val ACCENT_COLOR: Int = 0xFF0F766E.toInt()
+    /** Azul de marca (#2563EB): acento de notificaciones y luz LED. */
+    const val ACCENT_COLOR: Int = 0xFF2563EB.toInt()
 
     private val LEGACY_CHANNELS = listOf(
         "nexara_default",

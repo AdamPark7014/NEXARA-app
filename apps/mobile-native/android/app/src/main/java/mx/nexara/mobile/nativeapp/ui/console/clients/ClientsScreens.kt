@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -43,6 +46,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 /**
  * Clientes de NEXARA Core — las tres pantallas de
@@ -98,7 +102,14 @@ fun ClientsListScreen(
                         FilterChip(
                             selected = state.sector == sector,
                             onClick = { vm.selectSector(sector) },
-                            label = { Text("${sector.emoji} ${sector.shortLabel}") },
+                            label = { Text(sector.shortLabel) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = sector.glyph.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                                )
+                            },
                         )
                     }
                 }
@@ -243,7 +254,7 @@ fun ClientDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         state.clientSectors.forEach { sector ->
-                            NxStatusChip("${sector.emoji} ${sector.shortLabel}", NxTone.Brand)
+                            NxStatusChip(sector.shortLabel, NxTone.Brand, icon = sector.glyph.icon)
                         }
                     }
                     if (state.addableSectors.isNotEmpty()) {
@@ -368,7 +379,14 @@ fun NewClientScreen(
                         FilterChip(
                             selected = sector in state.sectors,
                             onClick = { vm.toggleSector(sector) },
-                            label = { Text("${sector.emoji} ${sector.shortLabel}") },
+                            label = { Text(sector.shortLabel) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = sector.glyph.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                                )
+                            },
                         )
                     }
                 }

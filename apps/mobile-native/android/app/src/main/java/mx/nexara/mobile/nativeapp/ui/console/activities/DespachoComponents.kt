@@ -9,10 +9,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -42,6 +46,9 @@ import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 /**
  * Quien reparte un despacho cambia su día y hora; queda en el Historial de la
@@ -65,17 +72,19 @@ internal fun ReprogramarDespachoInline(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                buildAnnotatedString {
-                    append("📅 Programada: ")
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = NxColors.Slate)) {
-                        append(CoreActivityRules.formatWhen(fechaActual) ?: "Sin fecha")
-                    }
-                },
-                fontSize = 13.sp,
-                color = NxColors.Muted,
-                modifier = Modifier.weight(1f),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = NxColors.Muted, modifier = Modifier.size(16.dp))
+                Text(
+                    buildAnnotatedString {
+                        append("Programada: ")
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = NxColors.Slate)) {
+                            append(CoreActivityRules.formatWhen(fechaActual) ?: "Sin fecha")
+                        }
+                    },
+                    fontSize = 13.sp,
+                    color = NxColors.Muted,
+                )
+            }
             if (!open) {
                 OutlinedButton(
                     onClick = {
@@ -89,7 +98,7 @@ internal fun ReprogramarDespachoInline(
             }
         }
         if (!open) {
-            ok?.let { Text("✓ $it", fontSize = 12.5.sp, color = Color(CoreActivityRules.VERDE)) }
+            ok?.let { NxIconText(text = it, icon = NxGlyph.DONE.icon, fontSize = 12.5.sp, color = Color(CoreActivityRules.VERDE)) }
         }
         if (open) {
             Column(

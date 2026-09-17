@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -212,7 +214,7 @@ fun openMapsAt(context: Context, lat: Double, lng: Double) {
 fun ProtectedPdfButton(
     url: String,
     modifier: Modifier = Modifier,
-    label: String = "📄 Abrir PDF",
+    label: String = "Abrir PDF",
     title: String = "Hoja de servicio",
 ) {
     val context = LocalContext.current
@@ -249,6 +251,10 @@ fun ProtectedPdfButton(
             },
             enabled = !loading,
         ) {
+            if (!loading) {
+                Icon(Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+            }
             Text(if (loading) "Descargando…" else label)
         }
         error?.let {

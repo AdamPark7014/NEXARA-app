@@ -21,7 +21,7 @@ extension CoreOrg {
 
     static var fieldInstallerEmails: [String] { [joanEmail, israelEmail, juanEmail] }
     static var servicioDelegateEmails: [String] { [carolinaEmail, alejandroEmail, robertoEmail] }
-    static var soporteTeamEmails: [String] { [antonioEmail, carolinaEmail, alejandroEmail, robertoEmail] }
+    static var soporteTeamEmails: [String] { [antonioEmail, carolinaEmail, alejandroEmail] }
 }
 
 // MARK: - Sectores de clientes
@@ -317,7 +317,8 @@ enum CoreActivityRules {
 
     static func extrasEmails(for kind: CoreActivityKind?) -> [String]? {
         switch kind {
-        case .servicio?: return CoreOrg.soporteTeamEmails
+        // Roberto solo atiende servicios: entra aquí y no en proyectos.
+        case .servicio?: return CoreOrg.soporteTeamEmails + [CoreOrg.robertoEmail]
         case .obra?: return CoreOrg.fieldInstallerEmails
         case .proyecto?: return CoreOrg.fieldInstallerEmails + CoreOrg.soporteTeamEmails
         default: return nil

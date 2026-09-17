@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.GpsFixed
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -65,7 +66,10 @@ import mx.nexara.mobile.nativeapp.data.offline.OfflineSyncStatus
 import mx.nexara.mobile.nativeapp.data.offline.QueuedMutation
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -110,6 +114,7 @@ fun OfflineQueueScreen(
     var items by remember { mutableStateOf(queue.load()) }
     var syncing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var messageError by remember { mutableStateOf(false) }
     var wasOffline by remember { mutableStateOf(!NetworkMonitor.isOnline.value) }
     var autoSyncPulse by remember { mutableStateOf(false) }
     val isOnline by NetworkMonitor.isOnline.collectAsState()
@@ -159,9 +164,10 @@ fun OfflineQueueScreen(
 
         if (!message.isNullOrBlank()) {
             item {
-                Text(
-                    message!!,
-                    color = if (message!!.startsWith("❌")) MaterialTheme.colorScheme.error else NxColors.Success,
+                NxIconText(
+                    text = message!!,
+                    icon = if (messageError) Icons.Outlined.ErrorOutline else NxGlyph.APPROVED.icon,
+                    color = if (messageError) MaterialTheme.colorScheme.error else NxColors.Success,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -186,7 +192,8 @@ fun OfflineQueueScreen(
                             OfflineSyncCoordinator.replay(queue, auth.token())
                             refresh()
                             val remaining = queue.load().size
-                            message = if (remaining == 0) "✅ Todo sincronizado"
+                            messageError = false
+                            message = if (remaining == 0) "Todo sincronizado"
                             else "Quedan $remaining pendientes"
                             syncing = false
                         }
@@ -211,7 +218,7 @@ fun OfflineQueueScreen(
         if (items.isEmpty()) {
             item {
                 NxEmptyState(
-                    title = "Todo sincronizado ✓",
+                    title = "Todo sincronizado",
                     subtitle = "No hay mutaciones pendientes en este dispositivo.",
                 )
             }
@@ -238,7 +245,8 @@ fun OfflineQueueScreen(
                         scope.launch {
                             val ok = OfflineSyncCoordinator.replaySingle(queue, auth.token(), item.id)
                             refresh()
-                            message = if (ok) "✅ Enviado" else "❌ No se pudo enviar — revisa el error"
+                            messageError = !ok
+                            message = if (ok) "Enviado" else "No se pudo enviar — revisa el error"
                         }
                     },
                 )

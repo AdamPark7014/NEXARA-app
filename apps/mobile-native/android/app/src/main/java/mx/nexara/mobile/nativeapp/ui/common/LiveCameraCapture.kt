@@ -21,15 +21,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Cameraswitch
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +76,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import mx.nexara.mobile.nativeapp.util.DeviceCoords
 import mx.nexara.mobile.nativeapp.util.DeviceLocation
 
@@ -128,6 +140,7 @@ fun LiveCameraCaptureDialog(
     /** Cámara con la que abre (la comida abre con la frontal, como la web). */
     frontCamera: Boolean = false,
     subtitle: String = "Acomódate o encuadra bien y toca «Tomar foto».",
+    titleIcon: ImageVector = NxGlyph.PHOTO.icon,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -244,7 +257,7 @@ fun LiveCameraCaptureDialog(
                 modifier = Modifier.fillMaxSize().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                NxIconText(text = title, icon = titleIcon, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Text(
                     subtitle,
                     color = Color(0xFFCBD5E1),
@@ -284,15 +297,18 @@ fun LiveCameraCaptureDialog(
                         }
                     }
                 }
+                val gpsIcon = if (!captureLocation) Icons.Outlined.AccessTime else Icons.Outlined.LocationOn
                 val gpsLine = when {
-                    !captureLocation -> "🕑 La foto se guarda con la hora en que la tomas"
-                    coords != null -> "📍 Al tomar la foto se guarda tu ubicación · GPS listo"
-                    !hasLocation -> "📍 Da permiso de ubicación: la foto se guarda con tu GPS"
-                    locating -> "📍 Al tomar la foto se guarda tu ubicación · buscando GPS…"
-                    else -> "📍 Al tomar la foto se guarda tu ubicación"
+                    !captureLocation -> "La foto se guarda con la hora en que la tomas"
+                    coords != null -> "Al tomar la foto se guarda tu ubicación · GPS listo"
+                    !hasLocation -> "Da permiso de ubicación: la foto se guarda con tu GPS"
+                    locating -> "Al tomar la foto se guarda tu ubicación · buscando GPS…"
+                    else -> "Al tomar la foto se guarda tu ubicación"
                 }
-                Text(gpsLine, color = Color(0xFFCBD5E1), fontSize = 12.5.sp)
-                error?.let { Text("❌ $it", color = Color(0xFFFCA5A5), fontSize = 13.sp) }
+                NxIconText(text = gpsLine, icon = gpsIcon, color = Color(0xFFCBD5E1), fontSize = 12.5.sp)
+                error?.let {
+                    NxIconText(text = it, icon = Icons.Outlined.ErrorOutline, color = Color(0xFFFCA5A5), fontSize = 13.sp)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { shoot() },
@@ -300,11 +316,15 @@ fun LiveCameraCaptureDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                         modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                     ) {
+                        if (!busy) {
+                            Icon(NxGlyph.PHOTO.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(6.dp))
+                        }
                         Text(
                             when {
-                                !busy -> "📸 Tomar foto"
-                                captureLocation -> "⏳ Ubicando…"
-                                else -> "⏳ Procesando…"
+                                !busy -> "Tomar foto"
+                                captureLocation -> "Ubicando…"
+                                else -> "Procesando…"
                             },
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
@@ -322,8 +342,10 @@ fun LiveCameraCaptureDialog(
                         enabled = !busy,
                         modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                     ) {
+                        Icon(Icons.Outlined.Cameraswitch, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
                         Text(
-                            if (lensFacing == CameraSelector.LENS_FACING_BACK) "🔄 Usar frontal" else "🔄 Usar trasera",
+                            if (lensFacing == CameraSelector.LENS_FACING_BACK) "Usar frontal" else "Usar trasera",
                             color = Color.White,
                         )
                     }
@@ -448,8 +470,9 @@ fun GeoPhotoPreviewDialog(
                 val lng = photo.longitude
                 if (lat != null && lng != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            String.format(Locale.US, "📍 Ubicación capturada: %.5f, %.5f · ", lat, lng),
+                        NxIconText(
+                            text = String.format(Locale.US, "Ubicación capturada: %.5f, %.5f · ", lat, lng),
+                            icon = Icons.Outlined.LocationOn,
                             fontSize = 12.5.sp,
                             color = NxColors.Muted,
                             modifier = Modifier.weight(1f, fill = false),
@@ -463,16 +486,23 @@ fun GeoPhotoPreviewDialog(
                         )
                     }
                 } else {
-                    Text("📍 Sin ubicación registrada", fontSize = 12.5.sp, color = NxColors.Muted)
+                    NxIconText(
+                        text = "Sin ubicación registrada",
+                        icon = Icons.Outlined.LocationOn,
+                        fontSize = 12.5.sp,
+                        color = NxColors.Muted,
+                    )
                 }
-                error?.let { Text("❌ $it", fontSize = 13.sp, color = Color(0xFFB91C1C)) }
+                error?.let {
+                    NxIconText(text = it, icon = Icons.Outlined.ErrorOutline, fontSize = 13.sp, color = Color(0xFFB91C1C))
+                }
                 Button(
                     onClick = onConfirm,
                     enabled = !sending,
                     colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) {
-                    Text(if (sending) "⏳ Enviando…" else confirmLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(if (sending) "Enviando…" else confirmLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -482,7 +512,11 @@ fun GeoPhotoPreviewDialog(
                         onClick = onRetake,
                         enabled = !sending,
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    ) { Text("📷 Tomar otra") }
+                    ) {
+                        Icon(NxGlyph.PHOTO.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text("Tomar otra")
+                    }
                     TextButton(onClick = onCancel, enabled = !sending) {
                         Text("Cancelar", color = NxColors.Muted)
                     }

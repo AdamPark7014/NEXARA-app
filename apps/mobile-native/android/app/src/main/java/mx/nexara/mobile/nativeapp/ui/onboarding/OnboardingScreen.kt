@@ -22,6 +22,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -29,15 +30,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 private data class OnboardingSlide(
-    val emoji: String,
+    val icon: ImageVector,
     val title: String,
     val subtitle: String,
     val accent: Color,
@@ -46,21 +50,21 @@ private data class OnboardingSlide(
 
 private val slides = listOf(
     OnboardingSlide(
-        emoji = "🏗️",
+        icon = NxGlyph.WORKSITE.icon,
         title = "Tus actividades",
         subtitle = "Recibe tus servicios y proyectos, registra entrada y salida con ubicación, y sube evidencias con foto y PDF.",
         accent = NxColors.Brand,
         accentSoft = NxColors.BrandSoft,
     ),
     OnboardingSlide(
-        emoji = "🕒",
+        icon = NxGlyph.ATTENDANCE.icon,
         title = "Asistencia y comida",
         subtitle = "Checa tu jornada con GPS y registra tu hora de comida; fuera de 3 a 4 pm, tu jefe revisa la justificación.",
         accent = NxColors.Info,
         accentSoft = NxColors.InfoSoft,
     ),
     OnboardingSlide(
-        emoji = "💬",
+        icon = NxGlyph.CHAT.icon,
         title = "Equipo conectado",
         subtitle = "Chat en tiempo real, avisos al instante y la revisión de tus evidencias por tus superiores.",
         accent = Color(0xFF7C3AED),
@@ -182,9 +186,11 @@ private fun OnboardingSlideContent(slide: OnboardingSlide) {
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = slide.emoji,
-                fontSize = 64.sp,
+            Icon(
+                imageVector = slide.icon,
+                contentDescription = null,
+                tint = slide.accent,
+                modifier = Modifier.size(64.dp),
             )
         }
 
