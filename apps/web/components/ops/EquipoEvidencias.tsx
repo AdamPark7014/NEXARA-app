@@ -28,8 +28,10 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import UndoIcon from "@mui/icons-material/Undo";
+import WrongLocationOutlinedIcon from "@mui/icons-material/WrongLocationOutlined";
 import { IconLabel } from "@/components/ui/IconBadge";
 import { useUser } from "@/components/UserContext";
+import { formatoDistancia, type GeocercaAlerta } from "@/lib/activity-geofence";
 import { formatApiError } from "@/lib/erp-api";
 import { flattenServiceSheetFields, mapsUrl, resolveAssetUrl } from "@/lib/evidence-display";
 import { digitalFormLabels, evidenceStepsForKind } from "@/lib/evidence-flow-helpers";
@@ -859,6 +861,127 @@ function Historial({
   );
 }
 
+/** Resumen en una etiqueta: sigue fuera, salidas sin justificar o solo cuántas hubo. */
+function ChipZona({ alertas }: { alertas: GeocercaAlerta[] }) {
+  if (!alertas.length) return null;
+  if (alertas.some((a) => a.abierta)) {
+    return (
+      <Chip color={ROJO} icon={WrongLocationOutlinedIcon}>
+        Fuera de zona
+      </Chip>
+    );
+  }
+  const sinJustificar = alertas.filter((a) => a.status !== "JUSTIFICADA").length;
+  if (sinJustificar) {
+    return (
+      <Chip color={NARANJA} icon={WrongLocationOutlinedIcon}>
+        {sinJustificar === 1 ? "Salida de zona sin justificar" : `${sinJustificar} salidas de zona sin justificar`}
+      </Chip>
+    );
+  }
+  return (
+    <Chip icon={WrongLocationOutlinedIcon}>
+      {alertas.length === 1 ? "1 salida de zona" : `${alertas.length} salidas de zona`}
+    </Chip>
+  );
+}
+
+/** Veces que salió de los 100 m alrededor de su punto de inicio, con su justificación y foto. */
+function SalidasDeZona({
+  alertas,
+  nombre,
+  abrirVisor,
+}: {
+  alertas: GeocercaAlerta[];
+  nombre: string;
+  abrirVisor: AbrirVisor;
+}) {
+  const { fotos, indice } = useMemo(() => {
+    const lista: Foto[] = [];
+    const porAlerta = new Map<number, number>();
+    for (const a of alertas) {
+      if (!a.fotoUrl) continue;
+      porAlerta.set(a.id, lista.length);
+      lista.push({
+        url: a.fotoUrl,
+        titulo: `${corto(nombre)} · Justificación de salida de zona`,
+        at: a.justificadaAt ?? a.detectedAt,
+      });
+    }
+    return { fotos: lista, indice: porAlerta };
+  }, [alertas, nombre]);
+
+  if (!alertas.length) return null;
+  return (
+    <Seccion titulo={`Salidas de zona (${alertas.length})`}>
+      <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+        {alertas.map((a) => {
+          const justificada = a.status === "JUSTIFICADA";
+          const color = justificada ? VERDE : a.abierta ? ROJO : NARANJA;
+          const mapa = mapsUrl(a.latitude, a.longitude);
+          const idxFoto = indice.get(a.id);
+          return (
+            <li
+              key={a.id}
+              style={{
+                borderLeft: `3px solid ${color}`,
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: `color-mix(in srgb, ${color} 6%, var(--surface))`,
+                display: "grid",
+                gap: 6,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <strong style={{ fontSize: 13.5 }}>
+                  <IconLabel icon={WrongLocationOutlinedIcon} size={16} iconColor={a.abierta ? ROJO : color}>
+                    Salió {fmt(a.detectedAt) ?? ""}
+                  </IconLabel>
+                </strong>
+                <Chip color={justificada ? VERDE : NARANJA} icon={justificada ? TaskAltIcon : HourglassTopIcon}>
+                  {justificada ? "Justificada" : "Abierta"}
+                </Chip>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", fontSize: 12.5, color: "var(--text-secondary)" }}>
+                <span>
+                  Hasta <strong>{formatoDistancia(a.maxDistanciaM)}</strong> del punto de inicio (máx. {a.radioM} m)
+                </span>
+                {a.abierta ? (
+                  <strong style={{ color: ROJO }}>Sigue fuera</strong>
+                ) : (
+                  <span>Regresó {fmt(a.returnedAt) ?? ""}</span>
+                )}
+                {mapa ? (
+                  <a href={mapa} target="_blank" rel="noreferrer" style={{ color: "var(--primary)", fontWeight: 650 }}>
+                    <IconLabel icon={PlaceOutlinedIcon} size={14} gap={4}>
+                      Dónde se detectó
+                    </IconLabel>
+                  </a>
+                ) : null}
+              </div>
+              {a.justificacion ? (
+                <div style={{ display: "grid", gap: 2 }}>
+                  <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>«{a.justificacion}»</p>
+                  {a.justificadaAt ? (
+                    <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Justificó {fmt(a.justificadaAt)}</span>
+                  ) : null}
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Todavía no lo justifica.</p>
+              )}
+              {idxFoto != null && fotos[idxFoto] ? (
+                <div style={{ maxWidth: 180 }}>
+                  <Miniatura foto={fotos[idxFoto]} onOpen={() => abrirVisor(fotos, idxFoto)} alto={120} />
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    </Seccion>
+  );
+}
+
 function RevisionModal({
   activityId,
   m,
@@ -1203,6 +1326,7 @@ function TarjetaPersona({
   );
   const corregidos = esCorreccion && ultimaDevolucion ? ultimaDevolucion.pasos : [];
   const devolverPaso = m.puedoRevisar ? (step: string) => onRevisar(m, { decision: "devolver", pasos: [step] }) : undefined;
+  const alertasZona = m.alertasZona ?? [];
 
   return (
     <article
@@ -1228,6 +1352,7 @@ function TarjetaPersona({
                 {estado.label}
               </Chip>
             ) : null}
+            <ChipZona alertas={alertasZona} />
             {m.eficienciaScore ? <Estrellas valor={m.eficienciaScore} /> : null}
             {m.retiradoAt ? <Chip>Salió del equipo</Chip> : null}
           </div>
@@ -1367,6 +1492,8 @@ function TarjetaPersona({
               onDevolverPaso={ev.status === "COMPLETED" ? devolverPaso : undefined}
             />
           )}
+
+          <SalidasDeZona alertas={alertasZona} nombre={m.nombre} abrirVisor={abrirVisor} />
 
           <Historial revisiones={m.revisiones} coreKind={coreKind} nombre={m.nombre} abrirVisor={abrirVisor} />
         </>
@@ -1528,6 +1655,7 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
                     )}
                   </div>
                 </div>
+                <ChipZona alertas={m.alertasZona ?? []} />
                 {estado ? (
                   <Chip color={estado.color} icon={estado.icon}>
                     {estado.label}
