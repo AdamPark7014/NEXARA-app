@@ -692,7 +692,7 @@ export default function WorkspaceChat({
       setShowJump(true);
       return;
     }
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollMessagesToBottom();
     setShowJump(false);
   }, [messages, activeId]);
 
@@ -1252,6 +1252,12 @@ export default function WorkspaceChat({
       setError(e instanceof Error ? e.message : "No se pudo salir del canal");
     }
   };
+
+  /** Baja solo la lista de mensajes: scrollIntoView también movía los contenedores de la página. */
+  function scrollMessagesToBottom() {
+    const el = messagesRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }
 
   const onScrollMessages = () => {
     const el = messagesRef.current;
@@ -2016,7 +2022,7 @@ export default function WorkspaceChat({
                     className={styles.jumpLatest}
                     onClick={() => {
                       nearBottomRef.current = true;
-                      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+                      scrollMessagesToBottom();
                       setShowJump(false);
                     }}
                   >
