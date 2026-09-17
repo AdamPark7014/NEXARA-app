@@ -11,6 +11,8 @@ const SOFT_DELETE_MODELS = new Set<string>([
   'Activity', 'Invoice', 'PurchaseOrder',
   'MaintenanceOrder',
   'Expense', 'Viatico', 'WorkProject', 'Cotizacion', 'Asset',
+  // Proyectos de campo: eliminar los oculta; sus actividades conservan el historial.
+  'OperationalProject',
 ]);
 
 /** Models excluded from audit logging (high-volume or internal) */
