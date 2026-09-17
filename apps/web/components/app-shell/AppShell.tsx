@@ -78,6 +78,7 @@ import {
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 import ShellConnectionStatus from "./ShellConnectionStatus";
+import CelebracionesBanner from "./CelebracionesBanner";
 import { ModuleIcon } from "./ShellIcons";
 import { IconBadge } from "@/components/ui/IconBadge";
 import NotificationKindIcon from "@/components/ui/NotificationKindIcon";
@@ -1141,6 +1142,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
       {/* ───────── MAIN ───────── */}
       <main id="nx-main" className={`${styles.main}${isFullBleed ? ` ${styles.mainFullBleed}` : ""}`} tabIndex={-1}>
         <div className={`${styles.contentInner}${isFullBleed ? ` ${styles.contentInnerFullBleed}` : ""}`}>
+          {/* Core (/erp): cumpleaños y aniversarios de hoy; el chat a pantalla completa no lo lleva. */}
+          {!isFullBleed && panel === "erp" ? <CelebracionesBanner token={user.token} userId={user.id} /> : null}
           {!isFullBleed && <ModuleGuideBanner />}
           {children}
         </div>

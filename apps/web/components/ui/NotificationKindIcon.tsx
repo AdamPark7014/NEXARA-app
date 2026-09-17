@@ -27,6 +27,8 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
+import CakeOutlinedIcon from "@mui/icons-material/CakeOutlined";
+import CelebrationOutlinedIcon from "@mui/icons-material/CelebrationOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 import { IconBadge } from "@/components/ui/IconBadge";
 import { notificationKind, type NotificationKind } from "@/lib/notification-kind";
@@ -58,6 +60,8 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, { icon: SvgIconCom
   fuera_zona: { icon: WrongLocationOutlinedIcon, color: RED },
   cancelada: { icon: BlockOutlinedIcon, color: RED },
   falta_justificada: { icon: EventBusyOutlinedIcon, color: "#7c3aed" },
+  cumpleanos: { icon: CakeOutlinedIcon, color: "#db2777" },
+  aniversario: { icon: CelebrationOutlinedIcon, color: "#ea580c" },
   cliente: { icon: StorefrontOutlinedIcon, color: BLUE },
   chat: { icon: ChatBubbleOutlineIcon, color: BLUE },
   ubicacion: { icon: PlaceOutlinedIcon, color: BLUE },

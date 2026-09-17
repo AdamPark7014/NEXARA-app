@@ -33,7 +33,12 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import { IconLabel } from "@/components/ui/IconBadge";
 import {
   createOperationalProject,
+  deactivateOperationalProject,
+  deleteOperationalProject,
+  formatOperationalProjectStatus,
+  isInactiveOperationalProject,
   listOperationalProjects,
+  reactivateOperationalProject,
   type OperationalProject,
 } from "@/lib/ops-operational-api";
 import styles from "../clientes-core.module.css";
@@ -232,6 +237,47 @@ export default function ClienteDetallePage() {
           router.push("/erp/clientes");
         } catch (err) {
           setError(err instanceof Error ? err.message : "No se pudo eliminar el cliente");
+        }
+      },
+    });
+  };
+
+  // Proyectos: misma regla que el cliente (solo Christian desactiva, reactiva o elimina).
+  const pedirCambioEstatusProyecto = (p: OperationalProject, activar: boolean) => {
+    setConfirm({
+      title: activar ? "Reactivar proyecto" : "Desactivar proyecto",
+      message: activar
+        ? `«${p.title}» volverá a estar activo.`
+        : `«${p.title}» quedará inactivo. Sus actividades y su historial se conservan y podrás reactivarlo después.`,
+      confirmLabel: activar ? "Reactivar" : "Desactivar",
+      danger: !activar,
+      fn: async () => {
+        if (!token) return;
+        setError(null);
+        try {
+          await (activar ? reactivateOperationalProject(token, p.id) : deactivateOperationalProject(token, p.id));
+          await load();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "No se pudo cambiar el estatus del proyecto");
+        }
+      },
+    });
+  };
+
+  const pedirEliminarProyecto = (p: OperationalProject) => {
+    setConfirm({
+      title: "Eliminar proyecto",
+      message: `¿Eliminar el proyecto «${p.title}»? Esta acción no se puede deshacer. Sus actividades conservan su historial. Si solo está detenido, mejor desactívalo.`,
+      confirmLabel: "Eliminar",
+      danger: true,
+      fn: async () => {
+        if (!token) return;
+        setError(null);
+        try {
+          await deleteOperationalProject(token, p.id);
+          await load();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "No se pudo eliminar el proyecto");
         }
       },
     });
@@ -464,14 +510,79 @@ export default function ClienteDetallePage() {
                 </p>
               ) : (
                 <div className={styles.list}>
-                  {projects.map((p) => (
-                    <div key={p.id} className={styles.row} style={{ cursor: "default" }}>
-                      <div>
-                        <div className={styles.rowName}>{p.title}</div>
-                        <div className={styles.rowSub}>{p.status}</div>
+                  {projects.map((p) => {
+                    const proyectoInactivo = isInactiveOperationalProject(p.status);
+                    const detalle = [
+                      proyectoInactivo ? null : formatOperationalProjectStatus(p.status),
+                      p.startDate
+                        ? `Inicio ${new Date(p.startDate).toLocaleDateString("es-MX", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            timeZone: "UTC",
+                          })}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    return (
+                      <div
+                        key={p.id}
+                        className={styles.row}
+                        style={{
+                          cursor: "default",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div className={styles.rowName}>
+                            {p.title}
+                            {proyectoInactivo ? (
+                              <span className={styles.chip} style={{ marginLeft: 8, fontSize: 11 }}>
+                                Inactivo
+                              </span>
+                            ) : null}
+                          </div>
+                          {detalle ? <div className={styles.rowSub}>{detalle}</div> : null}
+                        </div>
+                        {permisos.puedeDesactivar || permisos.puedeEliminar ? (
+                          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                            {permisos.puedeDesactivar ? (
+                              <button
+                                type="button"
+                                className={styles.ghostBtn}
+                                disabled={busy}
+                                onClick={() => pedirCambioEstatusProyecto(p, proyectoInactivo)}
+                              >
+                                <IconLabel
+                                  icon={proyectoInactivo ? RestartAltOutlinedIcon : BlockOutlinedIcon}
+                                  size={15}
+                                  gap={5}
+                                >
+                                  {proyectoInactivo ? "Reactivar" : "Desactivar"}
+                                </IconLabel>
+                              </button>
+                            ) : null}
+                            {permisos.puedeEliminar ? (
+                              <button
+                                type="button"
+                                className={styles.ghostBtn}
+                                disabled={busy}
+                                onClick={() => pedirEliminarProyecto(p)}
+                                style={{ color: "var(--danger)" }}
+                              >
+                                <IconLabel icon={DeleteOutlineOutlinedIcon} size={15} gap={5}>
+                                  Eliminar
+                                </IconLabel>
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               {canSeeClientSector(user?.email, "PROYECTO") ? (
