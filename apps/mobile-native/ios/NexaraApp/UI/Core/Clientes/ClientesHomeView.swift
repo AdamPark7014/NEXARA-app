@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Clientes de Core (`/erp/clientes`): un padrón, tres usos. Pestañas por
 /// sector según `clientSectorsForEmail`, búsqueda por nombre, RFC o encargado
-/// y alta con «Nuevo».
+/// y alta con «Nuevo cliente» (solo con `puedeAgregar`).
 struct ClientesHomeView: View {
     /// Deep link `/erp/clientes/:id`.
     var initialClientId: Int? = nil
@@ -18,6 +18,8 @@ struct ClientesHomeView: View {
     @State private var openClientId: Int?
     @State private var showNuevo = false
     @State private var didApplyInitial = false
+    /// Hasta confirmar con el API nadie ve «Nuevo cliente».
+    @State private var permisos = CoreClientPermissions.ninguno
 
     private var allowed: [ClientSector] { ClientSector.sectors(for: session.currentUser?.email) }
 
@@ -53,12 +55,16 @@ struct ClientesHomeView: View {
         .navigationTitle("Clientes")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Nuevo") { showNuevo = true }
-                    .disabled(sector == nil)
+                if permisos.puedeAgregar {
+                    Button("Nuevo cliente") { showNuevo = true }
+                        .disabled(sector == nil)
+                }
             }
         }
         .navigationDestination(item: $openClientId) { id in
-            ClienteDetailView(clientId: id)
+            ClienteDetailView(clientId: id) {
+                Task { await load() }
+            }
         }
         .navigationDestination(isPresented: $showNuevo) {
             ClienteNuevoView(presetSector: sector) { createdId in
@@ -83,9 +89,14 @@ struct ClientesHomeView: View {
             }
             await load()
         }
+        .task { await loadPermisos() }
         .onChange(of: sector) { _, _ in
             Task { await load() }
         }
+    }
+
+    private func loadPermisos() async {
+        permisos = (try? await ClientesRepository.shared.permissions()) ?? .ninguno
     }
 
     private var list: some View {
@@ -134,7 +145,7 @@ struct ClientesHomeView: View {
                     VStack(spacing: 8) {
                         Text(query.isEmpty ? "Nadie en este sector todavía." : "Sin coincidencias.")
                             .foregroundColor(.secondary)
-                        if query.isEmpty {
+                        if query.isEmpty && permisos.puedeAgregar {
                             Button("Crear el primero") { showNuevo = true }
                         }
                     }
@@ -151,7 +162,10 @@ struct ClientesHomeView: View {
             }
         }
         .searchable(text: $query, prompt: "Buscar nombre, RFC…")
-        .refreshable { await load() }
+        .refreshable {
+            await loadPermisos()
+            await load()
+        }
     }
 
     private func row(_ c: CoreSalesClient) -> some View {
@@ -165,7 +179,12 @@ struct ClientesHomeView: View {
             .joined(separator: " ")
         return HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(c.name).font(.subheadline.weight(.semibold))
+                HStack(spacing: 6) {
+                    Text(c.name).font(.subheadline.weight(.semibold))
+                    if c.isInactive {
+                        CoreChip(text: "Inactivo")
+                    }
+                }
                 Text(fiscal.isEmpty ? "Sin datos fiscales" : fiscal)
                     .font(.caption)
                     .foregroundColor(.secondary)

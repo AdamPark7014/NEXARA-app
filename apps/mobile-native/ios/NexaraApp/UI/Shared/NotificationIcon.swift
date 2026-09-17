@@ -34,6 +34,11 @@ enum NotificationIcon {
         case "atraso": return "hourglass"
         case "vencida": return "exclamationmark.triangle"
         case "fuera_zona": return "location.slash"
+        case "cancelada": return "xmark.circle.fill"
+        case "falta_justificada": return "checkmark.seal.fill"
+        case "cliente": return "building.2.fill"
+        case "cumpleanos": return "birthday.cake.fill"
+        case "aniversario": return "party.popper.fill"
         case "chat": return "bubble.left.and.bubble.right"
         case "mencion": return "at"
         case "seguridad": return "lock.shield"
@@ -55,6 +60,10 @@ enum NotificationIcon {
         case "ACTIVITY_STARTED": return "play.circle"
         case "ACTIVITY_RESCHEDULED": return "calendar.badge.clock"
         case "ACTIVITY_OUT_OF_ZONE": return "location.slash"
+        case "ACTIVITY_CANCELLED": return "xmark.circle.fill"
+        case "SALES_CLIENT_CREATED": return "building.2.fill"
+        case "BIRTHDAY": return "birthday.cake.fill"
+        case "WORK_ANNIVERSARY": return "party.popper.fill"
         case "ACTIVITY_COMPLETED", "PROJECT_COMPLETED": return "flag.checkered"
         case "ACTIVITY_APPROVED", "EVIDENCE_APPROVED": return "checkmark.seal"
         case "ACTIVITY_REJECTED", "EVIDENCE_REJECTED": return "arrow.uturn.left"
@@ -100,6 +109,7 @@ enum NotificationIcon {
         case "chat": return "bubble.left.and.bubble.right"
         case "profile": return "person.crop.circle"
         case "confirmations": return "checkmark.circle"
+        case "celebraciones": return "birthday.cake.fill"
         default: return "bell"
         }
     }
@@ -118,17 +128,28 @@ enum NotificationIcon {
         return Self.symbol(forType: notification["type"] as? String, category: notification["category"] as? String)
     }
 
-    /// Color del icono: semántico para aprobado / avisos / errores, marca para lo demás.
+    /// Colores de fiesta para cumpleaños y aniversarios.
+    static let birthdayPink = Color(red: 0.925, green: 0.282, blue: 0.600)  // #ec4899
+    static let anniversaryViolet = CorePalette.purple
+
+    /// Color del icono: semántico para aprobado / avisos / errores, festivo para
+    /// celebraciones, marca para lo demás.
     static func tint(forSymbol symbol: String) -> Color {
         switch symbol {
-        case "checkmark.seal", "checkmark.circle", "flag.checkered":
+        case "checkmark.seal", "checkmark.circle", "flag.checkered", "checkmark.seal.fill":
             return CorePalette.green
         case "hourglass", "clock.badge.exclamationmark", "exclamationmark.triangle",
              "arrow.uturn.backward", "arrow.uturn.left", "person.crop.circle.badge.exclamationmark",
              "chart.line.downtrend.xyaxis":
             return CorePalette.orange
-        case "xmark.circle", "lock.shield", "location.slash":
+        case "xmark.circle", "xmark.circle.fill", "lock.shield", "location.slash":
             return CorePalette.red
+        case "birthday.cake.fill":
+            return birthdayPink
+        case "party.popper.fill":
+            return anniversaryViolet
+        case "building.2.fill":
+            return CorePalette.blue
         default:
             return NxBrand.primary
         }

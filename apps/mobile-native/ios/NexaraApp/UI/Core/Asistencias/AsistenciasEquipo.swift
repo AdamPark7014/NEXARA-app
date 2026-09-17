@@ -1,17 +1,35 @@
 import SwiftUI
 
+/// Persona y día a justificar.
+private struct AttendanceJustifyTarget: Identifiable {
+    let userId: Int
+    let nombre: String
+    /// `AAAA-MM-DD`.
+    let fecha: String
+
+    var id: String { "\(userId)-\(fecha)" }
+}
+
 /// «Equipo del día»: KPIs, filtros y una tarjeta por persona con sus horas,
 /// sus fotos de entrada/salida y sus mapas. Espejo de la pestaña `equipo` de
-/// `apps/web/app/(panels)/erp/asistencias/page.tsx`.
+/// `apps/web/app/(panels)/erp/asistencias/page.tsx`. Las faltas justificadas se
+/// ven como «Falta justificada · motivo» y solo Christian ve «Justificar falta».
 struct AsistenciasEquipoSection: View {
     @ObservedObject var vm: AttendanceVM
     let onPhoto: (CorePhotoItem) -> Void
+
+    @State private var justificar: AttendanceJustifyTarget?
+    @State private var justifyNotice: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             kpis
             productividad
             chips
+            if let justifyNotice {
+                NxIconText(systemName: "checkmark.seal.fill", text: justifyNotice, tint: CorePalette.purple)
+                    .font(.footnote.weight(.semibold))
+            }
             if let error = vm.teamError {
                 NxAlertBanner(
                     alert: NxAlert(id: "att-team", title: "No se pudo cargar el equipo", subtitle: error, tone: .danger),
@@ -35,8 +53,29 @@ struct AsistenciasEquipoSection: View {
                 )
             } else {
                 ForEach(vm.filteredRows) { row in
-                    AttendancePersonCard(row: row, onPhoto: onPhoto)
+                    AttendancePersonCard(
+                        row: row,
+                        canJustify: vm.canJustifyAbsence,
+                        onPhoto: onPhoto,
+                        onJustify: {
+                            justifyNotice = nil
+                            justificar = AttendanceJustifyTarget(
+                                userId: row.member.userId,
+                                nombre: row.member.displayName,
+                                fecha: vm.dateString
+                            )
+                        }
+                    )
                 }
+            }
+        }
+        .sheet(item: $justificar) { target in
+            AttendanceJustifySheet(target: target) { motivo in
+                let error = await vm.justifyAbsence(userId: target.userId, fecha: target.fecha, motivo: motivo)
+                if error == nil {
+                    justifyNotice = "Falta de \(CoreFormat.shortName(target.nombre)) justificada."
+                }
+                return error
             }
         }
     }
@@ -86,6 +125,9 @@ struct AsistenciasEquipoSection: View {
                 filterChip(nil, label: "Todos", count: vm.counts.total)
                 filterChip(.presente, label: AttendanceEstado.presente.label, count: vm.counts.presentes)
                 filterChip(.completo, label: AttendanceEstado.completo.label, count: vm.counts.completos)
+                if vm.justificadas > 0 || vm.canJustifyAbsence {
+                    filterChip(.justificada, label: AttendanceEstado.justificada.label, count: vm.justificadas)
+                }
                 filterChip(.ausente, label: AttendanceEstado.ausente.label, count: vm.counts.ausentes)
             }
             .padding(.vertical, 2)
@@ -153,7 +195,9 @@ private struct AttendanceKpiTile: View {
 /// Tarjeta de una persona: horas, fotos con su etiqueta y mapas.
 private struct AttendancePersonCard: View {
     let row: AttendanceDayRow
+    let canJustify: Bool
     let onPhoto: (CorePhotoItem) -> Void
+    let onJustify: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -166,10 +210,44 @@ private struct AttendancePersonCard: View {
             }
             .buttonStyle(.plain)
             horas
+            if let falta = row.justification {
+                faltaJustificada(falta)
+            }
+            if row.estado == .ausente && canJustify {
+                HStack {
+                    Spacer()
+                    Button(action: onJustify) {
+                        Label("Justificar falta", systemImage: "checkmark.seal")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(CorePalette.purple)
+                    .font(.caption.weight(.semibold))
+                }
+            }
             fotos
             mapas
         }
         .coreCard(highlight: row.estado == .presente ? CorePalette.green : nil)
+    }
+
+    /// «Falta justificada · motivo», quién y cuándo (no es checada ni suma horas).
+    private func faltaJustificada(_ falta: AttendanceJustification) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "checkmark.seal.fill")
+                .foregroundStyle(CorePalette.purple)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(falta.texto)
+                    .font(.footnote.weight(.semibold))
+                Text(falta.detalle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(CorePalette.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var header: some View {
@@ -205,7 +283,7 @@ private struct AttendancePersonCard: View {
                     Text(row.estado == .presente ? "EN VIVO" : row.estado == .completo ? "JORNADA" : "TIEMPO")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text(row.estado == .ausente
+                    Text(row.estado == .ausente || row.estado == .justificada
                          ? "—"
                          : AttendanceClock.hms(row.elapsed(now: context.date)))
                         .font(.system(.body, design: .monospaced).weight(.heavy))
@@ -281,6 +359,94 @@ private struct AttendancePersonCard: View {
                 if let entrada { Link("Mapa entrada", destination: entrada).font(.caption.weight(.semibold)) }
                 if let salida { Link("Mapa salida", destination: salida).font(.caption.weight(.semibold)) }
             }
+        }
+    }
+}
+
+/// «Justificar falta» (solo Christian): motivo de al menos 10 caracteres. No crea checadas.
+private struct AttendanceJustifySheet: View {
+    let target: AttendanceJustifyTarget
+    /// Devuelve el error legible, o `nil` si quedó justificada.
+    let onSubmit: (String) async -> String?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var motivo = ""
+    @State private var saving = false
+    @State private var error: String?
+
+    private var limpio: String { motivo.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var minimo: Int { AttendanceJustification.motivoMinimo }
+    private var motivoOk: Bool { limpio.count >= minimo }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(target.nombre).font(.headline)
+                    NxIconText(systemName: "calendar", text: AttendanceJustification.diaCorto(target.fecha))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text("El día quedará como «Falta justificada» con tu motivo; no se crea ninguna checada. Se avisa a la persona y a sus jefes.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    TextField("Ej. Cita médica con comprobante del IMSS.", text: $motivo, axis: .vertical)
+                        .lineLimit(3...6)
+                        .disabled(saving)
+                } header: {
+                    Text("Motivo")
+                } footer: {
+                    CoreMotivoCounter(count: limpio.count, minimo: minimo)
+                }
+
+                if let error {
+                    Section {
+                        Text(error).foregroundStyle(CorePalette.red)
+                    }
+                }
+
+                Section {
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        Label(saving ? "Guardando…" : "Justificar falta", systemImage: "checkmark.seal")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(saving || !motivoOk)
+                }
+            }
+            .navigationTitle("Justificar falta")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                        .disabled(saving)
+                }
+            }
+            .interactiveDismissDisabled(saving)
+            .onChange(of: motivo) { _, value in
+                if value.count > AttendanceJustification.motivoMaximo {
+                    motivo = String(value.prefix(AttendanceJustification.motivoMaximo))
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard motivoOk else {
+            error = "Escribe el motivo de la falta justificada (mínimo \(minimo) caracteres)"
+            return
+        }
+        saving = true
+        error = nil
+        defer { saving = false }
+        if let failure = await onSubmit(limpio) {
+            error = failure
+        } else {
+            dismiss()
         }
     }
 }

@@ -127,6 +127,10 @@ struct EvidenceCaptureFlowView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                 }
+                // Se la pasaron: lo que dejó quien la tenía, solo para consulta.
+                ForEach(flow?.previousProgress ?? []) { item in
+                    ActivityPreviousProgressCard(item: item, coreKind: coreKind)
+                }
                 ForEach(Array(steps.enumerated()), id: \.element) { index, step in
                     stepCard(step, number: index + 1)
                 }

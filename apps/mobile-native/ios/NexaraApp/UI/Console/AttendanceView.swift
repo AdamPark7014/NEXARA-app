@@ -28,6 +28,8 @@ struct AttendanceDayRow: Identifiable {
     let checkOut: String?
     let entryPunch: AttendancePunch?
     let exitPunch: AttendancePunch?
+    /// Falta justificada del día que se está viendo.
+    let justification: AttendanceJustification?
     let isMe: Bool
 
     var id: Int { member.userId }
@@ -58,6 +60,8 @@ final class AttendanceVM: ObservableObject {
     @Published var mineError: String?
     @Published var checkInLoading = false
     @Published var checkInNotice: String?
+    /// Mis faltas justificadas de los últimos 30 días (`attendance/range`).
+    @Published var myJustifications: [AttendanceJustification] = []
 
     // Trayectoria
     @Published var teamGps: [GpsTeamLocation] = []
@@ -73,6 +77,8 @@ final class AttendanceVM: ObservableObject {
     var canRegisterSelf: Bool { mode.canRegisterSelf }
     var canManageTeam: Bool { mode.canManageTeam }
     var canLiveGps: Bool { AsistenciasAccess.canLiveGps(user) }
+    /// «Justificar falta»: solo Christian (y su equivalente); el API lo vuelve a exigir.
+    var canJustifyAbsence: Bool { CoreOrg.isCeo(user?.email) }
     var dateString: String { AttendanceClock.dayString(date) }
     var isToday: Bool { AttendanceClock.isToday(date) }
 
@@ -89,6 +95,7 @@ final class AttendanceVM: ObservableObject {
             let entry = member.latest("entrada")
             let exit = member.latest("salida")
             let info = member.day(day)
+            let falta = member.justification(day)
             let estado: AttendanceEstado
             if info?.isOpen == true {
                 estado = .presente
@@ -96,6 +103,8 @@ final class AttendanceVM: ObservableObject {
                 estado = .completo
             } else if entry != nil {
                 estado = .presente
+            } else if falta != nil {
+                estado = .justificada
             } else {
                 estado = .ausente
             }
@@ -106,6 +115,7 @@ final class AttendanceVM: ObservableObject {
                 checkOut: exit?.timestamp,
                 entryPunch: entry,
                 exitPunch: exit,
+                justification: falta,
                 isMe: me != nil && me == member.userId
             )
         }
@@ -129,6 +139,11 @@ final class AttendanceVM: ObservableObject {
             all.filter { $0.estado == .completo }.count,
             all.filter { $0.estado == .ausente }.count
         )
+    }
+
+    /// Aparte de `counts`: una falta justificada no es «Sin checada».
+    var justificadas: Int {
+        rows.filter { $0.estado == .justificada }.count
     }
 
     func productividad(now: Date) -> TimeInterval {
@@ -160,6 +175,9 @@ final class AttendanceVM: ObservableObject {
     var statusLabel: String {
         if hasEntryToday && hasExitToday && !isOpen { return "Completada" }
         if isOpen { return openedOnAnotherDay ? "Abierta (día anterior)" : "En jornada" }
+        if !hasEntryToday && myJustifications.contains(where: { $0.fecha == AttendanceClock.dayString(Date()) }) {
+            return AttendanceEstado.justificada.label
+        }
         return "Sin checada"
     }
 
@@ -222,6 +240,30 @@ final class AttendanceVM: ObservableObject {
         }
     }
 
+    /// Mis faltas justificadas de los últimos 30 días. Si falla, se queda lo que había.
+    func loadMyJustifications() async {
+        guard canRegisterSelf else { return }
+        let today = Date()
+        let from = Calendar.current.date(byAdding: .day, value: -30, to: today) ?? today
+        if let list = try? await AsistenciasRepository.shared.myJustifications(
+            from: AttendanceClock.dayString(from),
+            to: AttendanceClock.dayString(today)
+        ) {
+            myJustifications = list
+        }
+    }
+
+    /// `POST attendance/justificaciones` y recarga del equipo. Devuelve el error legible o `nil`.
+    func justifyAbsence(userId: Int, fecha: String, motivo: String) async -> String? {
+        do {
+            try await AsistenciasRepository.shared.justifyAbsence(userId: userId, fecha: fecha, motivo: motivo)
+            await loadTeam(quiet: true)
+            return nil
+        } catch {
+            return error.toUserMessage(fallback: "No se pudo justificar la falta")
+        }
+    }
+
     func loadTrajectory() async {
         guard canLiveGps else { return }
         trajectoryLoading = true
@@ -250,6 +292,8 @@ final class AttendanceVM: ObservableObject {
         switch tab {
         case .equipo:
             await loadMine()
+            // El refresco de fondo (cada 15 s) no vuelve a pedir el mes entero.
+            if !quiet { await loadMyJustifications() }
             await loadTeam(quiet: quiet)
         case .comidas:
             break
