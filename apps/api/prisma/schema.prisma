@@ -124,10 +124,67 @@ enum WorkProjectStatus {
   COMPLETED
 }
 
+/// Estado del proyecto operativo.
+///
+/// `ACTIVE` («En curso»), `ON_HOLD` («En pausa») y `COMPLETED` («Terminado») son los tres
+/// con los que nació el enum y hay proyectos vivos con ellos. Se suman `PLANNED`
+/// («Planeado»: aprobado pero sin arrancar) y `CANCELLED` («Cancelado»), que antes no se
+/// podían expresar y obligaban a dejar en pausa lo que en realidad se había caído.
+/// La traducción al español vive en `projects/proyecto-estado.ts`.
 enum OperationalProjectStatus {
   ACTIVE
   ON_HOLD
   COMPLETED
+  PLANNED
+  CANCELLED
+}
+
+/// Estado de una etapa/hito del cronograma. El retraso **no** se guarda: se calcula
+/// comparando `plannedDate` contra hoy (`projects/proyecto-salud.ts`), para que el
+/// tablero no pueda mentir por un campo que nadie actualizó.
+enum ProjectMilestoneStatus {
+  PENDIENTE
+  EN_CURSO
+  CUMPLIDO
+  CANCELADO
+}
+
+/// Las tres caras del alcance, con el mismo vocabulario que la cotización:
+/// lo que sí entra (entregable), lo que explícitamente no (exclusión) y de qué
+/// se parte para poder cumplir (supuesto).
+enum ProjectScopeItemKind {
+  ENTREGABLE
+  EXCLUSION
+  SUPUESTO
+}
+
+/// Estado de cada requerimiento del checklist.
+enum ProjectRequirementStatus {
+  PENDIENTE
+  EN_PROCESO
+  CUMPLIDO
+  NO_APLICA
+}
+
+/// Papel de cada persona dentro del proyecto. `RESPONSABLE` es el dueño del proyecto
+/// (se refleja en `OperationalProject.responsableId`); el resto participa.
+enum ProjectMemberRole {
+  RESPONSABLE
+  COORDINADOR
+  INGENIERO
+  INSTALADOR
+  ADMINISTRATIVO
+  APOYO
+}
+
+/// Tipo de documento adjunto al proyecto.
+enum ProjectDocumentKind {
+  PLANO
+  ACTA
+  CONTRATO
+  MINUTA
+  REPORTE
+  OTRO
 }
 
 enum ServiceProjectType {
@@ -155,39 +212,178 @@ enum ActivityType {
   CLIENT
 }
 
+/// Proyecto operativo: la obra que se entrega al cliente.
+///
+/// Las fechas son dos pares y no se mezclan, porque de eso depende poder decir «va
+/// retrasado» sin discutirlo: `startDate`/`endDate` son el **plan** (lo que se prometió) y
+/// `actualStartDate`/`actualEndDate` son lo **real** (lo que pasó). El avance y la salud no
+/// se guardan: se calculan a partir de las actividades y del cronograma en
+/// `projects/proyecto-salud.ts`.
 model OperationalProject {
   id             Int                      @id @default(autoincrement())
   title          String                   @db.VarChar(220)
   description    String?
   projectType    ServiceProjectType       @default(OTRO)
+  /// Resumen del alcance en una frase. El detalle vive en `scopeItems`.
   scopeSummary   String?
+  /// 01 Objetivo del proyecto: para qué se hace, en el lenguaje del cliente.
+  objective      String?                  @db.Text
   siteCount      Int?
   /// Vínculo 1:1 con el proyecto comercial (CRM). Misma entrega, dos facetas.
   salesProjectId Int?                     @unique
   status         OperationalProjectStatus @default(ACTIVE)
   vendorId       Int
+  /// Dueño del proyecto (a quién se le pregunta). Puede no ser quien lo vendió.
+  responsableId  Int?
   clientId       Int
   companyId      Int
+  /// Inicio **planeado**.
   startDate      DateTime
+  /// Fin **planeado** (contra el que se mide el retraso).
   endDate        DateTime?
+  /// Inicio **real**: el día que de verdad arrancó.
+  actualStartDate DateTime?
+  /// Fin **real**: el día que de verdad se entregó.
   actualEndDate  DateTime?
+  /// Presupuesto autorizado. Sin facturación: esto solo enmarca el proyecto.
+  budgetAmount   Decimal?                 @db.Decimal(12, 2)
+  currency       String                   @default("MXN") @db.VarChar(10)
+  /// Cotización que dio origen al proyecto, si la hubo: de ahí sale el alcance.
+  cotizacionId   Int?
+  /// Por qué se canceló (solo con `status = CANCELLED`).
+  cancelReason   String?                  @db.VarChar(500)
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
   deletedAt      DateTime?
 
   vendor              User                 @relation("ProjectVendor", fields: [vendorId], references: [id])
+  responsable         User?                @relation("ProjectResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
   client              ServiceClient        @relation(fields: [clientId], references: [id])
   company             CompanyProfile       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   salesProject        SalesProject?        @relation("SalesOperationalHandoff", fields: [salesProjectId], references: [id], onDelete: SetNull)
+  cotizacion          Cotizacion?          @relation("CotizacionProyecto", fields: [cotizacionId], references: [id], onDelete: SetNull)
   engineers           ProjectEngineer[]
+  members             ProjectMember[]
+  milestones          ProjectMilestone[]
+  scopeItems          ProjectScopeItem[]
+  requirements        ProjectRequirement[]
+  documents           ProjectDocument[]
   activities          Activity[]
   maintenanceContract MaintenanceContract? @relation("MaintenanceContractProject")
 
   @@index([vendorId])
+  @@index([responsableId])
   @@index([clientId])
   @@index([companyId])
   @@index([status])
+  @@index([cotizacionId])
   @@map("operational_projects")
+}
+
+/// Etapa o hito del cronograma: una fila del «cuándo» con nombre y dueño.
+model ProjectMilestone {
+  id            Int                    @id @default(autoincrement())
+  projectId     Int
+  name          String                 @db.VarChar(200)
+  description   String?                @db.Text
+  /// Orden en el cronograma (no las fechas: un hito sin fecha también ocupa su lugar).
+  orden         Int                    @default(0)
+  plannedDate   DateTime?
+  actualDate    DateTime?
+  responsableId Int?
+  status        ProjectMilestoneStatus @default(PENDIENTE)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  project     OperationalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  responsable User?              @relation("ProjectMilestoneResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([responsableId])
+  @@map("project_milestones")
+}
+
+/// Renglón de alcance: entregable, exclusión o supuesto.
+model ProjectScopeItem {
+  id        Int                  @id @default(autoincrement())
+  projectId Int
+  kind      ProjectScopeItemKind @default(ENTREGABLE)
+  titulo    String               @db.VarChar(240)
+  detalle   String?              @db.Text
+  orden     Int                  @default(0)
+  /// Clave del bloque de alcance de la cotización que lo originó (`paquete:<clave>`),
+  /// para no duplicarlo si la cotización se vuelve a volcar.
+  origenClave String?            @db.VarChar(80)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  project OperationalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([projectId, kind])
+  @@map("project_scope_items")
+}
+
+/// Requerimiento del proyecto: lo que hace falta para poder entregar, con dueño y estado.
+model ProjectRequirement {
+  id            Int                      @id @default(autoincrement())
+  projectId     Int
+  titulo        String                   @db.VarChar(240)
+  detalle       String?                  @db.Text
+  orden         Int                      @default(0)
+  responsableId Int?
+  status        ProjectRequirementStatus @default(PENDIENTE)
+  dueDate       DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  project     OperationalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  responsable User?              @relation("ProjectRequirementResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([responsableId])
+  @@map("project_requirements")
+}
+
+/// Persona del equipo con su papel. Sustituye a `ProjectEngineer`, que se conserva
+/// para no romper lo que ya lo lee; al migrar, cada ingeniero asignado entra aquí
+/// como `INGENIERO`.
+model ProjectMember {
+  id         Int               @id @default(autoincrement())
+  projectId  Int
+  userId     Int
+  role       ProjectMemberRole @default(APOYO)
+  notas      String?           @db.VarChar(300)
+  assignedAt DateTime          @default(now())
+
+  project OperationalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User               @relation("ProjectMembers", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+/// Documento del proyecto (planos, actas, minutas). El archivo se sube por la misma
+/// ruta que el resto de la app y aquí se guarda su URL.
+model ProjectDocument {
+  id            Int                 @id @default(autoincrement())
+  projectId     Int
+  kind          ProjectDocumentKind @default(OTRO)
+  nombre        String              @db.VarChar(220)
+  fileUrl       String              @db.VarChar(500)
+  mimeType      String?             @db.VarChar(120)
+  fileSizeBytes Int?
+  uploadedById  Int?
+  createdAt     DateTime            @default(now())
+
+  project    OperationalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy User?              @relation("ProjectDocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@map("project_documents")
 }
 
 model ProjectEngineer {
@@ -702,8 +898,13 @@ model User {
   internalComunicadosSent InternalComunicado[] @relation("ComunicadoAuthor")
 
   // === Operational Project Relations ===
-  projectsAsVendor OperationalProject[] @relation("ProjectVendor")
-  projectEngineers ProjectEngineer[]    @relation("ProjectEngineers")
+  projectsAsVendor      OperationalProject[] @relation("ProjectVendor")
+  projectsAsResponsable OperationalProject[] @relation("ProjectResponsable")
+  projectEngineers      ProjectEngineer[]    @relation("ProjectEngineers")
+  projectMemberships    ProjectMember[]      @relation("ProjectMembers")
+  projectMilestones     ProjectMilestone[]   @relation("ProjectMilestoneResponsable")
+  projectRequirements   ProjectRequirement[] @relation("ProjectRequirementResponsable")
+  projectDocuments      ProjectDocument[]    @relation("ProjectDocumentUploader")
 
   geofenceAlerts          ActivityGeofenceAlert[] @relation("GeofenceAlertUser")
   evidenceFieldPhotos     ActivityEvidenceFieldPhoto[] @relation("EvidenceFieldPhotoAuthor")
@@ -1898,6 +2099,8 @@ model Cotizacion {
   participantes   CotizacionParticipante[]
   /// Actividades comerciales ligadas a esta cotización (su evidencia son sus anexos).
   actividades     Activity[]                @relation("ActividadCotizacion")
+  /// Proyectos operativos que nacieron de esta cotización: su alcance es el mismo.
+  proyectos       OperationalProject[]      @relation("CotizacionProyecto")
 
   @@unique([companyId, quoteNumber])
   @@index([salesClientId])

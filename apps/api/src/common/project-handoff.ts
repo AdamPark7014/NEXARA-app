@@ -17,6 +17,7 @@ export function salesStatusToOps(status: SalesProjectStatus | string): Operation
     case 'CLOSED':
       return 'COMPLETED';
     case 'PLANNED':
+      return 'PLANNED';
     case 'IN_PROGRESS':
     default:
       return 'ACTIVE';
@@ -29,6 +30,12 @@ export function opsStatusToSales(status: OperationalProjectStatus | string): Sal
       return 'ON_HOLD';
     case 'COMPLETED':
       return 'CLOSED';
+    // Un proyecto cancelado en campo también está cerrado para CRM: lo que no hay
+    // en `SalesProjectStatus` es un «cancelado», y no se inventa aquí.
+    case 'CANCELLED':
+      return 'CLOSED';
+    case 'PLANNED':
+      return 'PLANNED';
     case 'ACTIVE':
     default:
       return 'IN_PROGRESS';
