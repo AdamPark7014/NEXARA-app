@@ -1,0 +1,245 @@
+{
+ "messages": [
+  {
+   "id": 7001,
+   "channelId": 201,
+   "authorId": 1,
+   "parentId": null,
+   "kind": "TEXT",
+   "body": "Buenos días equipo. Hoy la prioridad es el Corporativo Atlixco y la bodega norte.",
+   "attachmentUrl": null,
+   "attachmentName": null,
+   "pinnedAt": null,
+   "editedAt": null,
+   "createdAt": "2026-09-17T02:29:50.000Z",
+   "author": {
+    "id": 1,
+    "nombre": "Tú",
+    "email": "direccion@demo.nexara.mx",
+    "avatarUrl": null
+   },
+   "replyCount": 0,
+   "reactions": [
+    {
+     "emoji": "👍",
+     "count": 3,
+     "userIds": [
+      901,
+      902,
+      904
+     ],
+     "users": [
+      {
+       "id": 901,
+       "nombre": "Mariana López Herrera",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T02:30:50.000Z"
+      },
+      {
+       "id": 902,
+       "nombre": "Diego Ramírez Soto",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T02:31:50.000Z"
+      },
+      {
+       "id": 904,
+       "nombre": "Javier Morales Ortega",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T02:34:50.000Z"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 7002,
+   "channelId": 201,
+   "authorId": 901,
+   "parentId": null,
+   "kind": "TEXT",
+   "body": "Enterada. Ya estoy en sitio con Diego, empezamos por el estacionamiento.",
+   "attachmentUrl": null,
+   "attachmentName": null,
+   "pinnedAt": null,
+   "editedAt": null,
+   "createdAt": "2026-09-17T02:36:50.000Z",
+   "author": {
+    "id": 901,
+    "nombre": "Mariana López Herrera",
+    "email": "mariana.lopez@demo.nexara.mx",
+    "avatarUrl": null
+   },
+   "replyCount": 0,
+   "reactions": []
+  },
+  {
+   "id": 7003,
+   "channelId": 201,
+   "authorId": 904,
+   "parentId": null,
+   "kind": "TEXT",
+   "body": "Voy retrasado con el cableado de la bodega, falta material para el rack. ¿Alguien tiene 2 patch panel?",
+   "attachmentUrl": null,
+   "attachmentName": null,
+   "pinnedAt": null,
+   "editedAt": null,
+   "createdAt": "2026-09-17T04:14:50.000Z",
+   "author": {
+    "id": 904,
+    "nombre": "Javier Morales Ortega",
+    "email": "javier.morales@demo.nexara.mx",
+    "avatarUrl": null
+   },
+   "replyCount": 0,
+   "reactions": []
+  },
+  {
+   "id": 7004,
+   "channelId": 201,
+   "authorId": 908,
+   "parentId": null,
+   "kind": "TEXT",
+   "body": "Yo llevo dos en la camioneta, te los paso a las 12.",
+   "attachmentUrl": null,
+   "attachmentName": null,
+   "pinnedAt": null,
+   "editedAt": null,
+   "createdAt": "2026-09-17T04:22:50.000Z",
+   "author": {
+    "id": 908,
+    "nombre": "Luis Fernando Torres",
+    "email": "luis.torres@demo.nexara.mx",
+    "avatarUrl": null
+   },
+   "replyCount": 0,
+   "reactions": [
+    {
+     "emoji": "🙌",
+     "count": 1,
+     "userIds": [
+      904
+     ],
+     "users": [
+      {
+       "id": 904,
+       "nombre": "Javier Morales Ortega",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T04:24:50.000Z"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 7005,
+   "channelId": 201,
+   "authorId": 905,
+   "parentId": null,
+   "kind": "TEXT",
+   "body": "Terminé el levantamiento del Colegio Montebello, subo fotos en un momento.",
+   "attachmentUrl": null,
+   "attachmentName": null,
+   "pinnedAt": null,
+   "editedAt": null,
+   "createdAt": "2026-09-17T05:04:50.000Z",
+   "author": {
+    "id": 905,
+    "nombre": "Sofía Martínez Ruiz",
+    "email": "sofia.martinez@demo.nexara.mx",
+    "avatarUrl": null
+   },
+   "replyCount": 0,
+   "reactions": [
+    {
+     "emoji": "👏",
+     "count": 2,
+     "userIds": [
+      901,
+      907
+     ],
+     "users": [
+      {
+       "id": 901,
+       "nombre": "Mariana López Herrera",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T05:06:50.000Z"
+      },
+      {
+       "id": 907,
+       "nombre": "Paola Jiménez Castro",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T05:09:50.000Z"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": 7006,
+   "channelId": 201,
+   "authorId": 901,
+   "parentId": null,
+   "kind": "TEXT",
+   "body": "Listo, ya quedó la cámara del acceso principal. Van 5 de 8.",
+   "attachmentUrl": null,
+   "attachmentName": null,
+   "pinnedAt": null,
+   "editedAt": null,
+   "createdAt": "2026-09-17T05:28:50.000Z",
+   "author": {
+    "id": 901,
+    "nombre": "Mariana López Herrera",
+    "email": "mariana.lopez@demo.nexara.mx",
+    "avatarUrl": null
+   },
+   "replyCount": 0,
+   "reactions": [
+    {
+     "emoji": "🔥",
+     "count": 3,
+     "userIds": [
+      1,
+      902,
+      905
+     ],
+     "users": [
+      {
+       "id": 1,
+       "nombre": "Tú",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T05:29:50.000Z"
+      },
+      {
+       "id": 902,
+       "nombre": "Diego Ramírez Soto",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T05:30:50.000Z"
+      },
+      {
+       "id": 905,
+       "nombre": "Sofía Martínez Ruiz",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T05:31:50.000Z"
+      }
+     ]
+    },
+    {
+     "emoji": "👍",
+     "count": 1,
+     "userIds": [
+      908
+     ],
+     "users": [
+      {
+       "id": 908,
+       "nombre": "Luis Fernando Torres",
+       "avatarUrl": null,
+       "reactedAt": "2026-09-17T05:32:50.000Z"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "hasMore": false
+}

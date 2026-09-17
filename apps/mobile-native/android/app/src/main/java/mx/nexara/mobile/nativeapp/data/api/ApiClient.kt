@@ -69,6 +69,7 @@ object ApiClient {
             .connectTimeout(18, TimeUnit.SECONDS)
             .readTimeout(22, TimeUnit.SECONDS)
             .writeTimeout(22, TimeUnit.SECONDS)
+            .apply { ApiDebugHooks.interceptors.forEach { addInterceptor(it) } }
             .addInterceptor { chain ->
                 val original = chain.request()
                 // La identidad del dispositivo va en TODAS las peticiones,

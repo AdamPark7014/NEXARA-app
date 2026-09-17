@@ -1,0 +1,25 @@
+{
+ "id": 907,
+ "nombre": "Paola Jiménez Castro",
+ "email": "paola.jimenez@demo.nexara.mx",
+ "avatarUrl": null,
+ "puesto": "Coordinadora Administrativa",
+ "status": "libre",
+ "currentActivity": null,
+ "openActivities": [],
+ "clockInAt": "2026-09-17T01:54:50.000Z",
+ "workedMinutes": 220,
+ "activityStartedAt": null,
+ "activityElapsedMinutes": null,
+ "currentLateMinutes": null,
+ "idleSinceAt": "2026-09-17T04:19:50.000Z",
+ "lastFinished": {
+  "id": 5147,
+  "anNumber": null,
+  "titulo": "Alta de expediente · Colegio Montebello",
+  "finishedAt": "2026-09-17T04:19:50.000Z",
+  "lateMinutes": null
+ },
+ "enEsperaAprobacion": 1,
+ "enCorreccion": 0
+}

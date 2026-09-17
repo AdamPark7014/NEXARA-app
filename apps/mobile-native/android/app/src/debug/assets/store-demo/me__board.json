@@ -1,0 +1,294 @@
+{
+ "scope": "company",
+ "users": [
+  {
+   "id": 902,
+   "nombre": "Diego Ramírez Soto",
+   "email": "diego.ramirez@demo.nexara.mx",
+   "avatarUrl": null,
+   "puesto": "Ingeniero de Campo",
+   "status": "activo",
+   "currentActivity": {
+    "id": 5143,
+    "anNumber": null,
+    "titulo": "Mantenimiento preventivo CCTV · Hotel Casa Azul",
+    "estatus": "En Proceso",
+    "fechaMaxima": "2026-09-17T07:34:50.000Z",
+    "bucket": "services"
+   },
+   "openActivities": [
+    {
+     "id": 5143,
+     "anNumber": null,
+     "titulo": "Mantenimiento preventivo CCTV · Hotel Casa Azul",
+     "estatus": "En Proceso",
+     "evidenceStatus": "EVIDENCE_PHOTOS",
+     "progressPct": 40,
+     "coreKind": "servicio",
+     "assignmentCharge": "ejecucion",
+     "fechaFinalizacion": null,
+     "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+     "teamEmails": [
+      "diego.ramirez@demo.nexara.mx"
+     ],
+     "reparte": false,
+     "fechaInicio": "2026-09-17T03:59:50.000Z"
+    }
+   ],
+   "clockInAt": "2026-09-17T02:46:50.000Z",
+   "workedMinutes": 168,
+   "activityStartedAt": "2026-09-17T03:59:50.000Z",
+   "activityElapsedMinutes": 95,
+   "currentLateMinutes": null,
+   "idleSinceAt": null,
+   "lastFinished": null,
+   "enEsperaAprobacion": 0,
+   "enCorreccion": 0
+  },
+  {
+   "id": 908,
+   "nombre": "Luis Fernando Torres",
+   "email": "luis.torres@demo.nexara.mx",
+   "avatarUrl": null,
+   "puesto": "Ingeniero de Redes",
+   "status": "activo",
+   "currentActivity": {
+    "id": 5148,
+    "anNumber": null,
+    "titulo": "Configuración de red y NVR · Grupo Textil del Valle",
+    "estatus": "En Proceso",
+    "fechaMaxima": "2026-09-17T10:34:50.000Z",
+    "bucket": "services"
+   },
+   "openActivities": [
+    {
+     "id": 5148,
+     "anNumber": null,
+     "titulo": "Configuración de red y NVR · Grupo Textil del Valle",
+     "estatus": "En Proceso",
+     "evidenceStatus": "SERVICE_SHEET_PDF",
+     "progressPct": 50,
+     "coreKind": "servicio",
+     "assignmentCharge": "ejecucion",
+     "fechaFinalizacion": null,
+     "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+     "teamEmails": [
+      "luis.torres@demo.nexara.mx"
+     ],
+     "reparte": false,
+     "fechaInicio": "2026-09-17T04:29:50.000Z"
+    }
+   ],
+   "clockInAt": "2026-09-17T02:39:50.000Z",
+   "workedMinutes": 175,
+   "activityStartedAt": "2026-09-17T04:29:50.000Z",
+   "activityElapsedMinutes": 65,
+   "currentLateMinutes": null,
+   "idleSinceAt": null,
+   "lastFinished": null,
+   "enEsperaAprobacion": 0,
+   "enCorreccion": 0
+  },
+  {
+   "id": 901,
+   "nombre": "Mariana López Herrera",
+   "email": "mariana.lopez@demo.nexara.mx",
+   "avatarUrl": null,
+   "puesto": "Coordinadora de Operaciones",
+   "status": "activo",
+   "currentActivity": {
+    "id": 5142,
+    "anNumber": null,
+    "titulo": "Instalación de 8 cámaras IP · Corporativo Atlixco",
+    "estatus": "En Proceso",
+    "fechaMaxima": "2026-09-17T08:34:50.000Z",
+    "bucket": "projects"
+   },
+   "openActivities": [
+    {
+     "id": 5142,
+     "anNumber": null,
+     "titulo": "Instalación de 8 cámaras IP · Corporativo Atlixco",
+     "estatus": "En Proceso",
+     "evidenceStatus": "EVIDENCE_PHOTOS",
+     "progressPct": 65,
+     "coreKind": "proyecto",
+     "assignmentCharge": "ejecucion",
+     "fechaFinalizacion": null,
+     "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+     "teamEmails": [
+      "mariana.lopez@demo.nexara.mx"
+     ],
+     "reparte": false,
+     "fechaInicio": "2026-09-17T03:24:50.000Z"
+    }
+   ],
+   "clockInAt": "2026-09-17T02:32:50.000Z",
+   "workedMinutes": 182,
+   "activityStartedAt": "2026-09-17T03:24:50.000Z",
+   "activityElapsedMinutes": 130,
+   "currentLateMinutes": null,
+   "idleSinceAt": null,
+   "lastFinished": null,
+   "enEsperaAprobacion": 0,
+   "enCorreccion": 0
+  },
+  {
+   "id": 905,
+   "nombre": "Sofía Martínez Ruiz",
+   "email": "sofia.martinez@demo.nexara.mx",
+   "avatarUrl": null,
+   "puesto": "Diseñadora de Proyectos",
+   "status": "activo",
+   "currentActivity": {
+    "id": 5146,
+    "anNumber": null,
+    "titulo": "Levantamiento de sitio · Colegio Montebello",
+    "estatus": "En Proceso",
+    "fechaMaxima": "2026-09-17T09:34:50.000Z",
+    "bucket": "projects"
+   },
+   "openActivities": [
+    {
+     "id": 5146,
+     "anNumber": null,
+     "titulo": "Levantamiento de sitio · Colegio Montebello",
+     "estatus": "En Proceso",
+     "evidenceStatus": "EVIDENCE_PHOTOS",
+     "progressPct": 25,
+     "coreKind": "proyecto",
+     "assignmentCharge": "ejecucion",
+     "fechaFinalizacion": null,
+     "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+     "teamEmails": [
+      "sofia.martinez@demo.nexara.mx"
+     ],
+     "reparte": false,
+     "fechaInicio": "2026-09-17T04:39:50.000Z"
+    }
+   ],
+   "clockInAt": "2026-09-17T03:04:50.000Z",
+   "workedMinutes": 150,
+   "activityStartedAt": "2026-09-17T04:39:50.000Z",
+   "activityElapsedMinutes": 55,
+   "currentLateMinutes": null,
+   "idleSinceAt": null,
+   "lastFinished": null,
+   "enEsperaAprobacion": 0,
+   "enCorreccion": 0
+  },
+  {
+   "id": 904,
+   "nombre": "Javier Morales Ortega",
+   "email": "javier.morales@demo.nexara.mx",
+   "avatarUrl": null,
+   "puesto": "Técnico Instalador",
+   "status": "atrasado",
+   "currentActivity": {
+    "id": 5145,
+    "anNumber": null,
+    "titulo": "Cableado estructurado · Bodega Norte",
+    "estatus": "En Proceso",
+    "fechaMaxima": "2026-09-17T04:49:50.000Z",
+    "bucket": "projects"
+   },
+   "openActivities": [
+    {
+     "id": 5145,
+     "anNumber": null,
+     "titulo": "Cableado estructurado · Bodega Norte",
+     "estatus": "En Proceso",
+     "evidenceStatus": "SERVICE_SHEET_DATA",
+     "progressPct": 80,
+     "coreKind": "obra",
+     "assignmentCharge": "ejecucion",
+     "fechaFinalizacion": null,
+     "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+     "teamEmails": [
+      "javier.morales@demo.nexara.mx"
+     ],
+     "reparte": false,
+     "fechaInicio": "2026-09-17T01:44:50.000Z"
+    }
+   ],
+   "clockInAt": "2026-09-17T01:29:50.000Z",
+   "workedMinutes": 245,
+   "activityStartedAt": "2026-09-17T01:44:50.000Z",
+   "activityElapsedMinutes": 230,
+   "currentLateMinutes": 45,
+   "idleSinceAt": null,
+   "lastFinished": null,
+   "enEsperaAprobacion": 0,
+   "enCorreccion": 0
+  },
+  {
+   "id": 903,
+   "nombre": "Fernanda Cruz Molina",
+   "email": "fernanda.cruz@demo.nexara.mx",
+   "avatarUrl": null,
+   "puesto": "Ingeniera de Soporte",
+   "status": "libre",
+   "currentActivity": null,
+   "openActivities": [],
+   "clockInAt": "2026-09-17T02:19:50.000Z",
+   "workedMinutes": 195,
+   "activityStartedAt": null,
+   "activityElapsedMinutes": null,
+   "currentLateMinutes": null,
+   "idleSinceAt": "2026-09-17T04:54:50.000Z",
+   "lastFinished": {
+    "id": 5144,
+    "anNumber": null,
+    "titulo": "Soporte remoto de videovigilancia · Parque Industrial San José",
+    "finishedAt": "2026-09-17T04:54:50.000Z",
+    "lateMinutes": null
+   },
+   "enEsperaAprobacion": 1,
+   "enCorreccion": 0
+  },
+  {
+   "id": 907,
+   "nombre": "Paola Jiménez Castro",
+   "email": "paola.jimenez@demo.nexara.mx",
+   "avatarUrl": null,
+   "puesto": "Coordinadora Administrativa",
+   "status": "libre",
+   "currentActivity": null,
+   "openActivities": [],
+   "clockInAt": "2026-09-17T01:54:50.000Z",
+   "workedMinutes": 220,
+   "activityStartedAt": null,
+   "activityElapsedMinutes": null,
+   "currentLateMinutes": null,
+   "idleSinceAt": "2026-09-17T04:19:50.000Z",
+   "lastFinished": {
+    "id": 5147,
+    "anNumber": null,
+    "titulo": "Alta de expediente · Colegio Montebello",
+    "finishedAt": "2026-09-17T04:19:50.000Z",
+    "lateMinutes": null
+   },
+   "enEsperaAprobacion": 1,
+   "enCorreccion": 0
+  },
+  {
+   "id": 906,
+   "nombre": "Ricardo Hernández Vega",
+   "email": "ricardo.hernandez@demo.nexara.mx",
+   "avatarUrl": null,
+   "puesto": "Técnico de Servicio",
+   "status": "sin_actividad",
+   "currentActivity": null,
+   "openActivities": [],
+   "clockInAt": null,
+   "workedMinutes": null,
+   "activityStartedAt": null,
+   "activityElapsedMinutes": null,
+   "currentLateMinutes": null,
+   "idleSinceAt": null,
+   "lastFinished": null,
+   "enEsperaAprobacion": 0,
+   "enCorreccion": 0
+  }
+ ]
+}

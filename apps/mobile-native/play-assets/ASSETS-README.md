@@ -12,7 +12,7 @@ Textos y checklist operativo: [`docs/PLAY-STORE-LISTING.md`](../../../docs/PLAY-
 |---|---|---|---|---|
 | `icon-512.png` | **512 × 512 px** | PNG opaco (sin transparencia) | ✅ Presente | Icono de la aplicación en la ficha |
 | `feature-graphic-1024x500.png` | **1024 × 500 px** | PNG o JPEG | ✅ Presente | Gráfico destacado (obligatorio) |
-| `screenshots/phone/` | ver abajo | PNG o JPEG | ❌ Pendiente | Capturas de teléfono (mín. 2, máx. 8) |
+| `screenshots/phone/nexara-01…07.png` | 1080 × 1920 px | PNG | ✅ Presente (17-09-2026, v1.0.2) | Capturas de teléfono (mín. 2, máx. 8) |
 
 ---
 
@@ -105,7 +105,12 @@ No son obligatorias si la app no está optimizada para tablet como dispositivo p
 
 - [ ] `icon-512.png` existe y mide exactamente 512 × 512 px, sin canal alpha.
 - [ ] `feature-graphic-1024x500.png` existe y mide exactamente 1024 × 500 px.
-- [ ] Al menos 2 capturas en `screenshots/phone/` con datos ficticios del tenant `nexara-demo`.
+- [x] Capturas en `screenshots/phone/` con datos ficticios. Se regeneran así (emulador con sesión iniciada, APK debug):
+  1. `python scripts/store-demo/generar-fixtures.py` y `assembleDebug` (los fixtures van en `src/debug/assets/store-demo`).
+  2. En el emulador: `run-as mx.nexara.mobile.nativeapp touch files/store_demo/serve` → la app muestra personas, chat, clientes y avisos inventados (`StoreDemoInterceptor`, solo debug).
+  3. Modo demo de la barra de estado (`com.android.systemui.demo`), `screencap` de cada pantalla como `s1.png`…`s7.png`.
+  4. `python scripts/store-demo/enmarcar-capturas.py --entrada <carpeta> --salida apps/mobile-native/play-assets/screenshots/phone`.
+  5. Borrar `files/store_demo` al terminar para volver a los datos reales.
 - [ ] Mismo tema visual (claro u oscuro) en todas las capturas.
 - [ ] Sin credenciales, PII real ni marcas de terceros no autorizadas visibles.
 - [ ] Nombres de archivo en minúsculas con guiones (`01-ventas-dashboard.png`).

@@ -1,0 +1,44 @@
+{
+ "id": 904,
+ "nombre": "Javier Morales Ortega",
+ "email": "javier.morales@demo.nexara.mx",
+ "avatarUrl": null,
+ "puesto": "Técnico Instalador",
+ "status": "atrasado",
+ "currentActivity": {
+  "id": 5145,
+  "anNumber": null,
+  "titulo": "Cableado estructurado · Bodega Norte",
+  "estatus": "En Proceso",
+  "fechaMaxima": "2026-09-17T04:49:50.000Z",
+  "bucket": "projects"
+ },
+ "openActivities": [
+  {
+   "id": 5145,
+   "anNumber": null,
+   "titulo": "Cableado estructurado · Bodega Norte",
+   "estatus": "En Proceso",
+   "evidenceStatus": "SERVICE_SHEET_DATA",
+   "progressPct": 80,
+   "coreKind": "obra",
+   "assignmentCharge": "ejecucion",
+   "fechaFinalizacion": null,
+   "indicaciones": "Tomar fotos de cada punto instalado y llenar la hoja de servicio.",
+   "teamEmails": [
+    "javier.morales@demo.nexara.mx"
+   ],
+   "reparte": false,
+   "fechaInicio": "2026-09-17T01:44:50.000Z"
+  }
+ ],
+ "clockInAt": "2026-09-17T01:29:50.000Z",
+ "workedMinutes": 245,
+ "activityStartedAt": "2026-09-17T01:44:50.000Z",
+ "activityElapsedMinutes": 230,
+ "currentLateMinutes": 45,
+ "idleSinceAt": null,
+ "lastFinished": null,
+ "enEsperaAprobacion": 0,
+ "enCorreccion": 0
+}

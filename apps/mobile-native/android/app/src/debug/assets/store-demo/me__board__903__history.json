@@ -1,0 +1,42 @@
+[
+ {
+  "id": 5144,
+  "anNumber": null,
+  "titulo": "Soporte remoto de videovigilancia · Parque Industrial San José",
+  "estatus": "Por Validar",
+  "coreKind": "servicio",
+  "ticketTypeCustom": null,
+  "assignmentCharge": "ejecucion",
+  "fechaAsignacion": "2026-09-16T03:34:50.000Z",
+  "fechaFinalizacion": "2026-09-17T04:54:50.000Z",
+  "evidence": {
+   "status": "COMPLETED",
+   "progressPct": 100,
+   "entryPhotoUrl": null,
+   "evidencePhotos": [],
+   "exitPhotoUrl": null,
+   "serviceSheetPdfUrl": null,
+   "serviceSheetData": null
+  }
+ },
+ {
+  "id": 5103,
+  "anNumber": null,
+  "titulo": "Revisión mensual de equipos · Hotel Casa Azul",
+  "estatus": "Finalizada",
+  "coreKind": "servicio",
+  "ticketTypeCustom": null,
+  "assignmentCharge": "ejecucion",
+  "fechaAsignacion": "2026-09-14T03:34:50.000Z",
+  "fechaFinalizacion": "2026-09-15T03:34:50.000Z",
+  "evidence": {
+   "status": "COMPLETED",
+   "progressPct": 100,
+   "entryPhotoUrl": null,
+   "evidencePhotos": [],
+   "exitPhotoUrl": null,
+   "serviceSheetPdfUrl": null,
+   "serviceSheetData": null
+  }
+ }
+]

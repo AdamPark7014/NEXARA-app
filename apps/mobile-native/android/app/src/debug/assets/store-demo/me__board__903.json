@@ -1,0 +1,25 @@
+{
+ "id": 903,
+ "nombre": "Fernanda Cruz Molina",
+ "email": "fernanda.cruz@demo.nexara.mx",
+ "avatarUrl": null,
+ "puesto": "Ingeniera de Soporte",
+ "status": "libre",
+ "currentActivity": null,
+ "openActivities": [],
+ "clockInAt": "2026-09-17T02:19:50.000Z",
+ "workedMinutes": 195,
+ "activityStartedAt": null,
+ "activityElapsedMinutes": null,
+ "currentLateMinutes": null,
+ "idleSinceAt": "2026-09-17T04:54:50.000Z",
+ "lastFinished": {
+  "id": 5144,
+  "anNumber": null,
+  "titulo": "Soporte remoto de videovigilancia · Parque Industrial San José",
+  "finishedAt": "2026-09-17T04:54:50.000Z",
+  "lateMinutes": null
+ },
+ "enEsperaAprobacion": 1,
+ "enCorreccion": 0
+}

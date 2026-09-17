@@ -1,0 +1,202 @@
+{
+ "rangeStart": "2026-09-17",
+ "rangeEnd": "2026-09-18",
+ "totalUsers": 8,
+ "totalMinutesAll": 1315,
+ "avgMinutesPerUser": 0,
+ "users": [
+  {
+   "userId": 901,
+   "userName": "Mariana López Herrera",
+   "email": "mariana.lopez@demo.nexara.mx",
+   "department": "Operaciones",
+   "roleName": "Coordinadora de Operaciones",
+   "totalMinutes": 182,
+   "days": [
+    {
+     "date": "2026-09-17",
+     "totalMinutes": 182,
+     "isOpen": true
+    }
+   ],
+   "attendances": [
+    {
+     "type": "entrada",
+     "timestamp": "2026-09-17T02:32:50.000Z",
+     "deviceInfo": "Móvil · Android · NEXARA App",
+     "photoUrl": null,
+     "entryLatitude": 19.0414,
+     "entryLongitude": -98.2063
+    }
+   ]
+  },
+  {
+   "userId": 902,
+   "userName": "Diego Ramírez Soto",
+   "email": "diego.ramirez@demo.nexara.mx",
+   "department": "Ingeniería",
+   "roleName": "Ingeniero de Campo",
+   "totalMinutes": 168,
+   "days": [
+    {
+     "date": "2026-09-17",
+     "totalMinutes": 168,
+     "isOpen": true
+    }
+   ],
+   "attendances": [
+    {
+     "type": "entrada",
+     "timestamp": "2026-09-17T02:46:50.000Z",
+     "deviceInfo": "Móvil · Android · NEXARA App",
+     "photoUrl": null,
+     "entryLatitude": 19.0414,
+     "entryLongitude": -98.2063
+    }
+   ]
+  },
+  {
+   "userId": 903,
+   "userName": "Fernanda Cruz Molina",
+   "email": "fernanda.cruz@demo.nexara.mx",
+   "department": "Ingeniería",
+   "roleName": "Ingeniera de Soporte",
+   "totalMinutes": 195,
+   "days": [
+    {
+     "date": "2026-09-17",
+     "totalMinutes": 195,
+     "isOpen": true
+    }
+   ],
+   "attendances": [
+    {
+     "type": "entrada",
+     "timestamp": "2026-09-17T02:19:50.000Z",
+     "deviceInfo": "Móvil · Android · NEXARA App",
+     "photoUrl": null,
+     "entryLatitude": 19.0414,
+     "entryLongitude": -98.2063
+    }
+   ]
+  },
+  {
+   "userId": 904,
+   "userName": "Javier Morales Ortega",
+   "email": "javier.morales@demo.nexara.mx",
+   "department": "Operaciones",
+   "roleName": "Técnico Instalador",
+   "totalMinutes": 245,
+   "days": [
+    {
+     "date": "2026-09-17",
+     "totalMinutes": 245,
+     "isOpen": true
+    }
+   ],
+   "attendances": [
+    {
+     "type": "entrada",
+     "timestamp": "2026-09-17T01:29:50.000Z",
+     "deviceInfo": "Móvil · Android · NEXARA App",
+     "photoUrl": null,
+     "entryLatitude": 19.0414,
+     "entryLongitude": -98.2063
+    }
+   ]
+  },
+  {
+   "userId": 905,
+   "userName": "Sofía Martínez Ruiz",
+   "email": "sofia.martinez@demo.nexara.mx",
+   "department": "Diseño",
+   "roleName": "Diseñadora de Proyectos",
+   "totalMinutes": 150,
+   "days": [
+    {
+     "date": "2026-09-17",
+     "totalMinutes": 150,
+     "isOpen": true
+    }
+   ],
+   "attendances": [
+    {
+     "type": "entrada",
+     "timestamp": "2026-09-17T03:04:50.000Z",
+     "deviceInfo": "Móvil · Android · NEXARA App",
+     "photoUrl": null,
+     "entryLatitude": 19.0414,
+     "entryLongitude": -98.2063
+    }
+   ]
+  },
+  {
+   "userId": 906,
+   "userName": "Ricardo Hernández Vega",
+   "email": "ricardo.hernandez@demo.nexara.mx",
+   "department": "Operaciones",
+   "roleName": "Técnico de Servicio",
+   "totalMinutes": 0,
+   "days": [],
+   "attendances": []
+  },
+  {
+   "userId": 907,
+   "userName": "Paola Jiménez Castro",
+   "email": "paola.jimenez@demo.nexara.mx",
+   "department": "Administración",
+   "roleName": "Coordinadora Administrativa",
+   "totalMinutes": 200,
+   "days": [
+    {
+     "date": "2026-09-17",
+     "totalMinutes": 200,
+     "isOpen": false
+    }
+   ],
+   "attendances": [
+    {
+     "type": "entrada",
+     "timestamp": "2026-09-17T01:54:50.000Z",
+     "deviceInfo": "Móvil · Android · NEXARA App",
+     "photoUrl": null,
+     "entryLatitude": 19.0414,
+     "entryLongitude": -98.2063
+    },
+    {
+     "type": "salida",
+     "timestamp": "2026-09-17T05:14:50.000Z",
+     "deviceInfo": "Móvil · Android · NEXARA App",
+     "photoUrl": null,
+     "exitLatitude": 19.0431,
+     "exitLongitude": -98.1981
+    }
+   ]
+  },
+  {
+   "userId": 908,
+   "userName": "Luis Fernando Torres",
+   "email": "luis.torres@demo.nexara.mx",
+   "department": "Ingeniería",
+   "roleName": "Ingeniero de Redes",
+   "totalMinutes": 175,
+   "days": [
+    {
+     "date": "2026-09-17",
+     "totalMinutes": 175,
+     "isOpen": true
+    }
+   ],
+   "attendances": [
+    {
+     "type": "entrada",
+     "timestamp": "2026-09-17T02:39:50.000Z",
+     "deviceInfo": "Móvil · Android · NEXARA App",
+     "photoUrl": null,
+     "entryLatitude": 19.0414,
+     "entryLongitude": -98.2063
+    }
+   ]
+  }
+ ]
+}

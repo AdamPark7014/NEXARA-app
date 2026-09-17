@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/errors/all-exception.filter';
 import { appLogger } from './common/errors/logger';
 import { Reflector } from '@nestjs/core';
 import { CoreModule } from './common/core.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
+import { StripSecretsInterceptor } from './common/security/strip-secrets.interceptor';
 import { AppService } from './app.service';
 import { ExcelExportController } from './common/excel-export.controller';
 import { ExcelImportController } from './common/excel-import.controller';
@@ -201,6 +202,11 @@ import { DomainEventsModule } from './domain-events/domain-events.module.js';
     {
       provide: APP_FILTER,
       useFactory: () => new AllExceptionsFilter(appLogger),
+    },
+    // Ninguna respuesta lleva passwordHash ni mfaSecret, aunque el servicio devuelva el User completo.
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: StripSecretsInterceptor,
     },
   ],
 })
