@@ -27,6 +27,12 @@ import InlineAlert from "@/components/ui/InlineAlert";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { erpInputStyle, formatApiError } from "@/lib/erp-api";
 import {
+  checadaDelTipo,
+  insigniasChecada,
+  MOTIVO_CORRECCION_MINIMO,
+  type ChecadaValidable,
+} from "@/lib/attendance-validacion";
+import {
   faltaDelDia,
   justificarFalta,
   MOTIVO_FALTA_MINIMO,
@@ -52,7 +58,7 @@ interface ApiAttendanceUser {
   roleName?: string;
   totalMinutes?: number;
   days?: { date: string; totalMinutes?: number; isOpen?: boolean }[];
-  attendances?: {
+  attendances?: (ChecadaValidable & {
     type: string;
     timestamp: string;
     photoUrl?: string;
@@ -60,7 +66,7 @@ interface ApiAttendanceUser {
     entryLongitude?: number;
     exitLatitude?: number;
     exitLongitude?: number;
-  }[];
+  })[];
   /** Días sin checada que Christian justificó (API nueva; opcional). */
   justificaciones?: FaltaJustificada[];
 }
@@ -218,23 +224,75 @@ function FilterChip({
   );
 }
 
+/** Marcas del servidor en una checada: sin conexión, revisar, fuera de sitio, cierre, corregida. */
+function InsigniasChecada({ checada }: { checada?: ChecadaValidable }) {
+  const insignias = insigniasChecada(checada);
+  if (!insignias.length) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+      {insignias.map((i) => (
+        <span
+          key={i.clave}
+          title={i.detalle}
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            lineHeight: 1.4,
+            color: i.color,
+            background: `color-mix(in srgb, ${i.color} 12%, var(--surface))`,
+            border: `1px solid color-mix(in srgb, ${i.color} 35%, transparent)`,
+            padding: "2px 7px",
+            borderRadius: 999,
+          }}
+        >
+          {i.texto}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Solo dirección y RH: mover una hora deja rastro (antes, después, motivo y quién). */
+function BotonCorregir({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        marginTop: 4,
+        background: "none",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+        fontSize: 10.5,
+        fontWeight: 650,
+        color: "var(--primary)",
+      }}
+    >
+      Corregir hora
+    </button>
+  );
+}
+
 export default function ErpAsistenciasPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
   const attCfg = useMemo(() => getAttendanceSectionConfig(user), [user]);
   const isManager = attCfg.canManageTeam;
   const canRegister = attCfg.canRegisterSelf;
-  // GPS en vivo (gps/team) + propio trayecto: solo dirección / GPS_MANAGE.
-  // Encargados: checadas + trayecto de subordinados (no el propio).
-  const canLiveGps = Boolean(user?.isSuperAdmin || hasPermission(user, PERMISSIONS.GPS_MANAGE));
+  // GPS en vivo (mapa del equipo y trayectorias): solo dirección —Christian y
+  // Claudia— por el contrato del viernes 18-09. Un encargado ve las checadas de
+  // su gente, con su punto y su distancia al sitio, no el rastro del día.
+  const canLiveGps = isCeoEquivalentEmail(user?.email);
   const canSeeOwnTrajectory = canLiveGps;
 
   const [tab, setTab] = useState<TabId>("equipo");
   // Los avisos de comida abren /erp/asistencias?tab=comidas.
   useEffect(() => {
     const inicial = new URLSearchParams(window.location.search).get("tab");
-    if (inicial === "comidas" || inicial === "trayectoria" || inicial === "equipo") setTab(inicial);
-  }, []);
+    if (inicial === "comidas" || inicial === "equipo") setTab(inicial);
+    else if (inicial === "trayectoria" && canLiveGps) setTab(inicial);
+  }, [canLiveGps]);
   const [dateFilter, setDateFilter] = useState(todayIso());
   const [filterEstado, setFilterEstado] = useState<FilterEstado>("TODOS");
 
@@ -407,6 +465,65 @@ export default function ErpAsistenciasPage() {
   const [errorFalta, setErrorFalta] = useState<string | null>(null);
   const [confirmFalta, setConfirmFalta] = useState<ConfirmState | null>(null);
 
+  // Corregir la hora de una checada: dirección (CEO-equivalentes) y RH. La API lo vuelve a exigir.
+  const puedeCorregir =
+    isCeoEquivalentEmail(user?.email) ||
+    isDeveloperSuperAdminEmail(user?.email) ||
+    ["rh", "rrhh", "recursos_humanos"].includes(String(user?.roleKey ?? "").toLowerCase());
+  const [corrigiendo, setCorrigiendo] = useState<{
+    id: number;
+    nombre: string;
+    tipo: "entrada" | "salida";
+    timestamp: string;
+  } | null>(null);
+  const [horaCorreccion, setHoraCorreccion] = useState("");
+  const [motivoCorreccion, setMotivoCorreccion] = useState("");
+  const [guardandoCorreccion, setGuardandoCorreccion] = useState(false);
+  const [errorCorreccion, setErrorCorreccion] = useState<string | null>(null);
+
+  /** `AAAA-MM-DDTHH:mm` local, que es lo que entiende `datetime-local`. */
+  const paraInputLocal = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+
+  const abrirCorreccion = (
+    checada: ChecadaValidable | undefined,
+    nombre: string,
+    tipo: "entrada" | "salida",
+  ) => {
+    if (!checada?.id || !checada.timestamp) return;
+    setErrorCorreccion(null);
+    setMotivoCorreccion("");
+    setHoraCorreccion(paraInputLocal(checada.timestamp));
+    setCorrigiendo({ id: checada.id, nombre, tipo, timestamp: checada.timestamp });
+  };
+
+  const guardarCorreccion = async () => {
+    if (!corrigiendo || motivoCorreccion.trim().length < MOTIVO_CORRECCION_MINIMO) return;
+    const nueva = new Date(horaCorreccion);
+    if (Number.isNaN(nueva.getTime())) {
+      setErrorCorreccion("La hora no es válida");
+      return;
+    }
+    setGuardandoCorreccion(true);
+    setErrorCorreccion(null);
+    try {
+      await erpFetch(`attendance/${corrigiendo.id}/correccion`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ timestamp: nueva.toISOString(), motivo: motivoCorreccion.trim() }),
+      });
+      setCorrigiendo(null);
+      await loadEquipo(true);
+    } catch (e) {
+      setErrorCorreccion(formatApiError(e, "No se pudo corregir la checada"));
+    } finally {
+      setGuardandoCorreccion(false);
+    }
+  };
+
   const abrirJustificar = (userId: number, nombre: string) => {
     setMotivoFalta("");
     setErrorFalta(null);
@@ -503,7 +620,8 @@ export default function ErpAsistenciasPage() {
         tabs={[
           { key: "equipo", label: "Equipo del día" },
           { key: "comidas", label: "Comidas" },
-          { key: "trayectoria", label: "Trayectoria" },
+          // Mapa del equipo y recorridos: solo dirección.
+          ...(canLiveGps ? [{ key: "trayectoria" as const, label: "Trayectoria" }] : []),
         ]}
       />
 
@@ -691,6 +809,9 @@ export default function ErpAsistenciasPage() {
                       const exitPhoto = [...(m.attendances ?? [])]
                         .filter((a) => a.type === "salida" && a.photoUrl)
                         .pop();
+                      // Lo que el servidor dejó dicho de cada checada (contrato A).
+                      const checadaEntrada = checadaDelTipo(m.attendances, "entrada");
+                      const checadaSalida = checadaDelTipo(m.attendances, "salida");
                       return (
                         <article
                           key={m.userId}
@@ -815,6 +936,14 @@ export default function ErpAsistenciasPage() {
                               >
                                 {fmtTime(m.checkIn)}
                               </div>
+                              <InsigniasChecada checada={checadaEntrada} />
+                              {puedeCorregir && checadaEntrada?.id ? (
+                                <BotonCorregir
+                                  onClick={() =>
+                                    abrirCorreccion(checadaEntrada, m.nombre, "entrada")
+                                  }
+                                />
+                              ) : null}
                             </div>
                             <div>
                               <div
@@ -838,6 +967,12 @@ export default function ErpAsistenciasPage() {
                               >
                                 {fmtTime(m.checkOut)}
                               </div>
+                              <InsigniasChecada checada={checadaSalida} />
+                              {puedeCorregir && checadaSalida?.id ? (
+                                <BotonCorregir
+                                  onClick={() => abrirCorreccion(checadaSalida, m.nombre, "salida")}
+                                />
+                              ) : null}
                             </div>
                             <div style={{ textAlign: "right", alignSelf: "center", minWidth: 88 }}>
                               <div
@@ -992,6 +1127,7 @@ export default function ErpAsistenciasPage() {
                               hasCheckIn={Boolean(m.checkIn)}
                               viewerUserId={user?.id}
                               canViewOwnTrajectory={canSeeOwnTrajectory}
+                              canViewTrajectory={canLiveGps}
                             />
                           )}
                         </article>
@@ -1052,11 +1188,72 @@ export default function ErpAsistenciasPage() {
           {errorFalta ? <InlineAlert variant="danger" message={errorFalta} /> : null}
         </div>
       </Modal>
+      <Modal
+        open={corrigiendo != null}
+        onClose={() => !guardandoCorreccion && setCorrigiendo(null)}
+        title="Corregir hora de la checada"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setCorrigiendo(null)} disabled={guardandoCorreccion}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void guardarCorreccion()}
+              disabled={motivoCorreccion.trim().length < MOTIVO_CORRECCION_MINIMO || !horaCorreccion}
+              loading={guardandoCorreccion}
+            >
+              Guardar corrección
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            {corrigiendo?.nombre} · {corrigiendo?.tipo === "entrada" ? "Entrada" : "Salida"} de las{" "}
+            {corrigiendo ? fmtTime(corrigiendo.timestamp) : ""}. La checada original no se borra:
+            queda el antes, el después, tu motivo y tu nombre. Se avisa a la persona y a sus jefes.
+          </p>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Hora correcta *</span>
+            <input
+              type="datetime-local"
+              value={horaCorreccion}
+              onChange={(e) => setHoraCorreccion(e.target.value)}
+              style={erpInputStyle}
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo *</span>
+            <textarea
+              value={motivoCorreccion}
+              onChange={(e) => setMotivoCorreccion(e.target.value)}
+              rows={4}
+              maxLength={1000}
+              placeholder="Ej. Entró a la planta a las 8:05 y el teléfono no tenía señal."
+              style={{ ...erpInputStyle, resize: "vertical", fontFamily: "inherit" }}
+            />
+            <span
+              style={{
+                fontSize: 11,
+                color:
+                  motivoCorreccion.trim().length >= MOTIVO_CORRECCION_MINIMO
+                    ? "var(--text-tertiary)"
+                    : "var(--danger)",
+              }}
+            >
+              {motivoCorreccion.trim().length}/{MOTIVO_CORRECCION_MINIMO} caracteres mínimo
+            </span>
+          </label>
+          {errorCorreccion ? <InlineAlert variant="danger" message={errorCorreccion} /> : null}
+        </div>
+      </Modal>
+
       <ConfirmDialog state={confirmFalta} onClose={() => setConfirmFalta(null)} />
 
       {tab === "comidas" && <ComidasPanel fecha={dateFilter} />}
 
-      {tab === "trayectoria" && (
+      {tab === "trayectoria" && canLiveGps && (
         <>
           {canLiveGps && (
             <Section title="GPS del equipo" subtitle="Unidades con jornada abierta (gps/team).">

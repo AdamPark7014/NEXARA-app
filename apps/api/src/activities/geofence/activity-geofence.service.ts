@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { saveBase64Photo } from '../../common/file-upload.util';
 import { RADIO_ACTIVIDAD_M, distanciaM, mensajeSalidaFueraDeZona, puntoReal, type Punto } from './geocerca';
+import { puedeVerGpsDireccion } from '../../attendance/asistencia-confiable.js';
 
 /** Estatus de actividad que ya no se siguen. */
 const CERRADAS = ['Finalizada', 'Cancelada', 'Completada'];
@@ -153,13 +154,21 @@ export class ActivityGeofenceService {
     }
   }
 
-  /** Lo que ve la persona en su actividad: punto de inicio, recorrido y alertas. */
-  async estado(activityId: number, userId: number) {
+  /**
+   * Lo que ve la persona en su actividad: punto de inicio, alertas y —solo para
+   * dirección— el recorrido.
+   *
+   * `puntos` es telemetría: dónde estuvo alguien minuto a minuto. Las alertas de
+   * zona y su justificación siguen visibles para quien las tiene que revisar;
+   * el rastro completo se queda en dirección (contrato del viernes 18-09, A).
+   */
+  async estado(activityId: number, userId: number, viewer?: { email?: string | null } | null) {
     const o = await this.origen(activityId, userId);
     const alertas = await this.prisma.activityGeofenceAlert.findMany({
       where: { activityId, userId },
       orderBy: { detectedAt: 'desc' },
     });
+    const verRecorrido = puedeVerGpsDireccion(viewer);
     let puntos: Array<{ latitude: number; longitude: number; at: Date; distanciaM: number | null }> = [];
     if (o?.at) {
       const filas = await this.prisma.locationTracking.findMany({
@@ -187,7 +196,8 @@ export class ActivityGeofenceService {
       seguimientoActivo: Boolean(o && !o.salidaAt && o.status !== 'COMPLETED'),
       dentro: ultimo ? ultimo.distanciaM != null && ultimo.distanciaM <= RADIO_ACTIVIDAD_M : null,
       ultimo,
-      puntos,
+      // El rastro completo, solo dirección; «dentro/fuera» y las alertas siguen para todos.
+      puntos: verRecorrido ? puntos : [],
       alertas: alertas.map(alertaDto),
     };
   }
