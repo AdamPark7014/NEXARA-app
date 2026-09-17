@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -38,6 +39,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -80,6 +83,7 @@ import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconBadge
@@ -150,10 +154,10 @@ fun ActividadesScreen(
     val otros = users.count { it.id != user?.id }
     val tieneEquipo = otros > 0
     val cargandoEquipo = !isCeo && board == null && boardError == null
-    val sinEquipo = !isCeo && !tieneEquipo && (board != null || boardError != null)
     val conPestanas = !isCeo && tieneEquipo
-    val verMias = conPestanas && vista == VISTA_MIAS
     val viendoEquipo = isCeo || (conPestanas && vista == VISTA_EQUIPO)
+    // Quien no tiene equipo (o mientras se sabe) ve directo lo suyo: no espera a la pizarra.
+    val verMias = !isCeo && (!conPestanas || vista == VISTA_MIAS)
 
     // La pizarra se actualiza sola cada 30 s mientras se está viendo.
     LaunchedEffect(viendoEquipo) {
@@ -173,39 +177,29 @@ fun ActividadesScreen(
         runCatching { prefs.edit().putString(VISTA_KEY, v).apply() }
     }
 
-    when {
-        cargandoEquipo -> NxLoadingBlock("Cargando actividades…")
-        sinEquipo -> MisActividadesContent(
-            user = user,
-            repo = repo,
-            onOpenActivity = onOpenActivity,
-            onOpenPerson = onOpenPerson,
-            onSelfAssign = onSelfAssign,
-            highlightActivityId = highlightActivityId,
-        )
-        else -> Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
-            if (conPestanas) {
-                VistaTabs(vista = vista, onChange = ::cambiarVista)
-            }
-            if (verMias) {
-                MisActividadesContent(
-                    user = user,
-                    repo = repo,
-                    onOpenActivity = onOpenActivity,
-                    onOpenPerson = onOpenPerson,
-                    onSelfAssign = onSelfAssign,
-                    highlightActivityId = highlightActivityId,
-                )
-            } else {
-                TeamBoardContent(
-                    users = users,
-                    meId = user?.id,
-                    loading = boardLoading,
-                    error = boardError,
-                    onRefresh = { boardReload++ },
-                    onOpenPerson = onOpenPerson,
-                )
-            }
+    Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
+        if (conPestanas) {
+            VistaTabs(vista = vista, onChange = ::cambiarVista)
+        }
+        when {
+            // Solo quien volvió a la pestaña «Mi equipo» espera a la pizarra.
+            cargandoEquipo && vista == VISTA_EQUIPO -> NxLoadingBlock("Cargando actividades…")
+            verMias -> MisActividadesContent(
+                user = user,
+                repo = repo,
+                onOpenActivity = onOpenActivity,
+                onOpenPerson = onOpenPerson,
+                onSelfAssign = onSelfAssign,
+                highlightActivityId = highlightActivityId,
+            )
+            else -> TeamBoardContent(
+                users = users,
+                meId = user?.id,
+                loading = boardLoading,
+                error = boardError,
+                onRefresh = { boardReload++ },
+                onOpenPerson = onOpenPerson,
+            )
         }
     }
 }
@@ -229,7 +223,7 @@ private fun VistaTabs(vista: String, onChange: (String) -> Unit) {
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 44.dp)
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(if (on) NxColors.Brand else Color.Transparent)
                     .clickable { onChange(id) },
@@ -249,7 +243,7 @@ private fun VistaTabs(vista: String, onChange: (String) -> Unit) {
 
 // ── Pizarra del equipo ──────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TeamBoardContent(
     users: List<TeamBoardUserDto>,
@@ -259,72 +253,105 @@ private fun TeamBoardContent(
     onRefresh: () -> Unit,
     onOpenPerson: (Long) -> Unit,
 ) {
-    val counts = users.groupingBy { it.status ?: "sin_actividad" }.eachCount()
-    PullToRefreshBox(
-        isRefreshing = loading && users.isNotEmpty(),
-        onRefresh = onRefresh,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 156.dp),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    val counts = ActividadesUx.boardCounts(users)
+    /** Estado elegido en los chips; null = todos. */
+    var filtro by rememberSaveable { mutableStateOf<String?>(null) }
+    val visibles = ActividadesUx.filterBoard(users, filtro)
+    Column(Modifier.fillMaxSize()) {
+        if (users.isNotEmpty()) {
+            BoardFilterRow(
+                total = users.size,
+                counts = counts,
+                selected = filtro,
+                onSelect = { filtro = it },
+            )
+        }
+        PullToRefreshBox(
+            isRefreshing = loading && users.isNotEmpty(),
+            onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize(),
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "Tú y tu equipo — toca a alguien para ver su día o asignarle trabajo",
-                        fontSize = 13.sp,
-                        color = NxColors.Muted,
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        val legend = CoreActivityRules.BOARD_STATUS_ORDER +
-                            listOfNotNull("inactivo".takeIf { (counts["inactivo"] ?: 0) > 0 })
-                        legend.forEach { status ->
-                            val color = Color(CoreActivityRules.boardStatusColor(status))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .background(Color.White)
-                                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(999.dp))
-                                    .padding(horizontal = 10.dp, vertical = 5.dp),
-                            ) {
-                                Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-                                Text(
-                                    "${CoreActivityRules.boardStatusLabel(status)} ${counts[status] ?: 0}",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = NxColors.Slate,
-                                )
-                            }
-                        }
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 156.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                when {
+                    loading && users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
+                        NxLoadingBlock("Cargando…")
+                    }
+                    error != null && users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
+                        NxErrorBlock(error, onRefresh)
+                    }
+                    users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
+                        NxEmptyState(
+                            title = "Nadie en tu equipo por ahora",
+                            subtitle = "Cuando alguien quede a tu cargo aparecerá aquí.",
+                            actionLabel = "Actualizar",
+                            onAction = onRefresh,
+                        )
+                    }
+                    visibles.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
+                        NxEmptyState(
+                            title = "Nadie en «${CoreActivityRules.boardStatusLabel(filtro)}»",
+                            subtitle = "Nadie de tu equipo está en ese estado ahora.",
+                            actionLabel = "Ver a todos",
+                            onAction = { filtro = null },
+                        )
                     }
                 }
-            }
-            when {
-                loading && users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
-                    NxLoadingBlock("Cargando…")
+                gridItems(visibles, key = { it.id }) { u ->
+                    PersonBoardCard(user = u, isSelf = u.id == meId, onClick = { onOpenPerson(u.id) })
                 }
-                error != null && users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
-                    NxErrorBlock(error, onRefresh)
-                }
-                users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text("Nadie en tu equipo por ahora.", fontSize = 14.sp, color = NxColors.Muted)
-                }
-            }
-            gridItems(users, key = { it.id }) { u ->
-                PersonBoardCard(user = u, isSelf = u.id == meId, onClick = { onOpenPerson(u.id) })
             }
         }
     }
 }
+
+/** Una sola fila deslizable de filtros: Todos · Activo · Atrasado · Terminó · Sin actividad. */
+@Composable
+private fun BoardFilterRow(
+    total: Int,
+    counts: Map<String, Int>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        item(key = "todos") {
+            FilterChip(
+                selected = selected == null,
+                onClick = { onSelect(null) },
+                label = { Text("Todos $total", maxLines = 1) },
+                colors = boardChipColors(),
+            )
+        }
+        items(ActividadesUx.boardFilterOptions(counts, selected), key = { it }) { status ->
+            val color = Color(CoreActivityRules.boardStatusColor(status))
+            FilterChip(
+                selected = selected == status,
+                // Tocar el chip activo vuelve a «Todos».
+                onClick = { onSelect(if (selected == status) null else status) },
+                label = { Text("${CoreActivityRules.boardStatusLabel(status)} ${counts[status] ?: 0}", maxLines = 1) },
+                leadingIcon = { Box(Modifier.size(8.dp).clip(CircleShape).background(color)) },
+                colors = boardChipColors(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun boardChipColors() = FilterChipDefaults.filterChipColors(
+    containerColor = Color.White,
+    selectedContainerColor = NxColors.BrandSoft,
+    selectedLabelColor = NxColors.BrandDark,
+    labelColor = NxColors.Slate,
+)
 
 @Composable
 private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: () -> Unit) {
@@ -477,65 +504,43 @@ private fun MisActividadesContent(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Encabezado corto: saludo y resumen en una línea; lo primero que se ve es la actividad.
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(NxColors.BrandSoft.copy(alpha = 0.35f))
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(20.dp))
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("MIS ACTIVIDADES", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Muted, letterSpacing = 1.sp)
-                    Text(
-                        if (firstName.isNotBlank()) "Hola, $firstName" else "Tu día",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = NxColors.Slate,
-                    )
-                    Text(
-                        when {
-                            loading -> "Cargando tus actividades…"
-                            open.isEmpty() -> "No tienes pendientes por ahora."
-                            else -> "Tienes ${open.size} por hacer. Empieza por la #1."
-                        },
-                        fontSize = 14.sp,
-                        color = NxColors.Muted,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { reload++ }) { Text("↻ Actualizar") }
-                        if (canSelfAssign) {
-                            Button(
-                                onClick = { onSelfAssign?.invoke() },
-                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
-                            ) { Text("＋ Auto-asignarme", fontWeight = FontWeight.Bold) }
-                        }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            if (firstName.isNotBlank()) "Hola, $firstName" else "Tu día",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = NxColors.Slate,
+                        )
+                        Text(
+                            if (loading && data == null) {
+                                "Cargando tus actividades…"
+                            } else {
+                                ActividadesUx.resumenDia(open.size, urgentes, done.size, seguimiento.size)
+                            },
+                            fontSize = 13.sp,
+                            color = if (urgentes > 0) Color(CoreActivityRules.ROJO) else NxColors.Muted,
+                        )
+                    }
+                    // Con la lista vacía, el botón vive en el estado vacío (una sola acción).
+                    if (canSelfAssign && open.isNotEmpty()) {
+                        OutlinedButton(
+                            onClick = { onSelfAssign?.invoke() },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) { Text("Auto-asignarme", fontWeight = FontWeight.SemiBold) }
                     }
                 }
             }
 
-            item {
-                val stats = buildList {
-                    add(Triple("Por hacer", open.size, null))
-                    add(Triple("Urgentes", urgentes, if (urgentes > 0) CoreActivityRules.ROJO else null))
-                    add(Triple("Hechas hoy", done.size, if (done.isNotEmpty()) CoreActivityRules.VERDE else null))
-                    if (seguimiento.isNotEmpty()) add(Triple("En seguimiento", seguimiento.size, null))
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    stats.chunked(2).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            row.forEach { (label, value, color) ->
-                                StatBox(label = label, value = value, color = color, modifier = Modifier.weight(1f))
-                            }
-                            if (row.size == 1) Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
+            error?.let {
+                item { NxErrorBlock(it) { reload++ } }
             }
-
-            error?.let { item { Text(it, fontSize = 13.sp, color = Color(0xFFDC2626)) } }
 
             if (canReorder) {
                 item {
@@ -591,7 +596,7 @@ private fun MisActividadesContent(
                     total = open.size,
                     highlighted = highlightId == a.id,
                     canReorder = canReorder,
-                    onOpen = { onOpenActivity(a.id, null) },
+                    onOpen = { tab -> onOpenActivity(a.id, tab) },
                     onRepartir = { user?.id?.let(onOpenPerson) },
                     onMove = { from, to -> if (to in open.indices && to != from) pendingMove = PendingMove(a, from, to) },
                 )
@@ -687,25 +692,6 @@ private fun MisActividadesContent(
     }
 }
 
-@Composable
-private fun StatBox(label: String, value: Int, color: Long?, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    ) {
-        Text(
-            "$value",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = color?.let { Color(it) } ?: NxColors.Slate,
-        )
-        Text(label, fontSize = 12.sp, color = NxColors.Muted)
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OpenActivityCard(
@@ -714,7 +700,8 @@ private fun OpenActivityCard(
     total: Int,
     highlighted: Boolean,
     canReorder: Boolean,
-    onOpen: () -> Unit,
+    /** Abre el detalle en la pestaña indicada (null = Detalle). */
+    onOpen: (String?) -> Unit,
     onRepartir: () -> Unit,
     onMove: (Int, Int) -> Unit,
 ) {
@@ -768,14 +755,39 @@ private fun OpenActivityCard(
                     Text(a.titulo.orEmpty(), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
                     a.anNumber?.let { Text("Folio $it", fontSize = 12.sp, color = NxColors.Muted) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (a.porRepartir == true) {
-                        Button(
-                            onClick = onRepartir,
-                            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
-                        ) { Text("Repartir →", fontWeight = FontWeight.Bold) }
+                // Una acción principal que dice el siguiente paso; el detalle queda como secundaria.
+                val accion = ActividadesUx.primaryAction(a)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    when (accion.kind) {
+                        ActividadesUx.PrimaryKind.ABRIR -> OutlinedButton(
+                            onClick = { onOpen(null) },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) { Text("Abrir") }
+                        ActividadesUx.PrimaryKind.VER -> {
+                            OutlinedButton(
+                                onClick = { onOpen(accion.tab) },
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) { Text(accion.label) }
+                            TextButton(onClick = { onOpen(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                                Text("Detalle", color = NxColors.Brand)
+                            }
+                        }
+                        else -> {
+                            Button(
+                                onClick = {
+                                    if (accion.kind == ActividadesUx.PrimaryKind.REPARTIR) onRepartir() else onOpen(accion.tab)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) { Text(accion.label, fontWeight = FontWeight.Bold) }
+                            TextButton(onClick = { onOpen(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                                Text("Detalle", color = NxColors.Brand)
+                            }
+                        }
                     }
-                    OutlinedButton(onClick = onOpen) { Text("Abrir →") }
                 }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

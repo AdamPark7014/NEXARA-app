@@ -11,7 +11,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,7 +53,7 @@ private val ACTIVITY_TABS = listOf("Detalle", "Evidencias", "Historial")
 @Composable
 fun ActivityDetailScreen(
     activity: ActivityDto,
-    onBack: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onBack: () -> Unit,
     @Suppress("UNUSED_PARAMETER") onCaptureEvidence: ((Long) -> Unit)? = null,
     initialTab: Int = ACTIVITY_TAB_DETALLE,
     @Suppress("UNUSED_PARAMETER") onOpenGps: (() -> Unit)? = null,
@@ -155,12 +154,12 @@ fun ActivityDetailScreen(
         modifier = Modifier.fillMaxSize(),
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            // Sin «← Volver» propio: la barra superior de Core ya trae la flecha.
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TextButton(onClick = onBack) { Text("← Volver") }
                 Column(Modifier.weight(1f)) {
                     Text(
                         detail.titulo?.takeIf { it.isNotBlank() }
