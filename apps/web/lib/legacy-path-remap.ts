@@ -150,8 +150,8 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   // ── Cross-panel ERP/OPS ────────────────────────────────────────────────
   [/^\/erp\/cvs(\/.*)?$/, '/ops/recruiting'],
   [/^\/erp\/recruiting(\/.*)?$/, '/ops/recruiting'],
-  [/^\/erp\/cotizaciones(\/.*)?$/, '/crm/quotes'],
-  [/^\/erp\/quotes(\/.*)?$/, '/crm/quotes'],
+  // `/erp/cotizaciones` ya no viaja a CRM: es la página de Core (ver el atajo de arriba).
+  [/^\/erp\/quotes(\/.*)?$/, '/erp/cotizaciones'],
   [/^\/erp\/multas(\/?.*)$/, '/erp/hr/fines'],
   [/^\/erp\/fines(\/?.*)$/, '/erp/hr/fines'],
   [/^\/erp\/sanciones(\/?.*)$/, '/erp/hr/fines'],
@@ -208,6 +208,11 @@ export function remapLegacySlugs(pathname: string): string {
   }
   // Clientes Core: no traducir "clientes"→"clients" ni mandar a /crm/clients.
   if (pathname === '/erp/clientes' || pathname.startsWith('/erp/clientes/')) {
+    return pathname;
+  }
+  // Cotizaciones Core: desde el contrato del viernes son una página propia de /erp. Antes esta
+  // ruta se remapeaba a /crm/quotes y, en superficie Core, terminaba rebotando a la pizarra.
+  if (pathname === '/erp/cotizaciones' || pathname.startsWith('/erp/cotizaciones/')) {
     return pathname;
   }
   // Mis actividades Core: no traducir "mis-actividades"→"my-activities" (eso es OPS).
