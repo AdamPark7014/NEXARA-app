@@ -28,6 +28,9 @@
 
   display: grid;
   grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  /* Una fila del alto disponible: sin esto la fila crece con el contenido, las listas nunca hacen
+     scroll y scrollIntoView desplaza el contenedor (overflow: hidden) escondiendo buscador y encabezado. */
+  grid-template-rows: minmax(0, 1fr);
   width: 100% !important;
   max-width: none !important;
   flex: 1 1 auto;
@@ -69,6 +72,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   border-right: 1px solid var(--nx-panel-hairline, var(--border));
 }
 
@@ -187,6 +192,7 @@
 
 .sidebarScroll {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 2px 8px 18px;
   scrollbar-width: thin;
@@ -330,6 +336,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background:
     radial-gradient(
       90% 50% at 50% -10%,
@@ -641,6 +649,7 @@
 /* ── Messages ── */
 .messages {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 8px 0 10px;
   scroll-behavior: smooth;
@@ -1382,6 +1391,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 .panelHead {
@@ -1865,7 +1876,7 @@
   .shellWithPanel,
   .shellBleed {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
+    grid-template-rows: minmax(0, 1fr);
     height: 100%;
     min-height: 0;
     margin: 0;
