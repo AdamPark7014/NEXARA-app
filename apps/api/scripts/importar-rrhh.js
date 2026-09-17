@@ -24,6 +24,8 @@
  *   docker exec -i -w /app/apps/api nexara-api node - --archivo=/tmp/rrhh.json --apply < apps/api/scripts/importar-rrhh.js
  *   docker exec nexara-api rm -f /tmp/rrhh.json
  * Sin --apply solo simula. --company=1 (defecto) · --json imprime el reporte completo.
+ * --activas: las altas nacen activas y quien ya existía inactivo se activa (para que aparezca en la
+ *   pizarra). Sin contraseña usable: RH/administración la asigna desde Usuarios.
  * Necesita la API compilada con `dist/rrhh/nomenclatura.js` (desplegada).
  */
 'use strict';
@@ -39,6 +41,7 @@ function arg(nombre) {
 }
 const APLICAR = process.argv.includes('--apply');
 const COMO_JSON = process.argv.includes('--json');
+const ACTIVAS = process.argv.includes('--activas');
 const ARCHIVO = arg('archivo');
 const COMPANY_ID = Number(arg('company') || 1);
 if (!ARCHIVO) {
@@ -69,6 +72,8 @@ const ALTAS = {
     // Solo atiende servicios.
     moduleAccess: { pizarra: 'on', asistencias: 'on', chat: 'on', 'activities-daily': 'off', 'activities-projects': 'off', 'activities-services': 'on' },
   },
+  // Contadora general: administración, reporta a dirección.
+  'paulina tlapaltotoli alvarez': { email: 'finanzas@nexara.com.mx', modelo: 'soluciones@nexara.com.mx', jefe: 'gerencia@nexara.com.mx' },
 };
 
 function norm(t) {
@@ -173,7 +178,7 @@ async function main() {
         continue;
       }
       const jefe = alta.jefe ? porCorreo.get(alta.jefe) : null;
-      notas.push(`Alta sin acceso (inactivo) como ${alta.email}; rol y departamento de ${modelo.nombre}`);
+      notas.push(`Alta ${ACTIVAS ? 'activa (sin contraseña hasta que RH la asigne)' : 'sin acceso (inactivo)'} como ${alta.email}; rol y departamento de ${modelo.nombre}`);
       if (APLICAR) {
         await prisma.$transaction(async (tx) => {
           const creado = await tx.user.create({
@@ -189,7 +194,7 @@ async function main() {
               employeeNumber: numero,
               puesto: p.puesto,
               fechaIngreso: ingreso,
-              isActive: false,
+              isActive: ACTIVAS,
             },
           });
           await tx.userCompany.create({ data: { userId: creado.id, companyId: COMPANY_ID, isDefault: true, employeeNumber: numero } });
@@ -197,7 +202,7 @@ async function main() {
           await tx.auditLog.create({
             data: {
               entityType: 'User', entityId: creado.id, action: 'RRHH_ALTA', source: 'script', companyId: COMPANY_ID,
-              changes: { numeroEmpleado: { antes: null, despues: numero }, origen, activo: false, modelo: modelo.email },
+              changes: { numeroEmpleado: { antes: null, despues: numero }, origen, activo: ACTIVAS, modelo: modelo.email },
             },
           });
         });
@@ -209,6 +214,7 @@ async function main() {
     // Persona existente: número oficial, puesto, ingreso y perfil de RH. El correo de acceso no se toca.
     const nombreCompleto = norm(p.nombre).split(' ').length > norm(usuario.nombre).split(' ').length ? p.nombre : usuario.nombre;
     if (nombreCompleto !== usuario.nombre) notas.push(`Nombre completado: ${usuario.nombre} → ${nombreCompleto}`);
+    if (ACTIVAS && !usuario.isActive) notas.push('Se activa para que aparezca en la pizarra');
     const choque = numero ? usuarios.find((u) => u.id !== usuario.id && (u.employeeNumber || '').toUpperCase() === numero) : null;
     if (choque) {
       reporte.push({ nombre: p.nombre, accion: 'omitido', numeroAntes: usuario.employeeNumber, numeroDespues: numero, auditoria, notas: [`La clave ya la tiene ${choque.nombre}`] });
@@ -218,7 +224,13 @@ async function main() {
       await prisma.$transaction(async (tx) => {
         await tx.user.update({
           where: { id: usuario.id },
-          data: { nombre: nombreCompleto, employeeNumber: numero, puesto: p.puesto, ...(ingreso ? { fechaIngreso: ingreso } : {}) },
+          data: {
+            nombre: nombreCompleto,
+            employeeNumber: numero,
+            puesto: p.puesto,
+            ...(ingreso ? { fechaIngreso: ingreso } : {}),
+            ...(ACTIVAS && !usuario.isActive ? { isActive: true } : {}),
+          },
         });
         await tx.userCompany.upsert({
           where: { userId_companyId: { userId: usuario.id, companyId: COMPANY_ID } },

@@ -5,9 +5,11 @@ import { NotificationHierarchyService } from '../../notifications/notification-h
 import { CreateLunchBreakDto, RevisarComidaDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
 import { companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import { parseWorkDate, workDateColumn, workDayAtClock } from '../../common/time/workday.js';
+import { NON_EMPLOYEE_EMAILS } from '../../common/platform-accounts.js';
 
 /** Christian supervisa y developer es cuenta de plataforma: no registran comida. */
-const SIN_COMIDA = new Set(['gerencia@nexara.com.mx', 'developer@nexara.com.mx']);
+/** No registran comida ni salen como pendientes: quien no es empleado (ver platform-accounts). */
+const SIN_COMIDA = new Set<string>(NON_EMPLOYEE_EMAILS);
 const JUSTIFICACION_MIN = 5;
 /** Desfase aceptado entre la hora del teléfono y la del servidor. */
 const DESFASE_MAX_MS = 10 * 60_000;

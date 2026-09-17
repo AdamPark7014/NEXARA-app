@@ -5,6 +5,7 @@ import { ActivityEvidenceService } from '../activities/evidence/activity-evidenc
 import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 
 const CEO_EMAIL = 'gerencia@nexara.com.mx';
 
@@ -358,7 +359,7 @@ export class MyActivitiesService {
     const todo =
       Boolean(viewer.isSuperAdmin) ||
       viewer.roleKey === 'ceo' ||
-      email === CEO_EMAIL ||
+      isCeoEquivalentEmail(email) ||
       email === 'developer@nexara.com.mx' ||
       perms.has('console.admin') ||
       perms.has('evidences.review');
@@ -597,7 +598,7 @@ export class MyActivitiesService {
   }
 
   private assertNotCeo(viewer: MyActivitiesViewer): void {
-    if (norm(viewer.email) === CEO_EMAIL) {
+    if (isCeoEquivalentEmail(viewer.email)) {
       throw new ForbiddenException('Mis actividades no aplica a dirección general');
     }
   }

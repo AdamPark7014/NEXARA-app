@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
 import { workDayBounds } from '../common/time/workday.js';
+import { isCeoEquivalentEmail, isNonEmployeeEmail } from '../common/platform-accounts.js';
 
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
 /**
@@ -271,8 +272,8 @@ export class TeamBoardService {
       }
     }
 
-    // Nunca mostrar al CEO Christian en la pizarra de nadie.
-    scoped = scoped.filter((u) => u.email.toLowerCase() !== 'gerencia@nexara.com.mx');
+    // Quien no es empleado (Christian, Adam, Claudia de pruebas, cuenta demo) nunca sale en la pizarra.
+    scoped = scoped.filter((u) => !isNonEmployeeEmail(u.email));
 
     // Company-wide (CEO/developer): pizarra = equipo ajeno.
     // Encargados/subtree: SÍ incluir al viewer para ver lo que Christian (u otros) les asignan.
@@ -537,7 +538,7 @@ export class TeamBoardService {
     if (viewer.isSuperAdmin) return true;
     if (viewer.roleKey === 'ceo') return true;
     const email = (viewer.email || '').toLowerCase();
-    return email === 'gerencia@nexara.com.mx' || email === 'developer@nexara.com.mx';
+    return isCeoEquivalentEmail(email) || email === 'developer@nexara.com.mx';
   }
 
   /**
