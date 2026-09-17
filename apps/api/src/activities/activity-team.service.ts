@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { isClosedStatus } from './activity-status.js';
+import { horasPlanValidas } from './actividad-tiempos.js';
 import {
   canCancelActivity,
   canReassignFrom,
@@ -191,6 +192,8 @@ export class ActivityTeamService {
     const notes =
       input.indicaciones != null ? String(input.indicaciones).trim() || null : undefined;
     const byId = actorId && actorId > 0 ? actorId : null;
+    // Tiempo estimado de esta persona (la web de asignar lo pide): horas con dos decimales.
+    const horasPlan = horasPlanValidas(input.horasPlan);
 
     let member;
     if (existing) {
@@ -199,7 +202,7 @@ export class ActivityTeamService {
         data: {
           retiradoAt: null,
           rol: input.rol ?? existing.rol,
-          horasPlan: input.horasPlan ?? existing.horasPlan,
+          horasPlan: horasPlan ?? existing.horasPlan,
           ...(notes !== undefined ? { indicaciones: notes } : {}),
           // Registro de despacho: volver al equipo cuenta como una entrega nueva.
           ...(existing.retiradoAt
@@ -216,7 +219,7 @@ export class ActivityTeamService {
           activityId,
           userId: input.userId,
           rol: input.rol ?? 'TECNICO',
-          horasPlan: input.horasPlan ?? null,
+          horasPlan,
           indicaciones: notes ?? null,
           companyId: tenantId,
           asignadoPorId: byId,

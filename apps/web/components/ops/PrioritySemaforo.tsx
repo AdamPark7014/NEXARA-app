@@ -1,11 +1,16 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { normalizarPrioridad } from "@/lib/actividad-tiempos";
 
+/**
+ * Prioridad normalizada del contrato: se guarda ALTA | MEDIA | BAJA y se muestra
+ * Alta / Media / Baja. Un valor viejo («urgente», «P1») queda marcado igual.
+ */
 export const PRIORIDAD_SEMAFORO = [
-  { value: "Baja", label: "Baja", color: "#22c55e", hint: "Puede esperar" },
-  { value: "Media", label: "Media", color: "#eab308", hint: "Esta semana" },
-  { value: "Alta", label: "Alta", color: "#ef4444", hint: "Urgente" },
+  { value: "BAJA", label: "Baja", color: "#22c55e", hint: "Puede esperar" },
+  { value: "MEDIA", label: "Media", color: "#eab308", hint: "Esta semana" },
+  { value: "ALTA", label: "Alta", color: "#ef4444", hint: "Urgente" },
 ] as const;
 
 type Props = {
@@ -17,6 +22,8 @@ type Props = {
 };
 
 export default function PrioritySemaforo({ value, onChange, allowEmpty = false, compact = false }: Props) {
+  // Lo guardado puede venir en texto viejo: se marca la opción equivalente.
+  const seleccion = value ? normalizarPrioridad(value) : "";
   const wrap: CSSProperties = {
     display: "flex",
     flexDirection: "column",
@@ -50,7 +57,7 @@ export default function PrioritySemaforo({ value, onChange, allowEmpty = false, 
           </button>
         ) : null}
         {PRIORIDAD_SEMAFORO.map((p) => {
-          const on = value === p.value;
+          const on = seleccion === p.value;
           return (
             <button
               key={p.value}

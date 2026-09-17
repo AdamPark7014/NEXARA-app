@@ -51,6 +51,8 @@ async function addTeamMember(
   userId: number,
   indicaciones?: string,
   rol: "LEAD" | "TECNICO" | "APOYO" = "TECNICO",
+  /** Tiempo estimado de esta persona, en horas (decimal). */
+  horasPlan?: number | null,
 ) {
   const res = await fetch(buildApiUrl(`activities/${activityId}/team`), {
     method: "POST",
@@ -63,12 +65,19 @@ async function addTeamMember(
       userId,
       rol,
       ...(indicaciones?.trim() ? { indicaciones: indicaciones.trim() } : {}),
+      ...(horasPlan != null && horasPlan > 0 ? { horasPlan } : {}),
     }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || `HTTP ${res.status}`);
   }
+}
+
+/** «2 h 30 min» → 2.5 horas (lo que guarda la API en horasPlan). */
+function horasPlanDe(horas: number, minutos: number): number {
+  const total = Math.max(0, horas) * 60 + Math.max(0, minutos);
+  return Math.round((total / 60) * 100) / 100;
 }
 
 export default function AsignarActividadPage() {
@@ -87,8 +96,14 @@ export default function AsignarActividadPage() {
   /** Indicaciones personales del responsable (primer asignado de /asignar). */
   const [leadNotes, setLeadNotes] = useState("");
   const [headcount, setHeadcount] = useState(1);
+  /** Tiempo estimado de la actividad (obligatorio): se guarda como horasPlan. */
+  const [planHoras, setPlanHoras] = useState(1);
+  const [planMinutos, setPlanMinutos] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
+
+  const horasPlan = horasPlanDe(planHoras, planMinutos);
+  const planValido = horasPlan > 0;
 
   const v2 = useMemo(() => resolveV2RoleKey(user), [user]);
   const allowedKinds = useMemo(
@@ -242,6 +257,7 @@ export default function AsignarActividadPage() {
           userId,
           formatDispatchHeadcountNote(headcount, leadNotes),
           "LEAD",
+          horasPlan,
         );
         router.push(`/erp/pizarra/${userId}`);
         return;
@@ -249,30 +265,21 @@ export default function AsignarActividadPage() {
 
       // Luis + tarea/proyecto/comercial: ejecución personal, sin equipo.
       if (ejecucionOnly) {
-        if (leadNotes.trim()) {
-          await addTeamMember(token, activityId, userId, leadNotes.trim(), "LEAD");
-        }
+        // Siempre se manda: aunque no haya indicaciones, el tiempo estimado sí va.
+        await addTeamMember(token, activityId, userId, leadNotes.trim(), "LEAD", horasPlan);
         router.push(`/erp/pizarra/${userId}`);
         return;
       }
 
-      const needPrimaryLead =
-        Boolean(leadNotes.trim()) ||
-        autoPeerCoordinators.length > 0 ||
-        (effectiveCharge === "despacho" && extraIds.length > 0);
-
-      if (needPrimaryLead) {
-        await addTeamMember(
-          token,
-          activityId,
-          userId,
-          leadNotes.trim() ||
-            (autoPeerCoordinators.length
-              ? "Coordinación de su equipo en esta actividad."
-              : undefined),
-          "LEAD",
-        );
-      }
+      await addTeamMember(
+        token,
+        activityId,
+        userId,
+        leadNotes.trim() ||
+          (autoPeerCoordinators.length ? "Coordinación de su equipo en esta actividad." : undefined),
+        "LEAD",
+        horasPlan,
+      );
 
       const peerIds = new Set(autoPeerCoordinators.map((u) => u.id));
       for (const peer of autoPeerCoordinators) {
@@ -284,12 +291,13 @@ export default function AsignarActividadPage() {
           peer.id,
           "Coordinación de su equipo en esta actividad cruzada (instalación / soporte).",
           "LEAD",
+          horasPlan,
         );
       }
 
       for (const id of extraIds) {
         const rol = peerIds.has(id) || id === userId ? "LEAD" : "TECNICO";
-        await addTeamMember(token, activityId, id, extraNotes[id], rol);
+        await addTeamMember(token, activityId, id, extraNotes[id], rol, horasPlan);
       }
     } catch (e) {
       setTeamError(formatApiError(e, "Actividad creada, pero falló al sumar el equipo"));
@@ -637,6 +645,78 @@ export default function AsignarActividadPage() {
       )}
 
       {kindMeta && !bridgeNeeded && chargeReady ? (
+        <section
+          style={{
+            padding: 14,
+            borderRadius: 16,
+            border: planValido
+              ? "1px solid var(--border)"
+              : "1px solid color-mix(in srgb, #d97706 45%, var(--border))",
+            background: "var(--surface)",
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 750, color: "var(--text-secondary)" }}>
+              Tiempo estimado *
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.4 }}>
+              Cuánto debería tomarle. Con esto se compara el tiempo real y se avisa si se pasa.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <label style={{ display: "grid", gap: 4, width: 130 }}>
+              <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>Horas</span>
+              <input
+                type="number"
+                min={0}
+                max={99}
+                value={planHoras}
+                onChange={(e) => setPlanHoras(Math.max(0, Math.min(99, Number(e.target.value) || 0)))}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                  font: "inherit",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  background: "var(--surface)",
+                  color: "inherit",
+                }}
+              />
+            </label>
+            <label style={{ display: "grid", gap: 4, width: 130 }}>
+              <span style={{ fontSize: 12, fontWeight: 650, color: "var(--text-secondary)" }}>Minutos</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                step={5}
+                value={planMinutos}
+                onChange={(e) => setPlanMinutos(Math.max(0, Math.min(59, Number(e.target.value) || 0)))}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                  font: "inherit",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  background: "var(--surface)",
+                  color: "inherit",
+                }}
+              />
+            </label>
+          </div>
+          {!planValido ? (
+            <p style={{ margin: 0, fontSize: 12.5, color: "#d97706" }}>
+              Pon al menos unos minutos: sin tiempo estimado no se puede avisar si se excede.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {kindMeta && !bridgeNeeded && chargeReady && planValido ? (
         <>
           {!despachoOnly && !ejecucionOnly ? (
           <section
@@ -854,6 +934,10 @@ export default function AsignarActividadPage() {
             />
           </section>
         </>
+      ) : kindMeta && !bridgeNeeded && chargeReady && !planValido ? (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
+          Indica el tiempo estimado para continuar.
+        </p>
       ) : kindMeta && !bridgeNeeded && offerCharge && !charge ? (
         <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
           Elige el encargo (ejecución directa o despacho a equipo) para continuar.
