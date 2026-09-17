@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -67,10 +69,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -90,6 +94,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1438,7 +1443,8 @@ private fun ChatTypingIndicator(names: List<String>) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    onBack: (() -> Unit)? = null,
+    // La barra superior de quien lo aloja (Core o portal) ya trae título y flecha de volver.
+    @Suppress("UNUSED_PARAMETER") onBack: (() -> Unit)? = null,
     initialChannelId: Long? = null,
     initialMessageId: Long? = null,
 ) {
@@ -1478,6 +1484,13 @@ fun ChatScreen(
     var pdfFile by remember { mutableStateOf<File?>(null) }
     var openingAttachment by remember { mutableStateOf(false) }
     var attachMenuExpanded by remember { mutableStateOf(false) }
+
+    // Lista de conversaciones: búsqueda local, un filtro a la vez y la hoja «Nueva conversación».
+    var listQuery by rememberSaveable { mutableStateOf("") }
+    var listFilter by rememberSaveable { mutableStateOf(ChatListFilter.TODOS) }
+    /** true tras pedir «Buscar en mensajes»: muestra resultados de `chat/search` arriba de la lista. */
+    var buscandoEnMensajes by rememberSaveable { mutableStateOf(false) }
+    var showNewConversation by remember { mutableStateOf(false) }
 
     val onAttachmentPicked: (Uri) -> Unit = { uri ->
         vm.uploadAndSend(uri, draft)
@@ -1984,57 +1997,52 @@ fun ChatScreen(
         return
     }
 
-    val totalUnread = state.channels.sumOf { it.unreadCount }
+    val canalesVisibles = ChatListFiltering.apply(state.channels, listQuery, listFilter, state.favoriteChannelIds)
+    val lanzarBusquedaEnMensajes: () -> Unit = {
+        if (listQuery.trim().length >= 2) {
+            vm.setSearchQuery(listQuery.trim())
+            vm.runSearch()
+            buscandoEnMensajes = true
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (onBack != null) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Volver") }
-            }
-            Text(
-                "Chat del equipo",
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f).padding(start = if (onBack == null) 12.dp else 0.dp),
-            )
-            if (totalUnread > 0) {
-                Badge(
-                    modifier = Modifier.padding(end = 4.dp),
-                    containerColor = NxColors.Brand,
-                ) { Text("$totalUnread") }
-            }
-            IconButton(onClick = { vm.toggleSearch() }) {
-                Icon(Icons.Default.Search, "Buscar mensajes")
-            }
-            IconButton(onClick = { vm.toggleShowMentions() }) {
-                Icon(Icons.Default.AlternateEmail, "Menciones")
-            }
-            IconButton(onClick = { vm.setShowDmPicker(true) }) {
-                Icon(Icons.Default.Person, "Mensaje directo")
-            }
-            IconButton(onClick = { vm.setShowCreateChannel(true) }) {
-                Icon(Icons.Default.Add, "Nuevo canal")
-            }
-            IconButton(onClick = { vm.refreshChannels() }) {
-                Icon(Icons.Default.Refresh, "Actualizar")
-            }
-        }
+        // Búsqueda arriba: filtra la lista al escribir; «Buscar» en el teclado busca dentro de los mensajes.
+        OutlinedTextField(
+            value = listQuery,
+            onValueChange = {
+                listQuery = it
+                buscandoEnMensajes = false
+            },
+            placeholder = { Text("Buscar conversación o mensaje") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                if (listQuery.isNotEmpty()) {
+                    IconButton(onClick = {
+                        listQuery = ""
+                        buscandoEnMensajes = false
+                    }) { Icon(Icons.Default.Close, "Limpiar búsqueda") }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { lanzarBusquedaEnMensajes() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, top = 8.dp),
+        )
 
-        if (state.showSearch) {
-            // Desde la lista la búsqueda es global: no hay canal al que acotar.
-            ChatSearchPanel(
-                state = state,
-                showScopeToggle = false,
-                onQueryChange = { vm.setSearchQuery(it) },
-                onSearch = { vm.runSearch() },
-                onScopeChange = { vm.setSearchInChannel(it) },
-                onClose = { vm.toggleSearch() },
-                onOpenHit = { vm.openSearchHit(it) },
-            )
-        }
+        ChatFilterRow(
+            selected = listFilter,
+            counts = ChatListFilter.entries.associateWith {
+                ChatListFiltering.count(state.channels, it, state.favoriteChannelIds)
+            },
+            mentionsOpen = state.showMentions,
+            onSelect = { listFilter = it },
+            onToggleMentions = { vm.toggleShowMentions() },
+        )
 
         if (state.showMentions) {
             MentionsPanel(
@@ -2052,27 +2060,71 @@ fun ChatScreen(
                 itemCount = 7,
                 itemHeight = 80.dp,
             )
-            state.error != null && state.channels.isEmpty() -> {
-                Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-                    NxErrorBlock(state.error!!) { vm.loadChannels() }
-                }
-            }
-            state.channels.isEmpty() -> NxEmptyState("Sin canales", "Los canales aparecen cuando el administrador los configura.")
             else -> PullToRefreshBox(
                 isRefreshing = state.refreshing,
                 onRefresh = { vm.refreshChannels() },
                 modifier = Modifier.fillMaxSize(),
             ) {
                 LazyColumn(
-                    contentPadding = PaddingValues(12.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    // Abajo deja libre el botón «Nueva conversación».
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    state.error?.let { err ->
-                        item(key = "channels-error") {
-                            NxErrorBlock(err) { vm.refreshChannels() }
+                    if (listQuery.trim().length >= 2) {
+                        item(key = "search-messages") {
+                            if (buscandoEnMensajes) {
+                                ChatSearchResults(
+                                    state = state,
+                                    onOpenHit = { vm.openSearchHit(it) },
+                                    onClose = { buscandoEnMensajes = false },
+                                )
+                            } else {
+                                TextButton(
+                                    onClick = lanzarBusquedaEnMensajes,
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                ) {
+                                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "Buscar «${listQuery.trim()}» en los mensajes",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
                         }
                     }
-                    items(state.channels, key = { it.id }) { ch ->
+                    state.error?.let { err ->
+                        item(key = "channels-error") {
+                            NxErrorBlock(err) {
+                                if (state.channels.isEmpty()) vm.loadChannels() else vm.refreshChannels()
+                            }
+                        }
+                    }
+                    when {
+                        state.channels.isEmpty() && state.error == null -> item(key = "empty") {
+                            NxEmptyState(
+                                title = "Sin conversaciones",
+                                subtitle = "Crea un canal o escríbele a un compañero.",
+                                actionLabel = "Nueva conversación",
+                                onAction = { showNewConversation = true },
+                            )
+                        }
+                        state.channels.isNotEmpty() && canalesVisibles.isEmpty() -> item(key = "empty-filter") {
+                            NxEmptyState(
+                                title = "Sin coincidencias",
+                                subtitle = "Ninguna conversación coincide con la búsqueda o el filtro.",
+                                actionLabel = "Quitar filtros",
+                                onAction = {
+                                    listQuery = ""
+                                    listFilter = ChatListFilter.TODOS
+                                    buscandoEnMensajes = false
+                                },
+                            )
+                        }
+                    }
+                    items(canalesVisibles, key = { it.id }) { ch ->
                         ChannelListItem(
                             ch = ch,
                             isFavorite = ch.id in state.favoriteChannelIds,
@@ -2085,15 +2137,30 @@ fun ChatScreen(
         }
     }
 
-    FloatingActionButton(
-        onClick = { vm.setShowCreateChannel(true) },
+    ExtendedFloatingActionButton(
+        onClick = { showNewConversation = true },
         modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(16.dp),
         containerColor = NxColors.Brand,
-    ) {
-        Icon(Icons.Default.Add, "Crear canal")
+        contentColor = Color.White,
+        icon = { Icon(Icons.Default.Add, contentDescription = null) },
+        text = { Text("Nueva conversación") },
+    )
     }
+
+    if (showNewConversation) {
+        NewConversationSheet(
+            onDismiss = { showNewConversation = false },
+            onChannel = {
+                showNewConversation = false
+                vm.setShowCreateChannel(true)
+            },
+            onDirect = {
+                showNewConversation = false
+                vm.setShowDmPicker(true)
+            },
+        )
     }
 
     if (state.showCreateChannel) {
@@ -3584,73 +3651,180 @@ private fun ChatSearchPanel(
                     )
                 }
             }
-            state.searchError?.let { err ->
-                Text(err, style = MaterialTheme.typography.bodySmall, color = NxColors.Danger)
+            SearchHitsBody(state = state, onOpenHit = onOpenHit)
+        }
+    }
+}
+
+/** Resultados de `chat/search` lanzados desde la lista de conversaciones. */
+@Composable
+private fun ChatSearchResults(
+    state: ChatUiState,
+    onOpenHit: (ChatSearchHitDto) -> Unit,
+    onClose: () -> Unit,
+) {
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("En los mensajes", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Cerrar resultados") }
             }
-            when {
-                state.searchLoading -> NxLoadingBlock("Buscando…")
-                state.searchQuery.trim().length < 2 -> Text(
-                    "Escribe al menos dos letras para buscar.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                state.searchResults.isEmpty() -> Text(
-                    "Sin coincidencias.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+            SearchHitsBody(state = state, onOpenHit = onOpenHit)
+        }
+    }
+}
+
+@Composable
+private fun SearchHitsBody(
+    state: ChatUiState,
+    onOpenHit: (ChatSearchHitDto) -> Unit,
+) {
+    state.searchError?.let { err ->
+        Text(err, style = MaterialTheme.typography.bodySmall, color = NxColors.Danger)
+    }
+    when {
+        state.searchLoading -> NxLoadingBlock("Buscando…")
+        state.searchQuery.trim().length < 2 -> Text(
+            "Escribe al menos dos letras para buscar.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        state.searchResults.isEmpty() -> Text(
+            "Sin coincidencias.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        else -> {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                items(state.searchResults, key = { "hit-${it.id}" }) { hit ->
+                    Card(
+                        Modifier.fillMaxWidth().clickable { onOpenHit(hit) },
                     ) {
-                        items(state.searchResults, key = { "hit-${it.id}" }) { hit ->
-                            Card(
-                                Modifier.fillMaxWidth().clickable { onOpenHit(hit) },
-                            ) {
-                                Column(Modifier.padding(10.dp)) {
-                                    Row(Modifier.fillMaxWidth()) {
-                                        Text(
-                                            hit.author?.nombre?.takeIf { it.isNotBlank() } ?: "Usuario",
-                                            fontWeight = FontWeight.SemiBold,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            modifier = Modifier.weight(1f),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Text(
-                                            formatChannelTime(hit.createdAt),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                    hit.channel?.let { ch ->
-                                        NxIconText(
-                                            text = "${channelPrefix(ch.kind)}${ch.name}",
-                                            icon = channelIcon(ch.kind),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = NxColors.Brand,
-                                        )
-                                    }
-                                    Text(
-                                        hit.body.ifBlank { hit.attachmentName ?: "(adjunto)" },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 3,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
+                        Column(Modifier.padding(10.dp)) {
+                            Row(Modifier.fillMaxWidth()) {
+                                Text(
+                                    hit.author?.nombre?.takeIf { it.isNotBlank() } ?: "Usuario",
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    formatChannelTime(hit.createdAt),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
+                            hit.channel?.let { ch ->
+                                NxIconText(
+                                    text = "${channelPrefix(ch.kind)}${ch.name}",
+                                    icon = channelIcon(ch.kind),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = NxColors.Brand,
+                                )
+                            }
+                            Text(
+                                hit.body.ifBlank { hit.attachmentName ?: "(adjunto)" },
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
-                    }
-                    if (state.searchResults.size >= 30) {
-                        Text(
-                            "Se muestran los 30 mensajes más recientes; afina la búsqueda para ver otros.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
+            if (state.searchResults.size >= 30) {
+                Text(
+                    "Se muestran los 30 mensajes más recientes; afina la búsqueda para ver otros.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Filtros de la lista en una sola fila deslizable. «Menciones» abre el
+ * directorio de personas y entidades que antes era el ícono «@».
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatFilterRow(
+    selected: ChatListFilter,
+    counts: Map<ChatListFilter, Int>,
+    mentionsOpen: Boolean,
+    onSelect: (ChatListFilter) -> Unit,
+    onToggleMentions: () -> Unit,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(ChatListFilter.entries, key = { it.name }) { filter ->
+            val n = counts[filter] ?: 0
+            FilterChip(
+                selected = selected == filter,
+                // Tocar el filtro activo vuelve a «Todos».
+                onClick = { onSelect(if (selected == filter && filter != ChatListFilter.TODOS) ChatListFilter.TODOS else filter) },
+                label = {
+                    Text(
+                        if (filter == ChatListFilter.TODOS || n == 0) filter.label else "${filter.label} $n",
+                        maxLines = 1,
+                    )
+                },
+            )
+        }
+        item(key = "mentions") {
+            FilterChip(
+                selected = mentionsOpen,
+                onClick = onToggleMentions,
+                label = { Text("Menciones", maxLines = 1) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.AlternateEmail,
+                        contentDescription = null,
+                        modifier = Modifier.size(FilterChipDefaults.IconSize),
+                    )
+                },
+            )
+        }
+    }
+}
+
+/** «Nueva conversación»: una hoja con las dos formas de empezar a hablar. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NewConversationSheet(
+    onDismiss: () -> Unit,
+    onChannel: () -> Unit,
+    onDirect: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Text(
+                "Nueva conversación",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            ListItem(
+                headlineContent = { Text("Mensaje directo", fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text("Escríbele a una persona del equipo.") },
+                leadingContent = { Icon(Icons.Default.Person, contentDescription = null, tint = NxColors.Brand) },
+                modifier = Modifier.clickable(onClick = onDirect).padding(horizontal = 8.dp),
+            )
+            ListItem(
+                headlineContent = { Text("Canal", fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text("Un espacio para un tema o un grupo.") },
+                leadingContent = { Icon(Icons.Outlined.Tag, contentDescription = null, tint = NxColors.Brand) },
+                modifier = Modifier.clickable(onClick = onChannel).padding(horizontal = 8.dp),
+            )
         }
     }
 }
