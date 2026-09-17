@@ -656,7 +656,10 @@ struct EvidenceFlowState: Decodable, Hashable {
     let activity: EvidenceFlowActivityInfo?
     let assigneeIndicaciones: String?
     let progressPct: Double?
+    /// Lo que dejaron quienes la tuvieron antes (si se la pasaron a esta persona).
+    let avancesAnteriores: ActivityPreviousProgressList?
 
+    var previousProgress: [ActivityPreviousProgress] { avancesAnteriores?.items ?? [] }
     var isCorrection: Bool { reviewStatus == "REJECTED" }
     /// Enviada y esperando revisión (o aprobada): ya no se toca.
     var isLocked: Bool { !isCorrection && status == CoreEvidence.completed }

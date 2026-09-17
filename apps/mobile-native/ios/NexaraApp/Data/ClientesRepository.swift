@@ -174,9 +174,7 @@ final class ClientesRepository {
     /// Desactivar, reactivar y eliminar no van a la cola sin conexión: solo Christian
     /// puede hacerlos y, si el API los rechaza al reenviarlos, nadie se entera.
     private func requireOnline() async throws {
-        guard await NetworkMonitor.shared.isOnline else {
-            throw CoreError.message("Sin conexión: esta acción necesita señal. Intenta de nuevo cuando regrese.")
-        }
+        try await CoreRepository.requireOnline()
     }
 
     /// `POST ventas/clientes/:id/desactivar` (queda «Inactivo»). `nil` si la respuesta no se pudo leer.
