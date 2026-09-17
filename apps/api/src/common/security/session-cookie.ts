@@ -116,3 +116,31 @@ export function sessionTokenFromHeaders(headers: {
 }): string | null {
   return readBearerToken(headers.authorization) ?? readSessionCookie(headers.cookie);
 }
+
+/** `jti` (o `sub`) de un JWT sin verificar la firma: solo para comparar dos tokens ya emitidos. */
+function sesionDe(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'));
+    if (payload?.jti) return `jti:${payload.jti}`;
+    if (payload?.sub != null) return `sub:${payload.sub}`;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ¿Borrar la cookie al cerrar sesión? La cookie es una por navegador y cada pestaña manda su propio
+ * JWT: si la cookie es de otra sesión (otra cuenta en otra pestaña), se deja para no sacarla.
+ */
+export function logoutDebeBorrarCookie(headers: {
+  authorization?: string | string[];
+  cookie?: string | string[];
+}): boolean {
+  const bearer = readBearerToken(headers.authorization);
+  const cookie = readSessionCookie(headers.cookie);
+  if (!bearer || !cookie) return true;
+  const a = sesionDe(bearer);
+  const b = sesionDe(cookie);
+  return a == null || b == null || a === b;
+}
