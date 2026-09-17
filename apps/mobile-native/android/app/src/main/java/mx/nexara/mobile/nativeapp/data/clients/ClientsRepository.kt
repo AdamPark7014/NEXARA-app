@@ -53,6 +53,15 @@ class ClientsRepository(context: Context) {
     suspend fun projects(serviceClientId: Long): List<ClientProjectDto> =
         api.clientProjects(serviceClientId)
 
+    /** Desactivar (`ON_HOLD`) o reactivar (`ACTIVE`) un proyecto: misma regla que clientes. */
+    suspend fun setProjectActive(projectId: Long, activo: Boolean) {
+        if (activo) api.reactivateProject(projectId).close() else api.deactivateProject(projectId).close()
+    }
+
+    suspend fun deleteProject(projectId: Long) {
+        api.deleteProject(projectId).close()
+    }
+
     suspend fun createProject(
         title: String,
         serviceClientId: Long,

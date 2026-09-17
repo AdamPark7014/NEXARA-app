@@ -159,4 +159,16 @@ interface ClientsApi {
 
     @POST("operational-projects")
     suspend fun createProject(@Body body: CreateClientProjectBody): ClientProjectDto
+
+    /** Deja el proyecto `ON_HOLD` («Inactivo» en la app). Solo Christian. */
+    @POST("operational-projects/{id}/desactivar")
+    suspend fun deactivateProject(@Path("id") id: Long): ResponseBody
+
+    /** Lo regresa a `ACTIVE`. Solo Christian. */
+    @POST("operational-projects/{id}/reactivar")
+    suspend fun reactivateProject(@Path("id") id: Long): ResponseBody
+
+    /** Borrado lógico (`{ok:true}`): desaparece de las listas. Solo Christian. */
+    @DELETE("operational-projects/{id}")
+    suspend fun deleteProject(@Path("id") id: Long): ResponseBody
 }

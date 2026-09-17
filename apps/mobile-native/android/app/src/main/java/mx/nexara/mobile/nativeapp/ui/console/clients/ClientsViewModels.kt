@@ -242,6 +242,41 @@ class ClientDetailViewModel(
         }
     }
 
+    /** Proyecto del cliente: desactivar (`ON_HOLD`) o reactivar. Solo Christian. */
+    fun setProjectActive(projectId: Long, activo: Boolean) {
+        _state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.setProjectActive(projectId, activo) }
+                _state.update { it.copy(busy = false) }
+                load()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        error = e.toUserMessage("No se pudo cambiar el estatus del proyecto"),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Borrado lógico del proyecto: se quita de la lista sin esperar la recarga. */
+    fun deleteProject(projectId: Long) {
+        _state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.deleteProject(projectId) }
+                _state.update { s -> s.copy(busy = false, projects = s.projects.filterNot { it.id == projectId }) }
+                load()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(busy = false, error = e.toUserMessage("No se pudo eliminar el proyecto"))
+                }
+            }
+        }
+    }
+
     fun delete() {
         _state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {

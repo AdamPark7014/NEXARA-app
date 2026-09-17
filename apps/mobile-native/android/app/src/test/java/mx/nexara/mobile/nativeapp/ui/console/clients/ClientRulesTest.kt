@@ -57,6 +57,30 @@ class ClientRulesTest {
     }
 
     @Test
+    fun proyectoEnPausaSeLeeInactivo() {
+        assertTrue(ClientRules.isProjectInactive("ON_HOLD"))
+        assertTrue(ClientRules.isProjectInactive(" on_hold "))
+        assertFalse(ClientRules.isProjectInactive("ACTIVE"))
+        assertFalse(ClientRules.isProjectInactive(null))
+        assertEquals("Inactivo", ClientRules.projectStatusLabel("ON_HOLD"))
+        assertEquals("Activo", ClientRules.projectStatusLabel("ACTIVE"))
+        assertEquals("Terminado", ClientRules.projectStatusLabel("COMPLETED"))
+        assertEquals("Sin estatus", ClientRules.projectStatusLabel(null))
+        assertEquals("OTRO", ClientRules.projectStatusLabel(" OTRO "))
+    }
+
+    @Test
+    fun textosDeConfirmacionDeProyectos() {
+        assertEquals("Desactivar proyecto", ClientRules.projectToggleTitle(inactivo = false))
+        assertEquals("Reactivar proyecto", ClientRules.projectToggleTitle(inactivo = true))
+        assertTrue(ClientRules.projectToggleMessage("Torre A", inactivo = false).contains("quedará inactivo"))
+        val borrar = ClientRules.projectDeleteMessage("Torre A")
+        assertTrue(borrar.contains("«Torre A»"))
+        assertTrue(borrar.contains("no se puede deshacer"))
+        assertTrue(ClientRules.projectDeleteMessage(null).contains("«Proyecto sin nombre»"))
+    }
+
+    @Test
     fun textosDeConfirmacion() {
         assertEquals("Desactivar cliente", ClientRules.toggleActiveTitle(inactivo = false))
         assertEquals("Reactivar cliente", ClientRules.toggleActiveTitle(inactivo = true))
