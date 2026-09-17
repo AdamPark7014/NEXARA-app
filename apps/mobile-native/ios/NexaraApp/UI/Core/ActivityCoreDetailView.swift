@@ -42,6 +42,10 @@ struct ActivityCoreDetailView: View {
     @State private var despacho: DespachoTarget?
     @State private var reprogramar: ReprogramarTarget?
     @State private var notice: String?
+    /// Cancelar / pasar a otro compañero (solo superiores de quien la ejecuta).
+    @State private var acciones: ActivitySuperiorActions?
+    @State private var cancelar: ActivitySuperiorTarget?
+    @State private var pasar: ActivitySuperiorTarget?
 
     // MARK: Datos derivados
 
@@ -104,6 +108,27 @@ struct ActivityCoreDetailView: View {
         return assignees.contains { row in
             ActivityParse.int(row["asignadoPorId"]) == myId && userId(of: row) != myId
         }
+    }
+
+    /// «Cancelada por X · motivo» (`cancelReason` y `cancelledBy.nombre`).
+    private var cancelNotice: String? {
+        ActivityCancelNotice.text(
+            motivo: text("cancelReason"),
+            canceladaPor: ActivityParse.str((raw["cancelledBy"] as? [String: Any])?["nombre"])
+        )
+    }
+
+    private func superiorTarget(_ acciones: ActivitySuperiorActions) -> ActivitySuperiorTarget {
+        var enActividad = Set(assignees.filter { isActive($0) }.compactMap { userId(of: $0) })
+        if let responsableId { enActividad.insert(responsableId) }
+        let folio = text("anNumber")
+        let nombre = titulo.isEmpty ? "Actividad" : titulo
+        return ActivitySuperiorTarget(
+            id: activityId,
+            title: folio.isEmpty ? nombre : "\(folio) · \(nombre)",
+            acciones: acciones,
+            excluded: enActividad
+        )
     }
 
     // MARK: Vista
@@ -170,6 +195,27 @@ struct ActivityCoreDetailView: View {
                 Task { await load() }
             }
         }
+        .sheet(item: $cancelar) { target in
+            ActivityCancelSheet(target: target) { message in
+                afterSuperiorAction(message)
+            }
+        }
+        .sheet(item: $pasar) { target in
+            ActivityReassignSheet(target: target) { message in
+                afterSuperiorAction(message)
+            }
+        }
+    }
+
+    /// Tras cancelar o pasarla: aviso, detalle, evidencias e historial al día.
+    private func afterSuperiorAction(_ message: String) {
+        notice = message
+        teamRefresh += 1
+        eventsLoaded = false
+        Task {
+            await load()
+            if tab == .historial { await loadTimeline() }
+        }
     }
 
     // MARK: Detalle
@@ -210,6 +256,36 @@ struct ActivityCoreDetailView: View {
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            if let cancelNotice {
+                Section {
+                    NxIconText(systemName: "xmark.circle.fill", text: cancelNotice, tint: CorePalette.red)
+                        .font(.subheadline.weight(.semibold))
+                }
+            }
+
+            if let acciones, acciones.hayAlgo, !isClosed {
+                Section {
+                    if acciones.puedePasar {
+                        Button {
+                            pasar = superiorTarget(acciones)
+                        } label: {
+                            Label("Pasar a otro compañero", systemImage: "arrow.left.arrow.right")
+                        }
+                    }
+                    if acciones.puedeCancelar {
+                        Button(role: .destructive) {
+                            cancelar = superiorTarget(acciones)
+                        } label: {
+                            Label("Cancelar actividad", systemImage: "xmark.circle")
+                        }
+                    }
+                } header: {
+                    Text("Como superior")
+                } footer: {
+                    Text("Las dos piden motivo y quedan en el historial.")
+                }
             }
 
             if splits && !isClosed {
@@ -378,6 +454,8 @@ struct ActivityCoreDetailView: View {
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo cargar la actividad")
         }
+        // Sin respuesta (o sin permiso) no se ofrece nada: el API vuelve a validar al guardar.
+        acciones = try? await CoreRepository.shared.superiorActions(activityId: activityId)
     }
 
     @MainActor

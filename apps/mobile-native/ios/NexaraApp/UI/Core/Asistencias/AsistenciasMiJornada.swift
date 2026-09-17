@@ -26,11 +26,48 @@ struct MiJornadaCard: View {
             hints
             gpsCard
             history
+            faltasJustificadas
         }
         .coreCard()
     }
 
+    // MARK: Faltas justificadas
+
+    /// Días sin checada que Christian justificó (últimos 30 días). No suman horas.
+    @ViewBuilder
+    private var faltasJustificadas: some View {
+        if !vm.myJustifications.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Faltas justificadas").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+                ForEach(vm.myJustifications.prefix(5)) { falta in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            NxIconText(systemName: "checkmark.seal.fill", text: falta.fechaCorta, tint: CorePalette.purple)
+                                .font(.caption.weight(.semibold))
+                            Text(falta.texto)
+                                .font(.caption)
+                        }
+                        if !falta.justificadaPor.isEmpty {
+                            Text("Justificó \(falta.justificadaPor)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(CorePalette.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
     // MARK: Cabecera y cronómetro
+
+    private var statusColor: Color? {
+        if vm.isOpen { return CorePalette.green }
+        if vm.statusLabel == AttendanceEstado.justificada.label { return CorePalette.purple }
+        return nil
+    }
 
     private var header: some View {
         HStack(alignment: .top) {
@@ -42,7 +79,7 @@ struct MiJornadaCard: View {
             }
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 4) {
-                CoreChip(text: vm.statusLabel, color: vm.isOpen ? CorePalette.green : nil)
+                CoreChip(text: vm.statusLabel, color: statusColor)
                 timer
             }
         }

@@ -71,6 +71,9 @@ struct AttendanceRange: Hashable {
     let totalMinutesAll: Int
     let totalUsers: Int
     let events: [AttendanceEvent]
+    /// Faltas justificadas: en `attendance/range` van en la raíz; en
+    /// `attendance/hierarchy/range`, dentro de cada persona.
+    let justificaciones: [AttendanceJustification]
     let raw: [String: Any]
 
     static func == (lhs: AttendanceRange, rhs: AttendanceRange) -> Bool {
@@ -88,14 +91,17 @@ struct AttendanceRange: Hashable {
         totalUsers = StockParse.int(raw["totalUsers"]) ?? 0
         let users = raw["users"] as? [[String: Any]] ?? []
         var out: [AttendanceEvent] = []
+        var faltas = AttendanceJustification.list(raw["justificaciones"])
         for u in users {
             let name = StockParse.str(u["userName"])
             let attendances = u["attendances"] as? [[String: Any]] ?? []
             for e in attendances {
                 out.append(AttendanceEvent(raw: e, userName: name))
             }
+            faltas.append(contentsOf: AttendanceJustification.list(u["justificaciones"]))
         }
         events = out
+        justificaciones = faltas
     }
 }
 

@@ -64,6 +64,14 @@ final class CoreRepository {
         return (object["queued"] as? Bool) == true
     }
 
+    /// Acciones con permiso de superior (cancelar, pasar, justificar, desactivar…) no van a
+    /// la cola sin conexión: si el API las rechaza al reenviarlas, nadie se entera.
+    static func requireOnline() async throws {
+        guard await NetworkMonitor.shared.isOnline else {
+            throw CoreError.message("Sin conexión: esta acción necesita señal. Intenta de nuevo cuando regrese.")
+        }
+    }
+
     private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
         do {
@@ -158,6 +166,38 @@ final class CoreRepository {
             return events
         }
         return try decode([ActivityTimelineEvent].self, from: data)
+    }
+
+    // MARK: Acciones de superior
+
+    /// `GET activities/:id/acciones`: si quien consulta puede cancelarla o pasarla y de quién.
+    func superiorActions(activityId: Int) async throws -> ActivitySuperiorActions {
+        let data = try await api.get("activities/\(activityId)/acciones")
+        return try decode(ActivitySuperiorActions.self, from: data)
+    }
+
+    /// `POST activities/:id/cancelar { motivo }` (mínimo 10 caracteres).
+    func cancelActivity(activityId: Int, motivo: String) async throws {
+        struct Body: Encodable { let motivo: String }
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON("activities/\(activityId)/cancelar", body: Body(motivo: motivo))
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
+    /// `POST activities/:id/reasignar { aUsuarioId, deUsuarioId, motivo }`: quien la tenía deja
+    /// su lugar y quien entra continúa con su propia evidencia.
+    func reassignActivity(activityId: Int, aUsuarioId: Int, deUsuarioId: Int, motivo: String) async throws {
+        struct Body: Encodable {
+            let aUsuarioId: Int
+            let deUsuarioId: Int
+            let motivo: String
+        }
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON(
+            "activities/\(activityId)/reasignar",
+            body: Body(aUsuarioId: aUsuarioId, deUsuarioId: deUsuarioId, motivo: motivo)
+        )
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 
     // MARK: Evidencias del equipo
