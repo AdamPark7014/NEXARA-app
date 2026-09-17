@@ -65,6 +65,7 @@ import { UserPreferencesModule } from './user-preferences/user-preferences.modul
 import { EmailModule } from './common/email/email.module.js';
 import { CronModule } from './common/cron/cron.module.js';
 import { HrModule } from './hr/hr.module.js';
+import { RrhhModule } from './rrhh/rrhh.module.js';
 import { SearchModule } from './search/search.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { AccessControlModule } from './access-control/access-control.module.js';
@@ -165,6 +166,7 @@ import { DomainEventsModule } from './domain-events/domain-events.module.js';
     EmailModule,
     CronModule,
     HrModule,
+    RrhhModule,
     SearchModule,
     ActivityFeedModule,
     CatalogModule,

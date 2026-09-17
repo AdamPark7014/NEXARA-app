@@ -11,6 +11,7 @@ extension CoreOrg {
     static let antonioEmail = "jose.ramirez@nexara.com.mx"
     static let carolinaEmail = "soporte@nexara.com.mx"
     static let alejandroEmail = "alejandro.gonzalez@nexara.com.mx"
+    static let robertoEmail = "roberto.vivanco@nexara.com.mx"
     static let danielaEmail = "daniela.hernandez@nexara.com.mx"
     static let monicaEmail = "soluciones@nexara.com.mx"
     static let joanEmail = "joan.sanchez@nexara.com.mx"
@@ -19,8 +20,8 @@ extension CoreOrg {
     static let josueEmail = "infraestructura@nexara.com.mx"
 
     static var fieldInstallerEmails: [String] { [joanEmail, israelEmail, juanEmail] }
-    static var servicioDelegateEmails: [String] { [carolinaEmail, alejandroEmail] }
-    static var soporteTeamEmails: [String] { [antonioEmail, carolinaEmail, alejandroEmail] }
+    static var servicioDelegateEmails: [String] { [carolinaEmail, alejandroEmail, robertoEmail] }
+    static var soporteTeamEmails: [String] { [antonioEmail, carolinaEmail, alejandroEmail, robertoEmail] }
 }
 
 // MARK: - Sectores de clientes
@@ -214,6 +215,7 @@ enum CoreActivityRules {
         CoreOrg.juanEmail: [.tarea],
         CoreOrg.carolinaEmail: [.tarea],
         CoreOrg.alejandroEmail: [.tarea],
+        CoreOrg.robertoEmail: [],
         CoreOrg.josueEmail: [.tarea, .proyecto, .obra, .comercial],
     ]
 
@@ -228,6 +230,8 @@ enum CoreActivityRules {
         CoreOrg.juanEmail: [.tarea, .proyecto, .obra],
         CoreOrg.carolinaEmail: [.tarea, .proyecto, .servicio],
         CoreOrg.alejandroEmail: [.tarea, .proyecto, .servicio],
+        // Roberto: solo atiende servicios.
+        CoreOrg.robertoEmail: [.servicio],
         CoreOrg.danielaEmail: [.tarea, .comercial],
         CoreOrg.monicaEmail: [.tarea, .comercial],
         CoreOrg.josueEmail: [.tarea, .proyecto, .obra, .comercial],

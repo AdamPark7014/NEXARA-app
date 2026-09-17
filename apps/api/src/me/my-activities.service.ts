@@ -25,7 +25,12 @@ export const AREA_MANAGER_EMAILS = new Set<string>([
 /** A quién puede pasar cada encargado un despacho (espejo de dispatchPoolEmails en web). */
 const DISPATCH_POOLS: Record<string, string[]> = {
   'direccion.operaciones@nexara.com.mx': ['jose.ramirez@nexara.com.mx'],
-  'jose.ramirez@nexara.com.mx': ['soporte@nexara.com.mx', 'alejandro.gonzalez@nexara.com.mx'],
+  // Roberto (servicios) se suma al equipo de Antonio con Carolina y Alejandro.
+  'jose.ramirez@nexara.com.mx': [
+    'soporte@nexara.com.mx',
+    'alejandro.gonzalez@nexara.com.mx',
+    'roberto.vivanco@nexara.com.mx',
+  ],
   'operaciones@nexara.com.mx': [
     'joan.sanchez@nexara.com.mx',
     'israel.ramos@nexara.com.mx',

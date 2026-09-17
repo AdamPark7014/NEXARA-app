@@ -40,6 +40,7 @@ export const ORG_EMAILS = {
   antonio: 'jose.ramirez@nexara.com.mx',
   carolina: 'soporte@nexara.com.mx',
   alejandro: 'alejandro.gonzalez@nexara.com.mx',
+  roberto: 'roberto.vivanco@nexara.com.mx',
   daniela: 'daniela.hernandez@nexara.com.mx',
   monica: 'soluciones@nexara.com.mx',
   joan: 'joan.sanchez@nexara.com.mx',
@@ -150,6 +151,7 @@ const CREATE_BY_EMAIL: Record<string, ActivityKind[]> = {
   [ORG_EMAILS.juan]: ['tarea'],
   [ORG_EMAILS.carolina]: ['tarea'],
   [ORG_EMAILS.alejandro]: ['tarea'],
+  [ORG_EMAILS.roberto]: [],
   [ORG_EMAILS.josue]: ['tarea', 'proyecto', 'obra', 'comercial'],
 };
 
@@ -167,6 +169,8 @@ const RECEIVE_BY_EMAIL: Record<string, ActivityKind[]> = {
   // Soporte de Antonio
   [ORG_EMAILS.carolina]: ['tarea', 'proyecto', 'servicio'],
   [ORG_EMAILS.alejandro]: ['tarea', 'proyecto', 'servicio'],
+  // Roberto: solo atiende servicios.
+  [ORG_EMAILS.roberto]: ['servicio'],
   // Comercial / admin
   [ORG_EMAILS.daniela]: ['tarea', 'comercial'],
   [ORG_EMAILS.monica]: ['tarea', 'comercial'],
@@ -183,11 +187,11 @@ export function isServicioBridgeEmail(email?: string | null): boolean {
 }
 
 export function servicioDelegateEmails(): string[] {
-  return [ORG_EMAILS.carolina, ORG_EMAILS.alejandro];
+  return [ORG_EMAILS.carolina, ORG_EMAILS.alejandro, ORG_EMAILS.roberto];
 }
 
 export function soporteTeamEmails(): string[] {
-  return [ORG_EMAILS.antonio, ORG_EMAILS.carolina, ORG_EMAILS.alejandro];
+  return [ORG_EMAILS.antonio, ORG_EMAILS.carolina, ORG_EMAILS.alejandro, ORG_EMAILS.roberto];
 }
 
 export function fieldInstallerEmails(): string[] {
