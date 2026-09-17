@@ -3,7 +3,8 @@ import { distanciaM, puntoReal, type Punto } from './geofence/geocerca.js';
 /** Sitio donde debería hacerse la actividad (sucursal del cliente o punto del ticket). */
 export type SitioActividad = { punto: Punto; nombre: string | null };
 
-type PrismaLike = {
+/** Lo mínimo que necesita del cliente Prisma (así se puede probar sin base de datos). */
+export type PrismaSitio = {
   serviceClientBranch: {
     findFirst: (args: unknown) => Promise<{
       name: string | null;
@@ -27,7 +28,7 @@ type PrismaLike = {
  * sitio conocido no se mide distancia y nada se bloquea.
  */
 export async function sitioDeActividad(
-  prisma: PrismaLike,
+  prisma: PrismaSitio,
   activity: {
     id: number;
     clientId?: number | null;

@@ -19,7 +19,7 @@ import {
   rangoPrioridad,
   RADIO_SITIO_M,
 } from '../actividad-tiempos.js';
-import { distanciaAlSitio, sitioDeActividad } from '../sitio-actividad.js';
+import { distanciaAlSitio, sitioDeActividad, type PrismaSitio } from '../sitio-actividad.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import {
   clampEvidencePhotoRequired,
@@ -594,7 +594,7 @@ export class ActivityEvidenceService {
         select: { id: true, aceptadaAt: true, inicioRealAt: true },
       });
 
-      const sitio = await sitioDeActividad(this.prisma as never, activity);
+      const sitio = await sitioDeActividad(this.prisma as unknown as PrismaSitio, activity);
       const distancia = distanciaAlSitio(sitio, params.latitude, params.longitude);
       const salto = await this.otraDeMasPrioridadSinTerminar(activity, userId, at);
       const justificacion =
