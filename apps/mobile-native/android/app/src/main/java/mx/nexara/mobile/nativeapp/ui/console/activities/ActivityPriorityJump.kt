@@ -43,6 +43,19 @@ object ActivityPriorityJump {
             .minByOrNull { rango(it.prioridad) }
     }
 
+    /**
+     * ¿Esa actividad es del día (o de antes)? Lo que está programado para
+     * mañana no cuenta como salto de prioridad. Sin fecha, cuenta.
+     */
+    fun esDelDiaOAntes(
+        iso: String?,
+        hoy: java.time.LocalDate = java.time.LocalDate.now(),
+        zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    ): Boolean {
+        val instante = CoreActivityRules.parseInstant(iso, zone) ?: return true
+        return !instante.atZone(zone).toLocalDate().isAfter(hoy)
+    }
+
     /** «“Cambio de disco” es de prioridad alta y sigue sin empezar.» */
     fun aviso(titulo: String?, prioridad: String?): String {
         val nombre = titulo?.trim()?.takeIf { it.isNotEmpty() }?.let { "«$it»" } ?: "Otra actividad"
