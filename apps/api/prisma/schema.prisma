@@ -2402,6 +2402,9 @@ enum NotificationType {
   SLA_BREACH
   // Actividad: la persona salió del radio del punto donde inició
   ACTIVITY_OUT_OF_ZONE
+  // Celebraciones del equipo (tarea diaria de las 8:00)
+  BIRTHDAY
+  WORK_ANNIVERSARY
   STOCK_ALERT
 
   // ACS → Operaciones (acceso denegado en puerta)
