@@ -480,9 +480,32 @@ data class SalesClientDto(
         }
 }
 
+// ── Celebraciones del día (GET me/celebraciones/hoy) ────────────────────────
+
+/** Cumpleaños o aniversario de ingreso. La edad nunca viaja: `anios` solo en aniversarios. */
+data class CelebracionDto(
+    val userId: Long? = null,
+    val nombre: String? = null,
+    val avatarUrl: String? = null,
+    /** cumpleanos | aniversario */
+    val tipo: String? = null,
+    val anios: Int? = null,
+    /** Es quien pregunta: el aviso lo felicita a él. */
+    val soyYo: Boolean? = null,
+)
+
+data class CelebracionesHoyDto(
+    /** AAAA-MM-DD en la zona de la empresa. */
+    val fecha: String? = null,
+    val celebraciones: List<CelebracionDto>? = null,
+)
+
 interface CoreActivitiesApi {
     @GET("me/activities")
     suspend fun myActivities(): MyActivitiesResponseDto
+
+    @GET("me/celebraciones/hoy")
+    suspend fun celebracionesHoy(): CelebracionesHoyDto
 
     /** Asignar a otra persona (mismo cuerpo que `me/activities`). */
     @POST("activities")
