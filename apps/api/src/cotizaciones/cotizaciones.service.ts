@@ -64,6 +64,7 @@ import {
   mezclarBloqueAlcance,
   partidasDePaquete,
 } from './paquetes.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -1039,6 +1040,73 @@ export class CotizacionesService {
       .catch(() => undefined);
 
     return updated;
+  }
+
+  /**
+   * Sube un plano o anexo a la cotización (03 Planos).
+   *
+   * Los que vienen de la actividad comercial no se suben: ya están. Esto es para el plano CAD o el
+   * PDF que hace quien cotiza.
+   */
+  async agregarPlano(
+    id: number,
+    archivo: { buffer?: Buffer; originalname?: string; mimetype?: string; size?: number } | undefined,
+    nombre: string | undefined,
+    companyId?: number | null,
+  ) {
+    const quote = await this.findOne(id, companyId);
+    if (estaBloqueada(quote.status)) {
+      throw new BadRequestException(
+        'Esta cotización ya salió al cliente: edítala para crear una versión nueva antes de cambiar sus anexos.',
+      );
+    }
+    if (!archivo?.buffer?.length) throw new BadRequestException('Archivo requerido');
+
+    const tipoMime = String(archivo.mimetype || '');
+    const esImagen = tipoMime.startsWith('image/');
+    const esPdf = tipoMime === 'application/pdf';
+    if (!esImagen && !esPdf) {
+      throw new BadRequestException('El anexo debe ser una imagen o un PDF.');
+    }
+    if (archivo.buffer.length > 20 * 1024 * 1024) {
+      throw new BadRequestException('El anexo no puede pasar de 20 MB.');
+    }
+
+    const carpeta = getUploadSubdir(__dirname, 'cotizaciones-planos');
+    const extension =
+      path.extname(String(archivo.originalname || '')).toLowerCase() || (esPdf ? '.pdf' : '.png');
+    const nombreArchivo = `${id}-${Date.now()}${extension}`;
+    await fs.writeFile(path.join(carpeta, nombreArchivo), archivo.buffer);
+
+    const plano = {
+      url: `/uploads/cotizaciones-planos/${nombreArchivo}`,
+      nombre: nombre?.trim() || archivo.originalname || 'Plano',
+      tipo: esPdf ? 'pdf' : 'imagen',
+      origen: 'cotizacion',
+      at: new Date().toISOString(),
+    };
+
+    const previos = Array.isArray(quote.planos) ? (quote.planos as any[]) : [];
+    await this.db.cotizacion.update({
+      where: { id },
+      data: { planos: [...previos, plano] as Prisma.InputJsonValue },
+    });
+
+    return this.detalleCore(id, companyId);
+  }
+
+  /** Quita un anexo propio de la cotización (los heredados de la actividad viven en la actividad). */
+  async quitarPlano(id: number, url: string, companyId?: number | null) {
+    const quote = await this.findOne(id, companyId);
+    if (estaBloqueada(quote.status)) {
+      throw new BadRequestException('Esta cotización ya salió al cliente: edítala para crear una versión nueva.');
+    }
+    const previos = Array.isArray(quote.planos) ? (quote.planos as any[]) : [];
+    await this.db.cotizacion.update({
+      where: { id },
+      data: { planos: previos.filter((p: any) => String(p?.url ?? '') !== url) as Prisma.InputJsonValue },
+    });
+    return this.detalleCore(id, companyId);
   }
 
   /** Catálogo de paquetes («Cámara bala instalada» = cámara + balún + adaptador + caja + instalación). */

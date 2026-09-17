@@ -117,14 +117,28 @@ function datosEmpresa(payload: PropuestaPayload) {
   };
 }
 
-/** Archivo local de un anexo `/uploads/...`; `null` si es remoto o no existe. */
+/**
+ * Archivo local de un anexo; `null` si es remoto o no existe.
+ *
+ * Los anexos se guardan con URL `/uploads/<carpeta>/<archivo>` (o `/<carpeta>/<archivo>` en los
+ * flujos viejos) y el disco está en `UPLOADS_ROOT` o en `<raíz del repo>/uploads`, que no es el
+ * directorio de trabajo del API. Por eso se prueban varias raíces antes de rendirse.
+ */
 function archivoDePlano(url: string): string | null {
   try {
     if (!url || /^https?:\/\//i.test(url)) return null;
     const limpio = url.split('?')[0]!.replace(/^\/+/, '');
+    const sinPrefijo = limpio.replace(/^uploads\//, '');
+    const raices = [
+      process.env['UPLOADS_ROOT']?.trim(),
+      path.resolve(process.cwd(), 'uploads'),
+      path.resolve(process.cwd(), '..', 'uploads'),
+      path.resolve(process.cwd(), '..', '..', 'uploads'),
+    ].filter((r): r is string => Boolean(r));
+
     const candidatos = [
       path.resolve(process.cwd(), limpio),
-      path.resolve(process.cwd(), '..', limpio),
+      ...raices.map((raiz) => path.join(raiz, sinPrefijo)),
     ];
     for (const candidato of candidatos) {
       if (fs.existsSync(candidato) && fs.statSync(candidato).isFile()) return candidato;

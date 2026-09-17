@@ -21,9 +21,12 @@ import {
   listarPaquetes,
   marcarRevisada,
   obtenerCotizacion,
+  quitarPlano,
   rechazarCotizacion,
+  subirPlano,
   urlPdfCotizacion,
   versionesDeCotizacion,
+  type BloqueAlcance,
   type CotizacionDetalle,
   type EstadoCotizacion,
   type GrupoPartida,
@@ -86,6 +89,10 @@ export default function CotizacionDetallePage() {
   const [mensaje, setMensaje] = useState("");
   const [enviando, setEnviando] = useState(false);
 
+  // Alcance y anexos
+  const [bloques, setBloques] = useState<BloqueAlcance[]>([]);
+  const [subiendo, setSubiendo] = useState(false);
+
   // Catálogo
   const [busqueda, setBusqueda] = useState("");
   const [ofertas, setOfertas] = useState<SmartOffer[]>([]);
@@ -110,6 +117,7 @@ export default function CotizacionDetallePage() {
           laborRate: Number(p.laborRate || 0),
         })),
       );
+      setBloques(Array.isArray(detalle.alcanceBloques) ? detalle.alcanceBloques : []);
       setSegmento(detalle.segmento);
       setClientName(detalle.clientName ?? "");
       setClientEmail(detalle.clientEmail ?? "");
@@ -201,6 +209,7 @@ export default function CotizacionDetallePage() {
     try {
       await actualizarCotizacion(token, cot.id, {
         segmento,
+        alcanceBloques: bloques,
         clientName: clientName.trim() || null,
         clientEmail: clientEmail.trim() || null,
         projectName: projectName.trim() || null,
@@ -408,20 +417,56 @@ export default function CotizacionDetallePage() {
 
       <section className={styles.panel}>
         <h2 className={styles.panelTitle}>02 Alcance</h2>
-        {cot.alcanceBloques?.length ? (
-          <ol className={styles.terminos}>
-            {cot.alcanceBloques.map((b) => (
-              <li key={b.clave}>
-                <strong>{b.titulo}</strong>
-                {b.texto ? ` — ${b.texto}` : ""}
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className={styles.sub}>
-            Sin bloques todavía. Los paquetes que agregues abajo escriben su bloque de alcance solos.
-          </p>
-        )}
+        <p className={styles.sub}>
+          Bloques reutilizables. Los paquetes que agregues abajo escriben el suyo con la cantidad
+          cotizada, para que el texto y la tabla digan lo mismo.
+        </p>
+
+        {bloques.map((bloque, i) => (
+          <div key={bloque.clave || `bloque-${i}`} style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                className={styles.input}
+                value={bloque.titulo}
+                onChange={(e) =>
+                  setBloques((prev) =>
+                    prev.map((b, j) => (j === i ? { ...b, titulo: e.target.value } : b)),
+                  )
+                }
+                placeholder="Título del bloque"
+              />
+              <button
+                type="button"
+                className={styles.filterBtn}
+                aria-label="Quitar bloque"
+                onClick={() => setBloques((prev) => prev.filter((_, j) => j !== i))}
+              >
+                ×
+              </button>
+            </div>
+            <textarea
+              className={styles.textarea}
+              value={bloque.texto ?? ""}
+              onChange={(e) =>
+                setBloques((prev) => prev.map((b, j) => (j === i ? { ...b, texto: e.target.value } : b)))
+              }
+              placeholder="Qué se hace en este bloque, con sus parámetros."
+            />
+          </div>
+        ))}
+
+        <button
+          type="button"
+          className={styles.secondaryBtn}
+          onClick={() =>
+            setBloques((prev) => [
+              ...prev,
+              { clave: `libre-${Date.now()}`, titulo: "", texto: "" },
+            ])
+          }
+        >
+          Agregar bloque de alcance
+        </button>
       </section>
 
       <section className={styles.panel}>
@@ -429,17 +474,39 @@ export default function CotizacionDetallePage() {
         {cot.planos?.length ? (
           <div className={styles.planos}>
             {cot.planos.map((p) => (
-              <a key={p.url} className={styles.plano} href={p.url} target="_blank" rel="noreferrer">
-                {p.tipo === "pdf" ? (
-                  <span className={styles.planoImg} style={{ display: "grid", placeItems: "center" }}>
-                    PDF
-                  </span>
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className={styles.planoImg} src={p.url} alt={p.nombre ?? "Plano"} />
-                )}
+              <div key={p.url} className={styles.plano}>
+                <a href={p.url} target="_blank" rel="noreferrer">
+                  {p.tipo === "pdf" ? (
+                    <span className={styles.planoImg} style={{ display: "grid", placeItems: "center" }}>
+                      PDF
+                    </span>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className={styles.planoImg} src={p.url} alt={p.nombre ?? "Plano"} />
+                  )}
+                </a>
                 <span>{p.nombre ?? "Anexo"}</span>
-              </a>
+                {p.origen === "actividad" ? (
+                  <span className={styles.chip}>Del levantamiento</span>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.filterBtn}
+                    disabled={bloqueada}
+                    onClick={async () => {
+                      if (!token) return;
+                      try {
+                        await quitarPlano(token, cot.id, p.url);
+                        await cargar();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "No se pudo quitar");
+                      }
+                    }}
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         ) : (
@@ -448,6 +515,32 @@ export default function CotizacionDetallePage() {
             levantamiento entran aquí solas.
           </p>
         )}
+
+        <label className={styles.fieldLabel} htmlFor="plano">
+          Subir plano o anexo (imagen o PDF)
+        </label>
+        <input
+          id="plano"
+          type="file"
+          accept="image/*,application/pdf"
+          disabled={bloqueada || subiendo}
+          onChange={async (e) => {
+            const archivo = e.target.files?.[0];
+            e.target.value = "";
+            if (!archivo || !token) return;
+            setSubiendo(true);
+            setError(null);
+            try {
+              await subirPlano(token, cot.id, archivo);
+              await cargar();
+              setAviso("Anexo agregado.");
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "No se pudo subir el anexo");
+            } finally {
+              setSubiendo(false);
+            }
+          }}
+        />
         {cot.actividades?.length ? (
           <p className={styles.sub}>
             Actividad ligada:{" "}

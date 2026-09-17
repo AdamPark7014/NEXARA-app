@@ -265,6 +265,31 @@ export function ligarActividadACotizacion(token: string, id: number, activityId:
   });
 }
 
+/** Sube un plano o anexo (03 Planos). Los del levantamiento llegan solos desde la actividad. */
+export async function subirPlano(token: string, id: number, archivo: File, nombre?: string) {
+  const cuerpo = new FormData();
+  cuerpo.append("file", archivo);
+  if (nombre?.trim()) cuerpo.append("nombre", nombre.trim());
+  const res = await fetch(buildApiUrl(`cotizaciones/${id}/planos`), {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}` },
+    body: cuerpo,
+  });
+  if (!res.ok) {
+    const texto = await res.text().catch(() => "");
+    throw new Error(texto || `No se pudo subir el anexo (HTTP ${res.status})`);
+  }
+  return (await res.json()) as CotizacionDetalle;
+}
+
+export function quitarPlano(token: string, id: number, url: string) {
+  return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/planos/quitar`, token, {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
+}
+
 export type PaqueteCotizacion = {
   clave: string;
   titulo: string;
