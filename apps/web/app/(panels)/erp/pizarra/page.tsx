@@ -7,9 +7,12 @@ import ReplayIcon from "@mui/icons-material/Replay";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import OutboxOutlinedIcon from "@mui/icons-material/OutboxOutlined";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
+import AsignadasPorMiView from "@/components/pizarra/AsignadasPorMiView";
+import { KpiStrip, PrioridadChip, RangoSelector, SemaforoDot } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import {
@@ -17,13 +20,15 @@ import {
   STATUS_LABELS,
   fetchTeamBoard,
   formatMinutes,
+  type BoardRange,
   type BoardUserStatus,
+  type RangoPreset,
   type TeamBoardResponse,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
 
-/** Actividades tiene dos vistas: lo mío y mi equipo (se recuerda la última). */
-type Vista = "mias" | "equipo";
+/** Actividades tiene tres vistas: lo mío, mi equipo y lo que repartí (se recuerda la última). */
+type Vista = "mias" | "equipo" | "asignadas";
 const VISTA_KEY = "nx-actividades-vista";
 
 function initials(name: string): string {
@@ -221,27 +226,39 @@ function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean })
           </div>
         ) : null}
       </div>
+      <KpiStrip kpis={user.kpis} compacta />
       {open.length > 0 ? (
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
           {open.slice(0, 3).map((a) => (
             <div key={a.id} title={`${a.anNumber} · ${a.titulo}`}>
               <div
                 style={{
-                  fontSize: 10,
-                  fontWeight: 650,
-                  color: "var(--text-secondary)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  marginBottom: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  marginBottom: 3,
+                  minWidth: 0,
                 }}
               >
-                {a.titulo}
-                {a.assignmentCharge === "despacho"
-                  ? " · Despacho"
-                  : a.assignmentCharge === "ejecucion"
-                    ? " · Ejecución"
-                    : ""}
+                <SemaforoDot semaforo={a.semaforo} size={8} />
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 650,
+                    color: "var(--text-secondary)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {a.titulo}
+                  {a.assignmentCharge === "despacho"
+                    ? " · Despacho"
+                    : a.assignmentCharge === "ejecucion"
+                      ? " · Ejecución"
+                      : ""}
+                </span>
+                {a.prioridad === "ALTA" ? <PrioridadChip prioridad={a.prioridad} /> : null}
               </div>
               <div
                 style={{
@@ -294,18 +311,24 @@ export default function PizarraPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [vista, setVista] = useState<Vista>("mias");
+  const [preset, setPreset] = useState<RangoPreset>("hoy");
+  const [rango, setRango] = useState<BoardRange>({});
 
-  // ?vista=mias|equipo manda (enlaces viejos de Mis actividades); si no, la última elegida.
+  // ?vista=mias|equipo|asignadas manda (enlaces viejos de Mis actividades); si no, la última elegida.
   useEffect(() => {
     try {
       const q = new URLSearchParams(window.location.search).get("vista");
       const guardada = window.localStorage.getItem(VISTA_KEY);
-      setVista(q === "mias" || q === "equipo" ? q : guardada === "equipo" ? "equipo" : "mias");
+      const valida = (v: string | null): v is Vista =>
+        v === "mias" || v === "equipo" || v === "asignadas";
+      setVista(valida(q) ? q : valida(guardada) ? guardada : "mias");
     } catch {
       /* sin storage: queda «mias» */
     }
   }, []);
 
+  const desde = rango.desde ?? null;
+  const hasta = rango.hasta ?? null;
   const load = useCallback(async () => {
     if (!token) {
       setLoading(false);
@@ -315,14 +338,14 @@ export default function PizarraPage() {
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchTeamBoard(token));
+      setData(await fetchTeamBoard(token, { desde, hasta }));
     } catch (e) {
       setError(formatApiError(e, "No se pudo cargar Actividades"));
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, desde, hasta]);
 
   useEffect(() => {
     void load();
@@ -352,13 +375,21 @@ export default function PizarraPage() {
 
   const isCeo = isCeoEmail(user?.email);
   const otros = users.filter((u) => u.id !== user?.id).length;
-  // Dos vistas solo para quien tiene gente a su cargo (según su tablero). Los demás, directo su lista.
+  // Las vistas solo para quien tiene gente a su cargo (según su tablero). Los demás, directo su lista.
   const tieneEquipo = otros > 0;
   const cargandoEquipo = !isCeo && data == null && !error;
   const sinEquipo = !isCeo && !tieneEquipo && (data != null || Boolean(error));
-  // Christian solo asigna: ve el tablero. Encargados con subordinados eligen lo suyo o su equipo.
-  const conPestanas = !isCeo && tieneEquipo;
-  const verMias = conPestanas && vista === "mias";
+  // Christian solo asigna: ve el tablero y lo que repartió. Encargados con subordinados,
+  // además lo suyo.
+  const pestanas: Vista[] = isCeo
+    ? ["equipo", "asignadas"]
+    : tieneEquipo
+      ? ["mias", "equipo", "asignadas"]
+      : [];
+  const conPestanas = pestanas.length > 0;
+  const vistaActiva: Vista = conPestanas && pestanas.includes(vista) ? vista : pestanas[0] ?? "equipo";
+  const verMias = vistaActiva === "mias";
+  const verAsignadas = vistaActiva === "asignadas";
 
   const cambiarVista = (v: Vista) => {
     setVista(v);
@@ -389,7 +420,9 @@ export default function PizarraPage() {
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
             {verMias
               ? "Lo tuyo, en orden. En «Mi equipo» ves a tu gente y le asignas trabajo."
-              : "Tú y tu equipo — toca a alguien para ver su día o asignarle trabajo"}
+              : verAsignadas
+                ? "Lo que repartiste en el rango, con quién lo tiene y cómo va"
+                : "Tú y tu equipo — toca a alguien para ver su día o asignarle trabajo"}
           </p>
         </div>
         {verMias ? null : (
@@ -432,9 +465,12 @@ export default function PizarraPage() {
             [
               ["mias", "Mis actividades", TaskAltIcon],
               ["equipo", "Mi equipo", GroupsOutlinedIcon],
+              ["asignadas", "Asignadas por mí", OutboxOutlinedIcon],
             ] as const
-          ).map(([id, label, Icon]) => {
-            const on = vista === id;
+          )
+            .filter(([id]) => pestanas.includes(id))
+            .map(([id, label, Icon]) => {
+            const on = vistaActiva === id;
             return (
               <button
                 key={id}
@@ -468,6 +504,19 @@ export default function PizarraPage() {
 
       {verMias ? (
         <MisActividadesView />
+      ) : (
+      <>
+      <RangoSelector
+        preset={preset}
+        rango={rango}
+        onChange={(p, r) => {
+          setPreset(p);
+          setRango(p === "hoy" ? {} : r);
+        }}
+      />
+
+      {verAsignadas ? (
+        <AsignadasPorMiView token={token} rango={preset === "hoy" ? {} : rango} />
       ) : (
       <>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -513,6 +562,8 @@ export default function PizarraPage() {
             <PersonCard key={u.id} user={u} isSelf={u.id === user?.id} />
           ))}
         </div>
+      )}
+      </>
       )}
       </>
       )}
