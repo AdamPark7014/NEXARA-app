@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import mx.nexara.mobile.nativeapp.R
+import mx.nexara.mobile.nativeapp.access.PermissionLabels
+import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -322,8 +324,12 @@ fun MyProfileScreen(
             }
         }
 
+        // Dirección (Christian, Claudia) y cuentas de sistema no llevan expediente de RH ni checador.
+        val cuentaDireccion = PlatformAccounts.isCeoEquivalentEmail(user.email) ||
+            PlatformAccounts.isNonEmployeeEmail(user.email)
+
         // ── Completitud, identidad ACS y asistencia de hoy ────────────────
-        if (!profileState.loading && profileState.error == null) {
+        if (!profileState.loading && profileState.error == null && !cuentaDireccion) {
             item {
                 ProfileCoreSummary(state = profileState, brand = Brand, sub = Sub, slate = Slate)
             }
@@ -338,7 +344,7 @@ fun MyProfileScreen(
                 elevation = CardDefaults.cardElevation(1.dp),
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Datos personales", fontWeight = FontWeight.SemiBold, color = Slate)
+                    Text(if (cuentaDireccion) "Contacto" else "Datos personales", fontWeight = FontWeight.SemiBold, color = Slate)
                     if (profileState.loading) {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                     } else {
@@ -347,21 +353,23 @@ fun MyProfileScreen(
                             TextButton(onClick = { vm.load() }) { Text("Reintentar") }
                         }
                         ProfileField("Teléfono", profileState.telefono) { vm.setField("telefono", it) }
-                        DatePickerField(
+                        if (!cuentaDireccion) DatePickerField(
                             label = "Fecha de nacimiento",
                             value = profileState.fechaNacimiento,
                             onValueChange = { vm.setField("fechaNacimiento", it) },
                         )
-                        ProfileField("Dirección", profileState.direccion) { vm.setField("direccion", it) }
-                        ProfileField("Colonia", profileState.colonia) { vm.setField("colonia", it) }
-                        ProfileField("Ciudad", profileState.ciudad) { vm.setField("ciudad", it) }
-                        ProfileField("Estado", profileState.estado) { vm.setField("estado", it) }
-                        ProfileField("C.P.", profileState.codigoPostal) { vm.setField("codigoPostal", it) }
-                        ProfileField("País", profileState.pais) { vm.setField("pais", it) }
-                        ProfileField("CURP", profileState.curp) { vm.setField("curp", it) }
-                        ProfileField("RFC", profileState.rfc) { vm.setField("rfc", it) }
-                        ProfileField("Número de INE", profileState.ineNumero) { vm.setField("ineNumero", it) }
-                        ProfileField("NSS", profileState.nss) { vm.setField("nss", it) }
+                        if (!cuentaDireccion) {
+                            ProfileField("Dirección", profileState.direccion) { vm.setField("direccion", it) }
+                            ProfileField("Colonia", profileState.colonia) { vm.setField("colonia", it) }
+                            ProfileField("Ciudad", profileState.ciudad) { vm.setField("ciudad", it) }
+                            ProfileField("Estado", profileState.estado) { vm.setField("estado", it) }
+                            ProfileField("C.P.", profileState.codigoPostal) { vm.setField("codigoPostal", it) }
+                            ProfileField("País", profileState.pais) { vm.setField("pais", it) }
+                            ProfileField("CURP", profileState.curp) { vm.setField("curp", it) }
+                            ProfileField("RFC", profileState.rfc) { vm.setField("rfc", it) }
+                            ProfileField("Número de INE", profileState.ineNumero) { vm.setField("ineNumero", it) }
+                            ProfileField("NSS", profileState.nss) { vm.setField("nss", it) }
+                        }
                         ProfileField("Contacto emergencia", profileState.contactoEmergenciaNombre) {
                             vm.setField("contactoEmergenciaNombre", it)
                         }
@@ -403,9 +411,7 @@ fun MyProfileScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (user.department.isNotBlank()) ProfileInfoRow("Departamento", user.department, Brand, Sub)
-                    if (user.clientId != null) ProfileInfoRow("Client ID", user.clientId.toString(), Brand, Sub)
-                    if (user.branchId != null) ProfileInfoRow("Branch ID", user.branchId.toString(), Brand, Sub)
-                    ProfileInfoRow("ID de usuario", user.id.toString(), Brand, Sub)
+                    if (user.email.isNotBlank()) ProfileInfoRow("Correo", user.email, Brand, Sub)
                 }
             }
         }
@@ -473,30 +479,16 @@ fun MyProfileScreen(
             }
         }
 
-        // ── Permissions ──────────────────────────────────────────────────
+        // ── Lo que puedes hacer (permisos traducidos) ────────────────────
         if (user.permissions.isNotEmpty()) {
             item {
-                Text(
-                    "Permisos (${user.permissions.size})",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
-                    color = Sub,
-                    modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp),
+                PermisosAmigables(
+                    permisos = user.permissions,
+                    accesoTotal = user.isSuperAdmin || PlatformAccounts.isCeoEquivalentEmail(user.email),
+                    slate = Slate,
+                    sub = Sub,
+                    brand = Brand,
                 )
-            }
-            items(user.permissions) { p ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
-                    elevation = CardDefaults.cardElevation(0.dp),
-                ) {
-                    Text(
-                        p,
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = Slate,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
             }
         }
 
@@ -602,6 +594,70 @@ private fun ProfileCoreSummary(
                     color = sub,
                 )
             }
+        }
+    }
+}
+
+/** «Lo que puedes hacer»: permisos por módulo en lenguaje llano; lo heredado de otros paneles, plegado. */
+@Composable
+private fun PermisosAmigables(
+    permisos: List<String>,
+    accesoTotal: Boolean,
+    slate: Color,
+    sub: Color,
+    brand: Color,
+) {
+    val grupos = remember(permisos) { PermissionLabels.agrupar(permisos) }
+    val core = grupos.filter { it.modulo.core }
+    val otros = grupos.filter { !it.modulo.core }
+    var verOtros by remember { mutableStateOf(false) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(1.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Lo que puedes hacer", fontWeight = FontWeight.SemiBold, color = slate)
+            Text(
+                if (accesoTotal) "Tienes acceso completo de dirección a NEXARA." else "Según tu puesto en la empresa.",
+                style = MaterialTheme.typography.bodySmall,
+                color = sub,
+            )
+            core.forEach { g -> PermisoFila(g, slate, sub, brand) }
+            if (otros.isNotEmpty()) {
+                TextButton(onClick = { verOtros = !verOtros }) {
+                    Text(
+                        if (verOtros) "Ocultar módulos fuera de la app" else "Ver módulos fuera de la app (${otros.size})",
+                        color = brand,
+                    )
+                }
+                if (verOtros) otros.forEach { g -> PermisoFila(g, slate, sub, brand) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermisoFila(grupo: PermissionLabels.Grupo, slate: Color, sub: Color, brand: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFF8FAFC))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(if (grupo.modulo.core) brand else sub),
+        )
+        Column(Modifier.weight(1f)) {
+            Text(grupo.modulo.nombre, fontWeight = FontWeight.SemiBold, color = slate, fontSize = 14.sp)
+            Text(PermissionLabels.unirAcciones(grupo.acciones), style = MaterialTheme.typography.bodySmall, color = sub)
         }
     }
 }
