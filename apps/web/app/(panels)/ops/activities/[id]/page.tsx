@@ -8,6 +8,7 @@ import InlineAlert from "@/components/ui/InlineAlert";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
+import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
@@ -513,6 +514,17 @@ export default function ActivityDetailPage() {
           </div>
         )}
       </DetailSection>
+
+      {String(activity.coreKind ?? "").toLowerCase() === "comercial" ? (
+        <DetailSection title="Cotización">
+          <CotizacionDeActividad
+            activityId={activity.id}
+            coreKind={activity.coreKind}
+            cotizacion={(activity as { cotizacion?: CotizacionLigada | null }).cotizacion ?? null}
+            onLigada={() => void reload()}
+          />
+        </DetailSection>
+      ) : null}
 
       <DetailSection title="Evidencias del equipo">
         <EquipoEvidencias activityId={activity.id} compact verMasHref={hrefs.evidences} />
