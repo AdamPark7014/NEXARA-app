@@ -19,8 +19,19 @@ object ActivitySemaforo {
     const val ACEPTADA = "ACEPTADA"
     const val RECHAZADA = "RECHAZADA"
 
-    /** El motivo del rechazo lo pide el API con 10 caracteres mínimo. */
+    /** El motivo lo pide el API con 10 caracteres mínimo. */
     const val MIN_MOTIVO_RECHAZO = 10
+
+    /**
+     * Quien recibe una actividad no decide si la toma: la empieza. Por eso la
+     * acción principal dice «Comenzar actividad» y la secundaria «No puedo
+     * tomarla» — esta última usa el mismo endpoint de rechazo con su motivo.
+     */
+    const val ACCION_COMENZAR = "Comenzar actividad"
+    const val ACCION_NO_PUEDO = "No puedo tomarla"
+
+    /** Chip de la lista mientras no la ha comenzado. */
+    const val CHIP_SIN_COMENZAR = "Sin comenzar"
 
     data class Luz(val clave: String, val etiqueta: String, val color: Long)
 
@@ -58,10 +69,10 @@ object ActivitySemaforo {
     fun fueRechazada(aceptacion: String?): Boolean =
         aceptacion?.trim()?.uppercase() == RECHAZADA
 
-    /** «Rechazada: no tengo la llave del site» (sin motivo, solo «Rechazada»). */
+    /** «No la tomaste: no tengo la llave del site» (sin motivo, solo «No la tomaste»). */
     fun rechazadaTexto(motivo: String?): String {
         val m = motivo?.trim().orEmpty()
-        return if (m.isEmpty()) "Rechazada" else "Rechazada: $m"
+        return if (m.isEmpty()) "No la tomaste" else "No la tomaste: $m"
     }
 
     /** «Asignada por Luis»; `null` si nadie la asignó (auto-asignada). */
