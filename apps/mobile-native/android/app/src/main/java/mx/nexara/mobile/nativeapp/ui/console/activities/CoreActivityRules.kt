@@ -10,6 +10,8 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import mx.nexara.mobile.nativeapp.access.PlatformAccounts
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotosDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
@@ -164,6 +166,128 @@ object CoreActivityRules {
     /** Enviada y sin devolución: ya no se toca hasta que la revisen. */
     fun isEvidenceLocked(status: String?, reviewStatus: String?): Boolean =
         reviewStatus != "REJECTED" && status == STEP_COMPLETED
+
+    // ── Evidencia por campos ────────────────────────────────────────────────
+    //
+    // Un «campo» es una cosa concreta que hay que fotografiar («Cámara 1»,
+    // «Rack»). Cada campo pide foto en los momentos que diga el API: antes, en
+    // progreso, después — cualquier combinación. La actividad que no trae
+    // campos se captura como siempre (fotos libres): todo esto queda inerte.
+
+    const val MOMENTO_ANTES = "antes"
+    const val MOMENTO_PROGRESO = "progreso"
+    const val MOMENTO_DESPUES = "despues"
+
+    /** Orden en que se piden y se pintan. */
+    val MOMENTOS = listOf(MOMENTO_ANTES, MOMENTO_PROGRESO, MOMENTO_DESPUES)
+
+    /** Acepta lo que mande el API: «ANTES », «en progreso», «después». */
+    fun normMomento(momento: String?): String? =
+        when (momento?.trim()?.lowercase(ES_MX)) {
+            "antes" -> MOMENTO_ANTES
+            "progreso", "en progreso", "durante" -> MOMENTO_PROGRESO
+            "despues", "después" -> MOMENTO_DESPUES
+            else -> null
+        }
+
+    fun momentoLabel(momento: String?): String = when (normMomento(momento)) {
+        MOMENTO_ANTES -> "Antes"
+        MOMENTO_PROGRESO -> "En progreso"
+        MOMENTO_DESPUES -> "Después"
+        else -> momento?.trim().orEmpty()
+    }
+
+    /** Momentos que pide el campo, sin repetidos, en el orden de [MOMENTOS]. */
+    fun momentosDeCampo(campo: EvidenceCampoDto): List<String> {
+        val pedidos = campo.momentos.orEmpty().mapNotNull { normMomento(it) }.toSet()
+        return MOMENTOS.filter { it in pedidos }
+    }
+
+    /** Por `orden`, y a igualdad por id: el API puede mandarlos en cualquier orden. */
+    fun camposOrdenados(campos: List<EvidenceCampoDto>?): List<EvidenceCampoDto> =
+        campos.orEmpty().sortedWith(
+            compareBy({ it.orden ?: Int.MAX_VALUE }, { it.id ?: Long.MAX_VALUE }),
+        )
+
+    fun campoNombre(campo: EvidenceCampoDto): String =
+        campo.nombre?.trim()?.takeIf { it.isNotEmpty() }
+            ?: campo.id?.let { "Campo $it" }
+            ?: "Campo"
+
+    /** URL ya guardada en ese momento; `null` si el hueco sigue vacío. */
+    fun fotoDeCampo(campo: EvidenceCampoDto, momento: String): String? {
+        val url = when (normMomento(momento)) {
+            MOMENTO_ANTES -> campo.fotos?.antes
+            MOMENTO_PROGRESO -> campo.fotos?.progreso
+            MOMENTO_DESPUES -> campo.fotos?.despues
+            else -> null
+        }
+        return url?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    fun momentosPendientes(campo: EvidenceCampoDto): List<String> =
+        momentosDeCampo(campo).filter { fotoDeCampo(campo, it) == null }
+
+    fun campoListo(campo: EvidenceCampoDto): Boolean = momentosPendientes(campo).isEmpty()
+
+    /** Huecos obligatorios que faltan en toda la actividad. */
+    fun camposFaltantes(campos: List<EvidenceCampoDto>?): Int =
+        campos.orEmpty().sumOf { momentosPendientes(it).size }
+
+    fun camposRequeridos(campos: List<EvidenceCampoDto>?): Int =
+        campos.orEmpty().sumOf { momentosDeCampo(it).size }
+
+    /** Sin campos (API de hoy) nada bloquea; con campos, la salida espera. */
+    fun camposListos(campos: List<EvidenceCampoDto>?): Boolean = camposFaltantes(campos) == 0
+
+    /** «4 de 6 fotos por campo». */
+    fun camposResumen(campos: List<EvidenceCampoDto>?): String {
+        val total = camposRequeridos(campos)
+        val hechas = total - camposFaltantes(campos)
+        return "$hechas de $total fotos por campo"
+    }
+
+    /** Por qué la foto de salida está bloqueada; `null` si ya se puede cerrar. */
+    fun camposBloqueoSalida(campos: List<EvidenceCampoDto>?): String? =
+        when (val faltan = camposFaltantes(campos)) {
+            0 -> null
+            1 -> "Falta 1 foto por campo antes de cerrar la actividad."
+            else -> "Faltan $faltan fotos por campo antes de cerrar la actividad."
+        }
+
+    /** Fotos ya tomadas por campo, en orden (campo y momento). */
+    fun camposFotoUrls(campos: List<EvidenceCampoDto>?): List<String> =
+        camposOrdenados(campos).flatMap { campo ->
+            momentosDeCampo(campo).mapNotNull { fotoDeCampo(campo, it) }
+        }
+
+    /** El POST responde con el campo actualizado; lo que no mande se conserva. */
+    fun mezclaCampo(previo: EvidenceCampoDto, nuevo: EvidenceCampoDto?): EvidenceCampoDto {
+        if (nuevo == null) return previo
+        return previo.copy(
+            nombre = nuevo.nombre ?: previo.nombre,
+            orden = nuevo.orden ?: previo.orden,
+            momentos = nuevo.momentos ?: previo.momentos,
+            fotos = EvidenceCampoFotosDto(
+                antes = nuevo.fotos?.antes ?: previo.fotos?.antes,
+                progreso = nuevo.fotos?.progreso ?: previo.fotos?.progreso,
+                despues = nuevo.fotos?.despues ?: previo.fotos?.despues,
+            ),
+        )
+    }
+
+    /** Marca el hueco como tomado aunque el API no devuelva la URL (o no haya red). */
+    fun conFoto(campo: EvidenceCampoDto, momento: String, url: String): EvidenceCampoDto {
+        val fotos = campo.fotos ?: EvidenceCampoFotosDto()
+        return campo.copy(
+            fotos = when (normMomento(momento)) {
+                MOMENTO_ANTES -> fotos.copy(antes = fotos.antes ?: url)
+                MOMENTO_PROGRESO -> fotos.copy(progreso = fotos.progreso ?: url)
+                MOMENTO_DESPUES -> fotos.copy(despues = fotos.despues ?: url)
+                else -> fotos
+            },
+        )
+    }
 
     // ── Quién captura ───────────────────────────────────────────────────────
 
