@@ -323,6 +323,8 @@ data class AttendanceRangeUserDto(
     val totalMinutes: Int? = null,
     val days: List<AttendanceDayDto>? = null,
     val attendances: List<AttendanceEventDto>? = null,
+    /** Días sin checada que Christian justificó. */
+    val justificaciones: List<AttendanceJustificacionDto>? = null,
 )
 
 data class AttendanceRangeDto(
@@ -331,6 +333,33 @@ data class AttendanceRangeDto(
     val totalMinutesAll: Int? = null,
     val totalUsers: Int? = null,
     val users: List<AttendanceRangeUserDto>? = null,
+    /** `attendance/range` (lo propio): las faltas justificadas vienen arriba, sin `users`. */
+    val justificaciones: List<AttendanceJustificacionDto>? = null,
+)
+
+/**
+ * Falta justificada: ese día se lee «Falta justificada · motivo», ni ausente ni
+ * asistió. No es checada ni suma horas.
+ */
+data class AttendanceJustificacionDto(
+    val id: Long? = null,
+    val userId: Long? = null,
+    /** AAAA-MM-DD */
+    val fecha: String? = null,
+    val motivo: String? = null,
+    /** FALTA_JUSTIFICADA */
+    val estado: String? = null,
+    val etiqueta: String? = null,
+    val justificadaPor: ActivityPersonRefDto? = null,
+    val justificadaAt: String? = null,
+)
+
+/** `POST attendance/justificaciones` (solo Christian). */
+data class JustificarFaltaRequest(
+    val userId: Long,
+    /** AAAA-MM-DD */
+    val fecha: String,
+    val motivo: String,
 )
 
 data class AttendanceCurrentDto(
@@ -474,6 +503,10 @@ interface ConsoleApi {
         @Query("from") from: String,
         @Query("to") to: String,
     ): AttendanceRangeDto
+
+    /** Justificar la falta de un día sin checada. Solo Christian; no crea checadas. */
+    @POST("attendance/justificaciones")
+    suspend fun justificarFalta(@Body body: JustificarFaltaRequest): okhttp3.ResponseBody
 
     @GET("attendance/current")
     suspend fun getAttendanceCurrent(): AttendanceCurrentDto
