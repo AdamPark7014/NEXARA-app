@@ -271,7 +271,7 @@ export default function OpsActivityForm({
           ? "Mantenimiento e inventario cliente"
           : "Ticket cliente",
       indicaciones: request.description || prev.indicaciones,
-      prioridad: request.urgency === "HIGH" ? "Alta" : request.urgency === "LOW" ? "Baja" : "Media",
+      prioridad: request.urgency === "HIGH" ? "ALTA" : request.urgency === "LOW" ? "BAJA" : "MEDIA",
       clientId,
       projectId: matching.length === 1 ? String(matching[0].id) : "",
       projectMode: "with_project",
@@ -704,7 +704,7 @@ export default function OpsActivityForm({
         </select>
         )}
         <PrioritySemaforo
-          value={form.prioridad || "Media"}
+          value={form.prioridad || "MEDIA"}
           onChange={(prioridad) => setForm({ ...form, prioridad })}
         />
         <div>

@@ -20,6 +20,13 @@ import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missi
 import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
+import AceptarRechazar from "@/components/pizarra/AceptarRechazar";
+import {
+  normalizarPrioridad,
+  PRIORIDAD_UI,
+  SEMAFORO_UI,
+  textoPlanVsReal,
+} from "@/lib/actividad-tiempos";
 import type { SvgIconComponent } from "@mui/icons-material";
 import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
@@ -50,14 +57,10 @@ function workTypeLabel(workType?: string | null): string {
   return "Incidencia / servicio";
 }
 
+/** Prioridad normalizada (ALTA|MEDIA|BAJA) en el texto que lee la gente. */
 function normalizePriorityDisplay(raw?: string | null): string {
   if (!raw) return "";
-  const key = raw.trim().toLowerCase();
-  if (key === "baja" || key === "low") return "Baja";
-  if (key === "media" || key === "medium") return "Media";
-  if (key === "alta" || key === "high") return "Alta";
-  if (key === "urgente" || key === "urgent") return "Urgente";
-  return raw;
+  return PRIORIDAD_UI[normalizarPrioridad(raw)].label;
 }
 
 function flowStepForStatus(estatus: string): string {
@@ -134,7 +137,7 @@ export default function ActivityDetailPage() {
     if (!activity) return;
     setForm({
       estatus: flowStepForStatus(activity.estatus ?? "Pendiente"),
-      prioridad: normalizePriorityDisplay(activity.prioridad) || "Media",
+      prioridad: activity.prioridad ? normalizarPrioridad(activity.prioridad) : "MEDIA",
       descripcion: activity.descripcion ?? "",
       indicaciones: activity.indicaciones ?? "",
       fechaInicio: toDateLocal(activity.fechaInicio),
@@ -205,6 +208,16 @@ export default function ActivityDetailPage() {
   const activeFlowKey = flowStepForStatus(activity.estatus);
   const activeFlowIdx = Math.max(0, activityFlow.findIndex((s) => s.key === activeFlowKey));
   const priorityDisplay = normalizePriorityDisplay(activity.prioridad) || activity.prioridad || "—";
+  // Mi fila del equipo: de ahí salen aceptación, semáforo y tiempo planeado vs real.
+  const miFila = (activity.assignees ?? []).find(
+    (m) => (m.userId ?? m.user?.id) === user?.id && !m.retiradoAt,
+  );
+  const semaforo = miFila?.semaforo ?? activity.semaforo ?? null;
+  const planVsReal = textoPlanVsReal(
+    miFila?.minutosPlan ?? activity.minutosPlan,
+    miFila?.minutosReales ?? activity.minutosReales,
+  );
+  const excedida = Boolean(miFila?.excedida ?? activity.excedida);
   const hasProject = Boolean(activity.projectId || activity.project?.id);
   // Despacho a equipo: el responsable (y los LEAD) coordinan; ejecuta el resto del equipo.
   const despacho = activity.assignmentCharge === "despacho";
@@ -217,6 +230,29 @@ export default function ActivityDetailPage() {
   return (
     <>
       <ActivitySuperiorActions activityId={activity.id} token={token} onDone={reload} />
+      {token && miFila && miFila.aceptacion && miFila.aceptacion !== "ACEPTADA" ? (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
+            background: "color-mix(in srgb, var(--primary) 6%, var(--surface))",
+            display: "grid",
+            gap: 8,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 700 }}>Te asignaron esta actividad</div>
+          <AceptarRechazar
+            token={token}
+            activityId={activity.id}
+            aceptacion={miFila.aceptacion}
+            motivoRechazo={miFila.motivoRechazo}
+            titulo={activity.titulo}
+            onDone={reload}
+          />
+        </div>
+      ) : null}
       {/cancel/i.test(activity.estatus) && (activity.cancelReason || activity.cancelledAt) ? (
         <div
           role="status"
@@ -265,6 +301,21 @@ export default function ActivityDetailPage() {
         <KpiCard label="Estado" value={activity.estatus.replace(/_/g, " ")} variant={activityStatusVariant(activity.estatus)} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
         <KpiCard label="Prioridad" value={priorityDisplay} variant={/urgente|alta/i.test(priorityDisplay) ? (/urgente/i.test(priorityDisplay) ? "danger" : "warning") : "default"} icon={<BoltOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
         <KpiCard label="Evidencias" value={evidenceCount} icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} hint="Archivos adjuntos" />
+        {planVsReal ? (
+          <KpiCard
+            label="Tiempo"
+            value={planVsReal}
+            variant={excedida ? "danger" : semaforo === "amarillo" ? "warning" : "default"}
+            icon={<BoltOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+            hint={
+              excedida
+                ? "Excedió el tiempo estimado"
+                : semaforo
+                  ? SEMAFORO_UI[semaforo].label
+                  : "Estimado vs real"
+            }
+          />
+        ) : null}
         {despacho ? (
           <KpiCard
             label="Ejecuta"
@@ -462,7 +513,7 @@ export default function ActivityDetailPage() {
                 <PrioritySemaforo
                   compact
                   allowEmpty
-                  value={form.prioridad === "Urgente" ? "Alta" : form.prioridad}
+                  value={form.prioridad}
                   onChange={(prioridad) => setForm((f) => ({ ...f, prioridad }))}
                 />
               </div>

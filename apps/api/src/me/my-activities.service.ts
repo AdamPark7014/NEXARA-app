@@ -8,6 +8,15 @@ import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { tiposVisibles } from './equipo-alcance.js';
+import {
+  horasPlanValidas,
+  rangoPrioridad,
+  tiemposDto,
+  type Aceptacion,
+  type Prioridad,
+  type Semaforo,
+} from '../activities/actividad-tiempos.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 const CEO_EMAIL = 'gerencia@nexara.com.mx';
 
@@ -46,7 +55,15 @@ const DISPATCH_POOLS: Record<string, string[]> = {
   ],
 };
 
-export type DispatchMyActivityDto = { userIds: number[]; indicaciones?: string };
+export type DispatchMyActivityDto = {
+  userIds: number[];
+  indicaciones?: string;
+  /** Tiempo estimado para cada persona del reparto (la web de asignar lo pide). */
+  horasPlan?: number | null;
+};
+
+/** Rechazo con motivo: la actividad sigue asignada hasta que un superior la mueva. */
+export type RechazarActividadDto = { motivo: string };
 
 export type ReprogramarDespachoDto = { fecha: string; motivo?: string };
 
@@ -79,7 +96,8 @@ export type MyActivityItem = {
   titulo: string;
   descripcion: string | null;
   estatus: string;
-  prioridad: string | null;
+  /** Normalizada: ALTA | MEDIA | BAJA (los textos viejos se traducen). */
+  prioridad: Prioridad;
   coreKind: string | null;
   ticketTypeCustom: string | null;
   assignmentCharge: string | null;
@@ -120,6 +138,20 @@ export type MyActivityItem = {
     a: Date;
     motivo: string | null;
   } | null;
+  /** Aceptación de la asignación (la foto de entrada acepta sola en apps viejas). */
+  aceptacion: Aceptacion;
+  motivoRechazo: string | null;
+  semaforo: Semaforo;
+  /** Tiempo estimado en minutos (horasPlan × 60) y tiempo realmente dedicado. */
+  minutosPlan: number | null;
+  minutosReales: number | null;
+  excedida: boolean;
+  inicioRealAt: Date | null;
+  finRealAt: Date | null;
+  /** Quien sumó a esta persona a la actividad (o quien la creó). */
+  asignadoPor: { id: number; nombre: string } | null;
+  /** Inició teniendo otra del día con más prioridad sin terminar. */
+  saltoPrioridad: boolean;
 };
 
 export type MyActivitiesResponse = {
@@ -142,14 +174,6 @@ const norm = (email?: string | null) => (email || '').trim().toLowerCase();
 const isClosed = (estatus: string) =>
   /finalizada|completada|cancelada|aprobada/.test((estatus || '').toLowerCase());
 
-/** Alta/Urgente primero, luego Media (o sin prioridad), luego Baja. */
-const priorityRank = (p?: string | null) => {
-  const v = (p || '').toLowerCase();
-  if (v === 'alta' || v === 'urgente') return 0;
-  if (v === 'baja') return 2;
-  return 1;
-};
-
 /** null/undefined al final. */
 const nullsLast = (a: number | null | undefined, b: number | null | undefined) => {
   if (a == null && b == null) return 0;
@@ -165,7 +189,94 @@ export class MyActivitiesService {
     private readonly activities: ActivitiesService,
     private readonly team: ActivityTeamService,
     private readonly evidence: ActivityEvidenceService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
+
+  /**
+   * Aceptar la asignación: quien la recibe confirma que la hará.
+   * Sin aceptación nada se bloquea (las apps publicadas no tienen el botón y la
+   * foto de entrada acepta sola), pero quien asignó se entera en cuanto pasa.
+   */
+  async aceptar(viewer: MyActivitiesViewer, companyId: number | null, activityId: number) {
+    const fila = await this.filaAsignada(viewer, companyId, activityId);
+    if (fila.aceptadaAt) {
+      return { ok: true, aceptacion: 'ACEPTADA' as const, aceptadaAt: fila.aceptadaAt };
+    }
+    const aceptadaAt = new Date();
+    await this.prisma.activityAssignee.update({
+      where: { id: fila.id },
+      // Aceptar borra un rechazo anterior: la última decisión es la que vale.
+      data: { aceptadaAt, rechazadaAt: null, motivoRechazo: null },
+    });
+    void this.notificationHierarchy.notifyActivityAcceptedByAssignee({
+      activityId,
+      userId: viewer.id,
+      asignadoPorId: fila.asignadoPorId ?? null,
+    });
+    return { ok: true, aceptacion: 'ACEPTADA' as const, aceptadaAt };
+  }
+
+  /**
+   * Rechazar la asignación con motivo. La actividad **sigue siendo suya** hasta que
+   * un superior la pase a alguien más o la cancele: rechazar avisa, no descarga.
+   */
+  async rechazar(
+    viewer: MyActivitiesViewer,
+    companyId: number | null,
+    activityId: number,
+    dto: RechazarActividadDto,
+  ) {
+    const motivo = String(dto?.motivo ?? '').trim();
+    if (motivo.length < 10) {
+      throw new BadRequestException('Explica por qué no puedes hacerla (mínimo 10 caracteres)');
+    }
+    const fila = await this.filaAsignada(viewer, companyId, activityId);
+    if (fila.inicioRealAt) {
+      throw new BadRequestException('Ya la iniciaste: habla con tu encargado para moverla');
+    }
+    const rechazadaAt = new Date();
+    await this.prisma.activityAssignee.update({
+      where: { id: fila.id },
+      data: { rechazadaAt, motivoRechazo: motivo.slice(0, 500), aceptadaAt: null },
+    });
+    void this.notificationHierarchy.notifyActivityRejectedByAssignee({
+      activityId,
+      userId: viewer.id,
+      motivo: motivo.slice(0, 500),
+      asignadoPorId: fila.asignadoPorId ?? null,
+    });
+    return { ok: true, aceptacion: 'RECHAZADA' as const, rechazadaAt, motivoRechazo: motivo.slice(0, 500) };
+  }
+
+  /** Su fila de equipo en una actividad abierta (la que aceptan o rechazan). */
+  private async filaAsignada(
+    viewer: MyActivitiesViewer,
+    companyId: number | null,
+    activityId: number,
+  ) {
+    const fila = await this.prisma.activityAssignee.findFirst({
+      where: {
+        activityId,
+        userId: viewer.id,
+        retiradoAt: null,
+        ...(companyId != null ? { companyId } : {}),
+        activity: { deletedAt: null },
+      },
+      select: {
+        id: true,
+        aceptadaAt: true,
+        rechazadaAt: true,
+        inicioRealAt: true,
+        asignadoPorId: true,
+        activity: { select: { estatus: true } },
+      },
+    });
+    if (!fila) throw new NotFoundException('Esta actividad no está asignada a ti');
+    if (isClosed(fila.activity.estatus)) {
+      throw new BadRequestException('La actividad ya está cerrada');
+    }
+    return fila;
+  }
 
   /**
    * Quien reparte un despacho lo pasa a su gente sin ACTIVITIES_MANAGE (Antonio es
@@ -206,12 +317,18 @@ export class MyActivitiesService {
     }
 
     const notas = typeof dto?.indicaciones === 'string' ? dto.indicaciones.trim().slice(0, 500) : '';
+    const horasPlan = horasPlanValidas(dto?.horasPlan);
     for (const t of targets) {
       // Si quien recibe también reparte (Luis → Antonio) entra como LEAD; si no, la ejecuta.
       const rol: AssigneeRole = DISPATCH_POOLS[norm(t.email)] ? 'LEAD' : 'TECNICO';
       await this.team.addMember(
         activityId,
-        { userId: t.id, rol, ...(notas ? { indicaciones: notas } : {}) },
+        {
+          userId: t.id,
+          rol,
+          ...(notas ? { indicaciones: notas } : {}),
+          ...(horasPlan != null ? { horasPlan } : {}),
+        },
         companyId,
         viewer.id,
       );
@@ -677,6 +794,14 @@ export class MyActivitiesService {
         ordenEjecucion: true,
         ordenJustificacion: true,
         ordenActualizadoAt: true,
+        aceptadaAt: true,
+        rechazadaAt: true,
+        motivoRechazo: true,
+        inicioRealAt: true,
+        finRealAt: true,
+        horasPlan: true,
+        saltoPrioridad: true,
+        asignadoPor: { select: { id: true, nombre: true } },
         activity: {
           select: {
             id: true,
@@ -727,9 +852,11 @@ export class MyActivitiesService {
       take: 300,
     });
 
-    const dayStart = new Date(`${new Date().toLocaleDateString('sv-SE')}T00:00:00`);
+    const ahora = new Date();
+    const dayStart = new Date(`${ahora.toLocaleDateString('sv-SE')}T00:00:00`);
     const items: MyActivityItem[] = rows.map((row) => {
       const a = row.activity;
+      const tiempos = tiemposDto(row, a, ahora);
       const despachador = a.assignmentCharge === 'despacho' && String(row.rol) === 'LEAD';
       const statusByUser = new Map(a.activityEvidences.map((e) => [e.userId, e.status]));
       const pasadaA = a.assignees
@@ -747,7 +874,7 @@ export class MyActivitiesService {
         titulo: a.titulo,
         descripcion: a.descripcion,
         estatus: a.estatus,
-        prioridad: a.prioridad,
+        prioridad: tiempos.prioridad,
         coreKind: a.coreKind,
         ticketTypeCustom: a.ticketTypeCustom,
         assignmentCharge: a.assignmentCharge,
@@ -779,6 +906,21 @@ export class MyActivitiesService {
               motivo: a.scheduleChanges[0].motivo,
             }
           : null,
+        aceptacion: tiempos.aceptacion,
+        motivoRechazo: tiempos.motivoRechazo,
+        semaforo: tiempos.semaforo,
+        minutosPlan: tiempos.minutosPlan,
+        minutosReales: tiempos.minutosReales,
+        excedida: tiempos.excedida,
+        inicioRealAt: tiempos.inicioRealAt,
+        finRealAt: tiempos.finRealAt,
+        // Quien la pasó a esta persona; si nadie consta, quien creó la actividad.
+        asignadoPor: row.asignadoPor
+          ? { id: row.asignadoPor.id, nombre: row.asignadoPor.nombre }
+          : a.creador
+            ? { id: a.creador.id, nombre: a.creador.nombre }
+            : null,
+        saltoPrioridad: tiempos.saltoPrioridad,
       };
     });
 
@@ -788,11 +930,13 @@ export class MyActivitiesService {
     const seguimiento = items
       .filter((item) => !isClosed(item.estatus) && repartida(item))
       .sort((a, b) => a.fechaAsignacion.getTime() - b.fechaAsignacion.getTime());
-    // Orden personal → prioridad → fecha programada → fecha de asignación.
+    // Orden sugerido (nunca bloquea): lo ya iniciado primero, luego orden personal,
+    // prioridad, fecha programada y fecha de asignación.
     open.sort(
       (a, b) =>
+        Number(Boolean(b.inicioRealAt)) - Number(Boolean(a.inicioRealAt)) ||
         nullsLast(a.orden, b.orden) ||
-        priorityRank(a.prioridad) - priorityRank(b.prioridad) ||
+        rangoPrioridad(a.prioridad) - rangoPrioridad(b.prioridad) ||
         nullsLast(a.fechaInicio?.getTime(), b.fechaInicio?.getTime()) ||
         a.fechaAsignacion.getTime() - b.fechaAsignacion.getTime(),
     );

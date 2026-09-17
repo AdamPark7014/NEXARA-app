@@ -1,4 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { Prisma, type ActivityEvidence } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { saveBase64Photo } from '../../common/file-upload.util';
@@ -6,6 +13,13 @@ import { ActivitiesService } from '../activities.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { ActivityGeofenceService } from '../geofence/activity-geofence.service.js';
+import {
+  debeAutoAceptar,
+  esCerrada,
+  rangoPrioridad,
+  RADIO_SITIO_M,
+} from '../actividad-tiempos.js';
+import { distanciaAlSitio, sitioDeActividad, type PrismaSitio } from '../sitio-actividad.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import {
   clampEvidencePhotoRequired,
@@ -65,6 +79,8 @@ function sanitizePhotoGeo(raw: unknown, count: number): Array<PhotoGeo | null> |
 
 @Injectable()
 export class ActivityEvidenceService {
+  private readonly logger = new Logger(ActivityEvidenceService.name);
+
   constructor(
     private prisma: PrismaService,
     private activitiesService: ActivitiesService,
@@ -509,6 +525,8 @@ export class ActivityEvidenceService {
     latitude: number,
     longitude: number,
     companyId?: number | null,
+    /** Por qué la empieza antes que otra de más prioridad (opcional; no bloquea). */
+    justificacionOrden?: string | null,
   ) {
     const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
@@ -526,8 +544,142 @@ export class ActivityEvidenceService {
         status: 'EVIDENCE_PHOTOS',
       },
     });
+    // La foto de entrada es el inicio real: acepta sola, pone «En Proceso» y mide el sitio.
+    await this.registrarInicioReal({
+      activityId,
+      userId,
+      at: updated.entryPhotoUploadedAt ?? new Date(),
+      latitude,
+      longitude,
+      justificacionOrden,
+    });
     this.avisarAvance({ activityId, actorId: userId, paso: 'inicio', at: updated.entryPhotoUploadedAt ?? undefined });
     return updated;
+  }
+
+  /**
+   * Inicio real de una persona en una actividad (sección B del contrato):
+   * acepta sola si nadie había aceptado (las apps publicadas no tienen el botón),
+   * guarda `inicioRealAt`, pasa la actividad de «Pendiente» a «En Proceso»,
+   * mide la distancia al sitio del cliente y marca si se saltó el orden de prioridad.
+   *
+   * Nada de esto bloquea: si algo falla, la foto de entrada ya quedó guardada.
+   */
+  private async registrarInicioReal(params: {
+    activityId: number;
+    userId: number;
+    at: Date;
+    latitude: number;
+    longitude: number;
+    justificacionOrden?: string | null;
+  }) {
+    const { activityId, userId, at } = params;
+    try {
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: activityId },
+        select: {
+          id: true,
+          estatus: true,
+          prioridad: true,
+          fechaInicio: true,
+          clientId: true,
+          branchName: true,
+          branchNumber: true,
+        },
+      });
+      if (!activity) return;
+
+      const fila = await this.prisma.activityAssignee.findFirst({
+        where: { activityId, userId },
+        select: { id: true, aceptadaAt: true, inicioRealAt: true },
+      });
+
+      const sitio = await sitioDeActividad(this.prisma as unknown as PrismaSitio, activity);
+      const distancia = distanciaAlSitio(sitio, params.latitude, params.longitude);
+      const salto = await this.otraDeMasPrioridadSinTerminar(activity, userId, at);
+      const justificacion =
+        typeof params.justificacionOrden === 'string' && params.justificacionOrden.trim()
+          ? params.justificacionOrden.trim().slice(0, 500)
+          : null;
+
+      if (fila) {
+        await this.prisma.activityAssignee.update({
+          where: { id: fila.id },
+          data: {
+            // Empezar el trabajo vale como aceptación (app 1.0.2 no tiene el botón).
+            ...(debeAutoAceptar(fila) ? { aceptadaAt: at, rechazadaAt: null, motivoRechazo: null } : {}),
+            ...(fila.inicioRealAt ? {} : { inicioRealAt: at }),
+            ...(distancia != null ? { distanciaSitioInicioM: distancia } : {}),
+            ...(salto ? { saltoPrioridad: true } : {}),
+            ...(justificacion ? { justificacionOrden: justificacion } : {}),
+          },
+        });
+      }
+
+      // «Pendiente» → «En Proceso» en cuanto alguien la empieza (el resto de estatus no se toca).
+      if (/^pendiente/i.test(activity.estatus || '')) {
+        await this.prisma.activity.update({
+          where: { id: activityId },
+          data: {
+            estatus: 'En Proceso',
+            ...(activity.fechaInicio ? {} : { fechaInicio: at }),
+          },
+        });
+      }
+
+      const lejos = distancia != null && distancia > RADIO_SITIO_M;
+      if (lejos || salto) {
+        void Promise.resolve(
+          this.notificationHierarchy.notifyActivityStartFlagged({
+            activityId,
+            userId,
+            distanciaSitioM: lejos ? distancia : null,
+            saltoPrioridad: salto,
+            justificacion,
+          }),
+        ).catch(() => undefined);
+      }
+    } catch (error) {
+      // El inicio real es registro, no requisito: nunca tumba la foto de entrada.
+      this.logger.warn(`registrarInicioReal ${activityId}/${userId}: ${String(error)}`);
+    }
+  }
+
+  /**
+   * ¿Tiene ese mismo día otra actividad de más prioridad sin terminar?
+   * No se bloquea nada: solo se marca `saltoPrioridad` y se avisa a los jefes.
+   */
+  private async otraDeMasPrioridadSinTerminar(
+    activity: { id: number; prioridad: string | null },
+    userId: number,
+    at: Date,
+  ): Promise<boolean> {
+    const inicioDia = new Date(at);
+    inicioDia.setHours(0, 0, 0, 0);
+    const finDia = new Date(inicioDia.getTime() + 24 * 60 * 60 * 1000);
+    const rangoActual = rangoPrioridad(activity.prioridad);
+    if (rangoActual === 0) return false;
+
+    const otras = await this.prisma.activityAssignee.findMany({
+      where: {
+        userId,
+        retiradoAt: null,
+        activityId: { not: activity.id },
+        finRealAt: null,
+        activity: {
+          deletedAt: null,
+          OR: [
+            { fechaInicio: { gte: inicioDia, lt: finDia } },
+            { fechaInicio: null, fechaAsignacion: { gte: inicioDia, lt: finDia } },
+          ],
+        },
+      },
+      select: { activity: { select: { prioridad: true, estatus: true } } },
+      take: 50,
+    });
+    return otras.some(
+      (o) => !esCerrada(o.activity.estatus) && rangoPrioridad(o.activity.prioridad) < rangoActual,
+    );
   }
 
   /** Avance en campo para responsable, encargados y jefes; un fallo del aviso nunca rompe el guardado. */
@@ -681,10 +833,41 @@ export class ActivityEvidenceService {
       },
     });
 
+    // La foto de salida cierra el tiempo real de esa persona (y sus horas reales).
+    await this.registrarFinReal(activityId, userId, updated.exitPhotoUploadedAt ?? new Date());
+
     await this.maybeFinalizeActivity(activityId, companyId, updated.userId);
     void this.notifyEvidenceReadyForReview(activityId, updated.userId);
 
     return updated;
+  }
+
+  /**
+   * Fin real de una persona: la foto de salida cierra su tiempo y deja las horas
+   * reales calculadas (útiles para el costo del servicio). Nunca bloquea la foto.
+   */
+  private async registrarFinReal(activityId: number, userId: number, at: Date) {
+    try {
+      const fila = await this.prisma.activityAssignee.findFirst({
+        where: { activityId, userId },
+        select: { id: true, inicioRealAt: true, finRealAt: true, horasReales: true },
+      });
+      if (!fila || fila.finRealAt) return;
+      const minutos = fila.inicioRealAt
+        ? Math.max(0, Math.round((at.getTime() - fila.inicioRealAt.getTime()) / 60_000))
+        : null;
+      await this.prisma.activityAssignee.update({
+        where: { id: fila.id },
+        data: {
+          finRealAt: at,
+          ...(minutos != null && fila.horasReales == null
+            ? { horasReales: Math.round((minutos / 60) * 100) / 100 }
+            : {}),
+        },
+      });
+    } catch (error) {
+      this.logger.warn(`registrarFinReal ${activityId}/${userId}: ${String(error)}`);
+    }
   }
 
   /**
