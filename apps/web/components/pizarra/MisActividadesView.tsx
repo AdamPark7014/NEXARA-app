@@ -22,6 +22,8 @@ import { useUser } from "@/components/UserContext";
 import { ACTIVITY_KINDS, isCeoEmail, type ActivityIconKey, type ActivityKind } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
+import AceptarRechazar from "@/components/pizarra/AceptarRechazar";
+import { normalizarPrioridad, SEMAFORO_UI, textoPlanVsReal } from "@/lib/actividad-tiempos";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import { IconBadge, IconLabel } from "@/components/ui/IconBadge";
 import {
@@ -32,10 +34,9 @@ import {
 } from "@/lib/my-activities-api";
 
 const PRIORITY_UI: Record<string, { color: string; label: string }> = {
-  alta: { color: "#dc2626", label: "Urgente" },
-  urgente: { color: "#dc2626", label: "Urgente" },
-  media: { color: "#d97706", label: "Esta semana" },
-  baja: { color: "#16a34a", label: "Puede esperar" },
+  ALTA: { color: "#dc2626", label: "Urgente" },
+  MEDIA: { color: "#d97706", label: "Esta semana" },
+  BAJA: { color: "#16a34a", label: "Puede esperar" },
 };
 
 const MIN_REASON = 10;
@@ -72,7 +73,7 @@ function avanceUi(status?: string | null): { label: string; color?: string } {
 }
 
 function priorityUi(p?: string | null) {
-  return PRIORITY_UI[(p || "media").toLowerCase()] ?? PRIORITY_UI.media;
+  return PRIORITY_UI[normalizarPrioridad(p)] ?? PRIORITY_UI.MEDIA;
 }
 
 function kindLabel(item: MyActivityItem): string {
@@ -393,6 +394,8 @@ export default function MisActividadesPage() {
           const when = formatWhen(a.fechaInicio ?? a.fechaMaxima);
           const est = formatMinutes(a.tiempoEstimadoMin);
           const max = formatMinutes(a.tiempoMaximoMin);
+          // «Plan 2 h · real 2 h 35 min» (el tiempo estimado por persona manda sobre el viejo).
+          const plan = textoPlanVsReal(a.minutosPlan, a.minutosReales);
           const lugar = a.cliente || a.proyecto;
           const first = i === 0;
           const highlighted = highlightId === a.id;
@@ -481,6 +484,14 @@ export default function MisActividadesPage() {
                     <FiberManualRecordIcon aria-hidden="true" sx={{ fontSize: 9 }} />
                     {pr.label}
                   </Chip>
+                  {a.semaforo ? (
+                    <Chip color={SEMAFORO_UI[a.semaforo].color}>
+                      <FiberManualRecordIcon aria-hidden="true" sx={{ fontSize: 9 }} />
+                      {SEMAFORO_UI[a.semaforo].label}
+                    </Chip>
+                  ) : null}
+                  {a.aceptacion === "PENDIENTE" ? <Chip color="#d97706">Por aceptar</Chip> : null}
+                  {a.aceptacion === "RECHAZADA" ? <Chip color="#dc2626">Rechazada por ti</Chip> : null}
                   <Chip>
                     <ActivityKindIcon kind={kindIcon(a)} size={15} />
                     {kindLabel(a)}
@@ -505,7 +516,14 @@ export default function MisActividadesPage() {
                   <IconLabel icon={EventOutlinedIcon} gap={5}>
                     {when ?? "Sin fecha"}
                   </IconLabel>
-                  {est ? (
+                  {plan ? (
+                    <IconLabel icon={TimerOutlinedIcon} gap={5}>
+                      <span style={a.excedida ? { color: "#dc2626", fontWeight: 700 } : undefined}>
+                        {plan}
+                        {a.excedida ? " · excedida" : ""}
+                      </span>
+                    </IconLabel>
+                  ) : est ? (
                     <IconLabel icon={TimerOutlinedIcon} gap={5}>
                       {est}
                       {max ? ` · tope ${max}` : ""}
@@ -536,6 +554,16 @@ export default function MisActividadesPage() {
                     <EditNoteOutlinedIcon aria-hidden="true" sx={INLINE_ICON_SX} />
                     <strong>Por qué va aquí:</strong> {a.ordenJustificacion}
                   </p>
+                ) : null}
+                {token && !a.despachador ? (
+                  <AceptarRechazar
+                    token={token}
+                    activityId={a.id}
+                    aceptacion={a.aceptacion}
+                    motivoRechazo={a.motivoRechazo}
+                    titulo={a.titulo}
+                    onDone={() => void load()}
+                  />
                 ) : null}
                 {canReorder ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
