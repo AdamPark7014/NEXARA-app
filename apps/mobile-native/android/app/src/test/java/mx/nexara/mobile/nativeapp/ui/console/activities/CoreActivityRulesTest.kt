@@ -7,6 +7,7 @@ import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceReviewDto
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.CaptureRole
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -138,18 +139,20 @@ class CoreActivityRulesTest {
 
     @Test
     fun teamStateFollowsTheWebSemantics() {
-        assertEquals("✅ Finalizada: todo aprobado", CoreActivityRules.teamActivityState(2, 2, 2).label)
-        assertEquals("🔎 Por validar", CoreActivityRules.teamActivityState(2, 2, 1).label)
-        assertEquals("⏳ En curso", CoreActivityRules.teamActivityState(2, 1, 0).label)
-        assertEquals("⏳ En curso", CoreActivityRules.teamActivityState(0, 0, 0).label)
+        assertEquals("Finalizada: todo aprobado", CoreActivityRules.teamActivityState(2, 2, 2).label)
+        assertEquals("Por validar", CoreActivityRules.teamActivityState(2, 2, 1).label)
+        assertEquals("En curso", CoreActivityRules.teamActivityState(2, 1, 0).label)
+        assertEquals("En curso", CoreActivityRules.teamActivityState(0, 0, 0).label)
+        assertEquals(NxGlyph.APPROVED, CoreActivityRules.teamActivityState(2, 2, 2).glyph)
+        assertEquals(NxGlyph.TO_REVIEW, CoreActivityRules.teamActivityState(2, 2, 1).glyph)
     }
 
     @Test
     fun memberStateLabels() {
-        assertEquals("✅ Aprobada", CoreActivityRules.memberEstadoUi("COMPLETED", "APPROVED").label)
-        assertEquals("↩️ Corrigiendo", CoreActivityRules.memberEstadoUi("EXIT_PHOTO", "REJECTED").label)
-        assertEquals("🔎 Por revisar", CoreActivityRules.memberEstadoUi("COMPLETED", null).label)
-        assertEquals("⏳ En curso", CoreActivityRules.memberEstadoUi("EVIDENCE_PHOTOS", null).label)
+        assertEquals("Aprobada", CoreActivityRules.memberEstadoUi("COMPLETED", "APPROVED").label)
+        assertEquals("Corrigiendo", CoreActivityRules.memberEstadoUi("EXIT_PHOTO", "REJECTED").label)
+        assertEquals("Por revisar", CoreActivityRules.memberEstadoUi("COMPLETED", null).label)
+        assertEquals("En curso", CoreActivityRules.memberEstadoUi("EVIDENCE_PHOTOS", null).label)
     }
 
     @Test
@@ -191,9 +194,9 @@ class CoreActivityRulesTest {
         assertEquals("2026-09-14T10:00:00Z", set.fotos[1].at)
         assertNull(set.fotos[2].lat)
         assertEquals("2026-09-14T10:05:00Z", set.fotos[2].at)
-        assertEquals("Alejandro González · 🏁 Salida", set.fotos[3].titulo)
+        assertEquals("Alejandro González · Salida", set.fotos[3].titulo)
         assertEquals(
-            listOf("📍 Entrada", "📷 Evidencia 1", "📷 Evidencia 2", "🏁 Salida"),
+            listOf("Entrada", "Evidencia 1", "Evidencia 2", "Salida"),
             set.fotos.map { it.etiqueta },
         )
     }
@@ -201,7 +204,7 @@ class CoreActivityRulesTest {
     @Test
     fun historyPhotosAreLabeledEvenWithoutEntry() {
         val fotos = CoreActivityRules.fotosEtiquetadas(null, listOf("/a.jpg", " "), "/x.jpg", "Ana")
-        assertEquals(listOf("📷 Evidencia 1", "🏁 Salida"), fotos.map { it.etiqueta })
+        assertEquals(listOf("Evidencia 1", "Salida"), fotos.map { it.etiqueta })
     }
 
     // ── Corrección enviada (contrato 2026-09-15) ───────────────────────────
@@ -214,14 +217,14 @@ class CoreActivityRulesTest {
         val ev = TeamEvidenceDto(status = "COMPLETED", reviewStatus = "PENDING", correctionSubmittedAt = "2026-09-15T16:10:00Z")
 
         assertEquals(
-            "🔁 Corrección por revisar",
+            "Corrección por revisar",
             CoreActivityRules.memberEstadoUi(ev.status, ev.reviewStatus, ev.correctionSubmittedAt).label,
         )
         assertTrue(CoreActivityRules.esCorreccion(ev, revisiones))
         assertEquals(listOf("EXIT_PHOTO", "SERVICE_SHEET_DATA"), CoreActivityRules.pasosCorregidos(ev, revisiones))
         val zone = ZoneId.of("America/Mexico_City")
         val texto = CoreActivityRules.correccionTexto(ev.correctionSubmittedAt, revisiones, zone)
-        assertTrue(texto, texto.startsWith("🔁 Corrigió lo que se le devolvió (Foto de salida, Formulario) · "))
+        assertTrue(texto, texto.startsWith("Corrigió lo que se le devolvió (Foto de salida, Formulario) · "))
         assertTrue(texto, texto.endsWith(". Revisa la corrección y apruébala o devuélvela de nuevo."))
 
         val todo = listOf(TeamEvidenceReviewDto(id = 3L, decision = "DEVUELTA_TODO"))
@@ -236,11 +239,11 @@ class CoreActivityRulesTest {
     @Test
     fun correctingCopyTellsTheReviewerWhatComesNext() {
         assertEquals(
-            "↩️ Está corrigiendo: Foto de entrada · «Sin GPS». Cuando envíe la corrección podrás aprobarla o devolverla otra vez.",
+            "Está corrigiendo: Foto de entrada · «Sin GPS». Cuando envíe la corrección podrás aprobarla o devolverla otra vez.",
             CoreActivityRules.corrigiendoTexto(listOf("ENTRY_PHOTO"), "Sin GPS", avisarReenvio = true),
         )
         assertEquals(
-            "↩️ Está corrigiendo: Fotos en sitio",
+            "Está corrigiendo: Fotos en sitio",
             CoreActivityRules.corrigiendoTexto(listOf("EVIDENCE_PHOTOS"), null, avisarReenvio = false),
         )
     }
@@ -304,8 +307,10 @@ class CoreActivityRulesTest {
         assertEquals("En curso", CoreActivityRules.estatusUi("En Proceso").label)
         assertEquals("En revisión", CoreActivityRules.estatusUi("Por Validar").label)
         assertEquals("Por empezar", CoreActivityRules.estatusUi("Pendiente").label)
-        assertEquals("✅ Tarea · Junta", CoreActivityRules.kindLabel("tarea", "Junta"))
-        assertEquals("🛠️ Servicio", CoreActivityRules.kindLabel("servicio", "Junta"))
+        assertEquals("Tarea · Junta", CoreActivityRules.kindLabel("tarea", "Junta"))
+        assertEquals("Servicio", CoreActivityRules.kindLabel("servicio", "Junta"))
+        assertEquals(NxGlyph.SERVICE, CoreActivityRules.kindTone("servicio", null).glyph)
+        assertEquals(NxGlyph.ACTIVITY, CoreActivityRules.kindGlyph(null))
     }
 
     @Test
@@ -387,8 +392,8 @@ class CoreActivityRulesTest {
         )
         assertEquals("Finalizó a las 10:49, a tiempo", CoreActivityRules.boardTerminoTexto("2026-09-14T16:49:00Z", 0.0, zone))
         assertEquals("Finalizó a las 10:49", CoreActivityRules.boardTerminoTexto("2026-09-14T16:49:00Z", null, zone))
-        assertEquals("⏳ En espera de aprobación", CoreActivityRules.boardEnEsperaTexto(1))
-        assertEquals("⏳ 3 en espera de aprobación", CoreActivityRules.boardEnEsperaTexto(3))
+        assertEquals("En espera de aprobación", CoreActivityRules.boardEnEsperaTexto(1))
+        assertEquals("3 en espera de aprobación", CoreActivityRules.boardEnEsperaTexto(3))
     }
 
     @Test

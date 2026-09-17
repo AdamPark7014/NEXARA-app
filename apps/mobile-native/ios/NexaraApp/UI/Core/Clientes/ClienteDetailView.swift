@@ -49,7 +49,7 @@ struct ClienteDetailView: View {
                     } else {
                         CoreFlowLayout(spacing: 6) {
                             ForEach(client.clientSectors) { s in
-                                Text("\(s.emoji) \(s.shortTitle)")
+                                Label(s.shortTitle, systemImage: s.symbol)
                                     .font(.caption.weight(.semibold))
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)

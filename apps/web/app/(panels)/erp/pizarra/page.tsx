@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { SvgIconComponent } from "@mui/icons-material";
+import ReplayIcon from "@mui/icons-material/Replay";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
@@ -64,10 +69,13 @@ function Avatar({ url, name, size = 80 }: { url: string | null; name: string; si
   );
 }
 
-function MiniChip({ children, color }: { children: ReactNode; color: string }) {
+function MiniChip({ children, color, icon: Icon }: { children: ReactNode; color: string; icon?: SvgIconComponent }) {
   return (
     <span
       style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
         fontSize: 10.5,
         fontWeight: 650,
         lineHeight: 1.2,
@@ -79,6 +87,7 @@ function MiniChip({ children, color }: { children: ReactNode; color: string }) {
         whiteSpace: "nowrap",
       }}
     >
+      {Icon ? <Icon aria-hidden="true" sx={{ fontSize: 13, flex: "0 0 auto" }} /> : null}
       {children}
     </span>
   );
@@ -200,11 +209,13 @@ function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean })
         {user.enCorreccion || user.enEsperaAprobacion ? (
           <div style={{ marginTop: 6, display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
             {user.enCorreccion ? (
-              <MiniChip color="#d97706">↩️ Corrigiendo evidencia</MiniChip>
+              <MiniChip color="#d97706" icon={ReplayIcon}>
+                Corrigiendo evidencia
+              </MiniChip>
             ) : null}
             {user.enEsperaAprobacion ? (
-              <MiniChip color="#7c3aed">
-                ⏳ {user.enEsperaAprobacion > 1 ? `${user.enEsperaAprobacion} en espera de aprobación` : "En espera de aprobación"}
+              <MiniChip color="#7c3aed" icon={HourglassTopIcon}>
+                {user.enEsperaAprobacion > 1 ? `${user.enEsperaAprobacion} en espera de aprobación` : "En espera de aprobación"}
               </MiniChip>
             ) : null}
           </div>
@@ -419,10 +430,10 @@ export default function PizarraPage() {
         >
           {(
             [
-              ["mias", "✅ Mis actividades"],
-              ["equipo", "👥 Mi equipo"],
+              ["mias", "Mis actividades", TaskAltIcon],
+              ["equipo", "Mi equipo", GroupsOutlinedIcon],
             ] as const
-          ).map(([id, label]) => {
+          ).map(([id, label, Icon]) => {
             const on = vista === id;
             return (
               <button
@@ -442,8 +453,12 @@ export default function PizarraPage() {
                   fontSize: 14,
                   cursor: "pointer",
                   fontFamily: "inherit",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
+                <Icon aria-hidden="true" sx={{ fontSize: 18 }} />
                 {label}
               </button>
             );

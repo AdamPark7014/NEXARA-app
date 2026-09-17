@@ -187,7 +187,7 @@ struct ActivityCoreDetailView: View {
         List {
             if let notice {
                 Section {
-                    Text(notice).foregroundStyle(CorePalette.green)
+                    NxIconText(systemName: "checkmark.circle.fill", text: notice).foregroundStyle(CorePalette.green)
                 }
             }
 
@@ -202,10 +202,10 @@ struct ActivityCoreDetailView: View {
                         let estatus = CoreStatusUI.estatus(text("estatus"))
                         let priority = CoreStatusUI.priority(text("prioridad"))
                         CoreChip(text: estatus.label, color: estatus.color)
-                        CoreChip(text: "● \(priority.label)", color: priority.color)
-                        CoreChip(text: CoreStatusUI.kind(coreKind, ticketTypeCustom: text("ticketTypeCustom")))
+                        CoreChip(icon: "flag.fill", text: priority.label, color: priority.color)
+                        CoreChip(icon: CoreStatusUI.kindSymbol(coreKind), text: CoreStatusUI.kind(coreKind, ticketTypeCustom: text("ticketTypeCustom")))
                         if isDespacho {
-                            CoreChip(text: "📨 Despacho", color: CorePalette.purple)
+                            CoreChip(icon: "paperplane", text: "Despacho", color: CorePalette.purple)
                         }
                     }
                 }

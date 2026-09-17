@@ -26,6 +26,7 @@ import {
 import { formatApiError } from "@/lib/erp-api";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { resolveV2RoleKey } from "@/lib/user-access";
+import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import {
   fetchTeamBoard,
   fetchTeamBoardUser,
@@ -419,7 +420,7 @@ export default function AsignarActividadPage() {
                   minHeight: 112,
                 }}
               >
-                <div style={{ fontSize: 22 }}>{opt.emoji}</div>
+                <ActivityKindIcon kind={opt.icon} variant="badge" size={36} />
                 <div style={{ marginTop: 8, fontWeight: 800, fontSize: 14 }}>{opt.title}</div>
                 <div style={{ marginTop: 4, fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.35 }}>
                   {opt.help}
@@ -674,8 +675,8 @@ export default function AsignarActividadPage() {
                   marginBottom: 10,
                   padding: "10px 12px",
                   borderRadius: 12,
-                  border: "1px solid color-mix(in srgb, #16a34a 35%, var(--border))",
-                  background: "color-mix(in srgb, #16a34a 10%, var(--surface))",
+                  border: "1px solid color-mix(in srgb, var(--primary) 35%, var(--border))",
+                  background: "color-mix(in srgb, var(--primary) 10%, var(--surface))",
                   fontSize: 12.5,
                   lineHeight: 1.45,
                 }}
@@ -831,8 +832,8 @@ export default function AsignarActividadPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 750, marginBottom: 12, color: "var(--text-secondary)" }}>
-              {despachoOnly || ejecucionOnly ? "3" : offerCharge ? "4" : "3"} · {kindMeta.emoji}{" "}
-              {kindMeta.title}
+              {despachoOnly || ejecucionOnly ? "3" : offerCharge ? "4" : "3"} ·{" "}
+              <ActivityKindIcon kind={kindMeta.icon} size={16} /> {kindMeta.title}
               {chargeMeta ? ` · ${chargeMeta.badge}` : ""}
               {despachoOnly ? ` · ${headcount} persona${headcount === 1 ? "" : "s"}` : ""}
             </div>

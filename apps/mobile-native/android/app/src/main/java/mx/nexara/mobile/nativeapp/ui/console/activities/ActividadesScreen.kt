@@ -217,7 +217,7 @@ private fun VistaTabs(vista: String, onChange: (String) -> Unit) {
                     .weight(1f)
                     .heightIn(min = 44.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (on) NxColors.Teal else Color.Transparent)
+                    .background(if (on) NxColors.Brand else Color.Transparent)
                     .clickable { onChange(id) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -318,11 +318,11 @@ private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: ()
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelf) NxColors.TealSoft.copy(alpha = 0.35f) else Color.White,
+            containerColor = if (isSelf) NxColors.BrandSoft.copy(alpha = 0.35f) else Color.White,
         ),
         border = BorderStroke(
             if (isSelf) 2.dp else 1.dp,
-            if (isSelf) NxColors.Teal.copy(alpha = 0.55f) else Color(0xFFE2E8F0),
+            if (isSelf) NxColors.Brand.copy(alpha = 0.55f) else Color(0xFFE2E8F0),
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -354,7 +354,7 @@ private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: ()
                 textAlign = TextAlign.Center,
             )
             if (isSelf) {
-                Text("TÚ", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Teal, letterSpacing = 1.sp)
+                Text("TÚ", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Brand, letterSpacing = 1.sp)
             }
             Text(
                 CoreActivityRules.boardEstadoTexto(user.status, user.currentLateMinutes, user.idleSinceAt),
@@ -385,7 +385,7 @@ private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: ()
                         LinearProgressIndicator(
                             progress = { (pct / 100.0).toFloat() },
                             modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(999.dp)),
-                            color = if (pct >= 100.0) Color(CoreActivityRules.VERDE) else NxColors.Teal,
+                            color = if (pct >= 100.0) Color(CoreActivityRules.VERDE) else NxColors.Brand,
                             trackColor = Color(0xFFE2E8F0),
                         )
                     }
@@ -467,7 +467,7 @@ private fun MisActividadesContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
-                        .background(NxColors.TealSoft.copy(alpha = 0.35f))
+                        .background(NxColors.BrandSoft.copy(alpha = 0.35f))
                         .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(20.dp))
                         .padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -494,7 +494,7 @@ private fun MisActividadesContent(
                         if (canSelfAssign) {
                             Button(
                                 onClick = { onSelfAssign?.invoke() },
-                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                             ) { Text("＋ Auto-asignarme", fontWeight = FontWeight.Bold) }
                         }
                     }
@@ -527,7 +527,7 @@ private fun MisActividadesContent(
                     SoftNote(
                         title = "Tú decides el orden.",
                         text = "Usa «Subir» y «Bajar». Cada cambio te pide un motivo corto de por qué la harás en ese lugar.",
-                        color = 0xFF0D9488L,
+                        color = 0xFF2563EBL,
                     )
                 }
             } else if (!loading && open.size > 1 && data?.canReorder != true) {
@@ -562,7 +562,7 @@ private fun MisActividadesContent(
                         if (canSelfAssign) {
                             Button(
                                 onClick = { onSelfAssign?.invoke() },
-                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                             ) { Text("＋ Auto-asignarme una actividad") }
                         }
                     }
@@ -704,7 +704,7 @@ private fun OpenActivityCard(
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (first) NxColors.TealSoft.copy(alpha = 0.3f) else Color.White,
+            containerColor = if (first) NxColors.BrandSoft.copy(alpha = 0.3f) else Color.White,
         ),
         border = BorderStroke(
             when {
@@ -713,8 +713,8 @@ private fun OpenActivityCard(
                 else -> 1.dp
             },
             when {
-                highlighted -> NxColors.Teal
-                first -> NxColors.Teal.copy(alpha = 0.4f)
+                highlighted -> NxColors.Brand
+                first -> NxColors.Brand.copy(alpha = 0.4f)
                 else -> Color(0xFFE2E8F0)
             },
         ),
@@ -730,19 +730,19 @@ private fun OpenActivityCard(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(if (first) NxColors.Teal else NxColors.TealSoft),
+                    .background(if (first) NxColors.Brand else NxColors.BrandSoft),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "${index + 1}",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (first) Color.White else NxColors.Teal,
+                    color = if (first) Color.White else NxColors.Brand,
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (first) {
-                    Text("EMPIEZA POR AQUÍ", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Teal, letterSpacing = 1.sp)
+                    Text("EMPIEZA POR AQUÍ", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Brand, letterSpacing = 1.sp)
                 }
                 Column {
                     Text(a.titulo.orEmpty(), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
@@ -752,7 +752,7 @@ private fun OpenActivityCard(
                     if (a.porRepartir == true) {
                         Button(
                             onClick = onRepartir,
-                            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                            colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                         ) { Text("Repartir →", fontWeight = FontWeight.Bold) }
                     }
                     OutlinedButton(onClick = onOpen) { Text("Abrir →") }
@@ -824,7 +824,7 @@ private fun SeguimientoCard(
                     Text(s.titulo.orEmpty(), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
                     s.anNumber?.let { Text("Folio $it", fontSize = 12.sp, color = NxColors.Muted) }
                 }
-                TextButton(onClick = onOpenHistory) { Text("Ver registro →", color = NxColors.Teal, fontWeight = FontWeight.SemiBold) }
+                TextButton(onClick = onOpenHistory) { Text("Ver registro →", color = NxColors.Brand, fontWeight = FontWeight.SemiBold) }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 ToneChip(CoreActivityRules.estatusUi(s.estatus))
@@ -921,7 +921,7 @@ private fun ReorderDialog(
                     }
                 },
                 enabled = !saving && reason.trim().length >= min,
-                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
             ) { Text(if (saving) "Guardando…" else "Guardar orden") }
         },
         dismissButton = {

@@ -176,7 +176,7 @@ struct ReprogramarSheet: View {
             Form {
                 Section {
                     Text(target.title).font(.headline)
-                    Text("📅 Programada: \(CoreFormat.when(target.fechaActual) ?? "Sin fecha")")
+                    NxIconText(systemName: "calendar", text: "Programada: \(CoreFormat.when(target.fechaActual) ?? "Sin fecha")")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -240,7 +240,7 @@ struct ReprogramarSheet: View {
                 fecha: fecha,
                 motivo: reason.isEmpty ? nil : String(reason.prefix(500))
             )
-            onDone("✓ Reprogramada para \(CoreFormat.when(fecha))")
+            onDone("Reprogramada para \(CoreFormat.when(fecha))")
             dismiss()
         } catch {
             self.error = error.toUserMessage(fallback: "No se pudo reprogramar")

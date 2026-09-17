@@ -71,7 +71,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
     publicSubdomain: "core",
     name: "NEXARA Core",
     tagline: "Gobierno, inventario y operación administrativa",
-    accent: "#0ea5e9",
+    accent: "#2563EB",
     icon: "⚙️",
     entryPath: "/pizarra",
   },

@@ -13,6 +13,8 @@ import {
   type ClientSector,
 } from "@/lib/client-sectors";
 import { listSalesClients, type SalesClient } from "@/lib/sales-api";
+import { IconLabel } from "@/components/ui/IconBadge";
+import { CLIENT_SECTOR_ICONS } from "@/components/erp/ClientSectorIcon";
 import styles from "./clientes-core.module.css";
 
 function norm(email?: string | null) {
@@ -107,13 +109,17 @@ function ClientesWorkspace() {
               className={`${styles.tab} ${sector === s ? styles.tabActive : ""}`}
               onClick={() => selectSector(s)}
             >
-              {CLIENT_SECTOR_META[s].emoji} {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
+              <IconLabel icon={CLIENT_SECTOR_ICONS[CLIENT_SECTOR_META[s].icon]} size={15} gap={5}>
+                {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
+              </IconLabel>
             </button>
           ))}
         </div>
       ) : (
         <p className={styles.sub} style={{ margin: 0 }}>
-          {meta.emoji} {meta.title}
+          <IconLabel icon={CLIENT_SECTOR_ICONS[meta.icon]} size={16} gap={5}>
+            {meta.title}
+          </IconLabel>
         </p>
       )}
 

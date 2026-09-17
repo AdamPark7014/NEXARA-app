@@ -13,6 +13,12 @@ import { countEvidenceFiles } from "@/lib/evidence-display";
 import { EVIDENCE_STEP_ORDER, evidenceStepLabel } from "@/lib/evidence-lock";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import KpiCard from "@/components/ui/KpiCard";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import ChecklistOutlinedIcon from "@mui/icons-material/ChecklistOutlined";
+import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
 export default function ActivityApprovalsPage() {
   const { activity, error, reload, id } = useActivityDetail();
@@ -101,7 +107,7 @@ export default function ActivityApprovalsPage() {
   if (!review) {
     return (
       <EmptyState
-        icon="✅"
+        icon={<TaskAltIcon fontSize="inherit" aria-hidden="true" />}
         title="Sin paquete en revisión"
         description="El ingeniero debe completar el flujo de evidencias (entrada, fotos, hoja de servicio, salida) antes de que puedas aprobar."
       />
@@ -122,10 +128,10 @@ export default function ActivityApprovalsPage() {
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-        <KpiCard label="Estado revisión" value={(reviewState || "PENDIENTE").replace(/_/g, " ")} variant={reviewVariant} icon="🔍" />
-        <KpiCard label="Archivos" value={fileCount} icon="📎" variant={fileCount > 0 ? "accent" : "default"} />
-        <KpiCard label="Pasos del flujo" value={EVIDENCE_STEP_ORDER.length} icon="📋" />
-        <KpiCard label="Requiere acción" value={isPending && cfg.canApprove ? "Sí" : "No"} variant={isPending && cfg.canApprove ? "warning" : "positive"} icon="⚡" />
+        <KpiCard label="Estado revisión" value={(reviewState || "PENDIENTE").replace(/_/g, " ")} variant={reviewVariant} icon={<RateReviewOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+        <KpiCard label="Archivos" value={fileCount} icon={<AttachFileOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={fileCount > 0 ? "accent" : "default"} />
+        <KpiCard label="Pasos del flujo" value={EVIDENCE_STEP_ORDER.length} icon={<ChecklistOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+        <KpiCard label="Requiere acción" value={isPending && cfg.canApprove ? "Sí" : "No"} variant={isPending && cfg.canApprove ? "warning" : "positive"} icon={<BoltOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
       </div>
       <ActivityEvidenceReviewPanel activity={activity} />
 
@@ -271,7 +277,10 @@ export default function ActivityApprovalsPage() {
                   />
                 </label>
                 {rejectErr && (
-                  <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>⚠ {rejectErr}</div>
+                  <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                    <ErrorOutlineIcon aria-hidden="true" sx={{ fontSize: 16, flexShrink: 0 }} />
+                    <span>{rejectErr}</span>
+                  </div>
                 )}
                 {actionErr && (
                   <div

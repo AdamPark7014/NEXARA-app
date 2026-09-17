@@ -49,6 +49,7 @@ import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.security.AppLock
 import mx.nexara.mobile.nativeapp.ui.NexaraAppMeta
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAppMetaFooter
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
 /**
@@ -238,7 +239,7 @@ fun MyProfileScreen(
     val isSuperAdmin = user?.isSuperAdmin == true
     var appLockEnabled by remember { mutableStateOf(AppLock.isEnabled(context)) }
     val lockAvailable = remember(context) { AppLock.canAuthenticate(context) }
-    val Teal = Color(0xFF0D9488)
+    val Brand = NxColors.Brand
     val Slate = Color(0xFF0F172A)
     val Sub = Color(0xFF64748B)
 
@@ -266,7 +267,7 @@ fun MyProfileScreen(
                 ) {
                     if (isSuperAdmin) {
                         Box(
-                            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)).background(Teal),
+                            modifier = Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)).background(Brand),
                             contentAlignment = Alignment.Center,
                         ) {
                             androidx.compose.foundation.Image(
@@ -280,13 +281,13 @@ fun MyProfileScreen(
                         AsyncImage(
                             model = toAbsoluteAssetUrl(user.avatarUrl),
                             contentDescription = user.nombre,
-                            modifier = Modifier.size(80.dp).clip(CircleShape).border(3.dp, Teal, CircleShape),
+                            modifier = Modifier.size(80.dp).clip(CircleShape).border(3.dp, Brand, CircleShape),
                             contentScale = ContentScale.Crop,
                         )
                     } else {
                         val initials = user.nombre.split(" ").take(2).map { it.firstOrNull()?.uppercaseChar() ?: '?' }.joinToString("")
                         Box(
-                            modifier = Modifier.size(80.dp).clip(CircleShape).background(Teal),
+                            modifier = Modifier.size(80.dp).clip(CircleShape).background(Brand),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(initials, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
@@ -312,10 +313,10 @@ fun MyProfileScreen(
                     }
                     Box(
                         modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                            .background(if (isSuperAdmin) Teal else Color(0xFFCCFBF1))
+                            .background(if (isSuperAdmin) Brand else NxColors.BrandSoft)
                             .padding(horizontal = 12.dp, vertical = 5.dp),
                     ) {
-                        Text(roleBadge, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = if (isSuperAdmin) Color.White else Teal)
+                        Text(roleBadge, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = if (isSuperAdmin) Color.White else Brand)
                     }
                 }
             }
@@ -324,7 +325,7 @@ fun MyProfileScreen(
         // ── Completitud, identidad ACS y asistencia de hoy ────────────────
         if (!profileState.loading && profileState.error == null) {
             item {
-                ProfileCoreSummary(state = profileState, teal = Teal, sub = Sub, slate = Slate)
+                ProfileCoreSummary(state = profileState, brand = Brand, sub = Sub, slate = Slate)
             }
         }
 
@@ -368,7 +369,7 @@ fun MyProfileScreen(
                             vm.setField("contactoEmergenciaTelefono", it)
                         }
                         profileState.profileStatus?.takeIf { it.isNotBlank() }?.let { st ->
-                            ProfileInfoRow("Estatus perfil", st, Teal, Sub)
+                            ProfileInfoRow("Estatus perfil", st, Brand, Sub)
                         }
                         if (!profileState.saveMessage.isNullOrBlank()) {
                             Text(
@@ -401,10 +402,10 @@ fun MyProfileScreen(
                 elevation = CardDefaults.cardElevation(1.dp),
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (user.department.isNotBlank()) ProfileInfoRow("Departamento", user.department, Teal, Sub)
-                    if (user.clientId != null) ProfileInfoRow("Client ID", user.clientId.toString(), Teal, Sub)
-                    if (user.branchId != null) ProfileInfoRow("Branch ID", user.branchId.toString(), Teal, Sub)
-                    ProfileInfoRow("ID de usuario", user.id.toString(), Teal, Sub)
+                    if (user.department.isNotBlank()) ProfileInfoRow("Departamento", user.department, Brand, Sub)
+                    if (user.clientId != null) ProfileInfoRow("Client ID", user.clientId.toString(), Brand, Sub)
+                    if (user.branchId != null) ProfileInfoRow("Branch ID", user.branchId.toString(), Brand, Sub)
+                    ProfileInfoRow("ID de usuario", user.id.toString(), Brand, Sub)
                 }
             }
         }
@@ -525,7 +526,7 @@ private fun hhmmMexico(iso: String?): String? = iso?.takeIf { it.isNotBlank() }?
 @Composable
 private fun ProfileCoreSummary(
     state: MyProfileUiState,
-    teal: Color,
+    brand: Color,
     sub: Color,
     slate: Color,
 ) {
@@ -563,10 +564,10 @@ private fun ProfileCoreSummary(
 
             HorizontalDivider()
 
-            ProfileInfoRow("Departamento", state.departmentName ?: "—", teal, sub)
-            ProfileInfoRow("Rol", state.roleName ?: "—", teal, sub)
-            ProfileInfoRow("Nº de empleado", state.acsEmployeeNumber, teal, sub)
-            ProfileInfoRow("Control de acceso", state.integraStatusLabel, teal, sub)
+            ProfileInfoRow("Departamento", state.departmentName ?: "—", brand, sub)
+            ProfileInfoRow("Rol", state.roleName ?: "—", brand, sub)
+            ProfileInfoRow("Nº de empleado", state.acsEmployeeNumber, brand, sub)
+            ProfileInfoRow("Control de acceso", state.integraStatusLabel, brand, sub)
 
             HorizontalDivider()
 
@@ -586,8 +587,8 @@ private fun ProfileCoreSummary(
                 state.identity?.status == "linked" -> "Sin pases hoy"
                 else -> "Sin vincular"
             }
-            ProfileInfoRow("Checador de la app", erpTexto, teal, sub)
-            ProfileInfoRow("Pases en puertas", acsTexto, teal, sub)
+            ProfileInfoRow("Checador de la app", erpTexto, brand, sub)
+            ProfileInfoRow("Pases en puertas", acsTexto, brand, sub)
             Text(
                 "El checador de la app es el que cuenta para tu nómina.",
                 style = MaterialTheme.typography.bodySmall,
@@ -606,7 +607,7 @@ private fun ProfileCoreSummary(
 }
 
 @Composable
-private fun ProfileInfoRow(label: String, value: String, teal: Color, sub: Color) {
+private fun ProfileInfoRow(label: String, value: String, brand: Color, sub: Color) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = sub)
         Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color(0xFF0F172A))

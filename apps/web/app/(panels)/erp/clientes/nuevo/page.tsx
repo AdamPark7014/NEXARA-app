@@ -12,6 +12,8 @@ import {
   type ClientSector,
 } from "@/lib/client-sectors";
 import { createSalesClient } from "@/lib/sales-api";
+import { IconLabel } from "@/components/ui/IconBadge";
+import { CLIENT_SECTOR_ICONS } from "@/components/erp/ClientSectorIcon";
 import PhoneField, { isValidNexaraPhone } from "@/components/PhoneField";
 import FiscalRfcLookup from "@/components/FiscalRfcLookup";
 import styles from "../clientes-core.module.css";
@@ -100,8 +102,9 @@ function NuevoClienteForm() {
                   className={`${styles.sectorPickBtn} ${on ? styles.sectorPickBtnOn : ""}`}
                   onClick={() => toggleSector(s)}
                 >
-                  {CLIENT_SECTOR_META[s].emoji}{" "}
-                  {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
+                  <IconLabel icon={CLIENT_SECTOR_ICONS[CLIENT_SECTOR_META[s].icon]} size={15} gap={5}>
+                    {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
+                  </IconLabel>
                 </button>
               );
             })}

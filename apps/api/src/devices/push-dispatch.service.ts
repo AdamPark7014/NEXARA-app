@@ -33,6 +33,11 @@ export type PushPayload = {
   /** Nombre del grupo en chats grupales; vacío en mensajes directos. */
   threadTitle?: string | null;
   messageId?: number | null;
+  /**
+   * Ícono vectorial que dibuja la app (entrada, fotos, por_revisar, chat…). Vocabulario cerrado en
+   * `NOTIFICATION_ICONS` (notifications/notification-push-meta.ts); vacío = ícono genérico.
+   */
+  icon?: string | null;
 };
 
 /** Errores de FCM que significan que el token ya no sirve (app desinstalada o reinstalada). */
@@ -127,6 +132,7 @@ export class PushDispatchService {
       thread_id: threadId,
       thread_title: payload.threadTitle || '',
       message_id: payload.messageId != null ? String(payload.messageId) : '',
+      icon: payload.icon || '',
       sent_at: new Date().toISOString(),
     };
     return { data, priority, collapseKey, kind, threadId };

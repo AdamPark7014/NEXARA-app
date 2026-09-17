@@ -8,6 +8,19 @@ import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import PanelTabs from "@/components/ui/PanelTabs";
+import { IconLabel } from "@/components/ui/IconBadge";
+import NotificationKindIcon from "@/components/ui/NotificationKindIcon";
+import { stripLeadingEmoji } from "@/lib/notification-kind";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
+import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
@@ -279,9 +292,17 @@ export default function NotificationsCenterPage() {
         value={view}
         onChange={setView}
         tabs={[
-          { key: "action", label: "Acción ahora", badge: actionable.length || undefined },
-          { key: "notifications", label: "Inbox", badge: unread || undefined },
-          { key: "feed", label: "Señales de negocio" },
+          {
+            key: "action",
+            label: <IconLabel icon={TaskAltIcon} size={16}>Acción ahora</IconLabel>,
+            badge: actionable.length || undefined,
+          },
+          {
+            key: "notifications",
+            label: <IconLabel icon={InboxOutlinedIcon} size={16}>Inbox</IconLabel>,
+            badge: unread || undefined,
+          },
+          { key: "feed", label: <IconLabel icon={InsightsOutlinedIcon} size={16}>Señales de negocio</IconLabel> },
         ]}
       />
 
@@ -291,11 +312,11 @@ export default function NotificationsCenterPage() {
           value={category}
           onChange={setCategory}
           tabs={[
-            { key: "all", label: "Todas" },
-            { key: "ops", label: "Actividades" },
-            { key: "attendance", label: "Asistencia" },
-            { key: "chat", label: "Chat" },
-            { key: "other", label: "Otras" },
+            { key: "all", label: <IconLabel icon={NotificationsNoneOutlinedIcon} size={16}>Todas</IconLabel> },
+            { key: "ops", label: <IconLabel icon={AssignmentOutlinedIcon} size={16}>Actividades</IconLabel> },
+            { key: "attendance", label: <IconLabel icon={EventAvailableOutlinedIcon} size={16}>Asistencia</IconLabel> },
+            { key: "chat", label: <IconLabel icon={ChatBubbleOutlineIcon} size={16}>Chat</IconLabel> },
+            { key: "other", label: <IconLabel icon={MoreHorizIcon} size={16}>Otras</IconLabel> },
           ]}
         />
       )}
@@ -341,7 +362,7 @@ export default function NotificationsCenterPage() {
                   onClick={() => n.relatedUrl && openNotif(n)}
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr auto",
+                    gridTemplateColumns: "auto minmax(0, 1fr) auto",
                     gap: 10,
                     alignItems: "start",
                     padding: "10px 12px",
@@ -359,14 +380,18 @@ export default function NotificationsCenterPage() {
                     borderRadius: 8,
                   }}
                 >
+                  <NotificationKindIcon category={n.category} title={n.title} size={34} muted={n.isRead} />
                   <div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: !n.isRead ? 700 : 550, fontSize: 13 }}>{n.title}</span>
+                      <span style={{ fontWeight: !n.isRead ? 700 : 550, fontSize: 13 }}>{stripLeadingEmoji(n.title)}</span>
                       {n.priority === "high" && <Tag variant="danger">Alta</Tag>}
-                      <Tag variant="neutral">{CATEGORY_LABEL[n.category] ?? n.category}</Tag>
+                      <Tag variant="neutral">
+                        <NotificationKindIcon category={n.category} variant="inline" size={14} muted />
+                        {CATEGORY_LABEL[n.category] ?? n.category}
+                      </Tag>
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3, lineHeight: 1.35 }}>
-                      {n.message}
+                      {stripLeadingEmoji(n.message)}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
                       {timeAgo(n.createdAt)}
@@ -382,9 +407,10 @@ export default function NotificationsCenterPage() {
                           void markRead(n.id);
                         }}
                         title="Marcar como leída"
+                        aria-label="Marcar como leída"
                         style={iconBtn}
                       >
-                        ✓
+                        <CheckIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                       </button>
                     )}
                     <button
@@ -394,9 +420,10 @@ export default function NotificationsCenterPage() {
                         void remove(n.id);
                       }}
                       title="Eliminar"
+                      aria-label="Eliminar"
                       style={iconBtn}
                     >
-                      ✕
+                      <CloseIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                     </button>
                   </div>
                 </article>
@@ -438,7 +465,7 @@ export default function NotificationsCenterPage() {
               >
                 <div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 650, fontSize: 13 }}>{item.title}</span>
+                    <span style={{ fontWeight: 650, fontSize: 13 }}>{stripLeadingEmoji(item.title)}</span>
                     {item.priority === "high" && <Tag variant="danger">Alta</Tag>}
                     <Tag variant="neutral">{item.kind}</Tag>
                   </div>
@@ -489,5 +516,9 @@ const iconBtn: React.CSSProperties = {
   cursor: "pointer",
   fontSize: 14,
   color: "var(--text-tertiary)",
-  padding: "2px 6px",
+  padding: "4px 6px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 6,
 };

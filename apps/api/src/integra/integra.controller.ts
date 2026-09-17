@@ -56,6 +56,7 @@ import {
 } from './integra-detection.service';
 import { parseSocId } from './integra-acs-alarms.policy';
 import { IdentityLinkService } from '../identity/identity-link.service';
+import { AcsAvatarImportService } from './acs-avatar-import.service';
 
 export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
   if (!user) return false;
@@ -370,6 +371,7 @@ export class IntegraController {
     private readonly acsAlarms: IntegraAcsAlarmsService,
     private readonly eventRouter: IntegraEventRouterService,
     private readonly detection: IntegraDetectionService,
+    private readonly avatarImport: AcsAvatarImportService,
   ) {}
 
   @Get('health')
@@ -983,6 +985,30 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.getPerson(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Post('people/import-avatars')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Poner como avatar de cada empleado su foto enrolada en el ACS (dryRun=1 por defecto; dryRun=0 escribe)',
+  })
+  importAvatarsFromAcs(
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+    @Query('dryRun') dryRun?: string,
+    @Query('overwrite') overwrite?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para importar avatares desde el ACS');
+    }
+    // Sin parámetro = simulación: escribir en todos los usuarios tiene que pedirse explícitamente.
+    const flag = (v: string | undefined, fallback: boolean) =>
+      v == null || v === '' ? fallback : ['1', 'true', 'yes', 'si', 'sí'].includes(v.trim().toLowerCase());
+    return this.avatarImport.importAvatars(companyId, {
+      dryRun: flag(dryRun, true),
+      overwrite: flag(overwrite, false),
+    });
   }
 
   @Post('people/:id/link')

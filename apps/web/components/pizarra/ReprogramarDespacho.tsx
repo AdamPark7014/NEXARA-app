@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import EventOutlinedIcon from "@mui/icons-material/EventOutlined";
+import CheckIcon from "@mui/icons-material/Check";
 import { formatApiError } from "@/lib/erp-api";
 import { reprogramarDespacho } from "@/lib/my-activities-api";
 
@@ -126,8 +128,11 @@ export default function ReprogramarDespacho({ token, activityId, fechaActual, on
           color: "var(--text-secondary)",
         }}
       >
-        <span>
-          📅 Programada: <strong style={{ color: "inherit" }}>{formatAgenda(fechaActual)}</strong>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+          <EventOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+          <span>
+            Programada: <strong style={{ color: "inherit" }}>{formatAgenda(fechaActual)}</strong>
+          </span>
         </span>
         {!open ? (
           <button type="button" onClick={abrir} style={btn}>
@@ -135,7 +140,12 @@ export default function ReprogramarDespacho({ token, activityId, fechaActual, on
           </button>
         ) : null}
       </div>
-      {ok && !open ? <div style={{ fontSize: 12.5, color: "#15803d" }}>✓ {ok}</div> : null}
+      {ok && !open ? (
+        <div style={{ fontSize: 12.5, color: "#15803d", display: "flex", alignItems: "center", gap: 5 }}>
+          <CheckIcon aria-hidden="true" sx={{ fontSize: 15 }} />
+          <span>{ok}</span>
+        </div>
+      ) : null}
       {open ? (
         <div
           style={{

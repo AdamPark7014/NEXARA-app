@@ -8,6 +8,8 @@ import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { listActivityTeam, type ActivityTeamMember } from "@/lib/ops-activities-api";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 
 export default function ActivityTeamPage() {
   const { activity, error, reload } = useActivityDetail();
@@ -42,10 +44,10 @@ export default function ActivityTeamPage() {
         Responsable principal: <strong>{activity.responsable?.nombre ?? "—"}</strong>
       </div>
 
-      {loading && <EmptyState icon="⏳" title="Cargando equipo…" description="" />}
+      {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando equipo…" description="" />}
       {!loading && team.length === 0 && (
         <EmptyState
-          icon="👥"
+          icon={<GroupsOutlinedIcon fontSize="inherit" aria-hidden="true" />}
           title="Sin equipo adicional"
           description="Solo el responsable principal está asignado a esta actividad."
         />

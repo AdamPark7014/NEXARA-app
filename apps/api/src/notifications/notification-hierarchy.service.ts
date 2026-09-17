@@ -12,10 +12,27 @@ import {
   supportRequestStaffUrl,
   type PortalTicketClientAction,
 } from './portal-ticket-notify.js';
+import { fechaAviso, horaAviso, nombreCorto } from './notification-push-meta.js';
 
-/** 8:02 a. m. en la zona de la jornada. */
-function horaMexico(d: Date): string {
-  return d.toLocaleTimeString('es-MX', { timeZone: WORKDAY_TIMEZONE, hour: 'numeric', minute: '2-digit' });
+/**
+ * Nombre de la actividad para el aviso. El folio (AN-0001) nunca es el identificador principal:
+ * la gente reconoce «Mantenimiento de CCTV», no el código.
+ */
+function nombreActividad(titulo?: string | null): string {
+  return (titulo && String(titulo).trim()) || 'Actividad sin nombre';
+}
+
+/** Une las partes presentes con « · »: «Mantenimiento de CCTV · Plaza Dorada». */
+function unir(...partes: Array<string | null | undefined | false>): string {
+  return partes
+    .map((p) => (typeof p === 'string' ? p.trim() : ''))
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** Nombre corto de una persona, con respaldo cuando no hay nombre. */
+function persona(nombre: string | null | undefined, respaldo = 'Alguien del equipo'): string {
+  return nombreCorto(nombre) || respaldo;
 }
 
 /**
@@ -144,10 +161,9 @@ export class NotificationHierarchyService {
       });
       if (!user) return;
 
-      const nombre = user.nombre || userName;
+      const nombre = persona(user.nombre || userName);
       const entrada = type === 'ATTENDANCE_CHECKIN';
-      const hora = horaMexico(at);
-      const lugar = deviceInfo ? ` · ${deviceInfo}` : '';
+      const hora = horaAviso(at);
 
       // Retardo contra su plantilla (oficina 09:00, contratista 08:00, con 15 min de gracia).
       let horarioEsperado: string | null = null;
@@ -165,15 +181,16 @@ export class NotificationHierarchyService {
       }
 
       const title = !entrada
-        ? `🔴 ${nombre} terminó su jornada`
+        ? `${nombre} terminó su jornada`
         : horarioEsperado
-          ? `🟠 ${nombre} entró a trabajar con retardo`
-          : `🟢 ${nombre} entró a trabajar`;
+          ? `${nombre} llegó con retardo`
+          : `${nombre} entró a trabajar`;
       const message = !entrada
-        ? `Salida a las ${hora}${lugar}`
+        ? hora
         : horarioEsperado
-          ? `Entrada a las ${hora}; su horario es a las ${horarioEsperado}${lugar}`
-          : `Entrada a las ${hora}${lugar}`;
+          ? unir(hora, `Su horario inicia a las ${horarioEsperado.replace(/^0/, '')}`)
+          : unir(hora, deviceInfo);
+      const icon = !entrada ? 'salida' : horarioEsperado ? 'entrada_tarde' : 'entrada';
 
       for (const id of await this.shiftWatcherIds(userId)) {
         await this.notificationsService.createNotification({
@@ -182,6 +199,7 @@ export class NotificationHierarchyService {
           category: 'attendance',
           title,
           message,
+          icon,
           triggerUserId: userId,
           relatedEntityId: userId,
           entityType: 'User',
@@ -216,14 +234,16 @@ export class NotificationHierarchyService {
   ) {
     try {
       const sale = type === 'LUNCH_CHECKIN';
-      const hora = horaMexico(new Date());
+      const hora = horaAviso(new Date());
+      const nombre = persona(userName);
       for (const id of await this.shiftWatcherIds(userId)) {
         await this.notificationsService.createNotification({
           userId: id,
           type,
           category: 'lunch_breaks',
-          title: sale ? `🍽️ ${userName} salió a comer` : `↩️ ${userName} regresó de comer`,
-          message: sale ? `Salida a comer a las ${hora}` : `Regreso a las ${hora}`,
+          title: sale ? `${nombre} salió a comer` : `${nombre} regresó de comer`,
+          message: hora,
+          icon: sale ? 'comida_sale' : 'comida_regresa',
           triggerUserId: userId,
           relatedEntityId: userId,
           entityType: 'User',
@@ -257,13 +277,22 @@ export class NotificationHierarchyService {
         if (ceoId !== actorId) targets.add(ceoId);
       }
 
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: activityId },
+        select: { titulo: true, client: { select: { name: true } } },
+      });
+      const actividad = nombreActividad(activity?.titulo || activityTitle);
+      const title = `${persona(actorName)} inició ${actividad}`;
+      const message = unir(activity?.client?.name, `En proceso desde las ${horaAviso(new Date())}`);
+
       for (const userId of targets) {
         await this.notificationsService.createNotification({
           userId,
           type: 'ACTIVITY_STARTED',
           category: 'activities',
-          title: 'OT iniciada en campo',
-          message: `${actorName} inició "${activityTitle}"`,
+          title,
+          message,
+          icon: 'actividad_inicio',
           triggerUserId: actorId,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -278,7 +307,7 @@ export class NotificationHierarchyService {
   }
 
   /**
-   * Avance en campo paso a paso: «Alejandro inició AN-0001», «subió 4 fotos», «subió la hoja de
+   * Avance en campo paso a paso: «Alejandro González inició Mantenimiento de CCTV», «subió 4 fotos», «subió la hoja de
    * servicio», «llenó el formulario». Lo reciben el responsable, quien la creó, los encargados de
    * la actividad, los jefes por organigrama de quien la hace y Christian. En el teléfono cada
    * paso reemplaza al anterior de la misma persona y actividad, así no se amontonan.
@@ -297,7 +326,6 @@ export class NotificationHierarchyService {
         this.prisma.activity.findUnique({
           where: { id: activityId },
           select: {
-            anNumber: true,
             titulo: true,
             responsableId: true,
             creadoPorId: true,
@@ -312,22 +340,26 @@ export class NotificationHierarchyService {
       ]);
       if (!activity) return;
 
-      const nombre = actor?.nombre || 'Alguien del equipo';
-      const ref = activity.anNumber || `Actividad ${activityId}`;
-      const cliente = activity.client?.name ? ` · ${activity.client.name}` : '';
-      const hora = horaMexico(params.at ?? new Date());
+      const nombre = persona(actor?.nombre);
+      const actividad = nombreActividad(activity.titulo);
+      const cliente = activity.client?.name;
+      const hora = horaAviso(params.at ?? new Date());
       const fotos = params.fotos ?? 0;
 
       const title = {
-        inicio: `▶️ ${nombre} inició ${ref}`,
-        evidencias: `📷 ${nombre} subió ${fotos === 1 ? '1 foto' : `${fotos} fotos`} de evidencia`,
-        hoja: `📄 ${nombre} subió la hoja de servicio`,
-        formulario: `📝 ${nombre} llenó el formulario de servicio`,
+        inicio: `${nombre} inició ${actividad}`,
+        evidencias: `${nombre} subió ${fotos === 1 ? '1 foto' : `${fotos} fotos`} de evidencia`,
+        hoja: `${nombre} subió la hoja de servicio`,
+        formulario: `${nombre} llenó el formulario de servicio`,
       }[paso];
       const message =
-        paso === 'inicio'
-          ? `Llegó a las ${hora} · ${activity.titulo}${cliente}`
-          : `${ref} · ${activity.titulo}${cliente}`;
+        paso === 'inicio' ? unir(cliente, `Llegó a las ${hora}`) : unir(actividad, cliente);
+      const icon = {
+        inicio: 'actividad_inicio',
+        evidencias: 'fotos',
+        hoja: 'documento',
+        formulario: 'formulario',
+      }[paso];
 
       const targets = new Set<number>(await this.lunchReviewerIds(actorId));
       if (activity.responsableId) targets.add(activity.responsableId);
@@ -342,6 +374,7 @@ export class NotificationHierarchyService {
           category: 'activities',
           title,
           message,
+          icon,
           triggerUserId: actorId,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -553,7 +586,6 @@ export class NotificationHierarchyService {
         this.prisma.activity.findUnique({
           where: { id: activityId },
           select: {
-            anNumber: true,
             titulo: true,
             fechaInicio: true,
             client: { select: { name: true } },
@@ -561,19 +593,10 @@ export class NotificationHierarchyService {
         }),
         this.prisma.user.findUnique({ where: { id: userId }, select: { nombre: true } }),
       ]);
-      const ref = activity?.anNumber || activityTitle;
-      const titulo = activity?.titulo ? ` · ${activity.titulo}` : '';
-      const cliente = activity?.client?.name ? ` · ${activity.client.name}` : '';
-      const cuando = activity?.fechaInicio
-        ? ` · ${activity.fechaInicio.toLocaleString('es-MX', {
-            timeZone: WORKDAY_TIMEZONE,
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-            hour: 'numeric',
-            minute: '2-digit',
-          })}`
-        : '';
+      const actividad = nombreActividad(activity?.titulo || activityTitle);
+      const cliente = activity?.client?.name;
+      const cuando = activity?.fechaInicio ? fechaAviso(activity.fechaInicio, WORKDAY_TIMEZONE) : null;
+      const quienAsigna = persona(assignedByName, 'Sistema');
       const url = `/erp/actividades/${activityId}`;
       // Quien asigna no recibe su propio aviso (p. ej. al asignarse una tarea a sí mismo).
       const actor = assignedById ?? undefined;
@@ -582,8 +605,9 @@ export class NotificationHierarchyService {
         userId,
         type: 'ACTIVITY_ASSIGNED',
         category: 'activities',
-        title: `✨ Nueva actividad: ${ref}`,
-        message: `${assignedByName} te asignó${titulo}${cliente}${cuando}`.replace('asignó · ', 'asignó '),
+        title: `Nueva actividad: ${actividad}`,
+        message: unir(`${quienAsigna} te la asignó`, cliente, cuando),
+        icon: 'actividad_nueva',
         triggerUserId: actor,
         relatedEntityId: activityId,
         entityType: 'Activity',
@@ -592,15 +616,16 @@ export class NotificationHierarchyService {
       });
 
       // Sus jefes por organigrama, Christian y los administradores de su departamento.
-      const nombreAsignado = asignado?.nombre || 'alguien del equipo';
+      const nombreAsignado = persona(asignado?.nombre, 'alguien del equipo');
       for (const id of await this.shiftWatcherIds(userId)) {
         if (id === assignedById) continue;
         await this.notificationsService.createNotification({
           userId: id,
           type: 'ACTIVITY_ASSIGNED',
           category: 'activities',
-          title: `📌 ${assignedByName} asignó ${ref} a ${nombreAsignado}`,
-          message: `${activity?.titulo || activityTitle}${cliente}${cuando}`,
+          title: `${quienAsigna} asignó ${actividad} a ${nombreAsignado}`,
+          message: unir(cliente, cuando) || 'Sin fecha programada',
+          icon: 'actividad_nueva',
           triggerUserId: actor,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -625,10 +650,13 @@ export class NotificationHierarchyService {
   ) {
     try {
       const type = status === 'approved' ? 'ACTIVITY_APPROVED' : 'ACTIVITY_REJECTED';
-      const title = status === 'approved' ? '✅ Actividad aprobada' : '❌ Actividad rechazada';
-      const message = status === 'approved'
-        ? `Tu actividad "${activityTitle}" ha sido aprobada por ${reviewerName}`
-        : `Tu actividad "${activityTitle}" ha sido rechazada. ${reason ? `Razón: ${reason}` : 'Por favor revísala y corrígela.'}`;
+      const actividad = nombreActividad(activityTitle);
+      const quien = persona(reviewerName, 'Tu supervisor');
+      const title = status === 'approved' ? `${actividad} aprobada` : `${actividad} devuelta`;
+      const message =
+        status === 'approved'
+          ? `${quien} la aprobó`
+          : unir(`${quien} la devolvió`, reason ? `Motivo: ${reason}` : 'Revísala y corrígela');
 
       await this.notificationsService.createNotification({
         userId,
@@ -636,6 +664,7 @@ export class NotificationHierarchyService {
         category: 'activities',
         title,
         message,
+        icon: status === 'approved' ? 'aprobada' : 'devuelta',
         relatedEntityId: activityId,
         entityType: 'Activity',
         relatedUrl: `/ops/activities/${activityId}`,
@@ -675,7 +704,8 @@ export class NotificationHierarchyService {
     activityId: number,
     activityTitle: string,
     submitterName: string,
-    anNumber?: string | null,
+    /** Folio: ya no se muestra; el aviso identifica la actividad por su nombre. */
+    _anNumber?: string | null,
     /** Responsable (p. ej. Luis) que da seguimiento aunque no revise evidencias. */
     responsableId?: number | null,
     /** Encargados de la cadena y jefe directo: también revisan. */
@@ -684,11 +714,14 @@ export class NotificationHierarchyService {
     correccion = false,
   ) {
     try {
-      const ref = (anNumber && String(anNumber).trim()) || `ID ${activityId}`;
-      const titleAct = (activityTitle && String(activityTitle).trim()) || `Actividad ${ref}`;
+      const actividad = nombreActividad(activityTitle);
+      const quien = persona(submitterName);
+      const title = correccion
+        ? `${actividad} corregida, lista para revisión`
+        : `${actividad} lista para revisión`;
       const message = correccion
-        ? `${submitterName} corrigió lo que se le devolvió en "${titleAct}" (${ref}). Revísalo de nuevo: apruébalo o devuélvelo.`
-        : `${submitterName} completó el flujo de evidencias de "${titleAct}" (${ref}). Entra a revisarla.`;
+        ? `${quien} corrigió lo que se le devolvió`
+        : `${quien} envió sus evidencias`;
 
       const recipientIds = new Set(await this.getEvidenceReviewerUserIds(submitterUserId));
       for (const sup of await this.getSupervisors(submitterUserId)) {
@@ -707,8 +740,9 @@ export class NotificationHierarchyService {
           userId: uid,
           type: 'EVIDENCE_SUBMITTED',
           category: 'evidences',
-          title: correccion ? '🔁 Corrección lista para revisión' : '📋 Evidencia lista para revisión',
+          title,
           message,
+          icon: correccion ? 'correccion' : 'por_revisar',
           triggerUserId: submitterUserId,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -739,15 +773,15 @@ export class NotificationHierarchyService {
   ) {
     try {
       const type = status === 'approved' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED';
+      const actividad = nombreActividad(activityTitle);
       const title =
         status === 'approved'
           ? extra.closed
-            ? '✅ Actividad aprobada y finalizada'
-            : '✅ Evidencia aprobada'
-          : extra.full
-            ? '↩️ Evidencia devuelta: rehacer desde cero'
-            : '↩️ Evidencia devuelta para corregir';
-      const base = (activityTitle && String(activityTitle).trim()) || `Actividad ${activityId}`;
+            ? `${actividad} finalizada`
+            : `Evidencia aprobada: ${actividad}`
+          : `Evidencia devuelta: ${actividad}`;
+      const icon = status === 'approved' ? (extra.closed ? 'finalizada' : 'aprobada') : 'devuelta';
+      const quien = persona(reviewerName, 'Tu supervisor');
       const stepNames: Record<string, string> = {
         ENTRY_PHOTO: 'foto de entrada',
         EVIDENCE_PHOTOS: 'fotos en sitio',
@@ -756,14 +790,19 @@ export class NotificationHierarchyService {
         EXIT_PHOTO: 'foto de salida',
       };
       const pasos = (extra.steps ?? []).map((s) => stepNames[s] ?? s).join(', ');
-      const calif = extra.score ? ` Calificación: ${extra.score}/5.` : '';
-      const obs = notes ? ` Observaciones: ${notes}` : '';
-      const message =
+      const calif = extra.score ? `Calificación ${extra.score} de 5` : null;
+      const obs = notes?.trim() ? `Observaciones: ${notes.trim()}` : null;
+      const accion =
         status === 'approved'
-          ? `${reviewerName} aprobó la evidencia de "${base}".${extra.closed ? ' La actividad quedó finalizada.' : ''}${calif}${obs}`
+          ? extra.closed
+            ? `${quien} aprobó las evidencias`
+            : `${quien} aprobó la evidencia`
           : extra.full
-            ? `${reviewerName} devolvió toda la evidencia de "${base}": hay que rehacerla desde cero.${calif}${obs}`
-            : `${reviewerName} devolvió "${base}" para corregir${pasos ? `: ${pasos}` : ''}.${calif}${obs}`;
+            ? `${quien} pidió rehacer toda la evidencia`
+            : pasos
+              ? `${quien} pidió corregir: ${pasos}`
+              : `${quien} pidió corregir la evidencia`;
+      const message = unir(accion, calif, obs);
 
       const recipients = new Set<number>([responsableUserId, ...alsoNotify]);
       for (const ceoId of await this.getCeoUserIds()) recipients.add(ceoId);
@@ -776,6 +815,7 @@ export class NotificationHierarchyService {
           category: 'evidences',
           title,
           message,
+          icon,
           relatedEntityId: activityId,
           entityType: 'Activity',
           relatedUrl: `/erp/actividades/${activityId}/evidencias`,
@@ -803,18 +843,26 @@ export class NotificationHierarchyService {
   }) {
     try {
       const { activityId, label, actorId, memberId, memberName, responsableId, reparte } = params;
-      const actorName = actorId ? await this.resolveActorName(actorId) : 'Dirección';
+      const actorName = actorId ? persona(await this.resolveActorName(actorId), 'Dirección') : 'Dirección';
       const url = `/erp/actividades/${activityId}`;
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: activityId },
+        select: { titulo: true, client: { select: { name: true } } },
+      });
+      const actividad = nombreActividad(activity?.titulo || label);
+      const cliente = activity?.client?.name;
+      const miembro = persona(memberName, 'alguien del equipo');
 
       if (memberId !== actorId) {
         await this.notificationsService.createNotification({
           userId: memberId,
           type: 'ACTIVITY_ASSIGNED',
           category: 'activities',
-          title: reparte ? '📨 Te pasaron una actividad para repartir' : '✨ Nueva actividad asignada',
+          title: reparte ? `Actividad por repartir: ${actividad}` : `Nueva actividad: ${actividad}`,
           message: reparte
-            ? `${actorName} te pasó «${label}». Repártela a tu equipo.`
-            : `${actorName} te asignó «${label}». Tú la ejecutas.`,
+            ? unir(`${actorName} te la pasó para repartir a tu equipo`, cliente)
+            : unir(`${actorName} te la asignó`, cliente),
+          icon: reparte ? 'despacho' : 'actividad_nueva',
           triggerUserId: actorId ?? undefined,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -833,8 +881,9 @@ export class NotificationHierarchyService {
           userId: uid,
           type: 'ACTIVITY_ASSIGNED',
           category: 'activities',
-          title: 'Despacho registrado',
-          message: `${actorName} pasó «${label}» a ${memberName}.`,
+          title: `${actorName} pasó ${actividad} a ${miembro}`,
+          message: unir(cliente, reparte ? 'La reparte a su equipo' : 'La ejecuta directamente'),
+          icon: 'despacho',
           triggerUserId: actorId ?? undefined,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -872,19 +921,16 @@ export class NotificationHierarchyService {
     lunchId: number;
   }) {
     try {
-      const hora = params.hora.toLocaleTimeString('es-MX', {
-        timeZone: 'America/Mexico_City',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const accion = params.momento === 'salida' ? 'salió a comer' : 'regresó de comer';
+      const nombre = persona(params.userName);
+      const justificacion = params.justificacion?.trim() || 'Sin justificación';
       for (const uid of await this.lunchReviewerIds(params.userId)) {
         await this.notificationsService.createNotification({
           userId: uid,
           type: params.momento === 'salida' ? 'LUNCH_CHECKIN' : 'LUNCH_CHECKOUT',
           category: 'lunch_breaks',
-          title: '⏰ Comida a destiempo por aprobar',
-          message: `${params.userName} ${accion} a las ${hora}, fuera de 3 a 4 p.m.: «${params.justificacion}». Apruébala o recházala.`,
+          title: 'Comida fuera de horario por revisar',
+          message: `${nombre}: ${justificacion}`,
+          icon: 'comida_tarde',
           triggerUserId: params.userId,
           relatedEntityId: params.lunchId,
           entityType: 'LunchBreak',
@@ -907,13 +953,17 @@ export class NotificationHierarchyService {
     lunchId: number;
   }) {
     try {
-      const quien = await this.resolveActorName(params.reviewerId);
+      const quien = persona(await this.resolveActorName(params.reviewerId), 'Tu supervisor');
       await this.notificationsService.createNotification({
         userId: params.userId,
         type: 'LUNCH_CHECKOUT',
         category: 'lunch_breaks',
-        title: params.aprobada ? '✅ Aprobaron tu comida a destiempo' : '❌ Rechazaron tu comida a destiempo',
-        message: `${quien} ${params.aprobada ? 'aprobó' : 'rechazó'} tu justificación.${params.notas ? ` «${params.notas}»` : ''}`,
+        title: params.aprobada ? 'Aprobaron tu comida fuera de horario' : 'Rechazaron tu comida fuera de horario',
+        message: unir(
+          `${quien} ${params.aprobada ? 'aprobó' : 'rechazó'} tu justificación`,
+          params.notas ? `Nota: ${params.notas}` : null,
+        ),
+        icon: params.aprobada ? 'comida_aprobada' : 'comida_rechazada',
         triggerUserId: params.reviewerId,
         relatedEntityId: params.lunchId,
         entityType: 'LunchBreak',
@@ -936,16 +986,18 @@ export class NotificationHierarchyService {
     try {
       const targets = new Set<number>(await this.getCeoUserIds());
       if (responsableId) targets.add(responsableId);
-      const who = lastUserId ? await this.resolveActorName(lastUserId) : null;
+      const who = lastUserId ? persona(await this.resolveActorName(lastUserId)) : null;
+      const actividad = nombreActividad(label);
       for (const uid of targets) {
         await this.notificationsService.createNotification({
           userId: uid,
           type: 'ACTIVITY_COMPLETED',
           category: 'activities',
-          title: '📋 Actividad lista para revisión',
+          title: `${actividad} lista para revisión`,
           message: who
-            ? `«${label}»: el equipo terminó (la última evidencia la subió ${who}). Queda finalizada cuando alguien la aprueba.`
-            : `«${label}»: el equipo subió todas sus evidencias. Queda finalizada cuando alguien la aprueba.`,
+            ? `El equipo terminó; ${who} subió la última evidencia`
+            : 'El equipo subió todas sus evidencias',
+          icon: 'por_revisar',
           triggerUserId: lastUserId ?? undefined,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -975,7 +1027,7 @@ export class NotificationHierarchyService {
       const [activity, personas] = await Promise.all([
         this.prisma.activity.findUnique({
           where: { id: activityId },
-          select: { anNumber: true, titulo: true, creadoPorId: true, client: { select: { name: true } } },
+          select: { titulo: true, creadoPorId: true, client: { select: { name: true } } },
         }),
         this.prisma.user.findMany({
           where: { id: { in: [actorId, aUsuarioId, ...(deUsuarioId ? [deUsuarioId] : [])] } },
@@ -983,10 +1035,10 @@ export class NotificationHierarchyService {
         }),
       ]);
       if (!activity) return;
-      const nombreDe = (id: number | null) => personas.find((p) => p.id === id)?.nombre || 'alguien';
-      const ref = activity.anNumber || `Actividad ${activityId}`;
-      const cliente = activity.client?.name ? ` · ${activity.client.name}` : '';
-      const motivo = params.motivo?.trim() ? ` Motivo: ${params.motivo.trim()}` : '';
+      const nombreDe = (id: number | null) => persona(personas.find((p) => p.id === id)?.nombre, 'alguien');
+      const actividad = nombreActividad(activity.titulo);
+      const cliente = activity.client?.name;
+      const motivo = params.motivo?.trim() ? `Motivo: ${params.motivo.trim()}` : null;
       const base = {
         type: 'ACTIVITY_ASSIGNED',
         category: 'activities',
@@ -996,13 +1048,14 @@ export class NotificationHierarchyService {
         relatedUrl: `/erp/actividades/${activityId}`,
         channel: 'ops',
         dedupeSeconds: 0,
+        icon: 'reasignada',
       } as const;
 
       await this.notificationsService.createNotification({
         ...base,
         userId: aUsuarioId,
-        title: `📌 Te reasignaron ${ref}`,
-        message: `${activity.titulo}${cliente}. Te la pasó ${nombreDe(actorId)}.${motivo}`,
+        title: `Te reasignaron ${actividad}`,
+        message: unir(`${nombreDe(actorId)} te la pasó`, cliente, motivo),
         priority: 'high',
       });
 
@@ -1010,10 +1063,12 @@ export class NotificationHierarchyService {
         await this.notificationsService.createNotification({
           ...base,
           userId: deUsuarioId,
-          title: `🔄 ${ref} pasó a ${nombreDe(aUsuarioId)}`,
-          message: `${nombreDe(actorId)} la reasignó; ${
-            params.retiradoAnterior ? 'ya no estás en el equipo' : 'sigues en el equipo como apoyo'
-          }.${motivo}`,
+          title: `${actividad} pasó a ${nombreDe(aUsuarioId)}`,
+          message: unir(
+            `${nombreDe(actorId)} la reasignó`,
+            params.retiradoAnterior ? 'Ya no estás en el equipo' : 'Sigues en el equipo como apoyo',
+            motivo,
+          ),
         });
       }
 
@@ -1025,8 +1080,14 @@ export class NotificationHierarchyService {
         await this.notificationsService.createNotification({
           ...base,
           userId,
-          title: `🔄 ${nombreDe(actorId)} reasignó ${ref}`,
-          message: `${activity.titulo}${cliente}: de ${nombreDe(deUsuarioId)} a ${nombreDe(aUsuarioId)}.${motivo}`,
+          title: `${nombreDe(actorId)} reasignó ${actividad}`,
+          message: unir(
+            deUsuarioId
+              ? `De ${nombreDe(deUsuarioId)} a ${nombreDe(aUsuarioId)}`
+              : `Ahora la tiene ${nombreDe(aUsuarioId)}`,
+            cliente,
+            motivo,
+          ),
         });
       }
     } catch (error) {
@@ -1046,28 +1107,23 @@ export class NotificationHierarchyService {
   }) {
     try {
       const { activityId, label, actorId, de, a, motivo, recipientIds } = params;
-      const actorName = await this.resolveActorName(actorId);
-      const fmt = (d: Date) =>
-        d.toLocaleString('es-MX', {
-          timeZone: 'America/Mexico_City',
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+      const actorName = persona(await this.resolveActorName(actorId));
       const targets = new Set<number>([...recipientIds, ...(await this.getCeoUserIds())]);
       targets.delete(actorId);
-      const message = `${actorName} movió «${label}»${de ? ` del ${fmt(de)}` : ''} al ${fmt(a)}.${
-        motivo ? ` Motivo: ${motivo}` : ''
-      }`;
+      const title = `${nombreActividad(label)} reprogramada`;
+      const message = unir(
+        `${actorName} la movió al ${fechaAviso(a)}`,
+        de ? `Antes: ${fechaAviso(de)}` : null,
+        motivo?.trim() ? `Motivo: ${motivo.trim()}` : null,
+      );
       for (const uid of targets) {
         await this.notificationsService.createNotification({
           userId: uid,
           type: 'ACTIVITY_RESCHEDULED',
           category: 'activities',
-          title: '🕑 Actividad reprogramada',
+          title,
           message,
+          icon: 'reprogramada',
           triggerUserId: actorId,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -1098,7 +1154,7 @@ export class NotificationHierarchyService {
           userId: supervisor.id,
           type: 'VIATICO_ASSIGNED',
           category: 'viatics',
-          title: '💰 Solicitud de viático',
+          title: 'Solicitud de viático',
           message: `${requesterName} solicitó un viático de $${amount.toFixed(2)}`,
           relatedEntityId: viaticId,
           entityType: 'Viatico',
@@ -1125,7 +1181,7 @@ export class NotificationHierarchyService {
         userId,
         type: 'VIATICO_ASSIGNED',
         category: 'viatics',
-        title: '💳 Viático asignado',
+        title: 'Viático asignado',
         message: `${assignerName} te asignó un viático de $${amount.toFixed(2)}${detail}`,
         relatedEntityId: viaticId,
         entityType: 'Viatico',
@@ -1148,7 +1204,7 @@ export class NotificationHierarchyService {
   ) {
     try {
       const type = status === 'approved' ? 'VIATICO_APPROVED' : 'VIATICO_REJECTED';
-      const title = status === 'approved' ? '✅ Viático aprobado' : '❌ Viático rechazado';
+      const title = status === 'approved' ? 'Viático aprobado' : 'Viático rechazado';
       const message = status === 'approved'
         ? `Tu viático de $${amount.toFixed(2)} ha sido aprobado`
         : `Tu viático de $${amount.toFixed(2)} ha sido rechazado`;
@@ -1186,7 +1242,7 @@ export class NotificationHierarchyService {
           userId: supervisor.id,
           type: 'TOOL_REQUESTED',
           category: 'tools',
-          title: '🔨 Solicitud de herramienta',
+          title: 'Solicitud de herramienta',
           message: `${requesterName} solicitó: "${toolName}"`,
           relatedEntityId: toolRequestId,
           entityType: 'ToolRequest',
@@ -1210,7 +1266,7 @@ export class NotificationHierarchyService {
   ) {
     try {
       const type = status === 'approved' ? 'TOOL_APPROVED' : 'TOOL_REJECTED';
-      const title = status === 'approved' ? '✅ Herramienta aprobada' : '❌ Herramienta rechazada';
+      const title = status === 'approved' ? 'Herramienta aprobada' : 'Herramienta rechazada';
       const message = `Tu solicitud para "${toolName}" ha sido ${status === 'approved' ? 'aprobada' : 'rechazada'}`;
 
       await this.notificationsService.createNotification({
@@ -1245,22 +1301,22 @@ export class NotificationHierarchyService {
         asistencia: {
           url: appUrls.erpAttendance(undefined, userId),
           entityType: 'Attendance',
-          titulo: '⏰ Multa por Asistencia',
+          titulo: 'Multa por asistencia',
         },
         vehiculo: {
           url: appUrls.erpFines(fineId),
           entityType: 'Fine',
-          titulo: '🚗 Multa por Vehículos',
+          titulo: 'Multa por vehículos',
         },
         herramienta: {
           url: appUrls.erpFines(fineId),
           entityType: 'Fine',
-          titulo: '🔧 Multa por Herramientas',
+          titulo: 'Multa por herramientas',
         },
         actividad: {
           url: appUrls.erpFines(fineId),
           entityType: 'Fine',
-          titulo: '📋 Multa por Actividades',
+          titulo: 'Multa por actividades',
         },
       };
 
@@ -1269,7 +1325,7 @@ export class NotificationHierarchyService {
         : {
             url: appUrls.erpFines(fineId),
             entityType: 'Fine',
-            titulo: '⚠️ Nueva Multa',
+            titulo: 'Nueva multa',
           };
 
       await this.notificationsService.createNotification({
@@ -1304,7 +1360,7 @@ export class NotificationHierarchyService {
           userId: supervisor.id,
           type: 'PROFILE_DOCUMENT_UPLOADED',
           category: 'profile',
-          title: `📄 ${documentType} subido`,
+          title: `${documentType} subido`,
           message: `${uploaderName} subió su ${documentType} para revisión`,
           relatedUrl: `/erp/users?highlight=${userId}`,
           priority: 'normal',
@@ -1332,7 +1388,7 @@ export class NotificationHierarchyService {
           userId: supervisor.id,
           type: 'TOOL_RENEWAL_REQUESTED',
           category: 'tools',
-          title: '🔄 Solicitud de renovación de herramienta',
+          title: 'Solicitud de renovación de herramienta',
           message: `${requesterName} solicitó renovar: "${toolName}"`,
           relatedEntityId: renewalId,
           entityType: 'ToolRenewal',
@@ -1365,7 +1421,7 @@ export class NotificationHierarchyService {
         userId,
         type: 'VEHICLE_USAGE_EXPIRING',
         category: 'vehicles',
-        title: '⏰ Vehículo por vencer',
+        title: 'Vehículo por vencer',
         message,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
@@ -1379,7 +1435,7 @@ export class NotificationHierarchyService {
           userId: supervisor.id,
           type: 'VEHICLE_USAGE_EXPIRING',
           category: 'vehicles',
-          title: '⏰ Vehículo por vencer',
+          title: 'Vehículo por vencer',
           message,
           relatedEntityId: vehicleRequestId,
           entityType: 'VehicleControl',
@@ -1409,7 +1465,7 @@ export class NotificationHierarchyService {
           userId: supervisor.id,
           type: 'VEHICLE_DELIVERY_REQUESTED',
           category: 'vehicles',
-          title: '🚗 Solicitud de vehículo',
+          title: 'Solicitud de vehículo',
           message: `${requesterName} solicitó: "${vehicleName}"`,
           relatedEntityId: vehicleRequestId,
           entityType: 'VehicleControl',
@@ -1435,7 +1491,7 @@ export class NotificationHierarchyService {
         userId,
         type: 'VEHICLE_DELIVERY_APPROVED',
         category: 'vehicles',
-        title: '✅ Vehículo aprobado',
+        title: 'Vehículo aprobado',
         message: `Tu solicitud para "${vehicleName}" ha sido aprobada`,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
@@ -1460,7 +1516,7 @@ export class NotificationHierarchyService {
         userId,
         type: 'VEHICLE_DELIVERY_REJECTED',
         category: 'vehicles',
-        title: '❌ Vehículo rechazado',
+        title: 'Vehículo rechazado',
         message: `Tu solicitud para "${vehicleName}" ha sido rechazada`,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
@@ -1661,14 +1717,16 @@ export class NotificationHierarchyService {
   ) {
     try {
       const recipients = await this.getOperationalOversightRecipientIds(actorId);
-      const oversightMsg = `${actorName} marcó como finalizada la actividad «${activityLabel}».`;
+      const actividad = nombreActividad(activityLabel);
+      const quien = persona(actorName, 'Usuario');
       for (const uid of recipients) {
         await this.notificationsService.createNotification({
           userId: uid,
           type: 'ACTIVITY_COMPLETED',
           category: 'activities',
-          title: 'Actividad finalizada',
-          message: oversightMsg,
+          title: `${actividad} finalizada`,
+          message: `${quien} la marcó como finalizada`,
+          icon: 'finalizada',
           triggerUserId: actorId,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -1681,8 +1739,9 @@ export class NotificationHierarchyService {
           userId: actorId,
           type: 'USER_ACTION_CONFIRMED',
           category: 'confirmations',
-          title: 'Actividad completada',
-          message: `Marcaste «${activityLabel}» como finalizada.`,
+          title: `${actividad} finalizada`,
+          message: 'La marcaste como finalizada',
+          icon: 'finalizada',
           relatedEntityId: activityId,
           entityType: 'Activity',
           relatedUrl: `/ops/my-evidences?activityId=${activityId}`,
@@ -1692,8 +1751,9 @@ export class NotificationHierarchyService {
           userId: responsableId,
           type: 'ACTIVITY_COMPLETED',
           category: 'activities',
-          title: 'Tu actividad fue cerrada',
-          message: `${actorName} marcó como finalizada «${activityLabel}».`,
+          title: `${actividad} finalizada`,
+          message: `${quien} la marcó como finalizada`,
+          icon: 'finalizada',
           triggerUserId: actorId,
           relatedEntityId: activityId,
           entityType: 'Activity',
@@ -2133,7 +2193,7 @@ export class NotificationHierarchyService {
       const recipients = new Set(await this.getExecutiveRecipientIds());
       if (opts.ownerId) recipients.add(opts.ownerId);
 
-      const severityText = opts.severity === 'overspend' ? '🚨 Sobrepresupuesto' : '⚠️ Margen bajo';
+      const severityText = opts.severity === 'overspend' ? 'Sobrepresupuesto' : 'Margen bajo';
       const title = `${severityText} · ${opts.projectName}`;
       const message =
         opts.severity === 'overspend'

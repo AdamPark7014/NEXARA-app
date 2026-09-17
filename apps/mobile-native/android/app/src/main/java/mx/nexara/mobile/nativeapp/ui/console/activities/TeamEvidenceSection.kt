@@ -457,7 +457,7 @@ private fun TeamMemberCard(
             }
 
             TextButton(onClick = { abierta = !abierta }) {
-                Text(if (abierta) "Ocultar" else "Ver detalle", color = NxColors.Teal, fontWeight = FontWeight.SemiBold)
+                Text(if (abierta) "Ocultar" else "Ver detalle", color = NxColors.Brand, fontWeight = FontWeight.SemiBold)
             }
 
             if (abierta) {
@@ -653,7 +653,7 @@ private fun SectionTitle(
                 "↩️ Devolver este paso",
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = NxColors.Teal,
+                color = NxColors.Brand,
                 modifier = Modifier
                     .clickable { onDevolverPaso(step) }
                     .padding(vertical = 4.dp),
@@ -684,7 +684,7 @@ private fun PhotoThumb(foto: EvidencePhoto, height: Dp, onOpen: () -> Unit) {
                 "📍 Ver en mapa",
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = NxColors.Teal,
+                color = NxColors.Brand,
                 modifier = Modifier.clickable { openMapsAt(context, lat, lng) },
             )
         }
@@ -737,7 +737,7 @@ private fun ReviewHistory(
                         if (abierta == r.id) "Ocultar lo que se devolvió" else "Ver lo que se devolvió",
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = NxColors.Teal,
+                        color = NxColors.Brand,
                         modifier = Modifier
                             .clickable { abierta = if (abierta == r.id) null else r.id }
                             .padding(vertical = 4.dp),

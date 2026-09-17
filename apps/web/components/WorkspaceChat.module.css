@@ -13,10 +13,10 @@
 
 .shell {
   /* Map chat chrome to ERP / AppShell tokens */
-  --nx-accent: var(--panel-accent, var(--primary, #15a99d));
-  --nx-accent-soft: color-mix(in srgb, var(--panel-accent, var(--primary, #15a99d)) 12%, transparent);
-  --nx-send: var(--panel-accent, var(--primary, #15a99d));
-  --nx-send-hover: color-mix(in srgb, var(--panel-accent, var(--primary, #15a99d)) 82%, white 18%);
+  --nx-accent: var(--panel-accent, var(--primary, #2563EB));
+  --nx-accent-soft: color-mix(in srgb, var(--panel-accent, var(--primary, #2563EB)) 12%, transparent);
+  --nx-send: var(--panel-accent, var(--primary, #2563EB));
+  --nx-send-hover: color-mix(in srgb, var(--panel-accent, var(--primary, #2563EB)) 82%, white 18%);
   --nx-ok: var(--success, #22c55e);
   --nx-danger: var(--danger, #ef4444);
   --nx-line: var(--nx-panel-hairline, var(--border, #e4e8ef));
@@ -431,9 +431,9 @@
   text-transform: uppercase;
   padding: 3px 7px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--panel-accent, #0ea5e9) 12%, transparent);
-  color: var(--panel-accent, #0ea5e9);
-  border: 1px solid color-mix(in srgb, var(--panel-accent, #0ea5e9) 28%, transparent);
+  background: color-mix(in srgb, var(--panel-accent, #2563EB) 12%, transparent);
+  color: var(--panel-accent, #2563EB);
+  border: 1px solid color-mix(in srgb, var(--panel-accent, #2563EB) 28%, transparent);
 }
 
 .superviseTag {
@@ -442,7 +442,7 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--panel-accent, #0ea5e9);
+  color: var(--panel-accent, #2563EB);
   opacity: 0.9;
 }
 
@@ -450,6 +450,15 @@
   margin-left: 6px;
   font-size: 11px;
   opacity: 0.75;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.iconBtnInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .starBtn {
@@ -525,7 +534,7 @@
 }
 
 .pinItem:hover {
-  background: color-mix(in srgb, var(--panel-accent, #0ea5e9) 8%, transparent);
+  background: color-mix(in srgb, var(--panel-accent, #2563EB) 8%, transparent);
 }
 
 .pinItemAuthor {
@@ -546,6 +555,9 @@
 .pinnedBadge {
   font-size: 11px;
   margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--nx-accent);
 }
 
 .roleBadge {
@@ -746,12 +758,12 @@
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
 }
 
-.avatarHue0 { background: linear-gradient(145deg, #2eb8d9, #0ea5e9); }
-.avatarHue1 { background: linear-gradient(145deg, #2bc4a8, #15a99d); }
+.avatarHue0 { background: linear-gradient(145deg, #38BDF8, #1D4ED8); }
+.avatarHue1 { background: linear-gradient(145deg, #60A5FA, #2563EB); }
 .avatarHue2 { background: linear-gradient(145deg, #f07178, #e11d48); }
 .avatarHue3 { background: linear-gradient(145deg, #e2a336, #d97706); }
 .avatarHue4 { background: linear-gradient(145deg, #8b9cf6, #6366f1); }
-.avatarHue5 { background: linear-gradient(145deg, #45c4b0, #0d9488); }
+.avatarHue5 { background: linear-gradient(145deg, #a78bfa, #7c3aed); }
 
 .avatarSm {
   width: 22px;
@@ -888,6 +900,10 @@
   white-space: nowrap;
 }
 
+.actionBtn > svg {
+  vertical-align: middle;
+}
+
 .actionBtn:hover {
   background: var(--surface-2, #f4f6f8);
   color: var(--foreground, #111);
@@ -986,7 +1002,7 @@
 }
 
 .composerDragOver {
-  outline: 2px dashed color-mix(in srgb, var(--panel-accent, #0ea5e9) 55%, transparent);
+  outline: 2px dashed color-mix(in srgb, var(--panel-accent, #2563EB) 55%, transparent);
   outline-offset: -4px;
   border-radius: 12px;
 }
@@ -998,9 +1014,9 @@
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--panel-accent, #0ea5e9) 10%, var(--surface, #fff));
-  border: 1px dashed color-mix(in srgb, var(--panel-accent, #0ea5e9) 50%, transparent);
-  color: var(--panel-accent, #0ea5e9);
+  background: color-mix(in srgb, var(--panel-accent, #2563EB) 10%, var(--surface, #fff));
+  border: 1px dashed color-mix(in srgb, var(--panel-accent, #2563EB) 50%, transparent);
+  color: var(--panel-accent, #2563EB);
   font-size: 13px;
   font-weight: 600;
   pointer-events: none;
@@ -1103,6 +1119,9 @@
   cursor: pointer;
   color: var(--text-secondary, #667085);
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .attachBtn:hover:not(:disabled) {
@@ -1124,9 +1143,14 @@
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
+  color: var(--text-secondary, #667085);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .mentionToolBtn:hover {
+  color: var(--nx-accent);
   background: var(--surface-2, #f4f6f8);
 }
 
@@ -1154,6 +1178,9 @@
 .attachChipIcon {
   font-size: 15px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary, #667085);
 }
 
 .attachChipName {
@@ -1434,7 +1461,7 @@
   background: linear-gradient(
     145deg,
     color-mix(in srgb, var(--panel-accent, var(--primary)) 78%, white 22%),
-    var(--panel-accent, var(--primary, #15a99d))
+    var(--panel-accent, var(--primary, #2563EB))
   );
   box-shadow: 0 10px 28px color-mix(in srgb, var(--panel-accent, var(--primary)) 28%, transparent);
   letter-spacing: -0.04em;
@@ -1538,6 +1565,9 @@
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .entityTab:hover,

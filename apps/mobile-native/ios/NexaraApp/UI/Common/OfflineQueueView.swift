@@ -16,9 +16,9 @@ struct OfflineQueueView: View {
                     .font(.footnote)
                     .foregroundColor(.secondary)
                 if let message {
-                    Text(message)
+                    NxIconText(systemName: items.isEmpty ? "checkmark.circle.fill" : "exclamationmark.circle", text: message)
                         .font(.footnote.weight(.semibold))
-                        .foregroundColor(message.hasPrefix("❌") ? .red : .green)
+                        .foregroundColor(items.isEmpty ? .green : .orange)
                 }
                 Button {
                     Task { await syncNow() }
@@ -49,7 +49,7 @@ struct OfflineQueueView: View {
                     ForEach(items) { item in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(item.method).font(.subheadline.bold()).foregroundColor(.teal)
+                                Text(item.method).font(.subheadline.bold()).foregroundColor(NxBrand.primary)
                                 Spacer()
                                 Text(shortPath(item.url)).font(.caption2).foregroundColor(.secondary)
                             }
@@ -90,7 +90,7 @@ struct OfflineQueueView: View {
         message = nil
         await OfflineSyncCoordinator.shared.replay()
         refresh()
-        message = items.isEmpty ? "✅ Cola vacía" : "Quedan \(items.count) pendientes"
+        message = items.isEmpty ? "Cola vacía" : "Quedan \(items.count) pendientes"
         syncing = false
     }
 

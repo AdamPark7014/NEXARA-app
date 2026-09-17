@@ -233,7 +233,7 @@ struct MyProfileView: View {
             Button(saving ? "Guardando…" : "Guardar cambios") { Task { await save() } }
                 .disabled(saving)
             if let saved {
-                Text(saved).font(.footnote).foregroundColor(.green)
+                NxIconText(systemName: "checkmark.circle.fill", text: saved).font(.footnote).foregroundColor(.green)
             }
             if let saveError {
                 Text(saveError).font(.footnote).foregroundColor(.red)
@@ -305,7 +305,7 @@ struct MyProfileView: View {
         do {
             let sent = try await MyProfileRepository.shared.save(form)
             saved = sent
-                ? "✓ Guardado — pendiente de revisión por RH"
+                ? "Guardado — pendiente de revisión por RH"
                 : "Guardado sin conexión; se enviará al recuperar la red."
             if sent { await load() }
         } catch {

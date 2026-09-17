@@ -12,6 +12,7 @@ import {
   type ClientSector,
 } from "@/lib/client-sectors";
 import { addSalesClientSector, getSalesClient, type SalesClient } from "@/lib/sales-api";
+import ClientSectorIcon from "@/components/erp/ClientSectorIcon";
 import {
   createOperationalProject,
   listOperationalProjects,
@@ -152,7 +153,7 @@ export default function ClienteDetallePage() {
         <div className={styles.sectorPick}>
           {clientSectors.map((s) => (
             <span key={s} className={styles.chip}>
-              {CLIENT_SECTOR_META[s].emoji}{" "}
+              <ClientSectorIcon icon={CLIENT_SECTOR_META[s].icon} size={14} />
               {CLIENT_SECTOR_META[s].title.replace(/^Clientes de |^Clientes /i, "")}
             </span>
           ))}

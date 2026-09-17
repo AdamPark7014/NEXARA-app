@@ -5,6 +5,19 @@ import { type Socket } from "socket.io-client";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import styles from "./WorkspaceChat.module.css";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import type { SvgIconComponent } from "@mui/icons-material";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
+import PushPinIcon from "@mui/icons-material/PushPin";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import AttachFileOutlinedIcon from "@mui/icons-material/AttachFileOutlined";
+import NotificationsOffOutlinedIcon from "@mui/icons-material/NotificationsOffOutlined";
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 
 type Attachment = { url: string; name: string; mime: string; size: number };
 
@@ -155,11 +168,30 @@ function dayLabel(iso: string) {
   return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
 }
 
+/** Prefijo de texto (placeholders): solo los públicos llevan "#". */
 function channelPrefix(kind: ChannelKind) {
-  if (kind === "DIRECT") return "";
-  if (kind === "PRIVATE") return "🔒";
+  return kind === "PUBLIC" ? "#" : "";
+}
+
+/** Prefijo visual del canal: candado para privados, "#" para públicos, null para directos. */
+function channelPrefixNode(kind: ChannelKind): ReactNode {
+  if (kind === "DIRECT") return null;
+  if (kind === "PRIVATE") {
+    return (
+      <LockOutlinedIcon
+        titleAccess="Canal privado"
+        sx={{ fontSize: 14, verticalAlign: "middle", display: "inline-block" }}
+      />
+    );
+  }
   return "#";
 }
+
+const MENTION_KIND_ICON: Record<"USER" | "ACTIVITY" | "EVIDENCE", SvgIconComponent> = {
+  USER: PersonOutlineIcon,
+  ACTIVITY: AssignmentOutlinedIcon,
+  EVIDENCE: PhotoCameraOutlinedIcon,
+};
 
 function renderRichText(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
@@ -396,7 +428,7 @@ export default function WorkspaceChat({
       if (!("Notification" in window) || Notification.permission !== "granted") return;
       try {
         const n = new Notification(`${msg.author.nombre} · NEXARA Chat`, {
-          body: msg.attachmentName ? `📎 ${msg.attachmentName}` : msg.body.slice(0, 140),
+          body: msg.attachmentName ? `Adjunto: ${msg.attachmentName}` : msg.body.slice(0, 140),
           tag: `nexara-chat-${msg.channelId}`,
         });
         n.onclick = () => {
@@ -1055,7 +1087,7 @@ export default function WorkspaceChat({
     const token =
       entity.kind === "USER"
         ? `[@${cleanLabel}](user:${entity.id})`
-        : `[${entity.kind === "ACTIVITY" ? "📋" : "📷"} ${cleanLabel}](${entity.href ?? "/"})`;
+        : `[${cleanLabel}](${entity.href ?? "/"})`;
 
     if (entityTarget === "thread") {
       setThreadDraft((prev) => `${prev}${prev && !/\s$/.test(prev) ? " " : ""}${token} `);
@@ -1317,7 +1349,11 @@ export default function WorkspaceChat({
                   <span className={styles.msgTime} style={{ opacity: 1 }}>
                     {formatClock(m.createdAt)}
                   </span>
-                  {m.pinnedAt && <span className={styles.pinnedBadge} title="Fijado">📌</span>}
+                  {m.pinnedAt && (
+                    <span className={styles.pinnedBadge} title="Fijado" aria-label="Fijado">
+                      <PushPinIcon aria-hidden="true" sx={{ fontSize: 13 }} />
+                    </span>
+                  )}
                   {m.editedAt && <span className={styles.edited}>(editado)</span>}
                 </div>
               )}
@@ -1361,7 +1397,9 @@ export default function WorkspaceChat({
                     rel="noreferrer"
                     className={styles.msgAttachmentFile}
                   >
-                    <span className={styles.attachChipIcon}>📄</span>
+                    <span className={styles.attachChipIcon}>
+                      <DescriptionOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    </span>
                     <span className={styles.attachChipName}>{m.attachmentName ?? "Archivo"}</span>
                     <span className={styles.msgAttachmentDownload}>Descargar</span>
                   </a>
@@ -1434,9 +1472,14 @@ export default function WorkspaceChat({
                   type="button"
                   className={styles.actionBtn}
                   title={m.pinnedAt ? "Quitar pin" : "Fijar mensaje"}
+                  aria-label={m.pinnedAt ? "Quitar pin" : "Fijar mensaje"}
                   onClick={() => void togglePin(m.id)}
                 >
-                  {m.pinnedAt ? "📌" : "Pin"}
+                  {m.pinnedAt ? (
+                    <PushPinIcon aria-hidden="true" sx={{ fontSize: 14 }} />
+                  ) : (
+                    <PushPinOutlinedIcon aria-hidden="true" sx={{ fontSize: 14 }} />
+                  )}
                 </button>
                 {canEdit && (
                   <button
@@ -1508,11 +1551,15 @@ export default function WorkspaceChat({
           />
         </span>
       ) : (
-        <span className={styles.channelPrefix}>{channelPrefix(c.kind)}</span>
+        <span className={styles.channelPrefix}>{channelPrefixNode(c.kind)}</span>
       )}
       <span className={styles.channelLabel}>
         {c.name}
-        {c.muted ? <span className={styles.muteTag} title="Silenciado">🔇</span> : null}
+        {c.muted ? (
+          <span className={styles.muteTag} title="Silenciado" aria-label="Silenciado">
+            <NotificationsOffOutlinedIcon aria-hidden="true" sx={{ fontSize: 13 }} />
+          </span>
+        ) : null}
         {c.supervised ? <span className={styles.superviseTag}>Sup</span> : null}
       </span>
       <span className={styles.channelMeta}>
@@ -1521,6 +1568,7 @@ export default function WorkspaceChat({
           tabIndex={0}
           className={`${styles.starBtn} ${starredIds.includes(c.id) ? styles.starBtnOn : ""}`}
           title={starredIds.includes(c.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
+          aria-label={starredIds.includes(c.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
           onClick={(e) => toggleStar(c.id, e)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -1529,7 +1577,11 @@ export default function WorkspaceChat({
             }
           }}
         >
-          {starredIds.includes(c.id) ? "★" : "☆"}
+          {starredIds.includes(c.id) ? (
+            <StarIcon aria-hidden="true" sx={{ fontSize: 14 }} />
+          ) : (
+            <StarBorderIcon aria-hidden="true" sx={{ fontSize: 14 }} />
+          )}
         </span>
         {(c.unreadCount ?? 0) > 0 && activeId !== c.id && (
           <span className={styles.unreadBadge}>{c.unreadCount! > 99 ? "99+" : c.unreadCount}</span>
@@ -1652,7 +1704,7 @@ export default function WorkspaceChat({
                 </button>
                 <div className={styles.channelTitleBlock}>
                   <div className={styles.channelTitle}>
-                    <span>{channelPrefix(detail?.kind ?? "PUBLIC")}</span>
+                    <span>{channelPrefixNode(detail?.kind ?? "PUBLIC")}</span>
                     <span>{detail?.name ?? "…"}</span>
                     {detail?.supervised ? (
                       <span className={styles.supervisePill} title="Vista de supervisión (solo lectura)">
@@ -1689,27 +1741,41 @@ export default function WorkspaceChat({
                       type="button"
                       className={`${styles.iconBtn} ${detail?.muted ? styles.iconBtnActive : ""}`}
                       title={detail?.muted ? "Reactivar notificaciones del canal" : "Silenciar canal"}
+                      aria-label={detail?.muted ? "Reactivar notificaciones del canal" : "Silenciar canal"}
                       onClick={() => void toggleChannelMute()}
                     >
-                      {detail?.muted ? "🔇" : "Silenciar"}
+                      {detail?.muted ? (
+                        <NotificationsOffOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                      ) : (
+                        "Silenciar"
+                      )}
                     </button>
                   )}
                   <button
                     type="button"
                     className={`${styles.iconBtn} ${notifyOn ? styles.iconBtnActive : ""}`}
                     title={notifyOn ? "Notificaciones activadas" : "Activar notificaciones del navegador"}
+                    aria-label={notifyOn ? "Notificaciones activadas" : "Activar notificaciones del navegador"}
                     onClick={toggleNotify}
                   >
-                    {notifyOn ? "🔔" : "🔕"}
+                    {notifyOn ? (
+                      <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    ) : (
+                      <NotificationsOffOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                    )}
                   </button>
                   {pinned.length > 0 && (
                     <button
                       type="button"
                       className={`${styles.iconBtn} ${showPins ? styles.iconBtnActive : ""}`}
                       title="Mensajes fijados"
+                      aria-label={`Mensajes fijados: ${pinned.length}`}
                       onClick={() => setShowPins((v) => !v)}
                     >
-                      📌 {pinned.length}
+                      <span className={styles.iconBtnInner}>
+                        <PushPinOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+                        {pinned.length}
+                      </span>
                     </button>
                   )}
                   <button
@@ -1773,7 +1839,7 @@ export default function WorkspaceChat({
                     >
                       <span className={styles.pinItemAuthor}>{p.author.nombre}</span>
                       <span className={styles.pinItemBody}>
-                        {p.attachmentName ? `📎 ${p.attachmentName}` : p.body.slice(0, 120)}
+                        {p.attachmentName ? `Adjunto: ${p.attachmentName}` : p.body.slice(0, 120)}
                       </span>
                     </button>
                   ))}
@@ -1942,7 +2008,9 @@ export default function WorkspaceChat({
                               className={styles.attachChipThumb}
                             />
                           ) : (
-                            <span className={styles.attachChipIcon}>📎</span>
+                            <span className={styles.attachChipIcon}>
+                              <AttachFileOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                            </span>
                           )}
                           <span className={styles.attachChipName}>{attachment.name}</span>
                           <span className={styles.attachChipSize}>{formatFileSize(attachment.size)}</span>
@@ -2001,10 +2069,11 @@ export default function WorkspaceChat({
                         type="button"
                         className={styles.attachBtn}
                         title="Adjuntar archivo"
+                        aria-label="Adjuntar archivo"
                         disabled={uploading}
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        📎
+                        <AttachFileOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                       </button>
                       <input
                         ref={fileInputRef}
@@ -2019,25 +2088,28 @@ export default function WorkspaceChat({
                         type="button"
                         className={styles.mentionToolBtn}
                         title="Mencionar persona"
+                        aria-label="Mencionar persona"
                         onClick={() => openEntityPicker("USER")}
                       >
-                        👤
+                        <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                       </button>
                       <button
                         type="button"
                         className={styles.mentionToolBtn}
                         title="Mencionar actividad"
+                        aria-label="Mencionar actividad"
                         onClick={() => openEntityPicker("ACTIVITY")}
                       >
-                        📋
+                        <AssignmentOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                       </button>
                       <button
                         type="button"
                         className={styles.mentionToolBtn}
                         title="Mencionar evidencia"
+                        aria-label="Mencionar evidencia"
                         onClick={() => openEntityPicker("EVIDENCE")}
                       >
-                        📷
+                        <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                       </button>
                       <span className={styles.composerHint}>Enter envía · @ menciona</span>
                     </div>
@@ -2170,7 +2242,9 @@ export default function WorkspaceChat({
                                 className={styles.attachChipThumb}
                               />
                             ) : (
-                              <span className={styles.attachChipIcon}>📎</span>
+                              <span className={styles.attachChipIcon}>
+                                <AttachFileOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                              </span>
                             )}
                             <span className={styles.attachChipName}>{threadAttachment.name}</span>
                             <span className={styles.attachChipSize}>{formatFileSize(threadAttachment.size)}</span>
@@ -2210,10 +2284,11 @@ export default function WorkspaceChat({
                           type="button"
                           className={styles.attachBtn}
                           title="Adjuntar archivo"
+                          aria-label="Adjuntar archivo"
                           disabled={uploading}
                           onClick={() => threadFileInputRef.current?.click()}
                         >
-                          📎
+                          <AttachFileOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                         </button>
                         <input
                           ref={threadFileInputRef}
@@ -2228,25 +2303,28 @@ export default function WorkspaceChat({
                           type="button"
                           className={styles.mentionToolBtn}
                           title="Mencionar persona"
+                          aria-label="Mencionar persona"
                           onClick={() => openEntityPicker("USER", "thread")}
                         >
-                          👤
+                          <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                         </button>
                         <button
                           type="button"
                           className={styles.mentionToolBtn}
                           title="Mencionar actividad"
+                          aria-label="Mencionar actividad"
                           onClick={() => openEntityPicker("ACTIVITY", "thread")}
                         >
-                          📋
+                          <AssignmentOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                         </button>
                         <button
                           type="button"
                           className={styles.mentionToolBtn}
                           title="Mencionar evidencia"
+                          aria-label="Mencionar evidencia"
                           onClick={() => openEntityPicker("EVIDENCE", "thread")}
                         >
-                          📷
+                          <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                         </button>
                         <span className={styles.composerHint}>Respuesta al hilo</span>
                       </div>
@@ -2434,24 +2512,28 @@ export default function WorkspaceChat({
             <div className={styles.entityTabs}>
               {(
                 [
-                  ["USER", "👤 Personas"],
-                  ["ACTIVITY", "📋 Actividades"],
-                  ["EVIDENCE", "📷 Evidencias"],
+                  ["USER", "Personas"],
+                  ["ACTIVITY", "Actividades"],
+                  ["EVIDENCE", "Evidencias"],
                 ] as Array<[MentionEntity["kind"], string]>
-              ).map(([kind, label]) => (
-                <button
-                  key={kind}
-                  type="button"
-                  className={`${styles.entityTab} ${entityKind === kind ? styles.entityTabActive : ""}`}
-                  onClick={() => {
-                    setEntityKind(kind);
-                    setEntityQ("");
-                    setEntityResults([]);
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
+              ).map(([kind, label]) => {
+                const TabIcon = MENTION_KIND_ICON[kind];
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    className={`${styles.entityTab} ${entityKind === kind ? styles.entityTabActive : ""}`}
+                    onClick={() => {
+                      setEntityKind(kind);
+                      setEntityQ("");
+                      setEntityResults([]);
+                    }}
+                  >
+                    <TabIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
             <input
               className={styles.modalInput}
@@ -2477,7 +2559,10 @@ export default function WorkspaceChat({
                     onClick={() => insertEntityMention(entity)}
                   >
                     <span className={styles.entityResultIcon}>
-                      {entity.kind === "USER" ? "👤" : entity.kind === "ACTIVITY" ? "📋" : "📷"}
+                      {(() => {
+                        const KindIcon = MENTION_KIND_ICON[entity.kind];
+                        return <KindIcon aria-hidden="true" sx={{ fontSize: 18 }} />;
+                      })()}
                     </span>
                     <span className={styles.entityResultText}>
                       <strong>{entity.label}</strong>
@@ -2542,7 +2627,7 @@ export default function WorkspaceChat({
                   onMouseEnter={() => setSwitcherIndex(i)}
                   onClick={() => selectChannel(c.id)}
                 >
-                  <span className={styles.channelPrefix}>{channelPrefix(c.kind) || "·"}</span>
+                  <span className={styles.channelPrefix}>{channelPrefixNode(c.kind) ?? "·"}</span>
                   <span className={styles.channelLabel}>{c.name}</span>
                   {(c.unreadCount ?? 0) > 0 && (
                     <span className={styles.unreadBadge}>{c.unreadCount}</span>

@@ -242,7 +242,7 @@ html {
 /* Scrollbar discreto y homologado en todo el sitio público (light + dark) */
 html {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, #1F5F4E 50%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, #1E40AF 50%, transparent) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -255,7 +255,7 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, #1F5F4E 45%, transparent);
+  background: color-mix(in srgb, #1E40AF 45%, transparent);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -263,7 +263,7 @@ html {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, #1F5F4E 70%, transparent);
+  background: color-mix(in srgb, #1E40AF 70%, transparent);
   background-clip: padding-box;
 }
 
@@ -336,12 +336,16 @@ body.light {
   --text-secondary: #445668;
   --text-tertiary: #6b7a8f;
 
-  --primary: #15a99d;
-  --primary-strong: #0b7a72;
-  --secondary: #36bcae;
+  /* Core azul (antes teal #15a99d): primary / hover #1D4ED8 / dark / soft #DBEAFE / tint #EFF6FF */
+  --primary: #2563EB;
+  --primary-strong: #1E40AF;
+  --primary-hover: #1D4ED8;
+  --primary-soft: #DBEAFE;
+  --primary-tint: #EFF6FF;
+  --secondary: #3B82F6;
   --accent: #d66533;
   --accent-strong: #c24e1e;
-  --support: #79d8ce;
+  --support: #93C5FD;
   --success: #1a8d6f;
   --warning: #e67e15;
   --danger: #c9423d;
@@ -352,30 +356,30 @@ body.light {
   --bg-secondary: color-mix(in srgb, var(--surface-2) 88%, var(--background));
   --muted: color-mix(in srgb, var(--border) 68%, transparent);
 
-  --border: rgba(12, 71, 69, 0.14);
-  --border-strong: rgba(12, 71, 69, 0.26);
+  --border: rgba(30, 58, 138, 0.14);
+  --border-strong: rgba(30, 58, 138, 0.26);
   --shadow: 0 14px 32px rgba(10, 30, 52, 0.13);
-  --focus: rgba(21, 169, 157, 0.34);
+  --focus: rgba(37, 99, 235, 0.34);
   --surface-clean: color-mix(in srgb, var(--surface) 96%, var(--background));
   --surface-clean-soft: color-mix(in srgb, var(--surface-2) 92%, var(--background));
   --stroke-clean: color-mix(in srgb, var(--primary) 20%, transparent);
 
   /* Header / menu tokens with refined gradients and depth */
-  --header-bg: linear-gradient(142deg, #109b90 0%, #1fb0a4 40%, #6ed8cd 100%);
-  --header-border: rgba(110, 216, 205, 0.42);
+  --header-bg: linear-gradient(142deg, #1E40AF 0%, #2563EB 45%, #3B82F6 100%);
+  --header-border: rgba(147, 197, 253, 0.42);
   --header-text: #ffffff;
   --header-link: #ffffff;
   --header-link-hover-bg: rgba(255, 255, 255, 0.18);
   --header-link-active-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.16));
 
-  --menu-bg: linear-gradient(170deg, #0f9187 0%, #1ca79b 54%, #137f76 100%);
+  --menu-bg: linear-gradient(170deg, #1E40AF 0%, #1D4ED8 54%, #1E3A8A 100%);
   --menu-text: #ffffff;
-  --menu-muted: rgba(232, 255, 251, 0.86);
+  --menu-muted: rgba(226, 236, 255, 0.86);
   --menu-item-bg: rgba(255, 255, 255, 0.08);
   --menu-item-hover-bg: rgba(255, 255, 255, 0.16);
-  --menu-item-active-bg: linear-gradient(135deg, rgba(121, 216, 206, 0.44), rgba(255, 255, 255, 0.24));
+  --menu-item-active-bg: linear-gradient(135deg, rgba(147, 197, 253, 0.44), rgba(255, 255, 255, 0.24));
 
-  --public-title-gradient: linear-gradient(138deg, #0b7a72 0%, #15a99d 48%, #36bcae 100%);
+  --public-title-gradient: linear-gradient(138deg, #1E40AF 0%, #2563EB 48%, #3B82F6 100%);
 
   --state-success-bg: color-mix(in srgb, var(--success) 12%, transparent);
   --state-success-border: color-mix(in srgb, var(--success) 32%, transparent);
@@ -391,7 +395,7 @@ body.light {
 
   --state-info-bg: color-mix(in srgb, var(--primary) 12%, transparent);
   --state-info-border: color-mix(in srgb, var(--primary) 32%, transparent);
-  --state-info-text: color-mix(in srgb, var(--primary) 88%, #103835);
+  --state-info-text: color-mix(in srgb, var(--primary) 88%, #172554);
 
   --brand-glass-primary: color-mix(in srgb, var(--primary) 16%, transparent);
   --brand-glass-secondary: color-mix(in srgb, var(--secondary) 13%, transparent);
@@ -412,12 +416,15 @@ body.dark {
   --text-secondary: #c5d7eb;
   --text-tertiary: #91acc7;
 
-  --primary: #64c0d4;
-  --primary-strong: #47aec4;
-  --secondary: #1f9f83;
+  --primary: #60A5FA;
+  --primary-strong: #3B82F6;
+  --primary-hover: #93C5FD;
+  --primary-soft: rgba(96, 165, 250, 0.18);
+  --primary-tint: rgba(96, 165, 250, 0.08);
+  --secondary: #2563EB;
   --accent: #ed8219;
   --accent-strong: #ff9427;
-  --support: #7fd4e8;
+  --support: #93C5FD;
   --success: #2fb896;
   --warning: #f19f34;
   --danger: #d46d6d;
@@ -431,7 +438,7 @@ body.dark {
   --border: rgba(100, 160, 205, 0.22);
   --border-strong: rgba(120, 180, 225, 0.38);
   --shadow: 0 18px 42px rgba(0, 0, 0, 0.62);
-  --focus: rgba(100, 192, 212, 0.4);
+  --focus: rgba(96, 165, 250, 0.4);
   --surface-clean: color-mix(in srgb, var(--surface) 94%, var(--background));
   --surface-clean-soft: color-mix(in srgb, var(--surface-2) 90%, var(--background));
   --stroke-clean: color-mix(in srgb, var(--primary) 24%, transparent);
@@ -440,17 +447,17 @@ body.dark {
   --header-border: rgba(102, 170, 205, 0.3);
   --header-text: #e8f4ff;
   --header-link: #e8f4ff;
-  --header-link-hover-bg: rgba(100, 192, 212, 0.14);
-  --header-link-active-bg: linear-gradient(135deg, rgba(73, 156, 186, 0.4), rgba(24, 61, 86, 0.54));
+  --header-link-hover-bg: rgba(96, 165, 250, 0.14);
+  --header-link-active-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(30, 58, 138, 0.54));
 
   --menu-bg: linear-gradient(170deg, #0e1e2d 0%, #123044 54%, #10273a 100%);
   --menu-text: #eaf5ff;
   --menu-muted: rgba(205, 224, 242, 0.78);
-  --menu-item-bg: rgba(100, 192, 212, 0.08);
-  --menu-item-hover-bg: rgba(100, 192, 212, 0.14);
-  --menu-item-active-bg: linear-gradient(135deg, rgba(73, 156, 186, 0.42), rgba(34, 88, 120, 0.52));
+  --menu-item-bg: rgba(96, 165, 250, 0.08);
+  --menu-item-hover-bg: rgba(96, 165, 250, 0.14);
+  --menu-item-active-bg: linear-gradient(135deg, rgba(59, 130, 246, 0.42), rgba(30, 58, 138, 0.52));
 
-  --public-title-gradient: linear-gradient(138deg, #7fd4e8 0%, var(--success) 48%, var(--accent) 100%);
+  --public-title-gradient: linear-gradient(138deg, #93C5FD 0%, #60A5FA 48%, var(--accent) 100%);
 
   --state-success-bg: color-mix(in srgb, var(--success) 20%, transparent);
   --state-success-border: color-mix(in srgb, var(--success) 42%, transparent);

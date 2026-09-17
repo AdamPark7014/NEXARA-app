@@ -78,6 +78,26 @@ import {
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 import ShellConnectionStatus from "./ShellConnectionStatus";
+import { ModuleIcon } from "./ShellIcons";
+import { IconBadge } from "@/components/ui/IconBadge";
+import NotificationKindIcon from "@/components/ui/NotificationKindIcon";
+import { stripLeadingEmoji } from "@/lib/notification-kind";
+import SearchIcon from "@mui/icons-material/Search";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
+import SwitchAccountOutlinedIcon from "@mui/icons-material/SwitchAccountOutlined";
+import LogoutIcon from "@mui/icons-material/Logout";
+import MenuIcon from "@mui/icons-material/Menu";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 
 type AppShellProps = {
   panel: PanelId;
@@ -88,6 +108,7 @@ type NotifPreviewItem = {
   id: number;
   title: string;
   message: string;
+  category?: string | null;
   isRead: boolean;
   createdAt: string;
   relatedUrl?: string | null;
@@ -475,7 +496,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
             }}
           >
             <div style={{ textAlign: "center", maxWidth: 420 }}>
-              <div style={{ fontSize: 36, marginBottom: 12 }}>🔒</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+                <IconBadge icon={LockOutlinedIcon} size={56} />
+              </div>
               <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text-primary)", marginBottom: 8 }}>
                 Tu cuenta no tiene un rol asignado
               </div>
@@ -650,7 +673,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
         <div className={styles.search}>
           <div className={styles.searchWrap}>
             <span className={styles.searchIcon} aria-hidden="true">
-              🔍
+              <SearchIcon aria-hidden="true" sx={{ fontSize: 16, display: "block" }} />
             </span>
             <input
               type="search"
@@ -682,7 +705,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                     title={item.description}
                   >
                     <span className={styles.menuItemIcon} aria-hidden="true">
-                      {item.icon}
+                      <ModuleIcon id={item.id} size={18} />
                     </span>
                     <span className={styles.menuItemLabel}>{item.label}</span>
                   </Link>
@@ -711,7 +734,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
             aria-expanded={userMenuOpen}
             aria-label="Menú de usuario"
           >
-            ⋮
+            <MoreVertIcon aria-hidden="true" sx={{ fontSize: 18 }} />
           </button>
 
           {userMenuOpen && (
@@ -748,12 +771,18 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 onClick={() => setUserMenuOpen(false)}
                 style={menuItemStyle()}
               >
-                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>👤</span>
+                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
+                  <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                </span>
                 Mi perfil
               </Link>
               <button type="button" onClick={toggleDarkMode} style={menuItemStyle()}>
                 <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
-                  {darkMode ? "☀️" : "🌙"}
+                  {darkMode ? (
+                    <LightModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                  ) : (
+                    <DarkModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                  )}
                 </span>
                 {darkMode ? "Modo claro" : "Modo oscuro"}
               </button>
@@ -767,8 +796,15 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 style={menuItemStyle()}
                 aria-pressed={navMode === "avanzado"}
               >
-                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
-                  {navMode === "avanzado" ? "✦" : "·"}
+                <span
+                  style={{
+                    width: 18,
+                    display: "inline-flex",
+                    justifyContent: "center",
+                    color: navMode === "avanzado" ? "var(--primary)" : undefined,
+                  }}
+                >
+                  <TuneOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 </span>
                 {navMode === "avanzado" ? "Menú avanzado: on" : "Menú avanzado"}
               </button>
@@ -779,12 +815,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 onClick={() => setUserMenuOpen(false)}
                 style={menuItemStyle()}
               >
-                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>👥</span>
+                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
+                  <SwitchAccountOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                </span>
                 Otra cuenta (nueva pestaña)
               </Link>
               <hr style={{ border: 0, borderTop: "1px solid var(--nx-panel-hairline-soft)", margin: "4px 6px" }} />
               <button type="button" onClick={handleLogout} style={{ ...menuItemStyle(), color: "var(--danger)" }}>
-                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>🚪</span>
+                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
+                  <LogoutIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                </span>
                 Cerrar sesión
               </button>
             </div>
@@ -809,7 +849,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
           aria-expanded={mobileOpen}
           aria-controls="nx-sidebar-nav"
         >
-          ☰
+          <MenuIcon aria-hidden="true" sx={{ fontSize: 20 }} />
         </button>
 
         <button
@@ -819,7 +859,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
           aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
           title={collapsed ? "Expandir" : "Colapsar"}
         >
-          {collapsed ? "›" : "‹"}
+          {collapsed ? (
+            <ChevronRightIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+          ) : (
+            <ChevronLeftIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+          )}
         </button>
 
         <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
@@ -856,9 +900,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 aria-haspopup="menu"
                 aria-expanded={switcherOpen}
               >
-                <span className={styles.switcherBtnIcon}>{panelMeta.icon}</span>
+                <span className={styles.switcherBtnIcon} aria-hidden="true">
+                  <AppsOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+                </span>
                 <span>{panelMeta.name.replace(/^NEXARA\s+/i, "")}</span>
-                <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>
+                <KeyboardArrowDownIcon aria-hidden="true" sx={{ fontSize: 16, opacity: 0.6 }} />
               </button>
 
               {switcherOpen && (
@@ -880,7 +926,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
                         className={styles.switcherItem}
                         data-current={isCurrent ? "true" : "false"}
                       >
-                        <span className={styles.switcherItemIcon}>{p.icon}</span>
+                        <span className={styles.switcherItemIcon} aria-hidden="true" style={{ color: p.accent }}>
+                          <AppsOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                        </span>
                         <div className={styles.switcherItemBody}>
                           <div className={styles.switcherItemHead}>
                             <span className={styles.switcherItemName}>{p.name}</span>
@@ -914,7 +962,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
             title="Buscar (⌘K)"
             aria-label="Abrir paleta de comandos"
           >
-            <span aria-hidden="true">🔍</span>
+            <SearchIcon aria-hidden="true" sx={{ fontSize: 18 }} />
             <span className={styles.paletteBtnLabel}>Buscar…</span>
             <kbd className={styles.paletteBtnKbd}>⌘K</kbd>
           </button>
@@ -926,7 +974,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
             aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             title={darkMode ? "Modo claro" : "Modo oscuro"}
           >
-            {darkMode ? "☀️" : "🌙"}
+            {darkMode ? (
+              <LightModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+            ) : (
+              <DarkModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+            )}
           </button>
 
           {notificationsUrl && (
@@ -945,7 +997,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                   if (next) void loadNotifPreview();
                 }}
               >
-                🔔
+                <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 20 }} />
                 {unreadNotifs > 0 && (
                   <span
                     style={{
@@ -1016,7 +1068,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
                           type="button"
                           onClick={() => void openNotifPreview(n)}
                           style={{
-                            display: "block",
+                            display: "flex",
+                            gap: 10,
+                            alignItems: "flex-start",
                             width: "100%",
                             textAlign: "left",
                             padding: "10px 14px",
@@ -1030,16 +1084,19 @@ export default function AppShell({ panel, children }: AppShellProps) {
                             color: "inherit",
                           }}
                         >
-                          <div style={{ fontSize: 13, fontWeight: 600 }}>{n.title}</div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "var(--text-secondary)",
-                              marginTop: 2,
-                              lineHeight: 1.35,
-                            }}
-                          >
-                            {n.message}
+                          <NotificationKindIcon category={n.category} title={n.title} size={30} muted={n.isRead} />
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{stripLeadingEmoji(n.title)}</div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "var(--text-secondary)",
+                                marginTop: 2,
+                                lineHeight: 1.35,
+                              }}
+                            >
+                              {stripLeadingEmoji(n.message)}
+                            </div>
                           </div>
                         </button>
                       ))}
@@ -1132,7 +1189,9 @@ function PanelAccessDenied({
           }}
         >
           <div style={{ textAlign: "center", maxWidth: 480 }}>
-            <div style={{ fontSize: 40, marginBottom: 14 }}>🚫</div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+              <IconBadge icon={BlockOutlinedIcon} size={60} color="var(--danger, #dc2626)" />
+            </div>
             <div style={{ fontWeight: 700, fontSize: 20, color: "var(--text-primary)", marginBottom: 8 }}>
               No tienes acceso a este panel
             </div>

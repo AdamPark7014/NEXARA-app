@@ -14,7 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "standalone",
     background_color: "#0b1220",
-    theme_color: "#0f6ad6",
+    theme_color: "#2563EB",
     lang: "es-MX",
     icons: [
       { src: NEXARA_FAVICON_192, sizes: "192x192", type: "image/png" },

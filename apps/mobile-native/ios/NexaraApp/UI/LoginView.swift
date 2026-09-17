@@ -11,20 +11,20 @@ struct LoginView: View {
     @State private var showPassword = false
     @State private var quickProfiles = QuickProfileStore.load()
 
-    private let accent = Color(red: 0.05, green: 0.58, blue: 0.53)
+    private let accent = NxBrand.primary
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
                     VStack(spacing: 8) {
-                        // Mismo logo que Android; verde fuerte porque lleva «NEXARA» en blanco.
+                        // Mismo logo que Android; azul oscuro porque lleva «NEXARA» en blanco.
                         Image("LogoNexara")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 80, height: 80)
                             .padding(5)
-                            .background(Color(red: 0.06, green: 0.46, blue: 0.43))
+                            .background(NxBrand.dark)
                             .clipShape(RoundedRectangle(cornerRadius: 22))
                         Text("NEXARA")
                             .font(.caption)
@@ -145,7 +145,7 @@ struct LoginView: View {
             }
             .background(
                 LinearGradient(
-                    colors: [Color(red: 0.9, green: 0.98, blue: 0.97), Color(red: 0.94, green: 0.97, blue: 1)],
+                    colors: [NxBrand.soft, NxBrand.surface],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )

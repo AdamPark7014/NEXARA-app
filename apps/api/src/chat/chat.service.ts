@@ -10,6 +10,7 @@ import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { nombreCorto } from '../notifications/notification-push-meta.js';
 import { getOrgTier, ORG_ROLE_KEYS, ORG_TIER, type OrgRoleKey } from '../common/org-roles.js';
 import { isSuperAdminEmail } from '../common/platform-accounts.js';
 import { resolveUploadsDir } from '../common/uploads-path.js';
@@ -786,10 +787,11 @@ export class ChatService {
     if (destinatarios.length === 0) return;
 
     const autor = message.author?.nombre || 'Alguien';
+    const autorCorto = nombreCorto(autor) || autor;
     const directo = channel.kind === ChatChannelKind.DIRECT;
     const texto = this.textoParaAviso(message);
-    const title = directo ? autor : `${autor} en #${channel.name}`;
-    const body = message.parentId ? `↪️ ${texto}` : texto;
+    const title = directo ? autorCorto : `${autorCorto} en #${channel.name}`;
+    const body = message.parentId ? `Respuesta: ${texto}` : texto;
 
     await Promise.all(
       destinatarios.map((uid) =>
@@ -811,17 +813,22 @@ export class ChatService {
           threadId: `chat-${channel.id}`,
           threadTitle: directo ? '' : `#${channel.name}`,
           messageId: message.id,
+          icon: 'chat',
         }),
       ),
     );
   }
 
-  /** Texto legible del mensaje para el aviso: menciones como @nombre y adjuntos con ícono. */
+  /** Texto legible del mensaje para el aviso: menciones como @nombre y adjuntos por su tipo, sin emojis. */
   private textoParaAviso(message: { body: string; attachmentUrl: string | null; attachmentName: string | null }) {
     const limpio = this.preview((message.body || '').replace(/\[@([^\]]+)\]\(user:\d+\)/g, '@$1'));
     if (!message.attachmentUrl) return limpio || 'Mensaje nuevo';
     const esImagen = /\.(jpe?g|png|gif|webp|heic)(\?|$)/i.test(message.attachmentUrl);
-    const adjunto = esImagen ? '📷 Foto' : `📎 ${message.attachmentName || 'Archivo'}`;
+    const adjunto = esImagen
+      ? 'Foto'
+      : message.attachmentName
+        ? `Archivo: ${message.attachmentName}`
+        : 'Archivo adjunto';
     const sinEtiqueta = limpio.startsWith('Archivo: ') ? '' : limpio;
     return sinEtiqueta ? `${adjunto} · ${sinEtiqueta}` : adjunto;
   }
@@ -863,8 +870,9 @@ export class ChatService {
           userId,
           type: 'CHAT_MENTION',
           category: 'chat',
-          title: `${opts.authorName} te mencionó en #${opts.channelName}`,
+          title: `${nombreCorto(opts.authorName) || opts.authorName} te mencionó en #${opts.channelName}`,
           message: preview || 'Te mencionaron en el chat',
+          icon: 'mencion',
           triggerUserId: opts.authorId,
           relatedEntityId: opts.messageId,
           entityType: 'chat_message',

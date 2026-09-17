@@ -1,5 +1,13 @@
 import SwiftUI
 
+/// «(ojo) 12 · (pulgar) 3» con SF Symbols dentro del texto.
+private func kbStatsText(views: Int, helpful: Int) -> Text {
+    let eye = Text(Image(systemName: "eye"))
+    let thumb = Text(Image(systemName: "hand.thumbsup"))
+    let first: Text = eye + Text(verbatim: " \(views) · ")
+    return first + thumb + Text(verbatim: " \(helpful)")
+}
+
 @MainActor
 final class PortalHelpVM: ObservableObject {
     @Published var isLoading = true
@@ -184,7 +192,7 @@ private struct PortalHelpArticleCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
             }
-            Text("👁️ \(article.viewCount) · 👍 \(article.helpfulCount)")
+            kbStatsText(views: article.viewCount, helpful: article.helpfulCount)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
@@ -214,7 +222,7 @@ private struct PortalHelpArticleDetail: View {
                         .foregroundStyle(.secondary)
                 }
                 Text(article.title).font(.title3.bold())
-                Text(metaLine).font(.caption2).foregroundStyle(.secondary)
+                metaLine.font(.caption2).foregroundStyle(.secondary)
                 Text(article.content)
                     .font(.body)
                     .padding(.top, 4)
@@ -226,7 +234,13 @@ private struct PortalHelpArticleDetail: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("¿Te fue útil este artículo?")
-                Button(isMarkingHelpful ? "…" : "👍 Sí, gracias", action: onMarkHelpful)
+                Button(action: onMarkHelpful) {
+                    if isMarkingHelpful {
+                        Text("…")
+                    } else {
+                        Label("Sí, gracias", systemImage: "hand.thumbsup")
+                    }
+                }
                     .buttonStyle(.borderedProminent)
                     .disabled(isMarkingHelpful)
             }
@@ -237,13 +251,12 @@ private struct PortalHelpArticleDetail: View {
         }
     }
 
-    private var metaLine: String {
-        var parts: [String] = []
+    /// «fecha · (ojo) vistas · (pulgar) útil», con SF Symbols en lugar de emojis.
+    private var metaLine: Text {
         let published = formatPublishedAt(article.publishedAt)
-        if !published.isEmpty { parts.append(published) }
-        parts.append("👁️ \(article.viewCount)")
-        parts.append("👍 \(article.helpfulCount)")
-        return parts.joined(separator: " · ")
+        let stats = kbStatsText(views: article.viewCount, helpful: article.helpfulCount)
+        if published.isEmpty { return stats }
+        return Text(verbatim: published + " · ") + stats
     }
 
     private func formatPublishedAt(_ raw: String) -> String {

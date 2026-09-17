@@ -397,7 +397,7 @@ struct CoreAssignActivityView: View {
                     try await repo.addTeamMember(activityId: activityId, userId: id, rol: rol, indicaciones: extraNotes[id])
                 }
             }
-            onDone("✓ Actividad asignada a \(name).")
+            onDone("Actividad asignada a \(name).")
         } catch {
             onDone("Actividad creada, pero falló al sumar el equipo: \(error.toUserMessage())")
         }

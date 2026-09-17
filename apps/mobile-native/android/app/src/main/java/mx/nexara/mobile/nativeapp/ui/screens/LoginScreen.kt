@@ -67,8 +67,8 @@ import mx.nexara.mobile.nativeapp.ui.NexaraAppMeta
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAppMetaFooter
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
-private val NexaraTeal = Color(0xFF0D9488)
-private val NexaraTealDark = Color(0xFF0F766E)
+private val NexaraBrand = Color(0xFF2563EB)
+private val NexaraBrandDark = Color(0xFF1E40AF)
 private val FieldGray = Color(0xFFF1F5F9)
 private const val PRIVACY_POLICY_URL = "https://nexara.com.mx/legal/privacidad"
 
@@ -89,7 +89,7 @@ fun LoginScreen(
             .padding(contentPadding)
             .background(
                 Brush.linearGradient(
-                    colors = listOf(Color(0xFFE6F7F6), Color(0xFFEFF6FF)),
+                    colors = listOf(Color(0xFFDBEAFE), Color(0xFFF8FAFC)),
                 ),
             ),
         contentAlignment = Alignment.Center,
@@ -120,7 +120,7 @@ fun LoginScreen(
                             .size(90.dp)
                             .clip(RoundedCornerShape(22.dp))
                             // Verde fuerte: el logo lleva «NEXARA» en blanco y sobre un fondo claro no se lee.
-                            .background(NexaraTealDark),
+                            .background(NexaraBrandDark),
                         contentAlignment = Alignment.Center,
                     ) {
                         Image(
@@ -137,7 +137,7 @@ fun LoginScreen(
                         "NEXARA",
                         style = MaterialTheme.typography.labelLarge.copy(
                             letterSpacing = 3.sp,
-                            color = NexaraTeal,
+                            color = NexaraBrand,
                             fontWeight = FontWeight.SemiBold,
                         ),
                     )
@@ -173,14 +173,14 @@ fun LoginScreen(
                                 Card(
                                     onClick = { vm.selectQuickProfile(profile) },
                                     shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDFA)),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
                                     elevation = CardDefaults.cardElevation(0.dp),
                                 ) {
                                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                                         Text(
                                             profile.nombre.ifBlank { profile.email },
                                             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                                            color = NexaraTealDark,
+                                            color = NexaraBrandDark,
                                         )
                                         Text(
                                             profile.email,
@@ -214,7 +214,7 @@ fun LoginScreen(
                             .testTag("login_email"),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NexaraTeal,
+                            focusedBorderColor = NexaraBrand,
                             unfocusedBorderColor = Color(0xFFCBD5E1),
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = FieldGray,
@@ -264,7 +264,7 @@ fun LoginScreen(
                             .testTag("login_password"),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NexaraTeal,
+                            focusedBorderColor = NexaraBrand,
                             unfocusedBorderColor = Color(0xFFCBD5E1),
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = FieldGray,
@@ -285,8 +285,8 @@ fun LoginScreen(
                             .testTag("login_submit"),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = NexaraTeal,
-                            disabledContainerColor = Color(0xFFB2DFDB),
+                            containerColor = NexaraBrand,
+                            disabledContainerColor = Color(0xFF93C5FD),
                         ),
                     ) {
                         Row(
@@ -329,7 +329,7 @@ fun LoginScreen(
                                 Icon(
                                     imageVector = Icons.Default.Fingerprint,
                                     contentDescription = null,
-                                    tint = NexaraTeal,
+                                    tint = NexaraBrand,
                                 )
                                 Spacer(Modifier.width(8.dp))
                             }
@@ -339,7 +339,7 @@ fun LoginScreen(
                                 } else {
                                     "Usar huella o PIN"
                                 },
-                                color = NexaraTeal,
+                                color = NexaraBrand,
                             )
                         }
                     }
@@ -348,7 +348,7 @@ fun LoginScreen(
                         Spacer(Modifier.height(14.dp))
                         Text(
                             text = info,
-                            color = NexaraTealDark,
+                            color = NexaraBrandDark,
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
                         )
@@ -378,7 +378,7 @@ fun LoginScreen(
                         Text(
                             "Política de privacidad",
                             style = MaterialTheme.typography.bodySmall.copy(
-                                color = NexaraTeal,
+                                color = NexaraBrand,
                                 fontWeight = FontWeight.SemiBold,
                                 textDecoration = TextDecoration.Underline,
                             ),

@@ -85,7 +85,8 @@ export class ActivityTeamService {
     });
     void this.notificationHierarchy.notifyActivityRescheduled({
       activityId,
-      label: activity.titulo || activity.anNumber || `Actividad ${activityId}`,
+      // El aviso nombra la actividad por su título, nunca por el folio.
+      label: activity.titulo || '',
       actorId,
       de: actual?.fechaInicio ?? null,
       a: nueva,
@@ -203,7 +204,7 @@ export class ActivityTeamService {
 
     void this.notificationHierarchy?.notifyActivityDispatched({
       activityId,
-      label: activity.titulo || activity.anNumber || `Actividad ${activityId}`,
+      label: activity.titulo || '',
       actorId: byId,
       memberId: member.userId,
       memberName: member.user?.nombre ?? 'alguien del equipo',

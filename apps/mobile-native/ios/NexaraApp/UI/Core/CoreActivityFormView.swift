@@ -120,7 +120,8 @@ struct CoreActivityFormView: View {
                             Button {
                                 tareaTipoId = tipo.id
                             } label: {
-                                Text("\(tipo.emoji) \(tipo.label)")
+                                Label(tipo.label, systemImage: tipo.symbol)
+                                    .symbolRenderingMode(.hierarchical)
                                     .font(.subheadline.weight(on ? .bold : .regular))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
@@ -170,9 +171,18 @@ struct CoreActivityFormView: View {
 
             Section("Prioridad") {
                 Picker("Prioridad", selection: $prioridad) {
-                    Text("🔴 Alta · Urgente").tag("Alta")
-                    Text("🟡 Media · Esta semana").tag("Media")
-                    Text("🟢 Baja · Puede esperar").tag("Baja")
+                    Label { Text("Alta · Urgente") } icon: {
+                        Image(systemName: "exclamationmark.circle.fill").foregroundStyle(CorePalette.red)
+                    }
+                    .tag("Alta")
+                    Label { Text("Media · Esta semana") } icon: {
+                        Image(systemName: "circle.fill").foregroundStyle(CorePalette.amber)
+                    }
+                    .tag("Media")
+                    Label { Text("Baja · Puede esperar") } icon: {
+                        Image(systemName: "circle.fill").foregroundStyle(CorePalette.green)
+                    }
+                    .tag("Baja")
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
@@ -382,7 +392,7 @@ struct CoreSelfAssignSheet: View {
                     }
                 }
             }
-            .navigationTitle("🙋 Auto-asignarme")
+            .navigationTitle("Auto-asignarme")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -405,7 +415,7 @@ struct CoreKindRow: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(alignment: .top, spacing: 12) {
-                Text(kind.emoji).font(.title2)
+                NxIconBadge(systemName: kind.symbol, size: 36)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(kind.title).font(.body.weight(.bold)).foregroundStyle(Color.primary)
                     Text(kind.help).font(.caption).foregroundStyle(.secondary)

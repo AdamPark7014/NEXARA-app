@@ -23,7 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
 import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxTealTopAppBarColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxBrandTopAppBarColors
 import androidx.compose.ui.graphics.Color
 import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
@@ -119,7 +119,7 @@ fun TicketsNavHost(
         topBar = {
             TopAppBar(
                 title = { Text(title, color = Color.White) },
-                colors = NxTealTopAppBarColors(),
+                colors = NxBrandTopAppBarColors(),
                 navigationIcon = {
                     if (showBack) {
                         IconButton(onClick = { navController.popBackStack() }) {

@@ -297,7 +297,7 @@ fun LiveCameraCaptureDialog(
                     Button(
                         onClick = { shoot() },
                         enabled = hasCamera && ready && !busy,
-                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                         modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                     ) {
                         Text(
@@ -457,7 +457,7 @@ fun GeoPhotoPreviewDialog(
                         Text(
                             "Ver en mapa",
                             fontSize = 12.5.sp,
-                            color = NxColors.Teal,
+                            color = NxColors.Brand,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clickable { openMapsAt(context, lat, lng) },
                         )
@@ -469,7 +469,7 @@ fun GeoPhotoPreviewDialog(
                 Button(
                     onClick = onConfirm,
                     enabled = !sending,
-                    colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                    colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) {
                     Text(if (sending) "⏳ Enviando…" else confirmLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp)

@@ -14,11 +14,17 @@ import type { ActivityProjectMode } from '@/lib/ops-activity-form';
 
 export type ActivityKind = 'tarea' | 'proyecto' | 'obra' | 'servicio' | 'comercial';
 
+/**
+ * Clave de icono (sin emojis). La UI la traduce a un icono de @mui/icons-material
+ * en components/ops/ActivityKindIcon.tsx.
+ */
+export type ActivityIconKey = ActivityKind | TareaTipoId;
+
 export type ActivityKindMeta = {
   id: ActivityKind;
   title: string;
   help: string;
-  emoji: string;
+  icon: ActivityIconKey;
   projectMode: ActivityProjectMode;
   ticketType?: string;
   ticketTypeCustom?: string;
@@ -47,7 +53,7 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
     id: 'tarea',
     title: 'Tarea',
     help: 'Del día, sin proyecto ni cliente.',
-    emoji: '✅',
+    icon: 'tarea',
     projectMode: 'without_project',
     // El subtipo (Levantamiento, Junta…) viaja en ticketTypeCustom; ver TAREA_TIPOS.
     ticketType: 'OTRO',
@@ -56,14 +62,14 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
     id: 'proyecto',
     title: 'Proyecto',
     help: 'Liga a un proyecto operativo y su cliente.',
-    emoji: '📁',
+    icon: 'proyecto',
     projectMode: 'with_project',
   },
   obra: {
     id: 'obra',
     title: 'Obra',
     help: 'Instalación / obra en sitio, ligada a proyecto.',
-    emoji: '🏗️',
+    icon: 'obra',
     projectMode: 'with_project',
     ticketType: 'INSTALACION',
     requiresSchedule: true,
@@ -72,7 +78,7 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
     id: 'servicio',
     title: 'Servicio',
     help: 'Cliente de servicio. Luis → Antonio → soporte.',
-    emoji: '🛠️',
+    icon: 'servicio',
     projectMode: 'without_project',
     needsServiceClient: true,
     requiresSchedule: true,
@@ -81,7 +87,7 @@ export const ACTIVITY_KINDS: Record<ActivityKind, ActivityKindMeta> = {
     id: 'comercial',
     title: 'Comercial',
     help: 'Solo encargados de área.',
-    emoji: '💼',
+    icon: 'comercial',
     projectMode: 'without_project',
     ticketType: 'OTRO',
     ticketTypeCustom: 'COMERCIAL',
@@ -105,17 +111,17 @@ export type TareaTipoId =
   | 'documentacion'
   | 'otro';
 
-export const TAREA_TIPOS: ReadonlyArray<{ id: TareaTipoId; label: string; emoji: string }> = [
-  { id: 'levantamiento', label: 'Levantamiento', emoji: '📐' },
-  { id: 'recoleccion', label: 'Recolección', emoji: '📦' },
-  { id: 'entrega', label: 'Entrega', emoji: '🚚' },
-  { id: 'junta', label: 'Junta', emoji: '🤝' },
-  { id: 'compra', label: 'Compra de material', emoji: '🛒' },
-  { id: 'preparacion', label: 'Preparación de equipo', emoji: '🔧' },
-  { id: 'tramite', label: 'Trámite', emoji: '📄' },
-  { id: 'capacitacion', label: 'Capacitación', emoji: '🎓' },
-  { id: 'documentacion', label: 'Reporte / documentación', emoji: '📝' },
-  { id: 'otro', label: 'Otro', emoji: '✏️' },
+export const TAREA_TIPOS: ReadonlyArray<{ id: TareaTipoId; label: string; icon: ActivityIconKey }> = [
+  { id: 'levantamiento', label: 'Levantamiento', icon: 'levantamiento' },
+  { id: 'recoleccion', label: 'Recolección', icon: 'recoleccion' },
+  { id: 'entrega', label: 'Entrega', icon: 'entrega' },
+  { id: 'junta', label: 'Junta', icon: 'junta' },
+  { id: 'compra', label: 'Compra de material', icon: 'compra' },
+  { id: 'preparacion', label: 'Preparación de equipo', icon: 'preparacion' },
+  { id: 'tramite', label: 'Trámite', icon: 'tramite' },
+  { id: 'capacitacion', label: 'Capacitación', icon: 'capacitacion' },
+  { id: 'documentacion', label: 'Reporte / documentación', icon: 'documentacion' },
+  { id: 'otro', label: 'Otro', icon: 'otro' },
 ];
 
 const ALL: ActivityKind[] = ['tarea', 'proyecto', 'obra', 'servicio', 'comercial'];

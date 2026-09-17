@@ -38,7 +38,7 @@ struct ClienteNuevoView: View {
                         if sectors.contains(s) { sectors.remove(s) } else { sectors.insert(s) }
                     } label: {
                         HStack {
-                            Text("\(s.emoji) \(s.shortTitle)").foregroundColor(.primary)
+                            Label(s.shortTitle, systemImage: s.symbol).foregroundColor(.primary)
                             Spacer()
                             Image(systemName: sectors.contains(s) ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(sectors.contains(s) ? .accentColor : .secondary)

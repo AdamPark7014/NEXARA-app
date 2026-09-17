@@ -2,8 +2,33 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import type { SvgIconComponent } from "@mui/icons-material";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import EngineeringOutlinedIcon from "@mui/icons-material/EngineeringOutlined";
+import FactCheckOutlinedIcon from "@mui/icons-material/FactCheckOutlined";
+import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import LinkIcon from "@mui/icons-material/Link";
+import MoveToInboxOutlinedIcon from "@mui/icons-material/MoveToInboxOutlined";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import ReplayIcon from "@mui/icons-material/Replay";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import UndoIcon from "@mui/icons-material/Undo";
+import { IconLabel } from "@/components/ui/IconBadge";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { flattenServiceSheetFields, mapsUrl, resolveAssetUrl } from "@/lib/evidence-display";
@@ -86,16 +111,18 @@ function horaPaso(ev: TeamEvidenceSnapshot, step: string): string | null {
   }
 }
 
-function estadoUi(ev: TeamEvidence | null): { label: string; color: string } | null {
+type EstadoUi = { label: string; icon: SvgIconComponent; color: string };
+
+function estadoUi(ev: TeamEvidence | null): EstadoUi | null {
   if (!ev) return null;
-  if (ev.reviewStatus === "APPROVED") return { label: "✅ Aprobada", color: VERDE };
-  if (ev.reviewStatus === "REJECTED") return { label: "↩️ Corrigiendo", color: NARANJA };
+  if (ev.reviewStatus === "APPROVED") return { label: "Aprobada", icon: TaskAltIcon, color: VERDE };
+  if (ev.reviewStatus === "REJECTED") return { label: "Corrigiendo", icon: UndoIcon, color: NARANJA };
   if (ev.status === "COMPLETED") {
     return ev.correctionSubmittedAt
-      ? { label: "🔁 Corrección por revisar", color: NARANJA }
-      : { label: "🔎 Por revisar", color: NARANJA };
+      ? { label: "Corrección por revisar", icon: ReplayIcon, color: NARANJA }
+      : { label: "Por revisar", icon: RateReviewOutlinedIcon, color: NARANJA };
   }
-  return { label: "⏳ En curso", color: "#2563eb" };
+  return { label: "En curso", icon: HourglassTopIcon, color: AZUL };
 }
 
 function fotosDe(ev: TeamEvidenceSnapshot, nombre: string, etiqueta = "") {
@@ -184,7 +211,7 @@ const linkBtn: CSSProperties = {
 
 const campoLabel: CSSProperties = { fontSize: 13, fontWeight: 750 };
 
-function Chip({ children, color }: { children: ReactNode; color?: string }) {
+function Chip({ children, color, icon: Icon }: { children: ReactNode; color?: string; icon?: SvgIconComponent }) {
   return (
     <span
       style={{
@@ -201,8 +228,19 @@ function Chip({ children, color }: { children: ReactNode; color?: string }) {
         whiteSpace: "nowrap",
       }}
     >
+      {Icon ? <Icon aria-hidden="true" sx={{ fontSize: 16, flex: "0 0 auto" }} /> : null}
       {children}
     </span>
+  );
+}
+
+/** Icono dentro de un párrafo que puede partirse en varias líneas. */
+function IconoTexto({ icon: Icon, color, size = 16 }: { icon: SvgIconComponent; color?: string; size?: number }) {
+  return (
+    <Icon
+      aria-hidden="true"
+      sx={{ fontSize: size, verticalAlign: "text-bottom", mr: 0.75, ...(color ? { color } : {}) }}
+    />
   );
 }
 
@@ -213,10 +251,19 @@ function Estrellas({ valor, size = 14 }: { valor: number; size?: number }) {
       role="img"
       aria-label={`Eficiencia ${v} de 5: ${CALIF_LABEL[v] ?? ""}`}
       title={`Eficiencia ${v} de 5: ${CALIF_LABEL[v] ?? ""}`}
-      style={{ fontSize: size, letterSpacing: 1, whiteSpace: "nowrap", color: "#f59e0b" }}
+      style={{ display: "inline-flex", alignItems: "center", gap: 1, whiteSpace: "nowrap", color: "#f59e0b" }}
     >
-      {"★".repeat(v)}
-      <span style={{ color: "color-mix(in srgb, var(--text-tertiary) 55%, transparent)" }}>{"★".repeat(5 - v)}</span>
+      {[1, 2, 3, 4, 5].map((n) =>
+        n <= v ? (
+          <StarIcon key={n} aria-hidden="true" sx={{ fontSize: size }} />
+        ) : (
+          <StarBorderIcon
+            key={n}
+            aria-hidden="true"
+            sx={{ fontSize: size, color: "color-mix(in srgb, var(--text-tertiary) 55%, transparent)" }}
+          />
+        ),
+      )}
     </span>
   );
 }
@@ -265,7 +312,15 @@ function useArchivoProtegido(src: string | null | undefined, tipo?: string): Arc
   return archivo;
 }
 
-function SinArchivo({ alto, texto, icono = "📭" }: { alto?: number; texto: string; icono?: string }) {
+function SinArchivo({
+  alto,
+  texto,
+  icono: Icono = InboxOutlinedIcon,
+}: {
+  alto?: number;
+  texto: string;
+  icono?: SvgIconComponent;
+}) {
   return (
     <div
       role="img"
@@ -287,9 +342,7 @@ function SinArchivo({ alto, texto, icono = "📭" }: { alto?: number; texto: str
         lineHeight: 1.35,
       }}
     >
-      <span style={{ fontSize: 20 }} aria-hidden>
-        {icono}
-      </span>
+      <Icono aria-hidden="true" sx={{ fontSize: 22 }} />
       {texto}
     </div>
   );
@@ -298,7 +351,7 @@ function SinArchivo({ alto, texto, icono = "📭" }: { alto?: number; texto: str
 export function FotoProtegida({ url, alt, style, alto }: { url: string; alt: string; style: CSSProperties; alto?: number }) {
   const foto = useArchivoProtegido(url);
   const [rota, setRota] = useState(false);
-  if (foto.estado === "cargando") return <SinArchivo alto={alto} icono="⏳" texto="Cargando foto…" />;
+  if (foto.estado === "cargando") return <SinArchivo alto={alto} icono={HourglassTopIcon} texto="Cargando foto…" />;
   if (foto.estado === "error" || rota) return <SinArchivo alto={alto} texto="Esta foto ya no está en el servidor" />;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={foto.url} alt={alt} style={style} onError={() => setRota(true)} />;
@@ -306,7 +359,7 @@ export function FotoProtegida({ url, alt, style, alto }: { url: string; alt: str
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), {
   ssr: false,
-  loading: () => <SinArchivo alto={140} icono="⏳" texto="Cargando visor…" />,
+  loading: () => <SinArchivo alto={140} icono={HourglassTopIcon} texto="Cargando visor…" />,
 });
 
 /**
@@ -342,7 +395,7 @@ export function VisorPdf({ url, alto = "620px" }: { url: string; alto?: "400px" 
   if (pdf.error) {
     return <SinArchivo alto={140} texto="El PDF ya no está en el servidor: hay que pedir que lo vuelva a subir." />;
   }
-  if (!pdf.datos) return <SinArchivo alto={140} icono="⏳" texto="Cargando PDF…" />;
+  if (!pdf.datos) return <SinArchivo alto={140} icono={HourglassTopIcon} texto="Cargando PDF…" />;
   return <PDFViewer pdfUrl={ruta} pdfData={pdf.datos} fileName="Hoja de servicio.pdf" height={alto} />;
 }
 
@@ -459,7 +512,9 @@ function Miniatura({ foto, onOpen, alto = 132 }: { foto: Foto; onOpen: () => voi
       </button>
       {mapa ? (
         <a href={mapa} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "var(--primary)", fontWeight: 650 }}>
-          📍 Ver en mapa
+          <IconLabel icon={PlaceOutlinedIcon} size={14} gap={4}>
+            Ver en mapa
+          </IconLabel>
         </a>
       ) : null}
     </div>
@@ -528,7 +583,7 @@ function Visor({
           </div>
         </div>
         <button type="button" onClick={onClose} style={nav} aria-label="Cerrar">
-          ✕
+          <CloseIcon aria-hidden="true" sx={{ fontSize: 20 }} />
         </button>
       </div>
       <div onClick={(e) => e.stopPropagation()} style={{ display: "grid", placeItems: "center", minHeight: 0, overflow: "hidden" }}>
@@ -549,7 +604,8 @@ function Visor({
         </button>
         {mapa ? (
           <a href={mapa} target="_blank" rel="noreferrer" style={{ ...nav, textDecoration: "none" }}>
-            📍 Ver en mapa
+            <PlaceOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            Ver en mapa
           </a>
         ) : (
           <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12.5 }}>Sin ubicación registrada</span>
@@ -633,7 +689,9 @@ function EvidenciaContenido({
   const devolver = (step: string) =>
     onDevolverPaso ? (
       <button type="button" style={linkBtn} onClick={() => onDevolverPaso(step)}>
-        ↩️ Devolver este paso
+        <IconLabel icon={UndoIcon} size={16} gap={4}>
+          Devolver este paso
+        </IconLabel>
       </button>
     ) : null;
 
@@ -655,6 +713,7 @@ function EvidenciaContenido({
           const corregir = porCorregir.includes(step);
           const corregido = !corregir && hecho && corregidos.includes(step);
           const color = corregir ? NARANJA : corregido ? AZUL : hecho ? VERDE : null;
+          const marca = corregir ? UndoIcon : corregido ? ReplayIcon : hecho ? CheckIcon : RadioButtonUncheckedIcon;
           return (
             <li
               key={step}
@@ -666,7 +725,9 @@ function EvidenciaContenido({
               }}
             >
               <div style={{ fontSize: 12.5, fontWeight: 750 }}>
-                {corregir ? "↩️" : corregido ? "🔁" : hecho ? "✓" : "○"} {STEP_LABEL[step] ?? step}
+                <IconLabel icon={marca} size={16} gap={4} iconColor={color ?? "var(--text-tertiary)"}>
+                  {STEP_LABEL[step] ?? step}
+                </IconLabel>
               </div>
               <div
                 style={{
@@ -760,7 +821,9 @@ function Historial({
             >
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
                 <strong style={{ fontSize: 13.5 }}>
-                  {aprobada ? "✅ Aprobada" : r.decision === "DEVUELTA_TODO" ? "↩️ Devuelta completa" : "↩️ Devuelta para corregir"}
+                  <IconLabel icon={aprobada ? TaskAltIcon : UndoIcon} size={16} iconColor={color}>
+                    {aprobada ? "Aprobada" : r.decision === "DEVUELTA_TODO" ? "Devuelta completa" : "Devuelta para corregir"}
+                  </IconLabel>
                 </strong>
                 <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                   {corto(r.revisor) || "—"} · {fmt(r.at)}
@@ -872,10 +935,11 @@ function RevisionModal({
   const valor = hover || calificacion;
   const confirmar =
     decision === "aprobar"
-      ? "✅ Aprobar"
+      ? "Aprobar"
       : todo
-        ? "↩️ Devolver todo"
-        : `↩️ Devolver${marcados.length ? ` ${marcados.length}` : ""} paso${marcados.length === 1 ? "" : "s"}`;
+        ? "Devolver todo"
+        : `Devolver${marcados.length ? ` ${marcados.length}` : ""} paso${marcados.length === 1 ? "" : "s"}`;
+  const IconoConfirmar = decision === "aprobar" ? TaskAltIcon : UndoIcon;
   const colorConfirmar = decision === "aprobar" ? VERDE : todo ? ROJO : NARANJA;
 
   const opcion = (on: boolean, color: string): CSSProperties => ({
@@ -957,7 +1021,12 @@ function RevisionModal({
                   color: on ? color : "inherit",
                 }}
               >
-                {d === "aprobar" ? "✅ Aprobar" : "↩️ Devolver"}
+                {d === "aprobar" ? (
+                  <TaskAltIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+                ) : (
+                  <UndoIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+                )}
+                {d === "aprobar" ? "Aprobar" : "Devolver"}
               </button>
             );
           })}
@@ -1032,10 +1101,17 @@ function RevisionModal({
                   padding: 4,
                   minWidth: 44,
                   minHeight: 44,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   color: n <= valor ? "#f59e0b" : "color-mix(in srgb, var(--text-tertiary) 45%, transparent)",
                 }}
               >
-                ★
+                {n <= valor ? (
+                  <StarIcon fontSize="inherit" aria-hidden="true" />
+                ) : (
+                  <StarBorderIcon fontSize="inherit" aria-hidden="true" />
+                )}
               </button>
             ))}
             <span style={{ fontSize: 13.5, fontWeight: 700, marginLeft: 6, color: valor ? "inherit" : "var(--text-tertiary)" }}>
@@ -1087,7 +1163,14 @@ function RevisionModal({
             disabled={saving}
             style={{ ...btnLleno(colorConfirmar), opacity: saving ? 0.7 : 1 }}
           >
-            {saving ? "Guardando…" : confirmar}
+            {saving ? (
+              "Guardando…"
+            ) : (
+              <>
+                <IconoConfirmar aria-hidden="true" sx={{ fontSize: 18 }} />
+                {confirmar}
+              </>
+            )}
           </button>
         </footer>
       </div>
@@ -1134,10 +1217,17 @@ function TarjetaPersona({
         <div style={{ minWidth: 0, flex: "1 1 200px" }}>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{m.nombre}</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4, alignItems: "center" }}>
-            <Chip color={m.reparte ? "#7c3aed" : "#2563eb"}>
-              {m.reparte ? "📨 La reparte" : m.rol === "APOYO" ? "🤝 Apoyo" : "👷 La ejecuta"}
+            <Chip
+              color={m.reparte ? "#7c3aed" : AZUL}
+              icon={m.reparte ? SendOutlinedIcon : m.rol === "APOYO" ? HandshakeOutlinedIcon : EngineeringOutlinedIcon}
+            >
+              {m.reparte ? "La reparte" : m.rol === "APOYO" ? "Apoyo" : "La ejecuta"}
             </Chip>
-            {estado ? <Chip color={estado.color}>{estado.label}</Chip> : null}
+            {estado ? (
+              <Chip color={estado.color} icon={estado.icon}>
+                {estado.label}
+              </Chip>
+            ) : null}
             {m.eficienciaScore ? <Estrellas valor={m.eficienciaScore} /> : null}
             {m.retiradoAt ? <Chip>Salió del equipo</Chip> : null}
           </div>
@@ -1153,16 +1243,20 @@ function TarjetaPersona({
       </header>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", fontSize: 12.5, color: "var(--text-secondary)" }}>
-        <span>
-          📥 Recibió {fmt(m.asignadoAt) ?? ""}
+        <IconLabel icon={MoveToInboxOutlinedIcon} size={16} gap={4}>
+          Recibió {fmt(m.asignadoAt) ?? ""}
           {m.asignadoPor && m.asignadoPor !== m.nombre ? ` de ${corto(m.asignadoPor)}` : ""}
-        </span>
+        </IconLabel>
         {m.pasoA.map((p) => (
-          <span key={`${p.nombre}-${p.at}`}>
-            📨 La pasó a {corto(p.nombre)} · {fmt(p.at)}
-          </span>
+          <IconLabel key={`${p.nombre}-${p.at}`} icon={SendOutlinedIcon} size={16} gap={4}>
+            La pasó a {corto(p.nombre)} · {fmt(p.at)}
+          </IconLabel>
         ))}
-        {ev?.completedAt && ev.status === "COMPLETED" ? <span>📦 Envió {fmt(ev.completedAt)}</span> : null}
+        {ev?.completedAt && ev.status === "COMPLETED" ? (
+          <IconLabel icon={Inventory2OutlinedIcon} size={16} gap={4}>
+            Envió {fmt(ev.completedAt)}
+          </IconLabel>
+        ) : null}
       </div>
 
       {porRevisar ? (
@@ -1181,7 +1275,8 @@ function TarjetaPersona({
           <span style={{ flex: "1 1 220px", fontSize: 13.5, fontWeight: 650, lineHeight: 1.45 }}>
             {esCorreccion ? (
               <>
-                🔁 Corrigió lo que se le devolvió
+                <IconoTexto icon={ReplayIcon} color={NARANJA} />
+                Corrigió lo que se le devolvió
                 {corregidos.length && ultimaDevolucion?.decision !== "DEVUELTA_TODO"
                   ? ` (${corregidos.map((s) => STEP_LABEL[s] ?? s).join(", ")})`
                   : " (rehízo toda la actividad)"}
@@ -1189,14 +1284,19 @@ function TarjetaPersona({
                 devuélvela de nuevo.
               </>
             ) : (
-              "🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
+              <>
+                <IconoTexto icon={RateReviewOutlinedIcon} color={NARANJA} />
+                Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela.
+              </>
             )}
           </span>
           <button type="button" style={btnLleno(VERDE)} onClick={() => onRevisar(m, { decision: "aprobar" })}>
-            ✅ Aprobar
+            <TaskAltIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            Aprobar
           </button>
           <button type="button" style={btnLleno(NARANJA)} onClick={() => onRevisar(m, { decision: "devolver" })}>
-            ↩️ Devolver
+            <UndoIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            Devolver
           </button>
         </div>
       ) : null}
@@ -1204,11 +1304,13 @@ function TarjetaPersona({
       {m.puedoRevisar && ev?.reviewStatus === "APPROVED" ? (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 13, color: "var(--text-secondary)" }}>
           <span style={{ flex: "1 1 220px" }}>
-            ✅ Aprobada{ev.reviewedBy ? ` por ${corto(ev.reviewedBy)}` : ""}
+            <IconoTexto icon={TaskAltIcon} color={VERDE} />
+            Aprobada{ev.reviewedBy ? ` por ${corto(ev.reviewedBy)}` : ""}
             {ev.reviewedAt ? ` · ${fmt(ev.reviewedAt)}` : ""}. ¿Encontraste algo mal?
           </span>
           <button type="button" style={btn} onClick={() => onRevisar(m, { decision: "devolver" })}>
-            ↩️ Devolver
+            <UndoIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            Devolver
           </button>
         </div>
       ) : null}
@@ -1224,7 +1326,8 @@ function TarjetaPersona({
             background: `color-mix(in srgb, ${NARANJA} 8%, var(--surface))`,
           }}
         >
-          ↩️ Está corrigiendo: <strong>{corrigiendo.map((s) => STEP_LABEL[s] ?? s).join(", ")}</strong>
+          <IconoTexto icon={UndoIcon} color={NARANJA} />
+          Está corrigiendo: <strong>{corrigiendo.map((s) => STEP_LABEL[s] ?? s).join(", ")}</strong>
           {ev?.reviewNotes ? ` · «${ev.reviewNotes}»` : ""}
           {m.puedoRevisar || m.revisiones.length ? ". Cuando envíe la corrección podrás aprobarla o devolverla otra vez." : ""}
         </p>
@@ -1242,7 +1345,8 @@ function TarjetaPersona({
                 background: "color-mix(in srgb, var(--text-secondary) 6%, var(--surface))",
               }}
             >
-              💬 {m.indicaciones}
+              <IconoTexto icon={ChatBubbleOutlineIcon} />
+              {m.indicaciones}
             </p>
           ) : null}
 
@@ -1340,25 +1444,33 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
     .filter((n, i, arr): n is string => Boolean(n) && arr.indexOf(n) === i)
     .map(corto);
   const finalizada = resumen.ejecutores > 0 && resumen.aprobadas >= resumen.ejecutores;
-  const estadoActividad = finalizada
-    ? { label: "✅ Finalizada: todo aprobado", color: VERDE }
+  const estadoActividad: EstadoUi = finalizada
+    ? { label: "Finalizada: todo aprobado", icon: TaskAltIcon, color: VERDE }
     : resumen.ejecutores > 0 && resumen.terminaron >= resumen.ejecutores
-      ? { label: "🔎 Por validar", color: NARANJA }
-      : { label: "⏳ En curso", color: "#2563eb" };
+      ? { label: "Por validar", icon: RateReviewOutlinedIcon, color: NARANJA }
+      : { label: "En curso", icon: HourglassTopIcon, color: AZUL };
 
   if (compact) {
     return (
       <div style={{ display: "grid", gap: 10 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <Chip color={estadoActividad.color}>{estadoActividad.label}</Chip>
+          <Chip color={estadoActividad.color} icon={estadoActividad.icon}>
+            {estadoActividad.label}
+          </Chip>
           {resumen.ejecutores ? (
             <Chip>
               Aprobadas {resumen.aprobadas} de {resumen.ejecutores}
             </Chip>
           ) : null}
-          {resumen.porRevisarMias ? <Chip color={NARANJA}>🔎 {resumen.porRevisarMias} por revisar</Chip> : null}
+          {resumen.porRevisarMias ? (
+            <Chip color={NARANJA} icon={RateReviewOutlinedIcon}>
+              {resumen.porRevisarMias} por revisar
+            </Chip>
+          ) : null}
           {cadena.length > 1 ? (
-            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>🔗 {cadena.join(" → ")}</span>
+            <IconLabel icon={LinkIcon} size={16} gap={4} style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+              {cadena.join(" → ")}
+            </IconLabel>
           ) : null}
         </div>
         {members.length === 0 ? (
@@ -1368,6 +1480,13 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
             const ev = m.evidence;
             const fotos = ev ? (ev.entryPhotoUrl ? 1 : 0) + ev.evidencePhotos.length + (ev.exitPhotoUrl ? 1 : 0) : 0;
             const estado = m.reparte ? null : estadoUi(ev);
+            const partes: { key: string; icon?: SvgIconComponent; texto: string }[] = [
+              fotos
+                ? { key: "fotos", icon: PhotoCameraOutlinedIcon, texto: `${fotos} foto${fotos === 1 ? "" : "s"}` }
+                : { key: "fotos", texto: "Sin fotos aún" },
+              ...(ev?.serviceSheetPdfUrl ? [{ key: "pdf", icon: DescriptionOutlinedIcon, texto: "PDF" }] : []),
+              ...(ev?.serviceSheetCompletedAt ? [{ key: "form", icon: FactCheckOutlinedIcon, texto: "Formulario" }] : []),
+            ];
             return (
               <div
                 key={m.userId}
@@ -1389,20 +1508,31 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
                     {m.eficienciaScore ? <Estrellas valor={m.eficienciaScore} size={12} /> : null}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                    {m.reparte
-                      ? m.pasoA.length
-                        ? `📨 La pasó a ${m.pasoA.map((p) => corto(p.nombre)).join(", ")}`
-                        : "📨 La reparte"
-                      : [
-                          fotos ? `📷 ${fotos} foto${fotos === 1 ? "" : "s"}` : "Sin fotos aún",
-                          ev?.serviceSheetPdfUrl ? "📄 PDF" : null,
-                          ev?.serviceSheetCompletedAt ? "📝 Formulario" : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
+                    {m.reparte ? (
+                      <IconLabel icon={SendOutlinedIcon} size={14} gap={4}>
+                        {m.pasoA.length ? `La pasó a ${m.pasoA.map((p) => corto(p.nombre)).join(", ")}` : "La reparte"}
+                      </IconLabel>
+                    ) : (
+                      partes.map((p, i) => (
+                        <Fragment key={p.key}>
+                          {i ? " · " : null}
+                          {p.icon ? (
+                            <IconLabel icon={p.icon} size={14} gap={4}>
+                              {p.texto}
+                            </IconLabel>
+                          ) : (
+                            p.texto
+                          )}
+                        </Fragment>
+                      ))
+                    )}
                   </div>
                 </div>
-                {estado ? <Chip color={estado.color}>{estado.label}</Chip> : null}
+                {estado ? (
+                  <Chip color={estado.color} icon={estado.icon}>
+                    {estado.label}
+                  </Chip>
+                ) : null}
                 {!m.reparte ? (
                   <div style={{ flex: "0 1 160px" }}>
                     <Barra pct={m.progressPct} />
@@ -1434,12 +1564,19 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
         <div style={{ display: "grid", gap: 6 }}>
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Evidencias del equipo</h2>
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-            {cadena.length > 1 ? `🔗 ${cadena.join(" → ")} · ` : ""}
+            {cadena.length > 1 ? (
+              <>
+                <IconoTexto icon={LinkIcon} />
+                {`${cadena.join(" → ")} · `}
+              </>
+            ) : null}
             {alcanceTexto}
             {data.soloLectura && alcance !== "propio" ? " Solo lectura: puedes ver todo, no revisar." : ""}
           </p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <Chip color={estadoActividad.color}>{estadoActividad.label}</Chip>
+            <Chip color={estadoActividad.color} icon={estadoActividad.icon}>
+              {estadoActividad.label}
+            </Chip>
             {resumen.ejecutores ? (
               <>
                 <Chip>
@@ -1454,7 +1591,14 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
           </div>
         </div>
         <button type="button" style={btn} onClick={() => void load()} disabled={loading}>
-          {loading ? "Actualizando…" : "↻ Actualizar"}
+          {loading ? (
+            "Actualizando…"
+          ) : (
+            <>
+              <RefreshIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+              Actualizar
+            </>
+          )}
         </button>
       </div>
 
@@ -1470,7 +1614,8 @@ export default function EquipoEvidencias({ activityId, compact = false, verMasHr
             border: `1px solid color-mix(in srgb, ${NARANJA} 35%, var(--border))`,
           }}
         >
-          🔎 Tienes {resumen.porRevisarMias} evidencia{resumen.porRevisarMias === 1 ? "" : "s"} por revisar. La actividad queda
+          <IconoTexto icon={RateReviewOutlinedIcon} color={NARANJA} />
+          Tienes {resumen.porRevisarMias} evidencia{resumen.porRevisarMias === 1 ? "" : "s"} por revisar. La actividad queda
           finalizada cuando se aprueba la de todos.
         </p>
       ) : null}

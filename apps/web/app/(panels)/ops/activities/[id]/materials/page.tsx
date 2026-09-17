@@ -9,6 +9,9 @@ import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { listActivityMaterials, type ActivityMaterialRow } from "@/lib/ops-activities-api";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
+import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 
 export default function ActivityMaterialsPage() {
   const { activity, error, reload } = useActivityDetail();
@@ -43,15 +46,15 @@ export default function ActivityMaterialsPage() {
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
-        <KpiCard label="Movimientos" value={rows.length} icon="📦" />
-        <KpiCard label="Costo material" value={<Money value={costoTotal} compact />} icon="💰" variant={costoTotal > 0 ? "accent" : "default"} />
+        <KpiCard label="Movimientos" value={rows.length} icon={<Inventory2OutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+        <KpiCard label="Costo material" value={<Money value={costoTotal} compact />} icon={<PaymentsOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={costoTotal > 0 ? "accent" : "default"} />
       </div>
 
       <DetailSection title="Material consumido">
-        {loading && <EmptyState icon="⏳" title="Cargando materiales…" description="" />}
+        {loading && <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Cargando materiales…" description="" />}
         {!loading && rows.length === 0 && (
           <EmptyState
-            icon="📦"
+            icon={<Inventory2OutlinedIcon fontSize="inherit" aria-hidden="true" />}
             title="Sin consumo registrado"
             description="Los movimientos de almacén vinculados a esta actividad aparecerán aquí."
           />

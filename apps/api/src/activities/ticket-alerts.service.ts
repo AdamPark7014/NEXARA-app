@@ -5,6 +5,20 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { closedStatusSqlList } from './activity-status.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
+import { fechaAviso, horaAviso } from '../notifications/notification-push-meta.js';
+
+type SlaRow = {
+  id: number;
+  titulo: string | null;
+  clientName: string | null;
+  companyId: number;
+  fechaEntregaEsperada: Date | null;
+};
+
+/** Nombre de la actividad para el aviso; el folio no es identificador para la gente. */
+function nombreActividad(titulo?: string | null): string {
+  return (titulo && String(titulo).trim()) || 'Actividad sin nombre';
+}
 
 /**
  * Detecta tickets con SLA a punto de vencer y notifica a los usuarios
@@ -36,14 +50,13 @@ export class TicketAlertsService {
     const now = new Date();
     const alertAt = new Date(now.getTime() + 30 * 60 * 1000);
 
-    const upcoming = await this.prisma.$queryRaw<
-      Array<{ id: number; anNumber: string; clientName: string | null; companyId: number }>
-    >`
+    const upcoming = await this.prisma.$queryRaw<SlaRow[]>`
       SELECT
         a.id,
-        a."anNumber",
+        a.titulo,
         c.name AS "clientName",
-        a."companyId"
+        a."companyId",
+        a."fechaEntregaEsperada"
       FROM "Activity" a
       LEFT JOIN service_clients c ON c.id = a."clientId"
       WHERE a."clientId" IS NOT NULL
@@ -62,7 +75,11 @@ export class TicketAlertsService {
     }
 
     for (const activity of upcoming) {
-      const message = `Ticket ${activity.anNumber} de ${activity.clientName || 'cliente'} vence en 30 min`;
+      const entrega = activity.fechaEntregaEsperada
+        ? `Entrega a las ${horaAviso(new Date(activity.fechaEntregaEsperada))}`
+        : null;
+      const title = `${nombreActividad(activity.titulo)} vence en 30 minutos`;
+      const message = [activity.clientName?.trim(), entrega].filter(Boolean).join(' · ') || 'Revisa su avance';
 
       await Promise.all(
         adminUserIds.map((userId) =>
@@ -72,8 +89,9 @@ export class TicketAlertsService {
               type: 'SLA_ALERT' as any,
               category: 'sla-alert',
               priority: 'high',
-              title: 'Ticket por vencer',
+              title,
               message,
+              icon: 'atraso',
               entityType: 'Activity',
               relatedEntityId: activity.id,
               relatedUrl: `/ops/activities/${activity.id}`,
@@ -100,14 +118,13 @@ export class TicketAlertsService {
 
   private async scanBreachedDeadlines() {
     const now = new Date();
-    const breached = await this.prisma.$queryRaw<
-      Array<{ id: number; anNumber: string; clientName: string | null; companyId: number }>
-    >`
+    const breached = await this.prisma.$queryRaw<SlaRow[]>`
       SELECT
         a.id,
-        a."anNumber",
+        a.titulo,
         c.name AS "clientName",
-        a."companyId"
+        a."companyId",
+        a."fechaEntregaEsperada"
       FROM "Activity" a
       LEFT JOIN service_clients c ON c.id = a."clientId"
       WHERE a."clientId" IS NOT NULL
@@ -127,7 +144,12 @@ export class TicketAlertsService {
 
     const adminUserIds = await this.getConsoleAdminIds();
     for (const activity of breached) {
-      const message = `Ticket ${activity.anNumber} de ${activity.clientName || 'cliente'} SUPERÓ el SLA`;
+      const compromiso = activity.fechaEntregaEsperada
+        ? `Debía entregarse el ${fechaAviso(new Date(activity.fechaEntregaEsperada))}`
+        : null;
+      const title = `${nombreActividad(activity.titulo)} está vencida`;
+      const message =
+        [activity.clientName?.trim(), compromiso].filter(Boolean).join(' · ') || 'Superó el tiempo de entrega';
       await Promise.all(
         adminUserIds.map((userId) =>
           this.notifications
@@ -136,8 +158,9 @@ export class TicketAlertsService {
               type: 'SLA_BREACH' as any,
               category: 'sla-breach',
               priority: 'high',
-              title: 'SLA vencido',
+              title,
               message,
+              icon: 'vencida',
               entityType: 'Activity',
               relatedEntityId: activity.id,
               relatedUrl: `/ops/activities/${activity.id}`,

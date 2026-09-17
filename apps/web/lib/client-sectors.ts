@@ -8,27 +8,33 @@ export type ClientSector = "PROYECTO" | "CORPORATIVO" | "COMERCIAL";
 
 export const ALL_CLIENT_SECTORS: ClientSector[] = ["PROYECTO", "CORPORATIVO", "COMERCIAL"];
 
+/**
+ * Clave de icono del sector (sin emojis). La UI la traduce a un icono de
+ * @mui/icons-material en components/erp/ClientSectorIcon.tsx.
+ */
+export type ClientSectorIconKey = "proyecto" | "corporativo" | "comercial";
+
 export const CLIENT_SECTOR_META: Record<
   ClientSector,
-  { slug: string; title: string; help: string; emoji: string }
+  { slug: string; title: string; help: string; icon: ClientSectorIconKey }
 > = {
   PROYECTO: {
     slug: "proyecto",
     title: "Clientes de proyecto",
     help: "Se usan en actividades de tipo proyecto u obra. Aquí también creas sus proyectos.",
-    emoji: "📁",
+    icon: "proyecto",
   },
   CORPORATIVO: {
     slug: "corporativo",
     title: "Clientes corporativos",
     help: "Se usan en actividades de tipo servicio.",
-    emoji: "🏢",
+    icon: "corporativo",
   },
   COMERCIAL: {
     slug: "comercial",
     title: "Clientes comerciales",
     help: "Se usan en actividades de tipo comercial (también puedes sumarlos a otros sectores).",
-    emoji: "🤝",
+    icon: "comercial",
   },
 };
 

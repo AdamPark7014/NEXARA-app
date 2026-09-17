@@ -13,20 +13,24 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.theme.Typography
 
 private val LightColors = lightColorScheme(
-    primary = NxColors.Teal,
+    primary = NxColors.Brand,
     onPrimary = Color.White,
-    primaryContainer = NxColors.TealSoft,
-    secondary = Color(0xFF0F766E),
-    tertiary = Color(0xFF0EA5E9),
+    primaryContainer = NxColors.BrandSoft,
+    onPrimaryContainer = NxColors.BrandDark,
+    secondary = NxColors.BrandDark,
+    secondaryContainer = NxColors.BrandSoft,
+    onSecondaryContainer = NxColors.BrandDark,
+    tertiary = NxColors.Accent,
+    surfaceTint = NxColors.Brand,
     surface = NxColors.Surface,
     background = NxColors.Surface,
     error = NxColors.Danger,
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF2DD4BF),
+    primary = Color(0xFF60A5FA),
     onPrimary = NxColors.Slate,
-    secondary = Color(0xFF14B8A6),
+    secondary = Color(0xFF93C5FD),
     tertiary = Color(0xFF38BDF8),
     surface = NxColors.Slate,
     background = NxColors.Slate,

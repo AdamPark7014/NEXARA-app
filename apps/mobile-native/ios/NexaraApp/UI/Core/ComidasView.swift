@@ -3,20 +3,21 @@ import UIKit
 
 /// Estados de la hora de comida (espejo de `ComidasPanel` web).
 enum LunchUI {
-    static func revision(_ record: LunchRecord?) -> (label: String, color: Color)? {
+    /// `icon` es un SF Symbol para `CoreChip(icon:)`.
+    static func revision(_ record: LunchRecord?) -> (label: String, icon: String, color: Color)? {
         guard let estado = record?.revisionEstado, !estado.isEmpty else { return nil }
         switch estado {
-        case "APROBADA": return ("✅ Justificación aprobada", CorePalette.green)
-        case "RECHAZADA": return ("❌ Justificación rechazada", CorePalette.red)
-        default: return ("⏳ Por aprobar", CorePalette.orange)
+        case "APROBADA": return ("Justificación aprobada", "checkmark.circle", CorePalette.green)
+        case "RECHAZADA": return ("Justificación rechazada", "xmark.circle", CorePalette.red)
+        default: return ("Por aprobar", "hourglass", CorePalette.orange)
         }
     }
 
-    static func estado(_ record: LunchRecord?) -> (label: String, color: Color) {
-        guard let record else { return ("Sin registrar", CorePalette.slate) }
-        if record.isOut { return ("🍽️ En comida", CorePalette.blue) }
-        if let minutos = record.minutos { return ("✓ Comió \(minutos) min", CorePalette.green) }
-        return ("✓ Ya regresó", CorePalette.green)
+    static func estado(_ record: LunchRecord?) -> (label: String, icon: String, color: Color) {
+        guard let record else { return ("Sin registrar", "minus.circle", CorePalette.slate) }
+        if record.isOut { return ("En comida", "fork.knife", CorePalette.blue) }
+        if let minutos = record.minutos { return ("Comió \(minutos) min", "checkmark", CorePalette.green) }
+        return ("Ya regresó", "checkmark", CorePalette.green)
     }
 
     static func hour(_ iso: String?) -> String {
@@ -166,7 +167,7 @@ struct ComidasView: View {
         .fullScreenCover(item: $camera, onDismiss: openReasonAfterCamera) { request in
             GeoPhotoCaptureView(
                 title: request.checkIn ? "Tu foto de salida a comer" : "Tu foto de regreso",
-                confirmLabel: request.askReason ? "✓ Continuar" : "✓ Registrar con esta foto",
+                confirmLabel: request.askReason ? "Continuar" : "Registrar con esta foto",
                 requireLocation: false,
                 onConfirm: { captured in
                     if request.askReason {
@@ -242,13 +243,18 @@ struct ComidasView: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("🍽️ Tu hora de comida").font(.headline)
+                    NxIconText(systemName: "fork.knife", text: "Tu hora de comida", tint: NxBrand.primary)
+                        .font(.headline)
                     Text("Horario: \(day.windowText) · registra tu salida y tu regreso con foto.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
-                CoreChip(text: late ? "⏰ Fuera de horario" : "✓ Es tu horario", color: late ? CorePalette.orange : CorePalette.green)
+                CoreChip(
+                    icon: late ? "clock.badge.exclamationmark" : "checkmark.circle",
+                    text: late ? "Fuera de horario" : "Es tu horario",
+                    color: late ? CorePalette.orange : CorePalette.green
+                )
             }
             if late {
                 Text("Si sales a comer ahora tendrás que escribir por qué; tu jefe lo aprobará o rechazará.")
@@ -258,7 +264,7 @@ struct ComidasView: View {
             Button {
                 startRegister(checkIn: true, late: late)
             } label: {
-                Text("🍽️ Salir a comer").bold().frame(maxWidth: .infinity)
+                Label("Salir a comer", systemImage: "fork.knife").bold().frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
         }
@@ -273,24 +279,25 @@ struct ComidasView: View {
             HStack(alignment: .top, spacing: 10) {
                 LunchPhotoThumb(url: record.checkinPhotoUrl, title: "Tu foto de salida", time: record.checkinTime) { photo = $0 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("🍽️ Estás en tu hora de comida").font(.headline)
+                    NxIconText(systemName: "fork.knife", text: "Estás en tu hora de comida", tint: NxBrand.primary)
+                        .font(.headline)
                     Text("Saliste a las \(LunchUI.hour(record.checkinTime)) · llevas \(minutes) min")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     if let revision = LunchUI.revision(record) {
-                        CoreChip(text: revision.label, color: revision.color)
+                        CoreChip(icon: revision.icon, text: revision.label, color: revision.color)
                     }
                 }
             }
             if late {
-                Text("⏰ Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.")
+                NxIconText(systemName: "clock.badge.exclamationmark", text: "Ya pasó la hora de regreso (4:00 p.m.): al registrar tendrás que escribir por qué.")
                     .font(.footnote)
                     .foregroundStyle(CorePalette.orange)
             }
             Button {
                 startRegister(checkIn: false, late: late)
             } label: {
-                Text("↩️ Ya regresé").bold().frame(maxWidth: .infinity)
+                Label("Ya regresé", systemImage: "arrow.uturn.backward").bold().frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
         }
@@ -305,11 +312,16 @@ struct ComidasView: View {
                 LunchPhotoThumb(url: record.checkinPhotoUrl, title: "Tu foto de salida", time: record.checkinTime) { photo = $0 }
                 LunchPhotoThumb(url: record.checkoutPhotoUrl, title: "Tu foto de regreso", time: record.checkoutTime) { photo = $0 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("🍽️ Comida registrada").font(.headline)
+                    NxIconText(systemName: "fork.knife", text: "Comida registrada", tint: NxBrand.primary)
+                        .font(.headline)
                     Text("\(LunchUI.hour(record.checkinTime)) → \(LunchUI.hour(record.checkoutTime))\(minutes)")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    CoreChip(text: revision?.label ?? "A tiempo", color: revision?.color ?? CorePalette.green)
+                    CoreChip(
+                        icon: revision?.icon ?? "checkmark.circle",
+                        text: revision?.label ?? "A tiempo",
+                        color: revision?.color ?? CorePalette.green
+                    )
                 }
             }
             if let estado = record.revisionEstado, !estado.isEmpty, estado != "PENDIENTE" {
@@ -410,7 +422,7 @@ struct ComidasView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             if let pendientes = team.resumen?.pendientes, pendientes > 0 {
-                Text("⏳ Tienes \(pendientes) comida\(pendientes == 1 ? "" : "s") a destiempo por aprobar.")
+                NxIconText(systemName: "hourglass", text: "Tienes \(pendientes) comida\(pendientes == 1 ? "" : "s") a destiempo por aprobar.")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(CorePalette.orange)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -558,9 +570,9 @@ private struct LunchTeamRowCard: View {
                     Text(puesto).font(.caption).foregroundStyle(.secondary)
                 }
                 CoreFlowLayout {
-                    CoreChip(text: estado.label, color: estado.color)
+                    CoreChip(icon: estado.icon, text: estado.label, color: estado.color)
                     if let revision = LunchUI.revision(row.registro) {
-                        CoreChip(text: revision.label, color: revision.color)
+                        CoreChip(icon: revision.icon, text: revision.label, color: revision.color)
                     }
                 }
             }
@@ -582,10 +594,10 @@ private struct LunchTeamRowCard: View {
                 }
             }
             if let text = record.checkinJustificacion, !text.isEmpty {
-                Text("💬 Salida a las \(LunchUI.hour(record.checkinTime)): «\(text)»").font(.caption)
+                NxIconText(systemName: "text.bubble", text: "Salida a las \(LunchUI.hour(record.checkinTime)): «\(text)»").font(.caption)
             }
             if let text = record.checkoutJustificacion, !text.isEmpty {
-                Text("💬 Regreso a las \(LunchUI.hour(record.checkoutTime)): «\(text)»").font(.caption)
+                NxIconText(systemName: "text.bubble", text: "Regreso a las \(LunchUI.hour(record.checkoutTime)): «\(text)»").font(.caption)
             }
             if let estado = record.revisionEstado, !estado.isEmpty, estado != "PENDIENTE" {
                 Text(LunchUI.reviewedLine(record, mine: false))
@@ -602,10 +614,10 @@ private struct LunchTeamRowCard: View {
     private func reviewActions(_ record: LunchRecord) -> some View {
         if record.revisionEstado == "PENDIENTE" {
             HStack(spacing: 8) {
-                Button("✅ Aprobar") { onReview(record, "aprobar") }
+                Button { onReview(record, "aprobar") } label: { Label("Aprobar", systemImage: "checkmark") }
                     .buttonStyle(.borderedProminent)
                     .tint(CorePalette.green)
-                Button("❌ Rechazar") { onReview(record, "rechazar") }
+                Button { onReview(record, "rechazar") } label: { Label("Rechazar", systemImage: "xmark") }
                     .buttonStyle(.borderedProminent)
                     .tint(CorePalette.red)
             }
@@ -715,8 +727,8 @@ private struct LunchReviewSheet: View {
             Form {
                 Section {
                     Picker("Decisión", selection: $decision) {
-                        Text("✅ Aprobar").tag("aprobar")
-                        Text("❌ Rechazar").tag("rechazar")
+                        Text("Aprobar").tag("aprobar")
+                        Text("Rechazar").tag("rechazar")
                     }
                     .pickerStyle(.segmented)
                 } footer: {
@@ -724,10 +736,10 @@ private struct LunchReviewSheet: View {
                 }
                 Section("Lo que escribió") {
                     if let text = request.record.checkinJustificacion, !text.isEmpty {
-                        Text("💬 Salida a las \(LunchUI.hour(request.record.checkinTime)): «\(text)»").font(.footnote)
+                        NxIconText(systemName: "text.bubble", text: "Salida a las \(LunchUI.hour(request.record.checkinTime)): «\(text)»").font(.footnote)
                     }
                     if let text = request.record.checkoutJustificacion, !text.isEmpty {
-                        Text("💬 Regreso a las \(LunchUI.hour(request.record.checkoutTime)): «\(text)»").font(.footnote)
+                        NxIconText(systemName: "text.bubble", text: "Regreso a las \(LunchUI.hour(request.record.checkoutTime)): «\(text)»").font(.footnote)
                     }
                     if (request.record.checkinJustificacion ?? "").isEmpty && (request.record.checkoutJustificacion ?? "").isEmpty {
                         Text("Sin justificación escrita.").font(.footnote).foregroundStyle(.secondary)

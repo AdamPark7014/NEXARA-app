@@ -16,6 +16,7 @@ import {
   type ActivityProjectMode,
 } from "@/lib/ops-activity-form";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
+import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import {
   assignTicketRequest,
   createActivity,
@@ -623,7 +624,7 @@ export default function OpsActivityForm({
                           fontWeight: on ? 750 : 600,
                         }}
                       >
-                        <span aria-hidden>{t.emoji}</span>
+                        <ActivityKindIcon kind={t.icon} size={18} />
                         {t.label}
                       </button>
                     );

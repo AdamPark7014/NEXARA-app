@@ -57,7 +57,7 @@ struct AppLockGate<Content: View>: View {
             if locked && session.currentUser != nil {
                 Color(.systemBackground).ignoresSafeArea()
                 VStack(spacing: 16) {
-                    Image(systemName: "lock.fill").font(.largeTitle).foregroundColor(.teal)
+                    Image(systemName: "lock.fill").font(.largeTitle).foregroundColor(NxBrand.primary)
                     Text("NEXARA bloqueado").font(.headline)
                     Text("Confirma tu identidad para continuar")
                         .font(.caption).foregroundColor(.secondary)
@@ -65,7 +65,7 @@ struct AppLockGate<Content: View>: View {
                         Task { await unlock() }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.teal)
+                    .tint(NxBrand.primary)
                     .disabled(unlocking)
                 }
             }

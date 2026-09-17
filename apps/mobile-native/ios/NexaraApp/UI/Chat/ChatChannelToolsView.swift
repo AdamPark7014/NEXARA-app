@@ -93,7 +93,7 @@ struct ChatSearchSheet: View {
                                 HStack {
                                     Text(hit.displayChannel)
                                         .font(.caption.bold())
-                                        .foregroundStyle(.teal)
+                                        .foregroundStyle(NxBrand.primary)
                                     Spacer()
                                     if !hit.createdAt.isEmpty {
                                         Text(String(hit.createdAt.prefix(10)))

@@ -214,7 +214,8 @@ struct CameraPreview: UIViewRepresentable {
 /// y «Cancelar». Paridad con la cámara de `ActivityEvidenceFlow` en la web.
 struct GeoPhotoCaptureView: View {
     let title: String
-    var confirmLabel: String = "✓ Enviar esta foto"
+    /// Texto del botón; el icono de palomita lo pone la vista.
+    var confirmLabel: String = "Enviar esta foto"
     /// Entrada y salida exigen GPS; sin ubicación no se puede enviar.
     var requireLocation: Bool = true
     /// `nil` si se guardó; si no, el mensaje a mostrar sin cerrar la vista.
@@ -352,7 +353,7 @@ struct GeoPhotoCaptureView: View {
                 Button {
                     openURL(mapUrl)
                 } label: {
-                    Text("📍 Ubicación capturada · Ver en mapa")
+                    Label("Ubicación capturada · Ver en mapa", systemImage: "mappin.and.ellipse")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.green)
                 }
@@ -377,6 +378,8 @@ struct GeoPhotoCaptureView: View {
                     HStack(spacing: 8) {
                         if working {
                             ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
                         }
                         Text(confirmLabel).bold()
                     }
@@ -384,11 +387,13 @@ struct GeoPhotoCaptureView: View {
                     .padding(.vertical, 6)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.teal)
+                .tint(NxBrand.primary)
                 .disabled(working || locating || (requireLocation && photo.coords == nil))
 
                 if photo.coords == nil {
-                    Button("📍 Reintentar ubicación") { retryLocation(photo) }
+                    Button { retryLocation(photo) } label: {
+                        Label("Reintentar ubicación", systemImage: "location")
+                    }
                         .buttonStyle(.bordered)
                         .tint(.white)
                         .disabled(working || locating)
@@ -399,7 +404,7 @@ struct GeoPhotoCaptureView: View {
                         captured = nil
                         message = nil
                     } label: {
-                        Text("📷 Tomar otra").frame(maxWidth: .infinity)
+                        Label("Tomar otra", systemImage: "camera").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .tint(.white)

@@ -77,8 +77,8 @@ struct NotificationsCenterView: View {
                 }
             } else if rows.isEmpty && error == nil {
                 Section {
-                    VStack(spacing: 8) {
-                        Text("🎉").font(.largeTitle)
+                    VStack(spacing: 10) {
+                        NxIconBadge(systemName: "bell.badge", size: 56, circle: true)
                         Text("Sin notificaciones").foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity)
@@ -103,7 +103,7 @@ struct NotificationsCenterView: View {
                                     Button {
                                         Task { await markRead(n) }
                                     } label: { Label("Leída", systemImage: "checkmark") }
-                                    .tint(.blue)
+                                    .tint(NxBrand.primary)
                                 }
                             }
                     }
@@ -144,8 +144,9 @@ struct NotificationsCenterView: View {
     private func notificationRow(_ n: [String: Any]) -> some View {
         let isRead = (n["isRead"] as? Bool) == true
         let category = ConsoleHelpers.mapStr(n, "category")
+        let symbol = NotificationIcon.symbol(for: n)
         HStack(alignment: .top, spacing: 12) {
-            Text(categoryIcon(category)).font(.title2)
+            NxIconBadge(systemName: symbol, tint: NotificationIcon.tint(forSymbol: symbol), size: 38, circle: true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(ConsoleHelpers.mapStr(n, "title").isEmpty ? "Notificación" : ConsoleHelpers.mapStr(n, "title"))
                     .font(.subheadline)
@@ -246,20 +247,6 @@ struct NotificationsCenterView: View {
             await NotificationsBadgeStore.shared.refresh()
         } catch {
             self.error = error.toUserMessage()
-        }
-    }
-
-    private func categoryIcon(_ category: String) -> String {
-        switch category.lowercased() {
-        case "attendance": return "🕐"
-        case "activity": return "🧰"
-        case "tool": return "🔧"
-        case "finance": return "💸"
-        case "noc": return "🚨"
-        case "crm": return "✨"
-        case "approval": return "🛡️"
-        case "evidence": return "📸"
-        default: return "🔔"
         }
     }
 

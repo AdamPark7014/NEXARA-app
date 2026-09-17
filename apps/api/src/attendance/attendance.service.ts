@@ -17,6 +17,7 @@ import {
 } from '../common/time/workday.js';
 import { NotificationType, Prisma } from '@prisma/client';
 import { saveBase64Photo } from '../common/file-upload.util';
+import { horaAviso } from '../notifications/notification-push-meta.js';
 
 @Injectable()
 export class AttendanceService {
@@ -35,7 +36,7 @@ export class AttendanceService {
       await this.notifications.createNotification(payload);
       return;
     }
-    const { channel: _c, collapseKey: _k, excludeActor: _e, dedupeSeconds: _d, ...data } = payload;
+    const { channel: _c, collapseKey: _k, excludeActor: _e, dedupeSeconds: _d, icon: _i, ...data } = payload;
     await this.prisma.notification.create({ data: { ...data, type: data.type as NotificationType } });
   }
 
@@ -505,8 +506,9 @@ export class AttendanceService {
         userId: opts.targetUserId,
         type: 'ATTENDANCE_CHECKIN',
         category: 'attendance',
-        title: 'Entrada sugerida desde ACS',
-        message: `RH aplicó tu entrada desde puerta Integra${doorBit}.`,
+        title: 'Recursos Humanos registró tu entrada',
+        message: `${horaAviso(now)} · Control de acceso${doorBit}`,
+        icon: 'entrada',
         relatedEntityId: attendance.id,
         entityType: 'Attendance',
         relatedUrl: '/erp/asistencias',
@@ -520,7 +522,8 @@ export class AttendanceService {
       opts.targetUserId,
       'ATTENDANCE_CHECKIN',
       attendance.user.nombre || 'Usuario',
-      deviceInfo,
+      // En el aviso basta el origen; el detalle interno (quién la sugirió) queda en el registro.
+      `Control de acceso${doorBit}`,
       now,
     );
 
@@ -634,8 +637,9 @@ export class AttendanceService {
           userId,
           type: 'ATTENDANCE_CHECKIN',
           category: 'attendance',
-          title: 'Entrada registrada',
-          message: `Registraste tu entrada desde ${deviceInfo}.`,
+          title: 'Registraste tu entrada',
+          message: [horaAviso(now), deviceInfo].filter(Boolean).join(' · '),
+          icon: 'entrada',
           relatedEntityId: attendance.id,
           entityType: 'Attendance',
           relatedUrl: '/erp/asistencias',
@@ -732,8 +736,9 @@ export class AttendanceService {
         userId,
         type: 'ATTENDANCE_CHECKOUT',
         category: 'attendance',
-        title: 'Salida registrada',
-        message: `Registraste tu salida desde ${deviceInfo}.`,
+        title: 'Registraste tu salida',
+        message: [horaAviso(now), deviceInfo].filter(Boolean).join(' · '),
+        icon: 'salida',
         relatedEntityId: attendance.id,
         entityType: 'Attendance',
         relatedUrl: '/erp/asistencias',

@@ -5,7 +5,7 @@ let coreActividadesVistaKey = "nx-actividades-vista"
 
 /// «Actividades» de Core, espejo de `/erp/pizarra`:
 /// - CEO: solo el tablero del equipo (asigna, no ejecuta).
-/// - Quien tiene gente en su tablero: «✅ Mis actividades» / «👥 Mi equipo» (se recuerda la última).
+/// - Quien tiene gente en su tablero: «Mis actividades» / «Mi equipo» (se recuerda la última).
 /// - Los demás: su lista directo.
 struct ActividadesHomeView: View {
     @ObservedObject private var session = SessionStore.shared
@@ -30,8 +30,8 @@ struct ActividadesHomeView: View {
             } else {
                 VStack(spacing: 0) {
                     Picker("Vista", selection: $vista) {
-                        Text("✅ Mis actividades").tag("mias")
-                        Text("👥 Mi equipo").tag("equipo")
+                        Text("Mis actividades").tag("mias")
+                        Text("Mi equipo").tag("equipo")
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal)
@@ -195,12 +195,13 @@ private struct TeamPersonCard: View {
                         .padding(.top, 2)
                 }
                 if (user.enCorreccion ?? 0) > 0 {
-                    CoreChip(text: "↩️ Corrigiendo evidencia", color: CorePalette.orange)
+                    CoreChip(icon: "arrow.uturn.backward", text: "Corrigiendo evidencia", color: CorePalette.orange)
                         .padding(.top, 2)
                 }
                 if let enEspera = user.enEsperaAprobacion, enEspera > 0 {
                     CoreChip(
-                        text: enEspera > 1 ? "⏳ \(enEspera) en espera de aprobación" : "⏳ En espera de aprobación",
+                        icon: "hourglass",
+                        text: enEspera > 1 ? "\(enEspera) en espera de aprobación" : "En espera de aprobación",
                         color: CorePalette.purple
                     )
                     .padding(.top, 2)
@@ -277,7 +278,7 @@ struct TeamMemberDetailView: View {
         List {
             if let notice {
                 Section {
-                    Text(notice).foregroundStyle(CorePalette.green)
+                    NxIconText(systemName: "checkmark.circle.fill", text: notice).foregroundStyle(CorePalette.green)
                 }
             }
             if let member {
@@ -298,11 +299,12 @@ struct TeamMemberDetailView: View {
                                     .foregroundStyle(termino.color)
                             }
                             if (member.enCorreccion ?? 0) > 0 {
-                                CoreChip(text: "↩️ Corrigiendo evidencia", color: CorePalette.orange)
+                                CoreChip(icon: "arrow.uturn.backward", text: "Corrigiendo evidencia", color: CorePalette.orange)
                             }
                             if let enEspera = member.enEsperaAprobacion, enEspera > 0 {
                                 CoreChip(
-                                    text: enEspera > 1 ? "⏳ \(enEspera) en espera de aprobación" : "⏳ En espera de aprobación",
+                                    icon: "hourglass",
+                                    text: enEspera > 1 ? "\(enEspera) en espera de aprobación" : "En espera de aprobación",
                                     color: CorePalette.purple
                                 )
                             }
@@ -350,7 +352,7 @@ struct TeamMemberDetailView: View {
                                 if let indicaciones = activity.indicaciones, !indicaciones.isEmpty {
                                     Text(indicaciones).font(.caption).foregroundStyle(.secondary)
                                 }
-                                Text("📅 Programada: \(CoreFormat.when(activity.fechaInicio) ?? "Sin fecha")")
+                                NxIconText(systemName: "calendar", text: "Programada: \(CoreFormat.when(activity.fechaInicio) ?? "Sin fecha")")
                                     .font(.caption)
                                 HStack(spacing: 8) {
                                     Button("Despachar al equipo") {
@@ -395,7 +397,7 @@ struct TeamMemberDetailView: View {
                                 HStack(spacing: 6) {
                                     Text(activity.anNumber ?? "").font(.caption).foregroundStyle(.secondary)
                                     if activity.reparte == true {
-                                        CoreChip(text: "📨 La reparte", color: CorePalette.purple)
+                                        CoreChip(icon: "paperplane", text: "La reparte", color: CorePalette.purple)
                                     }
                                 }
                                 if activity.reparte != true {
@@ -425,7 +427,7 @@ struct TeamMemberDetailView: View {
                                 HStack(spacing: 6) {
                                     let estatus = CoreStatusUI.estatus(item.estatus)
                                     CoreChip(text: estatus.label, color: estatus.color)
-                                    CoreChip(text: CoreStatusUI.kind(item.coreKind, ticketTypeCustom: item.ticketTypeCustom))
+                                    CoreChip(icon: CoreStatusUI.kindSymbol(item.coreKind), text: CoreStatusUI.kind(item.coreKind, ticketTypeCustom: item.ticketTypeCustom))
                                 }
                                 if let evidence = item.evidence {
                                     CoreProgressBar(percent: evidence.progressPct ?? 0)

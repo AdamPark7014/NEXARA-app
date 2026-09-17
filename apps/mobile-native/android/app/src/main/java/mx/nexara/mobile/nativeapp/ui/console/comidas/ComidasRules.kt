@@ -7,6 +7,7 @@ import mx.nexara.mobile.nativeapp.data.api.ComidaRegistroDto
 import mx.nexara.mobile.nativeapp.data.api.ComidaResumenDto
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.Tone
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 
 /**
  * Reglas de la hora de comida sin Android — espejo de
@@ -47,15 +48,15 @@ object ComidasRules {
     /** null cuando fue a tiempo (no requiere aprobación). */
     fun estadoRevision(estado: String?): Tone? = when {
         estado.isNullOrBlank() -> null
-        estado == "APROBADA" -> Tone("✅ Justificación aprobada", CoreActivityRules.VERDE)
-        estado == "RECHAZADA" -> Tone("❌ Justificación rechazada", CoreActivityRules.ROJO)
-        else -> Tone("⏳ Por aprobar", CoreActivityRules.NARANJA)
+        estado == "APROBADA" -> Tone("Justificación aprobada", CoreActivityRules.VERDE, NxGlyph.APPROVED)
+        estado == "RECHAZADA" -> Tone("Justificación rechazada", CoreActivityRules.ROJO, NxGlyph.REJECTED)
+        else -> Tone("Por aprobar", CoreActivityRules.NARANJA, NxGlyph.WAITING)
     }
 
     fun estadoFila(registro: ComidaRegistroDto?): Tone = when {
         registro == null -> Tone("Sin registrar")
-        registro.checkoutTime.isNullOrBlank() -> Tone("🍽️ En comida", CoreActivityRules.AZUL)
-        else -> Tone("✓ Completa", CoreActivityRules.VERDE)
+        registro.checkoutTime.isNullOrBlank() -> Tone("En comida", CoreActivityRules.AZUL, NxGlyph.MEAL)
+        else -> Tone("Completa", CoreActivityRules.VERDE, NxGlyph.DONE)
     }
 
     /** Color del borde izquierdo de una fila del equipo. */

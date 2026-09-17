@@ -39,6 +39,8 @@ import {
   type MeNavigation,
 } from "@/lib/me-navigation";
 import { CORE_SURFACE_ONLY } from "@/lib/core-surface";
+import SearchIcon from "@mui/icons-material/Search";
+import { PaletteActionIcon } from "./ShellIcons";
 import {
   buildLegacyCreateActions,
   buildLegacyPanelJumpActions,
@@ -51,6 +53,7 @@ type Action = {
   id: string;
   label: string;
   description?: string;
+  /** Clave heredada (búsqueda); el glifo visible sale de `PaletteActionIcon` por id. */
   icon: string;
   group: string;
   panel?: PanelId;
@@ -287,7 +290,7 @@ export default function CommandPalette({
         id: "act:dark",
         label: "Cambiar tema (claro / oscuro)",
         description: "Modo visual de la interfaz",
-        icon: "🌗",
+        icon: "theme",
         group: "Acciones",
         onSelect: onToggleDark,
         keywords: ["tema", "dark", "light", "oscuro", "claro"],
@@ -296,7 +299,7 @@ export default function CommandPalette({
         id: "act:logout",
         label: "Cerrar sesión",
         description: "Salir de NEXARA",
-        icon: "🚪",
+        icon: "logout",
         group: "Acciones",
         onSelect: onLogout,
         keywords: ["salir", "logout", "exit"],
@@ -310,7 +313,7 @@ export default function CommandPalette({
           id: "act:create-client",
           label: "Nuevo cliente",
           description: "Alta en Clientes Core",
-          icon: "🏢",
+          icon: "client",
           group: "Crear",
           url: toUrl("/erp/clientes/nuevo"),
           keywords: ["nuevo", "cliente", "clientes"],
@@ -521,7 +524,7 @@ export default function CommandPalette({
                 "0 1px 0 rgba(255,255,255,0.18) inset, 0 6px 14px color-mix(in srgb, var(--primary) 32%, transparent)",
             }}
           >
-            ⌘
+            <SearchIcon aria-hidden="true" sx={{ fontSize: 20 }} />
           </span>
           <input
             ref={inputRef}
@@ -654,9 +657,11 @@ export default function CommandPalette({
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        color: "var(--primary)",
                       }}
+                      aria-hidden="true"
                     >
-                      {a.icon}
+                      <PaletteActionIcon actionId={a.id} size={18} />
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

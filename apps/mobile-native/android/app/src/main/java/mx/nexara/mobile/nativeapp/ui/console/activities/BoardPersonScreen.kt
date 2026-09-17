@@ -207,7 +207,7 @@ fun BoardPersonScreen(
                         Text(act.titulo.orEmpty(), fontSize = 16.sp, color = NxColors.Slate)
                         Text("Estatus: ${act.estatus.orEmpty()}", fontSize = 13.sp, color = NxColors.Muted)
                         TextButton(onClick = { onOpenActivity(act.id, null) }) {
-                            Text("Abrir actividad →", color = NxColors.Teal, fontWeight = FontWeight.Bold)
+                            Text("Abrir actividad →", color = NxColors.Brand, fontWeight = FontWeight.Bold)
                         }
                     } else {
                         Text("Sin actividad abierta en este momento.", fontSize = 14.sp, color = NxColors.Muted)
@@ -247,7 +247,7 @@ fun BoardPersonScreen(
                 item {
                     Button(
                         onClick = onAssign,
-                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                         modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                     ) { Text("Asignar actividad", fontWeight = FontWeight.Bold) }
                 }
@@ -361,7 +361,7 @@ private fun HistoryCard(
                     Text("Sin evidencia de esta persona.", fontSize = 13.sp, color = NxColors.Muted)
                 }
                 TextButton(onClick = onOpenActivity) {
-                    Text("Abrir actividad →", color = NxColors.Teal, fontWeight = FontWeight.Bold)
+                    Text("Abrir actividad →", color = NxColors.Brand, fontWeight = FontWeight.Bold)
                 }
             }
         }
