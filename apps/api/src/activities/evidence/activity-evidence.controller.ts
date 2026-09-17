@@ -82,7 +82,14 @@ export class ActivityEvidenceController {
   @Post(':activityId/entry-photo')
   async saveEntryPhoto(
     @Param('activityId') activityId: string,
-    @Body() body: { photoUrl: string; latitude: number; longitude: number },
+    @Body()
+    body: {
+      photoUrl: string;
+      latitude: number;
+      longitude: number;
+      /** Por qué la empieza antes que otra de más prioridad (opcional, no bloquea). */
+      justificacionOrden?: string | null;
+    },
     @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
@@ -100,6 +107,7 @@ export class ActivityEvidenceController {
       body.latitude,
       body.longitude,
       companyId,
+      body.justificacionOrden ?? null,
     );
   }
 
