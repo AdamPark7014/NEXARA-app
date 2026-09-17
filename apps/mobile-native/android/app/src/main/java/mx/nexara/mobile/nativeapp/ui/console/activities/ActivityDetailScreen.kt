@@ -1,11 +1,17 @@
 package mx.nexara.mobile.nativeapp.ui.console.activities
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -21,6 +27,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -134,11 +142,14 @@ fun ActivityDetailScreen(
         }
     }
 
-    LaunchedEffect(activity.id) {
+    /** Sube tras cancelar o pasar la actividad: se vuelve a pedir el detalle y las acciones. */
+    var recarga by remember(activity.id) { mutableIntStateOf(0) }
+
+    LaunchedEffect(activity.id, recarga) {
         loadingDetail = true
         detail = runCatching {
             withContext(Dispatchers.IO) { repo.activityById(activity.id) }
-        }.getOrElse { activity }
+        }.getOrElse { detail }
         editEstatus = detail.estatus
         editPrioridad = detail.prioridad ?: ""
         editDescripcion = detail.descripcion ?: ""
@@ -177,6 +188,38 @@ fun ActivityDetailScreen(
                     }
                 }
             }
+
+            // Cancelada por un superior: quién y por qué, visible en las tres pestañas.
+            ActivitySuperiorRules.avisoCancelada(detail)?.let { aviso ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(NxColors.DangerSoft)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(Icons.Outlined.Block, contentDescription = null, tint = NxColors.Danger, modifier = Modifier.size(18.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(aviso, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF991B1B))
+                        CoreActivityRules.formatWhen(detail.cancelledAt)?.let {
+                            Text(it, fontSize = 11.5.sp, color = NxColors.Muted)
+                        }
+                    }
+                }
+            }
+
+            ActivitySuperiorActions(
+                activityId = detail.id,
+                refreshKey = recarga,
+                onDone = { mensaje ->
+                    recarga++
+                    scope.launch { snackbarHostState.showSnackbar(mensaje) }
+                },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
 
             TabRow(selectedTabIndex = selectedTab) {
                 ACTIVITY_TABS.forEachIndexed { i, label ->
