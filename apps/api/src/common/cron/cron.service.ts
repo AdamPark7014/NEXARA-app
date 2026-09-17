@@ -8,6 +8,7 @@ import { VehiclesService } from '../../vehicles/vehicles.service.js';
 import { WebhooksService } from '../../webhooks/webhooks.service.js';
 import { DomainEventBusService } from '../../domain-events/domain-event-bus.service.js';
 import { OPEN_ACTIVITY_WHERE } from '../../activities/activity-status.js';
+import { normalizarPrioridad } from '../../activities/actividad-tiempos.js';
 
 @Injectable()
 export class CronService {
@@ -433,11 +434,12 @@ export class CronService {
       },
       take: 200,
     });
-    const limits: Record<string, number> = { Alta: 8, Media: 24, Baja: 72 };
+    // Claves en prioridad normalizada: los textos viejos se traducen antes de buscar.
+    const limits: Record<string, number> = { ALTA: 8, MEDIA: 24, BAJA: 72 };
     const breaches = open.filter((t) => {
       if (!t.fechaAsignacion) return false;
       const hrs = (now - t.fechaAsignacion.getTime()) / 3600000;
-      return hrs > (limits[t.prioridad || 'Media'] ?? 24);
+      return hrs > (limits[normalizarPrioridad(t.prioridad)] ?? 24);
     });
     if (!breaches.length) return;
     this.logger.warn(`SLA breaches abiertos: ${breaches.length}`);

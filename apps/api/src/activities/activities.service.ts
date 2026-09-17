@@ -9,6 +9,7 @@ import { generateTicketReportPdf } from './ticket-report-pdf.js';
 import { generateActivitiesReportPdf } from './activities-report-pdf.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, isFinishedStatus } from './activity-status.js';
+import { normalizarPrioridad, tiemposDto } from './actividad-tiempos.js';
 import {
   assertCanCancel,
   cleanMotivo,
@@ -96,6 +97,11 @@ export class ActivitiesService {
         anNumber,
         companyId: resolvedCompanyId,
         evidencePhotoRequired,
+        // Prioridad siempre en ALTA | MEDIA | BAJA (los textos viejos se traducen).
+        prioridad:
+          createActivityDto.prioridad == null || String(createActivityDto.prioridad).trim() === ''
+            ? null
+            : normalizarPrioridad(createActivityDto.prioridad),
         coreKind: createActivityDto.coreKind?.trim() || null,
         assignmentCharge: (() => {
           const c = createActivityDto.assignmentCharge?.trim().toLowerCase();
@@ -425,7 +431,27 @@ export class ActivitiesService {
       },
     });
     assertCompanyAccess(activity, companyId, 'Actividad');
-    return activity;
+    if (!activity) return activity;
+
+    // Contrato del 18-09: el detalle trae lo mismo que «Mis actividades» por persona
+    // (aceptación, semáforo y tiempo planeado vs real), sin quitar nada de lo que ya mandaba.
+    const ahora = new Date();
+    type FilaEquipo = (typeof activity.assignees)[number];
+    const equipo = (activity.assignees ?? []).map((a: FilaEquipo) => ({
+      ...a,
+      ...tiemposDto(a, activity, ahora),
+    }));
+    const propia = equipo.find((a) => a.userId === activity.responsableId) ?? equipo[0] ?? null;
+    return {
+      ...activity,
+      prioridad: activity.prioridad == null ? null : normalizarPrioridad(activity.prioridad),
+      assignees: equipo,
+      /** Resumen de la actividad: el del responsable, o el del primero del equipo. */
+      semaforo: propia?.semaforo ?? null,
+      minutosPlan: propia?.minutosPlan ?? null,
+      minutosReales: propia?.minutosReales ?? null,
+      excedida: Boolean(propia?.excedida),
+    };
   }
 
   /** KPIs para la bandeja de actividades (OPS dashboard). */
@@ -1044,7 +1070,18 @@ export class ActivitiesService {
       }
     }
 
-const updatedActivity = await this.prisma['activity'].update({
+    // Prioridad siempre en ALTA | MEDIA | BAJA, venga como venga del cliente.
+    if (updateActivityDto.prioridad !== undefined) {
+      updateActivityDto = {
+        ...updateActivityDto,
+        prioridad:
+          updateActivityDto.prioridad == null || String(updateActivityDto.prioridad).trim() === ''
+            ? null
+            : normalizarPrioridad(updateActivityDto.prioridad),
+      } as UpdateActivityDto;
+    }
+
+    const updatedActivity = await this.prisma['activity'].update({
       where: { id },
       data: updateActivityDto,
       include: { responsable: { select: { nombre: true, id: true } } },

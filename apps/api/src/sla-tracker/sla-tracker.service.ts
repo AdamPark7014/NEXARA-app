@@ -1,17 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OPEN_ACTIVITY_WHERE, isClosedStatus } from '../activities/activity-status.js';
+import { normalizarPrioridad } from '../activities/actividad-tiempos.js';
 
+// Las claves son la prioridad normalizada (ALTA | MEDIA | BAJA); los textos viejos
+// («Alta», «urgente», «P1») se traducen con normalizarPrioridad antes de buscar.
 const SLA_RESPONSE_HOURS_BY_PRIORITY: Record<string, number> = {
-  Alta: 2,
-  Media: 8,
-  Baja: 24,
+  ALTA: 2,
+  MEDIA: 8,
+  BAJA: 24,
 };
 
 const SLA_RESOLUTION_HOURS_BY_PRIORITY: Record<string, number> = {
-  Alta: 8,
-  Media: 24,
-  Baja: 72,
+  ALTA: 8,
+  MEDIA: 24,
+  BAJA: 72,
 };
 
 @Injectable()
@@ -58,8 +61,9 @@ export class SlaTrackerService {
     const breaches: any[] = [];
 
     for (const t of tickets) {
-      const slaResp = SLA_RESPONSE_HOURS_BY_PRIORITY[t.prioridad || 'Media'] ?? 8;
-      const slaRes = SLA_RESOLUTION_HOURS_BY_PRIORITY[t.prioridad || 'Media'] ?? 24;
+      const prioridad = normalizarPrioridad(t.prioridad);
+      const slaResp = SLA_RESPONSE_HOURS_BY_PRIORITY[prioridad] ?? 8;
+      const slaRes = SLA_RESOLUTION_HOURS_BY_PRIORITY[prioridad] ?? 24;
       const asignado = t.fechaAsignacion;
       if (!asignado) {
         stillOpen++;
