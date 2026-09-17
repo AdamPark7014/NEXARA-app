@@ -21,6 +21,7 @@ import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import WrongLocationOutlinedIcon from "@mui/icons-material/WrongLocationOutlined";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
@@ -51,6 +52,7 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, { icon: SvgIconCom
   rechazada: { icon: CancelOutlinedIcon, color: RED },
   atraso: { icon: HourglassTopIcon, color: AMBER },
   vencida: { icon: ErrorOutlineIcon, color: RED },
+  fuera_zona: { icon: WrongLocationOutlinedIcon, color: RED },
   chat: { icon: ChatBubbleOutlineIcon, color: BLUE },
   ubicacion: { icon: PlaceOutlinedIcon, color: BLUE },
   viatico: { icon: PaymentsOutlinedIcon, color: BLUE },

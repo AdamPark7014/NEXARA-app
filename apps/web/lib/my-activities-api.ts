@@ -1,3 +1,4 @@
+import type { GeocercaAlerta } from "@/lib/activity-geofence";
 import { erpFetch } from "@/lib/erp-api";
 
 /** Fila de Mis actividades (GET /me/activities). Fechas en ISO. */
@@ -123,6 +124,11 @@ export type TeamEvidenceMember = {
   eficienciaScore: number | null;
   /** Más reciente primero. */
   revisiones: TeamEvidenceReview[];
+  /**
+   * Salidas de la zona de 100 m alrededor de su punto de inicio, la más reciente primero.
+   * Opcional: una API anterior a la geocerca no lo manda.
+   */
+  alertasZona?: GeocercaAlerta[];
   evidence: TeamEvidence | null;
 };
 

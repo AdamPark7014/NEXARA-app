@@ -25,6 +25,7 @@ export type NotificationKind =
   | "rechazada"
   | "atraso"
   | "vencida"
+  | "fuera_zona"
   | "chat"
   | "ubicacion"
   | "viatico"
@@ -53,6 +54,17 @@ export function notificationKind(category?: string | null, title?: string | null
   const t = norm(stripLeadingEmoji(title));
 
   if (c === "chat") return "chat";
+  // ACTIVITY_OUT_OF_ZONE (push `icon: fuera_zona`): «Estás fuera de la zona…», «X salió de la zona…»,
+  // «X justificó su salida de zona». Va antes de «salida» para no confundirse con el checador.
+  if (
+    t.includes("fuera de la zona") ||
+    t.includes("fuera de zona") ||
+    t.includes("salio de la zona") ||
+    t.includes("salida de zona") ||
+    t.includes("salida de la zona")
+  ) {
+    return "fuera_zona";
+  }
   if (c.startsWith("lunch") || t.includes("comida")) return "comida";
   if (c === "sla-breach" || t.includes("vencid")) return "vencida";
   if (c === "sla-alert" || t.includes("atras") || t.includes("retras")) return "atraso";

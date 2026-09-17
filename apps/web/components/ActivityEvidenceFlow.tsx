@@ -19,6 +19,14 @@ import { Socket } from 'socket.io-client';
 import ConfirmDialog, { type ConfirmState } from '@/components/ui/ConfirmDialog';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import PhoneField from '@/components/PhoneField';
+import UbicacionActividadCard, { AvisoFueraDeZona, useGeocerca } from '@/components/ops/UbicacionActividad';
+import {
+  RADIO_ACTIVIDAD_M,
+  distanciaM,
+  mensajeSalidaFueraDeZona,
+  puntoReal,
+  type PuntoGeo,
+} from '@/lib/activity-geofence';
 
 type EvidenceBootstrap = {
   status?: string;
@@ -161,6 +169,39 @@ const ActivityEvidenceFlow = () => {
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
   const isFlowLocked = Boolean(flowData && isEvidenceLocked(flowData));
   const rejectedList = flowData ? rejectedStepsList(flowData) : [];
+
+  // Geocerca: desde la foto de entrada, la persona debe quedarse a ≤ 100 m del punto de inicio.
+  const actividadIniciada = Boolean(
+    flowData && (flowData.entryPhotoUrl || flowData.step !== 'ENTRY_PHOTO'),
+  );
+  const geocerca = useGeocerca(user?.token, flowData?.activityId ?? null, actividadIniciada);
+  const recargarGeocercaRef = useRef(geocerca.recargar);
+  recargarGeocercaRef.current = geocerca.recargar;
+  /** Foto de salida bloqueada por estar fuera del radio (validación local o 400 de la API). */
+  const [zonaSalidaError, setZonaSalidaError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setZonaSalidaError(null);
+  }, [flowData?.activityId]);
+
+  /** Punto donde inició (el de la API; si aún no carga, el GPS de la foto de entrada). */
+  const origenActividad = (): PuntoGeo | null => {
+    const o = geocerca.estado?.origen;
+    return (
+      (o ? puntoReal(o.latitude, o.longitude) : null) ??
+      puntoReal(flowData?.entryLatitude, flowData?.entryLongitude)
+    );
+  };
+
+  /** Mensaje de bloqueo si `punto` queda fuera del radio del inicio; `null` si puede registrar la salida. */
+  const bloqueoPorZona = (punto: PuntoGeo | null): string | null => {
+    const origen = origenActividad();
+    const aqui = punto ? puntoReal(punto.latitude, punto.longitude) : null;
+    if (!origen || !aqui) return null;
+    const radio = geocerca.estado?.radioM ?? RADIO_ACTIVIDAD_M;
+    const distancia = distanciaM(origen, aqui);
+    return distancia > radio ? mensajeSalidaFueraDeZona(distancia, radio) : null;
+  };
 
   const syncFlowFromSaved = (saved: Record<string, unknown>, local?: Partial<EvidenceFlowData>) => {
     if (!flowData) return;
@@ -428,6 +469,7 @@ const ActivityEvidenceFlow = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
         handleActivitySelect(Number(selectedActivityId));
+        void recargarGeocercaRef.current();
       }, 350);
     };
 
@@ -435,6 +477,8 @@ const ActivityEvidenceFlow = () => {
       if (!payload?.model) return;
       if (['ActivityEvidence', 'Inventory', 'Activity'].includes(payload.model)) {
         scheduleRefresh();
+      } else if (payload.model === 'ActivityGeofenceAlert') {
+        void recargarGeocercaRef.current();
       }
     });
 
@@ -624,6 +668,7 @@ const ActivityEvidenceFlow = () => {
 
   const openCamera = (kind: PendingPhoto['kind']) => {
     setError(null);
+    if (kind === 'exit') setZonaSalidaError(null);
     setPendingPhoto(null);
     liveGeoRef.current = null;
     // La ubicación se busca desde que abre la cámara para tenerla lista al tomar la foto.
@@ -992,8 +1037,25 @@ const ActivityEvidenceFlow = () => {
     if (!flowData) return;
     setLoading(true);
     setError(null);
+    setZonaSalidaError(null);
 
     try {
+      // Antes de abrir la cámara (y de cerrar el inventario): la salida solo se acepta dentro del radio.
+      if (
+        !forceInventoryConfirmed &&
+        typeof navigator !== 'undefined' &&
+        'geolocation' in navigator &&
+        origenActividad()
+      ) {
+        const aqui = await getGeolocation().catch(() => null);
+        const bloqueo = bloqueoPorZona(aqui);
+        if (bloqueo) {
+          setZonaSalidaError(bloqueo);
+          void geocerca.recargar();
+          return;
+        }
+      }
+
       if (isInventoryFlow) {
         const delta = inventoryItems.length - inventoryPreviousCount;
         if (delta !== 0 && !forceInventoryConfirmed) {
@@ -1052,6 +1114,15 @@ const ActivityEvidenceFlow = () => {
       // Misma ubicación que se mostró en la vista previa.
       const { dataUrl: photoUrl, latitude, longitude } = photo;
 
+      // Misma regla que la API: fuera del radio del punto de inicio no se envía.
+      const bloqueo = bloqueoPorZona({ latitude, longitude });
+      if (bloqueo) {
+        setZonaSalidaError(bloqueo);
+        void geocerca.recargar();
+        return false;
+      }
+      setZonaSalidaError(null);
+
       const endpoint = isCorrection
         ? `activity-evidence/${flowData.activityId}/resubmit`
         : `activity-evidence/${flowData.activityId}/exit-photo`;
@@ -1086,10 +1157,22 @@ const ActivityEvidenceFlow = () => {
           setSuccessMsg(correctionSuccessMessage(saved, '✅ Paso corregido.'));
         }
         setCameraActive(false);
+        void geocerca.recargar();
         return true;
       }
-      const errorData = await res.json().catch(() => ({}));
-      setError(errorData.message || 'Error al guardar foto');
+      const errorData: { message?: unknown } = await res.json().catch(() => ({}));
+      const apiMessage = Array.isArray(errorData.message)
+        ? errorData.message.filter((m): m is string => typeof m === 'string').join('. ')
+        : typeof errorData.message === 'string'
+          ? errorData.message
+          : '';
+      if (res.status === 400 && /iniciaste la actividad|punto de inicio/i.test(apiMessage)) {
+        // La API rechazó la salida por la geocerca: se muestra tal cual, destacado.
+        setZonaSalidaError(apiMessage);
+        void geocerca.recargar();
+      } else {
+        setError(apiMessage || 'Error al guardar foto');
+      }
       return false;
     } catch (err) {
       setError(photoErrorText(err));
@@ -1194,6 +1277,9 @@ const ActivityEvidenceFlow = () => {
                 Ver en mapa
               </a>
             </div>
+            {pendingPhoto.kind === 'exit' && zonaSalidaError ? (
+              <AvisoFueraDeZona mensaje={zonaSalidaError} />
+            ) : null}
             {error ? <div style={{ fontSize: 13, color: '#b91c1c' }}>❌ {error}</div> : null}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
@@ -1514,6 +1600,11 @@ const ActivityEvidenceFlow = () => {
           })}
         </div>
       </div>
+
+      {/* Geocerca: punto de inicio, recorrido y salidas de zona por justificar */}
+      {actividadIniciada ? (
+        <UbicacionActividadCard activityId={flowData.activityId} token={user.token} geocerca={geocerca} />
+      ) : null}
 
       {/* PASO 1: Foto de Entrada */}
       {flowData.step === 'ENTRY_PHOTO' && !isFlowLocked && (
@@ -2041,6 +2132,15 @@ const ActivityEvidenceFlow = () => {
             Toma la foto de salida en el sitio. Se capturará automáticamente tu ubicación GPS — es
             obligatoria para cerrar la actividad.
           </p>
+          <p className={styles.stepDescription}>
+            Debe tomarse a no más de {geocerca.estado?.radioM ?? RADIO_ACTIVIDAD_M} m del punto donde
+            iniciaste la actividad.
+          </p>
+          {zonaSalidaError && !pendingPhoto ? (
+            <div style={{ marginBottom: 12 }}>
+              <AvisoFueraDeZona mensaje={zonaSalidaError} />
+            </div>
+          ) : null}
           {flowData.exitLatitude != null && flowData.exitLongitude != null && (
             <p className={styles.stepDescription}>
               📍 Última ubicación registrada: {Number(flowData.exitLatitude).toFixed(5)},{' '}
