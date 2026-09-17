@@ -1,6 +1,8 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import okhttp3.ResponseBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -48,6 +50,18 @@ data class ClientDto(
             }
         }
 }
+
+/**
+ * `GET ventas/clientes/permisos`. Agregar y editar: jefes con gente a cargo,
+ * administración y dirección. Desactivar, reactivar y eliminar: solo Christian.
+ * Sin respuesta, todo en `false`: el servidor vuelve a decidir con un 403.
+ */
+data class ClientPermissionsDto(
+    val puedeAgregar: Boolean = false,
+    val puedeEditar: Boolean = false,
+    val puedeDesactivar: Boolean = false,
+    val puedeEliminar: Boolean = false,
+)
 
 data class CreateClientBody(
     val name: String,
@@ -109,11 +123,27 @@ interface ClientsApi {
     @GET("ventas/clientes")
     suspend fun listBySector(@Query("sector") sector: String): List<ClientDto>
 
+    /** Ruta literal: el servidor la declara antes de `:id`. */
+    @GET("ventas/clientes/permisos")
+    suspend fun permissions(): ClientPermissionsDto
+
     @GET("ventas/clientes/{id}")
     suspend fun getClient(@Path("id") id: Long): ClientDto
 
     @POST("ventas/clientes")
     suspend fun createClient(@Body body: CreateClientBody): ClientDto
+
+    /** Deja el cliente «Inactivo». Solo Christian; los demás reciben 403 con mensaje. */
+    @POST("ventas/clientes/{id}/desactivar")
+    suspend fun deactivateClient(@Path("id") id: Long): ResponseBody
+
+    /** Lo regresa a «Activo». Solo Christian. */
+    @POST("ventas/clientes/{id}/reactivar")
+    suspend fun reactivateClient(@Path("id") id: Long): ResponseBody
+
+    /** Elimina del padrón; no se puede deshacer. Solo Christian. */
+    @DELETE("ventas/clientes/{id}")
+    suspend fun deleteClient(@Path("id") id: Long): ResponseBody
 
     @POST("ventas/clientes/{id}/sectors")
     suspend fun addSector(

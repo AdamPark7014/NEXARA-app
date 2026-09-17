@@ -21,20 +21,33 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -78,9 +91,19 @@ fun ClientsListScreen(
     onOpenClient: (Long) -> Unit,
     onNewClient: (ClientSector?) -> Unit,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    /** La ficha desactivó, reactivó o eliminó un cliente: hay que volver a pedir la lista. */
+    refreshRequested: Boolean = false,
+    onRefreshConsumed: () -> Unit = {},
 ) {
     val vm: ClientsListViewModel = viewModel()
     val state by vm.state.collectAsState()
+
+    LaunchedEffect(refreshRequested) {
+        if (refreshRequested) {
+            vm.load(refresh = true)
+            onRefreshConsumed()
+        }
+    }
 
     if (state.allowedSectors.isEmpty()) {
         NxEmptyState(
@@ -174,27 +197,41 @@ fun ClientsListScreen(
                         )
                     }
                     state.visible.isEmpty() -> item {
-                        NxEmptyState(
-                            title = "Nadie en este sector todavía",
-                            subtitle = "Da de alta el primer cliente del sector.",
-                            actionLabel = "Crear el primero",
-                            onAction = { onNewClient(state.sector) },
-                        )
+                        if (state.permisos.puedeAgregar) {
+                            NxEmptyState(
+                                title = "Nadie en este sector todavía",
+                                subtitle = "Da de alta el primer cliente del sector.",
+                                actionLabel = "Crear el primero",
+                                onAction = { onNewClient(state.sector) },
+                            )
+                        } else {
+                            NxEmptyState(
+                                title = "Nadie en este sector todavía",
+                                subtitle = "Aún no hay clientes dados de alta en este sector.",
+                            )
+                        }
                     }
                     else -> items(state.visible, key = { it.id }) { client ->
+                        val inactivo = ClientRules.isInactive(client.status)
+                        val encargado = client.owner?.nombre?.split(Regex("\\s+"))?.take(2)?.joinToString(" ")
+                            ?: "Sin encargado"
                         NxListRow(
                             title = client.name.orEmpty().ifBlank { "Sin nombre" },
                             subtitle = client.subtitleLine(),
-                            meta = client.sectorNames
-                                .mapNotNull { ClientSector.fromApi(it)?.shortLabel }
-                                .joinToString(" · ")
-                                .ifBlank { null },
-                            chipText = if (state.showOwner) {
-                                client.owner?.nombre?.split(Regex("\\s+"))?.take(2)?.joinToString(" ")
-                                    ?: "Sin encargado"
-                            } else {
-                                "Ver"
+                            meta = listOfNotNull(
+                                client.sectorNames
+                                    .mapNotNull { ClientSector.fromApi(it)?.shortLabel }
+                                    .joinToString(" · ")
+                                    .ifBlank { null },
+                                // El chip dice «Inactivo»: el encargado baja a esta línea.
+                                encargado.takeIf { inactivo && state.showOwner },
+                            ).joinToString(" · ").ifBlank { null },
+                            chipText = when {
+                                inactivo -> ClientRules.STATUS_INACTIVO
+                                state.showOwner -> encargado
+                                else -> "Ver"
                             },
+                            chipTone = if (inactivo) NxTone.Warning else NxTone.Neutral,
                             onClick = { onOpenClient(client.id) },
                         )
                     }
@@ -202,14 +239,17 @@ fun ClientsListScreen(
             }
         }
 
-        ExtendedFloatingActionButton(
-            onClick = { onNewClient(state.sector) },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-            containerColor = NxColors.Brand,
-            contentColor = Color.White,
-            icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text("Nuevo cliente") },
-        )
+        // Solo quien puede agregar ve el botón; el servidor vuelve a comprobarlo.
+        if (state.permisos.puedeAgregar) {
+            ExtendedFloatingActionButton(
+                onClick = { onNewClient(state.sector) },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                containerColor = NxColors.Brand,
+                contentColor = Color.White,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Nuevo cliente") },
+            )
+        }
     }
 }
 
@@ -221,6 +261,10 @@ fun ClientDetailScreen(
     // La barra superior ya trae la flecha de volver; no se repite un «← Clientes».
     @Suppress("UNUSED_PARAMETER") onBack: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    /** Se desactivó o reactivó: el padrón debe recargarse al volver. */
+    onChanged: () -> Unit = {},
+    /** Se eliminó: regresar al padrón (y recargarlo). */
+    onDeleted: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as Application
     val vm: ClientDetailViewModel = viewModel(
@@ -229,6 +273,28 @@ fun ClientDetailScreen(
     )
     val state by vm.state.collectAsState()
     val client = state.client
+    var confirm by remember { mutableStateOf<ClientConfirm?>(null) }
+
+    LaunchedEffect(state.cambios) {
+        if (state.cambios > 0) onChanged()
+    }
+    LaunchedEffect(state.deleted) {
+        if (state.deleted) onDeleted()
+    }
+
+    confirm?.let { c ->
+        ConfirmActionDialog(
+            title = c.title,
+            message = c.message,
+            confirmLabel = c.confirmLabel,
+            danger = c.danger,
+            onDismiss = { confirm = null },
+            onConfirm = {
+                confirm = null
+                c.onConfirm()
+            },
+        )
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
@@ -247,7 +313,54 @@ fun ClientDetailScreen(
                 NxSectionHeader(
                     title = client.name.orEmpty().ifBlank { "Sin nombre" },
                     subtitle = "Encargado: ${client.owner?.nombre ?: "—"}",
+                    trailing = if (state.showOwnerActions) {
+                        {
+                            ClientOwnerMenu(
+                                inactivo = state.inactivo,
+                                puedeDesactivar = state.permisos.puedeDesactivar,
+                                puedeEliminar = state.permisos.puedeEliminar,
+                                enabled = !state.busy && !state.deleted,
+                                onToggleActive = {
+                                    val inactivo = state.inactivo
+                                    confirm = ClientConfirm(
+                                        title = ClientRules.toggleActiveTitle(inactivo),
+                                        message = ClientRules.toggleActiveMessage(client.name, inactivo),
+                                        confirmLabel = ClientRules.toggleActiveConfirmLabel(inactivo),
+                                        danger = !inactivo,
+                                        onConfirm = { vm.setActive(activo = inactivo) },
+                                    )
+                                },
+                                onDelete = {
+                                    confirm = ClientConfirm(
+                                        title = ClientRules.DELETE_TITLE,
+                                        message = ClientRules.deleteMessage(client.name),
+                                        confirmLabel = "Eliminar",
+                                        danger = true,
+                                        onConfirm = { vm.delete() },
+                                    )
+                                },
+                            )
+                        }
+                    } else {
+                        null
+                    },
                 )
+            }
+
+            if (state.inactivo || state.busy) {
+                item {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (state.inactivo) {
+                            NxStatusChip(ClientRules.STATUS_INACTIVO, NxTone.Warning, icon = Icons.Outlined.Block)
+                        }
+                        if (state.busy) {
+                            Text("Guardando…", style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                        }
+                    }
+                }
             }
 
             item {
@@ -356,6 +469,95 @@ fun ClientDetailScreen(
 
         item { Spacer(Modifier.height(16.dp)) }
     }
+}
+
+/** Confirmación pendiente en la ficha (desactivar, reactivar, eliminar). */
+internal data class ClientConfirm(
+    val title: String,
+    val message: String,
+    val confirmLabel: String,
+    val danger: Boolean,
+    val onConfirm: () -> Unit,
+)
+
+/** Menú ⋮ de la ficha: solo aparece con `puedeDesactivar` o `puedeEliminar` (Christian). */
+@Composable
+private fun ClientOwnerMenu(
+    inactivo: Boolean,
+    puedeDesactivar: Boolean,
+    puedeEliminar: Boolean,
+    enabled: Boolean,
+    onToggleActive: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, enabled = enabled) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Opciones del cliente")
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (puedeDesactivar) {
+                DropdownMenuItem(
+                    text = { Text(ClientRules.toggleActiveTitle(inactivo)) },
+                    leadingIcon = {
+                        Icon(
+                            if (inactivo) Icons.Outlined.RestartAlt else Icons.Outlined.Block,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        onToggleActive()
+                    },
+                )
+            }
+            if (puedeEliminar) {
+                DropdownMenuItem(
+                    text = { Text(ClientRules.DELETE_TITLE, color = NxColors.Danger) },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = NxColors.Danger)
+                    },
+                    onClick = {
+                        open = false
+                        onDelete()
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Confirmación de una acción del dueño. Con [danger] el botón va en rojo
+ * (eliminar, desactivar); el texto ya avisa si no se puede deshacer.
+ */
+@Composable
+internal fun ConfirmActionDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    danger: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.SemiBold) },
+        text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = if (danger) {
+                    ButtonDefaults.buttonColors(containerColor = NxColors.Danger, contentColor = Color.White)
+                } else {
+                    ButtonDefaults.buttonColors(containerColor = NxColors.Brand, contentColor = Color.White)
+                },
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        },
+    )
 }
 
 @Composable
