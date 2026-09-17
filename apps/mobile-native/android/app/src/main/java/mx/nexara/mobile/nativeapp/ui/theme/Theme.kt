@@ -24,6 +24,20 @@ private val LightColors = lightColorScheme(
     surfaceTint = NxColors.Brand,
     surface = NxColors.Surface,
     background = NxColors.Surface,
+    onSurface = NxColors.Slate,
+    onSurfaceVariant = NxColors.Muted,
+    // Material 3 trae contenedores lila por defecto (barra inferior, tarjetas, campos):
+    // se fijan a neutros pizarra con un toque azul para que toda la app se lea azul.
+    surfaceVariant = Color(0xFFEEF2F7),
+    surfaceBright = Color.White,
+    surfaceDim = Color(0xFFE2E8F0),
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color(0xFFF8FAFC),
+    surfaceContainer = Color(0xFFF1F5F9),
+    surfaceContainerHigh = Color(0xFFEEF2F7),
+    surfaceContainerHighest = Color(0xFFE8EDF4),
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0),
     error = NxColors.Danger,
 )
 

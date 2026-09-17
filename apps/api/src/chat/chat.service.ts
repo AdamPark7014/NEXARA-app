@@ -168,8 +168,14 @@ export class ChatService {
     return `chat:${channelId}`;
   }
 
+  /** Texto legible para listas y avisos: menciones y enlaces a su etiqueta, sin emojis. */
   private preview(body: string) {
-    const clean = body.replace(/\s+/g, ' ').trim();
+    const clean = body
+      .replace(/\[@?([^\]\n]+)\]\(user:\d+\)/g, '@$1')
+      .replace(/\[([^\]\n]+)\]\(([^)]+)\)/g, '$1')
+      .replace(/\p{Extended_Pictographic}️?\s?/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
     return clean.length > 140 ? `${clean.slice(0, 137)}…` : clean;
   }
 

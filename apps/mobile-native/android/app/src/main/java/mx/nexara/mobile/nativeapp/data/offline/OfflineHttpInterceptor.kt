@@ -38,7 +38,7 @@ class OfflineHttpInterceptor(
                         .body(hit.toResponseBody("application/json".toMediaType()))
                         .build()
                 }
-            } else if (method in MUTATING) {
+            } else if (method in MUTATING && isQueueable(url)) {
                 enqueue(request)
                 return queuedResponse(request)
             }
@@ -64,7 +64,7 @@ class OfflineHttpInterceptor(
                         .body(hit.toResponseBody("application/json".toMediaType()))
                         .build()
                 }
-            } else if (method in MUTATING) {
+            } else if (method in MUTATING && isQueueable(url)) {
                 enqueue(request)
                 return queuedResponse(request)
             }
@@ -110,6 +110,14 @@ class OfflineHttpInterceptor(
 
     companion object {
         private val MUTATING = setOf("POST", "PUT", "PATCH", "DELETE")
+
+        /**
+         * Sesión y registro del equipo no se encolan: se repiten solos al abrir la app y,
+         * encolados, dejan «Pendientes de sync» colgado cuando cambia el servidor.
+         */
+        private val NOT_QUEUEABLE = listOf("/auth/", "/devices/push-token")
+
+        fun isQueueable(url: String): Boolean = NOT_QUEUEABLE.none { url.contains(it) }
 
         /** Full-token hash — take(48) collided across users on the same device. */
         fun stableAuthTag(authorization: String?): String {
