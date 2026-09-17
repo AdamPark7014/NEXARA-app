@@ -302,6 +302,28 @@ data class AttendanceEventDto(
     val entryLongitude: Any? = null,
     val exitLatitude: Any? = null,
     val exitLongitude: Any? = null,
+    // ── Contrato A (asistencia confiable); todo opcional: la API vieja no los manda.
+    /** OK | PENDIENTE | REVISAR */
+    val validacion: String? = null,
+    val motivoValidacion: String? = null,
+    val fueraDeSitio: Boolean? = null,
+    val distanciaSitioM: Int? = null,
+    val sitioNombre: String? = null,
+    /** Se capturó sin conexión y se mandó después. */
+    val offline: Boolean? = null,
+    /** La salida la puso la tarea de las 23:30, no la persona. */
+    val cierreAutomatico: Boolean? = null,
+    val accuracyM: Double? = null,
+    val correcciones: List<AttendanceCorreccionDto>? = null,
+)
+
+/** Corrección de una checada (solo dirección y RH): antes → después, con motivo. */
+data class AttendanceCorreccionDto(
+    val antes: String? = null,
+    val despues: String? = null,
+    val motivo: String? = null,
+    val por: ActivityPersonRefDto? = null,
+    val at: String? = null,
 )
 
 /** `null` cuando el valor no es una coordenada real (espejo de `toCoord` en la web). */

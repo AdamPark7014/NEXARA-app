@@ -1,5 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
+import mx.nexara.mobile.nativeapp.data.api.AttendanceCorreccionDto
+import mx.nexara.mobile.nativeapp.data.api.AttendanceEventDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRegisterResponse
 
 /**
@@ -69,6 +71,28 @@ object AttendanceBadges {
             add(AttendanceBadge(fueraDeSitioTexto(distanciaSitioM, sitioNombre), AMBAR))
         }
         if (correcciones > 0) add(AttendanceBadge(CORREGIDA, MORADO))
+    }
+
+    /** Insignias de una checada del equipo o del historial propio. */
+    fun de(evento: AttendanceEventDto?): List<AttendanceBadge> {
+        if (evento == null) return emptyList()
+        return de(
+            validacion = evento.validacion,
+            motivoValidacion = evento.motivoValidacion,
+            offline = evento.offline,
+            fueraDeSitio = evento.fueraDeSitio,
+            distanciaSitioM = evento.distanciaSitioM,
+            sitioNombre = evento.sitioNombre,
+            cierreAutomatico = evento.cierreAutomatico,
+            correcciones = evento.correcciones?.size ?: 0,
+        )
+    }
+
+    /** «Corregida por Christian: el reloj marcó la salida tarde» (sin quién, solo el motivo). */
+    fun correccionTexto(c: AttendanceCorreccionDto): String {
+        val quien = c.por?.nombre?.trim()?.takeIf { it.isNotEmpty() }?.let { " por $it" }.orEmpty()
+        val motivo = c.motivo?.trim()?.takeIf { it.isNotEmpty() }?.let { ": $it" }.orEmpty()
+        return "Corregida$quien$motivo"
     }
 
     /** Lo que el servidor contestó al registrar (APIs viejas no traen nada: lista vacía). */
