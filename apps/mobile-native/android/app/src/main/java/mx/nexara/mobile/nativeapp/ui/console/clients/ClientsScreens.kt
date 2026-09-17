@@ -315,7 +315,10 @@ fun ClientDetailScreen(
                     subtitle = "Encargado: ${client.owner?.nombre ?: "—"}",
                     trailing = if (state.showOwnerActions) {
                         {
-                            ClientOwnerMenu(
+                            OwnerActionsMenu(
+                                toggleLabel = ClientRules.toggleActiveTitle(state.inactivo),
+                                deleteLabel = ClientRules.DELETE_TITLE,
+                                contentDescription = "Opciones del cliente",
                                 inactivo = state.inactivo,
                                 puedeDesactivar = state.permisos.puedeDesactivar,
                                 puedeEliminar = state.permisos.puedeEliminar,
@@ -434,9 +437,52 @@ fun ClientDetailScreen(
                                 )
                             } else {
                                 state.projects.forEach { project ->
+                                    val inactivo = ClientRules.isProjectInactive(project.status)
                                     NxListRow(
                                         title = project.title.orEmpty().ifBlank { "Proyecto ${project.id}" },
-                                        subtitle = project.status,
+                                        subtitle = ClientRules.projectStatusLabel(project.status)
+                                            .takeUnless { inactivo },
+                                        chipText = if (inactivo) ClientRules.STATUS_INACTIVO else null,
+                                        chipTone = NxTone.Warning,
+                                        // Mismos permisos que el cliente: solo Christian.
+                                        trailing = if (state.showOwnerActions) {
+                                            {
+                                                OwnerActionsMenu(
+                                                    toggleLabel = ClientRules.projectToggleTitle(inactivo),
+                                                    deleteLabel = ClientRules.PROJECT_DELETE_TITLE,
+                                                    contentDescription = "Opciones del proyecto",
+                                                    inactivo = inactivo,
+                                                    puedeDesactivar = state.permisos.puedeDesactivar,
+                                                    puedeEliminar = state.permisos.puedeEliminar,
+                                                    enabled = !state.busy,
+                                                    onToggleActive = {
+                                                        confirm = ClientConfirm(
+                                                            title = ClientRules.projectToggleTitle(inactivo),
+                                                            message = ClientRules.projectToggleMessage(
+                                                                project.title,
+                                                                inactivo,
+                                                            ),
+                                                            confirmLabel = ClientRules.toggleActiveConfirmLabel(inactivo),
+                                                            danger = !inactivo,
+                                                            onConfirm = {
+                                                                vm.setProjectActive(project.id, activo = inactivo)
+                                                            },
+                                                        )
+                                                    },
+                                                    onDelete = {
+                                                        confirm = ClientConfirm(
+                                                            title = ClientRules.PROJECT_DELETE_TITLE,
+                                                            message = ClientRules.projectDeleteMessage(project.title),
+                                                            confirmLabel = "Eliminar",
+                                                            danger = true,
+                                                            onConfirm = { vm.deleteProject(project.id) },
+                                                        )
+                                                    },
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
                                     )
                                     Spacer(Modifier.height(6.dp))
                                 }
@@ -480,9 +526,15 @@ internal data class ClientConfirm(
     val onConfirm: () -> Unit,
 )
 
-/** Menú ⋮ de la ficha: solo aparece con `puedeDesactivar` o `puedeEliminar` (Christian). */
+/**
+ * Menú ⋮ del dueño (cliente o proyecto): solo aparece con `puedeDesactivar` o
+ * `puedeEliminar` (Christian).
+ */
 @Composable
-private fun ClientOwnerMenu(
+private fun OwnerActionsMenu(
+    toggleLabel: String,
+    deleteLabel: String,
+    contentDescription: String,
     inactivo: Boolean,
     puedeDesactivar: Boolean,
     puedeEliminar: Boolean,
@@ -493,12 +545,12 @@ private fun ClientOwnerMenu(
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, enabled = enabled) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Opciones del cliente")
+            Icon(Icons.Default.MoreVert, contentDescription = contentDescription)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (puedeDesactivar) {
                 DropdownMenuItem(
-                    text = { Text(ClientRules.toggleActiveTitle(inactivo)) },
+                    text = { Text(toggleLabel) },
                     leadingIcon = {
                         Icon(
                             if (inactivo) Icons.Outlined.RestartAlt else Icons.Outlined.Block,
@@ -513,7 +565,7 @@ private fun ClientOwnerMenu(
             }
             if (puedeEliminar) {
                 DropdownMenuItem(
-                    text = { Text(ClientRules.DELETE_TITLE, color = NxColors.Danger) },
+                    text = { Text(deleteLabel, color = NxColors.Danger) },
                     leadingIcon = {
                         Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = NxColors.Danger)
                     },
