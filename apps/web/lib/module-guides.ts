@@ -475,6 +475,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `mis-actividades`,
   },
+  'erp-cotizaciones': {
+    id: 'erp-cotizaciones',
+    summary: `Propuestas técnicas: folio con tu nomenclatura, envío al cliente y seguimiento.`,
+    audience: `Dirección, administración y coordinadores (los encargados de área que cotizan).`,
+    how: `El folio lo emite el servidor (NEX-TuClave-0007) y al enviarla agrega las siglas de quien intervino. El segmento decide los términos.`,
+    steps: [
+      `Elige cliente y segmento`,
+      `Arma las partidas (catálogo o paquetes)`,
+      `Revisa el PDF y envíalo por correo`,
+    ],
+    connects: `erp-clients, mis-actividades`,
+  },
   'crm-dashboard': {
     id: 'crm-dashboard',
     summary: `Home comercial: pipeline, actividad del equipo e insights (LTV, forecast).`,

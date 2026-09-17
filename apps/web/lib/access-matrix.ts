@@ -204,6 +204,7 @@ export type ModuleId =
   | "pizarra"
   | "asistencias"
   | "erp-clients"
+  | "erp-cotizaciones"
   | "activities-daily"
   | "activities-projects"
   | "activities-services"
@@ -406,6 +407,18 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "erp-clients", panel: PANELS.ERP, path: "/clientes",
     label: "Clientes", description: "Proyecto, corporativo y comercial",
     icon: "🤝", allowedRoles: ANY_INTERNAL,
+    group: "Hoy", visible: true,
+  },
+  "erp-cotizaciones": {
+    id: "erp-cotizaciones", panel: PANELS.ERP, path: "/cotizaciones",
+    label: "Cotizaciones", description: "Propuestas técnicas: folio, envío y seguimiento",
+    icon: "🧾",
+    // Dirección, administración y coordinadores: los encargados de área que cotizan.
+    allowedRoles: [
+      R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL,
+      R.SALES_MANAGER, R.PROJECT_MANAGER, R.SENIOR_ENGINEER,
+      R.ADMIN_STAFF, R.MAINTENANCE_COORDINATOR,
+    ],
     group: "Hoy", visible: true,
   },
   "activities-daily": {

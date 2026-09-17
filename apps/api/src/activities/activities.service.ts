@@ -406,6 +406,8 @@ export class ActivitiesService {
         },
         project: { select: { id: true, title: true } },
         serviceSheet: true,
+        // Actividad comercial: su cotización, para abrirla desde el detalle.
+        cotizacion: { select: { id: true, quoteNumber: true, status: true, total: true, segmento: true } },
         cancelledBy: { select: { id: true, nombre: true } },
         evidencias: { orderBy: { subidoEn: 'desc' } },
         assignees: {
