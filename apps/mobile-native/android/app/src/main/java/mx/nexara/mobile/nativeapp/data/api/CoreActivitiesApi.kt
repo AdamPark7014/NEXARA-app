@@ -410,6 +410,24 @@ data class EvidenceFlowDto(
     val assigneeIndicaciones: String? = null,
     val progressPct: Double? = null,
     val stepsForKind: List<String>? = null,
+    /** Lo que dejó quien la tenía antes de que te la pasaran (solo lectura). Solo en el GET. */
+    val avancesAnteriores: List<AvanceAnteriorDto>? = null,
+)
+
+/**
+ * «Avance anterior de X»: evidencia parcial de quien dejó la actividad. Quien
+ * continúa la ve pero toma su propia foto de entrada y de salida.
+ */
+data class AvanceAnteriorDto(
+    val userId: Long? = null,
+    val nombre: String? = null,
+    val titulo: String? = null,
+    val motivo: String? = null,
+    val reasignadaAt: String? = null,
+    /** Quién la movió (el superior). */
+    val movidaPor: String? = null,
+    val progressPct: Double? = null,
+    val evidence: TeamEvidenceDto? = null,
 )
 
 data class EvidencePhotoGeoRequest(
