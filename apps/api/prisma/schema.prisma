@@ -2472,6 +2472,10 @@ enum NotificationType {
   QUOTE_EXPIRING
   QUOTE_EXPIRED
   QUOTE_SIGNED
+  /// Salió al cliente: avisa a quien la hizo, sus jefes y dirección.
+  QUOTE_SENT
+  /// El cliente la rechazó con motivo desde el enlace.
+  QUOTE_REJECTED
 
   // ORDERS - Órdenes
   ORDER_CREATED

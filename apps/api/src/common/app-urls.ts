@@ -74,6 +74,8 @@ export const appUrls = {
     return `/erp/invoicing`;
   },
   erpApprovals: (instanceId: number) => `/erp/approvals?highlight=${instanceId}`,
+  /** Cotizaciones en Core. `/crm/quotes` queda fuera de la superficie Core y rebota a la pizarra. */
+  erpCotizaciones: (id?: number) => (id ? `/erp/cotizaciones/${id}` : `/erp/cotizaciones`),
   erpFinanceViatics: (id?: number) =>
     id ? `/erp/finance/viatics?highlight=${id}` : `/erp/finance/viatics`,
   erpLunchBreaks: (_highlightId?: number) => `/erp/asistencias?tab=comidas`,

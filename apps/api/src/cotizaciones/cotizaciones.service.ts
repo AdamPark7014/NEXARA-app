@@ -33,6 +33,27 @@ import {
   type RawCotizacionItem,
 } from './cotizacion-totals.js';
 import { CtPurchaseOrderService } from '../smart-quote/orders/ct-purchase-order.service.js';
+import { CotizacionesCoreService } from './cotizaciones-core.service.js';
+import {
+  ESTADO,
+  ETIQUETA_ESTADO,
+  esFinal,
+  estaBloqueada,
+  estadoADb,
+  estadoDesdeDb,
+  motivoTransicionInvalida,
+  puedeFirmarse,
+  transicionPermitida,
+} from './estado-cotizacion.js';
+import { agruparPartidas, incluyeInstalacion, totalesPorGrupo } from './partidas-grupos.js';
+import {
+  ETIQUETA_SEGMENTO,
+  diasDeVigencia,
+  normalizarSegmento,
+  terminosDeCotizacion,
+  type Segmento,
+} from './terminos-segmento.js';
+import { avanceActividadPorEstado } from './estado-cotizacion.js';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -42,8 +63,31 @@ const normalizeStatus = (status?: string) => {
   if (normalized === 'draft') return CotizacionStatus.DRAFT;
   if (normalized === 'sent') return CotizacionStatus.SENT;
   if (normalized === 'approved') return CotizacionStatus.APPROVED;
+  if (normalized === 'rejected') return CotizacionStatus.REJECTED;
+  if (normalized === 'expired') return CotizacionStatus.EXPIRED;
+  // Los clientes de Core hablan en español (BORRADOR, ENVIADA, …).
+  const enEspanol = status.trim().toUpperCase();
+  if (['BORRADOR', 'ENVIADA', 'APROBADA', 'RECHAZADA', 'VENCIDA'].includes(enEspanol)) {
+    return estadoADb(enEspanol) as CotizacionStatus;
+  }
   return undefined;
 };
+
+/**
+ * Texto de cliente dentro del HTML del correo.
+ *
+ * El mensaje que escribe quien envía la cotización se interpolaba tal cual en el cuerpo del correo:
+ * cualquier `<` o comilla rompía el HTML, y una etiqueta pegada desde otro lado viajaba al buzón del
+ * cliente firmada por NEXARA.
+ */
+function escaparHtml(texto: string): string {
+  return texto
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 @Injectable()
 export class CotizacionesService {
@@ -55,6 +99,7 @@ export class CotizacionesService {
     @Inject(forwardRef(() => VentasService)) private readonly ventasService: VentasService,
     @Inject(forwardRef(() => CtPurchaseOrderService))
     private readonly ctPurchaseOrders: CtPurchaseOrderService,
+    private readonly core: CotizacionesCoreService,
   ) {}
 
   private get db() {
@@ -115,7 +160,23 @@ export class CotizacionesService {
     const items = this.normalizeItems(dto.items);
     const totals = this.calculateTotals(items);
     const status = normalizeStatus(dto.status) || CotizacionStatus.DRAFT;
-    const baseQuoteNumber = dto.quoteNumber.trim();
+    const segmento = normalizarSegmento(dto.segmento);
+
+    /**
+     * Folio del servidor. El cliente ya no lo arma: se emite con la nomenclatura de quien cotiza y
+     * su propio contador, en transacción. `dto.quoteNumber` se sigue aceptando para importaciones y
+     * para el CRM viejo, que lo mandaba hecho.
+     */
+    const folioManual = dto.quoteNumber?.trim();
+    const emitido = folioManual
+      ? null
+      : createdById
+        ? await this.core.siguienteFolio(createdById)
+        : null;
+    const baseQuoteNumber = folioManual || emitido?.folio;
+    if (!baseQuoteNumber) {
+      throw new BadRequestException('No se pudo emitir el folio: la cotización necesita un autor.');
+    }
 
     let salesClientId = dto.salesClientId ? Number(dto.salesClientId) : null;
     let opportunityId = dto.opportunityId ? Number(dto.opportunityId) : null;
@@ -187,6 +248,12 @@ export class CotizacionesService {
       issueDate: this.parseDate(dto.issueDate) || new Date(),
       validUntil: this.parseDate(dto.validUntil),
       status,
+      segmento: segmento as any,
+      folioNomenclatura: emitido?.nomenclatura ?? null,
+      folioConsecutivo: emitido?.consecutivo ?? null,
+      objetivo: dto.objetivo?.trim() || null,
+      alcanceBloques: (dto.alcanceBloques as Prisma.InputJsonValue) ?? Prisma.DbNull,
+      planos: (dto.planos as Prisma.InputJsonValue) ?? Prisma.DbNull,
       salesClientId,
       opportunityId,
       clientName,
@@ -233,6 +300,15 @@ export class CotizacionesService {
       } else {
         throw error;
       }
+    }
+
+    // Quien la hizo queda registrado solo: de aquí sale la cadena de siglas del folio al enviar.
+    await this.core.registrarParticipante(created.id, createdById, 'ELABORO');
+
+    if (dto.activityId) {
+      await this.ligarActividad(created.id, Number(dto.activityId), resolvedCompanyId).catch((error) => {
+        console.error('No se pudo ligar la actividad a la cotización:', error);
+      });
     }
 
     if (opportunityId && createdById) {
@@ -310,6 +386,131 @@ export class CotizacionesService {
     return quote;
   }
 
+  /** Partidas en la forma que entienden los grupos de la propuesta técnica. */
+  private partidasParaGrupos(items: any[]) {
+    return (items ?? []).map((item) => ({
+      grupo: item.grupo ?? null,
+      category: item.category ?? null,
+      name: item.name ?? null,
+      description: item.description ?? null,
+      unit: item.unit ?? null,
+      qty: Number(item.qty ?? 0),
+      unitPrice: Number(item.unitPrice ?? 0),
+      laborHours: Number(item.laborHours ?? 0),
+      laborRate: Number(item.laborRate ?? 0),
+      lineTotal: Number(item.lineTotal ?? 0),
+      paqueteClave: item.paqueteClave ?? null,
+      paqueteCantidad: item.paqueteCantidad ?? null,
+      id: item.id,
+    }));
+  }
+
+  /**
+   * Cotización como la leen Core y las apps: estado y segmento en español, folio con su cadena,
+   * términos que corresponden a lo que se cobra y partidas agrupadas.
+   */
+  async presentar(quote: any) {
+    const partidas = this.partidasParaGrupos(quote.items ?? []);
+    const instalacion = incluyeInstalacion(partidas);
+    const estado = estadoDesdeDb(quote.status);
+    const segmento = normalizarSegmento(quote.segmento);
+
+    const [participantes, actividades, cadena] = await Promise.all([
+      this.core.participantesParaApi(quote.id),
+      this.actividadesLigadas(quote.id),
+      this.core.cadenaDeParticipantes(quote.id, quote.createdById ?? null),
+    ]);
+
+    return {
+      ...quote,
+      folio: quote.quoteNumber,
+      folioBase: quote.folioEnviado ? quote.quoteNumber : quote.quoteNumber,
+      cadenaParticipantes: cadena,
+      estado,
+      estadoEtiqueta: ETIQUETA_ESTADO[estado],
+      bloqueada: estaBloqueada(quote.status),
+      segmento,
+      segmentoEtiqueta: ETIQUETA_SEGMENTO[segmento as Segmento],
+      incluyeInstalacion: instalacion,
+      terminos: terminosDeCotizacion({
+        segmento,
+        incluyeInstalacion: instalacion,
+        anticipoPct: quote.depositPercent,
+        vigenciaDias: diasDeVigencia(quote.issueDate, quote.validUntil),
+      }),
+      grupos: agruparPartidas(partidas),
+      totalesPorGrupo: totalesPorGrupo(partidas),
+      participantes,
+      actividades,
+    };
+  }
+
+  /** Detalle para Core (lista/editor): igual que `findOne`, pero presentado. */
+  async detalleCore(id: number, companyId?: number | null) {
+    const quote = await this.findOne(id, companyId);
+    return this.presentar(quote);
+  }
+
+  /** Lista para Core: folio, cliente, segmento, estado, total y quién intervino. */
+  async listaCore(query: PaginationQueryDto | undefined, companyId?: number | null) {
+    const where = {
+      ...companyWhere(companyId ?? null),
+      ...(query?.search
+        ? {
+            OR: [
+              { quoteNumber: { contains: query.search, mode: 'insensitive' as const } },
+              { clientName: { contains: query.search, mode: 'insensitive' as const } },
+              { clientCompany: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const filas = await this.db.cotizacion.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: query?.take ?? 200,
+      skip: query?.skip ?? 0,
+      include: {
+        createdBy: { select: { id: true, nombre: true } },
+        participantes: {
+          orderBy: { at: 'asc' },
+          include: { user: { select: { id: true, nombre: true } } },
+        },
+        actividades: { select: { id: true, anNumber: true }, take: 3 },
+      },
+    });
+
+    return filas.map((quote) => {
+      const estado = estadoDesdeDb(quote.status);
+      const segmento = normalizarSegmento(quote.segmento);
+      return {
+        id: quote.id,
+        folio: quote.quoteNumber,
+        clienteNombre: quote.clientName,
+        clienteEmpresa: quote.clientCompany,
+        segmento,
+        segmentoEtiqueta: ETIQUETA_SEGMENTO[segmento as Segmento],
+        estado,
+        estadoEtiqueta: ETIQUETA_ESTADO[estado],
+        total: Number(quote.total),
+        currency: quote.currency,
+        issueDate: quote.issueDate,
+        validUntil: quote.validUntil,
+        sentAt: quote.sentAt,
+        revision: quote.revision,
+        elaboro: quote.createdBy ? { id: quote.createdBy.id, nombre: quote.createdBy.nombre } : null,
+        intervinieron: quote.participantes.map((p) => ({
+          userId: p.userId,
+          nombre: p.user?.nombre ?? '',
+          siglas: p.siglas,
+          rol: p.rol,
+        })),
+        actividades: quote.actividades,
+      };
+    });
+  }
+
   async update(id: number, dto: UpdateCotizacionDto, updatedById?: number, companyId?: number | null) {
     const existing = await this.db.cotizacion.findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
@@ -317,10 +518,17 @@ export class CotizacionesService {
     });
     assertCompanyAccess(existing, companyId, 'Cotizacion');
 
-    if (existing.status !== CotizacionStatus.DRAFT) {
-      throw new BadRequestException(
-        'Solo se pueden editar cotizaciones en borrador. Las enviadas o aprobadas son inmutables.',
-      );
+    /**
+     * Enviada = bloqueada. Editarla no reescribe lo que ya vio el cliente: se guarda la versión
+     * enviada y la cotización vuelve a borrador, para salir después como -R2.
+     * Una aprobada no se toca: es el compromiso firmado.
+     */
+    if (esFinal(existing.status)) {
+      throw new BadRequestException(motivoTransicionInvalida(existing.status, ESTADO.BORRADOR));
+    }
+    const veniaBloqueada = estaBloqueada(existing.status);
+    if (veniaBloqueada) {
+      await this.guardarVersion(existing, updatedById, `Edición sobre ${ETIQUETA_ESTADO[estadoDesdeDb(existing.status)]}`);
     }
 
     const tenantId = existing.companyId ?? companyId ?? null;
@@ -339,7 +547,12 @@ export class CotizacionesService {
     }
 
     const updateData: Record<string, any> = {
-      quoteNumber: dto.quoteNumber?.trim(),
+      // El folio lo emite el servidor; solo se deja reescribir donde nunca lo emitió (CRM legacy).
+      quoteNumber: existing.folioNomenclatura ? undefined : dto.quoteNumber?.trim(),
+      segmento: dto.segmento ? (normalizarSegmento(dto.segmento) as any) : undefined,
+      objetivo: dto.objetivo?.trim(),
+      alcanceBloques: dto.alcanceBloques as Prisma.InputJsonValue | undefined,
+      planos: dto.planos as Prisma.InputJsonValue | undefined,
       issueDate: this.parseDate(dto.issueDate),
       validUntil: this.parseDate(dto.validUntil),
       salesClientId: dto.salesClientId !== undefined ? (dto.salesClientId ? Number(dto.salesClientId) : null) : undefined,
@@ -361,7 +574,15 @@ export class CotizacionesService {
     };
 
     const status = normalizeStatus(dto.status);
-    if (status) updateData['status'] = status;
+    if (status) {
+      if (!transicionPermitida(existing.status, status)) {
+        throw new BadRequestException(motivoTransicionInvalida(existing.status, status));
+      }
+      updateData['status'] = status;
+    }
+    // Editar una enviada la devuelve a borrador: lo que sale al cliente siempre es una versión
+    // cerrada, no el documento que alguien está tocando.
+    if (veniaBloqueada && !status) updateData['status'] = CotizacionStatus.DRAFT;
 
     let result: Awaited<ReturnType<typeof this.db.cotizacion.update>>;
     let finalItems: Array<{ discount: number }>;
@@ -500,6 +721,13 @@ export class CotizacionesService {
       });
     }
 
+    /**
+     * Antes bastaba con tener el enlace: se firmaba una cotización vencida, una rechazada o una que
+     * nunca se envió. La vigencia y el estado se revisan aquí, que es donde el cliente aprieta.
+     */
+    const permiso = puedeFirmarse({ estado: quote.status, validUntil: quote.validUntil });
+    if (!permiso.ok) throw new BadRequestException(permiso.motivo);
+
     const updated = await this.db.cotizacion.update({
       where: { id: quote.id },
       data: {
@@ -514,6 +742,18 @@ export class CotizacionesService {
     void this.applyQuoteSignedSideEffects(updated, dto).catch((error) => {
       console.error('Error applying quote signed side effects:', error);
     });
+    void this.sincronizarActividad(updated.id, updated.status).catch(() => undefined);
+    void this.core
+      .avisar({
+        cotizacionId: updated.id,
+        quoteNumber: updated.quoteNumber,
+        tipo: 'QUOTE_SIGNED',
+        titulo: 'Cotización aprobada por el cliente',
+        mensaje: `${updated.quoteNumber}: ${dto.name.trim()} la firmó.`,
+        autorId: updated.createdById,
+        companyId: updated.companyId,
+      })
+      .catch(() => undefined);
 
     return updated;
   }
@@ -723,13 +963,42 @@ export class CotizacionesService {
     const email = dto.email?.trim() || quote.clientEmail?.trim();
     if (!email) throw new BadRequestException('Email de cliente requerido');
 
+    if (!transicionPermitida(quote.status, ESTADO.ENVIADA)) {
+      throw new BadRequestException(motivoTransicionInvalida(quote.status, ESTADO.ENVIADA));
+    }
+
     const token = quote.publicToken || randomBytes(24).toString('hex');
-    const status = CotizacionStatus.SENT;
+
+    // Quien envía queda registrado antes de armar el folio: su sigla tiene que aparecer en la cadena.
+    await this.core.registrarParticipante(id, senderId ?? quote.createdById, 'ENVIO');
+
+    // Primer envío = revisión 1; cada envío posterior agrega -R2, -R3 al folio.
+    const revision = quote.sentAt ? (quote.revision || 1) + 1 : 1;
+    const base = quote.folioNomenclatura
+      ? quote.quoteNumber
+      : // Folios viejos (armados en el cliente) no tienen cadena: se envían tal cual.
+        quote.quoteNumber;
+    const folio = quote.folioNomenclatura
+      ? await this.core.folioParaEnvio(id, base, quote.createdById, revision)
+      : quote.quoteNumber;
+
+    /**
+     * El correo va **antes** de marcarla enviada.
+     *
+     * Antes se guardaba `SENT` y después se intentaba mandar el correo: si el SMTP fallaba, la
+     * cotización quedaba bloqueada como enviada y el cliente nunca la recibió. Ahora, si el correo
+     * no sale, el estado no se toca y se puede reintentar.
+     */
+    const pdf = await this.buildPdf({ ...quote, quoteNumber: folio, revision });
+    await this.sendEmail({ ...quote, quoteNumber: folio }, email, dto.message, pdf, token);
 
     const updated = await this.db.cotizacion.update({
       where: { id },
       data: {
-        status,
+        status: CotizacionStatus.SENT,
+        quoteNumber: folio,
+        folioEnviado: folio,
+        revision,
         publicToken: token,
         sentToEmail: email,
         sentAt: new Date(),
@@ -739,14 +1008,205 @@ export class CotizacionesService {
       include: { items: true },
     });
 
-    const pdf = await this.buildPdf(updated);
-    await this.sendEmail(updated, email, dto.message, pdf, token);
-
     void this.applyQuoteSentSideEffects(updated.id).catch((error) => {
       console.error('Error applying quote sent side effects:', error);
     });
+    void this.sincronizarActividad(updated.id, updated.status).catch(() => undefined);
+    void this.core
+      .avisar({
+        cotizacionId: updated.id,
+        quoteNumber: updated.quoteNumber,
+        tipo: 'QUOTE_SENT',
+        titulo: 'Cotización enviada',
+        mensaje: `${updated.quoteNumber} salió a ${updated.clientName || email}.`,
+        autorId: updated.createdById,
+        actorId: senderId,
+        companyId: updated.companyId,
+      })
+      .catch(() => undefined);
 
     return updated;
+  }
+
+  /** Guarda la foto de la cotización tal como está, para poder volver a ella. */
+  private async guardarVersion(quote: any, createdById?: number, note?: string) {
+    const ultima = await this.db.cotizacionVersion.findFirst({
+      where: { cotizacionId: quote.id },
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    });
+    const version = (ultima?.version ?? 0) + 1;
+    return this.db.cotizacionVersion
+      .create({
+        data: {
+          cotizacionId: quote.id,
+          version,
+          snapshot: JSON.parse(JSON.stringify(quote)) as Prisma.InputJsonValue,
+          note: note?.slice(0, 255) ?? null,
+          createdById: createdById ?? quote.createdById ?? null,
+        },
+      })
+      .catch((error) => {
+        console.error('No se pudo guardar la versión de la cotización:', error);
+        return null;
+      });
+  }
+
+  /** Versiones guardadas (para la línea de tiempo de la web). */
+  async versiones(id: number, companyId?: number | null) {
+    await this.findOne(id, companyId);
+    const filas = await this.db.cotizacionVersion.findMany({
+      where: { cotizacionId: id },
+      orderBy: { version: 'desc' },
+      include: { createdBy: { select: { id: true, nombre: true } } },
+    });
+    return filas.map((v) => ({
+      version: v.version,
+      note: v.note,
+      at: v.createdAt,
+      por: v.createdBy ? { id: v.createdBy.id, nombre: v.createdBy.nombre } : null,
+      folio: (v.snapshot as any)?.quoteNumber ?? null,
+      total: Number((v.snapshot as any)?.total ?? 0),
+    }));
+  }
+
+  /** Quién intervino, con su papel. */
+  async participantes(id: number, companyId?: number | null) {
+    await this.findOne(id, companyId);
+    return this.core.participantesParaApi(id);
+  }
+
+  /** Deja constancia de que alguien la revisó (sin cambiar el estado). */
+  async revisar(id: number, userId?: number, companyId?: number | null) {
+    const quote = await this.findOne(id, companyId);
+    await this.core.registrarParticipante(id, userId, 'REVISO');
+    return this.presentar(quote);
+  }
+
+  /** Aprobación interna (dirección): deja participante APROBO y aprueba la cotización. */
+  async aprobar(id: number, userId?: number, companyId?: number | null) {
+    const quote = await this.findOne(id, companyId);
+    if (!transicionPermitida(quote.status, ESTADO.APROBADA)) {
+      throw new BadRequestException(motivoTransicionInvalida(quote.status, ESTADO.APROBADA));
+    }
+    await this.core.registrarParticipante(id, userId, 'APROBO');
+    const updated = await this.db.cotizacion.update({
+      where: { id },
+      data: { status: CotizacionStatus.APPROVED },
+      include: { items: true },
+    });
+    void this.applyQuoteApprovedSideEffects(updated);
+    void this.sincronizarActividad(updated.id, updated.status).catch(() => undefined);
+    void this.core
+      .avisar({
+        cotizacionId: updated.id,
+        quoteNumber: updated.quoteNumber,
+        tipo: 'QUOTE_SIGNED',
+        titulo: 'Cotización aprobada',
+        mensaje: `${updated.quoteNumber} quedó aprobada.`,
+        autorId: updated.createdById,
+        actorId: userId,
+        companyId: updated.companyId,
+      })
+      .catch(() => undefined);
+    return this.presentar(updated);
+  }
+
+  /** Rechazo (interno o del cliente) con motivo. */
+  async rechazar(
+    id: number,
+    motivo: string,
+    opciones: { porNombre?: string | null; userId?: number; companyId?: number | null } = {},
+  ) {
+    const quote = await this.findOne(id, opciones.companyId ?? null);
+    if (!transicionPermitida(quote.status, ESTADO.RECHAZADA)) {
+      throw new BadRequestException(motivoTransicionInvalida(quote.status, ESTADO.RECHAZADA));
+    }
+    const limpio = (motivo || '').trim();
+    if (limpio.length < 5) {
+      throw new BadRequestException('Escribe el motivo del rechazo (al menos 5 caracteres).');
+    }
+
+    const updated = await this.db.cotizacion.update({
+      where: { id },
+      data: {
+        status: CotizacionStatus.REJECTED,
+        rejectedAt: new Date(),
+        rejectedReason: limpio.slice(0, 1000),
+        rejectedByName: opciones.porNombre?.trim()?.slice(0, 180) || null,
+      },
+      include: { items: true },
+    });
+
+    void this.sincronizarActividad(updated.id, updated.status).catch(() => undefined);
+    void this.core
+      .avisar({
+        cotizacionId: updated.id,
+        quoteNumber: updated.quoteNumber,
+        tipo: 'QUOTE_REJECTED',
+        titulo: 'Cotización rechazada',
+        mensaje: `${updated.quoteNumber}: ${limpio.slice(0, 160)}`,
+        autorId: updated.createdById,
+        actorId: opciones.userId,
+        companyId: updated.companyId,
+      })
+      .catch(() => undefined);
+
+    return this.presentar(updated);
+  }
+
+  /** El cliente rechaza desde el enlace público, con motivo. */
+  async rechazarPorToken(token: string, motivo: string, nombre?: string) {
+    const quote = await this.db.cotizacion.findUnique({ where: { publicToken: token } });
+    if (!quote) throw new NotFoundException('Cotizacion no encontrada');
+    return this.rechazar(quote.id, motivo, { porNombre: nombre ?? null, companyId: quote.companyId });
+  }
+
+  /**
+   * Liga una actividad comercial con su cotización (en los dos sentidos).
+   *
+   * La evidencia de la actividad —fotos del levantamiento y planos— pasa a ser anexo de la
+   * propuesta sin volver a subirla.
+   */
+  async ligarActividad(cotizacionId: number, activityId: number, companyId?: number | null) {
+    const actividad = await this.db.activity.findFirst({
+      where: { id: activityId, deletedAt: null, ...companyWhere(companyId ?? null) },
+      select: { id: true, coreKind: true, cotizacionId: true, companyId: true },
+    });
+    assertCompanyAccess(actividad, companyId, 'Actividad');
+
+    await this.db.activity.update({
+      where: { id: activityId },
+      data: { cotizacionId, coreKind: actividad.coreKind || 'comercial' },
+    });
+    return { activityId, cotizacionId };
+  }
+
+  /** Actividades comerciales ligadas a la cotización. */
+  async actividadesLigadas(cotizacionId: number) {
+    return this.db.activity.findMany({
+      where: { cotizacionId, deletedAt: null },
+      select: { id: true, anNumber: true, titulo: true, estatus: true, coreKind: true },
+      orderBy: { id: 'desc' },
+    });
+  }
+
+  /**
+   * El avance de la actividad comercial sigue el estado de su cotización.
+   *
+   * ENVIADA → «Por Validar» (la cotización sustituye a la hoja de servicio); APROBADA →
+   * «Finalizada»; rechazada o vencida no la cierran: la revisa un superior.
+   */
+  private async sincronizarActividad(cotizacionId: number, status: unknown) {
+    const estatus = avanceActividadPorEstado(status);
+    if (!estatus) return;
+    await this.db.activity.updateMany({
+      where: { cotizacionId, deletedAt: null, estatus: { notIn: ['Finalizada', 'Cancelada'] } },
+      data: {
+        estatus,
+        ...(estatus === 'Finalizada' ? { fechaFinalizacion: new Date() } : {}),
+      },
+    });
   }
 
   private async buildPdf(quote: any, internal = false) {
@@ -847,11 +1307,17 @@ export class CotizacionesService {
     const baseUrl = process.env['PUBLIC_WEB_URL'] || 'http://localhost:3000';
     const signUrl = `${baseUrl.replace(/\/+$/, '')}/cotizaciones/firmar/${token}`;
 
+    // Todo lo que viene de una persona se escapa: el mensaje libre y el nombre del cliente.
+    const saludo = escaparHtml(String(quote.clientName || 'cliente'));
+    const folio = escaparHtml(String(quote.quoteNumber));
+    const cuerpo = message?.trim()
+      ? `<p>${escaparHtml(message.trim()).replace(/\r?\n/g, '<br />')}</p>`
+      : '';
     const htmlMessage = `
-      <p>Hola ${quote.clientName || 'cliente'},</p>
-      <p>Adjuntamos la cotizacion ${quote.quoteNumber}.</p>
-      ${message ? `<p>${message}</p>` : ''}
-      <p>Para firmar la cotizacion visita: <a href="${signUrl}">${signUrl}</a></p>
+      <p>Hola ${saludo},</p>
+      <p>Adjuntamos la propuesta técnica ${folio}.</p>
+      ${cuerpo}
+      <p>Para revisarla y firmarla: <a href="${signUrl}">${signUrl}</a></p>
     `;
 
     try {
