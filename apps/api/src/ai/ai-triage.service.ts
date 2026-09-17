@@ -124,7 +124,8 @@ export class AiTriageService {
       where: {
         ...companyWhere(tenantId),
         estatus: { in: ['Pendiente', 'En Proceso'] },
-        prioridad: { in: ['Alta', 'Urgente', 'P0', 'P1'] },
+        // ALTA es la prioridad normalizada; los textos viejos siguen valiendo para datos sin migrar.
+        prioridad: { in: ['ALTA', 'Alta', 'Urgente', 'P0', 'P1'] },
       },
     });
 
