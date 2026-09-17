@@ -37,6 +37,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -119,7 +121,7 @@ fun LoginScreen(
                         modifier = Modifier
                             .size(90.dp)
                             .clip(RoundedCornerShape(22.dp))
-                            // Verde fuerte: el logo lleva «NEXARA» en blanco y sobre un fondo claro no se lee.
+                            // Azul oscuro: el logo lleva «NEXARA» en blanco y sobre un fondo claro no se lee.
                             .background(NexaraBrandDark),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -271,7 +273,41 @@ fun LoginScreen(
                         ),
                     )
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(12.dp))
+
+                    // «Recordarme»: la sesión se queda abierta en este teléfono y la app entra directo.
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { vm.setRememberMe(!state.rememberMe) }
+                            .testTag("login_remember"),
+                    ) {
+                        Checkbox(
+                            checked = state.rememberMe,
+                            onCheckedChange = { vm.setRememberMe(it) },
+                            colors = CheckboxDefaults.colors(checkedColor = NexaraBrand),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Recordarme",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color(0xFF0F172A),
+                            )
+                            Text(
+                                if (state.rememberMe) {
+                                    "Entrarás directo sin volver a escribir tu contraseña"
+                                } else {
+                                    "Se cerrará la sesión al cerrar la app"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF64748B),
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
 
                     Button(
                         onClick = { vm.submit(onLoggedIn) },

@@ -3,7 +3,8 @@ import SwiftUI
 struct LoginView: View {
     let onLoggedIn: () -> Void
 
-    @State private var email = ""
+    @State private var email = RememberMe.isEnabled ? RememberMe.lastEmail : ""
+    @State private var rememberMe = RememberMe.isEnabled
     @State private var password = ""
     @State private var kind: AuthRepository.Kind = .user
     @State private var isLoading = false
@@ -111,6 +112,19 @@ struct LoginView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
 
+                        // «Recordarme»: la sesión queda abierta en este teléfono y la app entra directo.
+                        Toggle(isOn: $rememberMe) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Recordarme").font(.subheadline.weight(.semibold))
+                                Text(rememberMe
+                                     ? "Entrarás directo sin volver a escribir tu contraseña"
+                                     : "Se cerrará la sesión al cerrar la app")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .tint(accent)
+
                         if let err = errorMessage {
                             Text(err).foregroundColor(.red).font(.footnote)
                         }
@@ -161,6 +175,8 @@ struct LoginView: View {
         defer { isLoading = false }
         do {
             _ = try await AuthRepository.shared.login(email: email, password: password, kind: kind)
+            RememberMe.isEnabled = rememberMe
+            RememberMe.lastEmail = rememberMe ? email.trimmingCharacters(in: .whitespacesAndNewlines) : ""
             quickProfiles = QuickProfileStore.load()
             await MainActor.run { onLoggedIn() }
         } catch {

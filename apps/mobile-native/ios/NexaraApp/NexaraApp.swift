@@ -40,6 +40,8 @@ final class AppState: ObservableObject {
     @Published var route: Route
 
     init() {
+        // «Recordarme» apagado: la sesión no sobrevive a cerrar la app.
+        RememberMe.endSessionOnLaunchIfNeeded()
         self.route = AppState.landing(for: SessionStore.shared.currentUser)
     }
 
