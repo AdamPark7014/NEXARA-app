@@ -1015,6 +1015,54 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * Checada que hay que mirar: ubicación simulada, fuera de sitio, hora del teléfono que no
+   * coincide o cierre automático de una salida olvidada. Le llega a sus jefes por organigrama y a
+   * dirección; a la persona sólo cuando le afecta directamente (le cerraron la jornada, le
+   * corrigieron la hora).
+   */
+  async notifyAttendanceFlagged(params: {
+    userId: number;
+    titulo: string;
+    mensaje: string;
+    attendanceId?: number | null;
+    avisarPersona?: boolean;
+  }) {
+    try {
+      const nombre = persona(await this.resolveActorName(params.userId));
+      const comun = {
+        type: 'ATTENDANCE_FLAGGED' as const,
+        category: 'attendance',
+        icon: 'asistencia_alerta',
+        relatedEntityId: params.attendanceId ?? params.userId,
+        entityType: params.attendanceId ? 'Attendance' : 'User',
+        priority: 'high' as const,
+        dedupeSeconds: 0,
+      };
+      if (params.avisarPersona) {
+        await this.notificationsService.createNotification({
+          ...comun,
+          userId: params.userId,
+          title: params.titulo,
+          message: params.mensaje,
+          relatedUrl: '/erp/asistencias',
+        });
+      }
+      for (const jefe of await this.lunchReviewerIds(params.userId)) {
+        await this.notificationsService.createNotification({
+          ...comun,
+          userId: jefe,
+          triggerUserId: params.userId,
+          title: `${nombre}: ${params.titulo.toLowerCase()}`,
+          message: params.mensaje,
+          relatedUrl: appUrls.erpAttendance(undefined, params.userId),
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyAttendanceFlagged', error);
+    }
+  }
+
+  /**
    * Christian justificó la falta de un día: la persona lo sabe («Tu falta del jue 17 sep quedó
    * justificada · motivo») y sus jefes por organigrama también. Quien la justificó no recibe aviso.
    */
