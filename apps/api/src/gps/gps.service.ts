@@ -1,16 +1,20 @@
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { CreateGpsDto } from './dto/create-gps.dto.js';
 import { parseWorkDate, workDateColumn, workDayBounds } from '../common/time/workday.js';
+import { ActivityGeofenceService } from '../activities/geofence/activity-geofence.service.js';
 
 @Injectable()
 export class GpsService {
   private readonly logger = new Logger(GpsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly geofence?: ActivityGeofenceService,
+  ) {}
 
   /**
    * "Hoy" para comparar contra `AttendanceDay.date`, que es `@db.Date`.
@@ -68,7 +72,17 @@ export class GpsService {
       companyId: resolvedCompanyId,
       ...(createGpsDto.actividadId ? { actividadId: createGpsDto.actividadId } : {}),
     };
-    return this.prisma['locationTracking'].create({ data });
+    const creado = await this.prisma['locationTracking'].create({ data });
+    // Geocerca de actividades: se mide sin hacer esperar al teléfono.
+    void Promise.resolve(
+      this.geofence?.evaluarPunto({
+        userId: createGpsDto.usuarioId,
+        latitude: punto.lat,
+        longitude: punto.lng,
+        actividadId: createGpsDto.actividadId ?? null,
+      }),
+    ).catch(() => undefined);
+    return creado;
   }
 
   async findMe(userId: number) {

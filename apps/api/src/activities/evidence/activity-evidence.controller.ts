@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ActivityEvidenceService } from './activity-evidence.service';
+import { ActivityGeofenceService } from '../geofence/activity-geofence.service.js';
 import { RBAC, RbacGuard } from '../../common/rbac.guard.js';
 import { UrlAccessGuard } from '../../common/rbac/url-access.guard.js';
 import { saveBase64Photo, saveBase64Pdf } from '../../common/file-upload.util';
@@ -23,7 +24,10 @@ import { Response } from 'express';
 @Controller('activity-evidence')
 @UseGuards(UrlAccessGuard, RbacGuard) // RBAC v2 + legacy en cascada
 export class ActivityEvidenceController {
-  constructor(private service: ActivityEvidenceService) {}
+  constructor(
+    private service: ActivityEvidenceService,
+    private geofence: ActivityGeofenceService,
+  ) {}
 
   @Get('history')
   async getOwnEvidenceHistory(@Req() req: any) {
@@ -166,6 +170,29 @@ export class ActivityEvidenceController {
       body,
       companyId,
     );
+  }
+
+  /** Geocerca de la actividad para quien la ejecuta: punto de inicio, recorrido y salidas de zona. */
+  @Get(':activityId/geocerca')
+  geocerca(@Param('activityId') activityId: string, @Req() req: any) {
+    return this.geofence.estado(parseInt(activityId, 10), req.user.id);
+  }
+
+  /** Justificar una salida de zona con motivo y foto. */
+  @Post(':activityId/geocerca/alertas/:alertId/justificacion')
+  justificarSalidaDeZona(
+    @Param('activityId') activityId: string,
+    @Param('alertId') alertId: string,
+    @Body() body: { motivo: string; fotoBase64?: string | null },
+    @Req() req: any,
+  ) {
+    return this.geofence.justificar({
+      activityId: parseInt(activityId, 10),
+      alertId: parseInt(alertId, 10),
+      userId: req.user.id,
+      motivo: body?.motivo,
+      fotoBase64: body?.fotoBase64 ?? null,
+    });
   }
 
   @Post(':activityId/exit-photo')

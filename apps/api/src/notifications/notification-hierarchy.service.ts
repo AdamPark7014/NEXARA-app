@@ -394,6 +394,107 @@ export class NotificationHierarchyService {
     }
   }
 
+  /** Quién sigue a alguien en una actividad: esa persona, sus jefes, Christian, responsable, creador y encargados. */
+  private async activityZoneWatcherIds(activityId: number, userId: number) {
+    const [activity, leads] = await Promise.all([
+      this.prisma.activity.findUnique({
+        where: { id: activityId },
+        select: { titulo: true, responsableId: true, creadoPorId: true, client: { select: { name: true } } },
+      }),
+      this.prisma.activityAssignee.findMany({
+        where: { activityId, rol: 'LEAD', retiradoAt: null },
+        select: { userId: true },
+      }),
+    ]);
+    const jefes = new Set<number>(await this.lunchReviewerIds(userId));
+    for (const s of await this.getSupervisors(userId)) jefes.add(s.id);
+    if (activity?.responsableId) jefes.add(activity.responsableId);
+    if (activity?.creadoPorId) jefes.add(activity.creadoPorId);
+    for (const l of leads) jefes.add(l.userId);
+    jefes.delete(userId);
+    return { activity, jefes: [...jefes] };
+  }
+
+  /**
+   * Geocerca: la persona salió del radio del punto donde inició la actividad. Le llega a ella
+   * (para que justifique) y a sus jefes, Christian y responsables de la actividad.
+   */
+  async notifyActivityOutOfZone(params: { activityId: number; userId: number; distanciaM: number; alertId: number }) {
+    try {
+      const { activity, jefes } = await this.activityZoneWatcherIds(params.activityId, params.userId);
+      if (!activity) return;
+      const persona_ = await this.prisma.user.findUnique({ where: { id: params.userId }, select: { nombre: true } });
+      const nombre = persona(persona_?.nombre);
+      const actividad = nombreActividad(activity.titulo);
+      const hora = horaAviso(new Date());
+      const url = `/erp/actividades/${params.activityId}/evidencias`;
+      const comun = {
+        type: 'ACTIVITY_OUT_OF_ZONE',
+        category: 'activities',
+        icon: 'fuera_zona',
+        relatedEntityId: params.activityId,
+        entityType: 'Activity',
+        priority: 'high' as const,
+        channel: 'ops',
+        collapseKey: `nx_zona_${params.alertId}`,
+        dedupeSeconds: 0,
+      };
+      await this.notificationsService.createNotification({
+        ...comun,
+        userId: params.userId,
+        title: 'Estás fuera de la zona de tu actividad',
+        message: unir(
+          actividad,
+          `Te alejaste ${params.distanciaM} m del punto de inicio (máx. 100 m) a las ${hora}`,
+          'Justifica el motivo con una foto',
+        ),
+        relatedUrl: `/erp/actividades/${params.activityId}`,
+      });
+      for (const uid of jefes) {
+        await this.notificationsService.createNotification({
+          ...comun,
+          userId: uid,
+          triggerUserId: params.userId,
+          title: `${nombre} salió de la zona de su actividad`,
+          message: unir(actividad, activity.client?.name, `A ${params.distanciaM} m del punto de inicio · ${hora}`),
+          relatedUrl: url,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityOutOfZone', error);
+    }
+  }
+
+  /** La persona justificó su salida de zona: jefes, Christian y responsables leen el motivo. */
+  async notifyActivityOutOfZoneJustified(params: { activityId: number; userId: number; motivo: string; alertId: number }) {
+    try {
+      const { activity, jefes } = await this.activityZoneWatcherIds(params.activityId, params.userId);
+      if (!activity) return;
+      const persona_ = await this.prisma.user.findUnique({ where: { id: params.userId }, select: { nombre: true } });
+      const nombre = persona(persona_?.nombre);
+      for (const uid of jefes) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'ACTIVITY_OUT_OF_ZONE',
+          category: 'activities',
+          icon: 'fuera_zona',
+          triggerUserId: params.userId,
+          title: `${nombre} justificó su salida de zona`,
+          message: unir(nombreActividad(activity.titulo), `«${params.motivo.slice(0, 160)}»`),
+          relatedEntityId: params.activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${params.activityId}/evidencias`,
+          priority: 'normal',
+          channel: 'ops',
+          collapseKey: `nx_zona_${params.alertId}`,
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityOutOfZoneJustified', error);
+    }
+  }
+
   /** Admins de consola + cuentas plataforma (solicitudes de soporte sin actor User). */
   private async getSupportStaffRecipientIds(): Promise<number[]> {
     const rows = await this.prisma.user.findMany({

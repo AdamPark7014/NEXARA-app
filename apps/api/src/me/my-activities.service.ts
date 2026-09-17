@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { alertaDto } from '../activities/geofence/activity-geofence.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { ActivityTeamService, type AssigneeRole } from '../activities/activity-team.service.js';
 import { ActivityEvidenceService } from '../activities/evidence/activity-evidence.service.js';
@@ -400,6 +401,17 @@ export class MyActivitiesService {
     }
 
     const evidenciaDe = new Map(activity.activityEvidences.map((e) => [e.userId, e]));
+    // Salidas de la zona de 100 m alrededor del punto de inicio de cada quien.
+    const alertasZona = await this.prisma.activityGeofenceAlert.findMany({
+      where: { activityId },
+      orderBy: { detectedAt: 'desc' },
+    });
+    const alertasDe = new Map<number, ReturnType<typeof alertaDto>[]>();
+    for (const a of alertasZona) {
+      const list = alertasDe.get(a.userId) ?? [];
+      list.push(alertaDto(a));
+      alertasDe.set(a.userId, list);
+    }
     const revisionesDe = new Map<number, typeof activity.evidenceReviews>();
     for (const r of activity.evidenceReviews) {
       const list = revisionesDe.get(r.evidenceUserId) ?? [];
@@ -431,6 +443,8 @@ export class MyActivitiesService {
         puedoRevisar: puedeRevisar(m) && e?.status === 'COMPLETED',
         rejectedSteps: e ? (textos(e.rejectedSteps).length ? textos(e.rejectedSteps) : e.rejectedStep ? [e.rejectedStep] : []) : [],
         eficienciaScore: e?.eficienciaScore ?? null,
+        /** Salidas de zona (radio 100 m del punto de inicio), la más reciente primero. */
+        alertasZona: alertasDe.get(m.userId) ?? [],
         revisiones: (revisionesDe.get(m.userId) ?? []).map((r) => ({
           id: r.id,
           decision: r.decision,

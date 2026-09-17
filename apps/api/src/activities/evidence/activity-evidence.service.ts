@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Optional } from '@nestjs/common';
 import { Prisma, type ActivityEvidence } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { saveBase64Photo } from '../../common/file-upload.util';
 import { ActivitiesService } from '../activities.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
+import { ActivityGeofenceService } from '../geofence/activity-geofence.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import {
   clampEvidencePhotoRequired,
@@ -68,6 +69,7 @@ export class ActivityEvidenceService {
     private prisma: PrismaService,
     private activitiesService: ActivitiesService,
     private notificationHierarchy: NotificationHierarchyService,
+    @Optional() private geofence?: ActivityGeofenceService,
   ) {}
 
   private async notifyEvidenceReadyForReview(
@@ -648,6 +650,8 @@ export class ActivityEvidenceService {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) {
       throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
     }
+    // Geocerca: la salida solo se registra a menos de 100 m de donde inició.
+    await this.geofence?.validarSalida(activityId, userId, latitude, longitude);
 
     const updated = await this.prisma.activityEvidence.update({
       where: { id: evidence.id },
@@ -1772,6 +1776,7 @@ export class ActivityEvidenceService {
         ) {
           throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
         }
+        await this.geofence?.validarSalida(activityId, userId, data.latitude, data.longitude);
         updateData = {
           ...updateData,
           exitPhotoUrl: data.photoUrl,
