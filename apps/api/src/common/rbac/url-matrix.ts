@@ -73,6 +73,20 @@ export const MEETINGS_LEAD_URL_RULES: UrlRule[] = [
   { path: '/api/reuniones', scope: 'write' },
 ];
 
+/**
+ * Cotizaciones en Core (contrato del viernes, D).
+ *
+ * Quien cotiza necesita escribir, no solo leer: sin esto, un director podía abrir la lista pero no
+ * crear ni enviar, porque su única regla sobre `/api/**` es de lectura.
+ */
+export const COTIZACIONES_CORE_URL_RULES: UrlRule[] = [
+  { path: '/erp/cotizaciones', scope: 'write' },
+  { path: '/erp/cotizaciones/**', scope: 'write' },
+  { path: '/api/cotizaciones/**', methods: ['GET', 'POST', 'PUT', 'PATCH'], scope: 'write' },
+  // Catálogo de productos para armar las partidas.
+  { path: '/api/smart-quote/search', methods: ['GET'], scope: 'read' },
+];
+
 /** Core ola1 — páginas shell (Pizarra / Asistencias / Chat / Actividades). */
 export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/erp/mis-actividades', scope: 'write' },
@@ -167,6 +181,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    ...COTIZACIONES_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     // Faltas justificadas: solo Christian (el servicio lo vuelve a exigir por correo).
@@ -199,6 +214,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // Supervisa OPS, valida trabajos antes de reportar a Admin + Dirección
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...COTIZACIONES_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     // OPS — lectura total + aprobación de actividades y evidencias
@@ -244,6 +260,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR DE OPERACIONES — aprueba viáticos/proyectos nivel alto
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
+    ...COTIZACIONES_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
@@ -292,6 +309,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR ADMINISTRATIVO — finanzas, compras, RH (alto nivel)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
+    ...COTIZACIONES_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp/**', scope: 'admin' },
@@ -328,6 +346,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...COTIZACIONES_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
@@ -398,6 +417,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ADMINISTRATIVO — primer nivel (operación día a día)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...COTIZACIONES_CORE_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     { path: '/erp', scope: 'read' },
@@ -454,6 +474,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD OPERACIONES — supervisa ing. de campo, project manager
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...COTIZACIONES_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     { path: '/ops', scope: 'read' },
@@ -604,6 +625,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD VENTAS — gerente comercial
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...COTIZACIONES_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/crm/**', scope: 'approve' },
