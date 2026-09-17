@@ -115,10 +115,21 @@ sin iniciar, o en curso con más del 80 % del plan consumido; verde = lo demás.
 ## D. Cotizaciones en Core (migración `20260917212000_cotizaciones_core`)
 
 - **Segmento** `COMERCIAL | OBRA | LICITACION | SERVICIO` (obligatorio al crear).
-- **Folio del servidor:** `NEX-{S}{AA}{MM}-{consecutivo 4 díg. por año}` al crear (S = C/O/L/S). Al **enviar** se fija la
-  cadena de quién intervino: `NEX-O2609-0007-LJ.JA.CE` y cada nueva versión enviada agrega `-R2`, `-R3`.
-  Las siglas salen de la nomenclatura del empleado (2 primeras letras de `employeeNumber` si tiene formato
-  `^[A-Z]{2}\d{8}$`; si no, iniciales del nombre).
+- **Folio del servidor, basado en la nomenclatura de quien la hace** (decisión de Adam 17-09: todos los encargados de
+  área cotizan, así que el folio dice de quién es y cuántas lleva):
+
+  `NEX-{NOMENCLATURA}-{contador 4 díg. de esa persona}` → `NEX-LJ75100126-0007` (séptima cotización de Luis).
+
+  - La nomenclatura es `User.employeeNumber` cuando cumple `^[A-Z]{2}\d{8}$`.
+  - **Cuando no está completa se rellena igual que la nomenclatura**: 2 iniciales del nombre (nombre(s) primero, sin
+    acentos) + los 8 dígitos que se puedan calcular (año y mes de nacimiento desde la CURP o el perfil; año y mes de
+    ingreso) y **ceros donde falte el dato**: Christian → `CE00000000`. Nunca se inventan datos.
+  - El contador es **por persona** (`cotizacion_contadores`: userId + ultimo), con transacción para que dos al mismo
+    tiempo no repitan. Si la persona cambia de nomenclatura después, los folios ya emitidos no se tocan.
+  - El **segmento** no va en el folio; es un campo y un filtro.
+  - Al **enviar** se agregan las siglas de quienes intervinieron además de quien la hizo, en orden:
+    `NEX-LJ75100126-0007-JA.CE`; cada versión enviada después agrega `-R2`, `-R3`. Las siglas son las 2 primeras
+    letras de la nomenclatura de cada quien.
 - **Participantes:** tabla `cotizacion_participantes` (cotizacionId, userId, clave (employeeNumber al momento), siglas,
   rol ELABORO | LEVANTAMIENTO | REVISO | APROBO | ENVIO, at). Se registran solos al crear/revisar/aprobar/enviar.
 - **Estados:** BORRADOR | ENVIADA | APROBADA | RECHAZADA | VENCIDA (tarea diaria marca vencidas). Enviada = bloqueada:
@@ -132,3 +143,15 @@ sin iniciar, o en curso con más del 80 % del plan consumido; verde = lo demás.
   generan las partidas y el alcance cuadra.
 - Core web: `/erp/cotizaciones` (lista, crear, editar, PDF, enviar por correo, historial de participantes y versiones),
   en el menú para dirección, administración y coordinadores.
+
+- **La cotización puede ser una actividad de tipo comercial** (pedido de Adam):
+  - `Activity.coreKind = 'comercial'` con `cotizacionId Int?` (columna nueva en `Activity`, en la misma migración).
+  - Desde la actividad: «Hacer cotización» crea la cotización con ese cliente y deja las dos ligadas; «Ligar cotización»
+    conecta una existente. Desde la cotización se ve y se abre su actividad.
+  - **La evidencia de la actividad es la evidencia de la cotización**: las fotos del levantamiento y los planos que subió
+    quien la atendió aparecen como anexos de la cotización (03 Planos) sin volver a subirlos.
+  - Flujo de evidencia de una actividad comercial: foto de entrada → fotos del levantamiento → **cotización** (en lugar
+    de la hoja de servicio; el paso se da por hecho cuando la cotización queda ENVIADA) → foto de salida.
+  - El avance de la actividad sigue el estado de la cotización: ENVIADA → «Por validar»; APROBADA → «Finalizada»;
+    RECHAZADA o VENCIDA → queda para que un superior la cierre o la reprograme.
+  - Los avisos push de la cotización (enviada, aprobada, rechazada) van a quien la hizo, sus jefes y dirección.
