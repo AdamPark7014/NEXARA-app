@@ -11,6 +11,7 @@
  */
 import { ROLES, type RoleKey } from '@/lib/rbac/roles';
 import type { ActivityProjectMode } from '@/lib/ops-activity-form';
+import { isCeoEquivalentEmail } from '@/lib/platform-accounts';
 
 export type ActivityKind = 'tarea' | 'proyecto' | 'obra' | 'servicio' | 'comercial';
 
@@ -250,8 +251,9 @@ export function isAreaManagerEmail(email?: string | null): boolean {
   return AREA_MANAGER_EMAILS.has(norm(email));
 }
 
+/** Christian y su equivalente de permisos (Claudia, tester) — ver platform-accounts.ts. */
 export function isCeoEmail(email?: string | null): boolean {
-  return norm(email) === ORG_EMAILS.ceo;
+  return isCeoEquivalentEmail(email);
 }
 
 export function canOfferAssignmentCharge(email?: string | null): boolean {
@@ -384,9 +386,9 @@ export function extrasEmailsForKind(kind: ActivityKind | null | undefined): stri
 }
 
 export function canCreateServicio(email?: string | null, v2?: RoleKey | null, isSuperAdmin?: boolean): boolean {
-  if (isSuperAdmin || v2 === ROLES.CEO || v2 === ROLES.SUPER_ADMIN) return true;
+  if (isSuperAdmin || v2 === ROLES.CEO || v2 === ROLES.SUPER_ADMIN || isCeoEquivalentEmail(email)) return true;
   const e = norm(email);
-  return e === ORG_EMAILS.luis || e === ORG_EMAILS.antonio || e === ORG_EMAILS.ceo;
+  return e === ORG_EMAILS.luis || e === ORG_EMAILS.antonio;
 }
 
 export function kindsForCreator(opts: {
@@ -394,7 +396,12 @@ export function kindsForCreator(opts: {
   email?: string | null;
   isSuperAdmin?: boolean;
 }): ActivityKind[] {
-  if (opts.isSuperAdmin || opts.v2Role === ROLES.CEO || opts.v2Role === ROLES.SUPER_ADMIN) {
+  if (
+    opts.isSuperAdmin ||
+    opts.v2Role === ROLES.CEO ||
+    opts.v2Role === ROLES.SUPER_ADMIN ||
+    isCeoEquivalentEmail(opts.email)
+  ) {
     return ALL;
   }
   const email = norm(opts.email);
@@ -405,6 +412,7 @@ export function kindsForCreator(opts: {
 export function kindsForTarget(email?: string | null): ActivityKind[] {
   const e = norm(email);
   if (!e) return ['tarea'];
+  if (isCeoEquivalentEmail(e)) return ALL;
   if (RECEIVE_BY_EMAIL[e]) return RECEIVE_BY_EMAIL[e];
   return ['tarea'];
 }
@@ -445,12 +453,12 @@ export function servicioShouldGoToBridge(opts: {
   isSuperAdmin?: boolean;
   isCeo?: boolean;
 }): boolean {
-  // Christian / superadmin: asignan servicio directo a cualquiera.
-  if (opts.isSuperAdmin || opts.isCeo) return false;
+  // Christian / Claudia (equivalente) / superadmin: asignan servicio directo a cualquiera.
+  if (opts.isSuperAdmin || opts.isCeo || isCeoEquivalentEmail(opts.creatorEmail)) return false;
   const creator = norm(opts.creatorEmail);
   const target = norm(opts.targetEmail);
   if (!creator || !target) return false;
-  if (creator === ORG_EMAILS.ceo || creator === ORG_EMAILS.developer) {
+  if (creator === ORG_EMAILS.developer) {
     return false;
   }
   if (creator === ORG_EMAILS.antonio) return false;

@@ -37,6 +37,14 @@ class AttendanceViewModeTest {
     }
 
     @Test
+    fun `claudia administra igual que christian, sin ser super admin`() {
+        // Owner rule: Claudia (tester) tiene EXACTAMENTE los permisos de Christian.
+        val m = mode(email = "claudia.bernal@nexara.com.mx", isSuperAdmin = false)
+        assertEquals(AttendanceViewMode.MANAGE, m)
+        assertFalse(m.canRegisterSelf)
+    }
+
+    @Test
     fun `rrhh y coordinadores administran y checan`() {
         listOf("rh", "dir_admin", "coord_admin", "coord_operaciones", "arquitecto", "ing_soporte")
             .forEach { key ->
@@ -70,6 +78,8 @@ class AttendanceViewModeTest {
         // El fallo real: cualquier attendance.manage veía a toda la empresa.
         assertNull(attendanceScopeParamFor("gerencia@nexara.com.mx", "ceo", isSuperAdmin = true))
         assertNull(attendanceScopeParamFor("developer@nexara.com.mx", null, isSuperAdmin = true))
+        // Claudia (tester) ve la empresa completa como Christian, sin ser super admin.
+        assertNull(attendanceScopeParamFor("claudia.bernal@nexara.com.mx", null, isSuperAdmin = false))
         assertEquals("subtree", attendanceScopeParamFor("rh@nexara.com.mx", "rh", isSuperAdmin = false))
         assertEquals(
             "subtree",

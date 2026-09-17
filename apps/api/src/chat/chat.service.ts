@@ -570,7 +570,8 @@ export class ChatService {
     const include = {
       author: { select: authorSelect },
       reactions: {
-        include: { user: { select: { id: true, nombre: true } } },
+        orderBy: { createdAt: 'asc' },
+        include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
       },
       _count: { select: { replies: true } },
     } as const;
@@ -635,14 +636,35 @@ export class ChatService {
     editedAt: Date | null;
     createdAt: Date;
     author: { id: number; nombre: string; email: string };
-    reactions: Array<{ emoji: string; userId: number; user: { id: number; nombre: string } }>;
+    reactions: Array<{
+      emoji: string;
+      userId: number;
+      createdAt?: Date;
+      user: { id: number; nombre: string; avatarUrl?: string | null };
+    }>;
     _count?: { replies: number };
   }) {
-    const reactionMap = new Map<string, { emoji: string; count: number; userIds: number[] }>();
+    const reactionMap = new Map<
+      string,
+      {
+        emoji: string;
+        count: number;
+        userIds: number[];
+        users: Array<{ id: number; nombre: string; avatarUrl: string | null; reactedAt: Date | null }>;
+      }
+    >();
+    // Nota: las consultas ordenan `reactions` por createdAt asc, así que el push
+    // conserva el orden real de reacción (más antigua primero) dentro de cada emoji.
     for (const r of m.reactions) {
-      const cur = reactionMap.get(r.emoji) ?? { emoji: r.emoji, count: 0, userIds: [] };
+      const cur = reactionMap.get(r.emoji) ?? { emoji: r.emoji, count: 0, userIds: [], users: [] };
       cur.count += 1;
       cur.userIds.push(r.userId);
+      cur.users.push({
+        id: r.user.id,
+        nombre: r.user.nombre,
+        avatarUrl: r.user.avatarUrl ?? null,
+        reactedAt: r.createdAt ?? null,
+      });
       reactionMap.set(r.emoji, cur);
     }
     return {
@@ -698,7 +720,10 @@ export class ChatService {
       },
       include: {
         author: { select: authorSelect },
-        reactions: { include: { user: { select: { id: true, nombre: true } } } },
+        reactions: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
+        },
         _count: { select: { replies: true } },
       },
     });
@@ -932,7 +957,10 @@ export class ChatService {
       where: { id: messageId },
       include: {
         author: { select: authorSelect },
-        reactions: { include: { user: { select: { id: true, nombre: true } } } },
+        reactions: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
+        },
         _count: { select: { replies: true } },
       },
     });
@@ -1121,7 +1149,10 @@ export class ChatService {
       data: { body: clean, editedAt: new Date() },
       include: {
         author: { select: authorSelect },
-        reactions: { include: { user: { select: { id: true, nombre: true } } } },
+        reactions: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
+        },
         _count: { select: { replies: true } },
       },
     });
@@ -1247,7 +1278,10 @@ export class ChatService {
       },
       include: {
         author: { select: authorSelect },
-        reactions: { include: { user: { select: { id: true, nombre: true } } } },
+        reactions: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
+        },
         _count: { select: { replies: true } },
       },
       orderBy: { pinnedAt: 'desc' },
@@ -1275,7 +1309,10 @@ export class ChatService {
         : { pinnedAt: new Date(), pinnedById: userId },
       include: {
         author: { select: authorSelect },
-        reactions: { include: { user: { select: { id: true, nombre: true } } } },
+        reactions: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
+        },
         _count: { select: { replies: true } },
       },
     });
@@ -1330,7 +1367,10 @@ export class ChatService {
       include: {
         author: { select: authorSelect },
         channel: { select: { id: true, name: true, kind: true, slug: true } },
-        reactions: { include: { user: { select: { id: true, nombre: true } } } },
+        reactions: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { id: true, nombre: true, avatarUrl: true } } },
+        },
         _count: { select: { replies: true } },
       },
       orderBy: { createdAt: 'desc' },

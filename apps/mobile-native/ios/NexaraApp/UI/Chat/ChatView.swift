@@ -28,6 +28,7 @@ struct ChatView: View {
     @State private var showThreadDocPicker = false
     @State private var replyTo: [String: Any]?
     @State private var editingMessage: [String: Any]?
+    @State private var reactorsSheetItem: ChatReactorsSheetItem?
     @State private var editDraft = ""
     @State private var favoriteIds: Set<Int64> = ChatFavoritesStore.load()
     @State private var showCreateChannel = false
@@ -134,6 +135,9 @@ struct ChatView: View {
                 }
             )) { item in
                 threadSheet(root: item.message)
+            }
+            .sheet(item: $reactorsSheetItem) { item in
+                ChatReactorsSheet(reactions: item.reactions, initialEmoji: item.initialEmoji)
             }
             .sheet(isPresented: $showCreateChannel) { createChannelSheet }
             .sheet(isPresented: $showDmPicker) { colleaguesSheet(mode: .dm) }
@@ -674,6 +678,17 @@ struct ChatView: View {
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        // Ver quién reaccionó (con quién y en qué orden): mantiene el
+                        // tap normal para reaccionar/quitar tu reacción.
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.35).onEnded { _ in
+                                reactorsSheetItem = ChatReactorsSheetItem(
+                                    id: messageId,
+                                    reactions: reactions,
+                                    initialEmoji: r.emoji
+                                )
+                            }
+                        )
                     }
                 }
             }
@@ -1436,10 +1451,23 @@ private enum ChatMessageFormat {
         return ConsoleHelpers.mapStr(m, "nombre", "authorName")
     }
 
+    /// Tab especial "Todas" del sheet de reactores (no es un emoji real).
+    static let allReactionsTab = "__all__"
+
+    struct ReactionUser: Hashable, Identifiable {
+        let id: Int64
+        let nombre: String
+        let avatarUrl: String?
+        /// ISO 8601 crudo tal como lo manda el API; se formatea con `relativeReactionTime`.
+        let reactedAt: String?
+    }
+
     struct Reaction: Hashable {
         let emoji: String
         let count: Int
         let mine: Bool
+        /// Reactores en orden de reacción (más antiguo primero), tal como lo entrega el API.
+        let users: [ReactionUser]
     }
 
     static func reactions(_ m: [String: Any]) -> [Reaction] {
@@ -1456,8 +1484,184 @@ private enum ChatMessageFormat {
                 if let s = v as? String { return Int64(s) }
                 return nil
             } ?? []
-            return Reaction(emoji: emoji, count: max(count, 1), mine: userIds.contains(uid))
+            let users: [ReactionUser] = ((r["users"] as? [[String: Any]]) ?? []).map { u in
+                ReactionUser(
+                    id: ConsoleHelpers.mapInt64(u, "id") ?? 0,
+                    nombre: ConsoleHelpers.mapStr(u, "nombre"),
+                    avatarUrl: (u["avatarUrl"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                        .nilIfEmpty,
+                    reactedAt: (u["reactedAt"] as? String)?.nilIfEmpty
+                )
+            }
+            return Reaction(emoji: emoji, count: max(count, 1), mine: userIds.contains(uid), users: users)
         }
+    }
+
+    static func initials(_ name: String) -> String {
+        let parts = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: " ")
+            .filter { !$0.isEmpty }
+        if parts.isEmpty { return "?" }
+        if parts.count == 1 { return String(parts[0].prefix(2)).uppercased() }
+        return (parts[0].prefix(1) + parts[1].prefix(1)).uppercased()
+    }
+
+    /// Parsea el `reactedAt` ISO 8601 del API (con o sin fracción de segundos).
+    static func parseReactedAt(_ iso: String?) -> Date? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let isoF = ISO8601DateFormatter()
+        isoF.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = isoF.date(from: iso) { return d }
+        isoF.formatOptions = [.withInternetDateTime]
+        return isoF.date(from: iso)
+    }
+
+    /// "hace 5 min" / "hace 2 h" / "hace 3 d" para el sheet de reactores.
+    static func relativeReactionTime(_ iso: String?) -> String {
+        guard let d = parseReactedAt(iso) else { return "" }
+        let seconds = max(0, Date().timeIntervalSince(d))
+        let minutes = Int(seconds / 60)
+        if minutes < 1 { return "ahora" }
+        if minutes < 60 { return "hace \(minutes) min" }
+        let hours = minutes / 60
+        if hours < 24 { return "hace \(hours) h" }
+        let days = hours / 24
+        if days < 7 { return "hace \(days) d" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es_MX")
+        f.dateFormat = "d MMM"
+        return f.string(from: d)
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+/// Ítem del sheet "quién reaccionó" (`.sheet(item:)` exige `Identifiable`).
+private struct ChatReactorsSheetItem: Identifiable {
+    let id: Int64
+    let reactions: [ChatMessageFormat.Reaction]
+    let initialEmoji: String?
+}
+
+/// Sheet "quién reaccionó": pestañas por emoji (Todas primero) y la lista de
+/// reactores en el orden en que reaccionaron (más antiguo primero).
+private struct ChatReactorsSheet: View {
+    let reactions: [ChatMessageFormat.Reaction]
+    let initialEmoji: String?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var activeEmoji: String = ChatMessageFormat.allReactionsTab
+
+    private var totalCount: Int { reactions.reduce(0) { $0 + $1.count } }
+
+    private var activeReactors: [(user: ChatMessageFormat.ReactionUser, emoji: String)] {
+        if activeEmoji == ChatMessageFormat.allReactionsTab {
+            return reactions
+                .flatMap { r in r.users.map { (user: $0, emoji: r.emoji) } }
+                .sorted {
+                    (ChatMessageFormat.parseReactedAt($0.user.reactedAt) ?? .distantPast)
+                        < (ChatMessageFormat.parseReactedAt($1.user.reactedAt) ?? .distantPast)
+                }
+        }
+        let match = reactions.first { $0.emoji == activeEmoji }
+        return (match?.users ?? []).map { (user: $0, emoji: activeEmoji) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        tabChip(label: "Todas · \(totalCount)", selected: activeEmoji == ChatMessageFormat.allReactionsTab) {
+                            activeEmoji = ChatMessageFormat.allReactionsTab
+                        }
+                        ForEach(reactions, id: \.emoji) { r in
+                            tabChip(label: "\(r.emoji) \(r.count)", selected: activeEmoji == r.emoji) {
+                                activeEmoji = r.emoji
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+                Divider()
+                if activeReactors.isEmpty {
+                    Spacer()
+                    Text("Sin reacciones").font(.footnote).foregroundStyle(.secondary)
+                    Spacer()
+                } else {
+                    List(Array(activeReactors.enumerated()), id: \.offset) { _, entry in
+                        HStack(spacing: 10) {
+                            ChatReactorAvatar(user: entry.user)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(entry.user.nombre).font(.subheadline.weight(.semibold))
+                                let time = ChatMessageFormat.relativeReactionTime(entry.user.reactedAt)
+                                Text(time.isEmpty ? "—" : time)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if activeEmoji == ChatMessageFormat.allReactionsTab {
+                                Text(entry.emoji)
+                            }
+                        }
+                        .listRowSeparator(.hidden)
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("Reacciones")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { dismiss() }
+                }
+            }
+            .onAppear {
+                if let initialEmoji, reactions.contains(where: { $0.emoji == initialEmoji }) {
+                    activeEmoji = initialEmoji
+                }
+            }
+        }
+    }
+
+    private func tabChip(label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption.weight(selected ? .bold : .regular))
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(selected ? NxBrand.primary.opacity(0.15) : Color(.tertiarySystemFill))
+                .foregroundStyle(selected ? NxBrand.primary : Color.primary)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(selected ? NxBrand.primary.opacity(0.5) : Color.clear, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Avatar de un reactor: foto protegida si hay `avatarUrl`, si no iniciales en azul.
+private struct ChatReactorAvatar: View {
+    let user: ChatMessageFormat.ReactionUser
+
+    var body: some View {
+        Group {
+            if let avatarUrl = user.avatarUrl, !avatarUrl.isEmpty {
+                AuthenticatedImage(url: avatarUrl, contentMode: .fill, background: NxBrand.primary.opacity(0.15))
+            } else {
+                ZStack {
+                    NxBrand.primary.opacity(0.15)
+                    Text(ChatMessageFormat.initials(user.nombre))
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(NxBrand.primary)
+                }
+            }
+        }
+        .frame(width: 32, height: 32)
+        .clipShape(Circle())
     }
 }
 

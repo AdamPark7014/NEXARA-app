@@ -60,7 +60,10 @@ object ClientSectors {
     )
 
     /** Sectores que puede usar un correo; vacío = sin acceso al módulo. */
-    fun forEmail(email: String?): List<ClientSector> = SECTOR_MATRIX[OrgEmails.norm(email)].orEmpty()
+    fun forEmail(email: String?): List<ClientSector> {
+        if (PlatformAccounts.isCeoEquivalentEmail(email)) return ALL
+        return SECTOR_MATRIX[OrgEmails.norm(email)].orEmpty()
+    }
 
     /** `canSeeClientesModule` de la web: solo por correo, también para super admin. */
     fun canSeeModule(email: String?): Boolean = forEmail(email).isNotEmpty()

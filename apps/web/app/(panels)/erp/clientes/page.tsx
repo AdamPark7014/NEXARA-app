@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useUser } from "@/components/UserContext";
-import { ORG_EMAILS } from "@/lib/activity-kinds";
+import { isCeoEquivalentEmail } from "@/lib/platform-accounts";
 import {
   canSeeClientesModule,
   CLIENT_SECTOR_META,
@@ -17,16 +17,12 @@ import { IconLabel } from "@/components/ui/IconBadge";
 import { CLIENT_SECTOR_ICONS } from "@/components/erp/ClientSectorIcon";
 import styles from "./clientes-core.module.css";
 
-function norm(email?: string | null) {
-  return String(email || "").trim().toLowerCase();
-}
-
 function ClientesWorkspace() {
   const router = useRouter();
   const search = useSearchParams();
   const { user, token } = useUser();
   const allowedSectors = useMemo(() => clientSectorsForEmail(user?.email), [user?.email]);
-  const showOwner = norm(user?.email) === ORG_EMAILS.ceo || Boolean(user?.isSuperAdmin);
+  const showOwner = isCeoEquivalentEmail(user?.email) || Boolean(user?.isSuperAdmin);
 
   const sectorParam = String(search.get("sector") || "").toUpperCase() as ClientSector;
   const initialSector =

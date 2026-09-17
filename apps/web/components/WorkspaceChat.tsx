@@ -68,7 +68,9 @@ type Channel = {
   readOnly?: boolean;
 };
 
-type Reaction = { emoji: string; count: number; userIds: number[] };
+type ReactionUser = { id: number; nombre: string; avatarUrl?: string | null; reactedAt?: string | null };
+
+type Reaction = { emoji: string; count: number; userIds: number[]; users?: ReactionUser[] };
 
 type MentionEntity = {
   kind: "USER" | "ACTIVITY" | "EVIDENCE";
@@ -166,6 +168,68 @@ function dayLabel(iso: string) {
   if (dayKey(iso) === dayKey(today.toISOString())) return "Hoy";
   if (dayKey(iso) === dayKey(yest.toISOString())) return "Ayer";
   return d.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+}
+
+function formatRelativeTime(iso?: string | null): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (diffSec < 45) return "ahora";
+  const min = Math.round(diffSec / 60);
+  if (min < 60) return `hace ${min} min`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `hace ${hr} h`;
+  const day = Math.round(hr / 24);
+  if (day < 7) return `hace ${day} d`;
+  return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+}
+
+/** Resumen corto para el tooltip al pasar el mouse sobre una reacción. */
+function summarizeReactors(users?: ReactionUser[]): string {
+  const names = (users ?? []).map((u) => u.nombre).filter(Boolean);
+  if (!names.length) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} y ${names[1]}`;
+  return `${names[0]}, ${names[1]} y ${names.length - 2} más`;
+}
+
+/** Busca un mensaje por id entre la lista principal y el panel de hilo. */
+function findMessageInLists(
+  id: number,
+  lists: Array<Message[] | Message | null | undefined>,
+): Message | undefined {
+  for (const l of lists) {
+    if (!l) continue;
+    if (Array.isArray(l)) {
+      const found = l.find((m) => m.id === id);
+      if (found) return found;
+    } else if (l.id === id) {
+      return l;
+    }
+  }
+  return undefined;
+}
+
+/** Avatar de un reactor: imagen si hay avatarUrl (con fallback a iniciales si falla), o iniciales. */
+function ReactorAvatar({ user }: { user: ReactionUser }) {
+  const [imgError, setImgError] = useState(false);
+  if (user.avatarUrl && !imgError) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={attachmentHref(user.avatarUrl)}
+        alt=""
+        className={styles.reactorAvatarImg}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+  return (
+    <div className={`${styles.avatar} ${avatarHue(user.id)}`} style={{ width: 30, height: 30, fontSize: 11, marginTop: 0 }}>
+      {initials(user.nombre)}
+    </div>
+  );
 }
 
 /** Prefijo de texto (placeholders): solo los públicos llevan "#". */
@@ -301,6 +365,8 @@ export default function WorkspaceChat({
   const [threadAttachment, setThreadAttachment] = useState<Attachment | null>(null);
   const [uploading, setUploading] = useState(false);
   const [emojiPickerFor, setEmojiPickerFor] = useState<number | null>(null);
+  const [hoveredReaction, setHoveredReaction] = useState<{ messageId: number; emoji: string } | null>(null);
+  const [reactionsDialog, setReactionsDialog] = useState<{ messageId: number; emoji: string } | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [unreadBoundary, setUnreadBoundary] = useState<{ channelId: number; before: string } | null>(null);
   const [notifyOn, setNotifyOn] = useState(() => {
@@ -1409,20 +1475,44 @@ export default function WorkspaceChat({
               {m.reactions?.length > 0 && (
                 <div className={styles.reactions}>
                   {m.reactions.map((r) => (
-                    <button
+                    <div
                       key={r.emoji}
-                      type="button"
                       className={`${styles.reaction} ${mineReaction(r.emoji) ? styles.reactionMine : ""}`}
-                      onClick={() => {
-                        if (detail?.readOnly) return;
-                        void react(m.id, r.emoji);
-                      }}
-                      disabled={detail?.readOnly}
-                      style={detail?.readOnly ? { cursor: "default" } : undefined}
+                      onMouseEnter={() => setHoveredReaction({ messageId: m.id, emoji: r.emoji })}
+                      onMouseLeave={() =>
+                        setHoveredReaction((cur) =>
+                          cur && cur.messageId === m.id && cur.emoji === r.emoji ? null : cur,
+                        )
+                      }
                     >
-                      <span>{r.emoji}</span>
-                      <span>{r.count}</span>
-                    </button>
+                      <button
+                        type="button"
+                        className={styles.reactionEmojiBtn}
+                        onClick={() => {
+                          if (detail?.readOnly) return;
+                          void react(m.id, r.emoji);
+                        }}
+                        disabled={detail?.readOnly}
+                        title={mineReaction(r.emoji) ? "Quitar tu reacción" : "Reaccionar"}
+                      >
+                        {r.emoji}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.reactionCountBtn}
+                        onClick={() => setReactionsDialog({ messageId: m.id, emoji: r.emoji })}
+                        aria-label={`Ver quién reaccionó con ${r.emoji}`}
+                      >
+                        {r.count}
+                      </button>
+                      {hoveredReaction?.messageId === m.id &&
+                        hoveredReaction.emoji === r.emoji &&
+                        r.users?.length ? (
+                          <div className={styles.reactionTooltip} role="tooltip">
+                            {summarizeReactors(r.users)}
+                          </div>
+                        ) : null}
+                    </div>
                   ))}
                 </div>
               )}
@@ -2642,6 +2732,84 @@ export default function WorkspaceChat({
           </div>
         </div>
       )}
+
+      {reactionsDialog && (() => {
+        const target = findMessageInLists(reactionsDialog.messageId, [messages, threadRoot, threadReplies]);
+        const reactions = target?.reactions ?? [];
+        if (!target || !reactions.length) return null;
+        const activeEmoji = reactions.some((r) => r.emoji === reactionsDialog.emoji)
+          ? reactionsDialog.emoji
+          : "__all__";
+        const totalCount = reactions.reduce((sum, r) => sum + r.count, 0);
+        const activeReactors: Array<ReactionUser & { emoji: string }> =
+          activeEmoji === "__all__"
+            ? reactions
+                .flatMap((r) => (r.users ?? []).map((u) => ({ ...u, emoji: r.emoji })))
+                .sort((a, b) => {
+                  const ta = a.reactedAt ? new Date(a.reactedAt).getTime() : 0;
+                  const tb = b.reactedAt ? new Date(b.reactedAt).getTime() : 0;
+                  return ta - tb;
+                })
+            : (reactions.find((r) => r.emoji === activeEmoji)?.users ?? []).map((u) => ({
+                ...u,
+                emoji: activeEmoji,
+              }));
+
+        return (
+          <div className={styles.modalBackdrop} role="presentation" onClick={() => setReactionsDialog(null)}>
+            <div
+              className={`${styles.modal} ${styles.reactorsModal}`}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="chat-modal-reactions"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.modalTitle} id="chat-modal-reactions">
+                Reacciones
+              </div>
+              <div className={styles.entityTabs}>
+                <button
+                  type="button"
+                  className={`${styles.entityTab} ${activeEmoji === "__all__" ? styles.entityTabActive : ""}`}
+                  onClick={() => setReactionsDialog({ messageId: reactionsDialog.messageId, emoji: "__all__" })}
+                >
+                  Todas · {totalCount}
+                </button>
+                {reactions.map((r) => (
+                  <button
+                    key={r.emoji}
+                    type="button"
+                    className={`${styles.entityTab} ${activeEmoji === r.emoji ? styles.entityTabActive : ""}`}
+                    onClick={() => setReactionsDialog({ messageId: reactionsDialog.messageId, emoji: r.emoji })}
+                  >
+                    <span>{r.emoji}</span> {r.count}
+                  </button>
+                ))}
+              </div>
+              <div className={styles.reactorsList}>
+                {activeReactors.map((u, i) => (
+                  <div key={`${u.emoji}-${u.id}-${i}`} className={styles.reactorRow}>
+                    <ReactorAvatar user={u} />
+                    <div className={styles.reactorMeta}>
+                      <span className={styles.reactorName}>{u.nombre}</span>
+                      <span className={styles.reactorTime}>{formatRelativeTime(u.reactedAt) || "—"}</span>
+                    </div>
+                    {activeEmoji === "__all__" && <span className={styles.reactorEmoji}>{u.emoji}</span>}
+                  </div>
+                ))}
+                {activeReactors.length === 0 && (
+                  <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", padding: 8 }}>Sin reacciones</div>
+                )}
+              </div>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.actionBtn} onClick={() => setReactionsDialog(null)}>
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

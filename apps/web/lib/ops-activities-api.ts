@@ -1,4 +1,5 @@
 import { buildApiUrl } from "@/lib/api-base";
+import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 
 import type { ActivityEvidenceDetail } from "@/lib/evidence-display";
 
@@ -238,8 +239,10 @@ export function listOperationalProjects(token: string) {
   return apiFetch<OperationalProjectRow[]>("operational-projects", token);
 }
 
-export function listAssignableUsers(token: string) {
-  return apiFetch<AssignableUserOption[]>("users/assignable", token);
+export async function listAssignableUsers(token: string) {
+  const users = await apiFetch<AssignableUserOption[]>("users/assignable", token);
+  // Safety net: Christian/Adam/Claudia/cuenta demo no deben aparecer como responsable asignable.
+  return users.filter((u) => !isNonEmployeeEmail(u.email));
 }
 
 export type AssignableUserOption = { id: number; nombre: string; email?: string; role?: { nombre: string } };

@@ -57,8 +57,7 @@ enum AsistenciasAccess {
     static func companyWide(_ user: SessionUser?) -> Bool {
         guard let user else { return false }
         if user.isSuperAdmin { return true }
-        let email = CoreOrg.normalized(user.email)
-        if email == CoreOrg.ceoEmail || email == CoreOrg.developerEmail { return true }
+        if CoreOrg.isCeo(user.email) || CoreOrg.normalized(user.email) == CoreOrg.developerEmail { return true }
         return role(user) == RolePanelMatrix.ceo
     }
 

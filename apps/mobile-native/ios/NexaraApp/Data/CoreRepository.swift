@@ -123,9 +123,14 @@ final class CoreRepository {
 
     // MARK: Pizarra
 
+    /// Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados.
     func teamBoard() async throws -> TeamBoardResponse {
         let data = try await api.get("me/board")
-        return try decode(TeamBoardResponse.self, from: data)
+        let decoded = try decode(TeamBoardResponse.self, from: data)
+        return TeamBoardResponse(
+            scope: decoded.scope,
+            users: decoded.users.filter { !CoreOrg.isNonEmployee($0.email) }
+        )
     }
 
     func teamBoardUser(userId: Int) async throws -> TeamBoardUser {

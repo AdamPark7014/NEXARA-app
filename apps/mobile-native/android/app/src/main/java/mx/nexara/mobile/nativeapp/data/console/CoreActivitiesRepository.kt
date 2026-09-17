@@ -1,6 +1,7 @@
 package mx.nexara.mobile.nativeapp.data.console
 
 import android.content.Context
+import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
 import mx.nexara.mobile.nativeapp.data.api.AddTeamMemberRequest
@@ -107,7 +108,11 @@ class CoreActivitiesRepository(context: Context) {
 
     // ── Pizarra ─────────────────────────────────────────────────────────────
 
-    suspend fun board(): TeamBoardResponseDto = api.board()
+    /** Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados. */
+    suspend fun board(): TeamBoardResponseDto {
+        val raw = api.board()
+        return raw.copy(users = raw.users?.filter { !PlatformAccounts.isNonEmployeeEmail(it.email) })
+    }
 
     suspend fun boardUser(userId: Long): TeamBoardUserDto = api.boardUser(userId)
 

@@ -9,6 +9,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
@@ -48,8 +49,11 @@ object CoreActivityRules {
 
     fun norm(email: String?): String = email?.trim()?.lowercase().orEmpty()
 
-    /** Christian solo asigna y revisa: ve la pizarra y nunca captura. */
-    fun isCeoEmail(email: String?): Boolean = norm(email) == CEO_EMAIL
+    /**
+     * Christian solo asigna y revisa: ve la pizarra y nunca captura. Claudia
+     * (tester) tiene el mismo trato — ver PlatformAccounts.isCeoEquivalentEmail.
+     */
+    fun isCeoEmail(email: String?): Boolean = PlatformAccounts.isCeoEquivalentEmail(email)
 
     // ── Pasos de evidencia ──────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
+import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.SessionUser
 
 /**
@@ -46,17 +47,8 @@ internal object AttendanceRoles {
 }
 
 /**
- * Correos que la web trata como dueño de plataforma / cuenta técnica: ven la
- * empresa completa y no `scope=subtree`.
- */
-private val PLATFORM_EMAILS = setOf(
-    "gerencia@nexara.com.mx",
-    "developer@nexara.com.mx",
-)
-
-/**
- * Rol efectivo, como `resolveV2RoleKey`: el dueño de la plataforma es CEO
- * aunque la base lo marque `isSuperAdmin`.
+ * Rol efectivo, como `resolveV2RoleKey`: el dueño de la plataforma (o su
+ * equivalente, Claudia) es CEO aunque la base lo marque `isSuperAdmin`.
  */
 internal fun resolveAttendanceRoleKey(
     email: String?,
@@ -64,8 +56,7 @@ internal fun resolveAttendanceRoleKey(
     orgRoleKey: String?,
     isSuperAdmin: Boolean,
 ): String? {
-    val mail = email?.trim()?.lowercase()
-    if (mail == "gerencia@nexara.com.mx") return AttendanceRoles.CEO
+    if (PlatformAccounts.isCeoEquivalentEmail(email)) return AttendanceRoles.CEO
     if (isSuperAdmin) return AttendanceRoles.SUPER_ADMIN
     roleKey?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }?.let { return it }
     return orgRoleKey?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
@@ -114,7 +105,7 @@ fun attendanceIsCompanyWideViewer(
 ): Boolean {
     if (isSuperAdmin) return true
     if (roleKey?.trim()?.lowercase() == AttendanceRoles.CEO) return true
-    return email?.trim()?.lowercase() in PLATFORM_EMAILS
+    return PlatformAccounts.isCeoEquivalentEmail(email) || PlatformAccounts.isDeveloperEmail(email)
 }
 
 fun attendanceIsCompanyWideViewer(user: SessionUser?): Boolean =
