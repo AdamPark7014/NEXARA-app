@@ -1,15 +1,20 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
 import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
 import { resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
+import { canDeleteOrDeactivateClient, type ClientActor } from '../ventas/client-permissions.js';
 
 const salesProjectInclude = {
   id: true,
   name: true,
   status: true,
 } as const;
+
+export const PROJECT_DEACTIVATE_FORBIDDEN =
+  'Solo Christian (Dirección General) puede desactivar o reactivar proyectos';
+export const PROJECT_DELETE_FORBIDDEN = 'Solo Christian (Dirección General) puede eliminar proyectos';
 
 @Injectable()
 export class OperationalProjectsService {
@@ -357,12 +362,21 @@ export class OperationalProjectsService {
     return updated;
   }
 
-  async changeStatus(id: number, statusDto: ProjectStatusChangeDto, companyId?: number | null) {
-    await this.findById(id, companyId);
+  async changeStatus(
+    id: number,
+    statusDto: ProjectStatusChangeDto,
+    companyId?: number | null,
+    actor?: ClientActor | null,
+  ) {
+    const actual = await this.findById(id, companyId);
     const validStatuses = ['ACTIVE', 'ON_HOLD', 'COMPLETED'];
 
     if (!validStatuses.includes(statusDto.status)) {
       throw new BadRequestException(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+    // Poner o quitar la pausa es desactivar/reactivar: la misma regla que en clientes.
+    if ((statusDto.status === 'ON_HOLD') !== (actual?.status === 'ON_HOLD') && !canDeleteOrDeactivateClient(actor)) {
+      throw new ForbiddenException(PROJECT_DEACTIVATE_FORBIDDEN);
     }
 
     const updated = await this.projectRepo.update({
@@ -602,5 +616,19 @@ export class OperationalProjectsService {
       created.push(activity);
     }
     return { count: created.length, activities: created };
+  }
+
+  /** Desactivar = «En pausa»; reactivar = «Activo». Solo Christian. */
+  async setActive(id: number, activo: boolean, actor: ClientActor | null | undefined, companyId?: number | null) {
+    if (!canDeleteOrDeactivateClient(actor)) throw new ForbiddenException(PROJECT_DEACTIVATE_FORBIDDEN);
+    return this.changeStatus(id, { status: activo ? 'ACTIVE' : 'ON_HOLD' }, companyId, actor);
+  }
+
+  /** Borrado lógico (`deletedAt`): desaparece de listas y buscadores; las actividades conservan su historial. */
+  async remove(id: number, actor: ClientActor | null | undefined, companyId?: number | null) {
+    if (!canDeleteOrDeactivateClient(actor)) throw new ForbiddenException(PROJECT_DELETE_FORBIDDEN);
+    await this.findById(id, companyId);
+    await this.prisma.operationalProject.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { ok: true, id };
   }
 }

@@ -92,8 +92,41 @@ export class OperationalProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() statusDto: ProjectStatusChangeDto,
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
   ) {
-    return this.operationalProjectsService.changeStatus(id, statusDto, companyId);
+    return this.operationalProjectsService.changeStatus(id, statusDto, companyId, user);
+  }
+
+  /** Desactivar (queda «En pausa»): solo Christian. */
+  @Post(':id/desactivar')
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.ACTIVITIES_MANAGE] })
+  deactivate(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+  ) {
+    return this.operationalProjectsService.setActive(id, false, user, companyId);
+  }
+
+  @Post(':id/reactivar')
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.ACTIVITIES_MANAGE] })
+  reactivate(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+  ) {
+    return this.operationalProjectsService.setActive(id, true, user, companyId);
+  }
+
+  /** Eliminar (borrado lógico: las actividades conservan su historial): solo Christian. */
+  @Delete(':id')
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.ACTIVITIES_MANAGE] })
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+  ) {
+    return this.operationalProjectsService.remove(id, user, companyId);
   }
 
   @Post(':id/engineers')
