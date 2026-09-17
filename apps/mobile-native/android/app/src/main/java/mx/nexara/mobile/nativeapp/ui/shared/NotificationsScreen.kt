@@ -113,6 +113,7 @@ internal val NOTIFICATION_CATEGORY_LABEL: Map<String, String> = mapOf(
     "profile" to "Perfil",
     "confirmations" to "Confirmación",
     "security" to "Seguridad",
+    "celebraciones" to "Celebraciones",
 )
 
 /** Categorías de módulos retirados de Core: sus avisos viejos no se listan. */

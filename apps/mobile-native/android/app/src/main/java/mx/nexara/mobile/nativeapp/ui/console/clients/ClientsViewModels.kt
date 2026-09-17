@@ -16,6 +16,7 @@ import mx.nexara.mobile.nativeapp.access.ClientSectors
 import mx.nexara.mobile.nativeapp.access.OrgEmails
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ClientDto
+import mx.nexara.mobile.nativeapp.data.api.ClientPermissionsDto
 import mx.nexara.mobile.nativeapp.data.api.ClientProjectDto
 import mx.nexara.mobile.nativeapp.data.api.CreateClientBody
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
@@ -42,6 +43,8 @@ data class ClientsListUiState(
     val items: List<ClientDto> = emptyList(),
     /** Sólo dirección ve de quién es cada cliente. */
     val showOwner: Boolean = false,
+    /** «Nuevo cliente» solo con `puedeAgregar`; mientras llega, oculto. */
+    val permisos: ClientPermissionsDto = ClientPermissionsDto(),
 ) {
     /** Búsqueda por nombre, razón social, RFC o encargado (la de la web). */
     val visible: List<ClientDto>
@@ -73,6 +76,7 @@ class ClientsListViewModel(app: Application) : AndroidViewModel(app) {
                     OrgEmails.norm(session?.email) == OrgEmails.CEO,
             )
         }
+        loadPermisos()
         load()
     }
 
@@ -84,7 +88,16 @@ class ClientsListViewModel(app: Application) : AndroidViewModel(app) {
         load()
     }
 
+    /** Permisos del padrón: se piden aparte para que un fallo no tumbe la lista. */
+    private fun loadPermisos() {
+        viewModelScope.launch {
+            val permisos = withContext(Dispatchers.IO) { runCatching { repo.permissions() }.getOrNull() }
+            if (permisos != null) _state.update { it.copy(permisos = permisos) }
+        }
+    }
+
     fun load(refresh: Boolean = false) {
+        if (refresh) loadPermisos()
         val sector = _state.value.sector
         if (sector == null) {
             _state.update { it.copy(loading = false, refreshing = false, items = emptyList()) }
@@ -123,7 +136,17 @@ data class ClientDetailUiState(
     val mySectors: List<ClientSector> = emptyList(),
     val projectTitle: String = "",
     val projectStart: String = "",
+    val permisos: ClientPermissionsDto = ClientPermissionsDto(),
+    /** Sube con cada desactivar/reactivar: el padrón se recarga al volver. */
+    val cambios: Int = 0,
+    /** Ya se eliminó: la pantalla regresa al padrón. */
+    val deleted: Boolean = false,
 ) {
+    val inactivo: Boolean get() = ClientRules.isInactive(client?.status)
+
+    /** Hay algo que mostrar en el menu ⋮ de la ficha. */
+    val showOwnerActions: Boolean get() = permisos.puedeDesactivar || permisos.puedeEliminar
+
     val clientSectors: List<ClientSector>
         get() = client?.sectorNames.orEmpty().mapNotNull { ClientSector.fromApi(it) }
 
@@ -162,6 +185,11 @@ class ClientDetailViewModel(
     fun load() {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
+            // Sin permisos no hay menú ⋮; un fallo aquí no debe tumbar la ficha.
+            val permisos = withContext(Dispatchers.IO) { runCatching { repo.permissions() }.getOrNull() }
+            if (permisos != null) _state.update { it.copy(permisos = permisos) }
+        }
+        viewModelScope.launch {
             try {
                 val client = withContext(Dispatchers.IO) { repo.client(clientId) }
                 // Los proyectos cuelgan del puente operativo; sin él no hay nada que pedir.
@@ -190,6 +218,74 @@ class ClientDetailViewModel(
             } catch (e: Exception) {
                 _state.update {
                     it.copy(busy = false, error = e.toUserMessage("No se pudo agregar el sector"))
+                }
+            }
+        }
+    }
+
+    /** Desactivar (`activo = false`) o reactivar. Solo Christian; a otros el servidor les da 403. */
+    fun setActive(activo: Boolean) {
+        _state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.setActive(clientId, activo) }
+                _state.update { it.copy(busy = false, cambios = it.cambios + 1) }
+                load()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        error = e.toUserMessage("No se pudo cambiar el estatus del cliente"),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Proyecto del cliente: desactivar (`ON_HOLD`) o reactivar. Solo Christian. */
+    fun setProjectActive(projectId: Long, activo: Boolean) {
+        _state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.setProjectActive(projectId, activo) }
+                _state.update { it.copy(busy = false) }
+                load()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        error = e.toUserMessage("No se pudo cambiar el estatus del proyecto"),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Borrado lógico del proyecto: se quita de la lista sin esperar la recarga. */
+    fun deleteProject(projectId: Long) {
+        _state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.deleteProject(projectId) }
+                _state.update { s -> s.copy(busy = false, projects = s.projects.filterNot { it.id == projectId }) }
+                load()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(busy = false, error = e.toUserMessage("No se pudo eliminar el proyecto"))
+                }
+            }
+        }
+    }
+
+    fun delete() {
+        _state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.delete(clientId) }
+                _state.update { it.copy(busy = false, deleted = true) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(busy = false, error = e.toUserMessage("No se pudo eliminar el cliente"))
                 }
             }
         }

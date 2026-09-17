@@ -102,6 +102,48 @@ data class ActivityDto(
     /** Fotos de evidencia que pide la actividad (mínimo). */
     val evidencePhotoRequired: Int? = null,
     val assignees: List<ActivityAssigneeRefDto>? = null,
+    /** Cancelada por un superior: motivo, cuándo y quién. */
+    val cancelReason: String? = null,
+    val cancelledAt: String? = null,
+    val cancelledBy: ActivityPersonRefDto? = null,
+)
+
+/** `{ id, nombre }` con nombre opcional: una persona borrada no debe tumbar el detalle. */
+data class ActivityPersonRefDto(
+    val id: Long? = null,
+    val nombre: String? = null,
+)
+
+/** Persona de la actividad que quien consulta puede reemplazar. */
+data class ActivityAccionPersonaDto(
+    val userId: Long,
+    val nombre: String? = null,
+    /** LEAD | TECNICO | APOYO */
+    val rol: String? = null,
+    val responsable: Boolean? = null,
+    /** Ejecuta (sube evidencia); en despacho el LEAD solo reparte. */
+    val ejecuta: Boolean? = null,
+)
+
+/** `GET activities/:id/acciones`: lo que un superior puede hacer con la actividad. */
+data class ActivityAccionesDto(
+    val puedeCancelar: Boolean? = null,
+    val puedePasar: Boolean? = null,
+    val personas: List<ActivityAccionPersonaDto>? = null,
+    val cerrada: Boolean? = null,
+    val estatus: String? = null,
+    val motivoMinimo: Int? = null,
+)
+
+data class CancelActivityRequest(
+    val motivo: String,
+)
+
+/** «Pasar a otro compañero»: quien la deja, quien la continúa y por qué. */
+data class ReassignActivityRequest(
+    val aUsuarioId: Long,
+    val deUsuarioId: Long,
+    val motivo: String,
 )
 
 /** Fila de equipo de `GET activities/:id` (quién la reparte, quién la ejecuta). */
@@ -281,6 +323,8 @@ data class AttendanceRangeUserDto(
     val totalMinutes: Int? = null,
     val days: List<AttendanceDayDto>? = null,
     val attendances: List<AttendanceEventDto>? = null,
+    /** Días sin checada que Christian justificó. */
+    val justificaciones: List<AttendanceJustificacionDto>? = null,
 )
 
 data class AttendanceRangeDto(
@@ -289,6 +333,33 @@ data class AttendanceRangeDto(
     val totalMinutesAll: Int? = null,
     val totalUsers: Int? = null,
     val users: List<AttendanceRangeUserDto>? = null,
+    /** `attendance/range` (lo propio): las faltas justificadas vienen arriba, sin `users`. */
+    val justificaciones: List<AttendanceJustificacionDto>? = null,
+)
+
+/**
+ * Falta justificada: ese día se lee «Falta justificada · motivo», ni ausente ni
+ * asistió. No es checada ni suma horas.
+ */
+data class AttendanceJustificacionDto(
+    val id: Long? = null,
+    val userId: Long? = null,
+    /** AAAA-MM-DD */
+    val fecha: String? = null,
+    val motivo: String? = null,
+    /** FALTA_JUSTIFICADA */
+    val estado: String? = null,
+    val etiqueta: String? = null,
+    val justificadaPor: ActivityPersonRefDto? = null,
+    val justificadaAt: String? = null,
+)
+
+/** `POST attendance/justificaciones` (solo Christian). */
+data class JustificarFaltaRequest(
+    val userId: Long,
+    /** AAAA-MM-DD */
+    val fecha: String,
+    val motivo: String,
 )
 
 data class AttendanceCurrentDto(
@@ -433,6 +504,10 @@ interface ConsoleApi {
         @Query("to") to: String,
     ): AttendanceRangeDto
 
+    /** Justificar la falta de un día sin checada. Solo Christian; no crea checadas. */
+    @POST("attendance/justificaciones")
+    suspend fun justificarFalta(@Body body: JustificarFaltaRequest): okhttp3.ResponseBody
+
     @GET("attendance/current")
     suspend fun getAttendanceCurrent(): AttendanceCurrentDto
 
@@ -454,6 +529,23 @@ interface ConsoleApi {
 
     @GET("activities/{id}/reasignaciones")
     suspend fun getActivityReassignments(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
+
+    /** Cancelar y «pasar a otro compañero»: qué puede hacer quien consulta. */
+    @GET("activities/{id}/acciones")
+    suspend fun getActivityActions(@Path("id") id: Long): ActivityAccionesDto
+
+    /** Solo superiores de quien la ejecuta; motivo de al menos `motivoMinimo` caracteres. */
+    @POST("activities/{id}/cancelar")
+    suspend fun cancelActivity(
+        @Path("id") id: Long,
+        @Body body: CancelActivityRequest,
+    ): okhttp3.ResponseBody
+
+    @POST("activities/{id}/reasignar")
+    suspend fun reassignActivity(
+        @Path("id") id: Long,
+        @Body body: ReassignActivityRequest,
+    ): okhttp3.ResponseBody
 
     @GET("gps/me")
     suspend fun getGpsMe(): GpsMeResponse

@@ -15,6 +15,9 @@ internal object NotificationEventIcons {
     val GREEN: Int = 0xFF16A34A.toInt()
     val RED: Int = 0xFFDC2626.toInt()
 
+    /** Rosa de fiesta: cumpleaños. Los aniversarios van en [AMBER]. */
+    val PINK: Int = 0xFFDB2777.toInt()
+
     private val GLYPHS: Map<String, Int> = mapOf(
         "entrada" to R.drawable.ic_nx_login,
         "entrada_tarde" to R.drawable.ic_nx_login,
@@ -40,20 +43,28 @@ internal object NotificationEventIcons {
         "atraso" to R.drawable.ic_nx_hourglass_top,
         "vencida" to R.drawable.ic_nx_error_outline,
         "fuera_zona" to R.drawable.ic_nx_wrong_location,
+        "cancelada" to R.drawable.ic_nx_event_busy,
+        "falta_justificada" to R.drawable.ic_nx_event_available,
+        "cliente" to R.drawable.ic_nx_business,
+        // Celebraciones (type BIRTHDAY / WORK_ANNIVERSARY, categoría `celebraciones`).
+        "cumpleanos" to R.drawable.ic_nx_cake,
+        "aniversario" to R.drawable.ic_nx_celebration,
         "chat" to R.drawable.ic_nx_chat,
         "mencion" to R.drawable.ic_nx_alternate_email,
         "seguridad" to R.drawable.ic_nx_shield,
         "aviso" to R.drawable.ic_nx_notifications,
     )
 
-    private val AMBER_KEYS = setOf("entrada_tarde", "atraso", "comida_tarde")
+    private val AMBER_KEYS = setOf("entrada_tarde", "atraso", "comida_tarde", "aniversario")
     private val GREEN_KEYS = setOf("aprobada", "finalizada", "comida_aprobada")
-    private val RED_KEYS = setOf("devuelta", "vencida", "comida_rechazada", "seguridad", "fuera_zona")
+    private val RED_KEYS = setOf("devuelta", "vencida", "comida_rechazada", "seguridad", "fuera_zona", "cancelada")
+    private val PINK_KEYS = setOf("cumpleanos")
 
     @DrawableRes
     fun glyphRes(icon: String): Int = GLYPHS[icon] ?: R.drawable.ic_nx_notifications
 
     fun color(icon: String): Int = when (icon) {
+        in PINK_KEYS -> PINK
         in AMBER_KEYS -> AMBER
         in GREEN_KEYS -> GREEN
         in RED_KEYS -> RED

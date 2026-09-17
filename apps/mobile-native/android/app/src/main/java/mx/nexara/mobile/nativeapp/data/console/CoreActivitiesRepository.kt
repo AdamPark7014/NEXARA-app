@@ -12,6 +12,7 @@ import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.CelebracionesHoyDto
 import mx.nexara.mobile.nativeapp.data.api.CoreActivitiesApi
 import mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest
 import mx.nexara.mobile.nativeapp.data.api.DispatchMyActivityRequest
@@ -40,6 +41,9 @@ class CoreActivitiesRepository(context: Context) {
     // ── Mis actividades ─────────────────────────────────────────────────────
 
     suspend fun myActivities(): MyActivitiesResponseDto = api.myActivities()
+
+    /** Cumpleaños y aniversarios de hoy en la empresa (aviso arriba de Actividades). */
+    suspend fun celebracionesHoy(): CelebracionesHoyDto = api.celebracionesHoy()
 
     suspend fun reorder(
         activityIds: List<Long>,

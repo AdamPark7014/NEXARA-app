@@ -6,6 +6,7 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.AddClientSectorBody
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.ClientDto
+import mx.nexara.mobile.nativeapp.data.api.ClientPermissionsDto
 import mx.nexara.mobile.nativeapp.data.api.ClientProjectDto
 import mx.nexara.mobile.nativeapp.data.api.ClientsApi
 import mx.nexara.mobile.nativeapp.data.api.CreateClientBody
@@ -28,7 +29,19 @@ class ClientsRepository(context: Context) {
 
     suspend fun client(id: Long): ClientDto = api.getClient(id)
 
+    /** Qué puede hacer la sesión con el padrón (agregar, editar, desactivar, eliminar). */
+    suspend fun permissions(): ClientPermissionsDto = api.permissions()
+
     suspend fun create(body: CreateClientBody): ClientDto = api.createClient(body)
+
+    /** Desactivar (`activo = false`) o reactivar. El servidor responde 403 si no eres Christian. */
+    suspend fun setActive(id: Long, activo: Boolean) {
+        if (activo) api.reactivateClient(id).close() else api.deactivateClient(id).close()
+    }
+
+    suspend fun delete(id: Long) {
+        api.deleteClient(id).close()
+    }
 
     suspend fun addSector(id: Long, sector: ClientSector): ClientDto =
         api.addSector(id, AddClientSectorBody(sector.name))
@@ -39,6 +52,15 @@ class ClientsRepository(context: Context) {
     /** Proyectos del cliente: se piden por el puente operativo, no por el id del padrón. */
     suspend fun projects(serviceClientId: Long): List<ClientProjectDto> =
         api.clientProjects(serviceClientId)
+
+    /** Desactivar (`ON_HOLD`) o reactivar (`ACTIVE`) un proyecto: misma regla que clientes. */
+    suspend fun setProjectActive(projectId: Long, activo: Boolean) {
+        if (activo) api.reactivateProject(projectId).close() else api.deactivateProject(projectId).close()
+    }
+
+    suspend fun deleteProject(projectId: Long) {
+        api.deleteProject(projectId).close()
+    }
 
     suspend fun createProject(
         title: String,

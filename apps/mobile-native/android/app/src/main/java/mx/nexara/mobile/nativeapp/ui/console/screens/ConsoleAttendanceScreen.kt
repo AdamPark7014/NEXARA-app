@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +53,7 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.SessionUser
 import mx.nexara.mobile.nativeapp.data.api.AttendanceCurrentDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceEventDto
+import mx.nexara.mobile.nativeapp.data.api.AttendanceJustificacionDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto
 import mx.nexara.mobile.nativeapp.data.api.GpsLocationDto
 import mx.nexara.mobile.nativeapp.data.api.attendanceCoord
@@ -92,6 +94,8 @@ import java.util.Locale
 enum class AttendanceEstado(val etiqueta: String, val color: Color) {
     PRESENTE("En jornada", Color(0xFF16A34A)),
     COMPLETO("Completó", Color(0xFF2563EB)),
+    /** Sin checada, pero Christian la justificó: ni ausente ni asistió. */
+    JUSTIFICADA(FaltasJustificadas.ETIQUETA, Color(0xFF7C3AED)),
     AUSENTE("Sin checada", Color(0xFF94A3B8)),
 }
 
@@ -106,6 +110,8 @@ data class AttendancePersona(
     val fotoSalida: String?,
     val mapaEntrada: String?,
     val mapaSalida: String?,
+    /** Justificación de ese día («Falta justificada · motivo»). */
+    val justificacion: AttendanceJustificacionDto? = null,
 )
 
 data class AttendanceUiState(
@@ -124,6 +130,8 @@ data class AttendanceUiState(
     val equipoGps: List<GpsLocationDto> = emptyList(),
     val trayecto: List<GpsLocationDto> = emptyList(),
     val trayectoCargando: Boolean = false,
+    /** Mi falta justificada del día que se ve (si no checé entrada). */
+    val miJustificacion: AttendanceJustificacionDto? = null,
 ) {
     val presentes: Int get() = personas.count { it.estado == AttendanceEstado.PRESENTE }
     val completos: Int get() = personas.count { it.estado == AttendanceEstado.COMPLETO }
@@ -195,10 +203,12 @@ internal fun mapPersonas(
         val entrada = ultimaPorTipo(raw.attendances, "entrada")
         val salida = ultimaPorTipo(raw.attendances, "salida")
         val dia = raw.days?.firstOrNull { it.date == fecha || it.date.startsWith(fecha) }
+        val justificacion = FaltasJustificadas.delDia(raw.justificaciones, fecha)
         val estado = when {
             dia?.isOpen == true -> AttendanceEstado.PRESENTE
             entrada != null && salida != null -> AttendanceEstado.COMPLETO
             entrada != null -> AttendanceEstado.PRESENTE
+            justificacion != null -> AttendanceEstado.JUSTIFICADA
             else -> AttendanceEstado.AUSENTE
         }
         val fotoEntrada = raw.attendances
@@ -227,6 +237,7 @@ internal fun mapPersonas(
                 attendanceCoord(salida?.exitLatitude),
                 attendanceCoord(salida?.exitLongitude),
             ),
+            justificacion = justificacion.takeIf { estado == AttendanceEstado.JUSTIFICADA },
         )
     }
     .sortedWith(
@@ -243,6 +254,8 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
 
     val viewMode: AttendanceViewMode = attendanceViewMode(sesion)
     val puedeVerTrayectoria: Boolean = attendanceCanSeeTrajectory(sesion)
+    /** «Justificar falta»: solo Christian. */
+    val puedeJustificar: Boolean = FaltasJustificadas.puedeJustificar(sesion?.email)
     private val scope: String? = attendanceScopeParam(sesion)
 
     private val _state = MutableStateFlow(AttendanceUiState())
@@ -278,6 +291,18 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
             val historial = runCatching {
                 withContext(Dispatchers.IO) { repo.attendanceHistory(fecha) }
             }.getOrDefault(emptyList())
+            // Sin entrada ese día puede haber una falta justificada: solo entonces se pregunta.
+            val miJustificacion = if (
+                viewMode.canRegisterSelf && historial.none { it.type.equals("entrada", true) }
+            ) {
+                runCatching {
+                    withContext(Dispatchers.IO) { repo.myAttendanceJustifications(from = fecha, to = fecha) }
+                }.onFailure { if (it is CancellationException) throw it }
+                    .getOrNull()
+                    ?.let { FaltasJustificadas.delDia(it, fecha) }
+            } else {
+                null
+            }
 
             val personas = if (viewMode.canManageTeam) {
                 try {
@@ -304,9 +329,22 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                     personas = personas,
                     error = fallo,
                     gpsActivo = JornadaGps.isRunning(),
+                    miJustificacion = miJustificacion,
                 )
             }
         }
+    }
+
+    /**
+     * Solo Christian: marca el día (el que se está viendo) como «Falta justificada».
+     * Lanza el error del servidor para que el diálogo lo muestre; al guardar, recarga.
+     */
+    suspend fun justificarFalta(userId: Long, motivo: String) {
+        val fecha = _state.value.fecha
+        withContext(Dispatchers.IO) {
+            repo.justificarFalta(userId = userId, fecha = fecha, motivo = FaltasJustificadas.motivoLimpio(motivo))
+        }
+        refresh(initial = false)
     }
 
     fun cargarTrayectoria() {
@@ -609,6 +647,8 @@ private fun EquipoTab(
 ) {
     val esHoy = state.fecha == hoyIso()
     var ahoraMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    /** Persona a la que Christian le está justificando la falta. */
+    var justificando by remember { mutableStateOf<AttendancePersona?>(null) }
     val hayJornadaAbierta = state.presentes > 0 || state.current?.isOpen == true
     LaunchedEffect(hayJornadaAbierta) {
         while (hayJornadaAbierta) {
@@ -701,10 +741,129 @@ private fun EquipoTab(
         }
 
         items(state.visibles, key = { "asis-${it.userId}" }) { persona ->
-            PersonaCard(persona = persona, ahoraMs = ahoraMs, onAbrir = onAbrir)
+            PersonaCard(
+                persona = persona,
+                ahoraMs = ahoraMs,
+                onAbrir = onAbrir,
+                // Solo Christian, en un día sin entrada que no sea futuro.
+                onJustificar = if (
+                    FaltasJustificadas.ofrecerJustificar(
+                        puede = vm.puedeJustificar,
+                        hayEntrada = persona.entradaIso != null,
+                        yaJustificada = persona.justificacion != null,
+                        fecha = state.fecha,
+                        hoy = hoyIso(),
+                    ) && persona.estado == AttendanceEstado.AUSENTE
+                ) {
+                    { justificando = persona }
+                } else {
+                    null
+                },
+            )
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+
+    justificando?.let { persona ->
+        JustificarFaltaDialog(
+            nombre = persona.nombre,
+            dia = etiquetaDia(state.fecha, esHoy),
+            onDismiss = { justificando = null },
+            onConfirm = { motivo ->
+                vm.justificarFalta(persona.userId, motivo)
+                justificando = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun JustificarFaltaDialog(
+    nombre: String,
+    dia: String,
+    onDismiss: () -> Unit,
+    onConfirm: suspend (String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var motivo by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val ok = FaltasJustificadas.motivoOk(motivo)
+    val min = FaltasJustificadas.MOTIVO_MINIMO
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Justificar falta", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "$nombre · ${dia.replaceFirstChar { it.lowercase() }}. El día quedará como «Falta justificada» " +
+                        "con tu motivo; no se crea ninguna checada.",
+                    fontSize = 13.sp,
+                    color = NxColors.Muted,
+                )
+                OutlinedTextField(
+                    value = motivo,
+                    onValueChange = { motivo = it.take(1000) },
+                    label = { Text("Motivo *") },
+                    placeholder = { Text("Ej. Incapacidad del IMSS por tres días.") },
+                    minLines = 3,
+                    enabled = !saving,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "${FaltasJustificadas.motivoLimpio(motivo).length}/$min caracteres mínimo",
+                    fontSize = 11.5.sp,
+                    color = if (ok) NxColors.Muted else NxColors.Danger,
+                )
+                error?.let { Text(it, fontSize = 13.sp, color = NxColors.Danger) }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    scope.launch {
+                        saving = true
+                        error = null
+                        try {
+                            onConfirm(motivo)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            error = e.toUserMessage("No se pudo justificar la falta")
+                        } finally {
+                            saving = false
+                        }
+                    }
+                },
+                enabled = ok && !saving,
+                colors = ButtonDefaults.buttonColors(containerColor = AttendanceEstado.JUSTIFICADA.color),
+            ) { Text(if (saving) "Guardando…" else "Justificar falta") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancelar") }
+        },
+    )
+}
+
+/** «Falta justificada · motivo», con quién la justificó. */
+@Composable
+private fun FaltaJustificadaNota(j: AttendanceJustificacionDto, modifier: Modifier = Modifier) {
+    val color = AttendanceEstado.JUSTIFICADA.color
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.08f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(FaltasJustificadas.texto(j), fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = color)
+        FaltasJustificadas.quien(j)?.let { Text(it, fontSize = 11.5.sp, color = NxColors.Muted) }
     }
 }
 
@@ -769,16 +928,24 @@ private fun MiJornadaCard(
                     modifier = Modifier.size(32.dp),
                 )
             }
+            // Sin entrada pero justificada: no es «sin entrada registrada».
+            val miFalta = state.miJustificacion?.takeIf { !abierta && !hayEntrada }
             Text(
                 when {
                     abierta -> "Jornada en curso"
                     haySalida && hayEntrada -> "Jornada completada"
+                    miFalta != null -> FaltasJustificadas.ETIQUETA
                     else -> "Sin entrada registrada"
                 },
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = if (abierta) AttendanceEstado.PRESENTE.color else NxColors.Slate,
+                color = when {
+                    abierta -> AttendanceEstado.PRESENTE.color
+                    miFalta != null -> AttendanceEstado.JUSTIFICADA.color
+                    else -> NxColors.Slate
+                },
             )
+            miFalta?.let { FaltaJustificadaNota(it) }
             if (abierta && inicioIso != null) {
                 Text(
                     fmtHms(transcurridoMs(inicioIso, null, ahoraMs)),
@@ -921,6 +1088,8 @@ private fun PersonaCard(
     persona: AttendancePersona,
     ahoraMs: Long,
     onAbrir: (String) -> Unit,
+    /** «Justificar falta» (solo Christian, día sin entrada). */
+    onJustificar: (() -> Unit)? = null,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -966,45 +1135,58 @@ private fun PersonaCard(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF8FAFC))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("ENTRADA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
-                    Text(fmtHora(persona.entradaIso), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
+            val justificacion = persona.justificacion
+            if (persona.estado == AttendanceEstado.JUSTIFICADA && justificacion != null) {
+                // Ni «sin checada» ni horas en cero: el día está justificado.
+                FaltaJustificadaNota(justificacion)
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF8FAFC))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("ENTRADA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
+                        Text(fmtHora(persona.entradaIso), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("SALIDA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
+                        Text(fmtHora(persona.salidaIso), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            if (persona.estado == AttendanceEstado.PRESENTE) "EN VIVO" else "JORNADA",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = NxColors.Muted,
+                        )
+                        Text(
+                            if (persona.estado == AttendanceEstado.AUSENTE) {
+                                "—"
+                            } else {
+                                fmtHms(
+                                    transcurridoMs(
+                                        persona.entradaIso,
+                                        if (persona.estado == AttendanceEstado.PRESENTE) null else persona.salidaIso,
+                                        ahoraMs,
+                                    ),
+                                )
+                            },
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = persona.estado.color,
+                        )
+                    }
                 }
-                Column(Modifier.weight(1f)) {
-                    Text("SALIDA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
-                    Text(fmtHora(persona.salidaIso), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        if (persona.estado == AttendanceEstado.PRESENTE) "EN VIVO" else "JORNADA",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = NxColors.Muted,
-                    )
-                    Text(
-                        if (persona.estado == AttendanceEstado.AUSENTE) {
-                            "—"
-                        } else {
-                            fmtHms(
-                                transcurridoMs(
-                                    persona.entradaIso,
-                                    if (persona.estado == AttendanceEstado.PRESENTE) null else persona.salidaIso,
-                                    ahoraMs,
-                                ),
-                            )
-                        },
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = persona.estado.color,
-                    )
-                }
+            }
+
+            onJustificar?.let { justificar ->
+                OutlinedButton(
+                    onClick = justificar,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AttendanceEstado.JUSTIFICADA.color),
+                ) { Text("Justificar falta", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
             }
 
             if (persona.fotoEntrada != null || persona.fotoSalida != null) {

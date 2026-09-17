@@ -79,6 +79,9 @@ internal object ConsoleRoutes {
      */
     const val NewClient = "console/clients-new?sector={sector}"
 
+    /** Marca en el padrón: la ficha cambió o eliminó un cliente y la lista debe recargarse. */
+    const val CLIENTS_CHANGED_KEY = "clientes_cambiaron"
+
     const val MyProfile = "console/my-profile"
     const val Notifications = "console/notifications"
     const val OfflineQueue = "console/offline-queue"
@@ -357,8 +360,13 @@ fun ConsoleNavHost(
                     initialMessageId = chatMessageId,
                 )
             }
-            nxComposable(ConsoleRoutes.Clients) {
+            nxComposable(ConsoleRoutes.Clients) { entry ->
+                val recargar by entry.savedStateHandle
+                    .getStateFlow(ConsoleRoutes.CLIENTS_CHANGED_KEY, false)
+                    .collectAsState()
                 ClientsListScreen(
+                    refreshRequested = recargar,
+                    onRefreshConsumed = { entry.savedStateHandle[ConsoleRoutes.CLIENTS_CHANGED_KEY] = false },
                     onOpenClient = { clientId ->
                         navController.navigate(ConsoleRoutes.clientDetail(clientId)) {
                             launchSingleTop = true
@@ -373,9 +381,28 @@ fun ConsoleNavHost(
             }
             nxComposable(ConsoleRoutes.ClientDetail, style = NxNavAnimStyle.Push) { entry ->
                 val clientId = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                // El padrón que quedó debajo se entera por su savedStateHandle y se recarga al volver.
+                val marcarPadron: () -> Unit = {
+                    runCatching { navController.getBackStackEntry(ConsoleRoutes.Clients) }
+                        .getOrNull()
+                        ?.savedStateHandle
+                        ?.set(ConsoleRoutes.CLIENTS_CHANGED_KEY, true)
+                }
                 ClientDetailScreen(
                     clientId = clientId,
                     onBack = { navController.popBackStack() },
+                    onChanged = marcarPadron,
+                    onDeleted = {
+                        marcarPadron()
+                        if (!navController.popBackStack(ConsoleRoutes.Clients, inclusive = false)) {
+                            // Llegó por un enlace, sin padrón debajo: se abre uno nuevo (ya viene fresco).
+                            navController.popBackStack()
+                            navController.navigate(ConsoleRoutes.Clients) {
+                                popUpTo(startRoute)
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                 )
             }
             nxComposable(ConsoleRoutes.NewClient, style = NxNavAnimStyle.Modal) { entry ->

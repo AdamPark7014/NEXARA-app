@@ -185,6 +185,8 @@ fun EvidenceCaptureFlow(
         }
     }
 
+    /** Visor de las fotos del avance anterior. */
+    var visor by remember { mutableStateOf<Pair<List<CoreActivityRules.EvidencePhoto>, Int>?>(null) }
     var cameraKind by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf<GeoPhoto?>(null) }
     var pendingKind by remember { mutableStateOf<String?>(null) }
@@ -206,6 +208,8 @@ fun EvidenceCaptureFlow(
         flow = saved.copy(
             activity = saved.activity ?: flow?.activity,
             assigneeIndicaciones = saved.assigneeIndicaciones ?: flow?.assigneeIndicaciones,
+            // Los POST no traen el avance anterior: se conserva el del GET.
+            avancesAnteriores = saved.avancesAnteriores ?: flow?.avancesAnteriores,
         )
         error = null
         successIcon = if (saved.status == STEP_COMPLETED) NxGlyph.APPROVED.icon else NxGlyph.DONE.icon
@@ -396,6 +400,15 @@ fun EvidenceCaptureFlow(
             val paraTi = flow?.assigneeIndicaciones
             if (!paraTi.isNullOrBlank()) SoftNote(title = "Indicaciones para ti", text = paraTi)
 
+            // Te la pasaron: lo que dejó quien la tenía, solo lectura, antes de tus pasos.
+            flow?.avancesAnteriores.orEmpty().forEach { av ->
+                AvanceAnteriorCard(
+                    av = av,
+                    coreKind = coreKind,
+                    onOpenVisor = { fotos, index -> if (index in fotos.indices) visor = fotos to index },
+                )
+            }
+
             if (isCorrection && (rejected.isNotEmpty() || !flow?.reviewNotes.isNullOrBlank())) {
                 CorrectionBanner(rejected = rejected, steps = steps, notes = flow?.reviewNotes)
             }
@@ -540,6 +553,10 @@ fun EvidenceCaptureFlow(
                 }
             }
         }
+    }
+
+    visor?.let { (fotos, index) ->
+        EvidencePhotoViewer(fotos = fotos, startIndex = index, onClose = { visor = null })
     }
 
     cameraKind?.let { kind ->

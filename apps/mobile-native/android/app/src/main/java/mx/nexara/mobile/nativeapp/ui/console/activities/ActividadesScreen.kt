@@ -178,6 +178,11 @@ fun ActividadesScreen(
     }
 
     Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
+        // Cumpleaños y aniversarios de hoy; sin nada que celebrar no ocupa lugar.
+        CelebracionesBanner(
+            repo = repo,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+        )
         if (conPestanas) {
             VistaTabs(vista = vista, onChange = ::cambiarVista)
         }
