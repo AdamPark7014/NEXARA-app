@@ -12,7 +12,14 @@ import {
   clientSectorsForEmail,
   type ClientSector,
 } from "@/lib/client-sectors";
-import { listSalesClients, type SalesClient } from "@/lib/sales-api";
+import {
+  getClientPermissions,
+  isInactiveClient,
+  listSalesClients,
+  NO_CLIENT_PERMISSIONS,
+  type ClientPermissions,
+  type SalesClient,
+} from "@/lib/sales-api";
 import { IconLabel } from "@/components/ui/IconBadge";
 import { CLIENT_SECTOR_ICONS } from "@/components/erp/ClientSectorIcon";
 import styles from "./clientes-core.module.css";
@@ -33,10 +40,23 @@ function ClientesWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [permisos, setPermisos] = useState<ClientPermissions>(NO_CLIENT_PERMISSIONS);
 
   useEffect(() => {
     if (initialSector && initialSector !== sector) setSector(initialSector);
   }, [initialSector, sector]);
+
+  // Solo quien puede agregar (jefes con personal a cargo, administración, dirección) ve «Nuevo».
+  useEffect(() => {
+    if (!token) return;
+    let vivo = true;
+    getClientPermissions(token)
+      .then((p) => vivo && setPermisos(p))
+      .catch(() => vivo && setPermisos(NO_CLIENT_PERMISSIONS));
+    return () => {
+      vivo = false;
+    };
+  }, [token]);
 
   const load = useCallback(async () => {
     if (!token || !sector) return;
@@ -86,12 +106,14 @@ function ClientesWorkspace() {
           <h1 className={styles.title}>Clientes</h1>
           <p className={styles.sub}>Un padrón, tres usos. Cambia de sector sin salir de aquí.</p>
         </div>
-        <Link
-          className={styles.primaryBtn}
-          href={`/erp/clientes/nuevo?sector=${meta.slug}`}
-        >
-          Nuevo
-        </Link>
+        {permisos.puedeAgregar ? (
+          <Link
+            className={styles.primaryBtn}
+            href={`/erp/clientes/nuevo?sector=${meta.slug}`}
+          >
+            Nuevo
+          </Link>
+        ) : null}
       </div>
 
       {allowedSectors.length > 1 ? (
@@ -140,15 +162,27 @@ function ClientesWorkspace() {
         <p className={styles.sub}>Cargando…</p>
       ) : visible.length === 0 ? (
         <div className={styles.empty}>
-          Nadie en este sector todavía.{" "}
-          <Link href={`/erp/clientes/nuevo?sector=${meta.slug}`}>Crear el primero</Link>
+          Nadie en este sector todavía.
+          {permisos.puedeAgregar ? (
+            <>
+              {" "}
+              <Link href={`/erp/clientes/nuevo?sector=${meta.slug}`}>Crear el primero</Link>
+            </>
+          ) : null}
         </div>
       ) : (
         <div className={styles.list}>
           {visible.map((c) => (
             <Link key={c.id} href={`/erp/clientes/${c.id}`} className={styles.row}>
               <div style={{ minWidth: 0 }}>
-                <div className={styles.rowName}>{c.name}</div>
+                <div className={styles.rowName}>
+                  {c.name}
+                  {isInactiveClient(c.status) ? (
+                    <span className={styles.chip} style={{ marginLeft: 8, fontSize: 11 }}>
+                      Inactivo
+                    </span>
+                  ) : null}
+                </div>
                 <div className={styles.rowSub}>
                   {[c.taxId, c.legalName].filter(Boolean).join(" · ") || "Sin datos fiscales"}
                 </div>

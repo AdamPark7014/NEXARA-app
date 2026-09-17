@@ -371,6 +371,22 @@ export class ActivityEvidenceService {
     if (activity.estatus === 'Aprobada') {
       throw new ForbiddenException('La actividad ya fue aprobada y no permite nuevas evidencias');
     }
+    if (/cancel/i.test(activity.estatus || '')) {
+      throw new ForbiddenException('La actividad fue cancelada y ya no recibe evidencias');
+    }
+
+    // Quien pasó la actividad a otro compañero ya no sube evidencia: su avance quedó guardado.
+    if (activity.responsableId !== userId) {
+      const fila = await this.prisma.activityAssignee.findFirst({
+        where: { activityId, userId },
+        select: { retiradoAt: true },
+      });
+      if (fila?.retiradoAt) {
+        throw new ForbiddenException(
+          'Ya no estás en esta actividad: se la pasaron a otro compañero. Tu avance quedó guardado.',
+        );
+      }
+    }
 
     let evidence = await this.prisma.activityEvidence.findFirst({
       where: { activityId, userId, ...companyWhere(activity.companyId) },
@@ -723,7 +739,89 @@ export class ActivityEvidenceService {
       assigneeIndicaciones: evidence.activity.assignees[0]?.indicaciones ?? null,
       stepsForKind: evidenceStepsForKind(coreKind),
       progressPct: evidenceProgressPct(evidence.status, coreKind),
+      avancesAnteriores: await this.previousProgress(activityId, evidence.userId),
     };
+  }
+
+  /**
+   * «Avance anterior de <nombre>»: lo que dejó quien tenía la actividad antes de que se la pasaran
+   * a esta persona (y, si hubo varias entregas, a quien la tuvo antes). Solo lectura: quien continúa
+   * toma su propia foto de entrada y de salida.
+   */
+  async previousProgress(activityId: number, userId: number) {
+    const out: Array<{
+      userId: number;
+      nombre: string;
+      titulo: string;
+      motivo: string | null;
+      reasignadaAt: Date;
+      movidaPor: string | null;
+      progressPct: number;
+      evidence: {
+        status: string;
+        entryPhotoUrl: string | null;
+        entryPhotoUploadedAt: Date | null;
+        evidencePhotos: string[];
+        evidencePhotosUploadedAt: Date | null;
+        serviceSheetPdfUrl: string | null;
+        serviceSheetData: unknown;
+        serviceSheetCompletedAt: Date | null;
+        exitPhotoUrl: string | null;
+        exitPhotoUploadedAt: Date | null;
+      } | null;
+    }> = [];
+    const vistos = new Set<number>([userId]);
+    let frontera = [userId];
+    for (let nivel = 0; nivel < 5 && frontera.length; nivel++) {
+      const entregas = await this.prisma.activityReassignment.findMany({
+        where: { activityId, aUsuarioId: { in: frontera }, deUsuarioId: { not: null } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          deUsuarioId: true,
+          motivo: true,
+          createdAt: true,
+          deUsuario: { select: { nombre: true } },
+          movidaPor: { select: { nombre: true } },
+        },
+      });
+      const siguiente: number[] = [];
+      for (const r of entregas) {
+        if (r.deUsuarioId == null || vistos.has(r.deUsuarioId)) continue;
+        vistos.add(r.deUsuarioId);
+        siguiente.push(r.deUsuarioId);
+        const [ev, activity] = await Promise.all([
+          this.prisma.activityEvidence.findFirst({
+            where: { activityId, userId: r.deUsuarioId },
+            select: {
+              status: true,
+              entryPhotoUrl: true,
+              entryPhotoUploadedAt: true,
+              evidencePhotos: true,
+              evidencePhotosUploadedAt: true,
+              serviceSheetPdfUrl: true,
+              serviceSheetData: true,
+              serviceSheetCompletedAt: true,
+              exitPhotoUrl: true,
+              exitPhotoUploadedAt: true,
+            },
+          }),
+          this.prisma.activity.findUnique({ where: { id: activityId }, select: { coreKind: true } }),
+        ]);
+        const nombre = r.deUsuario?.nombre?.trim() || 'un compañero';
+        out.push({
+          userId: r.deUsuarioId,
+          nombre,
+          titulo: `Avance anterior de ${nombre}`,
+          motivo: r.motivo ?? null,
+          reasignadaAt: r.createdAt,
+          movidaPor: r.movidaPor?.nombre ?? null,
+          progressPct: ev ? evidenceProgressPct(ev.status, activity?.coreKind ?? null) : 0,
+          evidence: ev ? { ...ev, evidencePhotos: ev.evidencePhotos ?? [] } : null,
+        });
+      }
+      frontera = siguiente;
+    }
+    return out;
   }
 
   /**

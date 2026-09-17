@@ -77,15 +77,35 @@ export class ActivityTeamController {
 export class ActivityReassignController {
   constructor(private readonly service: ActivityTeamService) {}
 
+  /**
+   * «Pasar a otro compañero» con motivo. Guard amplio a propósito: un encargado sin
+   * ACTIVITIES_MANAGE también es superior; la regla la aplica el servicio.
+   */
   @Post('reasignar')
-  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
   reassign(
     @Param('id', ParseIntPipe) activityId: number,
-    @Body() body: { aUsuarioId: number; motivo?: string; retirarAnterior?: boolean },
+    @Body() body: { aUsuarioId: number; deUsuarioId?: number; motivo?: string; retirarAnterior?: boolean },
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.reassign(activityId, body, Number(user?.id), companyId);
+    return this.service.reassign(
+      activityId,
+      body,
+      { id: Number(user?.id), email: user?.email ?? null },
+      companyId,
+    );
+  }
+
+  /** Acciones de superior disponibles para quien consulta: cancelar y a quién puede reemplazar. */
+  @Get('acciones')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  acciones(
+    @Param('id', ParseIntPipe) activityId: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.superiorActions(activityId, { id: Number(user?.id), email: user?.email ?? null }, companyId);
   }
 
   @Get('reasignaciones')

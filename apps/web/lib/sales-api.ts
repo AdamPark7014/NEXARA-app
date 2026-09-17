@@ -612,6 +612,59 @@ export const getSalesClient = async (token: string, id: number) => {
   >(`ventas/clientes/${id}`, { token, method: "GET" }, "No se pudo cargar el cliente");
 };
 
+/** Qué puede hacer el usuario con el padrón (la API decide; la web solo esconde lo que no aplica). */
+export type ClientPermissions = {
+  puedeAgregar: boolean;
+  puedeEditar: boolean;
+  puedeDesactivar: boolean;
+  puedeEliminar: boolean;
+};
+
+export const NO_CLIENT_PERMISSIONS: ClientPermissions = {
+  puedeAgregar: false,
+  puedeEditar: false,
+  puedeDesactivar: false,
+  puedeEliminar: false,
+};
+
+export const getClientPermissions = async (token: string) => {
+  return apiRequest<ClientPermissions>(
+    "ventas/clientes/permisos",
+    { token, method: "GET" },
+    "No se pudieron consultar tus permisos de clientes",
+  );
+};
+
+export const isInactiveClient = (status?: string | null) =>
+  ["inactivo", "inactiva", "inactive"].includes(String(status ?? "").trim().toLowerCase());
+
+/** Solo Christian: deja el cliente «Inactivo». */
+export const deactivateSalesClient = async (token: string, id: number) => {
+  return apiRequest<SalesClient>(
+    `ventas/clientes/${id}/desactivar`,
+    { token, method: "POST" },
+    "No se pudo desactivar el cliente",
+  );
+};
+
+/** Solo Christian: regresa el cliente a «Activo». */
+export const reactivateSalesClient = async (token: string, id: number) => {
+  return apiRequest<SalesClient>(
+    `ventas/clientes/${id}/reactivar`,
+    { token, method: "POST" },
+    "No se pudo reactivar el cliente",
+  );
+};
+
+/** Solo Christian: elimina el cliente del padrón. */
+export const deleteSalesClient = async (token: string, id: number) => {
+  return apiRequest<SalesClient>(
+    `ventas/clientes/${id}`,
+    { token, method: "DELETE" },
+    "No se pudo eliminar el cliente",
+  );
+};
+
 export type ClientInvoiceRow = {
   id: number;
   invoiceNumber: string;

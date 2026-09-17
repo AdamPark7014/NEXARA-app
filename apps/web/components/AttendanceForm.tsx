@@ -6,6 +6,7 @@ import { useUser } from './UserContext';
 import styles from './AttendanceForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import type { FaltaJustificada } from '@/lib/attendance-justifications';
 
 
 const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
@@ -43,6 +44,8 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
   const [rangeTo, setRangeTo] = useState<string>(() => getWeekRange().to);
   const [rangeTotalMinutes, setRangeTotalMinutes] = useState<number>(0);
   const [rangeDays, setRangeDays] = useState<{ date: string; totalMinutes: number }[]>([]);
+  /** Días sin checada que Christian justificó (se muestran aparte: no suman horas). */
+  const [rangeFaltas, setRangeFaltas] = useState<FaltaJustificada[]>([]);
   
   // Camera states
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -433,10 +436,15 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         if (!res.ok) return;
-        const data = await parseResponseJson<{ totalMinutes?: number; days?: typeof rangeDays }>(res);
+        const data = await parseResponseJson<{
+          totalMinutes?: number;
+          days?: typeof rangeDays;
+          justificaciones?: FaltaJustificada[];
+        }>(res);
         if (!data) return;
         setRangeTotalMinutes(data.totalMinutes || 0);
         if (Array.isArray(data.days)) setRangeDays(data.days);
+        setRangeFaltas(Array.isArray(data.justificaciones) ? data.justificaciones : []);
       } catch {
         // No interrumpir la UI si falla la consulta
       }
@@ -772,6 +780,19 @@ const AttendanceForm = ({ compact = false }: { compact?: boolean }) => {
                   <div key={day.date} className={styles.rangeDayItem}>
                     <span>{formatDate(day.date)}</span>
                     <span className={styles.mutedText}>{formatTotal(day.totalMinutes)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {rangeFaltas.length > 0 && (
+              <div className={styles.rangeDaysList}>
+                {rangeFaltas.map((falta) => (
+                  <div key={`falta-${falta.id}`} className={styles.rangeDayItem}>
+                    <span>{formatDate(`${falta.fecha}T12:00:00`)}</span>
+                    <span className={styles.mutedText}>
+                      Falta justificada · {falta.motivo}
+                      {falta.justificadaPor?.nombre ? ` (${falta.justificadaPor.nombre})` : ''}
+                    </span>
                   </div>
                 ))}
               </div>

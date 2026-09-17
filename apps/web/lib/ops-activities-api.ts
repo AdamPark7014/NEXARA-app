@@ -62,6 +62,11 @@ export type ActivityDetail = {
   clientFeedback?: string | null;
   branchLatitude?: number | string | null;
   branchLongitude?: number | string | null;
+  /** Cancelación documentada (solo superiores, con motivo). */
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
+  cancelledById?: number | null;
+  cancelledBy?: { id: number; nombre: string } | null;
 };
 
 export type ViaticoRow = {
@@ -153,15 +158,54 @@ export function listActivityTimeline(token: string, activityId: number) {
   return apiFetch<{ events: ActivityTimelineEvent[] }>(`activities/${activityId}/timeline`, token);
 }
 
+/**
+ * «Pasar a otro compañero»: solo superiores de quien la tiene y con motivo (mín. 10). Quien entra
+ * continúa con su propia evidencia; quien sale queda retirado con su avance guardado.
+ */
 export function reassignActivity(
   token: string,
   activityId: number,
-  body: { aUsuarioId: number; motivo?: string; retirarAnterior?: boolean },
+  body: { aUsuarioId: number; deUsuarioId?: number; motivo: string; retirarAnterior?: boolean },
 ) {
   return apiFetch<{ reassigned: boolean }>(`activities/${activityId}/reasignar`, token, {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+/** Cancelar con motivo (mín. 10): solo superiores de quien la ejecuta. */
+export function cancelActivity(token: string, activityId: number, motivo: string) {
+  return apiFetch<ActivityDetail>(`activities/${activityId}/cancelar`, token, {
+    method: "POST",
+    body: JSON.stringify({ motivo }),
+  });
+}
+
+export type ActivitySuperiorActions = {
+  estatus: string;
+  cerrada: boolean;
+  puedeCancelar: boolean;
+  puedePasar: boolean;
+  /** Personas cuyo trabajo puede pasar a otro compañero quien consulta. */
+  personas: Array<{ userId: number; nombre: string; rol: string; responsable: boolean; ejecuta: boolean }>;
+  motivoMinimo: number;
+};
+
+export function getActivitySuperiorActions(token: string, activityId: number) {
+  return apiFetch<ActivitySuperiorActions>(`activities/${activityId}/acciones`, token);
+}
+
+/** Mensaje legible de un error de la API (Nest manda `{ message }`). */
+export function apiErrorMessage(e: unknown, fallback: string): string {
+  const raw = e instanceof Error ? e.message : "";
+  try {
+    const parsed = JSON.parse(raw) as { message?: string | string[] };
+    if (Array.isArray(parsed.message)) return parsed.message.join(", ");
+    if (typeof parsed.message === "string" && parsed.message.trim()) return parsed.message;
+  } catch {
+    /* texto plano */
+  }
+  return raw.trim() || fallback;
 }
 
 export type DispatchActivityCard = {
