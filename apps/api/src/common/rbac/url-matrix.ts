@@ -169,6 +169,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   [ROLES.CEO]: [
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
+    // Faltas justificadas: solo Christian (el servicio lo vuelve a exigir por correo).
+    { path: '/api/attendance/justificaciones', methods: ['GET', 'POST'], scope: 'approve' },
+    { path: '/api/attendance/justificaciones/*', methods: ['DELETE'], scope: 'approve' },
     // Rutas específicas primero (first-match-wins)
     { path: '/erp/approvals/**', scope: 'approve' },
     { path: '/api/workflow/**', methods: ['POST'], scope: 'approve' },

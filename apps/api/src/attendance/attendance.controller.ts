@@ -1,7 +1,8 @@
-import { Controller, Post, Body, Req, UseGuards, Get, Query, Res } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards, Get, Query, Res, Delete, Param, ParseIntPipe } from '@nestjs/common';
 import type { Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import { AttendanceHybridService } from './attendance-hybrid.service';
+import { AttendanceJustificationsService } from './attendance-justifications.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -15,7 +16,56 @@ export class AttendanceController {
     private readonly attendanceService: AttendanceService,
     private readonly hybridService: AttendanceHybridService,
     private readonly excelExport: ExcelExportService,
+    private readonly justifications: AttendanceJustificationsService,
   ) {}
+
+  /** Justificar la falta de un día (solo Christian): { userId, fecha: AAAA-MM-DD, motivo }. No crea checadas. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  @Post('justificaciones')
+  justify(
+    @Req() req: any,
+    @Body() body: { userId?: number; fecha?: string; motivo?: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.justifications.justify(this.actor(req), body, companyId);
+  }
+
+  /** Faltas justificadas de una persona (?userId&from&to); sin userId, las propias. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  @Get('justificaciones')
+  listJustifications(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('userId') userId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.justifications.listForUser(this.actor(req), { userId, from, to }, companyId);
+  }
+
+  /** Quitar una falta justificada (solo Christian). */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  @Delete('justificaciones/:id')
+  removeJustification(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.justifications.remove(this.actor(req), id, companyId);
+  }
+
+  private actor(req: any) {
+    const u = req?.user ?? {};
+    return {
+      id: Number(u.id),
+      email: u.email ?? null,
+      isSuperAdmin: Boolean(u.isSuperAdmin),
+      permissions: Array.isArray(u.permissions) ? u.permissions : [],
+    };
+  }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })

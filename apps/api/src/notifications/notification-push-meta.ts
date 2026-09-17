@@ -83,6 +83,7 @@ export const NOTIFICATION_ICONS = [
   'vencida',
   'fuera_zona',
   'cancelada',
+  'falta_justificada',
   'cliente',
   'chat',
   'mencion',
