@@ -251,6 +251,16 @@ function channelPrefixNode(kind: ChannelKind): ReactNode {
   return "#";
 }
 
+/** Preview de canal legible: `[@Nombre](user:2)` → `@Nombre`, `[etiqueta](/ruta)` → `etiqueta`, sin emojis. */
+function readableChatPreview(body: string): string {
+  return body
+    .replace(/\[@?([^\]\n]+)\]\(user:\d+\)/g, "@$1")
+    .replace(/\[([^\]\n]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/\p{Extended_Pictographic}️?\s?/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const MENTION_KIND_ICON: Record<"USER" | "ACTIVITY" | "EVIDENCE", SvgIconComponent> = {
   USER: PersonOutlineIcon,
   ACTIVITY: AssignmentOutlinedIcon,
@@ -1627,7 +1637,7 @@ export default function WorkspaceChat({
         c.unread && activeId !== c.id ? styles.channelBtnUnread : ""
       }`}
       onClick={() => selectChannel(c.id)}
-      title={c.lastMessagePreview ?? c.topic ?? c.name}
+      title={(c.lastMessagePreview ? readableChatPreview(c.lastMessagePreview) : null) ?? c.topic ?? c.name}
     >
       {c.kind === "DIRECT" ? (
         <span className={styles.presenceWrap}>
@@ -1678,7 +1688,7 @@ export default function WorkspaceChat({
         )}
       </span>
       {c.lastMessagePreview && activeId !== c.id && (
-        <span className={styles.previewLine}>{c.lastMessagePreview}</span>
+        <span className={styles.previewLine}>{readableChatPreview(c.lastMessagePreview)}</span>
       )}
     </button>
   );

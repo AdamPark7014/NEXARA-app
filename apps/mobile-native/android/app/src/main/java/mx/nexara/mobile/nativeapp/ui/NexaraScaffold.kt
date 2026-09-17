@@ -1,6 +1,10 @@
 package mx.nexara.mobile.nativeapp.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,6 +52,7 @@ fun NexaraScaffold(content: @Composable () -> Unit) {
         }
     }
 
+    val bannerVisible = !isOnline || pending > 0
     Column(modifier = Modifier.fillMaxSize()) {
         OfflineBanner(
             isOffline = !isOnline,
@@ -59,6 +64,11 @@ fun NexaraScaffold(content: @Composable () -> Unit) {
                 }
             },
         )
-        content()
+        // Con aviso visible, el aviso ya ocupa la barra de estado: la barra superior no la repite.
+        Box(
+            if (bannerVisible) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier,
+        ) {
+            content()
+        }
     }
 }

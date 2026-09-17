@@ -293,9 +293,20 @@ private fun formatChannelTime(iso: String): String {
     }
 }
 
+/**
+ * Texto legible de un mensaje para listas y avisos: `[@Nombre](user:2)` → `@Nombre`,
+ * `[etiqueta](/ruta)` → `etiqueta`, sin emojis de mensajes viejos.
+ */
+internal fun readableChatText(body: String): String = body
+    .replace(Regex("""\[@?([^\]\n]+)\]\(user:\d+\)"""), "@$1")
+    .replace(chatEntityLinkRegex, "$1")
+    .replace(Regex("""[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]\x{FE0F}?\s?"""), "")
+    .trim()
+
 /** Texto del preview y si es un adjunto (para anteponerle el ícono de clip). */
 private fun formatLastMessagePreview(preview: String?): Pair<String, Boolean>? {
     val raw = preview
+        ?.let(::readableChatText)
         ?.replace(Regex("\\s+"), " ")
         ?.trim()
         ?.takeIf { it.isNotBlank() }

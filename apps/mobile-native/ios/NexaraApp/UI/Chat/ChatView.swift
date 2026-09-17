@@ -1397,9 +1397,14 @@ private enum ChatChannelFormat {
         }
     }
 
+    /// Preview legible: menciones y enlaces a su texto, sin emojis de mensajes viejos.
     static func preview(_ raw: String) -> String {
-        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return t.isEmpty ? "" : t
+        let sinEmojis = String(String.UnicodeScalarView(
+            ChatMentionFormat.display(raw).unicodeScalars.filter { !$0.properties.isEmojiPresentation }
+        ))
+        return sinEmojis
+            .replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func channelTime(_ iso: String) -> String {

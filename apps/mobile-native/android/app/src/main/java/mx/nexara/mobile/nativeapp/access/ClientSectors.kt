@@ -35,8 +35,10 @@ enum class ClientSector(
     ),
     ;
 
-    /** «proyecto», «corporativos», «comerciales». */
-    val shortLabel: String get() = title.replace(Regex("^Clientes de |^Clientes ", RegexOption.IGNORE_CASE), "")
+    /** «Proyecto», «Corporativos», «Comerciales». */
+    val shortLabel: String get() = title
+        .replace(Regex("^Clientes de |^Clientes ", RegexOption.IGNORE_CASE), "")
+        .replaceFirstChar { it.uppercaseChar() }
 
     companion object {
         fun fromApi(value: String?): ClientSector? =

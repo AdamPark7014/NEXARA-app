@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.apiBaseUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -59,6 +60,13 @@ object OfflineSyncCoordinator {
         val now = System.currentTimeMillis()
         withContext(Dispatchers.IO) {
             for (item in pending) {
+                // De otro servidor (otra compilación) o de lo que ya no se encola: nunca saldrán.
+                if (!item.url.startsWith(apiBaseUrl()) || !OfflineHttpInterceptor.isQueueable(item.url)) {
+                    done.add(item.id)
+                    NexaraOffline.mediaStore().purgeRefsInBody(item.body)
+                    Log.w("OfflineSync", "Dropping ${item.id}: not for this API")
+                    continue
+                }
                 // Backoff: 2^attempts segundos (cap 5 min) desde último intento.
                 val last = item.lastAttemptAt
                 if (last != null && item.attempts > 0) {
