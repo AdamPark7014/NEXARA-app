@@ -44,6 +44,19 @@ export function extrasDeTablero(email?: string | null): string[] {
   return EXTRAS_POR_CORREO[(email || '').trim().toLowerCase()] ?? [];
 }
 
+/**
+ * Para **asignar** trabajo, el flujo de despacho es más estrecho que el de ver: Luis coordina
+ * servicios y se los pasa a José Antonio, que elige a quién de su equipo. Luis no asigna
+ * directamente a soporte aunque los vea en su pizarra.
+ */
+const EXTRAS_ASIGNACION_POR_CORREO: Record<string, string[]> = {
+  'direccion.operaciones@nexara.com.mx': ['jose.ramirez@nexara.com.mx'],
+};
+
+export function extrasDeAsignacion(email?: string | null): string[] {
+  return EXTRAS_ASIGNACION_POR_CORREO[(email || '').trim().toLowerCase()] ?? [];
+}
+
 export function esDeTodaLaEmpresa(viewer: Alcanzador): boolean {
   if (viewer.isSuperAdmin) return true;
   if (viewer.roleKey === 'ceo') return true;
@@ -96,4 +109,44 @@ const TIPOS_POR_CORREO: Record<string, string[]> = {
 export function tiposVisibles(viewer: Alcanzador): string[] | null {
   if (esDeTodaLaEmpresa(viewer)) return null;
   return TIPOS_POR_CORREO[(viewer.email || '').trim().toLowerCase()] ?? null;
+}
+
+/** Reportes directos de alguien (a quienes reparte su trabajo). */
+export function reportesDirectos(
+  jefeId: number,
+  users: Array<{ id: number; managerId: number | null }>,
+): number[] {
+  return users.filter((u) => u.managerId === jefeId).map((u) => u.id);
+}
+
+/** ¿Tiene gente a su cargo? Quien no, no reparte trabajo. */
+export function esJefe(userId: number, users: Array<{ id: number; managerId: number | null }>): boolean {
+  return users.some((u) => u.managerId === userId);
+}
+
+/**
+ * ¿`viewer` puede **asignarle** trabajo a `targetId`? Su organigrama hacia abajo (no él mismo) más
+ * el flujo de despacho. Dirección puede con todos.
+ */
+export function puedeAsignarA(
+  viewer: Alcanzador,
+  users: Array<{ id: number; email: string; managerId: number | null }>,
+  targetId: number,
+): boolean {
+  if (targetId === viewer.id) return false;
+  if (esDeTodaLaEmpresa(viewer)) return true;
+  if (subarbolIds(viewer.id, users).has(targetId)) return true;
+  const target = users.find((u) => u.id === targetId);
+  return Boolean(target && extrasDeAsignacion(viewer.email).includes(target.email.toLowerCase()));
+}
+
+/** A quién puede asignarle, en orden: primero quienes reparten (jefes), luego el resto. */
+export function asignablesDe(
+  viewer: Alcanzador,
+  users: Array<{ id: number; email: string; nombre?: string | null; managerId: number | null }>,
+): Array<{ id: number; esJefe: boolean }> {
+  return users
+    .filter((u) => puedeAsignarA(viewer, users, u.id))
+    .map((u) => ({ id: u.id, esJefe: esJefe(u.id, users) }))
+    .sort((a, b) => Number(b.esJefe) - Number(a.esJefe));
 }

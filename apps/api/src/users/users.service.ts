@@ -12,18 +12,13 @@ import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
 import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
+import { asignablesDe, esJefe } from '../me/equipo-alcance.js';
 import {
   buildAccessScheduleAssignment,
   deviceMatchesDoorScope,
   listAccessScheduleTemplates,
   type AccessScheduleAssignment,
 } from '../integra/access-schedule-defaults.js';
-
-/** Roles que reciben OT, kits de herramientas y asignaciones de campo. */
-const FIELD_ASSIGNEE_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
-
-/** Pueden asignar a cualquier ingeniero de campo (no solo reportes directos). */
-const BROAD_FIELD_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
 
 @Injectable()
 export class UsersService {
@@ -757,87 +752,59 @@ export class UsersService {
     return this.withEmployeeNumberList(users);
   }
 
+  /**
+   * A quién puede asignarle trabajo quien pregunta: **su organigrama hacia abajo**, más el flujo de
+   * despacho (Luis pasa servicios a José Antonio, que reparte a su equipo). Dirección puede con todos.
+   *
+   * Antes salía por rol: cualquiera con consola o gestión de actividades veía a todo el personal de
+   * campo, así que David podía asignarle a José Antonio y a soporte, que no son suyos.
+   * Los jefes salen primero: Christian normalmente reparte a encargados y ellos delegan.
+   */
   async findAssignableUsers(
-    currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any },
+    currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any; email?: string | null; roleKey?: string | null },
     companyId?: number | null,
   ) {
     try {
       const tenantId = requireCompanyId(companyId);
       const membership = this.companyMembershipFilter(tenantId);
-      // Quien no es empleado nunca sale en «asignar a» (Christian, Adam, Claudia de pruebas, demo).
-      const superAdminEmails = [...NON_EMPLOYEE_EMAILS];
-
-      // Cargar usuario actual de la BD para obtener rol actual
       const userInDb = await this.prisma['user'].findUnique({
         where: { id: currentUser.id },
-        include: { role: true },
+        select: { id: true, email: true, roleKey: true },
       });
-
       if (!userInDb) return [];
 
-      // Si el usuario actual es SuperAdmin (email o bandera)
-      const isSuperAdmin = currentUser.isSuperAdmin || superAdminEmails.includes(userInDb.email);
-      
-      if (isSuperAdmin) {
-        // SuperAdmin puede asignar a TODOS excepto a sí mismo y otros superadmins
-        return this.prisma['user'].findMany({
-          where: {
-            AND: [
-              membership,
-              { id: { not: currentUser.id } },
-              { email: { notIn: superAdminEmails } },
-            ],
-          },
-          select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
-          orderBy: { nombre: 'asc' },
+      const activos = await this.prisma['user'].findMany({
+        where: { AND: [membership, { isActive: true }] },
+        select: { id: true, nombre: true, email: true, managerId: true, puesto: true, avatarUrl: true, role: true },
+        orderBy: { nombre: 'asc' },
+      });
+      // Christian, Adam, Claudia y la cuenta demo nunca reciben trabajo.
+      const candidatos = activos.filter((u: any) => !NON_EMPLOYEE_EMAILS.includes(String(u.email || '').toLowerCase()));
+      const orden = asignablesDe(
+        {
+          id: currentUser.id,
+          email: userInDb.email,
+          roleKey: userInDb.roleKey ?? currentUser.roleKey ?? null,
+          isSuperAdmin: Boolean(currentUser.isSuperAdmin),
+        },
+        activos as any,
+      );
+      const porId = new Map(candidatos.map((u: any) => [u.id, u]));
+      return orden
+        .filter((p) => porId.has(p.id))
+        .map((p) => {
+          const u: any = porId.get(p.id);
+          return {
+            id: u.id,
+            nombre: u.nombre,
+            email: u.email,
+            role: u.role,
+            avatarUrl: u.avatarUrl,
+            puesto: u.puesto ?? null,
+            /** Tiene gente a su cargo: al asignarle, él reparte. */
+            esJefe: p.esJefe || esJefe(u.id, activos as any),
+          };
         });
-      }
-
-      const hasConsoleAdminPermission = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
-      const hasUsersManagePermission = Boolean(currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE));
-      const hasActivitiesManagePermission = Boolean(currentUser.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE));
-      // Fallback por rol para compatibilidad con cuentas antiguas
-      const isConsoleAdminByRole = userInDb.role?.accesoConsoleAdmin === true;
-      const canAssignByHierarchy = hasConsoleAdminPermission || hasUsersManagePermission || isConsoleAdminByRole;
-
-      if (canAssignByHierarchy) {
-        // Admin/supervisor de consola puede asignar a cualquier usuario operativo (incluye otros admins), excepto superadmins de plataforma
-        return this.prisma['user'].findMany({
-          where: {
-            AND: [
-              membership,
-              { id: { not: currentUser.id } },
-              { email: { notIn: superAdminEmails } },
-            ],
-          },
-          select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
-          orderBy: { nombre: 'asc' },
-        });
-      }
-
-      if (hasActivitiesManagePermission) {
-        // OPS manager: asigna a ingenieros de campo bajo su jerarquía (organigrama NEXARA).
-        const assignerRoleKey = String(userInDb.roleKey || userInDb.role?.orgRoleKey || '').toLowerCase();
-        const fieldAssigneeFilter: Prisma.UserWhereInput[] = [
-          membership,
-          { isActive: true },
-          { email: { notIn: superAdminEmails } },
-          { roleKey: { in: [...FIELD_ASSIGNEE_ROLE_KEYS] } },
-        ];
-
-        if (!BROAD_FIELD_ASSIGN_SCOPE.has(assignerRoleKey)) {
-          fieldAssigneeFilter.push({ managerId: currentUser.id });
-        }
-
-        return this.prisma['user'].findMany({
-          where: { AND: fieldAssigneeFilter },
-          select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
-          orderBy: { nombre: 'asc' },
-        });
-      }
-
-      // Usuario normal sin permisos: retorna vacío
-      return [];
     } catch (error) {
       if (error instanceof ForbiddenException) throw error;
       console.error('Error finding assignable users:', error);

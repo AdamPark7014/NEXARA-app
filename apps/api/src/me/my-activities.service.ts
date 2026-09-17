@@ -17,6 +17,7 @@ import {
   type Semaforo,
 } from '../activities/actividad-tiempos.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { extrasDeAsignacion, reportesDirectos } from './equipo-alcance.js';
 
 const CEO_EMAIL = 'gerencia@nexara.com.mx';
 
@@ -35,25 +36,21 @@ export const AREA_MANAGER_EMAILS = new Set<string>([
 ]);
 
 /** A quién puede pasar cada encargado un despacho (espejo de dispatchPoolEmails en web). */
-const DISPATCH_POOLS: Record<string, string[]> = {
-  'direccion.operaciones@nexara.com.mx': ['jose.ramirez@nexara.com.mx'],
-  // Roberto (servicios) se suma al equipo de Antonio con Carolina y Alejandro.
-  'jose.ramirez@nexara.com.mx': [
-    'soporte@nexara.com.mx',
-    'alejandro.gonzalez@nexara.com.mx',
-    'roberto.vivanco@nexara.com.mx',
-  ],
-  'operaciones@nexara.com.mx': [
-    'joan.sanchez@nexara.com.mx',
-    'israel.ramos@nexara.com.mx',
-    'juan.gonzalez@nexara.com.mx',
-  ],
-  'infraestructura@nexara.com.mx': [
-    'joan.sanchez@nexara.com.mx',
-    'israel.ramos@nexara.com.mx',
-    'juan.gonzalez@nexara.com.mx',
-  ],
-};
+/** Quien reparte un despacho: tiene gente a su cargo, o es Luis pasándole servicios a José Antonio. */
+async function equipoDeDespacho(
+  prisma: PrismaService,
+  viewer: { id: number; email?: string | null },
+): Promise<Set<number>> {
+  const activos = await prisma.user.findMany({
+    where: { isActive: true },
+    select: { id: true, email: true, managerId: true },
+  });
+  const directos = reportesDirectos(viewer.id, activos).filter((id) => id !== viewer.id);
+  const extras = extrasDeAsignacion(viewer.email)
+    .map((correo) => activos.find((u) => u.email.toLowerCase() === correo)?.id)
+    .filter((id): id is number => typeof id === 'number');
+  return new Set([...directos, ...extras]);
+}
 
 export type DispatchMyActivityDto = {
   userIds: number[];
@@ -307,12 +304,12 @@ export class MyActivitiesService {
     });
     if (!lead) throw new ForbiddenException('Solo quien reparte este despacho puede asignarlo');
 
-    const pool = new Set(DISPATCH_POOLS[norm(viewer.email)] ?? []);
+    const pool = await equipoDeDespacho(this.prisma, viewer);
     const targets = await this.prisma.user.findMany({
       where: { id: { in: ids }, isActive: true },
-      select: { id: true, email: true },
+      select: { id: true, email: true, managerId: true },
     });
-    if (targets.length !== ids.length || targets.some((t) => !pool.has(norm(t.email)))) {
+    if (targets.length !== ids.length || targets.some((t) => !pool.has(t.id))) {
       throw new ForbiddenException('Solo puedes pasarla a gente de tu equipo');
     }
 
@@ -320,7 +317,8 @@ export class MyActivitiesService {
     const horasPlan = horasPlanValidas(dto?.horasPlan);
     for (const t of targets) {
       // Si quien recibe también reparte (Luis → Antonio) entra como LEAD; si no, la ejecuta.
-      const rol: AssigneeRole = DISPATCH_POOLS[norm(t.email)] ? 'LEAD' : 'TECNICO';
+      // Si quien recibe también tiene gente a su cargo entra como LEAD: él reparte.
+      const rol: AssigneeRole = (await equipoDeDespacho(this.prisma, t)).size > 0 ? 'LEAD' : 'TECNICO';
       await this.team.addMember(
         activityId,
         {
