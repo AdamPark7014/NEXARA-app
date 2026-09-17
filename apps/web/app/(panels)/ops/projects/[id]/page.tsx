@@ -21,11 +21,14 @@ const toDateOnly = (iso?: string | null) => {
 };
 
 export default function OpsProjectSummaryPage() {
-  const { project, error, reload, id } = useOpsProjectDetail();
+  const { project, error, reload, id, permisos } = useOpsProjectDetail();
   const { user } = useUser();
   const token = user?.token ?? "";
   const cfg = useMemo(() => getActivitiesSectionConfig(user), [user]);
   const canEdit = cfg.canCreate || user?.isSuperAdmin;
+  // Poner o quitar «Inactivo» (ON_HOLD) es desactivar/reactivar: solo Christian; la API da 403 a los demás.
+  const puedeCambiarInactivo = permisos.puedeDesactivar;
+  const statusOptions = puedeCambiarInactivo ? STATUSES : STATUSES.filter((s) => s !== "ON_HOLD");
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ status: "", title: "", scopeSummary: "", description: "", notes: "", endDate: "" });
@@ -94,7 +97,7 @@ export default function OpsProjectSummaryPage() {
           {(() => {
             const FLOW = [
               { key: "ACTIVE", label: "Activo", icon: "⚙️" },
-              { key: "ON_HOLD", label: "En pausa", icon: "⏸" },
+              { key: "ON_HOLD", label: "Inactivo", icon: "⏸" },
               { key: "COMPLETED", label: "Completado", icon: "✅" },
             ];
             const COMPLETED_FLOW = [
@@ -209,9 +212,15 @@ export default function OpsProjectSummaryPage() {
 
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Estado *</span>
-              <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={inp}>
-                {STATUSES.map((s) => <option key={s} value={s}>{formatOperationalProjectStatus(s)}</option>)}
-              </select>
+              {project.status === "ON_HOLD" && !puedeCambiarInactivo ? (
+                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                  Inactivo · solo Christian (Dirección General) puede reactivarlo
+                </span>
+              ) : (
+                <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={inp}>
+                  {statusOptions.map((s) => <option key={s} value={s}>{formatOperationalProjectStatus(s)}</option>)}
+                </select>
+              )}
             </label>
 
             <label style={{ display: "grid", gap: 4 }}>
