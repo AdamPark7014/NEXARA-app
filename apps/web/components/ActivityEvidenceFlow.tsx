@@ -107,7 +107,27 @@ interface EvidenceFlowData {
   assigneeIndicaciones?: string | null;
   progressPct?: number;
   stepsForKind?: EvidenceStep[];
+  /** «Avance anterior de <nombre>»: lo que dejó quien la tenía antes (solo lectura). */
+  avancesAnteriores?: AvanceAnterior[];
 }
+
+type AvanceAnterior = {
+  userId: number;
+  nombre: string;
+  titulo: string;
+  motivo: string | null;
+  reasignadaAt: string;
+  movidaPor: string | null;
+  progressPct: number;
+  evidence: {
+    status: string;
+    entryPhotoUrl: string | null;
+    evidencePhotos: string[];
+    serviceSheetPdfUrl: string | null;
+    serviceSheetData: unknown;
+    exitPhotoUrl: string | null;
+  } | null;
+};
 
 interface InventoryDraftItem {
   sectionName: string;
@@ -386,6 +406,7 @@ const ActivityEvidenceFlow = () => {
           assigneeIndicaciones: data.assigneeIndicaciones ?? null,
           progressPct: data.progressPct != null ? Number(data.progressPct) : undefined,
           stepsForKind: Array.isArray(data.stepsForKind) ? data.stepsForKind : undefined,
+          avancesAnteriores: Array.isArray(data.avancesAnteriores) ? data.avancesAnteriores : [],
         });
 
         if ((data.activity?.workType || currentActivity?.workType) === 'PREVENTIVE_INVENTORY') {
@@ -1531,6 +1552,67 @@ const ActivityEvidenceFlow = () => {
           ) : null}
         </div>
       )}
+
+      {/* Avance de quien la tenía antes: solo lectura; esta persona toma su propia entrada y salida. */}
+      {(flowData.avancesAnteriores ?? []).map((av) => {
+        const ev = av.evidence;
+        const fotos = [ev?.entryPhotoUrl, ...(ev?.evidencePhotos ?? []), ev?.exitPhotoUrl].filter(
+          (u): u is string => Boolean(u),
+        );
+        const campos =
+          ev?.serviceSheetData && typeof ev.serviceSheetData === 'object'
+            ? Object.entries(ev.serviceSheetData as Record<string, unknown>).filter(
+                ([, v]) => typeof v === 'string' && v.trim() && !String(v).startsWith('data:'),
+              )
+            : [];
+        return (
+          <div key={`avance-${av.userId}`} className={styles.stepCard} style={{ marginBottom: 12 }}>
+            <strong className={styles.stepTitle} style={{ fontSize: 14 }}>
+              {av.titulo}
+            </strong>
+            <p className={styles.stepDescription} style={{ marginBottom: 8 }}>
+              Solo lectura · {av.progressPct}% avanzado
+              {av.movidaPor ? ` · ${av.movidaPor} te la pasó` : ''}
+              {av.motivo ? ` · Motivo: ${av.motivo}` : ''}. Continúa desde aquí con tu propia foto de entrada y de
+              salida.
+            </p>
+            {fotos.length > 0 ? (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: campos.length || ev?.serviceSheetPdfUrl ? 8 : 0 }}>
+                {fotos.map((url) => (
+                  <a key={url} href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                    <img
+                      src={getAssetUrl(url)}
+                      alt={`Evidencia de ${av.nombre}`}
+                      style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.stepDescription} style={{ marginBottom: 0 }}>
+                No alcanzó a subir fotos.
+              </p>
+            )}
+            {ev?.serviceSheetPdfUrl ? (
+              <a href={getAssetUrl(ev.serviceSheetPdfUrl)} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600 }}>
+                Ver hoja de servicio que subió
+              </a>
+            ) : null}
+            {campos.length > 0 ? (
+              <dl style={{ margin: '8px 0 0', display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 10px', fontSize: 12.5 }}>
+                {campos.slice(0, 12).map(([k, v]) => (
+                  <React.Fragment key={k}>
+                    <dt style={{ color: '#6b7280' }}>
+                      {digitalFormLabels(flowData.coreKind).find((f) => f.key === k)?.label ?? k}
+                    </dt>
+                    <dd style={{ margin: 0 }}>{String(v)}</dd>
+                  </React.Fragment>
+                ))}
+              </dl>
+            ) : null}
+          </div>
+        );
+      })}
 
       {/* Banner de Rechazo */}
       {flowData.reviewStatus === 'REJECTED' &&

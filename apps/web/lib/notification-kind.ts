@@ -26,6 +26,7 @@ export type NotificationKind =
   | "atraso"
   | "vencida"
   | "fuera_zona"
+  | "cancelada"
   | "cliente"
   | "chat"
   | "ubicacion"
@@ -79,7 +80,10 @@ export function notificationKind(category?: string | null, title?: string | null
   if (c === "profile") return "perfil";
   if (c === "viatics" || t.includes("viatico")) return "viatico";
 
-  if (t.includes("reasign") || t.includes("paso a ")) return "reasignada";
+  // ACTIVITY_CANCELLED (push `icon: cancelada`): «Mantenimiento de CCTV fue cancelada».
+  if (t.includes("fue cancelada")) return "cancelada";
+  // «Te asignaron X para continuarla» es una reasignación, no una actividad nueva.
+  if (t.includes("reasign") || t.includes("paso a ") || t.includes("para continuarla")) return "reasignada";
   if (t.includes("reprogram")) return "reprogramada";
   if (t.includes("devuel")) return "devuelta";
   if (t.includes("correcc") || t.includes("corrig")) return "correccion";
