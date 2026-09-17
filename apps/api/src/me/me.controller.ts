@@ -17,6 +17,7 @@ import { MeService } from './me.service.js';
 import {
   MyActivitiesService,
   type DispatchMyActivityDto,
+  type RechazarActividadDto,
   type ReorderMyActivitiesDto,
   type ReprogramarDespachoDto,
   type RevisarEvidenciaDto,
@@ -71,6 +72,42 @@ export class MeController {
     return this.myActivities.selfCreate(
       { id: Number(user.id), email: user.email ?? null },
       companyId,
+      body,
+    );
+  }
+
+  /** Aceptar la actividad que le asignaron (las apps viejas la aceptan con la foto de entrada). */
+  @Post('activities/:id/aceptar')
+  aceptarActividad(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.aceptar(
+      { id: Number(user.id), email: user.email ?? null },
+      companyId,
+      activityId,
+    );
+  }
+
+  /** Rechazar con motivo: sigue asignada hasta que un superior la pase o la cancele. */
+  @Post('activities/:id/rechazar')
+  rechazarActividad(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Body() body: RechazarActividadDto,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.rechazar(
+      { id: Number(user.id), email: user.email ?? null },
+      companyId,
+      activityId,
       body,
     );
   }

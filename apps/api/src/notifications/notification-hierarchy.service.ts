@@ -36,6 +36,15 @@ function persona(nombre: string | null | undefined, respaldo = 'Alguien del equi
   return nombreCorto(nombre) || respaldo;
 }
 
+/** Minutos en lenguaje de campo: «2 h 35 min», «45 min». */
+function minutosLargos(min: number): string {
+  const total = Math.max(0, Math.round(min));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h <= 0) return `${m} min`;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
 /**
  * Servicio que maneja notificaciones jerárquicas
  * Determina a quién notificar en la cadena de mando
@@ -1304,6 +1313,194 @@ export class NotificationHierarchyService {
       }
     } catch (error) {
       this.logger.error('notifyActivityCancelled', error);
+    }
+  }
+
+  /**
+   * Aceptó la actividad que le asignaron: le llega a quien se la pasó (y al responsable),
+   * que es quien está esperando saber si cuenta con esa persona.
+   */
+  async notifyActivityAcceptedByAssignee(params: {
+    activityId: number;
+    userId: number;
+    asignadoPorId: number | null;
+  }) {
+    try {
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: params.activityId },
+        select: { titulo: true, responsableId: true, creadoPorId: true, client: { select: { name: true } } },
+      });
+      if (!activity) return;
+      const quien = persona(await this.resolveActorName(params.userId));
+      const targets = new Set<number>(
+        [params.asignadoPorId, activity.responsableId, activity.creadoPorId].filter(
+          (id): id is number => Boolean(id),
+        ),
+      );
+      targets.delete(params.userId);
+      for (const userId of targets) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_ACCEPTED_BY_ASSIGNEE',
+          category: 'activities',
+          title: `${quien} aceptó ${nombreActividad(activity.titulo)}`,
+          message: unir(activity.client?.name, `Aceptada a las ${horaAviso(new Date())}`),
+          icon: 'aceptada',
+          triggerUserId: params.userId,
+          relatedEntityId: params.activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${params.activityId}`,
+          priority: 'normal',
+          channel: 'ops',
+          collapseKey: `nx_acept_${params.activityId}_u${params.userId}`,
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityAcceptedByAssignee', error);
+    }
+  }
+
+  /**
+   * Rechazó con motivo: se enteran quien se la asignó, el responsable y sus jefes.
+   * La actividad sigue siendo suya hasta que alguien la mueva: el aviso es la señal.
+   */
+  async notifyActivityRejectedByAssignee(params: {
+    activityId: number;
+    userId: number;
+    motivo: string;
+    asignadoPorId: number | null;
+  }) {
+    try {
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: params.activityId },
+        select: { titulo: true, responsableId: true, creadoPorId: true, client: { select: { name: true } } },
+      });
+      if (!activity) return;
+      const quien = persona(await this.resolveActorName(params.userId));
+      const targets = new Set<number>(await this.lunchReviewerIds(params.userId));
+      for (const id of [params.asignadoPorId, activity.responsableId, activity.creadoPorId]) {
+        if (id) targets.add(id);
+      }
+      targets.delete(params.userId);
+      const title = `${quien} rechazó ${nombreActividad(activity.titulo)}`;
+      const message = unir(`Motivo: ${params.motivo.trim().slice(0, 200)}`, activity.client?.name);
+      for (const userId of targets) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_REJECTED_BY_ASSIGNEE',
+          category: 'activities',
+          title,
+          message,
+          icon: 'rechazada',
+          triggerUserId: params.userId,
+          relatedEntityId: params.activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${params.activityId}`,
+          priority: 'high',
+          channel: 'ops',
+          collapseKey: `nx_rech_${params.activityId}_u${params.userId}`,
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityRejectedByAssignee', error);
+    }
+  }
+
+  /**
+   * Pasó de su tiempo estimado: le llega a la persona y a sus superiores, una sola vez
+   * por actividad (la tarea marca `alertaExcesoAt` para no repetirlo).
+   */
+  async notifyActivityOvertime(params: {
+    activityId: number;
+    userId: number;
+    minutosPlan: number;
+    minutosReales: number;
+  }) {
+    try {
+      const { activity, jefes } = await this.activityZoneWatcherIds(params.activityId, params.userId);
+      if (!activity) return;
+      const quien = persona(await this.resolveActorName(params.userId));
+      const actividad = nombreActividad(activity.titulo);
+      const plan = minutosLargos(params.minutosPlan);
+      const real = minutosLargos(params.minutosReales);
+      const comun = {
+        type: 'ACTIVITY_OVERTIME' as const,
+        category: 'activities',
+        icon: 'tiempo_excedido' as const,
+        relatedEntityId: params.activityId,
+        entityType: 'Activity',
+        priority: 'high' as const,
+        channel: 'ops',
+        collapseKey: `nx_exceso_${params.activityId}_u${params.userId}`,
+        dedupeSeconds: 0,
+      };
+      await this.notificationsService.createNotification({
+        ...comun,
+        userId: params.userId,
+        title: `${actividad} excedió su tiempo estimado`,
+        message: unir(`Plan ${plan} · llevas ${real}`, activity.client?.name),
+        relatedUrl: `/erp/actividades/${params.activityId}`,
+      });
+      for (const uid of jefes) {
+        await this.notificationsService.createNotification({
+          ...comun,
+          userId: uid,
+          triggerUserId: params.userId,
+          title: `${actividad} excedió su tiempo estimado`,
+          message: unir(`${quien}: plan ${plan} · lleva ${real}`, activity.client?.name),
+          relatedUrl: `/erp/actividades/${params.activityId}/evidencias`,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityOvertime', error);
+    }
+  }
+
+  /**
+   * Inicio marcado: empezó lejos del sitio del cliente o antes que otra de más prioridad.
+   * Nunca bloquea la foto de entrada; solo deja constancia a los superiores.
+   */
+  async notifyActivityStartFlagged(params: {
+    activityId: number;
+    userId: number;
+    distanciaSitioM?: number | null;
+    saltoPrioridad?: boolean;
+    justificacion?: string | null;
+  }) {
+    try {
+      const { activity, jefes } = await this.activityZoneWatcherIds(params.activityId, params.userId);
+      if (!activity || !jefes.length) return;
+      const quien = persona(await this.resolveActorName(params.userId));
+      const actividad = nombreActividad(activity.titulo);
+      const motivos = [
+        params.distanciaSitioM != null
+          ? `Inició a ${params.distanciaSitioM} m del sitio del cliente`
+          : null,
+        params.saltoPrioridad ? 'Tenía otra de más prioridad sin terminar' : null,
+        params.justificacion ? `«${params.justificacion.slice(0, 160)}»` : null,
+      ];
+      for (const uid of jefes) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'ACTIVITY_START_FLAGGED',
+          category: 'activities',
+          title: `${quien} inició ${actividad} fuera de lo previsto`,
+          message: unir(...motivos, activity.client?.name),
+          icon: 'inicio_marcado',
+          triggerUserId: params.userId,
+          relatedEntityId: params.activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${params.activityId}/evidencias`,
+          priority: 'normal',
+          channel: 'ops',
+          collapseKey: `nx_inicio_marcado_${params.activityId}_u${params.userId}`,
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityStartFlagged', error);
     }
   }
 
