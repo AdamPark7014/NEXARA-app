@@ -75,6 +75,7 @@ object OrgEmails {
     const val ANTONIO = "jose.ramirez@nexara.com.mx"
     const val CAROLINA = "soporte@nexara.com.mx"
     const val ALEJANDRO = "alejandro.gonzalez@nexara.com.mx"
+    const val ROBERTO = "roberto.vivanco@nexara.com.mx"
     const val DANIELA = "daniela.hernandez@nexara.com.mx"
     const val MONICA = "soluciones@nexara.com.mx"
     const val JOAN = "joan.sanchez@nexara.com.mx"

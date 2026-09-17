@@ -355,7 +355,7 @@ private fun HistoryCard(
                         )
                     }
                     ev.serviceSheetPdfUrl?.takeIf { it.isNotBlank() }?.let {
-                        ProtectedPdfButton(url = it, label = "📄 Ver hoja de servicio (PDF)")
+                        ProtectedPdfButton(url = it, label = "Ver hoja de servicio (PDF)")
                     }
                 } else {
                     Text("Sin evidencia de esta persona.", fontSize = 13.sp, color = NxColors.Muted)

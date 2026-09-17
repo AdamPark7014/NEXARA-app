@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -75,9 +76,13 @@ import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.console.CoreMenu
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityKinds.FormState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconBadge
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 private val BorderGray = Color(0xFFE2E8F0)
 private val WarningText = Color(0xFFD97706)
@@ -262,7 +267,13 @@ private fun AssignFlow(
     }
     if (selfAssign) {
         NxPanelShell {
-            Text("🙋 Auto-asignarme una actividad", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
+            NxIconText(
+                text = "Auto-asignarme una actividad",
+                icon = NxGlyph.PERSON.icon,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = NxColors.Slate,
+            )
             Spacer(Modifier.height(6.dp))
             Text(
                 "Queda solo a tu nombre, como ejecución directa. Ponle día, hora y cuánto te va a tomar; " +
@@ -472,7 +483,7 @@ private fun AssignFlow(
             else -> "3"
         }
         val title = buildString {
-            append("$step · ${meta.emoji} ${meta.title}")
+            append("$step · ${meta.title}")
             if (selfAssign) {
                 append(" · para ti")
             } else {
@@ -528,6 +539,7 @@ private fun AssignFlow(
         key(kind, effectiveCharge) {
             ActivityFormPanel(
                 stepTitle = title,
+                stepIcon = meta.glyph.icon,
                 meta = meta,
                 initial = k.initialForm(meta.id, targetUserId, effectiveCharge),
                 creatorEmail = user.email,
@@ -554,6 +566,7 @@ private fun AssignFlow(
 @Composable
 private fun ActivityFormPanel(
     stepTitle: String,
+    stepIcon: ImageVector? = null,
     meta: CoreActivityKinds.KindMeta,
     initial: FormState,
     creatorEmail: String?,
@@ -647,7 +660,7 @@ private fun ActivityFormPanel(
     }
 
     NxPanelShell {
-        StepLabel(stepTitle)
+        StepLabel(stepTitle, stepIcon)
         Spacer(Modifier.height(8.dp))
         NxSectionHeader(
             title = "Datos de la actividad",
@@ -705,7 +718,8 @@ private fun ActivityFormPanel(
                 ) {
                     k.TAREA_TIPOS.forEach { t ->
                         Pill(
-                            text = "${t.emoji} ${t.label}",
+                            text = t.label,
+                            icon = t.glyph.icon,
                             selected = tareaTipo == t.id,
                             onClick = {
                                 form = k.pickTareaTipo(form, tareaTipo, t.id)
@@ -894,8 +908,14 @@ private fun Gap() {
 }
 
 @Composable
-private fun StepLabel(text: String) {
-    Text(text, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = NxColors.Muted)
+private fun StepLabel(text: String, icon: ImageVector? = null) {
+    NxIconText(
+        text = text,
+        icon = icon,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        color = NxColors.Muted,
+    )
 }
 
 @Composable
@@ -907,7 +927,7 @@ private fun KindGrid(kinds: List<String>, selected: String?, onPick: (String) ->
                     val m = CoreActivityKinds.meta(id)
                     if (m != null) {
                         ChoiceCard(
-                            emoji = m.emoji,
+                            icon = m.glyph.icon,
                             title = m.title,
                             help = m.help,
                             selected = selected == id,
@@ -929,7 +949,7 @@ private fun ChoiceCard(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    emoji: String? = null,
+    icon: ImageVector? = null,
 ) {
     val shape = RoundedCornerShape(16.dp)
     Column(
@@ -941,8 +961,8 @@ private fun ChoiceCard(
             .heightIn(min = 88.dp)
             .padding(12.dp),
     ) {
-        if (emoji != null) {
-            Text(emoji, fontSize = 22.sp)
+        if (icon != null) {
+            NxIconBadge(icon = icon, size = 32.dp)
             Spacer(Modifier.height(6.dp))
         }
         Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = NxColors.Slate)
@@ -958,6 +978,7 @@ private fun Pill(
     onClick: () -> Unit,
     dotColor: Color? = null,
     hint: String? = null,
+    icon: ImageVector? = null,
 ) {
     val shape = RoundedCornerShape(999.dp)
     val accent = dotColor ?: NxColors.Brand
@@ -974,6 +995,9 @@ private fun Pill(
     ) {
         if (dotColor != null) {
             Box(Modifier.size(10.dp).clip(CircleShape).background(dotColor))
+        }
+        if (icon != null) {
+            Icon(imageVector = icon, contentDescription = null, tint = NxColors.Brand, modifier = Modifier.size(16.dp))
         }
         Text(
             text,

@@ -58,6 +58,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -337,18 +338,23 @@ fun NxAlertBanner(alert: NxAlert, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun NxStatusChip(text: String, tone: NxTone = NxTone.Neutral) {
+fun NxStatusChip(text: String, tone: NxTone = NxTone.Neutral, icon: ImageVector? = null) {
     Box(
         modifier = Modifier
             .background(tone.bg(), RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = tone.fg(),
-            fontSize = 11.sp,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (icon != null) {
+                Icon(imageVector = icon, contentDescription = null, tint = tone.fg(), modifier = Modifier.size(12.dp))
+            }
+            Text(
+                text,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = tone.fg(),
+                fontSize = 11.sp,
+            )
+        }
     }
 }
 

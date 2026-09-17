@@ -304,9 +304,15 @@ internal object NexaraPushRenderer {
             builder.setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(title).bigText(body))
         }
-        if (p.senderName.isNotBlank()) {
-            builder.setLargeIcon(NotificationAvatars.forPerson(app, p.senderName, p.senderAvatar, allowNetwork = true))
+        val glyphRes = NotificationEventIcons.glyphRes(p.icon)
+        val badgeColor = NotificationEventIcons.color(p.icon)
+        val largeIcon = if (p.senderName.isNotBlank()) {
+            val avatar = NotificationAvatars.forPerson(app, p.senderName, p.senderAvatar, allowNetwork = true)
+            NotificationAvatars.withBadge(app, avatar, glyphRes, badgeColor)
+        } else {
+            NotificationAvatars.filledGlyphCircle(app, glyphRes, badgeColor)
         }
+        builder.setLargeIcon(largeIcon)
 
         notify(app, notificationId, builder.build())
         refreshEventSummary(app, channelId, group, notificationId, summaryLine(title, body))

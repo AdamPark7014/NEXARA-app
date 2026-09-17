@@ -333,7 +333,11 @@ object CoreActivityRules {
     /** A quién puede pasar cada encargado un despacho (DISPATCH_POOLS del API). */
     private val DISPATCH_POOLS = mapOf(
         LUIS_EMAIL to listOf("jose.ramirez@nexara.com.mx"),
-        "jose.ramirez@nexara.com.mx" to listOf("soporte@nexara.com.mx", "alejandro.gonzalez@nexara.com.mx"),
+        "jose.ramirez@nexara.com.mx" to listOf(
+            "soporte@nexara.com.mx",
+            "alejandro.gonzalez@nexara.com.mx",
+            "roberto.vivanco@nexara.com.mx",
+        ),
         "operaciones@nexara.com.mx" to INSTALADORES,
         "infraestructura@nexara.com.mx" to INSTALADORES,
     )

@@ -17,6 +17,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.GpsFixed
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -24,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +63,9 @@ import mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
@@ -105,6 +113,7 @@ data class AttendanceUiState(
     val error: String? = null,
     val checkInLoading: Boolean = false,
     val checkInMessage: String? = null,
+    val checkInError: Boolean = false,
     val fecha: String = hoyIso(),
     val filtro: AttendanceEstado? = null,
     val current: AttendanceCurrentDto? = null,
@@ -343,7 +352,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val gpsNota = if (type == "entrada") encenderGps() else apagarGps()
                 val base = res.message
-                    ?: if (type == "entrada") "✅ Entrada registrada" else "✅ Salida registrada"
+                    ?: if (type == "entrada") "Entrada registrada" else "Salida registrada"
                 val geo = when {
                     coords == null -> " (sin GPS — activa ubicación)"
                     coords.accuracyM != null && coords.accuracyM > 100f ->
@@ -355,6 +364,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         checkInLoading = false,
                         checkInMessage = base + geo + gpsNota,
+                        checkInError = false,
                         gpsActivo = JornadaGps.isRunning(),
                     )
                 }
@@ -365,7 +375,8 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         checkInLoading = false,
-                        checkInMessage = "❌ ${e.toUserMessage("Error al registrar")}",
+                        checkInMessage = e.toUserMessage("Error al registrar"),
+                        checkInError = true,
                     )
                 }
             }
@@ -740,7 +751,12 @@ private fun MiJornadaCard(
                     .background(if (abierta) AttendanceEstado.PRESENTE.color else Color(0xFFE2E8F0)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(if (abierta) "🟢" else "⚫", fontSize = 28.sp)
+                Icon(
+                    imageVector = if (abierta) NxGlyph.APPROVED.icon else Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    tint = if (abierta) Color.White else NxColors.Muted,
+                    modifier = Modifier.size(32.dp),
+                )
             }
             Text(
                 when {
@@ -807,8 +823,12 @@ private fun MiJornadaCard(
                         colors = ButtonDefaults.buttonColors(containerColor = AttendanceEstado.PRESENTE.color),
                         shape = RoundedCornerShape(12.dp),
                     ) {
+                        if (!state.checkInLoading) {
+                            Icon(NxGlyph.ENTRY.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                        }
                         Text(
-                            if (state.checkInLoading) "Registrando…" else "▶  Entrada",
+                            if (state.checkInLoading) "Registrando…" else "Entrada",
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -819,8 +839,12 @@ private fun MiJornadaCard(
                         colors = ButtonDefaults.buttonColors(containerColor = NxColors.Danger),
                         shape = RoundedCornerShape(12.dp),
                     ) {
+                        if (!state.checkInLoading) {
+                            Icon(NxGlyph.EXIT.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                        }
                         Text(
-                            if (state.checkInLoading) "Registrando…" else "⏹  Salida",
+                            if (state.checkInLoading) "Registrando…" else "Salida",
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -835,12 +859,14 @@ private fun MiJornadaCard(
             }
 
             state.checkInMessage?.takeIf { it.isNotBlank() }?.let { msg ->
-                Text(
-                    msg,
-                    fontSize = 12.sp,
-                    color = if (msg.startsWith("✅")) AttendanceEstado.PRESENTE.color else NxColors.Danger,
-                    textAlign = TextAlign.Center,
-                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    NxIconText(
+                        text = msg,
+                        icon = if (state.checkInError) Icons.Outlined.ErrorOutline else NxGlyph.APPROVED.icon,
+                        fontSize = 12.sp,
+                        color = if (state.checkInError) NxColors.Danger else AttendanceEstado.PRESENTE.color,
+                    )
+                }
             }
 
             if (state.misChecadas.isNotEmpty()) {
@@ -856,8 +882,9 @@ private fun MiJornadaCard(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(
-                            if (ev.type.equals("entrada", true)) "📍 Entrada" else "🏁 Salida",
+                        NxIconText(
+                            text = if (ev.type.equals("entrada", true)) "Entrada" else "Salida",
+                            icon = if (ev.type.equals("entrada", true)) NxGlyph.ENTRY.icon else NxGlyph.EXIT.icon,
                             fontSize = 12.5.sp,
                             color = NxColors.Slate,
                         )
@@ -887,8 +914,9 @@ private fun GpsJornadaAviso(onDetener: () -> Unit) {
         shape = RoundedCornerShape(14.dp),
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                "📡 Jornada en curso · compartiendo ubicación",
+            NxIconText(
+                text = "Jornada en curso · compartiendo ubicación",
+                icon = Icons.Outlined.GpsFixed,
                 fontSize = 13.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = NxColors.Slate,
@@ -1015,8 +1043,8 @@ private fun PersonaCard(
 
             if (persona.fotoEntrada != null || persona.fotoSalida != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    persona.fotoEntrada?.let { FotoChecada("📍 Entrada", it) }
-                    persona.fotoSalida?.let { FotoChecada("🏁 Salida", it) }
+                    persona.fotoEntrada?.let { FotoChecada("Entrada", it, NxGlyph.ENTRY.icon) }
+                    persona.fotoSalida?.let { FotoChecada("Salida", it, NxGlyph.EXIT.icon) }
                 }
             }
 
@@ -1047,14 +1075,14 @@ private fun PersonaCard(
 }
 
 @Composable
-private fun FotoChecada(etiqueta: String, url: String) {
+private fun FotoChecada(etiqueta: String, url: String, icon: ImageVector) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         ProtectedImage(
             url = url,
             contentDescription = etiqueta,
             modifier = Modifier.size(62.dp).clip(RoundedCornerShape(10.dp)),
         )
-        Text(etiqueta, fontSize = 10.sp, color = NxColors.Muted)
+        NxIconText(text = etiqueta, icon = icon, fontSize = 10.sp, color = NxColors.Muted)
     }
 }
 

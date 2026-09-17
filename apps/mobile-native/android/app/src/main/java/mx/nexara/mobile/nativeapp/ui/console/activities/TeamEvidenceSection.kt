@@ -17,17 +17,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -51,6 +60,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -85,6 +95,9 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_P
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.STEP_PHOTOS
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules.VERDE
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 
 /** Con qué se abre la hoja de revisión (desde «Aprobar», «Devolver» o «Devolver este paso»). */
 private data class RevisionInicial(val aprobar: Boolean, val pasos: List<String> = emptyList())
@@ -163,10 +176,15 @@ fun TeamEvidenceSection(
             ) {
                 ToneChip(estado)
                 if (ejecutores > 0) ToneChip("Aprobadas $aprobadas de $ejecutores")
-                if (porRevisarMias > 0) ToneChip("🔎 $porRevisarMias por revisar", NARANJA)
+                if (porRevisarMias > 0) ToneChip("$porRevisarMias por revisar", NARANJA, icon = NxGlyph.TO_REVIEW.icon)
             }
             if (cadena.size > 1) {
-                Text("🔗 ${cadena.joinToString(" → ")}", fontSize = 12.5.sp, color = NxColors.Muted)
+                NxIconText(
+                    text = cadena.joinToString(" → "),
+                    icon = Icons.Outlined.Link,
+                    fontSize = 12.5.sp,
+                    color = NxColors.Muted,
+                )
             }
             if (members.isEmpty()) {
                 Text("Nadie en el equipo todavía.", fontSize = 13.sp, color = NxColors.Muted)
@@ -195,11 +213,16 @@ fun TeamEvidenceSection(
                 } else {
                     ""
                 }
-                Text(
-                    (if (cadena.size > 1) "🔗 ${cadena.joinToString(" → ")} · " else "") + alcanceTexto + soloLectura,
-                    fontSize = 13.sp,
-                    color = NxColors.Muted,
-                )
+                if (cadena.size > 1) {
+                    NxIconText(
+                        text = "${cadena.joinToString(" → ")} · $alcanceTexto$soloLectura",
+                        icon = Icons.Outlined.Link,
+                        fontSize = 13.sp,
+                        color = NxColors.Muted,
+                    )
+                } else {
+                    Text("$alcanceTexto$soloLectura", fontSize = 13.sp, color = NxColors.Muted)
+                }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -222,13 +245,14 @@ fun TeamEvidenceSection(
 
         if (porRevisarMias > 0) {
             SoftNote(
-                text = "🔎 Tienes $porRevisarMias evidencia${if (porRevisarMias == 1) "" else "s"} por revisar. " +
+                text = "Tienes $porRevisarMias evidencia${if (porRevisarMias == 1) "" else "s"} por revisar. " +
                     "La actividad queda finalizada cuando se aprueba la de todos.",
                 color = NARANJA,
+                icon = NxGlyph.TO_REVIEW.icon,
             )
         }
-        aviso?.let { SoftNote(text = it, color = VERDE) }
-        error?.let { Text(it, fontSize = 13.sp, color = Color(0xFFB91C1C)) }
+        aviso?.let { SoftNote(text = it, color = VERDE, icon = NxGlyph.DONE.icon) }
+        error?.let { NxIconText(text = it, icon = Icons.Outlined.ErrorOutline, fontSize = 13.sp, color = Color(0xFFB91C1C)) }
 
         if (members.isEmpty()) {
             Text("Nadie en el equipo todavía.", fontSize = 13.sp, color = NxColors.Muted)
@@ -274,19 +298,23 @@ private fun CompactMemberRow(m: TeamEvidenceMemberDto) {
         (if (ev.entryPhotoUrl.isNullOrBlank()) 0 else 1) + ev.evidencePhotos.orEmpty().size +
             (if (ev.exitPhotoUrl.isNullOrBlank()) 0 else 1)
     }
-    val subtitle = if (reparte) {
+    val subtitle: String
+    val subtitleIcon: ImageVector
+    if (reparte) {
         val pasoA = m.pasoA.orEmpty()
-        if (pasoA.isNotEmpty()) {
-            "📨 La pasó a ${pasoA.joinToString(", ") { CoreActivityRules.shortName(it.nombre) }}"
+        subtitle = if (pasoA.isNotEmpty()) {
+            "La pasó a ${pasoA.joinToString(", ") { CoreActivityRules.shortName(it.nombre) }}"
         } else {
-            "📨 La reparte"
+            "La reparte"
         }
+        subtitleIcon = NxGlyph.DISPATCH.icon
     } else {
-        listOfNotNull(
-            if (fotos > 0) "📷 $fotos foto${if (fotos == 1) "" else "s"}" else "Sin fotos aún",
-            if (!ev?.serviceSheetPdfUrl.isNullOrBlank()) "📄 PDF" else null,
-            if (!ev?.serviceSheetCompletedAt.isNullOrBlank()) "📝 Formulario" else null,
+        subtitle = listOfNotNull(
+            if (fotos > 0) "$fotos foto${if (fotos == 1) "" else "s"}" else "Sin fotos aún",
+            if (!ev?.serviceSheetPdfUrl.isNullOrBlank()) "PDF" else null,
+            if (!ev?.serviceSheetCompletedAt.isNullOrBlank()) "Formulario" else null,
         ).joinToString(" · ")
+        subtitleIcon = if (fotos > 0) NxGlyph.PHOTO.icon else NxGlyph.WAITING.icon
     }
     Column(
         modifier = Modifier
@@ -309,7 +337,7 @@ private fun CompactMemberRow(m: TeamEvidenceMemberDto) {
                     )
                     m.eficienciaScore?.takeIf { it > 0 }?.let { StarsText(it, 12.sp) }
                 }
-                Text(subtitle, fontSize = 12.sp, color = NxColors.Muted)
+                NxIconText(text = subtitle, icon = subtitleIcon, fontSize = 12.sp, color = NxColors.Muted)
             }
             if (!reparte && ev != null) {
                 ToneChip(CoreActivityRules.memberEstadoUi(ev.status, ev.reviewStatus, ev.correctionSubmittedAt))
@@ -382,16 +410,19 @@ private fun TeamMemberCard(
                 val de = m.asignadoPor?.takeIf { it.isNotBlank() && it != m.nombre }
                     ?.let { " de ${CoreActivityRules.shortName(it)}" }
                     .orEmpty()
-                add("📥 Recibió $recibio$de".trim())
+                add("Recibió $recibio$de".trim() to NxGlyph.ENTRY.icon)
                 m.pasoA.orEmpty().forEach { p ->
-                    add("📨 La pasó a ${CoreActivityRules.shortName(p.nombre)} · ${CoreActivityRules.formatWhen(p.at).orEmpty()}")
+                    add(
+                        "La pasó a ${CoreActivityRules.shortName(p.nombre)} · ${CoreActivityRules.formatWhen(p.at).orEmpty()}" to
+                            NxGlyph.DISPATCH.icon,
+                    )
                 }
                 if (ev?.status == STEP_COMPLETED && !ev.completedAt.isNullOrBlank()) {
-                    add("📦 Envió ${CoreActivityRules.formatWhen(ev.completedAt).orEmpty()}")
+                    add("Envió ${CoreActivityRules.formatWhen(ev.completedAt).orEmpty()}" to NxGlyph.PICKUP.icon)
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                meta.forEach { Text(it, fontSize = 12.5.sp, color = NxColors.Muted) }
+                meta.forEach { (text, icon) -> NxIconText(text = text, icon = icon, fontSize = 12.5.sp, color = NxColors.Muted) }
             }
 
             if (porRevisar) {
@@ -404,12 +435,13 @@ private fun TeamMemberCard(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        if (esCorreccion) {
+                    NxIconText(
+                        text = if (esCorreccion) {
                             CoreActivityRules.correccionTexto(ev?.correctionSubmittedAt, revisiones)
                         } else {
-                            "🔎 Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
+                            "Ya envió su evidencia. Revísala, califícala y apruébala o devuélvela."
                         },
+                        icon = NxGlyph.TO_REVIEW.icon,
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = NxColors.Slate,
@@ -419,12 +451,20 @@ private fun TeamMemberCard(
                             onClick = { onRevisar(m, RevisionInicial(aprobar = true)) },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(VERDE)),
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        ) { Text("✅ Aprobar", fontWeight = FontWeight.Bold) }
+                        ) {
+                            Icon(NxGlyph.APPROVED.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Aprobar", fontWeight = FontWeight.Bold)
+                        }
                         Button(
                             onClick = { onRevisar(m, RevisionInicial(aprobar = false)) },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(NARANJA)),
                             modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        ) { Text("↩️ Devolver", fontWeight = FontWeight.Bold) }
+                        ) {
+                            Icon(NxGlyph.RETURNED.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Devolver", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -433,14 +473,17 @@ private fun TeamMemberCard(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val por = ev.reviewedBy?.let { " por ${CoreActivityRules.shortName(it)}" }.orEmpty()
                     val cuando = CoreActivityRules.formatWhen(ev.reviewedAt)?.let { " · $it" }.orEmpty()
-                    Text(
-                        "✅ Aprobada$por$cuando. ¿Encontraste algo mal?",
+                    NxIconText(
+                        text = "Aprobada$por$cuando. ¿Encontraste algo mal?",
+                        icon = NxGlyph.APPROVED.icon,
                         fontSize = 13.sp,
                         color = NxColors.Muted,
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedButton(onClick = { onRevisar(m, RevisionInicial(aprobar = false)) }) {
-                        Text("↩️ Devolver")
+                        Icon(NxGlyph.RETURNED.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Devolver")
                     }
                 }
             }
@@ -453,6 +496,7 @@ private fun TeamMemberCard(
                         avisarReenvio = puedoRevisar || revisiones.isNotEmpty(),
                     ),
                     color = NARANJA,
+                    icon = NxGlyph.CORRECTION.icon,
                 )
             }
 
@@ -461,7 +505,7 @@ private fun TeamMemberCard(
             }
 
             if (abierta) {
-                m.indicaciones?.takeIf { it.isNotBlank() }?.let { SoftNote(text = "💬 $it") }
+                m.indicaciones?.takeIf { it.isNotBlank() }?.let { SoftNote(text = it, icon = NxGlyph.CHAT.icon) }
                 when {
                     reparte -> Text(
                         "Su parte fue repartirla" +
@@ -534,15 +578,15 @@ private fun EvidenceContent(
                             .border(1.dp, color?.copy(alpha = 0.35f) ?: Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                     ) {
-                        Text(
-                            "${
-                                when {
-                                    corregir -> "↩️"
-                                    corregido -> "🔁"
-                                    hecho -> "✓"
-                                    else -> "○"
-                                }
-                            } ${CoreActivityRules.stepLabel(step)}",
+                        NxIconText(
+                            text = CoreActivityRules.stepLabel(step),
+                            icon = when {
+                                corregir -> NxGlyph.RETURNED.icon
+                                corregido -> NxGlyph.CORRECTION.icon
+                                hecho -> NxGlyph.DONE.icon
+                                else -> Icons.Outlined.RadioButtonUnchecked
+                            },
+                            iconTint = color ?: NxColors.Muted,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = NxColors.Slate,
@@ -649,8 +693,9 @@ private fun SectionTitle(
             CoreActivityRules.formatWhen(hora)?.let { Text(it, fontSize = 11.5.sp, color = NxColors.Muted) }
         }
         if (onDevolverPaso != null) {
-            Text(
-                "↩️ Devolver este paso",
+            NxIconText(
+                text = "Devolver este paso",
+                icon = NxGlyph.RETURNED.icon,
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = NxColors.Brand,
@@ -680,8 +725,9 @@ private fun PhotoThumb(foto: EvidencePhoto, height: Dp, onOpen: () -> Unit) {
         val lat = foto.lat
         val lng = foto.lng
         if (lat != null && lng != null) {
-            Text(
-                "📍 Ver en mapa",
+            NxIconText(
+                text = "Ver en mapa",
+                icon = Icons.Outlined.LocationOn,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = NxColors.Brand,
@@ -780,7 +826,9 @@ fun EvidencePhotoViewer(fotos: List<EvidencePhoto>, startIndex: Int, onClose: ()
                             fontSize = 12.5.sp,
                         )
                     }
-                    TextButton(onClick = onClose) { Text("✕", color = Color.White, fontSize = 20.sp) }
+                    TextButton(onClick = onClose) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Cerrar", tint = Color.White)
+                    }
                 }
                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().weight(1f)) { p ->
                     ProtectedImage(
@@ -800,7 +848,9 @@ fun EvidencePhotoViewer(fotos: List<EvidencePhoto>, startIndex: Int, onClose: ()
                         val lng = foto?.lng
                         if (lat != null && lng != null) {
                             TextButton(onClick = { openMapsAt(context, lat, lng) }) {
-                                Text("📍 Ver en mapa", color = Color.White, fontWeight = FontWeight.SemiBold)
+                                Icon(Icons.Outlined.LocationOn, contentDescription = null, tint = Color.White)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Ver en mapa", color = Color.White, fontWeight = FontWeight.SemiBold)
                             }
                         } else {
                             Text("Sin ubicación registrada", color = Color.White.copy(alpha = 0.6f), fontSize = 12.5.sp)
@@ -904,8 +954,8 @@ private fun ReviewSheet(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DecisionToggle("✅ Aprobar", aprobar, VERDE, Modifier.weight(1f)) { aprobar = true }
-                DecisionToggle("↩️ Devolver", !aprobar, NARANJA, Modifier.weight(1f)) { aprobar = false }
+                DecisionToggle("Aprobar", aprobar, VERDE, Modifier.weight(1f), NxGlyph.APPROVED.icon) { aprobar = true }
+                DecisionToggle("Devolver", !aprobar, NARANJA, Modifier.weight(1f), NxGlyph.RETURNED.icon) { aprobar = false }
             }
 
             if (!aprobar) {
@@ -955,10 +1005,11 @@ private fun ReviewSheet(
                             modifier = Modifier.size(44.dp).clickable { calificacion = n },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                "★",
-                                fontSize = 30.sp,
-                                color = if (n <= calificacion) Color(0xFFF59E0B) else Color(0xFFCBD5E1),
+                            Icon(
+                                Icons.Rounded.Star,
+                                contentDescription = null,
+                                tint = if (n <= calificacion) Color(0xFFF59E0B) else Color(0xFFCBD5E1),
+                                modifier = Modifier.size(30.dp),
                             )
                         }
                     }
@@ -994,10 +1045,11 @@ private fun ReviewSheet(
 
             val n = marcados.size
             val confirmar = when {
-                aprobar -> "✅ Aprobar"
-                todo -> "↩️ Devolver todo"
-                else -> "↩️ Devolver${if (n > 0) " $n" else ""} paso${if (n == 1) "" else "s"}"
+                aprobar -> "Aprobar"
+                todo -> "Devolver todo"
+                else -> "Devolver${if (n > 0) " $n" else ""} paso${if (n == 1) "" else "s"}"
             }
+            val confirmarIcon = if (aprobar) NxGlyph.APPROVED.icon else NxGlyph.RETURNED.icon
             val colorConfirmar = when {
                 aprobar -> VERDE
                 todo -> ROJO
@@ -1014,7 +1066,13 @@ private fun ReviewSheet(
                     enabled = !saving,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(colorConfirmar)),
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                ) { Text(if (saving) "Guardando…" else confirmar, fontWeight = FontWeight.Bold) }
+                ) {
+                    if (!saving) {
+                        Icon(confirmarIcon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(if (saving) "Guardando…" else confirmar, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -1026,6 +1084,7 @@ private fun DecisionToggle(
     selected: Boolean,
     color: Long,
     modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
     onClick: () -> Unit,
 ) {
     val c = Color(color)
@@ -1038,7 +1097,13 @@ private fun DecisionToggle(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (selected) c else NxColors.Slate)
+        NxIconText(
+            text = label,
+            icon = icon,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) c else NxColors.Slate,
+        )
     }
 }
 

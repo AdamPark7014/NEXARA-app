@@ -12,6 +12,8 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.Log
+import androidx.annotation.DrawableRes
+import androidx.core.content.ContextCompat
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.apiAssetOrigin
 import mx.nexara.mobile.nativeapp.data.api.resolveProtectedUploadUrl
@@ -174,6 +176,45 @@ internal object NotificationAvatars {
         }
         canvas.drawText(letters, half, half - (text.descent() + text.ascent()) / 2f, text)
         return out
+    }
+
+    /**
+     * Círculo relleno de [colorInt] con el glifo blanco de [glyphRes] al centro:
+     * la insignia de evento cuando no hay foto del remitente.
+     */
+    fun filledGlyphCircle(context: Context, @DrawableRes glyphRes: Int, colorInt: Int): Bitmap {
+        val out = Bitmap.createBitmap(SIZE_PX, SIZE_PX, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        val half = SIZE_PX / 2f
+        canvas.drawCircle(half, half, half, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colorInt })
+        drawGlyph(context, canvas, glyphRes, 0, 0, SIZE_PX, (SIZE_PX * 0.58f).toInt())
+        return out
+    }
+
+    /**
+     * [base] (foto o iniciales) con una insignia circular de [colorInt] y el
+     * glifo blanco de [glyphRes] en la esquina inferior derecha.
+     */
+    fun withBadge(context: Context, base: Bitmap, @DrawableRes glyphRes: Int, colorInt: Int): Bitmap {
+        val out = base.copy(Bitmap.Config.ARGB_8888, true) ?: return base
+        val canvas = Canvas(out)
+        val badgeSize = SIZE_PX * 0.44f
+        val cx = SIZE_PX - badgeSize / 2f
+        val cy = SIZE_PX - badgeSize / 2f
+        // Borde blanco para que la insignia se despegue de la foto de fondo.
+        canvas.drawCircle(cx, cy, badgeSize / 2f + SIZE_PX * 0.02f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE })
+        canvas.drawCircle(cx, cy, badgeSize / 2f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colorInt })
+        val left = (cx - badgeSize / 2f).toInt()
+        val top = (cy - badgeSize / 2f).toInt()
+        drawGlyph(context, canvas, glyphRes, left, top, badgeSize.toInt(), (badgeSize * 0.6f).toInt())
+        return out
+    }
+
+    private fun drawGlyph(context: Context, canvas: Canvas, @DrawableRes glyphRes: Int, left: Int, top: Int, boxSize: Int, glyphSize: Int) {
+        val drawable = ContextCompat.getDrawable(context, glyphRes) ?: return
+        val inset = (boxSize - glyphSize) / 2
+        drawable.setBounds(left + inset, top + inset, left + inset + glyphSize, top + inset + glyphSize)
+        drawable.draw(canvas)
     }
 
     private fun cacheName(url: String): String {

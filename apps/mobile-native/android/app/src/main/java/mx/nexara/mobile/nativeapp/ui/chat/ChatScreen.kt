@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -51,6 +52,9 @@ import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -89,6 +93,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -141,8 +146,12 @@ import mx.nexara.mobile.nativeapp.ui.common.PdfViewerScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxIcons
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import mx.nexara.mobile.nativeapp.ui.util.downloadAuthedToCache
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 import mx.nexara.mobile.nativeapp.ui.util.openFile
@@ -176,13 +185,7 @@ private fun formatEntityMentionToken(entity: ChatMentionDto): String {
             "EVIDENCE" -> "/ops/activities/${entity.id}/evidences"
             else -> "/"
         }
-    val icon = when (entity.kind.uppercase()) {
-        "ACTIVITY" -> "📋"
-        "EVIDENCE" -> "📷"
-        else -> ""
-    }
-    val label = if (icon.isNotEmpty()) "$icon $cleanLabel" else cleanLabel
-    return "[$label]($href)"
+    return "[$cleanLabel]($href)"
 }
 
 private fun buildChatMessageAnnotatedString(
@@ -284,19 +287,18 @@ private fun formatChannelTime(iso: String): String {
     }
 }
 
-private fun formatLastMessagePreview(preview: String?): String? {
+/** Texto del preview y si es un adjunto (para anteponerle el ícono de clip). */
+private fun formatLastMessagePreview(preview: String?): Pair<String, Boolean>? {
     val raw = preview
         ?.replace(Regex("\\s+"), " ")
         ?.trim()
         ?.takeIf { it.isNotBlank() }
         ?: return null
-    val normalized = when {
-        raw.startsWith("Archivo:", ignoreCase = true) ->
-            "📎 ${raw.removePrefix("Archivo:").trim()}"
-        raw.length > 72 -> "${raw.take(72).trimEnd()}…"
-        else -> raw
+    if (raw.startsWith("Archivo:", ignoreCase = true)) {
+        return raw.removePrefix("Archivo:").trim() to true
     }
-    return normalized
+    val normalized = if (raw.length > 72) "${raw.take(72).trimEnd()}…" else raw
+    return normalized to false
 }
 
 private fun buildChatListItems(
@@ -1343,9 +1345,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 private fun channelPrefix(kind: String): String = when (kind.uppercase()) {
-    "DIRECT" -> ""
-    "PRIVATE" -> "🔒 "
+    "DIRECT", "PRIVATE" -> ""
     else -> "# "
+}
+
+private fun channelIcon(kind: String): ImageVector? = when (kind.uppercase()) {
+    "PRIVATE" -> Icons.Outlined.Lock
+    else -> null
 }
 
 private fun channelKindLabel(kind: String): String = when (kind.uppercase()) {
@@ -1602,8 +1608,9 @@ fun ChatScreen(
                 TopAppBar(
                     title = {
                         Column {
-                            Text(
-                                "${channelPrefix(channel.kind)}${channel.name}",
+                            NxIconText(
+                                text = "${channelPrefix(channel.kind)}${channel.name}",
+                                icon = channelIcon(channel.kind),
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -2284,8 +2291,9 @@ private fun ChannelListItem(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        "${channelPrefix(ch.kind)}${ch.name}",
+                    NxIconText(
+                        text = "${channelPrefix(ch.kind)}${ch.name}",
+                        icon = channelIcon(ch.kind),
                         fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -2313,9 +2321,10 @@ private fun ChannelListItem(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                preview?.let {
-                    Text(
-                        it,
+                preview?.let { (text, isAttachment) ->
+                    NxIconText(
+                        text = text,
+                        icon = if (isAttachment) Icons.Outlined.AttachFile else null,
                         style = MaterialTheme.typography.bodySmall,
                         color = if (hasUnread) {
                             MaterialTheme.colorScheme.onSurface
@@ -2488,14 +2497,14 @@ private fun ChatComposeBar(
                 enabled = canAttach,
                 modifier = Modifier.size(36.dp),
             ) {
-                Text("📋", style = MaterialTheme.typography.titleSmall)
+                Icon(NxIcons.Assignment, contentDescription = "Mencionar actividad", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(
                 onClick = onPickEvidence,
                 enabled = canAttach,
                 modifier = Modifier.size(36.dp),
             ) {
-                Text("📷", style = MaterialTheme.typography.titleSmall)
+                Icon(NxGlyph.PHOTO.icon, contentDescription = "Mencionar evidencia", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             BasicTextField(
                 value = draft,
@@ -2665,14 +2674,14 @@ private fun ThreadSheetContent(
                     enabled = !sending && !uploading,
                     modifier = Modifier.size(36.dp),
                 ) {
-                    Text("📋", style = MaterialTheme.typography.titleSmall)
+                    Icon(NxIcons.Assignment, contentDescription = "Mencionar actividad")
                 }
                 IconButton(
                     onClick = onPickEvidence,
                     enabled = !sending && !uploading,
                     modifier = Modifier.size(36.dp),
                 ) {
-                    Text("📷", style = MaterialTheme.typography.titleSmall)
+                    Icon(NxGlyph.PHOTO.icon, contentDescription = "Mencionar evidencia")
                 }
             }
             TextButton(
@@ -2866,7 +2875,12 @@ private fun ChatMessageCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (pinned || msg.pinnedAt != null) {
-                        Text("📌", style = MaterialTheme.typography.labelSmall)
+                        Icon(
+                            Icons.Outlined.PushPin,
+                            contentDescription = "Fijado",
+                            modifier = Modifier.size(14.dp),
+                            tint = NxColors.Muted,
+                        )
                     }
                     Box {
                         if (!isOwn) {
@@ -2935,16 +2949,18 @@ private fun ChatMessageCard(
                         contentScale = ContentScale.Fit,
                     )
                 } else {
-                    Text(
-                        "📎 $name",
+                    NxIconText(
+                        text = name,
+                        icon = Icons.Outlined.AttachFile,
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isOwn) Color.White else NxColors.Brand,
                         modifier = Modifier.clickable { onOpenAttachment(url, msg.attachmentName) },
                     )
                 }
             } ?: msg.attachmentName?.takeIf { it.isNotBlank() }?.let { name ->
-                Text(
-                    "📎 $name",
+                NxIconText(
+                    text = name,
+                    icon = Icons.Outlined.AttachFile,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isOwn) Color.White else NxColors.Brand,
                 )
@@ -3165,7 +3181,10 @@ private fun EntityMentionPickerDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("ACTIVITY" to "📋 Actividades", "EVIDENCE" to "📷 Evidencias").forEach { (value, label) ->
+                    listOf(
+                        Triple("ACTIVITY", "Actividades", NxIcons.Assignment),
+                        Triple("EVIDENCE", "Evidencias", NxGlyph.PHOTO.icon),
+                    ).forEach { (value, label, icon) ->
                         TextButton(
                             onClick = {
                                 query = ""
@@ -3173,6 +3192,8 @@ private fun EntityMentionPickerDialog(
                             },
                             enabled = kind != value,
                         ) {
+                            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(4.dp))
                             Text(label, fontWeight = if (kind == value) FontWeight.Bold else FontWeight.Normal)
                         }
                     }
@@ -3222,9 +3243,10 @@ private fun EntityMentionPickerDialog(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(
-                                        if (mention.kind == "ACTIVITY") "📋" else "📷",
-                                        style = MaterialTheme.typography.titleMedium,
+                                    Icon(
+                                        if (mention.kind == "ACTIVITY") NxIcons.Assignment else NxGlyph.PHOTO.icon,
+                                        contentDescription = null,
+                                        tint = NxColors.Muted,
                                     )
                                     Column(Modifier.weight(1f)) {
                                         Text(
@@ -3393,8 +3415,9 @@ private fun ChatSearchPanel(
                                         )
                                     }
                                     hit.channel?.let { ch ->
-                                        Text(
-                                            "${channelPrefix(ch.kind)}${ch.name}",
+                                        NxIconText(
+                                            text = "${channelPrefix(ch.kind)}${ch.name}",
+                                            icon = channelIcon(ch.kind),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = NxColors.Brand,
                                         )
