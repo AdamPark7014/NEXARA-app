@@ -13,6 +13,8 @@ import { ActivitiesService } from '../activities.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { ActivityGeofenceService } from '../geofence/activity-geofence.service.js';
+import { ActivityEvidenceFieldsService } from './activity-evidence-fields.service.js';
+import { progresoDeCampos } from './evidence-fields.helpers.js';
 import {
   debeAutoAceptar,
   esCerrada,
@@ -125,6 +127,7 @@ export class ActivityEvidenceService {
     private activitiesService: ActivitiesService,
     private notificationHierarchy: NotificationHierarchyService,
     @Optional() private geofence?: ActivityGeofenceService,
+    @Optional() private campos?: ActivityEvidenceFieldsService,
   ) {}
 
   private async notifyEvidenceReadyForReview(
@@ -750,7 +753,20 @@ export class ActivityEvidenceService {
       throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
     }
 
-    if (isInventoryFlow) {
+    // Con campos definidos, lo que se exige son los huecos que pidió quien asignó
+    // («Cámara 1 antes», «Rack después»), no un número de fotos sueltas. Las libres
+    // quedan como extra opcional. Sin campos, todo sigue como antes.
+    const campos = await this.camposDeActividad(activityId, activity.companyId);
+    const porCampos = progresoDeCampos(campos);
+
+    if (porCampos.requeridas > 0) {
+      if (!porCampos.completo) {
+        throw new BadRequestException(
+          `Falta documentar: ${porCampos.faltantes.slice(0, 6).join(', ')}` +
+            (porCampos.faltantes.length > 6 ? ` y ${porCampos.faltantes.length - 6} más` : ''),
+        );
+      }
+    } else if (isInventoryFlow) {
       if (photoUrls.length < 1) {
         throw new BadRequestException('Para mantenimiento e inventario se requiere al menos 1 evidencia visual');
       }
@@ -958,13 +974,32 @@ export class ActivityEvidenceService {
     }
 
     const coreKind = evidence.activity.coreKind;
+    // Qué hay que documentar en esta actividad. Sin campos, `campos: []` y la persona
+    // ve el flujo de siempre: N fotos libres.
+    const campos = await this.camposDeActividad(activityId, evidence.activity.companyId);
     return {
       ...evidence,
       assigneeIndicaciones: evidence.activity.assignees[0]?.indicaciones ?? null,
       stepsForKind: evidenceStepsForKind(coreKind),
       progressPct: evidenceProgressPct(evidence.status, coreKind),
+      campos,
+      camposProgreso: progresoDeCampos(campos),
       avancesAnteriores: await this.previousProgress(activityId, evidence.userId),
     };
+  }
+
+  /**
+   * Campos de evidencia de la actividad. Nunca tumba el flujo: si algo falla se
+   * devuelve vacío y la persona sigue con las fotos libres de siempre.
+   */
+  private async camposDeActividad(activityId: number, companyId: number) {
+    if (!this.campos) return [];
+    try {
+      return await this.campos.listarCamposDeActividad(activityId, companyId);
+    } catch (error) {
+      this.logger.warn(`camposDeActividad ${activityId}: ${String(error)}`);
+      return [];
+    }
   }
 
   /**
@@ -2059,8 +2094,16 @@ export class ActivityEvidenceService {
         const activity = await this.loadActivityForTenant(activityId, companyId);
         const isInventoryFlow = activity?.workType === 'PREVENTIVE_INVENTORY';
         const required = clampEvidencePhotoRequired(activity.evidencePhotoRequired);
+        const porCampos = progresoDeCampos(
+          await this.camposDeActividad(activityId, activity.companyId),
+        );
 
-        if (isInventoryFlow) {
+        if (porCampos.requeridas > 0) {
+          if (!porCampos.completo) {
+            throw new BadRequestException(`Falta documentar: ${porCampos.faltantes.join(', ')}`);
+          }
+          if (!Array.isArray(data.photoUrls)) data.photoUrls = [];
+        } else if (isInventoryFlow) {
           if (!Array.isArray(data.photoUrls) || data.photoUrls.length < 1) {
             throw new BadRequestException('Requiere al menos 1 evidencia visual');
           }
