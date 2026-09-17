@@ -116,7 +116,7 @@ export class ActivityEvidenceZipService {
         fechaFinalizacion: true,
         branchName: true,
         responsable: { select: { id: true, nombre: true } },
-        project: { select: { name: true } },
+        project: { select: { title: true } },
         client: { select: { name: true } },
       },
     });
@@ -141,7 +141,7 @@ export class ActivityEvidenceZipService {
     ]);
 
     const raiz = [
-      limpiarNombreDeArchivo(activity.project?.name || activity.client?.name || 'Sin proyecto'),
+      limpiarNombreDeArchivo(activity.project?.title || activity.client?.name || 'Sin proyecto'),
       limpiarNombreDeArchivo(`${activity.anNumber || ''} ${activity.titulo || ''}`.trim(), 'Actividad'),
     ].join('/');
 
@@ -242,7 +242,7 @@ export class ActivityEvidenceZipService {
     l.push(`${activity.anNumber || ''} ${activity.titulo || ''}`.trim());
     l.push('='.repeat(Math.max(8, `${activity.anNumber || ''} ${activity.titulo || ''}`.trim().length)));
     l.push('');
-    l.push(`Proyecto o cliente: ${activity.project?.name || activity.client?.name || '—'}`);
+    l.push(`Proyecto o cliente: ${activity.project?.title || activity.client?.name || '—'}`);
     if (activity.branchName) l.push(`Sucursal: ${activity.branchName}`);
     l.push(`Responsable: ${activity.responsable?.nombre || '—'}`);
     l.push(`Estatus: ${activity.estatus || '—'}`);
