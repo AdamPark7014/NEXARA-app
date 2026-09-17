@@ -1,7 +1,19 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { isClosedStatus } from './activity-status.js';
+import {
+  canCancelActivity,
+  canReassignFrom,
+  chainExecutorIds,
+  chainPeopleIds,
+  cleanMotivo,
+  loadActivityChain,
+  MOTIVO_MINIMO,
+  REASSIGN_FORBIDDEN,
+  type ChainActor,
+} from './activity-superiors.js';
 
 /**
  * Equipo de una actividad y su historial de reasignaciones.
@@ -261,99 +273,174 @@ export class ActivityTeamService {
   }
 
   /**
-   * Reasigna la actividad y deja constancia.
+   * Qué puede hacer quien consulta como superior en esta actividad: cancelarla y a quién puede
+   * reemplazar («Pasar a otro compañero»). Web y apps solo muestran los botones que aplican.
+   */
+  async superiorActions(activityId: number, actor: ChainActor, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const chain = await loadActivityChain(this.prisma, activityId, tenantId);
+    const cerrada = isClosedStatus(chain.estatus);
+    const ejecutores = new Set(chainExecutorIds(chain));
+    const personas = cerrada
+      ? []
+      : chainPeopleIds(chain)
+          .filter((id) => canReassignFrom(actor, chain, id))
+          .map((id) => ({
+            userId: id,
+            nombre: chain.nombres.get(id) || 'Sin nombre',
+            rol: chain.members.find((m) => m.userId === id)?.rol ?? (id === chain.responsableId ? 'LEAD' : 'TECNICO'),
+            responsable: id === chain.responsableId,
+            ejecuta: ejecutores.has(id),
+          }));
+    return {
+      estatus: chain.estatus,
+      cerrada,
+      puedeCancelar: !cerrada && canCancelActivity(actor, chain),
+      puedePasar: personas.length > 0,
+      personas,
+      motivoMinimo: MOTIVO_MINIMO,
+    };
+  }
+
+  /**
+   * «Pasar a otro compañero»: quien la tenía (`deUsuarioId`, por omisión el responsable) deja su
+   * lugar a `aUsuarioId`, que continúa donde se quedó.
    *
-   * Antes esto era un `UPDATE` que pisaba el responsable: se perdía quién la
-   * tenía, quién la movió y por qué, y el SLA seguía midiéndose desde una
-   * asignación que ya no correspondía a nadie.
-   *
-   * El responsable anterior **permanece en el equipo como APOYO** salvo que se
-   * pida retirarlo: normalmente conserva contexto del trabajo ya hecho.
+   * - Solo superiores de la persona reemplazada (misma regla que cancelar) y con motivo (mín. 10).
+   * - Queda constancia en `ActivityReassignment` (de, a, quién la movió y por qué).
+   * - Quien entra hereda el lugar en la cadena (rol, indicaciones y orden) y recibe **su propia**
+   *   evidencia desde la foto de entrada: toma su entrada y su salida.
+   * - Quien sale queda retirado (`retiradoAt`) con su avance parcial intacto: revisores y quien
+   *   continúa lo ven como «Avance anterior de <nombre>». `retirarAnterior: false` lo conserva
+   *   como apoyo (uso del centro de despacho).
    */
   async reassign(
     activityId: number,
-    input: { aUsuarioId: number; motivo?: string; retirarAnterior?: boolean },
-    actorId: number,
+    input: { aUsuarioId: number; deUsuarioId?: number | null; motivo?: string; retirarAnterior?: boolean },
+    actor: ChainActor,
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
-    const activity = await this.loadActivity(activityId, tenantId);
-
-    const destino = await this.prisma.user.findFirst({
-      where: { id: input.aUsuarioId, isActive: true },
-      select: { id: true },
-    });
-    if (!destino) throw new NotFoundException('El nuevo responsable no existe o está inactivo');
-
-    const anterior = activity.responsableId;
-    if (anterior === input.aUsuarioId) {
-      throw new BadRequestException('Esa persona ya es el responsable de la actividad');
+    const chain = await loadActivityChain(this.prisma, activityId, tenantId);
+    if (isClosedStatus(chain.estatus)) {
+      throw new BadRequestException('La actividad ya está cerrada (finalizada o cancelada); no se puede pasar a otro compañero');
     }
 
+    const aUsuarioId = Number(input?.aUsuarioId);
+    if (!Number.isInteger(aUsuarioId) || aUsuarioId <= 0) {
+      throw new BadRequestException('Elige al compañero que la va a continuar');
+    }
+    const anterior = input?.deUsuarioId != null ? Number(input.deUsuarioId) : chain.responsableId;
+    if (!chainPeopleIds(chain).includes(anterior)) {
+      throw new NotFoundException('Esa persona ya no está en el equipo de la actividad');
+    }
+    if (!canReassignFrom(actor, chain, anterior)) {
+      throw new ForbiddenException(REASSIGN_FORBIDDEN);
+    }
+    const motivo = cleanMotivo(input?.motivo);
+    if (!motivo) {
+      throw new BadRequestException(`Escribe por qué la pasas a otro compañero (mínimo ${MOTIVO_MINIMO} caracteres)`);
+    }
+    if (anterior === aUsuarioId) {
+      throw new BadRequestException('Elige a un compañero distinto de quien la tiene');
+    }
+    if (chainPeopleIds(chain).includes(aUsuarioId)) {
+      throw new BadRequestException('Esa persona ya está en el equipo de la actividad');
+    }
+
+    const destino = await this.prisma.user.findFirst({
+      where: { id: aUsuarioId, isActive: true },
+      select: { id: true },
+    });
+    if (!destino) throw new NotFoundException('El compañero elegido no existe o está inactivo');
+
+    const retirar = input?.retirarAnterior !== false;
+    const esResponsable = anterior === chain.responsableId;
+    const now = new Date();
+
     const result = await this.prisma.$transaction(async (tx) => {
-      await tx.activity.update({
-        where: { id: activityId },
-        data: { responsableId: input.aUsuarioId, fechaAsignacion: new Date() },
-      });
+      const deRow = await tx.activityAssignee.findFirst({ where: { activityId, userId: anterior } });
+      const rolNuevo = esResponsable ? 'LEAD' : (deRow?.rol ?? 'TECNICO');
+
+      if (esResponsable) {
+        await tx.activity.update({
+          where: { id: activityId },
+          data: { responsableId: aUsuarioId, fechaAsignacion: now },
+        });
+      }
 
       await tx.activityReassignment.create({
         data: {
           activityId,
-          deUsuarioId: anterior ?? null,
-          aUsuarioId: input.aUsuarioId,
-          movidaPorId: actorId,
-          motivo: input.motivo?.trim()?.slice(0, 400) || null,
+          deUsuarioId: anterior,
+          aUsuarioId,
+          movidaPorId: actor.id,
+          motivo,
           companyId: tenantId,
         },
       });
 
-      // El nuevo responsable entra como líder del equipo.
-      const yaEnEquipo = await tx.activityAssignee.findFirst({
-        where: { activityId, userId: input.aUsuarioId },
-      });
+      // Quien entra ocupa el mismo lugar de la cadena: rol, indicaciones y orden de llegada.
+      const lugar = {
+        rol: rolNuevo,
+        retiradoAt: null,
+        asignadoPorId: actor.id,
+        ...(deRow?.asignadoAt ? { asignadoAt: deRow.asignadoAt } : {}),
+        ...(deRow?.indicaciones ? { indicaciones: deRow.indicaciones } : {}),
+      };
+      const yaEnEquipo = await tx.activityAssignee.findFirst({ where: { activityId, userId: aUsuarioId } });
       if (yaEnEquipo) {
-        await tx.activityAssignee.update({
-          where: { id: yaEnEquipo.id },
-          data: { rol: 'LEAD', retiradoAt: null },
-        });
+        await tx.activityAssignee.update({ where: { id: yaEnEquipo.id }, data: lugar });
       } else {
         await tx.activityAssignee.create({
-          data: { activityId, userId: input.aUsuarioId, rol: 'LEAD', companyId: tenantId },
+          data: { activityId, userId: aUsuarioId, companyId: tenantId, ...lugar },
         });
       }
 
-      if (anterior) {
-        if (input.retirarAnterior) {
+      if (retirar) {
+        if (deRow) {
           await tx.activityAssignee.updateMany({
             where: { activityId, userId: anterior, retiradoAt: null },
-            data: { retiradoAt: new Date() },
+            data: { retiradoAt: now },
           });
         } else {
-          const previo = await tx.activityAssignee.findFirst({
-            where: { activityId, userId: anterior },
+          // Responsable sin fila de equipo: se deja la fila retirada para que su avance siga visible.
+          await tx.activityAssignee.create({
+            data: { activityId, userId: anterior, rol: 'LEAD', companyId: tenantId, retiradoAt: now },
           });
-          if (previo) {
-            await tx.activityAssignee.update({ where: { id: previo.id }, data: { rol: 'APOYO' } });
-          } else {
-            await tx.activityAssignee.create({
-              data: { activityId, userId: anterior, rol: 'APOYO', companyId: tenantId },
-            });
-          }
         }
+      } else if (deRow) {
+        await tx.activityAssignee.update({ where: { id: deRow.id }, data: { rol: 'APOYO' } });
+      } else {
+        await tx.activityAssignee.create({
+          data: { activityId, userId: anterior, rol: 'APOYO', companyId: tenantId },
+        });
       }
 
-      return { reassigned: true, de: anterior, a: input.aUsuarioId };
+      // Su propia evidencia, desde la foto de entrada (en despacho el LEAD solo reparte).
+      const reparte = chain.assignmentCharge === 'despacho' && rolNuevo === 'LEAD';
+      if (!reparte) {
+        await tx.activityEvidence.upsert({
+          where: { activityId_userId: { activityId, userId: aUsuarioId } },
+          create: { activityId, userId: aUsuarioId, companyId: tenantId, status: 'ENTRY_PHOTO' },
+          update: {},
+        });
+      }
+
+      return { reassigned: true, de: anterior, a: aUsuarioId, retiradoAnterior: retirar, motivo };
     });
 
     // Opcional: las pruebas del equipo arman el servicio sin avisos.
-    void this.notificationHierarchy?.notifyActivityReassigned({
-      activityId,
-      actorId,
-      deUsuarioId: anterior ?? null,
-      aUsuarioId: input.aUsuarioId,
-      motivo: input.motivo,
-      retiradoAnterior: input.retirarAnterior,
-    });
+    void Promise.resolve(
+      this.notificationHierarchy?.notifyActivityReassigned({
+        activityId,
+        actorId: actor.id,
+        deUsuarioId: anterior,
+        aUsuarioId,
+        motivo,
+        retiradoAnterior: retirar,
+      }),
+    ).catch(() => undefined);
     return result;
   }
 
