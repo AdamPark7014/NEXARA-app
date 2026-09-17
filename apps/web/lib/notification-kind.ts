@@ -28,6 +28,8 @@ export type NotificationKind =
   | "fuera_zona"
   | "cancelada"
   | "falta_justificada"
+  | "cumpleanos"
+  | "aniversario"
   | "cliente"
   | "chat"
   | "ubicacion"
@@ -57,6 +59,17 @@ export function notificationKind(category?: string | null, title?: string | null
   const t = norm(stripLeadingEmoji(title));
 
   if (c === "chat") return "chat";
+  // BIRTHDAY / WORK_ANNIVERSARY (push `icon: cumpleanos|aniversario`, categoría `celebraciones`):
+  // «¡Feliz cumpleaños, Ana! 🎂», «Hoy es cumpleaños de Ana López 🎂», «¡Felicidades, Ana! 🎉»,
+  // «Ana López cumple 3 años en NEXARA 🎉». Va antes que el resto: un nombre no debe cambiar el ícono.
+  if (
+    c === "celebraciones" ||
+    t.includes("feliz cumpleanos") ||
+    t.includes("es cumpleanos de") ||
+    (t.includes(" cumple ") && t.includes("en nexara"))
+  ) {
+    return t.includes("cumpleanos") ? "cumpleanos" : "aniversario";
+  }
   // ACTIVITY_OUT_OF_ZONE (push `icon: fuera_zona`): «Estás fuera de la zona…», «X salió de la zona…»,
   // «X justificó su salida de zona». Va antes de «salida» para no confundirse con el checador.
   if (
