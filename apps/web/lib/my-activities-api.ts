@@ -1,4 +1,5 @@
 import type { GeocercaAlerta } from "@/lib/activity-geofence";
+import type { Aceptacion, Semaforo } from "@/lib/actividad-tiempos";
 import { erpFetch } from "@/lib/erp-api";
 
 /** Fila de Mis actividades (GET /me/activities). Fechas en ISO. */
@@ -49,6 +50,20 @@ export type MyActivityItem = {
     a: string;
     motivo: string | null;
   } | null;
+  /**
+   * Contrato del 18-09. Opcionales: una API anterior no los manda y la pantalla
+   * debe seguir funcionando igual (nada nuevo bloquea).
+   */
+  aceptacion?: Aceptacion;
+  motivoRechazo?: string | null;
+  semaforo?: Semaforo;
+  minutosPlan?: number | null;
+  minutosReales?: number | null;
+  excedida?: boolean;
+  inicioRealAt?: string | null;
+  finRealAt?: string | null;
+  asignadoPor?: { id: number; nombre: string } | null;
+  saltoPrioridad?: boolean;
 };
 
 export type MyActivitiesResponse = {
@@ -87,6 +102,30 @@ export function dispatchMyActivity(
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+/** Aceptar la actividad asignada (POST /me/activities/:id/aceptar). */
+export function aceptarMiActividad(
+  token: string,
+  activityId: number,
+): Promise<{ ok: boolean; aceptacion: Aceptacion }> {
+  return erpFetch<{ ok: boolean; aceptacion: Aceptacion }>(`me/activities/${activityId}/aceptar`, token, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+/** Rechazar con motivo (POST /me/activities/:id/rechazar); sigue asignada hasta que la muevan. */
+export function rechazarMiActividad(
+  token: string,
+  activityId: number,
+  motivo: string,
+): Promise<{ ok: boolean; aceptacion: Aceptacion; motivoRechazo: string }> {
+  return erpFetch<{ ok: boolean; aceptacion: Aceptacion; motivoRechazo: string }>(
+    `me/activities/${activityId}/rechazar`,
+    token,
+    { method: "POST", body: JSON.stringify({ motivo }) },
+  );
 }
 
 /** Quien reparte un despacho cambia su día y hora (PATCH /me/activities/:id/reprogramar). */

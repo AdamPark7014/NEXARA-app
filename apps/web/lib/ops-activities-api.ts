@@ -2,6 +2,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 
 import type { ActivityEvidenceDetail } from "@/lib/evidence-display";
+import type { Aceptacion, Semaforo } from "@/lib/actividad-tiempos";
 
 export type ActivityDetail = {
   id: number;
@@ -45,6 +46,7 @@ export type ActivityDetail = {
   evidencias?: Array<{ id: number; tipo?: string; descripcion?: string; url?: string }>;
   assignees?: Array<{
     id: number;
+    userId?: number;
     rol?: string;
     horasPlan?: number | string | null;
     horasReales?: number | string | null;
@@ -54,7 +56,22 @@ export type ActivityDetail = {
     acsEntryDoor?: string | null;
     retiradoAt?: string | null;
     user?: { id: number; nombre: string; email?: string };
+    /** Contrato del 18-09 (opcional: una API anterior no lo manda). */
+    aceptacion?: Aceptacion;
+    motivoRechazo?: string | null;
+    semaforo?: Semaforo;
+    minutosPlan?: number | null;
+    minutosReales?: number | null;
+    excedida?: boolean;
+    inicioRealAt?: string | null;
+    finRealAt?: string | null;
+    saltoPrioridad?: boolean;
   }>;
+  /** Resumen de tiempos de la actividad (responsable o primero del equipo). */
+  semaforo?: Semaforo | null;
+  minutosPlan?: number | null;
+  minutosReales?: number | null;
+  excedida?: boolean;
   fechaMaxima?: string | null;
   tiempoEstimadoMin?: number | null;
   tiempoMaximoMin?: number | null;
