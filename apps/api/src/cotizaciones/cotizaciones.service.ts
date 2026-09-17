@@ -55,6 +55,15 @@ import {
 } from './terminos-segmento.js';
 import { avanceActividadPorEstado } from './estado-cotizacion.js';
 import { isPdfUrl, pasoCubiertoPorCotizacion } from '../activities/evidence/evidence-flow.helpers.js';
+import { generarPropuestaTecnicaPdf } from './propuesta-tecnica-pdf.js';
+import { objetivoDePropuesta } from './objetivo-plantilla.js';
+import {
+  PAQUETES,
+  bloqueAlcanceDePaquete,
+  buscarPaquete,
+  mezclarBloqueAlcance,
+  partidasDePaquete,
+} from './paquetes.js';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -1032,6 +1041,71 @@ export class CotizacionesService {
     return updated;
   }
 
+  /** Catálogo de paquetes («Cámara bala instalada» = cámara + balún + adaptador + caja + instalación). */
+  paquetes() {
+    return PAQUETES.map((paquete) => ({
+      clave: paquete.clave,
+      titulo: paquete.titulo,
+      descripcion: paquete.descripcion,
+      bloqueAlcance: paquete.bloqueAlcance ?? null,
+      partidas: paquete.partidas,
+    }));
+  }
+
+  /**
+   * Agrega N paquetes a una cotización: genera sus partidas y **deja cuadrado el alcance**.
+   *
+   * Cotizar un paquete a mano es de donde salen las propuestas con 15 cámaras y 14 instalaciones.
+   */
+  async agregarPaquete(id: number, clave: string, cantidad: number, userId?: number, companyId?: number | null) {
+    const existing = await this.findOne(id, companyId);
+    if (estaBloqueada(existing.status)) {
+      throw new BadRequestException(
+        'Esta cotización ya salió al cliente: edítala para crear una versión nueva antes de agregar paquetes.',
+      );
+    }
+
+    const paquete = buscarPaquete(clave);
+    if (!paquete) throw new BadRequestException('Ese paquete no existe.');
+
+    const n = Math.max(1, Math.trunc(Number(cantidad) || 0));
+    // Las partidas del mismo paquete se reemplazan: dos pasadas de «15 cámaras» no son 30.
+    const conservadas = existing.items.filter((item: any) => item.paqueteClave !== paquete.clave);
+    const generadas = partidasDePaquete(paquete, n);
+
+    const items = [
+      ...conservadas.map((item: any) => ({
+        grupo: item.grupo,
+        paqueteClave: item.paqueteClave,
+        paqueteCantidad: item.paqueteCantidad,
+        category: item.category,
+        name: item.name,
+        description: item.description,
+        unit: item.unit,
+        qty: Number(item.qty),
+        unitPrice: Number(item.unitPrice),
+        discount: Number(item.discount),
+        tax: Number(item.tax),
+        laborHours: Number(item.laborHours || 0),
+        laborRate: Number(item.laborRate || 0),
+      })),
+      ...generadas,
+    ];
+
+    const bloques = mezclarBloqueAlcance(
+      (Array.isArray(existing.alcanceBloques) ? (existing.alcanceBloques as any[]) : []) as Array<{ clave: string }>,
+      bloqueAlcanceDePaquete(paquete, n) as unknown as { clave: string },
+    );
+
+    await this.update(
+      id,
+      { items: items as any, alcanceBloques: bloques as unknown as unknown[] },
+      userId,
+      companyId,
+    );
+    return this.detalleCore(id, companyId);
+  }
+
   /** Guarda la foto de la cotización tal como está, para poder volver a ella. */
   private async guardarVersion(quote: any, createdById?: number, note?: string) {
     const ultima = await this.db.cotizacionVersion.findFirst({
@@ -1297,7 +1371,119 @@ export class CotizacionesService {
     });
   }
 
+  /**
+   * PDF que ve el cliente: la «Propuesta técnica» del contrato.
+   *
+   * El PDF viejo (una tabla y un párrafo de términos fijo) se conserva para la vista interna, que
+   * es la única que lleva costo de proveedor y margen.
+   */
+  private async buildPropuesta(quote: any): Promise<Buffer> {
+    const partidas = this.partidasParaGrupos(quote.items ?? []);
+    const segmento = normalizarSegmento(quote.segmento);
+    const instalacion = incluyeInstalacion(partidas);
+    const vigenciaDias = diasDeVigencia(quote.issueDate, quote.validUntil);
+
+    let company = quote.company;
+    if (!company && quote.companyId) {
+      company = await this.db.companyProfile.findUnique({ where: { id: quote.companyId } });
+    }
+
+    const [planos, participantes] = await Promise.all([
+      this.planosDePropuesta(quote),
+      this.core.participantesParaApi(quote.id),
+    ]);
+
+    const bloques = Array.isArray(quote.alcanceBloques) ? (quote.alcanceBloques as any[]) : [];
+    const fecha = (valor: unknown) => {
+      if (!valor) return null;
+      const d = new Date(valor as string);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+    };
+
+    return generarPropuestaTecnicaPdf({
+      folio: quote.quoteNumber,
+      revision: Number(quote.revision || 1),
+      issueDate: fecha(quote.issueDate) ?? new Date().toISOString().slice(0, 10),
+      validUntil: fecha(quote.validUntil),
+      segmentoEtiqueta: ETIQUETA_SEGMENTO[segmento as Segmento],
+      cliente: {
+        nombre: quote.clientName,
+        empresa: quote.clientCompany,
+        telefono: quote.clientPhone,
+        correo: quote.clientEmail,
+        direccion: quote.clientAddress,
+      },
+      proyecto: quote.projectName,
+      objetivo: objetivoDePropuesta({
+        segmento,
+        partidas,
+        proyecto: quote.projectName,
+        objetivoLibre: quote.objetivo,
+        vigenciaDias,
+      }),
+      alcance: bloques.map((b) => ({
+        titulo: String(b?.titulo ?? b?.clave ?? 'Alcance'),
+        texto: b?.texto ?? null,
+        vinetas: Array.isArray(b?.vinetas) ? b.vinetas.map(String) : [],
+        parametros: b?.parametros ?? null,
+      })),
+      planos: planos.map((p: any) => ({
+        url: String(p?.url ?? ''),
+        nombre: p?.nombre ?? null,
+        tipo: p?.tipo ?? null,
+      })),
+      grupos: agruparPartidas(partidas).map((g) => ({
+        grupo: g.grupo,
+        etiqueta: g.etiqueta,
+        subtotal: g.subtotal,
+        partidas: g.partidas.map((p) => ({
+          name: String(p.name ?? ''),
+          description: p.description ?? null,
+          unit: p.unit ?? null,
+          qty: Number(p.qty ?? 0),
+          unitPrice: Number(p.unitPrice ?? 0),
+          lineTotal: Number(p.lineTotal ?? 0),
+        })),
+      })),
+      subtotal: Number(quote.subtotal ?? 0),
+      iva: Number(quote.taxTotal ?? 0),
+      total: Number(quote.total ?? 0),
+      currency: quote.currency || 'MXN',
+      terminos: terminosDeCotizacion({
+        segmento,
+        incluyeInstalacion: instalacion,
+        anticipoPct: quote.depositPercent,
+        vigenciaDias,
+      }),
+      participantes: participantes.map((p) => ({
+        nombre: p.nombre,
+        rolEtiqueta: p.rolEtiqueta,
+        siglas: p.siglas,
+      })),
+      empresa: company
+        ? {
+            legalName: company.legalName,
+            tradeName: company.tradeName,
+            contactEmail: company.contactEmail,
+            contactPhone: company.contactPhone,
+            websiteUrl: company.websiteUrl,
+            fiscalAddress: company.fiscalAddress,
+          }
+        : null,
+    });
+  }
+
   private async buildPdf(quote: any, internal = false) {
+    // Lo que sale al cliente es la propuesta técnica; la vista interna conserva el formato viejo,
+    // que es el único con costo de proveedor y margen.
+    if (!internal) {
+      try {
+        return await this.buildPropuesta(quote);
+      } catch (error) {
+        console.error('No se pudo armar la propuesta técnica; se usa el formato anterior:', error);
+      }
+    }
+
     const items = quote.items.map((item: any) => ({
       category: item.category,
       name: item.name,
