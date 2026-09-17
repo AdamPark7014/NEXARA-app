@@ -5,6 +5,12 @@ import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatus
 import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
 import { resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 import { canDeleteOrDeactivateClient, type ClientActor } from '../ventas/client-permissions.js';
+import {
+  esEstadoProyecto,
+  etiquetaEstadoProyecto,
+  puedeTransicionar,
+  PROYECTO_ESTADOS,
+} from './proyecto-estado.js';
 
 const salesProjectInclude = {
   id: true,
@@ -369,21 +375,35 @@ export class OperationalProjectsService {
     actor?: ClientActor | null,
   ) {
     const actual = await this.findById(id, companyId);
-    const validStatuses = ['ACTIVE', 'ON_HOLD', 'COMPLETED'];
 
-    if (!validStatuses.includes(statusDto.status)) {
-      throw new BadRequestException(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    if (!esEstadoProyecto(statusDto.status)) {
+      throw new BadRequestException(`Invalid status. Must be one of: ${PROYECTO_ESTADOS.join(', ')}`);
+    }
+    if (actual?.status && !puedeTransicionar(actual.status, statusDto.status)) {
+      throw new BadRequestException(
+        `No se puede pasar de «${etiquetaEstadoProyecto(actual.status)}» a «${etiquetaEstadoProyecto(statusDto.status)}»`,
+      );
     }
     // Poner o quitar la pausa es desactivar/reactivar: la misma regla que en clientes.
-    if ((statusDto.status === 'ON_HOLD') !== (actual?.status === 'ON_HOLD') && !canDeleteOrDeactivateClient(actor)) {
+    // Cancelar es lo mismo pero peor, así que pide el mismo permiso.
+    const detenido = (estado?: string | null) => estado === 'ON_HOLD' || estado === 'CANCELLED';
+    if (detenido(statusDto.status) !== detenido(actual?.status) && !canDeleteOrDeactivateClient(actor)) {
       throw new ForbiddenException(PROJECT_DEACTIVATE_FORBIDDEN);
+    }
+    if (statusDto.status === 'CANCELLED' && !statusDto.cancelReason?.trim()) {
+      throw new BadRequestException('Para cancelar un proyecto hay que decir por qué');
     }
 
     const updated = await this.projectRepo.update({
       where: { id },
       data: {
         status: statusDto.status as any,
-        ...(statusDto.status === 'COMPLETED' && { actualEndDate: new Date() }),
+        // Terminar es fijar el fin **real**; si se reabre, esa fecha deja de ser cierta.
+        ...(statusDto.status === 'COMPLETED' && {
+          actualEndDate: statusDto.actualEndDate ? new Date(statusDto.actualEndDate) : new Date(),
+        }),
+        ...(statusDto.status === 'ACTIVE' && { actualEndDate: null }),
+        ...(statusDto.status === 'CANCELLED' && { cancelReason: statusDto.cancelReason?.trim() || null }),
       },
       include: {
         vendor: {
