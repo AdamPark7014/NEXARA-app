@@ -5,7 +5,7 @@ import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
-import { LigarActividadDto, RechazarCotizacionDto } from './dto/rechazar-cotizacion.dto.js';
+import { AgregarPaqueteDto, LigarActividadDto, RechazarCotizacionDto } from './dto/rechazar-cotizacion.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -45,6 +45,14 @@ export class CotizacionesController {
   @Get('core')
   listaCore(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
     return this.cotizacionesService.listaCore(query, companyId);
+  }
+
+  /** Catálogo de paquetes. Antes de `:id` para que no lo tome por un id. */
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
+  @Get('paquetes')
+  paquetes() {
+    return this.cotizacionesService.paquetes();
   }
 
   /** Detalle de Core: estado y segmento en español, términos, partidas agrupadas y participantes. */
@@ -179,6 +187,19 @@ export class CotizacionesController {
       userId: user?.id,
       companyId,
     });
+  }
+
+  /** Agrega N paquetes: genera las partidas y cuadra el alcance. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/paquetes')
+  agregarPaquete(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AgregarPaqueteDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.agregarPaquete(id, dto.clave, dto.cantidad, user?.id, companyId);
   }
 
   /** «Ligar cotización» desde la actividad comercial (o desde la cotización). */
