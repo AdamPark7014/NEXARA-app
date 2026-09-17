@@ -99,6 +99,7 @@ import { JobsModule } from './jobs/jobs.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { ActivityFeedModule } from './activity-feed/activity-feed.module.js';
 import { DomainEventsModule } from './domain-events/domain-events.module.js';
+import { CelebrationsModule } from './celebrations/celebrations.module.js';
 
 @Module({
   imports: [
@@ -195,6 +196,7 @@ import { DomainEventsModule } from './domain-events/domain-events.module.js';
     WebhooksModule,
     ScimModule,
     AiModule,
+    CelebrationsModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [
