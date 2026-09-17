@@ -64,6 +64,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
 import mx.nexara.mobile.nativeapp.data.api.EvidenceFlowDto
 import mx.nexara.mobile.nativeapp.data.api.GeocercaDto
 import mx.nexara.mobile.nativeapp.util.JornadaGps
@@ -95,6 +96,12 @@ private const val KIND_ENTRY = "entry"
 private const val KIND_EVIDENCE = "evidence"
 private const val KIND_EXIT = "exit"
 
+/** Foto de un campo en un momento (evidencia por campos). */
+private const val KIND_CAMPO = "campo"
+
+/** Clave del hueco de un campo: sirve para la miniatura recién tomada. */
+private fun campoSlotKey(campoId: Long?, momento: String): String = "${campoId ?: 0L}:$momento"
+
 /** Hoja PDF: el API guarda base64; más de esto no pasa en una red de campo. */
 private const val MAX_PDF_BYTES = 15 * 1024 * 1024
 
@@ -115,6 +122,12 @@ private class DraftPhoto(
  * En corrección (`reviewStatus = REJECTED`) cada paso se manda a
  * `activity-evidence/:id/resubmit` con el mismo payload del paso original y el
  * API avanza al siguiente paso devuelto.
+ *
+ * **Evidencia por campos.** Si la actividad trae `campos`, las fotos en sitio
+ * dejan de ser libres: cada campo («Cámara 1», «Rack») pide foto en los
+ * momentos que marque el API — antes, en progreso, después — y la foto de
+ * salida no se habilita hasta que no falte ninguna. La actividad sin campos se
+ * captura exactamente igual que antes.
  */
 @Composable
 fun EvidenceCaptureFlow(
@@ -156,6 +169,14 @@ fun EvidenceCaptureFlow(
     val rejected = CoreActivityRules.rejectedStepsList(flow?.rejectedSteps, flow?.rejectedStep)
     val steps = CoreActivityRules.evidenceStepsForKind(coreKind)
     val needsPdf = CoreActivityRules.requiresServiceSheetPdf(coreKind)
+
+    // Evidencia por campos: vacío contra la API de hoy (el flujo no cambia).
+    val campos = CoreActivityRules.camposOrdenados(flow?.campos)
+    val porCampos = campos.isNotEmpty()
+    /** Miniatura local del hueco recién tomado, mientras no se recarga el GET. */
+    var camposThumbs by remember(activity.id) { mutableStateOf<Map<String, Bitmap>>(emptyMap()) }
+    /** Campo y momento que se está fotografiando (`campoId to momento`). */
+    var campoPendiente by remember(activity.id) { mutableStateOf<Pair<Long, String>?>(null) }
 
     var drafts by remember(activity.id) { mutableStateOf<List<DraftPhoto>>(emptyList()) }
     LaunchedEffect(flow?.id, flow?.status, flow?.evidencePhotos) {
@@ -244,8 +265,9 @@ fun EvidenceCaptureFlow(
         flow = saved.copy(
             activity = saved.activity ?: flow?.activity,
             assigneeIndicaciones = saved.assigneeIndicaciones ?: flow?.assigneeIndicaciones,
-            // Los POST no traen el avance anterior: se conserva el del GET.
+            // Los POST no traen el avance anterior ni los campos: se conserva lo del GET.
             avancesAnteriores = saved.avancesAnteriores ?: flow?.avancesAnteriores,
+            campos = saved.campos ?: flow?.campos,
         )
         error = null
         successIcon = if (saved.status == STEP_COMPLETED) NxGlyph.APPROVED.icon else NxGlyph.DONE.icon
@@ -315,8 +337,65 @@ fun EvidenceCaptureFlow(
         }
     }
 
+    /**
+     * Evidencia por campos: una foto del campo en un momento. El API responde
+     * con el campo actualizado; el flujo completo no cambia, así que se mezcla
+     * en sitio. Sin conexión (`null`) el hueco se marca igual para que la
+     * persona no vuelva a tomar la misma foto.
+     */
+    suspend fun sendCampoFoto(campoId: Long, momento: String, photo: GeoPhoto): Boolean {
+        busy = true
+        pendingError = null
+        return try {
+            val guardado = withContext(Dispatchers.IO) {
+                repo.campoFoto(
+                    activityId = activity.id,
+                    campoId = campoId,
+                    momento = momento,
+                    fotoBase64 = photo.dataUrl,
+                    lat = photo.latitude,
+                    lng = photo.longitude,
+                )
+            }
+            val actualizados = flow?.campos.orEmpty().map { campo ->
+                if (campo.id != campoId) {
+                    campo
+                } else {
+                    CoreActivityRules.conFoto(
+                        CoreActivityRules.mezclaCampo(campo, guardado),
+                        momento,
+                        photo.dataUrl,
+                    )
+                }
+            }
+            flow = flow?.copy(campos = actualizados)
+            thumbnailOf(photo.preview)?.let { thumb ->
+                camposThumbs = camposThumbs + (campoSlotKey(campoId, momento) to thumb)
+            }
+            error = null
+            if (guardado == null) {
+                successIcon = Icons.Outlined.CloudOff
+                success = "Sin conexión: la foto se enviará sola en cuanto vuelva la red."
+            } else {
+                successIcon = NxGlyph.PHOTO.icon
+                success = "Foto guardada · " + CoreActivityRules.momentoLabel(momento)
+            }
+            onFlowChanged()
+            // Al completarse los campos el API puede haber avanzado el paso solo.
+            if (CoreActivityRules.camposListos(actualizados)) reloadKey++
+            true
+        } catch (e: Exception) {
+            pendingError = e.toUserMessage("No se pudo guardar la foto del campo")
+            false
+        } finally {
+            busy = false
+        }
+    }
+
     fun savePhotos() {
-        if (drafts.size < photoRequired) {
+        // Con campos las fotos ya viajaron una por una: aquí solo se avanza el
+        // paso mandando lo que quedó guardado por campo.
+        if (!porCampos && drafts.size < photoRequired) {
             error = "Se requieren al menos $photoRequired fotos (tienes ${drafts.size})"
             return
         }
@@ -324,8 +403,9 @@ fun EvidenceCaptureFlow(
             busy = true
             error = null
             try {
-                val urls = drafts.map { it.url }
-                val geo = drafts.map { it.geo }
+                val urls = if (porCampos) CoreActivityRules.camposFotoUrls(campos) else drafts.map { it.url }
+                val geo: List<EvidencePhotoGeoRequest?> =
+                    if (porCampos) List(urls.size) { null } else drafts.map { it.geo }
                 val saved = withContext(Dispatchers.IO) {
                     if (isCorrection) {
                         repo.resubmit(activity.id, STEP_PHOTOS, EvidencePhotosWithGeoRequest(urls, geo))
@@ -457,6 +537,23 @@ fun EvidenceCaptureFlow(
 
             StepProgress(steps = steps, flow = flow, current = step)
 
+            // El avance lo calcula el API; aquí solo se pinta.
+            flow?.progressPct?.let { pct -> ProgressWithPct(pct) }
+
+            if (porCampos) {
+                CamposEvidenciaCard(
+                    campos = campos,
+                    thumbs = camposThumbs,
+                    enabled = !busy && !locked && step != STEP_COMPLETED,
+                    onTomar = { campoId, momento ->
+                        success = null
+                        error = null
+                        campoPendiente = campoId to momento
+                        cameraKind = KIND_CAMPO
+                    },
+                )
+            }
+
             if (!flow?.entryPhotoUrl.isNullOrBlank()) {
                 GeocercaActividadCard(
                     activityId = activity.id,
@@ -493,6 +590,19 @@ fun EvidenceCaptureFlow(
                         success = null
                         error = null
                         cameraKind = KIND_ENTRY
+                    }
+                }
+
+                // Con campos las fotos en sitio ya no son libres: van arriba, por campo.
+                step == STEP_PHOTOS && porCampos -> StepCard(
+                    title = "$stepPrefix: Fotos por campo",
+                    description = "Toma las fotos de cada campo en la lista de arriba " +
+                        "(${CoreActivityRules.camposResumen(campos)}). Las de «Después» " +
+                        "puedes dejarlas para cuando termines.",
+                    icon = NxGlyph.PHOTO.icon,
+                ) {
+                    PrimaryAction(if (busy) "Guardando…" else "Siguiente paso →", enabled = !busy) {
+                        savePhotos()
                     }
                 }
 
@@ -587,10 +697,23 @@ fun EvidenceCaptureFlow(
                     description = "Tómala en el sitio al terminar. Tu ubicación GPS es obligatoria para cerrar.",
                     icon = NxGlyph.EXIT.icon,
                 ) {
-                    PrimaryAction("Tomar foto de salida", icon = NxGlyph.PHOTO.icon, enabled = !busy) {
+                    // Con campos no se cierra hasta que no falte ninguna foto obligatoria.
+                    val bloqueoCampos = CoreActivityRules.camposBloqueoSalida(campos)
+                    PrimaryAction(
+                        "Tomar foto de salida",
+                        icon = NxGlyph.PHOTO.icon,
+                        enabled = !busy && bloqueoCampos == null,
+                    ) {
                         success = null
                         error = null
                         cameraKind = KIND_EXIT
+                    }
+                    bloqueoCampos?.let {
+                        SoftNote(
+                            text = it,
+                            color = CoreActivityRules.NARANJA,
+                            icon = Icons.Outlined.WarningAmber,
+                        )
                     }
                 }
             }
@@ -601,21 +724,33 @@ fun EvidenceCaptureFlow(
         EvidencePhotoViewer(fotos = fotos, startIndex = index, onClose = { visor = null })
     }
 
+    /** «Cámara 1 · Antes» — lo que se está fotografiando ahora mismo. */
+    val campoTitulo = campoPendiente?.let { (campoId, momento) ->
+        val campo = campos.firstOrNull { it.id == campoId }
+        val nombre = campo?.let { CoreActivityRules.campoNombre(it) } ?: "Campo"
+        "$nombre · ${CoreActivityRules.momentoLabel(momento)}"
+    }
+
     cameraKind?.let { kind ->
         LiveCameraCaptureDialog(
             title = when (kind) {
                 KIND_ENTRY -> "Foto de entrada"
                 KIND_EXIT -> "Foto de salida"
+                KIND_CAMPO -> campoTitulo ?: "Foto del campo"
                 else -> "Foto de evidencia ${drafts.size + 1} de $photoRequired"
             },
-            requireLocation = kind != KIND_EVIDENCE,
+            // El campo se fotografía donde esté; la ubicación viaja si la hay.
+            requireLocation = kind == KIND_ENTRY || kind == KIND_EXIT,
             onCaptured = { photo ->
                 cameraKind = null
                 pending = photo
                 pendingKind = kind
                 pendingError = null
             },
-            onDismiss = { cameraKind = null },
+            onDismiss = {
+                cameraKind = null
+                if (kind == KIND_CAMPO) campoPendiente = null
+            },
         )
     }
 
@@ -626,6 +761,7 @@ fun EvidenceCaptureFlow(
             title = when (kind) {
                 KIND_ENTRY -> "Tu foto de entrada"
                 KIND_EXIT -> "Tu foto de salida"
+                KIND_CAMPO -> campoTitulo ?: "Tu foto del campo"
                 else -> "Tu foto de evidencia ${drafts.size + 1} de $photoRequired"
             },
             photo = photo,
@@ -633,7 +769,21 @@ fun EvidenceCaptureFlow(
             sending = busy,
             error = pendingError,
             onConfirm = {
-                if (kind == KIND_EVIDENCE) {
+                if (kind == KIND_CAMPO) {
+                    val destino = campoPendiente
+                    if (destino == null) {
+                        pending = null
+                        pendingKind = null
+                    } else {
+                        scope.launch {
+                            if (sendCampoFoto(destino.first, destino.second, photo)) {
+                                pending = null
+                                pendingKind = null
+                                campoPendiente = null
+                            }
+                        }
+                    }
+                } else if (kind == KIND_EVIDENCE) {
                     val geo = if (photo.latitude != null && photo.longitude != null) {
                         EvidencePhotoGeoRequest(photo.latitude, photo.longitude, photo.capturedAt)
                     } else {
@@ -665,6 +815,7 @@ fun EvidenceCaptureFlow(
                 pending = null
                 pendingKind = null
                 pendingError = null
+                campoPendiente = null
             },
         )
     }
@@ -890,6 +1041,157 @@ private fun DraftGrid(
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
+    }
+}
+
+/**
+ * Evidencia por campos: cada campo con los huecos que pide («Antes», «En
+ * progreso», «Después»). Un hueco vacío abre la cámara; uno lleno enseña la
+ * miniatura y se puede volver a tomar.
+ */
+@Composable
+private fun CamposEvidenciaCard(
+    campos: List<EvidenceCampoDto>,
+    thumbs: Map<String, Bitmap>,
+    enabled: Boolean,
+    onTomar: (campoId: Long, momento: String) -> Unit,
+) {
+    val faltan = CoreActivityRules.camposFaltantes(campos)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFFF8FAFC))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            NxIconText(
+                text = "Fotos por campo",
+                icon = NxGlyph.PHOTO.icon,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = NxColors.Slate,
+            )
+            Text(
+                CoreActivityRules.camposResumen(campos) +
+                    if (faltan == 0) " · completo" else "",
+                fontSize = 12.5.sp,
+                color = if (faltan == 0) Color(CoreActivityRules.VERDE) else NxColors.Muted,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        campos.forEach { campo ->
+            val momentos = CoreActivityRules.momentosDeCampo(campo)
+            if (momentos.isEmpty()) return@forEach
+            val listo = CoreActivityRules.campoListo(campo)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        CoreActivityRules.campoNombre(campo),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NxColors.Slate,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ToneChip(
+                        if (listo) "Listo" else "Faltan ${CoreActivityRules.momentosPendientes(campo).size}",
+                        if (listo) CoreActivityRules.VERDE else CoreActivityRules.NARANJA,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    momentos.forEach { momento ->
+                        CampoSlot(
+                            momento = momento,
+                            url = CoreActivityRules.fotoDeCampo(campo, momento),
+                            thumb = thumbs[campoSlotKey(campo.id, momento)],
+                            enabled = enabled && campo.id != null,
+                            onClick = { campo.id?.let { onTomar(it, momento) } },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    // Los campos con menos de tres momentos no estiran los huecos.
+                    repeat(CoreActivityRules.MOMENTOS.size - momentos.size) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Un hueco: «Antes» vacío (toca para la cámara) o con su miniatura. */
+@Composable
+private fun CampoSlot(
+    momento: String,
+    url: String?,
+    thumb: Bitmap?,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tomada = thumb != null || url != null
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (tomada) Color(0xFF0F172A) else Color(0xFFE2E8F0))
+                .border(
+                    1.dp,
+                    if (tomada) Color(CoreActivityRules.VERDE) else Color(0xFFCBD5E1),
+                    RoundedCornerShape(10.dp),
+                )
+                .clickable(enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                thumb != null -> Image(
+                    bitmap = thumb.asImageBitmap(),
+                    contentDescription = CoreActivityRules.momentoLabel(momento),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                url != null -> ProtectedImage(
+                    url = url,
+                    contentDescription = CoreActivityRules.momentoLabel(momento),
+                    modifier = Modifier.fillMaxSize(),
+                )
+                else -> Icon(
+                    NxGlyph.PHOTO.icon,
+                    contentDescription = null,
+                    tint = NxColors.Muted,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            if (tomada) {
+                Icon(
+                    NxGlyph.DONE.icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(Color(CoreActivityRules.VERDE))
+                        .padding(4.dp),
+                )
+            }
+        }
+        Text(
+            CoreActivityRules.momentoLabel(momento),
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (tomada) NxColors.Slate else NxColors.Muted,
+        )
     }
 }
 
