@@ -6,8 +6,13 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.api.ActivityAccionesDto
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.AttendanceJustificacionDto
+import mx.nexara.mobile.nativeapp.data.api.CancelActivityRequest
 import mx.nexara.mobile.nativeapp.data.api.ConsoleApi
+import mx.nexara.mobile.nativeapp.data.api.JustificarFaltaRequest
+import mx.nexara.mobile.nativeapp.data.api.ReassignActivityRequest
 
 class ConsoleRepository(context: Context) {
     private val authRepo = AuthRepository(context)
@@ -51,6 +56,21 @@ class ConsoleRepository(context: Context) {
 
     suspend fun activityReassignments(activityId: Long): List<Map<String, Any?>> =
         parseJsonArray(api.getActivityReassignments(activityId).string())
+
+    /** Qué puede hacer un superior: cancelar y a quién puede reemplazar. */
+    suspend fun activityActions(activityId: Long): ActivityAccionesDto = api.getActivityActions(activityId)
+
+    suspend fun cancelActivity(activityId: Long, motivo: String) {
+        api.cancelActivity(activityId, CancelActivityRequest(motivo.trim())).close()
+    }
+
+    /** «Pasar a otro compañero»: [deUsuarioId] la deja y [aUsuarioId] continúa donde se quedó. */
+    suspend fun reassignActivity(activityId: Long, deUsuarioId: Long, aUsuarioId: Long, motivo: String) {
+        api.reassignActivity(
+            activityId,
+            ReassignActivityRequest(aUsuarioId = aUsuarioId, deUsuarioId = deUsuarioId, motivo = motivo.trim()),
+        ).close()
+    }
 
     private fun parseJsonArray(raw: String): List<Map<String, Any?>> {
         val trimmed = raw.trim()
@@ -227,6 +247,15 @@ class ConsoleRepository(context: Context) {
 
     /** Checadas propias del día (`yyyy-MM-dd`); null = hoy. */
     suspend fun attendanceHistory(date: String? = null) = api.getAttendanceHistory(date = date)
+
+    /** Faltas justificadas propias en el rango (`attendance/range`, sin jerarquía). */
+    suspend fun myAttendanceJustifications(from: String, to: String): List<AttendanceJustificacionDto> =
+        api.getAttendanceRange(from = from, to = to).justificaciones.orEmpty()
+
+    /** Solo Christian: el día queda «Falta justificada · motivo». */
+    suspend fun justificarFalta(userId: Long, fecha: String, motivo: String) {
+        api.justificarFalta(JustificarFaltaRequest(userId = userId, fecha = fecha, motivo = motivo.trim())).close()
+    }
 
     suspend fun attendanceCheckIn(
         type: String,
