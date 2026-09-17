@@ -72,13 +72,21 @@ class CoreActivitiesRepository(context: Context) {
             ?.takeIf { it > 0L }
     }
 
-    suspend fun addTeamMember(activityId: Long, userId: Long, rol: String, indicaciones: String?) {
+    /** @param horasPlan «Tiempo estimado» de quien asigna (contrato B). */
+    suspend fun addTeamMember(
+        activityId: Long,
+        userId: Long,
+        rol: String,
+        indicaciones: String?,
+        horasPlan: Double? = null,
+    ) {
         api.addTeamMember(
             activityId,
             AddTeamMemberRequest(
                 userId = userId,
                 rol = rol,
                 indicaciones = indicaciones?.trim()?.takeIf { it.isNotEmpty() },
+                horasPlan = horasPlan?.takeIf { it > 0 },
             ),
         ).close()
     }

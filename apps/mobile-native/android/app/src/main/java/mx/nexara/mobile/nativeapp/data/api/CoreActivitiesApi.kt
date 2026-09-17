@@ -489,6 +489,8 @@ data class AddTeamMemberRequest(
     /** LEAD | TECNICO | APOYO */
     val rol: String,
     val indicaciones: String? = null,
+    /** Tiempo estimado en horas (contrato B); el API viejo lo ignora. */
+    val horasPlan: Double? = null,
 )
 
 /** Cliente del padrón (`GET ventas/clientes?sector=`). */
