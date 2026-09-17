@@ -31,6 +31,11 @@ export type AcsAvatarImportOptions = {
   dryRun: boolean;
   /** false (por defecto): solo usuarios sin avatar. */
   overwrite?: boolean;
+  /**
+   * Empresa donde viven las personas del ACS, si no es la de los empleados. En NEXARA los
+   * terminales están en la empresa 2 (control de acceso) y los empleados en la 1.
+   */
+  acsCompanyId?: number | null;
 };
 
 export type AcsAvatarImported = {
@@ -133,6 +138,7 @@ export class AcsAvatarImportService {
     const tenantId = requireCompanyId(companyId);
     const dryRun = opts.dryRun !== false;
     const overwrite = opts.overwrite === true;
+    const acsTenantId = opts.acsCompanyId ? requireCompanyId(opts.acsCompanyId) : tenantId;
 
     const memberships = await this.prisma.userCompany.findMany({
       where: { companyId: tenantId, user: { isActive: true } },
@@ -156,7 +162,7 @@ export class AcsAvatarImportService {
     const userById = new Map(users.map((u) => [u.id, u]));
 
     const rows = await this.prisma.integraPerson.findMany({
-      where: { companyId: tenantId },
+      where: { companyId: acsTenantId },
       orderBy: [{ siteId: 'asc' }, { personId: 'asc' }],
       select: {
         personId: true,
@@ -173,7 +179,7 @@ export class AcsAvatarImportService {
       personCode: r.personCode,
       siteId: r.siteId,
       syncedAt: r.syncedAt,
-      hasFace: hasLocalPersonFace(tenantId, r.personId) || Boolean(r.faceUrl?.trim()),
+      hasFace: hasLocalPersonFace(acsTenantId, r.personId) || Boolean(r.faceUrl?.trim()),
     }));
 
     // Se empareja contra TODOS los usuarios activos: si alguien que ya tiene
@@ -200,7 +206,7 @@ export class AcsAvatarImportService {
 
       let buffer: Buffer;
       try {
-        const face = await this.integra.getPersonFace(tenantId, m.personId, m.siteId);
+        const face = await this.integra.getPersonFace(acsTenantId, m.personId, m.siteId);
         buffer = face.buffer;
       } catch (e) {
         skipped.push({ ...base, reason: `sin foto en ACS: ${errorMessage(e)}` });
