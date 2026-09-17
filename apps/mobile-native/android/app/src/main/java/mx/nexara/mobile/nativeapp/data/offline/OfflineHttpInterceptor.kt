@@ -129,8 +129,14 @@ class OfflineHttpInterceptor(
          * Decisiones de un superior (desactivar/eliminar clientes y proyectos, cancelar o pasar
          * actividades, justificar faltas): sin conexión deben fallar a la vista, no quedar en cola
          * dando por hecho algo que la API todavía puede rechazar.
+         *
+         * Aceptar o rechazar una actividad va en la misma lista: las dos avisan a quien la asignó
+         * y a los jefes, y encoladas dejarían la tarjeta diciendo «aceptada» sin que nadie lo sepa.
          */
-        private val SOLO_EN_LINEA = listOf("/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones")
+        private val SOLO_EN_LINEA = listOf(
+            "/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones",
+            "/aceptar", "/rechazar",
+        )
         private val BORRADO_SOLO_EN_LINEA = listOf("/ventas/clientes/", "/operational-projects/")
 
         fun isQueueable(url: String, method: String = "POST"): Boolean {

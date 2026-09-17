@@ -21,6 +21,7 @@ import mx.nexara.mobile.nativeapp.data.api.EvidencePhotoGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotosWithGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceResubmitRequest
 import mx.nexara.mobile.nativeapp.data.api.MyActivitiesResponseDto
+import mx.nexara.mobile.nativeapp.data.api.RechazarActividadRequest
 import mx.nexara.mobile.nativeapp.data.api.ReorderMyActivitiesRequest
 import mx.nexara.mobile.nativeapp.data.api.ReprogramarDespachoRequest
 import mx.nexara.mobile.nativeapp.data.api.RevisarEvidenciaRequest
@@ -93,12 +94,24 @@ class CoreActivitiesRepository(context: Context) {
         return runCatching { org.json.JSONObject(raw).optString("next", "") }.getOrDefault("")
     }
 
-    suspend fun dispatch(activityId: Long, userIds: List<Long>, indicaciones: String?) {
+    /** Contrato B: aceptar lo que te asignaron (avisa a quien la asignó). */
+    suspend fun aceptarActividad(activityId: Long) {
+        api.aceptarActividad(activityId).close()
+    }
+
+    /** Rechazar con motivo (≥ 10). Sigue asignada hasta que un superior la mueva. */
+    suspend fun rechazarActividad(activityId: Long, motivo: String) {
+        api.rechazarActividad(activityId, RechazarActividadRequest(motivo.trim())).close()
+    }
+
+    /** @param horasPlan «Tiempo estimado» de quien reparte (contrato B). */
+    suspend fun dispatch(activityId: Long, userIds: List<Long>, indicaciones: String?, horasPlan: Double? = null) {
         api.dispatch(
             activityId,
             DispatchMyActivityRequest(
                 userIds = userIds,
                 indicaciones = indicaciones?.trim()?.takeIf { it.isNotEmpty() },
+                horasPlan = horasPlan?.takeIf { it > 0 },
             ),
         ).close()
     }
