@@ -1,7 +1,7 @@
 # RELEVO
 
 - **Último turno:** claude-code
-- **Fecha:** 2026-09-16
+- **Fecha:** 2026-09-17
 - **Rama:** mejora/calidad-y-web
 - **HEAD:** (cerrar)
 
@@ -117,6 +117,17 @@ Pedido de Adam (14-09): los encargados ven fotos, formularios y PDF embebidos de
    - **Perfiles de RH:** la tabla que volvió a pegar Adam ya está cargada en los 15 empleados (los huecos coinciden con la tabla: Israel y Mónica sin RFC/CURP/NSS, Luis Joel y Mónica sin teléfono, Daniela Hernández sin sueldo, Roberto sin correo). No se purgan.
    - **Agentes en curso (ramas aparte, sin integrar):** `ux/android-friccion` (fricción en todas las pantallas: quitar «Salir» del encabezado, títulos duplicados, chat con un solo «+», chips de filtros en una fila, una sola acción en Mi jornada, avisos marcados al abrir); `feat/permisos-cancelacion-faltas` (API + web: solo Christian elimina/desactiva clientes; cancelar o pasar actividad solo superiores con motivo y push; falta justificada solo por Christian); `demo/semana` (scripts `apps/api/scripts/demo-semana/`: purgar operación —clientes, actividades, asistencias, chat, avisos—, sembrar una semana realista y purgar lo sembrado). **Purga y siembra aún NO ejecutadas**: correr solo tras `pg_dump` completo.
    - **Cobro Google Cloud:** ver punto 25. Recomendación a Adam: dejar cerrada la cuenta de facturación de Maps o deshabilitar Places API (New) en «My First Project», restringir la clave «Maps Platform API Key» y poner alertas de presupuesto; `apps/web/app/components/Map.tsx` trae una clave de respaldo escrita en el código (no se tocó, veto de credenciales).
+
+27. **17-09 (10:00–11:15): 1.0.2 en revisión, cumpleaños, permisos, proyectos y purga con semana demo.**
+   - **Google Play:** «Enviar 4 cambios a revisión» pulsado; estado «Tus cambios están en proceso de revisión» (1.0.2, bundle 10). Lo que se integró después (UX Android, cumpleaños, permisos) va en la siguiente versión (código 11).
+   - **UX Android** (merge `aa1ce53a`, rama `ux/android-friccion`): sin «Salir» en la barra (cerrar sesión en Mi perfil), bandeja que se da por vista al abrir, filtros en una fila, botón del siguiente paso, Mi jornada con un botón, chat con búsqueda y un «Nueva conversación», clientes con FAB. Probado en emulador: la campana baja de 39 a 0.
+   - **Cumpleaños y aniversarios** (`fcef4122`, `apps/api/src/celebrations/`): tarea 8:00/11:00/14:00 (hora de México), una vez por día; aviso a quien celebra y a su empresa; nacimiento del perfil o del CURP; nunca la edad. `GET me/celebraciones/hoy` para el banner. **Ya funcionó en producción:** 17-09 11:00, 18 avisos por el cumpleaños de José Antonio (push confirmado en el emulador). Web con banner (merge `b4860c8b`).
+   - **Permisos** (merge `15e39faa`, rama `feat/permisos-cancelacion-faltas`): clientes solo Christian desactiva/elimina; cancelar o pasar actividad solo superiores con motivo y push; faltas justificadas solo Christian. Migraciones `20260917180000`, `20260917190000`, `20260917200000` aplicadas. Falla previa y ajena: `activities.controller.spec.ts › scopes an ops manager…`.
+   - **Proyectos** (`8ba94ed3`): `POST operational-projects/:id/desactivar|reactivar` (ON_HOLD = «Inactivo») y `DELETE` lógico, solo Christian; `OperationalProject` entra al borrado lógico de PrismaService.
+   - **Purga y semana demo en producción** (merge `cf80056e`, `apps/api/scripts/demo-semana/`): probado primero completo en copia `nexara_prueba_demo` (ya borrada). En producción: purgados 351 registros (clientes, actividades, asistencia, GPS, chat, avisos); sembrado lote **`semana-2026-09-14`** (1973 filas, 283 archivos; `SIN_GPS_EN_CURSO=SI`, oficina 19.0740,-98.2780). Avisos de días anteriores marcados leídos; los 18 de cumpleaños de hoy se reinsertaron para que la tarea de las 14:00 no repita. Quitar la demo: `docker exec -i -e CONFIRMAR=SI -e LOTE=semana-2026-09-14 -w /app/apps/api nexara-api node - < apps/api/scripts/demo-semana/purgar-demo.js`.
+   - **Respaldos en el servidor:** `/root/backups/nexara_db-20260917-1644-antes-permisos-celebraciones.dump` (completo, 1.6 GB) y `nexara_db-20260917-1708-antes-purga-sin-auditoria.dump` (6 MB, sin datos de `audit_logs`).
+   - **Servidor:** se mató un bucle viejo `while pgrep -f deploy/update.sh` que se encontraba a sí mismo; para esperar despliegues usar `pgrep -f "[d]eploy/update\.sh"`.
+   - **En curso (agentes, sin integrar):** Android e iOS: botones de Christian para clientes y proyectos, íconos y banner de cumpleaños, cancelar/pasar actividad, avance anterior y faltas justificadas.
 
 ### Falta probar a mano
 
