@@ -1,6 +1,8 @@
 "use client";
 
 import Button from "@/components/ui/Button";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 
 type Props = {
   onExcel?: () => void;
@@ -37,7 +39,7 @@ export default function ListExportActions({
         <Button
           variant="ghost"
           size={size}
-          iconLeft="⬇"
+          iconLeft={<FileDownloadOutlinedIcon aria-hidden="true" sx={{ fontSize: 15 }} />}
           disabled={excelDisabled || excelBusy || !onExcel}
           onClick={() => onExcel?.()}
         >
@@ -48,7 +50,7 @@ export default function ListExportActions({
         <Button
           variant="ghost"
           size={size}
-          iconLeft="📄"
+          iconLeft={<DescriptionOutlinedIcon aria-hidden="true" sx={{ fontSize: 15 }} />}
           disabled={pdfDisabled || pdfBusy || !onPdf}
           onClick={() => onPdf?.()}
         >

@@ -802,6 +802,14 @@ model UserProfile {
   rfc                        String?   @db.VarChar(20)
   ineNumero                  String?   @db.VarChar(30)
   nss                        String?   @db.VarChar(30)
+  /// Datos de RH (importación 16-09-2026): correo personal, alta en IMSS, sueldo y funciones del puesto.
+  correoContacto             String?   @db.VarChar(150)
+  imssAlta                   Boolean?
+  documentosPendientes       Boolean   @default(false)
+  sueldoSemanal              Decimal?  @db.Decimal(10, 2)
+  funciones                  Json?
+  /// Origen del número de empleado: rh (lo mandó RH) | generada (calculada por el sistema).
+  nomenclaturaOrigen         String?   @db.VarChar(20)
   contactoEmergenciaNombre   String?
   contactoEmergenciaTelefono String?   @db.VarChar(30)
   estatus                    String    @default("Pendiente") @db.VarChar(30)
@@ -2389,6 +2397,7 @@ enum NotificationType {
   // Alertas cross-módulo (Phase 8)
   MARGIN_ALERT
   SLA_ALERT
+  SLA_BREACH
   STOCK_ALERT
 
   // ACS → Operaciones (acceso denegado en puerta)
