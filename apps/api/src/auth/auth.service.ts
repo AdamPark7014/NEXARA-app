@@ -579,6 +579,20 @@ export class AuthService {
       set.add(PERMISSIONS.LUNCH_BREAKS_VIEW);
     }
 
+    // ── Personal Core de oficina (administración, diseño, finanzas, RH) ───
+    // También recibe tareas y actividades: las abre, las ejecuta con evidencia y checa su jornada
+    // con GPS como cualquier persona del equipo. Sin esto la app les daba 403 al abrir una actividad.
+    const V2_CORE_OFFICE_ROLES = new Set(['administrativo', 'lider_diseno', 'disenador', 'coord_admin', 'contabilidad', 'rh']);
+    if (V2_CORE_OFFICE_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.CONSOLE_ACCESS);
+      set.add(PERMISSIONS.ACTIVITIES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_CREATE);
+      set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      set.add(PERMISSIONS.LUNCH_BREAKS_VIEW);
+      set.add(PERMISSIONS.GPS_VIEW);
+    }
+
     // ── Studio / diseño web ──────────────────────────────────────────
     if (roleKey === 'lider_diseno' || roleKey === 'disenador') {
       set.add(PERMISSIONS.PANEL_WEB);
