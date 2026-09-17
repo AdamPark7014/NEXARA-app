@@ -699,6 +699,7 @@ model User {
   projectsAsVendor OperationalProject[] @relation("ProjectVendor")
   projectEngineers ProjectEngineer[]    @relation("ProjectEngineers")
 
+  geofenceAlerts          ActivityGeofenceAlert[] @relation("GeofenceAlertUser")
   @@unique([oidcProvider, oidcSubject])
   @@index([lastLoginAt])
   @@index([isActive, lastLoginAt])
@@ -919,6 +920,7 @@ model Activity {
   companyId               Int
   company                 CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  geofenceAlerts          ActivityGeofenceAlert[]
   @@unique([companyId, anNumber])
   @@index([projectId])
   @@index([clientId])
@@ -2398,6 +2400,8 @@ enum NotificationType {
   MARGIN_ALERT
   SLA_ALERT
   SLA_BREACH
+  // Actividad: la persona salió del radio del punto donde inició
+  ACTIVITY_OUT_OF_ZONE
   STOCK_ALERT
 
   // ACS → Operaciones (acceso denegado en puerta)
@@ -5131,6 +5135,7 @@ model CompanyProfile {
   integraDetectionProfiles   IntegraDetectionProfile[]
   integraCameraCapabilities  IntegraCameraCapability[]
 
+  activityGeofenceAlerts  ActivityGeofenceAlert[]
   @@map("company_profile")
 }
 
@@ -5542,6 +5547,40 @@ model ActivityEvidenceReview {
   @@index([companyId])
   @@index([evidenceUserId])
   @@map("activity_evidence_reviews")
+}
+
+/// Salidas del radio permitido (100 m) alrededor del punto donde la persona inició la actividad
+/// (foto de entrada). Se abre al llegar un punto GPS fuera del radio, se cierra al volver y la
+/// persona puede justificarla con motivo y foto.
+model ActivityGeofenceAlert {
+  id                    Int       @id @default(autoincrement())
+  activityId            Int
+  userId                Int
+  companyId             Int
+  originLatitude        Decimal   @db.Decimal(10, 8)
+  originLongitude       Decimal   @db.Decimal(11, 8)
+  latitude              Decimal   @db.Decimal(10, 8)
+  longitude             Decimal   @db.Decimal(11, 8)
+  /// Distancia del primer punto fuera del radio, en metros.
+  distanceM             Int
+  /// La mayor distancia registrada mientras estuvo fuera.
+  maxDistanceM          Int
+  radiusM               Int       @default(100)
+  detectedAt            DateTime  @default(now())
+  returnedAt            DateTime?
+  /// ABIERTA | JUSTIFICADA
+  status                String    @default("ABIERTA") @db.VarChar(20)
+  justification         String?   @db.Text
+  justificationPhotoUrl String?   @db.VarChar(500)
+  justifiedAt           DateTime?
+
+  activity Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User           @relation("GeofenceAlertUser", fields: [userId], references: [id], onDelete: Cascade)
+  company  CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([activityId, userId])
+  @@index([companyId])
+  @@map("activity_geofence_alerts")
 }
 
 /// Reasignación de una actividad inconclusa.

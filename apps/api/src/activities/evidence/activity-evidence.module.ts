@@ -5,9 +5,10 @@ import { CoreModule } from '../../common/core.module';
 import { PrismaModule } from '../../prisma/prisma.module.js';
 import { ActivitiesModule } from '../activities.module.js';
 import { NotificationsModule } from '../../notifications/notifications.module.js';
+import { ActivityGeofenceModule } from '../geofence/activity-geofence.module.js';
 
 @Module({
-  imports: [CoreModule, PrismaModule, ActivitiesModule, NotificationsModule],
+  imports: [CoreModule, PrismaModule, ActivitiesModule, NotificationsModule, ActivityGeofenceModule],
   controllers: [ActivityEvidenceController],
   providers: [ActivityEvidenceService],
   exports: [ActivityEvidenceService],
