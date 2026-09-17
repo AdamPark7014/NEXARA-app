@@ -1,33 +1,50 @@
 package mx.nexara.mobile.nativeapp.ui.shared
 
 import android.app.Application
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -43,7 +60,13 @@ import mx.nexara.mobile.nativeapp.access.NotificationDeepLinkResolver
 import mx.nexara.mobile.nativeapp.data.api.NotificationRowDto
 import mx.nexara.mobile.nativeapp.data.notifications.NotificationsRepository
 import mx.nexara.mobile.nativeapp.data.realtime.RealtimeBus
+import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
+import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 
 enum class NotificationFilter { ALL, UNREAD }
@@ -100,6 +123,21 @@ internal fun isLegacyNotificationCategory(category: String?): Boolean {
 
 enum class NotificationViewMode { BANDEJA, FEED }
 
+/** Reglas de «abrir la bandeja la da por vista», sin Android para poder probarlas. */
+internal object NotificationSeen {
+    /** Ids que llegaron sin leer (se muestran como «Nuevo» durante la visita). */
+    fun unreadIds(rows: List<NotificationRowDto>): Set<Long> =
+        rows.filter { it.isRead != true }.map { it.id }.toSet()
+
+    /** Solo se llama al API si de verdad hay algo sin leer (contador o lista). */
+    fun shouldMarkAll(unreadCount: Int, rows: List<NotificationRowDto>): Boolean =
+        unreadCount > 0 || rows.any { it.isRead != true }
+
+    /** «Nuevo» = llegó sin leer en esta visita o sigue sin leer. */
+    fun isNew(row: NotificationRowDto, newIds: Set<Long>): Boolean =
+        row.id in newIds || row.isRead != true
+}
+
 data class NotificationsUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
@@ -112,6 +150,11 @@ data class NotificationsUiState(
     val category: NotificationCategory = NotificationCategory.TODAS,
     val viewMode: NotificationViewMode = NotificationViewMode.BANDEJA,
     val feedItems: List<Map<String, Any?>> = emptyList(),
+    /**
+     * Avisos que llegaron sin leer en esta visita. Abrir la pantalla ya los da por
+     * vistos en el servidor; aquí se recuerdan para marcarlos «Nuevo» hasta salir.
+     */
+    val newIds: Set<Long> = emptySet(),
 )
 
 class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
@@ -165,7 +208,12 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun refresh(initial: Boolean = false) {
+    /**
+     * @param markSeen true cuando la persona está mirando la lista (al abrir y al
+     * deslizar para actualizar): lo que llegue sin leer se da por visto. Los
+     * refrescos en tiempo real no marcan nada.
+     */
+    fun refresh(initial: Boolean = false, markSeen: Boolean = initial) {
         _state.update {
             if (initial) it.copy(isLoading = true, error = null, message = null)
             else it.copy(isRefreshing = true, error = null)
@@ -181,8 +229,10 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
                         rows = list,
                         unreadCount = count,
                         error = null,
+                        newIds = it.newIds + NotificationSeen.unreadIds(list),
                     )
                 }
+                if (markSeen && NotificationSeen.shouldMarkAll(count, list)) markAllSeen()
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
@@ -195,16 +245,22 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun markAllRead() {
-        _state.update { it.copy(saving = true, error = null, message = null) }
+    /**
+     * Abrir la bandeja = verla: se usa el mismo «leer todo» del API, una vez por
+     * carga y sin avisos en pantalla. Si falla (sin red) no pasa nada visible:
+     * los avisos siguen sin leer y se vuelve a intentar la próxima vez.
+     */
+    private fun markAllSeen() {
         viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) { repo.markAllRead() }
-                _state.update { it.copy(saving = false, message = "Marcadas como leídas") }
-                refresh(initial = false)
-            } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.toUserMessage("No se pudo marcar")) }
-            }
+            runCatching { withContext(Dispatchers.IO) { repo.markAllRead() } }
+                .onSuccess {
+                    _state.update { s ->
+                        s.copy(
+                            rows = s.rows.map { if (it.isRead == true) it else it.copy(isRead = true) },
+                            unreadCount = 0,
+                        )
+                    }
+                }
         }
     }
 
@@ -258,250 +314,307 @@ class NotificationsViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+/**
+ * Avisos visibles: sin módulos retirados de Core, filtrados por categoría y, con
+ * [NotificationFilter.UNREAD], solo los «Nuevos» de esta visita.
+ */
+internal fun visibleNotificationRows(
+    rows: List<NotificationRowDto>,
+    filter: NotificationFilter,
+    category: NotificationCategory,
+    newIds: Set<Long> = emptySet(),
+): List<NotificationRowDto> = rows
+    .filter { !isLegacyNotificationCategory(it.category) }
+    .filter { filter == NotificationFilter.ALL || NotificationSeen.isNew(it, newIds) }
+    .filter { category == NotificationCategory.TODAS || NotificationCategory.of(it.category) == category }
+
+/** Conteo por categoría sobre lo que sí se lista (sin avisos de módulos retirados). */
+internal fun notificationCategoryCounts(rows: List<NotificationRowDto>): Map<NotificationCategory, Int> {
+    val core = rows.filter { !isLegacyNotificationCategory(it.category) }
+    return NotificationCategory.entries.associateWith { cat ->
+        if (cat == NotificationCategory.TODAS) core.size
+        else core.count { NotificationCategory.of(it.category) == cat }
+    }
+}
+
+/**
+ * Bandeja de Core. Abrirla da todo por visto (un solo «leer todo» al cargar);
+ * lo que llegó sin leer se queda marcado «Nuevo» mientras sigas aquí.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsScreen(
-    onBack: () -> Unit,
     onOpenDestination: ((DeepLinkDestination) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val vm: NotificationsViewModel = viewModel()
     val state by vm.state.collectAsState()
-    val filteredRows = when (state.filter) {
-        NotificationFilter.ALL -> state.rows
-        NotificationFilter.UNREAD -> state.rows.filter { it.isRead != true }
-    }.let { rows ->
-        // Avisos de módulos que ya no existen en Core (cotizaciones, ventas, viáticos…) no se muestran.
-        val core = rows.filter { !isLegacyNotificationCategory(it.category) }
-        if (state.category == NotificationCategory.TODAS) core
-        else core.filter { NotificationCategory.of(it.category) == state.category }
+    val filteredRows = visibleNotificationRows(state.rows, state.filter, state.category, state.newIds)
+    val counts = notificationCategoryCounts(state.rows)
+    val nuevos = visibleNotificationRows(state.rows, NotificationFilter.UNREAD, NotificationCategory.TODAS, state.newIds).size
+    val snackbar = rememberNxSnackbarHostState()
+
+    // Confirmaciones cortas («Eliminada») sin botón «Cerrar».
+    LaunchedEffect(state.message) {
+        val msg = state.message ?: return@LaunchedEffect
+        vm.dismissMessage()
+        snackbar.showSnackbar(msg)
     }
 
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Top,
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-        ) {
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Volver") }
-            Button(
-                onClick = { vm.markAllRead() },
-                enabled = !state.saving && state.unreadCount > 0,
-                modifier = Modifier.weight(1f),
-            ) { Text("Leer todo") }
-        }
-
-        PullToRefreshBox(
-            isRefreshing = state.isRefreshing,
-            onRefresh = { vm.refresh(initial = false) },
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                item {
-                    Text("Notificaciones", style = MaterialTheme.typography.titleLarge)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "${state.unreadCount} sin leer · ${state.rows.size} total",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Box(modifier = modifier.fillMaxSize().background(NxColors.Surface)) {
+        Column(Modifier.fillMaxSize()) {
+            NotificationFilterRow(
+                state = state,
+                counts = counts,
+                nuevos = nuevos,
+                onUnread = {
+                    vm.setViewMode(NotificationViewMode.BANDEJA)
+                    vm.setFilter(
+                        if (state.filter == NotificationFilter.UNREAD) NotificationFilter.ALL else NotificationFilter.UNREAD,
                     )
-                }
+                },
+                onCategory = { cat ->
+                    vm.setViewMode(NotificationViewMode.BANDEJA)
+                    vm.setCategory(cat)
+                },
+                onFeed = {
+                    vm.setViewMode(
+                        if (state.viewMode == NotificationViewMode.FEED) NotificationViewMode.BANDEJA else NotificationViewMode.FEED,
+                    )
+                },
+            )
 
-                if (state.isLoading && state.rows.isEmpty()) {
-                    item { NxSkeletonList() }
-                    return@LazyColumn
-                }
-
-                item {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        FilterChip(
-                            selected = state.viewMode == NotificationViewMode.BANDEJA,
-                            onClick = { vm.setViewMode(NotificationViewMode.BANDEJA) },
-                            label = { Text("Bandeja") },
-                        )
-                        FilterChip(
-                            selected = state.viewMode == NotificationViewMode.FEED,
-                            onClick = { vm.setViewMode(NotificationViewMode.FEED) },
-                            label = { Text("Feed") },
-                        )
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = {
+                    // Deslizar para actualizar es mirar la lista: lo nuevo también queda visto.
+                    if (state.viewMode == NotificationViewMode.FEED) vm.loadFeed() else vm.refresh(initial = false, markSeen = true)
+                },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (state.viewMode == NotificationViewMode.FEED) {
+                        feedItems(state, onRetry = vm::loadFeed)
+                        return@LazyColumn
                     }
-                }
 
-                if (state.viewMode == NotificationViewMode.FEED) {
-                    if (state.isLoading && state.feedItems.isEmpty()) {
+                    if (state.isLoading && state.rows.isEmpty()) {
                         item { NxSkeletonList() }
-                    } else if (state.feedItems.isEmpty() && state.error.isNullOrBlank()) {
+                        return@LazyColumn
+                    }
+
+                    if (!state.error.isNullOrBlank()) {
+                        item { NxErrorBlock(state.error!!) { vm.refresh(initial = true) } }
+                    }
+
+                    if (filteredRows.isEmpty() && state.error.isNullOrBlank()) {
                         item {
-                            Text(
-                                "Sin actividad reciente",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 24.dp),
-                            )
+                            val filtrando = state.filter == NotificationFilter.UNREAD ||
+                                state.category != NotificationCategory.TODAS
+                            if (filtrando) {
+                                NxEmptyState(
+                                    title = "Nada con este filtro",
+                                    subtitle = "No hay avisos que coincidan.",
+                                    actionLabel = "Ver todos",
+                                    onAction = {
+                                        vm.setFilter(NotificationFilter.ALL)
+                                        vm.setCategory(NotificationCategory.TODAS)
+                                    },
+                                )
+                            } else {
+                                NxEmptyState(
+                                    title = "Todo al día",
+                                    subtitle = "Cuando algo necesite tu atención aparecerá aquí.",
+                                )
+                            }
                         }
                     } else {
-                        items(state.feedItems.size) { idx ->
-                            val item = state.feedItems[idx]
-                            val title = (item["title"] as? String).orEmpty().ifBlank { "Evento" }
-                            val subtitle = (item["subtitle"] as? String).orEmpty()
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(12.dp)) {
-                                    Text(title, style = MaterialTheme.typography.titleMedium)
-                                    if (subtitle.isNotBlank()) {
-                                        Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    return@LazyColumn
-                }
-
-                item {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        FilterChip(
-                            selected = state.filter == NotificationFilter.ALL,
-                            onClick = { vm.setFilter(NotificationFilter.ALL) },
-                            label = { Text("Todas (${state.rows.size})") },
-                        )
-                        FilterChip(
-                            selected = state.filter == NotificationFilter.UNREAD,
-                            onClick = { vm.setFilter(NotificationFilter.UNREAD) },
-                            label = { Text("Sin leer (${state.unreadCount})") },
-                        )
-                    }
-                }
-
-                // Mismos cubos de categoría que el centro de notificaciones web.
-                item {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        NotificationCategory.entries.forEach { cat ->
-                            val count = if (cat == NotificationCategory.TODAS) {
-                                state.rows.size
-                            } else {
-                                state.rows.count { NotificationCategory.of(it.category) == cat }
-                            }
-                            FilterChip(
-                                selected = state.category == cat,
-                                onClick = { vm.setCategory(cat) },
-                                label = { Text("${cat.label} ($count)") },
+                        items(filteredRows, key = { it.id }) { n ->
+                            NotificationCard(
+                                n = n,
+                                isNew = NotificationSeen.isNew(n, state.newIds),
+                                saving = state.saving,
+                                navigable = NotificationDeepLinkResolver.resolve(n) != null && onOpenDestination != null,
+                                onOpen = { vm.openNotification(n) { dest -> onOpenDestination?.invoke(dest) } },
+                                onDelete = { vm.delete(n.id) },
                             )
                         }
                     }
                 }
+            }
+        }
+        NxSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
+    }
+}
 
-                if (!state.message.isNullOrBlank()) {
-                    item {
-                        Text(state.message!!, color = MaterialTheme.colorScheme.primary)
-                        OutlinedButton(onClick = vm::dismissMessage) { Text("Cerrar") }
+/**
+ * Una sola fila deslizable: «Nuevos» · categorías · «Actividad reciente».
+ * Antes eran tres filas (Bandeja/Feed, Todas/Sin leer y categorías).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotificationFilterRow(
+    state: NotificationsUiState,
+    counts: Map<NotificationCategory, Int>,
+    nuevos: Int,
+    onUnread: () -> Unit,
+    onCategory: (NotificationCategory) -> Unit,
+    onFeed: () -> Unit,
+) {
+    val bandeja = state.viewMode == NotificationViewMode.BANDEJA
+    // Categorías vacías no ocupan lugar; la elegida se queda aunque ya no tenga avisos.
+    val categorias = NotificationCategory.entries.filter { cat ->
+        cat == NotificationCategory.TODAS || (counts[cat] ?: 0) > 0 || cat == state.category
+    }
+    LazyRow(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // «Nuevos» solo existe si esta visita trajo algo nuevo (o si ya está elegido).
+        if (nuevos > 0 || state.filter == NotificationFilter.UNREAD) {
+            item(key = "unread") {
+                FilterChip(
+                    selected = bandeja && state.filter == NotificationFilter.UNREAD,
+                    onClick = onUnread,
+                    label = { Text("Nuevos ($nuevos)", maxLines = 1) },
+                )
+            }
+            item(key = "sep-1") { VerticalDivider(Modifier.height(24.dp)) }
+        }
+        items(categorias, key = { "cat-${it.name}" }) { cat ->
+            FilterChip(
+                selected = bandeja && state.category == cat,
+                onClick = { onCategory(cat) },
+                label = { Text("${cat.label} (${counts[cat] ?: 0})", maxLines = 1) },
+            )
+        }
+        item(key = "sep-2") { VerticalDivider(Modifier.height(24.dp)) }
+        item(key = "feed") {
+            FilterChip(
+                selected = !bandeja,
+                onClick = onFeed,
+                label = { Text("Actividad reciente", maxLines = 1) },
+            )
+        }
+    }
+}
+
+private fun LazyListScope.feedItems(
+    state: NotificationsUiState,
+    onRetry: () -> Unit,
+) {
+    when {
+        state.isLoading && state.feedItems.isEmpty() -> item { NxSkeletonList() }
+        !state.error.isNullOrBlank() && state.feedItems.isEmpty() -> item { NxErrorBlock(state.error!!, onRetry) }
+        state.feedItems.isEmpty() -> item {
+            NxEmptyState(title = "Sin actividad reciente", subtitle = "Aquí verás lo último que pasó en tu equipo.")
+        }
+        else -> items(state.feedItems.size) { idx ->
+            val item = state.feedItems[idx]
+            val title = (item["title"] as? String).orEmpty().ifBlank { "Evento" }
+            val subtitle = (item["subtitle"] as? String).orEmpty()
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleSmall, color = NxColors.Slate)
+                    if (subtitle.isNotBlank()) {
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
                     }
                 }
+            }
+        }
+    }
+}
 
-                if (!state.error.isNullOrBlank()) {
-                    item {
-                        Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                        Button(onClick = { vm.refresh(initial = true) }) { Text("Reintentar") }
-                    }
+@Composable
+private fun NotificationCard(
+    n: NotificationRowDto,
+    /** Llegó sin leer en esta visita: fondo azul tenue y etiqueta «Nuevo» hasta salir. */
+    isNew: Boolean,
+    saving: Boolean,
+    navigable: Boolean,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var menu by remember(n.id) { mutableStateOf(false) }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (navigable) Modifier.clickable(onClick = onOpen) else Modifier),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isNew) NxColors.BrandTint else NxColors.Card,
+        ),
+    ) {
+        Row(
+            Modifier.padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                Modifier
+                    .padding(top = 7.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (isNew) NxColors.Brand else Color.Transparent),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (isNew) {
+                    Text(
+                        "Nuevo",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = NxColors.Brand,
+                    )
                 }
-
-                if (filteredRows.isEmpty() && state.error.isNullOrBlank()) {
-                    item {
-                        Text(
-                            if (state.filter == NotificationFilter.UNREAD) "No hay notificaciones sin leer."
-                            else "No hay notificaciones.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 24.dp),
-                        )
-                    }
-                } else {
-                    items(filteredRows, key = { it.id }) { n ->
-                        val destination = NotificationDeepLinkResolver.resolve(n)
-                        val isNavigable = destination != null && onOpenDestination != null
-                        val isUnread = n.isRead != true
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(
-                                    if (isNavigable) {
-                                        Modifier.clickable {
-                                            vm.openNotification(n) { dest -> onOpenDestination?.invoke(dest) }
-                                        }
-                                    } else Modifier,
-                                ),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isUnread) {
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                                } else {
-                                    MaterialTheme.colorScheme.surface
-                                },
-                            ),
-                        ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    n.title ?: "Notificación",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
-                                )
-                                if (!n.message.isNullOrBlank()) {
-                                    Text(n.message!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                val meta = buildList {
-                                    n.category?.takeIf { it.isNotBlank() }?.let { raw ->
-                                        add(NOTIFICATION_CATEGORY_LABEL[raw.lowercase()] ?: raw)
-                                    }
-                                    // «Hace 12 min» en vez de la fecha ISO cruda.
-                                    mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityRules
-                                        .relativeTime(n.createdAt)
-                                        .takeIf { it.isNotBlank() }
-                                        ?.let { add(it) }
-                                    if (n.isRead != true) add("Sin leer")
-                                }.joinToString(" · ")
-                                Text(
-                                    meta,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (isUnread) {
-                                        OutlinedButton(
-                                            onClick = { vm.markRead(n.id) },
-                                            enabled = !state.saving,
-                                        ) { Text("Marcar leída") }
-                                    }
-                                    OutlinedButton(
-                                        onClick = { vm.delete(n.id) },
-                                        enabled = !state.saving,
-                                    ) { Text("Eliminar") }
-                                }
-                            }
-                        }
-                    }
+                Text(
+                    n.title ?: "Notificación",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (isNew) FontWeight.SemiBold else FontWeight.Normal,
+                    color = NxColors.Slate,
+                )
+                if (!n.message.isNullOrBlank()) {
+                    Text(
+                        n.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = NxColors.Muted,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-
-                item { Spacer(Modifier.height(16.dp)) }
+                val meta = buildList {
+                    n.category?.takeIf { it.isNotBlank() }?.let { raw ->
+                        add(NOTIFICATION_CATEGORY_LABEL[raw.lowercase()] ?: raw)
+                    }
+                    // «Hace 12 min» en vez de la fecha ISO cruda.
+                    CoreActivityRules.relativeTime(n.createdAt)
+                        .takeIf { it.isNotBlank() }
+                        ?.let { add(it) }
+                }.joinToString(" · ")
+                if (meta.isNotBlank()) {
+                    Text(meta, style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
+                }
+            }
+            Box {
+                IconButton(onClick = { menu = true }, enabled = !saving) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Opciones de la notificación")
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Eliminar", color = NxColors.Danger) },
+                        onClick = {
+                            menu = false
+                            onDelete()
+                        },
+                    )
+                }
             }
         }
     }
