@@ -6,7 +6,11 @@
 import { getApiBase } from "./api-base";
 import { isNeverQueuePath } from "@nexara/offline-shared";
 
-const DB_NAME = "nexara-api-get-cache-v1";
+// v2: la v1 guardaba las respuestas con la misma etiqueta para todas las cuentas (todas mandaban el
+// token genérico de la cookie), así que una pestaña podía leer lo que había pedido otra con otro
+// usuario. Al cambiar el nombre, esa caché envenenada se descarta y además se borra abajo.
+const DB_NAME = "nexara-api-get-cache-v2";
+const DB_NAME_VIEJA = "nexara-api-get-cache-v1";
 const STORE = "entries";
 const DB_VERSION = 1;
 const MAX_ENTRIES = 450;
@@ -53,14 +57,46 @@ function normalizeGetUrl(href: string): string {
   }
 }
 
-export function authCacheTag(token: string | undefined): string {
-  if (!token) return "anon";
+/**
+ * Etiqueta con la que se guarda cada respuesta: token **y** usuario. Con el token solo, dos cuentas
+ * abiertas en el mismo navegador compartían caché si el token no era propio de la sesión.
+ */
+export function authCacheTag(token: string | undefined, userId?: number | string | null): string {
+  const sufijo = userId != null && String(userId).trim() ? `:${String(userId).trim()}` : "";
+  if (!token) return `anon${sufijo}`;
   let h = 2166136261;
   for (let i = 0; i < token.length; i++) {
     h ^= token.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
-  return `u${(h >>> 0).toString(16)}`;
+  return `u${(h >>> 0).toString(16)}${sufijo}`;
+}
+
+/** Borra toda la caché local de respuestas (al cerrar sesión, y la versión vieja al arrancar). */
+export async function borrarCacheApi(): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
+  for (const nombre of [DB_NAME, DB_NAME_VIEJA]) {
+    try {
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase(nombre);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** Se llama una vez al cargar: tira la caché de la versión con etiqueta compartida. */
+export function descartarCacheVieja(): void {
+  if (typeof indexedDB === "undefined") return;
+  try {
+    indexedDB.deleteDatabase(DB_NAME_VIEJA);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function shouldCacheApiGet(absUrl: string): boolean {

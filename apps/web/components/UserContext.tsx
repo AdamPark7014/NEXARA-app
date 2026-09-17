@@ -511,6 +511,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
 	const logout = () => {
 		const tokenPestana = user?.token;
+		// La caché local de respuestas es del navegador entero: se borra para que la siguiente cuenta
+		// no vea nada de la anterior.
+		void import('@/lib/offline-api-cache').then((m) => m.borrarCacheApi()).catch(() => undefined);
 		clearActivePanel();
 		setSessionEndedMessage(null);
 		setUser(null);
