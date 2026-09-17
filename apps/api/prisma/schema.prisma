@@ -572,6 +572,7 @@ model User {
   attendanceDays            AttendanceDay[]
   faltasJustificadas        AttendanceJustification[]  @relation("AttendanceJustificationUser")
   faltasJustificadasPor     AttendanceJustification[]  @relation("AttendanceJustificationAuthor")
+  checadasCorregidas        AttendanceCorrection[]     @relation("AttendanceCorrectionAuthor")
   lunchBreaks               LunchBreak[]
   employeePayments          EmployeePayment[]
   employeePaymentsCreated   EmployeePayment[]          @relation("EmployeePaymentCreator")
@@ -1449,13 +1450,51 @@ model Attendance {
   /// No se puede indexar `timestamp::date` directamente porque convertir zonas
   /// no es inmutable en Postgres; por eso el día se guarda resuelto.
   workDate       DateTime?      @db.Date
+  /// Hora del teléfono al capturar. Informativa: `timestamp` siempre es la del servidor,
+  /// salvo una captura sin conexión dentro de la ventana permitida.
+  clientCapturedAt DateTime?
+  /// Precisión del GPS en metros que reportó el teléfono.
+  accuracyM        Float?
+  /// El teléfono detectó ubicación simulada (Android `isMock`, iOS `isSimulatedBySoftware`).
+  /// El registro se rechaza con 422; la columna existe para los intentos que sí se guarden.
+  mockDetected     Boolean      @default(false)
+  /// Se capturó sin conexión y se mandó después.
+  offline          Boolean      @default(false)
+  /// OK | PENDIENTE (sin conexión) | REVISAR (algo no cuadra y alguien debe mirarlo).
+  validacion       String       @default("OK")
+  motivoValidacion String?
+  /// El punto no cayó en ningún sitio permitido (oficina o sucursal de su actividad del día).
+  fueraDeSitio     Boolean      @default(false)
+  /// Metros al sitio permitido más cercano.
+  distanciaSitioM  Int?
+  sitioNombre      String?
+  /// Salida inventada por la tarea de las 23:30 porque nadie la registró.
+  cierreAutomatico Boolean      @default(false)
   companyId      Int
   user           User           @relation(fields: [userId], references: [id])
   company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  correcciones   AttendanceCorrection[]
 
   @@unique([companyId, userId, workDate, type])
   @@index([companyId])
   @@index([userId, timestamp])
+}
+
+/// Corrección de hora de una checada: sólo dirección y RH, siempre con motivo.
+/// La checada original no se pisa en silencio — queda el antes, el después y quién lo hizo.
+model AttendanceCorrection {
+  id           Int        @id @default(autoincrement())
+  attendanceId Int
+  antes        DateTime
+  despues      DateTime
+  motivo       String     @db.Text
+  porId        Int?
+  createdAt    DateTime   @default(now())
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  por          User?      @relation("AttendanceCorrectionAuthor", fields: [porId], references: [id], onDelete: SetNull)
+
+  @@index([attendanceId])
+  @@map("attendance_corrections")
 }
 
 model AttendanceDay {
@@ -2324,6 +2363,8 @@ enum NotificationType {
   ATTENDANCE_CHECKOUT
   ATTENDANCE_ABSENCE
   ATTENDANCE_UPDATE
+  /// Checada que alguien debe mirar: ubicación simulada, fuera de sitio o cierre automático.
+  ATTENDANCE_FLAGGED
 
   // LUNCH BREAKS - Comida
   LUNCH_CHECKIN
