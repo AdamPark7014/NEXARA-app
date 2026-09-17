@@ -22,6 +22,10 @@ class NexaraApplication : Application(), ImageLoaderFactory {
         // Canales antes que nada: un push con la app cerrada arranca el proceso
         // directo en NexaraFirebaseService, sin pasar por MainActivity.
         NexaraNotifications.ensureChannels(this)
+        // Nombre del teléfono para los avisos de inicio de sesión («desde Galaxy S24 Ultra»).
+        mx.nexara.mobile.nativeapp.data.api.ApiClient.deviceDisplayName = runCatching {
+            android.provider.Settings.Global.getString(contentResolver, android.provider.Settings.Global.DEVICE_NAME)
+        }.getOrNull()?.takeIf { it.isNotBlank() }
 
         // Mientras el proceso vive (app abierta, en segundo plano o con la jornada activa), cada
         // aviso que llega por el socket se muestra igual que un push de FCM. Si FCM también lo

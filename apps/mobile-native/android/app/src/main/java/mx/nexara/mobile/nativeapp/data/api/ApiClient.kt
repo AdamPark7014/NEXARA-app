@@ -41,6 +41,14 @@ object ApiClient {
         "NexaraApp/$version (Android $release; $deviceModel) OkHttp"
     }
 
+    /**
+     * Nombre del teléfono como lo ve la persona (Ajustes → Acerca del teléfono), p. ej. «Galaxy S24
+     * Ultra». Lo fija `NexaraApplication` al arrancar; sirve para avisos tipo «Iniciaste sesión desde…».
+     * Viaja codificado en URL porque puede traer acentos y OkHttp solo admite ASCII en cabeceras.
+     */
+    @Volatile
+    var deviceDisplayName: String? = null
+
     /** Modelo legible para la ficha de dispositivo del servidor. */
     private val deviceModel: String by lazy {
         listOf(Build.MANUFACTURER, Build.MODEL)
@@ -77,6 +85,10 @@ object ApiClient {
                     // que la v2 esté desplegada: ver
                     // `.ai/auditoria-2026-09/14-integridad-datos-remediacion.md`.
                     .header("X-Device-Browser", "NEXARA App")
+                    .header("X-Device-OS", "Android ${Build.VERSION.RELEASE ?: ""}".trim())
+                deviceDisplayName?.takeIf { it.isNotBlank() }?.let {
+                    builder.header("X-Device-Name", java.net.URLEncoder.encode(it, "UTF-8"))
+                }
 
                 val token = tokenProvider?.invoke()
                 if (token.isNullOrBlank()) {
