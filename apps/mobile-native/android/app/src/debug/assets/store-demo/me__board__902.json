@@ -10,7 +10,7 @@
   "anNumber": null,
   "titulo": "Mantenimiento preventivo CCTV · Hotel Casa Azul",
   "estatus": "En Proceso",
-  "fechaMaxima": "2026-09-17T07:34:50.000Z",
+  "fechaMaxima": "2026-09-17T08:17:24.000Z",
   "bucket": "services"
  },
  "openActivities": [
@@ -29,12 +29,12 @@
     "diego.ramirez@demo.nexara.mx"
    ],
    "reparte": false,
-   "fechaInicio": "2026-09-17T03:59:50.000Z"
+   "fechaInicio": "2026-09-17T04:42:24.000Z"
   }
  ],
- "clockInAt": "2026-09-17T02:46:50.000Z",
+ "clockInAt": "2026-09-17T03:29:24.000Z",
  "workedMinutes": 168,
- "activityStartedAt": "2026-09-17T03:59:50.000Z",
+ "activityStartedAt": "2026-09-17T04:42:24.000Z",
  "activityElapsedMinutes": 95,
  "currentLateMinutes": null,
  "idleSinceAt": null,

@@ -111,6 +111,7 @@ No son obligatorias si la app no está optimizada para tablet como dispositivo p
   3. Modo demo de la barra de estado (`com.android.systemui.demo`), `screencap` de cada pantalla como `s1.png`…`s7.png`.
   4. `python scripts/store-demo/enmarcar-capturas.py --entrada <carpeta> --salida apps/mobile-native/play-assets/screenshots/phone`.
   5. Borrar `files/store_demo` al terminar para volver a los datos reales.
+- [x] Video de la declaración de servicio en primer plano (ubicación): con `serve` + `checador` en `files/store_demo/` la checada y el GPS de jornada se simulan (no llegan al servidor) y la cuenta de dirección ve su propio checador. Ubicación de prueba: `appops set com.android.shell android:mock_location allow` y `cmd location providers set-test-provider-location gps|network|fused --location 19.0414,-98.2063` cada segundo mientras se graba con `screenrecord`. Quitar los proveedores de prueba al terminar.
 - [ ] Mismo tema visual (claro u oscuro) en todas las capturas.
 - [ ] Sin credenciales, PII real ni marcas de terceros no autorizadas visibles.
 - [ ] Nombres de archivo en minúsculas con guiones (`01-ventas-dashboard.png`).

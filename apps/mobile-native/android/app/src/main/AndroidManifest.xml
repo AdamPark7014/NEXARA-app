@@ -10,8 +10,11 @@
       aunque la pantalla esté apagada, para dibujar el trayecto del día en el
       ERP. Mientras ocurre hay una notificación permanente que lo dice, y se
       apaga sola al registrar la salida.
+      Sin ACCESS_BACKGROUND_LOCATION a propósito: el servicio en primer plano de tipo
+      «location» se arranca desde la checada (app abierta) y conserva el acceso a la
+      ubicación con la pantalla apagada; pedir «todo el tiempo» obliga a otra
+      declaración en Google Play y no aporta nada al trayecto.
     -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />

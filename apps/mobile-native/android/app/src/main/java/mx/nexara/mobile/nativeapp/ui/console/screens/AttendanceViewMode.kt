@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
+import mx.nexara.mobile.nativeapp.data.api.ApiDebugHooks
 import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.SessionUser
 
@@ -85,6 +86,7 @@ fun attendanceViewMode(
 }
 
 fun attendanceViewMode(user: SessionUser?): AttendanceViewMode {
+    if (ApiDebugHooks.forceSelfCheckIn) return AttendanceViewMode.MANAGE_REGISTER
     if (user == null) return AttendanceViewMode.REGISTER
     return attendanceViewMode(
         email = user.email,

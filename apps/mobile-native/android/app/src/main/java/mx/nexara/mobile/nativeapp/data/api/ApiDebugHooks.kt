@@ -9,4 +9,8 @@ import okhttp3.Interceptor
 object ApiDebugHooks {
     @Volatile
     var interceptors: List<Interceptor> = emptyList()
+
+    /** Solo debug (video de Google Play): muestra el checador propio aunque la cuenta sea de dirección. */
+    @Volatile
+    var forceSelfCheckIn: Boolean = false
 }
