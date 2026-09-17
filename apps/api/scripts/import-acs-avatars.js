@@ -19,7 +19,8 @@
  *   docker exec -i -w /app/apps/api nexara-api node - --apply < apps/api/scripts/import-acs-avatars.js
  *
  * Opciones:
- *   --company=1    empresa (defecto 1)
+ *   --company=1    empresa de los empleados (defecto 1)
+ *   --acs-company=2  empresa donde están las personas del ACS (defecto: la misma)
  *   --overwrite    también reemplaza avatares que ya existen (defecto: solo quien no tiene)
  *   --json         imprime el reporte completo en JSON
  *
@@ -33,13 +34,13 @@ const path = require('path');
 
 function usage(code) {
   console.log(
-    'Uso: node import-acs-avatars.js (--dry-run | --apply) [--company=1] [--overwrite] [--json]',
+    'Uso: node import-acs-avatars.js (--dry-run | --apply) [--company=1] [--acs-company=2] [--overwrite] [--json]',
   );
   process.exit(code);
 }
 
 function parseArgs(argv) {
-  const opts = { dryRun: null, companyId: 1, overwrite: false, json: false };
+  const opts = { dryRun: null, companyId: 1, acsCompanyId: null, overwrite: false, json: false };
   for (const arg of argv) {
     if (!arg) continue;
     if (arg === '--dry-run') opts.dryRun = opts.dryRun === false ? 'both' : true;
@@ -47,6 +48,7 @@ function parseArgs(argv) {
     else if (arg === '--overwrite') opts.overwrite = true;
     else if (arg === '--json') opts.json = true;
     else if (arg.startsWith('--company=')) opts.companyId = Number(arg.slice('--company='.length));
+    else if (arg.startsWith('--acs-company=')) opts.acsCompanyId = Number(arg.slice('--acs-company='.length));
     else if (arg === '--help' || arg === '-h') usage(0);
     else {
       console.error(`Opción desconocida: ${arg}`);
@@ -166,6 +168,7 @@ async function main() {
     const report = await service.importAvatars(opts.companyId, {
       dryRun: opts.dryRun,
       overwrite: opts.overwrite,
+      acsCompanyId: opts.acsCompanyId,
     });
     if (opts.json) console.log(JSON.stringify(report, null, 2));
     else printReport(report);
