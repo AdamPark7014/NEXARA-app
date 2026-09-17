@@ -277,6 +277,55 @@ data class TeamEvidenceMemberDto(
     /** Más reciente primero. */
     val revisiones: List<TeamEvidenceReviewDto>? = null,
     val evidence: TeamEvidenceDto? = null,
+    /** Salidas de la zona de 100 m alrededor de su punto de inicio (la más reciente primero). */
+    val alertasZona: List<GeocercaAlertaDto>? = null,
+)
+
+// ── Geocerca de la actividad (GET activity-evidence/:id/geocerca) ───────────
+
+data class GeocercaPuntoDto(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val at: String? = null,
+    val distanciaM: Int? = null,
+)
+
+data class GeocercaOrigenDto(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val at: String? = null,
+)
+
+data class GeocercaAlertaDto(
+    val id: Long,
+    val detectedAt: String? = null,
+    val returnedAt: String? = null,
+    val distanciaM: Int? = null,
+    val maxDistanciaM: Int? = null,
+    val radioM: Int? = null,
+    /** ABIERTA | JUSTIFICADA */
+    val status: String? = null,
+    /** Sigue fuera (no ha vuelto al radio). */
+    val abierta: Boolean? = null,
+    val justificacion: String? = null,
+    val fotoUrl: String? = null,
+    val justificadaAt: String? = null,
+)
+
+data class GeocercaDto(
+    val activityId: Long? = null,
+    val radioM: Int? = null,
+    val origen: GeocercaOrigenDto? = null,
+    val seguimientoActivo: Boolean? = null,
+    val dentro: Boolean? = null,
+    val ultimo: GeocercaPuntoDto? = null,
+    val puntos: List<GeocercaPuntoDto>? = null,
+    val alertas: List<GeocercaAlertaDto>? = null,
+)
+
+data class JustificarZonaRequest(
+    val motivo: String,
+    val fotoBase64: String? = null,
 )
 
 data class TeamEvidenceActivityDto(
@@ -520,6 +569,16 @@ interface CoreActivitiesApi {
         @Path("id") activityId: Long,
         @Body body: Any,
     ): EvidenceFlowDto
+
+    @GET("activity-evidence/{id}/geocerca")
+    suspend fun geocerca(@Path("id") activityId: Long): GeocercaDto
+
+    @POST("activity-evidence/{id}/geocerca/alertas/{alertId}/justificacion")
+    suspend fun justificarZona(
+        @Path("id") activityId: Long,
+        @Path("alertId") alertId: Long,
+        @Body body: JustificarZonaRequest,
+    ): GeocercaAlertaDto
 
     @POST("activity-evidence/{id}/exit-photo")
     suspend fun exitPhoto(
