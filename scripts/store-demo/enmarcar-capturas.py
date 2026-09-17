@@ -33,6 +33,7 @@ CAPTURAS = [
     ("s7.png", "Avisos que importan", "Entradas, avances y revisiones al instante"),
     ("s4.png", "Canales y mensajes directos", "Todo el equipo conectado en un solo lugar"),
     ("s6.png", "Clientes por sector", "Proyecto, corporativos y comerciales"),
+    ("s8.png", "Alertas si alguien sale de zona", "A más de 100 m del inicio llega el aviso y su motivo"),
 ]
 
 
