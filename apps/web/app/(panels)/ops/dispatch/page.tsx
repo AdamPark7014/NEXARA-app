@@ -155,6 +155,8 @@ export default function OpsDispatchPage() {
         await reassignActivity(token, id, {
           aUsuarioId: Number(assignUserId),
           motivo: "Asignación desde centro de despacho",
+          // Quien la tenía sigue de apoyo (antes era lo único que hacía esta reasignación).
+          retirarAnterior: false,
         });
         ok += 1;
       } catch {

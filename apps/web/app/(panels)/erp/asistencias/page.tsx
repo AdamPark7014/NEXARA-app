@@ -22,6 +22,18 @@ import { isCeoEquivalentEmail, isDeveloperSuperAdminEmail, isNonEmployeeEmail } 
 import { erpFetch } from "@/lib/erp-api";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import Modal from "@/components/ui/Modal";
+import InlineAlert from "@/components/ui/InlineAlert";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { erpInputStyle, formatApiError } from "@/lib/erp-api";
+import {
+  faltaDelDia,
+  justificarFalta,
+  MOTIVO_FALTA_MINIMO,
+  quitarFaltaJustificada,
+  type FaltaJustificada,
+} from "@/lib/attendance-justifications";
+import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
@@ -29,7 +41,7 @@ import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 type TabId = "equipo" | "comidas" | "trayectoria";
-type Estado = "PRESENTE" | "COMPLETO" | "AUSENTE";
+type Estado = "PRESENTE" | "COMPLETO" | "JUSTIFICADA" | "AUSENTE";
 type FilterEstado = "TODOS" | Estado;
 
 interface ApiAttendanceUser {
@@ -49,6 +61,8 @@ interface ApiAttendanceUser {
     exitLatitude?: number;
     exitLongitude?: number;
   }[];
+  /** Días sin checada que Christian justificó (API nueva; opcional). */
+  justificaciones?: FaltaJustificada[];
 }
 
 interface LunchBreak {
@@ -84,10 +98,11 @@ interface TrajectoryPoint {
 const ESTADO_META: Record<Estado, { label: string; color: string }> = {
   PRESENTE: { label: "En jornada", color: "#16a34a" },
   COMPLETO: { label: "Completó", color: "#2563eb" },
+  JUSTIFICADA: { label: "Falta justificada", color: "#7c3aed" },
   AUSENTE: { label: "Sin checada", color: "#94a3b8" },
 };
 
-const ESTADO_ORDER: Record<Estado, number> = { PRESENTE: 0, COMPLETO: 1, AUSENTE: 2 };
+const ESTADO_ORDER: Record<Estado, number> = { PRESENTE: 0, COMPLETO: 1, JUSTIFICADA: 2, AUSENTE: 3 };
 
 async function apiFetch<T>(path: string, token: string): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
@@ -347,18 +362,22 @@ export default function ErpAsistenciasPage() {
         const checkIn = latestByType(raw.attendances, "entrada");
         const checkOut = latestByType(raw.attendances, "salida");
         const dayInfo = raw.days?.find((d) => d.date === dateFilter || d.date?.startsWith(dateFilter));
+        const falta = faltaDelDia(raw.justificaciones, dateFilter);
         const estado: Estado = dayInfo?.isOpen
           ? "PRESENTE"
           : checkIn && checkOut
             ? "COMPLETO"
             : checkIn
               ? "PRESENTE"
-              : "AUSENTE";
+              : falta
+                ? "JUSTIFICADA"
+                : "AUSENTE";
         return {
           ...raw,
           checkIn,
           checkOut,
           estado,
+          falta,
           entryMapUrl: attendanceMapUrl(raw.attendances, "entrada"),
           exitMapUrl: attendanceMapUrl(raw.attendances, "salida"),
           totalMinutes: dayInfo?.totalMinutes ?? raw.totalMinutes ?? 0,
@@ -377,7 +396,54 @@ export default function ErpAsistenciasPage() {
   const presentes = mapped.filter((m) => m.estado === "PRESENTE").length;
   const completos = mapped.filter((m) => m.estado === "COMPLETO").length;
   const ausentes = mapped.filter((m) => m.estado === "AUSENTE").length;
+  const justificadas = mapped.filter((m) => m.estado === "JUSTIFICADA").length;
   const hasOpenJornada = presentes > 0;
+
+  // Faltas justificadas: solo Christian (y su equivalente) las marca o las quita; la API lo vuelve a exigir.
+  const puedeJustificar = isCeoEquivalentEmail(user?.email);
+  const [justificando, setJustificando] = useState<{ userId: number; nombre: string } | null>(null);
+  const [motivoFalta, setMotivoFalta] = useState("");
+  const [guardandoFalta, setGuardandoFalta] = useState(false);
+  const [errorFalta, setErrorFalta] = useState<string | null>(null);
+  const [confirmFalta, setConfirmFalta] = useState<ConfirmState | null>(null);
+
+  const abrirJustificar = (userId: number, nombre: string) => {
+    setMotivoFalta("");
+    setErrorFalta(null);
+    setJustificando({ userId, nombre });
+  };
+
+  const guardarJustificacion = async () => {
+    if (!justificando || motivoFalta.trim().length < MOTIVO_FALTA_MINIMO) return;
+    setGuardandoFalta(true);
+    setErrorFalta(null);
+    try {
+      await justificarFalta(token, { userId: justificando.userId, fecha: dateFilter, motivo: motivoFalta.trim() });
+      setJustificando(null);
+      await loadEquipo(true);
+    } catch (e) {
+      setErrorFalta(formatApiError(e, "No se pudo justificar la falta"));
+    } finally {
+      setGuardandoFalta(false);
+    }
+  };
+
+  const pedirQuitarFalta = (falta: FaltaJustificada, nombre: string) => {
+    setConfirmFalta({
+      title: "Quitar falta justificada",
+      message: `El ${dateFilter} de ${nombre} volverá a mostrarse como «Sin checada».`,
+      confirmLabel: "Quitar",
+      danger: true,
+      fn: async () => {
+        try {
+          await quitarFaltaJustificada(token, falta.id);
+          await loadEquipo(true);
+        } catch (e) {
+          setError(formatApiError(e, "No se pudo quitar la falta justificada"));
+        }
+      },
+    });
+  };
 
   useEffect(() => {
     if (!hasOpenJornada) return;
@@ -578,6 +644,15 @@ export default function ErpAsistenciasPage() {
                   color={ESTADO_META.COMPLETO.color}
                   onClick={() => setFilterEstado("COMPLETO")}
                 />
+                {justificadas > 0 || puedeJustificar ? (
+                  <FilterChip
+                    active={filterEstado === "JUSTIFICADA"}
+                    label="Falta justificada"
+                    count={justificadas}
+                    color={ESTADO_META.JUSTIFICADA.color}
+                    onClick={() => setFilterEstado("JUSTIFICADA")}
+                  />
+                ) : null}
                 <FilterChip
                   active={filterEstado === "AUSENTE"}
                   label="Sin checada"
@@ -845,6 +920,54 @@ export default function ErpAsistenciasPage() {
                             </div>
                           )}
 
+                          {m.falta ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "flex-start",
+                                padding: "10px 12px",
+                                borderRadius: 12,
+                                background: `color-mix(in srgb, ${ESTADO_META.JUSTIFICADA.color} 8%, var(--surface))`,
+                                fontSize: 12.5,
+                                lineHeight: 1.45,
+                              }}
+                            >
+                              <EventBusyOutlinedIcon aria-hidden="true" sx={{ fontSize: 18, color: ESTADO_META.JUSTIFICADA.color, mt: "1px" }} />
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontWeight: 700 }}>Falta justificada · {m.falta.motivo}</div>
+                                <div style={{ color: "var(--text-tertiary)", fontSize: 11.5 }}>
+                                  {m.falta.justificadaPor?.nombre ? `Justificó ${m.falta.justificadaPor.nombre}` : "Justificada"}
+                                  {" · "}
+                                  {new Date(m.falta.justificadaAt).toLocaleString("es-MX", {
+                                    day: "numeric",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </div>
+                              </div>
+                              {puedeJustificar ? (
+                                <Button size="sm" variant="ghost" onClick={() => pedirQuitarFalta(m.falta!, m.nombre)}>
+                                  Quitar
+                                </Button>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {m.estado === "AUSENTE" && puedeJustificar ? (
+                            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => abrirJustificar(m.userId, m.nombre)}
+                                iconLeft={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+                              >
+                                Justificar falta
+                              </Button>
+                            </div>
+                          ) : null}
+
                           {(m.entryMapUrl || m.exitMapUrl) && (
                             <div style={{ display: "flex", gap: 12, fontSize: 11 }}>
                               {m.entryMapUrl && (
@@ -881,6 +1004,55 @@ export default function ErpAsistenciasPage() {
           )}
         </>
       )}
+
+      <Modal
+        open={justificando != null}
+        onClose={() => !guardandoFalta && setJustificando(null)}
+        title="Justificar falta"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setJustificando(null)} disabled={guardandoFalta}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void guardarJustificacion()}
+              disabled={motivoFalta.trim().length < MOTIVO_FALTA_MINIMO}
+              loading={guardandoFalta}
+            >
+              Justificar falta
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            {justificando?.nombre} · {dateFilter}. El día quedará como «Falta justificada» con tu motivo; no se crea
+            ninguna checada. Se avisa a la persona y a sus jefes.
+          </p>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo *</span>
+            <textarea
+              value={motivoFalta}
+              onChange={(e) => setMotivoFalta(e.target.value)}
+              rows={4}
+              maxLength={1000}
+              placeholder="Ej. Cita médica con comprobante del IMSS."
+              style={{ ...erpInputStyle, resize: "vertical", fontFamily: "inherit" }}
+            />
+            <span
+              style={{
+                fontSize: 11,
+                color: motivoFalta.trim().length >= MOTIVO_FALTA_MINIMO ? "var(--text-tertiary)" : "var(--danger)",
+              }}
+            >
+              {motivoFalta.trim().length}/{MOTIVO_FALTA_MINIMO} caracteres mínimo
+            </span>
+          </label>
+          {errorFalta ? <InlineAlert variant="danger" message={errorFalta} /> : null}
+        </div>
+      </Modal>
+      <ConfirmDialog state={confirmFalta} onClose={() => setConfirmFalta(null)} />
 
       {tab === "comidas" && <ComidasPanel fecha={dateFilter} />}
 

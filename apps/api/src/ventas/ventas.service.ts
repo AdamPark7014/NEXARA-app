@@ -35,6 +35,18 @@ import {
   needsOpsProvision,
   type ClientSectorCode,
 } from './client-sectors.js';
+import {
+  canDeleteOrDeactivateClient,
+  canManageClients,
+  CLIENT_DEACTIVATE_FORBIDDEN,
+  CLIENT_DELETE_FORBIDDEN,
+  CLIENT_MANAGE_FORBIDDEN,
+  CLIENT_STATUS_ACTIVE,
+  CLIENT_STATUS_INACTIVE,
+  clientPermissions,
+  isInactiveClientStatus,
+  type ClientPermissions,
+} from './client-permissions.js';
 
 @Injectable()
 export class VentasService {
@@ -353,7 +365,40 @@ export class VentasService {
     }));
   }
 
+  /** Tiene personal a su cargo: alguien activo lo tiene como jefe directo (`managerId`). */
+  private async hasDirectReports(userId?: number | null): Promise<boolean> {
+    const id = Number(userId);
+    if (!Number.isInteger(id) || id <= 0) return false;
+    const count = await this.prisma.user.count({ where: { managerId: id, isActive: true } });
+    return count > 0;
+  }
+
+  /** Qué puede hacer el usuario con el padrón de clientes (web y apps esconden lo que no aplica). */
+  async getClientPermissions(user?: any): Promise<ClientPermissions> {
+    const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
+    const owner = canDeleteOrDeactivateClient(actor);
+    const reports = owner ? false : await this.hasDirectReports(user?.id);
+    return clientPermissions(actor, reports);
+  }
+
+  private async assertCanManageClients(user?: any) {
+    const actor = { id: user?.id, email: user?.email, roleKey: user?.roleKey };
+    if (canManageClients(actor, false)) return;
+    if (!(await this.hasDirectReports(user?.id))) {
+      throw new ForbiddenException(CLIENT_MANAGE_FORBIDDEN);
+    }
+  }
+
+  private assertCanDeactivateClient(user?: any) {
+    if (!canDeleteOrDeactivateClient({ email: user?.email })) {
+      throw new ForbiddenException(CLIENT_DEACTIVATE_FORBIDDEN);
+    }
+  }
+
   async createClient(dto: CreateSalesClientDto, user?: any, companyId?: number | null) {
+    await this.assertCanManageClients(user);
+    // Dar de alta un cliente ya inactivo equivale a desactivarlo.
+    if (isInactiveClientStatus(dto.status)) this.assertCanDeactivateClient(user);
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     const sectors = this.normalizeIncomingSectors(dto.sectors);
@@ -600,8 +645,16 @@ export class VentasService {
   }
 
   async updateClient(id: number, dto: UpdateSalesClientDto, user?: any, companyId?: number | null) {
+    await this.assertCanManageClients(user);
     const existing = await this.getClient(id, user, companyId);
-    const ownerId = this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
+    // Pasar a «Inactivo» (o sacarlo de ahí) por PATCH es desactivar/reactivar: misma regla.
+    if (dto.status !== undefined && isInactiveClientStatus(dto.status) !== isInactiveClientStatus(existing.status)) {
+      this.assertCanDeactivateClient(user);
+    }
+    // Sin `ownerId` en el cuerpo el encargado no cambia: editar datos no es reasignar el cliente
+    // (antes quien editaba un cliente ajeno recibía «No puedes asignar este recurso a otro usuario»).
+    const ownerId =
+      dto.ownerId === undefined ? existing.ownerId : this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
     const updated = await this.prisma.salesClient.update({
       where: { id },
       data: {
@@ -640,8 +693,42 @@ export class VentasService {
   }
 
   async deleteClient(id: number, user?: any, companyId?: number | null) {
+    if (!canDeleteOrDeactivateClient({ email: user?.email })) {
+      throw new ForbiddenException(CLIENT_DELETE_FORBIDDEN);
+    }
     await this.getClient(id, user, companyId);
     return this.prisma.salesClient.delete({ where: { id } });
+  }
+
+  /** Desactivar (status «Inactivo») o reactivar («Activo») un cliente: solo dirección general. */
+  async setClientActive(id: number, active: boolean, user?: any, companyId?: number | null) {
+    this.assertCanDeactivateClient(user);
+    const existing = await this.getClient(id, user, companyId);
+    const status = active ? CLIENT_STATUS_ACTIVE : CLIENT_STATUS_INACTIVE;
+    if (isInactiveClientStatus(existing.status) === !active) {
+      throw new BadRequestException(active ? 'El cliente ya está activo' : 'El cliente ya está inactivo');
+    }
+    const updated = await this.prisma.salesClient.update({
+      where: { id },
+      data: { status },
+      include: this.clientInclude(),
+    });
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'SALES_CLIENT',
+      entityId: updated.id,
+      companyId: updated.companyId,
+      userId: user?.id,
+      payload: {
+        name: updated.name,
+        status: updated.status,
+        prevStatus: existing.status,
+        ownerId: updated.ownerId,
+        serviceClientId: updated.serviceClientId,
+      },
+    });
+
+    return { updated, prevStatus: existing.status ?? null };
   }
 
   /** Crea o devuelve el ServiceClient operativo vinculado a un cliente comercial. */

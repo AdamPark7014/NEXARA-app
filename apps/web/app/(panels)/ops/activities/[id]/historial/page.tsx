@@ -32,6 +32,7 @@ import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
+import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 
 /** La API manda `icon` como emoji; lo traducimos por code point a un icono MUI. */
 const TIMELINE_ICON_BY_CODEPOINT: Record<number, SvgIconComponent> = {
@@ -52,6 +53,7 @@ const TIMELINE_ICON_BY_CODEPOINT: Record<number, SvgIconComponent> = {
   0x1f4cd: PlaceOutlinedIcon, // check-in / check-out
   0x1f4dd: DescriptionOutlinedIcon, // hoja de servicio
   0x1f4f8: PhotoCameraOutlinedIcon, // evidencia revisada
+  0x1f6ab: BlockOutlinedIcon, // cancelada (con motivo)
 };
 
 const TIMELINE_ICON_BY_KIND: Record<string, SvgIconComponent> = {
@@ -68,6 +70,7 @@ const TIMELINE_ICON_BY_KIND: Record<string, SvgIconComponent> = {
   evidencia: PhotoCameraOutlinedIcon,
   cumplida: TaskAltIcon,
   revision: RateReviewOutlinedIcon,
+  cancelada: BlockOutlinedIcon,
 };
 
 function timelineIcon(ev: ActivityTimelineEvent): SvgIconComponent {

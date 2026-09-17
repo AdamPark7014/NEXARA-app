@@ -26,6 +26,9 @@ export type NotificationKind =
   | "atraso"
   | "vencida"
   | "fuera_zona"
+  | "cancelada"
+  | "falta_justificada"
+  | "cliente"
   | "chat"
   | "ubicacion"
   | "viatico"
@@ -65,6 +68,10 @@ export function notificationKind(category?: string | null, title?: string | null
   ) {
     return "fuera_zona";
   }
+  // SALES_CLIENT_CREATED (push `icon: cliente`): «Ana López agregó el cliente Plaza Dorada».
+  if (t.includes("agrego el cliente") || (c === "sales" && t.includes("nuevo cliente"))) return "cliente";
+  // ATTENDANCE_ABSENCE (push `icon: falta_justificada`): «Tu falta del jue 17 sep quedó justificada».
+  if (t.includes("falta del") && t.includes("justificada")) return "falta_justificada";
   if (c.startsWith("lunch") || t.includes("comida")) return "comida";
   if (c === "sla-breach" || t.includes("vencid")) return "vencida";
   if (c === "sla-alert" || t.includes("atras") || t.includes("retras")) return "atraso";
@@ -76,7 +83,10 @@ export function notificationKind(category?: string | null, title?: string | null
   if (c === "profile") return "perfil";
   if (c === "viatics" || t.includes("viatico")) return "viatico";
 
-  if (t.includes("reasign") || t.includes("paso a ")) return "reasignada";
+  // ACTIVITY_CANCELLED (push `icon: cancelada`): «Mantenimiento de CCTV fue cancelada».
+  if (t.includes("fue cancelada")) return "cancelada";
+  // «Te asignaron X para continuarla» es una reasignación, no una actividad nueva.
+  if (t.includes("reasign") || t.includes("paso a ") || t.includes("para continuarla")) return "reasignada";
   if (t.includes("reprogram")) return "reprogramada";
   if (t.includes("devuel")) return "devuelta";
   if (t.includes("correcc") || t.includes("corrig")) return "correccion";

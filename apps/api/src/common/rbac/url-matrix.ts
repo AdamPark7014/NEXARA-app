@@ -112,6 +112,27 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', methods: ['GET'], scope: 'read' },
 ];
 
+/**
+ * Alta y edición de clientes para roles administrativos sin panel de ventas (RH, contabilidad).
+ * Quién puede de verdad (jefes con personal a cargo, administración, dirección) y qué clientes ve
+ * cada quien lo deciden `client-permissions.ts` y las reglas de sector del servicio.
+ */
+export const CLIENT_ADMIN_WRITE_URL_RULES: UrlRule[] = [
+  { path: '/api/ventas/clientes/permisos', methods: ['GET'], scope: 'read' },
+  { path: '/api/ventas/clientes', methods: ['POST'], scope: 'write' },
+  { path: '/api/ventas/clientes/*', methods: ['PATCH'], scope: 'write' },
+];
+
+/**
+ * Cancelar una actividad o pasarla a otro compañero, para roles de dirección y administración que
+ * no tienen escritura general sobre actividades. El servicio exige ser superior de quien la ejecuta.
+ */
+export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
+  { path: '/api/activities/*/acciones', methods: ['GET'], scope: 'read' },
+  { path: '/api/activities/*/cancelar', methods: ['POST'], scope: 'approve' },
+  { path: '/api/activities/*/reasignar', methods: ['POST'], scope: 'approve' },
+];
+
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
 export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', scope: 'write' },
@@ -147,6 +168,10 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
     ...MEETINGS_LEAD_URL_RULES,
+    ...ACTIVITY_SUPERIOR_URL_RULES,
+    // Faltas justificadas: solo Christian (el servicio lo vuelve a exigir por correo).
+    { path: '/api/attendance/justificaciones', methods: ['GET', 'POST'], scope: 'approve' },
+    { path: '/api/attendance/justificaciones/*', methods: ['DELETE'], scope: 'approve' },
     // Rutas específicas primero (first-match-wins)
     { path: '/erp/approvals/**', scope: 'approve' },
     { path: '/api/workflow/**', methods: ['POST'], scope: 'approve' },
@@ -220,6 +245,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
     ...MEETINGS_LEAD_URL_RULES,
+    ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/executive', scope: 'read' },
@@ -267,6 +293,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
     ...MEETINGS_LEAD_URL_RULES,
+    ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp/**', scope: 'admin' },
     { path: '/crm/dashboard', scope: 'read' },
     { path: '/crm/quotes/**', scope: 'approve' },
@@ -302,6 +329,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
     ...MEETINGS_LEAD_URL_RULES,
+    ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/approvals/**', scope: 'approve' },
@@ -577,6 +605,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
     ...MEETINGS_LEAD_URL_RULES,
+    ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/crm/**', scope: 'approve' },
     { path: '/crm/chat', scope: 'write' },
     { path: '/erp/dashboard', scope: 'read' },
@@ -708,6 +737,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.RH]: [
     ...MEETINGS_LEAD_URL_RULES,
+    ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/hr/**', scope: 'write' },
@@ -733,6 +763,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/lunch-breaks/**', scope: 'write' },
     { path: '/api/users', methods: ['GET'], scope: 'read' },
     { path: '/api/documents/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    ...CLIENT_ADMIN_WRITE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -740,6 +771,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
     ...MEETINGS_STAFF_URL_RULES,
+    ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/accounting/**', scope: 'write' },
@@ -766,6 +798,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     { path: '/api/expenses/**', scope: 'write' },
     { path: '/api/employee-payments/**', methods: ['GET', 'POST'], scope: 'write' },
+    ...CLIENT_ADMIN_WRITE_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
   ],
 

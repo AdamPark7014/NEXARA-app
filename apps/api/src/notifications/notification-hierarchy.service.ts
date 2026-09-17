@@ -1014,6 +1014,51 @@ export class NotificationHierarchyService {
     return [...ids];
   }
 
+  /**
+   * Christian justificó la falta de un día: la persona lo sabe («Tu falta del jue 17 sep quedó
+   * justificada · motivo») y sus jefes por organigrama también. Quien la justificó no recibe aviso.
+   */
+  async notifyAbsenceJustified(params: {
+    userId: number;
+    actorId: number;
+    fecha: string;
+    motivo: string;
+    justificationId: number;
+  }) {
+    try {
+      const nombre = persona(await this.resolveActorName(params.userId));
+      const motivo = `Motivo: ${params.motivo.trim().slice(0, 200)}`;
+      const comun = {
+        type: 'ATTENDANCE_ABSENCE',
+        category: 'attendance',
+        icon: 'falta_justificada',
+        triggerUserId: params.actorId,
+        relatedEntityId: params.justificationId,
+        entityType: 'AttendanceJustification',
+        priority: 'normal' as const,
+        dedupeSeconds: 0,
+      };
+      await this.notificationsService.createNotification({
+        ...comun,
+        userId: params.userId,
+        title: `Tu falta del ${params.fecha} quedó justificada`,
+        message: motivo,
+        relatedUrl: '/erp/asistencias',
+      });
+      for (const jefe of await this.lunchReviewerIds(params.userId)) {
+        await this.notificationsService.createNotification({
+          ...comun,
+          userId: jefe,
+          title: `${nombre}: falta del ${params.fecha} justificada`,
+          message: motivo,
+          relatedUrl: appUrls.erpAttendance(undefined, params.userId),
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyAbsenceJustified', error);
+    }
+  }
+
   /** Comida a destiempo: sus jefes y Christian reciben el motivo para aprobarla o rechazarla. */
   async notifyLunchLate(params: {
     userId: number;
@@ -1130,7 +1175,7 @@ export class NotificationHierarchyService {
       const [activity, personas] = await Promise.all([
         this.prisma.activity.findUnique({
           where: { id: activityId },
-          select: { titulo: true, creadoPorId: true, client: { select: { name: true } } },
+          select: { titulo: true, creadoPorId: true, responsableId: true, client: { select: { name: true } } },
         }),
         this.prisma.user.findMany({
           where: { id: { in: [actorId, aUsuarioId, ...(deUsuarioId ? [deUsuarioId] : [])] } },
@@ -1157,8 +1202,13 @@ export class NotificationHierarchyService {
       await this.notificationsService.createNotification({
         ...base,
         userId: aUsuarioId,
-        title: `Te reasignaron ${actividad}`,
-        message: unir(`${nombreDe(actorId)} te la pasó`, cliente, motivo),
+        title: `Te asignaron ${actividad} para continuarla`,
+        message: unir(
+          motivo,
+          deUsuarioId ? `Continúas donde se quedó ${nombreDe(deUsuarioId)}` : null,
+          `${nombreDe(actorId)} te la pasó`,
+          cliente,
+        ),
         priority: 'high',
       });
 
@@ -1168,15 +1218,21 @@ export class NotificationHierarchyService {
           userId: deUsuarioId,
           title: `${actividad} pasó a ${nombreDe(aUsuarioId)}`,
           message: unir(
-            `${nombreDe(actorId)} la reasignó`,
-            params.retiradoAnterior ? 'Ya no estás en el equipo' : 'Sigues en el equipo como apoyo',
             motivo,
+            `${nombreDe(actorId)} la reasignó`,
+            params.retiradoAnterior ? 'Tu avance quedó guardado' : 'Sigues en el equipo como apoyo',
           ),
         });
       }
 
+      // Responsable, quien la creó, jefes de quien salió y de quien entra, y Christian.
       const observadores = new Set<number>(await this.getCeoUserIds());
       if (activity.creadoPorId) observadores.add(activity.creadoPorId);
+      if (activity.responsableId) observadores.add(activity.responsableId);
+      for (const id of [deUsuarioId, aUsuarioId]) {
+        if (id) for (const jefe of await this.lunchReviewerIds(id)) observadores.add(jefe);
+      }
+      observadores.delete(actorId);
       observadores.delete(aUsuarioId);
       if (deUsuarioId) observadores.delete(deUsuarioId);
       for (const userId of observadores) {
@@ -1195,6 +1251,59 @@ export class NotificationHierarchyService {
       }
     } catch (error) {
       this.logger.error('notifyActivityReassigned', error);
+    }
+  }
+
+  /**
+   * Un superior canceló la actividad: «Mantenimiento de CCTV fue cancelada · motivo». Lo reciben
+   * quienes la ejecutaban (y quien salió del equipo no), el responsable, quien la creó, los jefes
+   * por organigrama de cada uno y Christian. Nadie recibe su propio aviso.
+   */
+  async notifyActivityCancelled(params: { activityId: number; actorId: number; motivo: string }) {
+    const { activityId, actorId } = params;
+    try {
+      const [activity, team] = await Promise.all([
+        this.prisma.activity.findUnique({
+          where: { id: activityId },
+          select: { titulo: true, responsableId: true, creadoPorId: true, client: { select: { name: true } } },
+        }),
+        this.prisma.activityAssignee.findMany({
+          where: { activityId, retiradoAt: null },
+          select: { userId: true },
+        }),
+      ]);
+      if (!activity) return;
+      const personas = new Set<number>([activity.responsableId, ...team.map((t) => t.userId)]);
+      const targets = new Set<number>(personas);
+      if (activity.creadoPorId) targets.add(activity.creadoPorId);
+      for (const id of personas) {
+        for (const jefe of await this.lunchReviewerIds(id)) targets.add(jefe);
+      }
+      for (const ceo of await this.getCeoUserIds()) targets.add(ceo);
+      targets.delete(actorId);
+
+      const quien = persona(await this.resolveActorName(actorId));
+      const title = `${nombreActividad(activity.titulo)} fue cancelada`;
+      const message = unir(`Motivo: ${params.motivo.trim().slice(0, 200)}`, `${quien} la canceló`, activity.client?.name);
+      for (const userId of targets) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_CANCELLED',
+          category: 'activities',
+          title,
+          message,
+          icon: 'cancelada',
+          triggerUserId: actorId,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activityId}/historial`,
+          priority: 'high',
+          channel: 'ops',
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityCancelled', error);
     }
   }
 
@@ -1674,8 +1783,30 @@ export class NotificationHierarchyService {
 
   async notifySalesClientCreated(actorId: number, clientId: number, clientName: string, actorName: string) {
     try {
-      const recipients = await this.getOperationalOversightRecipientIds(actorId);
-      const msg = `${actorName} registró el cliente comercial «${clientName}».`;
+      // El token no trae el nombre: sin él los avisos decían «Usuario registró…».
+      const nombreReal =
+        actorName && actorName !== 'Usuario' ? actorName : await this.resolveActorName(actorId);
+      const ceoIds = new Set(await this.getCeoUserIds());
+      // Christian recibe el aviso con su propio formato: «Ana López agregó el cliente Plaza Dorada».
+      for (const uid of ceoIds) {
+        if (uid === actorId) continue;
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'SALES_CLIENT_CREATED',
+          category: 'sales',
+          title: `${persona(nombreReal)} agregó el cliente ${String(clientName || '').trim() || 'sin nombre'}`,
+          message: 'Nuevo cliente en el padrón',
+          icon: 'cliente',
+          triggerUserId: actorId,
+          relatedEntityId: clientId,
+          entityType: 'SalesClient',
+          relatedUrl: `/erp/clientes/${clientId}`,
+          priority: 'normal',
+          dedupeSeconds: 0,
+        });
+      }
+      const recipients = (await this.getOperationalOversightRecipientIds(actorId)).filter((id) => !ceoIds.has(id));
+      const msg = `${nombreReal} registró el cliente comercial «${clientName}».`;
       for (const uid of recipients) {
         await this.notificationsService.createNotification({
           userId: uid,

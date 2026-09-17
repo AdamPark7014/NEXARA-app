@@ -19,6 +19,10 @@ import { NotificationType, Prisma } from '@prisma/client';
 import { saveBase64Photo } from '../common/file-upload.util';
 import { horaAviso } from '../notifications/notification-push-meta.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
+import {
+  AttendanceJustificationsService,
+  type AttendanceJustificationDto,
+} from './attendance-justifications.service';
 
 @Injectable()
 export class AttendanceService {
@@ -133,6 +137,28 @@ export class AttendanceService {
     const end = Math.min(rangeEnd.getTime(), finDeSuJornada);
     if (end <= start) return 0;
     return Math.max(0, Math.floor((end - start) / 60000));
+  }
+
+  /**
+   * Faltas justificadas por persona en el rango: «Falta justificada · motivo» en vez de «Sin checada».
+   * No son checadas ni jornada; van aparte para que nadie las sume como horas.
+   */
+  private async justificacionesPorPersona(
+    userIds: number[],
+    from: string,
+    to: string,
+    tenantId: number,
+  ): Promise<Map<number, AttendanceJustificationDto[]>> {
+    // Pruebas con Prisma simulado sin la tabla: sin faltas justificadas.
+    if (!userIds.length || !(this.prisma as { attendanceJustification?: unknown }).attendanceJustification) {
+      return new Map();
+    }
+    try {
+      return await new AttendanceJustificationsService(this.prisma).listForUsers(userIds, from, to, tenantId);
+    } catch (err) {
+      this.logger.warn(`No se pudieron leer las faltas justificadas: ${(err as Error).message}`);
+      return new Map();
+    }
   }
 
   /** `AAAA-MM-DD` se interpreta como dia de la zona de la empresa. */
@@ -352,7 +378,10 @@ export class AttendanceService {
     };
 
     const fallback = totalMinutes === 0 && attendances.length ? buildFallbackTotals() : null;
+    const justificaciones = (await this.justificacionesPorPersona([userId], from, to, tenantId)).get(userId) ?? [];
     return {
+      /** Días marcados por Christian como «Falta justificada» (con motivo, quién y cuándo). */
+      justificaciones,
       totalMinutes: fallback?.totalMinutes ?? totalMinutes,
       days: fallback?.days
         ?? days.map((day) => {
@@ -1046,6 +1075,7 @@ export class AttendanceService {
     const effectiveEnd = now < end ? now : end;
 
     const accessibleUserIds = accessibleUsers.map((user) => user.id);
+    const justificadas = await this.justificacionesPorPersona(accessibleUserIds, from, to, tenantId);
     const evidenceRows = await this.prisma.evidence.findMany({
       where: {
         userId: { in: accessibleUserIds },
@@ -1182,6 +1212,8 @@ export class AttendanceService {
             accesoContabilidad: Boolean(user.role?.accesoContabilidad),
           },
           isSuperAdmin: this.isSuperAdminEmail(user.email),
+          /** Días sin checada que Christian justificó: se muestran como «Falta justificada · motivo». */
+          justificaciones: justificadas.get(user.id) ?? [],
           totalMinutes,
           workDays,
           avgMinutesPerDay:

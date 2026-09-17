@@ -129,6 +129,10 @@ export type TeamEvidenceMember = {
    * Opcional: una API anterior a la geocerca no lo manda.
    */
   alertasZona?: GeocercaAlerta[];
+  /** Se la pasaron a otro compañero (API nueva; opcional para APIs anteriores). */
+  pasadaA?: { userId: number; nombre: string; motivo: string | null; at: string; por: string | null } | null;
+  /** «Avance anterior de <nombre>»: su evidencia parcial es solo lectura. */
+  avanceAnterior?: string | null;
   evidence: TeamEvidence | null;
 };
 

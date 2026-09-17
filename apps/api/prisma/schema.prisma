@@ -555,6 +555,7 @@ model User {
   actividadesCreadas        Activity[]                 @relation("CreadorActividades")
   actividadesAsignadas      Activity[]                 @relation("ResponsableActividades")
   actividadesAcsEntrada     Activity[]                 @relation("ActivityAcsEnteredBy")
+  actividadesCanceladas     Activity[]                 @relation("ActivityCancelledBy")
   evidencias                Evidence[]
   evidenciasAprobadas       Evidence[]                 @relation("EvidenceApprover")
   vehiculosRevisados        VehicleControl[]           @relation("VehicleDeliveryReviewer")
@@ -569,6 +570,8 @@ model User {
   viaticosAsignados         Viatico[]                  @relation("ViaticoAsignadoPor")
   attendances               Attendance[]
   attendanceDays            AttendanceDay[]
+  faltasJustificadas        AttendanceJustification[]  @relation("AttendanceJustificationUser")
+  faltasJustificadasPor     AttendanceJustification[]  @relation("AttendanceJustificationAuthor")
   lunchBreaks               LunchBreak[]
   employeePayments          EmployeePayment[]
   employeePaymentsCreated   EmployeePayment[]          @relation("EmployeePaymentCreator")
@@ -916,6 +919,11 @@ model Activity {
   /// Salida ACS / bandera «salió del sitio».
   acsExitedAt             DateTime?
   acsLeftSite             Boolean                  @default(false)
+  /// Cancelación documentada: solo superiores de quien la ejecuta, con motivo obligatorio.
+  cancelReason            String?                  @db.Text
+  cancelledAt             DateTime?
+  cancelledById           Int?
+  cancelledBy             User?                    @relation("ActivityCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
   deletedAt               DateTime?
   companyId               Int
   company                 CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -1463,6 +1471,25 @@ model AttendanceDay {
 
   @@unique([companyId, userId, date])
   @@index([companyId])
+}
+
+/// Falta justificada: Christian marca un día sin checada como justificado, con motivo.
+/// No crea checadas ni jornada: el día se muestra como «Falta justificada · motivo».
+model AttendanceJustification {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  companyId     Int
+  date          DateTime       @db.Date
+  reason        String         @db.Text
+  justifiedById Int?
+  createdAt     DateTime       @default(now())
+  user          User           @relation("AttendanceJustificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  justifiedBy   User?          @relation("AttendanceJustificationAuthor", fields: [justifiedById], references: [id], onDelete: SetNull)
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, date])
+  @@index([companyId, date])
+  @@map("attendance_justifications")
 }
 
 model LunchBreak {
@@ -2402,6 +2429,8 @@ enum NotificationType {
   SLA_BREACH
   // Actividad: la persona salió del radio del punto donde inició
   ACTIVITY_OUT_OF_ZONE
+  /// Un superior canceló la actividad (con motivo).
+  ACTIVITY_CANCELLED
   // Celebraciones del equipo (tarea diaria de las 8:00)
   BIRTHDAY
   WORK_ANNIVERSARY
@@ -5053,6 +5082,7 @@ model CompanyProfile {
   leaveRequests              LeaveRequest[]
   attendances                Attendance[]
   attendanceDays             AttendanceDay[]
+  attendanceJustifications   AttendanceJustification[]
   lunchBreaks                LunchBreak[]
   newsPosts                  NewsPost[]
   pageContents               PageContent[]
