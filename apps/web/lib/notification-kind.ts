@@ -27,6 +27,7 @@ export type NotificationKind =
   | "vencida"
   | "fuera_zona"
   | "cancelada"
+  | "falta_justificada"
   | "cliente"
   | "chat"
   | "ubicacion"
@@ -69,6 +70,8 @@ export function notificationKind(category?: string | null, title?: string | null
   }
   // SALES_CLIENT_CREATED (push `icon: cliente`): «Ana López agregó el cliente Plaza Dorada».
   if (t.includes("agrego el cliente") || (c === "sales" && t.includes("nuevo cliente"))) return "cliente";
+  // ATTENDANCE_ABSENCE (push `icon: falta_justificada`): «Tu falta del jue 17 sep quedó justificada».
+  if (t.includes("falta del") && t.includes("justificada")) return "falta_justificada";
   if (c.startsWith("lunch") || t.includes("comida")) return "comida";
   if (c === "sla-breach" || t.includes("vencid")) return "vencida";
   if (c === "sla-alert" || t.includes("atras") || t.includes("retras")) return "atraso";
