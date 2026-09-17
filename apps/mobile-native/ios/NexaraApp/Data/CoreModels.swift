@@ -161,6 +161,157 @@ enum CoreEvidence {
     static func ratingLabel(_ value: Int) -> String {
         ratingLabels.indices.contains(value) ? ratingLabels[value] : ""
     }
+
+    // MARK: Evidencia por campos
+    //
+    // Un «campo» es una cosa concreta que hay que fotografiar («Cámara 1»,
+    // «Rack»). Cada campo pide foto en los momentos que diga el API: antes, en
+    // progreso, después, en cualquier combinación. La actividad que no trae
+    // campos se captura como siempre (fotos libres): esto queda inerte.
+
+    static let momentoAntes = "antes"
+    static let momentoProgreso = "progreso"
+    static let momentoDespues = "despues"
+
+    /// Orden en que se piden y se pintan.
+    static let momentos = [momentoAntes, momentoProgreso, momentoDespues]
+
+    /// Acepta lo que mande el API: «ANTES », «en progreso», «después».
+    static func normMomento(_ raw: String?) -> String? {
+        switch (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "antes": return momentoAntes
+        case "progreso", "en progreso", "durante": return momentoProgreso
+        case "despues", "después": return momentoDespues
+        default: return nil
+        }
+    }
+
+    static func momentoLabel(_ raw: String?) -> String {
+        guard let momento = normMomento(raw) else {
+            return (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        switch momento {
+        case momentoAntes: return "Antes"
+        case momentoProgreso: return "En progreso"
+        default: return "Después"
+        }
+    }
+
+    /// Momentos que pide el campo, sin repetidos y en el orden de `momentos`.
+    static func momentosPedidos(of campo: EvidenceCampo) -> [String] {
+        let pedidos = Set((campo.momentos ?? []).compactMap { normMomento($0) })
+        return momentos.filter { pedidos.contains($0) }
+    }
+
+    /// Por `orden`, y a igualdad por id: el API puede mandarlos como sea.
+    static func ordered(_ campos: [EvidenceCampo]?) -> [EvidenceCampo] {
+        (campos ?? []).sorted {
+            let a = ($0.orden ?? Int.max, $0.id ?? Int.max)
+            let b = ($1.orden ?? Int.max, $1.id ?? Int.max)
+            return a < b
+        }
+    }
+
+    static func campoName(_ campo: EvidenceCampo) -> String {
+        let nombre = (campo.nombre ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !nombre.isEmpty { return nombre }
+        if let id = campo.id { return "Campo \(id)" }
+        return "Campo"
+    }
+
+    /// URL ya guardada en ese momento; `nil` si el hueco sigue vacío.
+    static func photo(of campo: EvidenceCampo, momento: String) -> String? {
+        let url: String?
+        switch normMomento(momento) {
+        case momentoAntes: url = campo.fotos?.antes
+        case momentoProgreso: url = campo.fotos?.progreso
+        case momentoDespues: url = campo.fotos?.despues
+        default: url = nil
+        }
+        let text = (url ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
+    static func missingMomentos(of campo: EvidenceCampo) -> [String] {
+        momentosPedidos(of: campo).filter { photo(of: campo, momento: $0) == nil }
+    }
+
+    static func isCampoDone(_ campo: EvidenceCampo) -> Bool {
+        missingMomentos(of: campo).isEmpty
+    }
+
+    /// Huecos obligatorios que faltan en toda la actividad.
+    static func missingCampoPhotos(_ campos: [EvidenceCampo]?) -> Int {
+        (campos ?? []).reduce(0) { $0 + missingMomentos(of: $1).count }
+    }
+
+    static func requiredCampoPhotos(_ campos: [EvidenceCampo]?) -> Int {
+        (campos ?? []).reduce(0) { $0 + momentosPedidos(of: $1).count }
+    }
+
+    /// Sin campos (API de hoy) nada bloquea; con campos, la salida espera.
+    static func camposDone(_ campos: [EvidenceCampo]?) -> Bool {
+        missingCampoPhotos(campos) == 0
+    }
+
+    /// «4 de 6 fotos por campo».
+    static func camposSummary(_ campos: [EvidenceCampo]?) -> String {
+        let total = requiredCampoPhotos(campos)
+        let hechas = total - missingCampoPhotos(campos)
+        return "\(hechas) de \(total) fotos por campo"
+    }
+
+    /// Por qué la foto de salida está bloqueada; `nil` si ya se puede cerrar.
+    static func exitBlockedByCampos(_ campos: [EvidenceCampo]?) -> String? {
+        let faltan = missingCampoPhotos(campos)
+        if faltan == 0 { return nil }
+        if faltan == 1 { return "Falta 1 foto por campo antes de cerrar la actividad." }
+        return "Faltan \(faltan) fotos por campo antes de cerrar la actividad."
+    }
+
+    /// Fotos ya tomadas por campo, en orden (campo y momento).
+    static func campoPhotoUrls(_ campos: [EvidenceCampo]?) -> [String] {
+        ordered(campos).flatMap { campo in
+            momentosPedidos(of: campo).compactMap { photo(of: campo, momento: $0) }
+        }
+    }
+
+    /// El POST responde con el campo actualizado; lo que no mande se conserva.
+    static func merge(_ previo: EvidenceCampo, with nuevo: EvidenceCampo?) -> EvidenceCampo {
+        guard let nuevo else { return previo }
+        return EvidenceCampo(
+            id: nuevo.id ?? previo.id,
+            nombre: nuevo.nombre ?? previo.nombre,
+            orden: nuevo.orden ?? previo.orden,
+            momentos: nuevo.momentos ?? previo.momentos,
+            fotos: EvidenceCampoFotos(
+                antes: nuevo.fotos?.antes ?? previo.fotos?.antes,
+                progreso: nuevo.fotos?.progreso ?? previo.fotos?.progreso,
+                despues: nuevo.fotos?.despues ?? previo.fotos?.despues
+            )
+        )
+    }
+
+    /// Marca el hueco como tomado aunque el API no devuelva la URL (o no haya red).
+    static func marking(_ campo: EvidenceCampo, momento: String, url: String) -> EvidenceCampo {
+        let fotos = campo.fotos ?? EvidenceCampoFotos(antes: nil, progreso: nil, despues: nil)
+        var antes = fotos.antes
+        var progreso = fotos.progreso
+        var despues = fotos.despues
+        switch normMomento(momento) {
+        case momentoAntes: antes = antes ?? url
+        case momentoProgreso: progreso = progreso ?? url
+        case momentoDespues: despues = despues ?? url
+        default: break
+        }
+        return EvidenceCampo(
+            id: campo.id,
+            nombre: campo.nombre,
+            orden: campo.orden,
+            momentos: campo.momentos,
+            fotos: EvidenceCampoFotos(antes: antes, progreso: progreso, despues: despues)
+        )
+    }
 }
 
 // MARK: - Organización (mismas reglas que el API)
@@ -629,6 +780,26 @@ struct EvidenceFlowActivityInfo: Decodable, Hashable {
     let estatus: String?
 }
 
+/// Un «campo» que hay que fotografiar («Cámara 1», «Rack») y en qué momentos.
+struct EvidenceCampo: Decodable, Hashable {
+    let id: Int?
+    let nombre: String?
+    let orden: Int?
+    /// antes | progreso | despues
+    let momentos: [String]?
+    let fotos: EvidenceCampoFotos?
+
+    /// Clave estable para `ForEach` aunque el API no mande id.
+    var rowKey: String { "\(id ?? 0)-\(nombre ?? "")" }
+}
+
+/// URL de lo ya guardado en cada momento; el hueco que falta viene nulo.
+struct EvidenceCampoFotos: Decodable, Hashable {
+    let antes: String?
+    let progreso: String?
+    let despues: String?
+}
+
 struct EvidenceFlowState: Decodable, Hashable {
     let id: Int?
     let activityId: Int?
@@ -658,6 +829,9 @@ struct EvidenceFlowState: Decodable, Hashable {
     let progressPct: Double?
     /// Lo que dejaron quienes la tuvieron antes (si se la pasaron a esta persona).
     let avancesAnteriores: ActivityPreviousProgressList?
+    /// Evidencia por campos. Nulo o vacío contra la API de hoy: entonces la
+    /// captura sigue siendo la de siempre (fotos libres).
+    let campos: [EvidenceCampo]?
 
     var previousProgress: [ActivityPreviousProgress] { avancesAnteriores?.items ?? [] }
     var isCorrection: Bool { reviewStatus == "REJECTED" }

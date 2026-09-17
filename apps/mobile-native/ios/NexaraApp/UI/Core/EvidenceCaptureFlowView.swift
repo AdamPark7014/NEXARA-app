@@ -11,6 +11,9 @@ struct CorePdfItem: Identifiable {
 private struct CameraRequest: Identifiable {
     let id = UUID()
     let step: String
+    /// Evidencia por campos: qué campo y en qué momento se está fotografiando.
+    var campoId: Int? = nil
+    var momento: String? = nil
 }
 
 /// Captura de evidencias del ejecutor, paridad con `ActivityEvidenceFlow` web:
@@ -18,6 +21,12 @@ private struct CameraRequest: Identifiable {
 /// SERVICE_SHEET_DATA (formulario real por tipo) → EXIT_PHOTO. Cámara en vivo
 /// con GPS en cada foto (entrada y salida obligatoria) y modo corrección: si te
 /// devolvieron pasos, solo esos se rehacen vía `resubmit`.
+///
+/// **Evidencia por campos.** Si la actividad trae `campos`, las fotos en sitio
+/// dejan de ser libres: cada campo («Cámara 1», «Rack») pide foto en los
+/// momentos que marque el API — antes, en progreso, después — y la foto de
+/// salida no se habilita hasta que no falte ninguna. La actividad sin campos se
+/// captura exactamente igual que antes.
 struct EvidenceCaptureFlowView: View {
     let activityId: Int
     var fallbackCoreKind: String? = nil
@@ -47,6 +56,10 @@ struct EvidenceCaptureFlowView: View {
     @State private var checkingExitZone = false
     /// Motivo por el que no se puede tomar la salida (fuera de la zona o 400 del API).
     @State private var exitBlocked: String?
+    /// Evidencia por campos: vacío contra la API de hoy (el flujo no cambia).
+    @State private var campos: [EvidenceCampo] = []
+    /// Miniatura local del hueco recién tomado, mientras no vuelve el GET.
+    @State private var campoThumbs: [String: UIImage] = [:]
 
     // MARK: Derivados
 
@@ -76,6 +89,16 @@ struct EvidenceCaptureFlowView: View {
     }
 
     private var questionKeys: Set<String> { ["queSeHizo", "queHiciste"] }
+
+    /// La actividad se captura por campos (y no con fotos libres).
+    private var porCampos: Bool { !campos.isEmpty }
+
+    /// Texto de bloqueo de la salida por campos incompletos; `nil` si ya se puede.
+    private var camposBlockingExit: String? { CoreEvidence.exitBlockedByCampos(campos) }
+
+    private func campoSlotKey(_ campoId: Int?, _ momento: String) -> String {
+        "\(campoId ?? 0):\(momento)"
+    }
 
     private var formComplete: Bool {
         let fields = CoreEvidence.formFields(for: coreKind)
@@ -120,6 +143,13 @@ struct EvidenceCaptureFlowView: View {
                     Text(loadError).font(.footnote).foregroundStyle(CorePalette.red)
                 }
                 statusBanner
+                // El avance lo calcula el API; aquí solo se pinta.
+                if let pct = flow?.progressPct {
+                    CoreProgressBar(percent: pct)
+                }
+                if porCampos {
+                    camposCard
+                }
                 if let indicaciones = flow?.assigneeIndicaciones ?? flow?.activity?.indicaciones, !indicaciones.isEmpty {
                     NxIconText(systemName: "text.bubble", text: indicaciones)
                         .font(.footnote)
@@ -183,6 +213,116 @@ struct EvidenceCaptureFlowView: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: Evidencia por campos
+
+    /// Lista de campos con sus huecos: uno vacío abre la cámara, uno lleno
+    /// enseña la miniatura y se puede volver a tomar.
+    private var camposCard: some View {
+        let faltan = CoreEvidence.missingCampoPhotos(campos)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "camera.on.rectangle")
+                    .symbolRenderingMode(.hierarchical)
+                Text("Fotos por campo").font(.subheadline.weight(.bold))
+                Spacer()
+                CoreChip(
+                    text: faltan == 0 ? "Completo" : "Faltan \(faltan)",
+                    color: faltan == 0 ? CorePalette.green : CorePalette.orange
+                )
+            }
+            Text(CoreEvidence.camposSummary(campos))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(faltan == 0 ? CorePalette.green : Color.secondary)
+            ForEach(CoreEvidence.ordered(campos), id: \.rowKey) { campo in
+                campoRow(campo)
+            }
+        }
+        .coreCard(highlight: faltan == 0 ? nil : CorePalette.orange)
+    }
+
+    @ViewBuilder
+    private func campoRow(_ campo: EvidenceCampo) -> some View {
+        let momentos = CoreEvidence.momentosPedidos(of: campo)
+        if !momentos.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(CoreEvidence.campoName(campo))
+                        .font(.footnote.weight(.bold))
+                    Spacer()
+                    if CoreEvidence.isCampoDone(campo) {
+                        CoreChip(text: "Listo", color: CorePalette.green)
+                    } else {
+                        CoreChip(
+                            text: "Faltan \(CoreEvidence.missingMomentos(of: campo).count)",
+                            color: CorePalette.orange
+                        )
+                    }
+                }
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(momentos, id: \.self) { momento in
+                        campoSlot(campo, momento: momento)
+                    }
+                    // Los campos de menos de tres momentos no estiran los huecos.
+                    if momentos.count < CoreEvidence.momentos.count {
+                        ForEach(0..<(CoreEvidence.momentos.count - momentos.count), id: \.self) { _ in
+                            Color.clear.frame(maxWidth: .infinity).frame(height: 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func campoSlot(_ campo: EvidenceCampo, momento: String) -> some View {
+        let url = CoreEvidence.photo(of: campo, momento: momento)
+        let thumb = campoThumbs[campoSlotKey(campo.id, momento)]
+        let taken = url != nil || thumb != nil
+        let canCapture = loaded && !busy && !isApproved && !isLocked && campo.id != nil
+        return VStack(spacing: 4) {
+            Button {
+                guard let campoId = campo.id else { return }
+                errorText = nil
+                message = nil
+                camera = CameraRequest(step: CoreEvidence.evidencePhotos, campoId: campoId, momento: momento)
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(taken ? Color.black : Color.secondary.opacity(0.14))
+                    if let thumb {
+                        Image(uiImage: thumb)
+                            .resizable()
+                            .scaledToFill()
+                    } else if let url {
+                        AuthenticatedImage(url: url)
+                    } else {
+                        Image(systemName: "camera.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(height: 84)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(taken ? CorePalette.green : Color.secondary.opacity(0.3), lineWidth: 1)
+                )
+                .overlay(alignment: .topTrailing) {
+                    if taken {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(Color.white, CorePalette.green)
+                            .padding(4)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(!canCapture)
+            Text(CoreEvidence.momentoLabel(momento))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(taken ? Color.primary : Color.secondary)
+        }
     }
 
     private func stepTitle(_ step: String) -> String {
