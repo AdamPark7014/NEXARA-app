@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
 import { workDayBounds } from '../common/time/workday.js';
 import { isCeoEquivalentEmail, isNonEmployeeEmail } from '../common/platform-accounts.js';
+import { esDeTodaLaEmpresa, extrasDeTablero, subarbolIds, tiposVisibles } from './equipo-alcance.js';
 
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
 /**
@@ -124,7 +125,7 @@ export class TeamBoardService {
     if (userIds.length === 0) {
       return { scope: companyWide ? 'company' : 'subtree', users: [] };
     }
-    const users = await this.buildCards(scoped, userIds, companyId, now);
+    const users = await this.buildCards(scoped, userIds, companyId, now, tiposVisibles(viewer));
     return { scope: companyWide ? 'company' : 'subtree', users };
   }
 
@@ -136,7 +137,7 @@ export class TeamBoardService {
     const { scoped, now } = await this.resolveScope(viewer, companyId);
     const target = scoped.find((u) => u.id === userId);
     if (!target) throw new NotFoundException('Usuario fuera de tu alcance');
-    const [card] = await this.buildCards([target], [userId], companyId, now);
+    const [card] = await this.buildCards([target], [userId], companyId, now, tiposVisibles(viewer));
     return card;
   }
 
@@ -171,8 +172,9 @@ export class TeamBoardService {
     });
     for (const a of asLead) ids.add(a.id);
 
+    const tipos = tiposVisibles(viewer);
     const activities = await this.prisma.activity.findMany({
-      where: { id: { in: [...ids] }, deletedAt: null },
+      where: { id: { in: [...ids] }, deletedAt: null, ...(tipos ? { coreKind: { in: tipos } } : {}) },
       select: {
         id: true,
         anNumber: true,
@@ -294,6 +296,8 @@ export class TeamBoardService {
     userIds: number[],
     companyId: number | null,
     now: Date,
+    /** Solo estos tipos de actividad (`coreKind`); `null` = todos. */
+    tipos: string[] | null = null,
   ): Promise<TeamBoardUser[]> {
     // Día de México: el contenedor corre en UTC y el «hoy» cambiaba a las 18:00.
     const { start: dayStart, end: dayEnd } = workDayBounds(now);
@@ -315,6 +319,7 @@ export class TeamBoardService {
           userId: { in: userIds },
           retiradoAt: null,
           ...(companyId != null ? { companyId } : {}),
+          ...(tipos ? { activity: { coreKind: { in: tipos } } } : {}),
         },
         select: {
           userId: true,
@@ -535,61 +540,18 @@ export class TeamBoardService {
   }
 
   private isCompanyWide(viewer: Viewer): boolean {
-    if (viewer.isSuperAdmin) return true;
-    if (viewer.roleKey === 'ceo') return true;
-    const email = (viewer.email || '').toLowerCase();
-    return isCeoEquivalentEmail(email) || email === 'developer@nexara.com.mx';
+    return esDeTodaLaEmpresa(viewer);
   }
 
-  /**
-   * Gente que debe verse en pizarra aunque managerId no los cuelgue del viewer.
-   * Luis (coord. servicios) → Antonio + soporte; Antonio → Carolina/Alejandro.
-   */
+  /** Flujo de despacho que no cuelga del organigrama (ver `equipo-alcance.ts`). */
   private boardExtraEmails(viewerEmail?: string | null): string[] {
-    const email = (viewerEmail || '').trim().toLowerCase();
-    if (email === 'direccion.operaciones@nexara.com.mx') {
-      return [
-        'jose.ramirez@nexara.com.mx',
-        'soporte@nexara.com.mx',
-        'alejandro.gonzalez@nexara.com.mx',
-        'roberto.vivanco@nexara.com.mx',
-      ];
-    }
-    if (email === 'jose.ramirez@nexara.com.mx') {
-      return ['soporte@nexara.com.mx', 'alejandro.gonzalez@nexara.com.mx', 'roberto.vivanco@nexara.com.mx'];
-    }
-    // David: instaladores de campo (por si managerId local no coincide con el seed)
-    if (email === 'operaciones@nexara.com.mx') {
-      return [
-        'joan.sanchez@nexara.com.mx',
-        'israel.ramos@nexara.com.mx',
-        'juan.gonzalez@nexara.com.mx',
-      ];
-    }
-    return [];
+    return extrasDeTablero(viewerEmail);
   }
 
   private subtreeIds(
     rootId: number,
     users: Array<{ id: number; managerId: number | null }>,
   ): Set<number> {
-    const children = new Map<number, number[]>();
-    for (const u of users) {
-      if (u.managerId == null) continue;
-      const list = children.get(u.managerId) ?? [];
-      list.push(u.id);
-      children.set(u.managerId, list);
-    }
-    const out = new Set<number>([rootId]);
-    const queue = [rootId];
-    while (queue.length) {
-      const id = queue.shift()!;
-      for (const child of children.get(id) ?? []) {
-        if (out.has(child)) continue;
-        out.add(child);
-        queue.push(child);
-      }
-    }
-    return out;
+    return subarbolIds(rootId, users);
   }
 }

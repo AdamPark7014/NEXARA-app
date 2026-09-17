@@ -14,6 +14,7 @@ import {
   REASSIGN_FORBIDDEN,
   type ChainActor,
 } from './activity-superiors.js';
+import { alcanzaA, esDeTodaLaEmpresa, tiposVisibles, type Alcanzador } from '../me/equipo-alcance.js';
 
 /**
  * Equipo de una actividad y su historial de reasignaciones.
@@ -49,6 +50,7 @@ export class ActivityTeamService {
         anNumber: true,
         titulo: true,
         assignmentCharge: true,
+        coreKind: true,
       },
     });
     assertCompanyAccess(activity, companyId, 'Actividad');
@@ -133,6 +135,30 @@ export class ActivityTeamService {
    * Reincorporar a alguien que había salido reactiva su fila en vez de crear
    * una nueva: así el historial de horas de esa persona no se fragmenta.
    */
+  /**
+   * Asignar desde la pizarra o el detalle: solo a gente que alcanzas (tu organigrama o tu flujo de
+   * despacho) y en actividades de los tipos que coordinas. Dirección asigna a cualquiera.
+   * El reparto de despacho (`me/activities/:id/despacho`) ya valida su propio equipo.
+   */
+  async assertPuedeAsignar(actor: Alcanzador, activityId: number, userId: number, companyId?: number | null) {
+    if (esDeTodaLaEmpresa(actor)) return;
+    const tipos = tiposVisibles(actor);
+    if (tipos) {
+      const tenantId = requireCompanyId(companyId);
+      const activity = await this.loadActivity(activityId, tenantId);
+      if (!tipos.includes(String(activity.coreKind ?? ''))) {
+        throw new ForbiddenException('Solo coordinas actividades de tipo servicio');
+      }
+    }
+    const users = await this.prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true, email: true, managerId: true },
+    });
+    if (!alcanzaA(actor, users, userId)) {
+      throw new ForbiddenException('Solo puedes asignar a gente de tu equipo');
+    }
+  }
+
   async addMember(
     activityId: number,
     input: {

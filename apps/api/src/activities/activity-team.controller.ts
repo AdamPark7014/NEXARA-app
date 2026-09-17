@@ -41,12 +41,23 @@ export class ActivityTeamController {
 
   @Post()
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  add(
+  async add(
     @Param('id', ParseIntPipe) activityId: number,
     @Body() body: { userId: number; rol?: AssigneeRole; horasPlan?: number; indicaciones?: string },
     @CurrentCompanyId() companyId: number | null,
     @CurrentUser() user: any,
   ) {
+    await this.service.assertPuedeAsignar(
+      {
+        id: Number(user?.id),
+        email: user?.email ?? null,
+        roleKey: user?.roleKey ?? null,
+        isSuperAdmin: Boolean(user?.isSuperAdmin),
+      },
+      activityId,
+      Number(body?.userId),
+      companyId,
+    );
     return this.service.addMember(activityId, body, companyId, Number(user?.id) || null);
   }
 
