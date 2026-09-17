@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { isCeoEquivalentEmail, isNonEmployeeEmail } from "@/lib/platform-accounts";
 import { buildApiUrl } from "@/lib/api-base";
 import PhoneField from "@/components/PhoneField";
 import KpiCard from "@/components/ui/KpiCard";
@@ -96,6 +97,8 @@ const emptyForm: Profile = {
 export default function MyProfilePage() {
   const { user } = useUser();
   const token = user?.token ?? "";
+  // Dirección (Christian, Claudia) y cuentas de sistema: sin expediente de RH, documentos ni checador.
+  const cuentaDireccion = isCeoEquivalentEmail(user?.email) || isNonEmployeeEmail(user?.email);
 
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [form, setForm] = useState<Profile>({ ...emptyForm });
@@ -154,7 +157,11 @@ export default function MyProfilePage() {
       <PageHeader
         eyebrow="ERP · Mi cuenta"
         title="Mi perfil"
-        subtitle="Tus datos personales, contacto de emergencia y documentos de identidad."
+        subtitle={
+          cuentaDireccion
+            ? "Tus datos de contacto."
+            : "Tus datos personales, contacto de emergencia y documentos de identidad."
+        }
         meta={profile && (
           <>
             <Tag variant="accent" dot>{profile.role?.nombre ?? "—"}</Tag>
@@ -173,13 +180,15 @@ export default function MyProfilePage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
             <KpiCard label="Departamento" value={profile.department?.nombre ?? "—"} icon={<BusinessOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
             <KpiCard label="Rol" value={profile.role?.nombre ?? "—"} icon={<BadgeOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant="accent" />
-            <KpiCard label="Perfil completo" value={`${completeness}%`} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={completeness >= 80 ? "positive" : completeness >= 50 ? "warning" : "danger"} hint="Campos personales" />
+            {!cuentaDireccion && (
+              <KpiCard label="Perfil completo" value={`${completeness}%`} icon={<AssignmentOutlinedIcon fontSize="inherit" aria-hidden="true" />} variant={completeness >= 80 ? "positive" : completeness >= 50 ? "warning" : "danger"} hint="Campos personales" />
+            )}
             <KpiCard label="Email" value={profile.email} icon={<MailOutlineIcon fontSize="inherit" aria-hidden="true" />} />
           </div>
         );
       })()}
 
-      {!loading && !error && profile && (() => {
+      {!loading && !error && profile && !cuentaDireccion && (() => {
         const sections = [
           { label: "Datos personales", fields: [form.telefono, form.fechaNacimiento, form.ciudad, form.estado] },
           { label: "Documentos", fields: [form.curp, form.rfc, form.nss] },
@@ -238,6 +247,7 @@ export default function MyProfilePage() {
             </div>
           </Section>
 
+          {!cuentaDireccion && (
           <Section
             title="Acceso y asistencia (hoy)"
             subtitle="El checador de la app es el que cuenta para tu nómina."
@@ -279,11 +289,16 @@ export default function MyProfilePage() {
               </p>
             )}
           </Section>
+          )}
 
-          <Section title="Datos personales" subtitle="Solo tú y RH/Dirección pueden ver esta información.">
+          <Section
+            title={cuentaDireccion ? "Contacto" : "Datos personales"}
+            subtitle={cuentaDireccion ? undefined : "Solo tú y RH/Dirección pueden ver esta información."}
+          >
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Teléfono</span>
                 <PhoneField value={form.telefono ?? ""} onChange={(telefono) => setForm((f) => ({ ...f, telefono }))} /></label>
+              {!cuentaDireccion && (<>
               <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Fecha de nacimiento</span>
                 <input type="date" value={form.fechaNacimiento ?? ""} onChange={(e) => setForm((f) => ({ ...f, fechaNacimiento: e.target.value }))} style={inp} /></label>
               <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}><span style={lbl}>Dirección</span>
@@ -304,6 +319,7 @@ export default function MyProfilePage() {
                 <input value={form.ineNumero ?? ""} onChange={(e) => setForm((f) => ({ ...f, ineNumero: e.target.value }))} style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={lbl}>NSS (IMSS)</span>
                 <input value={form.nss ?? ""} onChange={(e) => setForm((f) => ({ ...f, nss: e.target.value }))} style={inp} /></label>
+              </>)}
             </div>
           </Section>
 
@@ -321,7 +337,7 @@ export default function MyProfilePage() {
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? "Guardando…" : "Guardar cambios"}</Button>
-            {saved && <IconLabel icon={CheckIcon} style={{ fontSize: 12.5, color: "var(--success)" }}>Guardado — pendiente de revisión por RH</IconLabel>}
+            {saved && <IconLabel icon={CheckIcon} style={{ fontSize: 12.5, color: "var(--success)" }}>{cuentaDireccion ? "Guardado" : "Guardado — pendiente de revisión por RH"}</IconLabel>}
           </div>
         </>
       )}
