@@ -13,6 +13,7 @@ import {
   BadRequestException,
   Res,
   Query,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -247,8 +248,32 @@ export class ActivitiesController {
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    const actor = user?.id ? { id: user.id, nombre: user.nombre } : undefined;
+    const actor = user?.id ? { id: user.id, nombre: user.nombre, email: user.email ?? null } : undefined;
     return this.activitiesService.update(+id, updateActivityDto, actor, companyId);
+  }
+
+  /**
+   * Cancelar con motivo (mín. 10 caracteres). Guard amplio a propósito: quién puede (superiores de
+   * quien la ejecuta, incluido un encargado sin ACTIVITIES_MANAGE) lo decide el servicio.
+   */
+  @Post(':id/cancelar')
+  @UseGuards(RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.CONSOLE_ADMIN,
+    ],
+  })
+  cancel(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { motivo?: string },
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const actor = user?.id ? { id: user.id, nombre: user.nombre, email: user.email ?? null } : undefined;
+    return this.activitiesService.cancel(id, body?.motivo, actor, companyId);
   }
 
   /** Ingeniero de campo: actualizar estatus de su propia OT (iniciar/finalizar). */
@@ -276,7 +301,7 @@ export class ActivitiesController {
     if (body.estatus) allowed.estatus = body.estatus;
     if (body.fechaInicio) allowed.fechaInicio = body.fechaInicio;
     if (body.fechaFinalizacion) allowed.fechaFinalizacion = body.fechaFinalizacion;
-    const actor = user?.id ? { id: user.id, nombre: user.nombre } : undefined;
+    const actor = user?.id ? { id: user.id, nombre: user.nombre, email: user.email ?? null } : undefined;
     return this.activitiesService.update(+id, allowed, actor, companyId);
   }
 

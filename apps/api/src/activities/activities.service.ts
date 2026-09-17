@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
@@ -8,6 +8,14 @@ import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagina
 import { generateTicketReportPdf } from './ticket-report-pdf.js';
 import { generateActivitiesReportPdf } from './activities-report-pdf.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { ACTIVITY_STATUS, isFinishedStatus } from './activity-status.js';
+import {
+  assertCanCancel,
+  cleanMotivo,
+  isCancelledStatus,
+  loadActivityChain,
+  MOTIVO_MINIMO,
+} from './activity-superiors.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -392,6 +400,7 @@ export class ActivitiesService {
         },
         project: { select: { id: true, title: true } },
         serviceSheet: true,
+        cancelledBy: { select: { id: true, nombre: true } },
         evidencias: { orderBy: { subidoEn: 'desc' } },
         assignees: {
           where: { retiradoAt: null },
@@ -879,10 +888,77 @@ export class ActivitiesService {
     });
   }
 
+  /**
+   * Cancelar con motivo documentado. Solo superiores de quien la ejecuta (jefes por organigrama,
+   * responsable o creador que no la ejecutan, encargado que la repartió, Christian). Cualquier
+   * camino que ponga «Cancelada» pasa por aquí: el PATCH genérico y el de ejecución también.
+   */
+  async cancel(
+    id: number,
+    motivoRaw: unknown,
+    actor: { id: number; nombre?: string; email?: string | null } | undefined,
+    companyId?: number | null,
+  ) {
+    if (!actor?.id) throw new ForbiddenException('Usuario no autenticado');
+    const chain = await loadActivityChain(this.prisma, id, companyId);
+    // Primero el permiso: a quien no le toca no se le pide motivo.
+    assertCanCancel(actor, chain);
+    if (isCancelledStatus(chain.estatus)) {
+      throw new BadRequestException('La actividad ya estaba cancelada');
+    }
+    if (isFinishedStatus(chain.estatus)) {
+      throw new BadRequestException('La actividad ya está finalizada; no se puede cancelar');
+    }
+    const motivo = cleanMotivo(motivoRaw);
+    if (!motivo) {
+      throw new BadRequestException(`Escribe el motivo de la cancelación (mínimo ${MOTIVO_MINIMO} caracteres)`);
+    }
+
+    const now = new Date();
+    const updated = await this.prisma.activity.update({
+      where: { id },
+      data: {
+        estatus: ACTIVITY_STATUS.CANCELADA,
+        cancelReason: motivo,
+        cancelledAt: now,
+        cancelledById: actor.id,
+      },
+      include: {
+        responsable: { select: { nombre: true, id: true } },
+        cancelledBy: { select: { id: true, nombre: true } },
+      },
+    });
+
+    void Promise.resolve(
+      this.notificationHierarchy.notifyActivityCancelled?.({
+        activityId: id,
+        actorId: actor.id,
+        motivo,
+      }),
+    ).catch(() => undefined);
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'ACTIVITY',
+      entityId: id,
+      companyId: chain.companyId,
+      userId: actor.id,
+      payload: {
+        estatus: updated.estatus,
+        anNumber: updated.anNumber,
+        titulo: updated.titulo,
+        responsableId: updated.responsableId,
+        prevEstatus: chain.estatus,
+        cancelReason: motivo,
+      },
+    });
+
+    return updated;
+  }
+
   async update(
     id: number,
     updateActivityDto: UpdateActivityDto,
-    actor?: { id: number; nombre?: string },
+    actor?: { id: number; nombre?: string; email?: string | null },
     companyId?: number | null,
   ) {
     const prev = await this.prisma['activity'].findFirst({
@@ -898,6 +974,24 @@ export class ActivitiesService {
       },
     });
     assertCompanyAccess(prev, companyId, 'Actividad');
+
+    // La cancelación documentada no se puede saltar editando el estatus.
+    const { cancelReason, ...rest } = updateActivityDto;
+    if (updateActivityDto.estatus !== undefined && isCancelledStatus(updateActivityDto.estatus)) {
+      if (!isCancelledStatus(prev.estatus)) {
+        const otros = Object.entries(rest).filter(([k, v]) => k !== 'estatus' && v !== undefined);
+        const cancelled = await this.cancel(id, cancelReason, actor, companyId);
+        if (otros.length === 0) return cancelled;
+      }
+      updateActivityDto = { ...rest };
+      delete updateActivityDto.estatus;
+    } else {
+      updateActivityDto = rest;
+      if (updateActivityDto.estatus !== undefined && isCancelledStatus(prev.estatus)) {
+        // Reabrir una cancelada es decisión de los mismos superiores.
+        assertCanCancel(actor, await loadActivityChain(this.prisma, id, companyId));
+      }
+    }
 
     if (updateActivityDto.fechaInicio != null && updateActivityDto.fechaInicio !== '') {
       const start = new Date(updateActivityDto.fechaInicio);

@@ -1198,6 +1198,59 @@ export class NotificationHierarchyService {
     }
   }
 
+  /**
+   * Un superior canceló la actividad: «Mantenimiento de CCTV fue cancelada · motivo». Lo reciben
+   * quienes la ejecutaban (y quien salió del equipo no), el responsable, quien la creó, los jefes
+   * por organigrama de cada uno y Christian. Nadie recibe su propio aviso.
+   */
+  async notifyActivityCancelled(params: { activityId: number; actorId: number; motivo: string }) {
+    const { activityId, actorId } = params;
+    try {
+      const [activity, team] = await Promise.all([
+        this.prisma.activity.findUnique({
+          where: { id: activityId },
+          select: { titulo: true, responsableId: true, creadoPorId: true, client: { select: { name: true } } },
+        }),
+        this.prisma.activityAssignee.findMany({
+          where: { activityId, retiradoAt: null },
+          select: { userId: true },
+        }),
+      ]);
+      if (!activity) return;
+      const personas = new Set<number>([activity.responsableId, ...team.map((t) => t.userId)]);
+      const targets = new Set<number>(personas);
+      if (activity.creadoPorId) targets.add(activity.creadoPorId);
+      for (const id of personas) {
+        for (const jefe of await this.lunchReviewerIds(id)) targets.add(jefe);
+      }
+      for (const ceo of await this.getCeoUserIds()) targets.add(ceo);
+      targets.delete(actorId);
+
+      const quien = persona(await this.resolveActorName(actorId));
+      const title = `${nombreActividad(activity.titulo)} fue cancelada`;
+      const message = unir(`Motivo: ${params.motivo.trim().slice(0, 200)}`, `${quien} la canceló`, activity.client?.name);
+      for (const userId of targets) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'ACTIVITY_CANCELLED',
+          category: 'activities',
+          title,
+          message,
+          icon: 'cancelada',
+          triggerUserId: actorId,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/erp/actividades/${activityId}/historial`,
+          priority: 'high',
+          channel: 'ops',
+          dedupeSeconds: 0,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityCancelled', error);
+    }
+  }
+
   /** Reprogramación de día/hora: responsable, equipo y Christian (menos quien la movió). */
   async notifyActivityRescheduled(params: {
     activityId: number;
