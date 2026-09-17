@@ -17,6 +17,22 @@ class NotificationEventIconsTest {
     }
 
     @Test
+    fun alertaDeAsistenciaTieneIconoPropioYRojo() {
+        // Contrato A: ATTENDANCE_FLAGGED (ubicación simulada, fuera de sitio, cierre automático).
+        assertEquals(R.drawable.ic_nx_location_off, NotificationEventIcons.glyphRes("asistencia_alerta"))
+        assertEquals(NotificationEventIcons.RED, NotificationEventIcons.color("asistencia_alerta"))
+    }
+
+    @Test
+    fun rechazoYExcesoDeTiempoTienenSuGlifo() {
+        // Contrato B: ACTIVITY_REJECTED_BY_ASSIGNEE (rojo) y ACTIVITY_OVERTIME (ámbar).
+        assertEquals(R.drawable.ic_nx_event_busy, NotificationEventIcons.glyphRes("actividad_rechazada"))
+        assertEquals(NotificationEventIcons.RED, NotificationEventIcons.color("actividad_rechazada"))
+        assertEquals(R.drawable.ic_nx_hourglass_top, NotificationEventIcons.glyphRes("exceso_tiempo"))
+        assertEquals(NotificationEventIcons.AMBER, NotificationEventIcons.color("exceso_tiempo"))
+    }
+
+    @Test
     fun iconosNuevosDelServidorNoCaenEnLaCampana() {
         listOf("cancelada", "falta_justificada", "cliente").forEach { icon ->
             assertNotEquals(icon, R.drawable.ic_nx_notifications, NotificationEventIcons.glyphRes(icon))

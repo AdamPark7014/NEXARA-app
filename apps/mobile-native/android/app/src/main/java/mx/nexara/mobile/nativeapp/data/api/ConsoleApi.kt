@@ -106,6 +106,16 @@ data class ActivityDto(
     val cancelReason: String? = null,
     val cancelledAt: String? = null,
     val cancelledBy: ActivityPersonRefDto? = null,
+    // ── Contrato B en el detalle; opcionales (la API vieja no los manda).
+    /** PENDIENTE | ACEPTADA | RECHAZADA — lo de quien consulta. */
+    val aceptacion: String? = null,
+    val motivoRechazo: String? = null,
+    /** rojo | amarillo | verde */
+    val semaforo: String? = null,
+    val minutosPlan: Double? = null,
+    val minutosReales: Double? = null,
+    val excedida: Boolean? = null,
+    val asignadoPor: ActivityPersonRefDto? = null,
 )
 
 /** `{ id, nombre }` con nombre opcional: una persona borrada no debe tumbar el detalle. */
@@ -302,6 +312,28 @@ data class AttendanceEventDto(
     val entryLongitude: Any? = null,
     val exitLatitude: Any? = null,
     val exitLongitude: Any? = null,
+    // ── Contrato A (asistencia confiable); todo opcional: la API vieja no los manda.
+    /** OK | PENDIENTE | REVISAR */
+    val validacion: String? = null,
+    val motivoValidacion: String? = null,
+    val fueraDeSitio: Boolean? = null,
+    val distanciaSitioM: Int? = null,
+    val sitioNombre: String? = null,
+    /** Se capturó sin conexión y se mandó después. */
+    val offline: Boolean? = null,
+    /** La salida la puso la tarea de las 23:30, no la persona. */
+    val cierreAutomatico: Boolean? = null,
+    val accuracyM: Double? = null,
+    val correcciones: List<AttendanceCorreccionDto>? = null,
+)
+
+/** Corrección de una checada (solo dirección y RH): antes → después, con motivo. */
+data class AttendanceCorreccionDto(
+    val antes: String? = null,
+    val despues: String? = null,
+    val motivo: String? = null,
+    val por: ActivityPersonRefDto? = null,
+    val at: String? = null,
 )
 
 /** `null` cuando el valor no es una coordenada real (espejo de `toCoord` en la web). */
@@ -374,11 +406,24 @@ data class AttendanceCurrentDto(
     val lastEntryAt: String? = null,
 )
 
+/**
+ * `POST attendance` — contrato A (asistencia no manipulable).
+ *
+ * La hora que vale es la del servidor: ya no se manda `timestamp`. `capturedAt`
+ * es informativo (la hora del teléfono al capturar) y solo se respeta cuando la
+ * checada viene de la cola sin conexión, que es quien agrega `offline: true` al
+ * cuerpo al reenviarla (ver `OfflineQueueBody`).
+ */
 data class AttendanceRegisterRequest(
     val type: String, // "entrada" | "salida"
-    val timestamp: String? = null,
+    /** Hora del teléfono al capturar (ISO-8601). */
+    val capturedAt: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    /** Precisión del GPS en metros; el servidor marca «Ubicación imprecisa» arriba de 200. */
+    val accuracyM: Double? = null,
+    /** El teléfono detectó ubicación simulada; el servidor contesta 422 y avisa a sus jefes. */
+    val mockLocation: Boolean? = null,
     val photoBase64: String,
 )
 
@@ -387,6 +432,12 @@ data class AttendanceRegisterResponse(
     val type: String? = null,
     val timestamp: String? = null,
     val message: String? = null,
+    /** OK | PENDIENTE | REVISAR (contrato A); ausente en APIs viejas. */
+    val validacion: String? = null,
+    val motivoValidacion: String? = null,
+    val fueraDeSitio: Boolean? = null,
+    val distanciaSitioM: Int? = null,
+    val sitioNombre: String? = null,
 )
 
 /**
@@ -670,6 +721,11 @@ data class ActivityEvidencePhotoStepRequest(
     val photoUrl: String,
     val latitude: Double,
     val longitude: Double,
+    /**
+     * Contrato B: por qué empezó esta y no la de más prioridad que sigue
+     * pendiente. Es opcional — la foto de entrada nunca se bloquea por esto.
+     */
+    val justificacionOrden: String? = null,
 )
 
 data class ActivityEvidencePdfStepRequest(

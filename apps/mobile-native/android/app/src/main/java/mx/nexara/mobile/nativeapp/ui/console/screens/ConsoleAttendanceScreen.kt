@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -51,6 +53,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.SessionUser
+import mx.nexara.mobile.nativeapp.data.api.AttendanceCorreccionDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceCurrentDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceEventDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceJustificacionDto
@@ -112,6 +115,11 @@ data class AttendancePersona(
     val mapaSalida: String?,
     /** Justificación de ese día («Falta justificada · motivo»). */
     val justificacion: AttendanceJustificacionDto? = null,
+    /** Contrato A: «Sin conexión», «Revisar: motivo», «Fuera de sitio · N m», «Cierre automático», «Corregida». */
+    val avisosEntrada: List<AttendanceBadge> = emptyList(),
+    val avisosSalida: List<AttendanceBadge> = emptyList(),
+    /** Correcciones de sus checadas del día (antes → después, con motivo). */
+    val correcciones: List<AttendanceCorreccionDto> = emptyList(),
 )
 
 data class AttendanceUiState(
@@ -121,6 +129,8 @@ data class AttendanceUiState(
     val checkInLoading: Boolean = false,
     val checkInMessage: String? = null,
     val checkInError: Boolean = false,
+    /** 422 «ubicación simulada»: se muestra en un diálogo, no como una línea más. */
+    val checkInBloqueo: String? = null,
     val fecha: String = hoyIso(),
     val filtro: AttendanceEstado? = null,
     val current: AttendanceCurrentDto? = null,
@@ -238,6 +248,9 @@ internal fun mapPersonas(
                 attendanceCoord(salida?.exitLongitude),
             ),
             justificacion = justificacion.takeIf { estado == AttendanceEstado.JUSTIFICADA },
+            avisosEntrada = AttendanceBadges.de(entrada),
+            avisosSalida = AttendanceBadges.de(salida),
+            correcciones = raw.attendances.orEmpty().flatMap { it.correcciones.orEmpty() },
         )
     }
     .sortedWith(
@@ -275,6 +288,8 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
     fun setFiltro(estado: AttendanceEstado?) = _state.update { it.copy(filtro = estado) }
 
     fun clearMessage() = _state.update { it.copy(checkInMessage = null) }
+
+    fun clearBloqueo() = _state.update { it.copy(checkInBloqueo = null) }
 
     fun refresh(initial: Boolean = true) {
         val fecha = _state.value.fecha
@@ -386,24 +401,31 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         type,
                         lat = coords?.lat,
                         lng = coords?.lng,
+                        accuracyM = coords?.accuracyM,
+                        // Se manda aunque sea true: el servidor la rechaza y avisa a sus jefes.
+                        mockLocation = coords?.mock == true,
                         photoBase64 = photoBase64,
                     )
                 }
                 val gpsNota = if (type == "entrada") encenderGps() else apagarGps()
                 val base = res.message
                     ?: if (type == "entrada") "Entrada registrada" else "Salida registrada"
-                val geo = when {
-                    coords == null -> " (sin GPS — activa ubicación)"
-                    coords.accuracyM != null && coords.accuracyM > 100f ->
-                        " · GPS ±${coords.accuracyM.toInt()}m (baja precisión)"
-                    coords.accuracyM != null -> " · GPS ±${coords.accuracyM.toInt()}m"
-                    else -> " · GPS ok"
-                }
+                val geo = AttendanceCheckIn.notaGps(
+                    hayCoords = coords != null,
+                    accuracyM = coords?.accuracyM,
+                    mock = coords?.mock == true,
+                )
+                val aviso = AttendanceBadges.deRegistro(res)
+                    .takeIf { it.isNotEmpty() }
+                    ?.joinToString(" · ") { it.texto }
+                    ?.let { " · $it" }
+                    .orEmpty()
                 _state.update {
                     it.copy(
                         checkInLoading = false,
-                        checkInMessage = base + geo + gpsNota,
+                        checkInMessage = base + geo + gpsNota + aviso,
                         checkInError = false,
+                        checkInBloqueo = null,
                         gpsActivo = JornadaGps.isRunning(),
                     )
                 }
@@ -411,11 +433,20 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                val mensaje = e.toUserMessage("Error al registrar")
+                val code = (e as? retrofit2.HttpException)?.code()
+                val mock = AttendanceCheckIn.esUbicacionSimulada(code, mensaje)
                 _state.update {
                     it.copy(
                         checkInLoading = false,
-                        checkInMessage = e.toUserMessage("Error al registrar"),
-                        checkInError = true,
+                        // El 422 de ubicación simulada se ve en un diálogo, no en una línea gris.
+                        checkInMessage = if (mock) null else mensaje,
+                        checkInError = !mock,
+                        checkInBloqueo = if (mock) {
+                            mensaje.takeIf { m -> m.isNotBlank() } ?: AttendanceCheckIn.MOCK_MENSAJE
+                        } else {
+                            null
+                        },
                     )
                 }
             }
@@ -560,6 +591,46 @@ fun ConsoleAttendanceScreen(
             }
         }
     }
+
+    state.checkInBloqueo?.let { mensaje ->
+        UbicacionSimuladaDialog(mensaje = mensaje, onDismiss = vm::clearBloqueo)
+    }
+}
+
+/**
+ * 422 del servidor: la checada no se registró porque el teléfono traía GPS
+ * falso. Se dice completo y en un diálogo — es lo único que importa en ese
+ * momento — con lo que hay que hacer para poder checar.
+ */
+@Composable
+private fun UbicacionSimuladaDialog(mensaje: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Outlined.ErrorOutline,
+                contentDescription = null,
+                tint = NxColors.Danger,
+                modifier = Modifier.size(28.dp),
+            )
+        },
+        title = { Text("No se pudo checar", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(mensaje, fontSize = 14.sp, color = NxColors.Slate, fontWeight = FontWeight.SemiBold)
+                Text(AttendanceCheckIn.MOCK_AYUDA, fontSize = 13.sp, color = NxColors.Muted)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+            ) { Text("Entendido") }
+        },
+    )
 }
 
 // ── Selector de día ──────────────────────────────────────────────────────────
@@ -1047,6 +1118,15 @@ private fun MiJornadaCard(
                         )
                         Text(fmtHora(ev.timestamp), fontSize = 12.5.sp, color = NxColors.Muted)
                     }
+                    val avisos = AttendanceBadges.de(ev)
+                    if (avisos.isNotEmpty()) AvisosChecada(avisos)
+                    ev.correcciones.orEmpty().forEach { c ->
+                        Text(
+                            AttendanceBadges.correccionTexto(c),
+                            fontSize = 11.5.sp,
+                            color = Color(AttendanceBadges.MORADO),
+                        )
+                    }
                 }
             }
         }
@@ -1182,6 +1262,18 @@ private fun PersonaCard(
                 }
             }
 
+            val avisos = (persona.avisosEntrada + persona.avisosSalida).distinctBy { it.texto }
+            if (avisos.isNotEmpty()) {
+                AvisosChecada(avisos)
+            }
+            persona.correcciones.forEach { c ->
+                Text(
+                    AttendanceBadges.correccionTexto(c),
+                    fontSize = 12.sp,
+                    color = Color(AttendanceBadges.MORADO),
+                )
+            }
+
             onJustificar?.let { justificar ->
                 OutlinedButton(
                     onClick = justificar,
@@ -1209,6 +1301,32 @@ private fun PersonaCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Insignias de lo que le pasó a la checada: por qué está para revisar, si se
+ * capturó sin conexión, si se cerró sola o si alguien la corrigió.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AvisosChecada(avisos: List<AttendanceBadge>, modifier: Modifier = Modifier) {
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        avisos.forEach { aviso ->
+            val color = Color(aviso.color)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(color.copy(alpha = 0.12f))
+                    .padding(horizontal = 9.dp, vertical = 4.dp),
+            ) {
+                Text(aviso.texto, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
             }
         }
     }

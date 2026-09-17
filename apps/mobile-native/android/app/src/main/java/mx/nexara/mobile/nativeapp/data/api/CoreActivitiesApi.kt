@@ -78,7 +78,28 @@ data class MyActivityItemDto(
     val porRepartir: Boolean? = null,
     val pasadaA: List<MyActivityPasadaDto>? = null,
     val ultimaReprogramacion: MyActivityReprogramacionDto? = null,
-)
+    // ── Contrato B (aceptación y tiempos); todo opcional: la API vieja no lo manda.
+    /** PENDIENTE | ACEPTADA | RECHAZADA. */
+    val aceptacion: String? = null,
+    val motivoRechazo: String? = null,
+    /** rojo | amarillo | verde (lo calcula el servidor). */
+    val semaforo: String? = null,
+    /** Tiempo planeado en minutos (`horasPlan` × 60). */
+    val minutosPlan: Double? = null,
+    /** Tiempo real: inicio → fin, o inicio → ahora si sigue en curso. */
+    val minutosReales: Double? = null,
+    val excedida: Boolean? = null,
+    val inicioRealAt: String? = null,
+    val finRealAt: String? = null,
+    /** Quién se la asignó (nombre del contrato; `asignadaPor` es el campo viejo). */
+    val asignadoPor: MyActivityRefDto? = null,
+    /** La empezó habiendo otra de más prioridad sin terminar. */
+    val saltoPrioridad: Boolean? = null,
+    val justificacionOrden: String? = null,
+) {
+    /** El contrato dice `asignadoPor`; las respuestas de hoy traen `asignadaPor`. */
+    val quienAsigno: MyActivityRefDto? get() = asignadoPor ?: asignadaPor
+}
 
 data class MyActivitiesResponseDto(
     /** Encargados de área: pueden reordenar su cola (con justificación). */
@@ -101,6 +122,13 @@ data class ReorderMyActivitiesRequest(
 data class DispatchMyActivityRequest(
     val userIds: List<Long>,
     val indicaciones: String? = null,
+    /** Tiempo estimado en horas (contrato B); el API viejo lo ignora. */
+    val horasPlan: Double? = null,
+)
+
+/** `POST me/activities/:id/rechazar` — el motivo es obligatorio (≥ 10). */
+data class RechazarActividadRequest(
+    val motivo: String,
 )
 
 data class ReprogramarDespachoRequest(
@@ -131,6 +159,14 @@ data class TeamBoardOpenActivityDto(
     val assignmentCharge: String? = null,
     val fechaFinalizacion: String? = null,
     val indicaciones: String? = null,
+    // ── Contrato C (pizarra con semáforo); opcionales.
+    val prioridad: String? = null,
+    /** rojo | amarillo | verde */
+    val semaforo: String? = null,
+    val asignadoPor: MyActivityRefDto? = null,
+    val minutosPlan: Double? = null,
+    val minutosReales: Double? = null,
+    val excedida: Boolean? = null,
     /** Emails del equipo activo: dice si un despacho ya se repartió. */
     val teamEmails: List<String>? = null,
     /** En despacho esta persona (LEAD) solo reparte. */
@@ -172,7 +208,53 @@ data class TeamBoardUserDto(
     val enEsperaAprobacion: Int? = null,
     /** Actividades con evidencia devuelta que está corrigiendo. */
     val enCorreccion: Int? = null,
+    /** Contrato C: números del rango que se está viendo; ausente en APIs viejas. */
+    val kpis: TeamBoardKpisDto? = null,
 )
+
+/**
+ * KPI de una persona en el rango (`me/board?desde&hasta`).
+ *
+ * `eficienciaPct` = plan/real × 100 (solo lo terminado con plan);
+ * `productividadPct` = minutos en actividad / minutos asistidos × 100.
+ */
+data class TeamBoardKpisDto(
+    val asignadas: Int? = null,
+    val cerradas: Int? = null,
+    val aTiempo: Int? = null,
+    val aTiempoPct: Double? = null,
+    val minutosPlan: Double? = null,
+    val minutosReales: Double? = null,
+    val eficienciaPct: Double? = null,
+    val minutosAsistidos: Double? = null,
+    val minutosEnActividad: Double? = null,
+    val productividadPct: Double? = null,
+    val rechazadas: Int? = null,
+)
+
+/** `GET me/board/asignadas-por-mi`: lo que asignó quien consulta, con persona y semáforo. */
+data class BoardAsignadaPorMiDto(
+    val id: Long,
+    val anNumber: String? = null,
+    val titulo: String? = null,
+    val estatus: String? = null,
+    val prioridad: String? = null,
+    /** rojo | amarillo | verde */
+    val semaforo: String? = null,
+    /** PENDIENTE | ACEPTADA | RECHAZADA */
+    val aceptacion: String? = null,
+    val motivoRechazo: String? = null,
+    val fechaMaxima: String? = null,
+    val minutosPlan: Double? = null,
+    val minutosReales: Double? = null,
+    val excedida: Boolean? = null,
+    /** A quién se la asignó. */
+    val persona: MyActivityRefDto? = null,
+    val usuario: MyActivityRefDto? = null,
+) {
+    /** El contrato dice «con persona»; se acepta `usuario` por si el API lo nombra así. */
+    val quien: MyActivityRefDto? get() = persona ?: usuario
+}
 
 data class TeamBoardResponseDto(
     /** company (CEO) | subtree (encargados). */
@@ -201,6 +283,13 @@ data class TeamBoardHistoryItemDto(
     val fechaAsignacion: String? = null,
     val fechaFinalizacion: String? = null,
     val evidence: TeamBoardHistoryEvidenceDto? = null,
+    /** Contrato C: la persona fue retirada de esta actividad (sigue en su historial). */
+    val retirado: Boolean? = null,
+    /** rojo | amarillo | verde */
+    val semaforo: String? = null,
+    val minutosPlan: Double? = null,
+    val minutosReales: Double? = null,
+    val excedida: Boolean? = null,
 )
 
 // ── Evidencias del equipo (GET me/activities/:id/evidencias) ────────────────
@@ -461,6 +550,8 @@ data class AddTeamMemberRequest(
     /** LEAD | TECNICO | APOYO */
     val rol: String,
     val indicaciones: String? = null,
+    /** Tiempo estimado en horas (contrato B); el API viejo lo ignora. */
+    val horasPlan: Double? = null,
 )
 
 /** Cliente del padrón (`GET ventas/clientes?sector=`). */
@@ -552,6 +643,17 @@ interface CoreActivitiesApi {
     @POST("me/activities")
     suspend fun selfAssign(@Body body: CreateActivityRequest): ResponseBody
 
+    /** Contrato B: quien la recibe acepta… */
+    @POST("me/activities/{id}/aceptar")
+    suspend fun aceptarActividad(@Path("id") activityId: Long): ResponseBody
+
+    /** …o la rechaza con motivo; sigue asignada hasta que un superior la mueva. */
+    @POST("me/activities/{id}/rechazar")
+    suspend fun rechazarActividad(
+        @Path("id") activityId: Long,
+        @Body body: RechazarActividadRequest,
+    ): ResponseBody
+
     @POST("me/activities/{id}/despacho")
     suspend fun dispatch(
         @Path("id") activityId: Long,
@@ -564,14 +666,33 @@ interface CoreActivitiesApi {
         @Body body: ReprogramarDespachoRequest,
     ): ResponseBody
 
+    /** @param desde/@param hasta `AAAA-MM-DD` (contrato C); sin ellos, hoy. */
     @GET("me/board")
-    suspend fun board(): TeamBoardResponseDto
+    suspend fun board(
+        @retrofit2.http.Query("desde") desde: String? = null,
+        @retrofit2.http.Query("hasta") hasta: String? = null,
+    ): TeamBoardResponseDto
+
+    /** Lo que asignó quien consulta en el rango. Se lee crudo: el API está en obra. */
+    @GET("me/board/asignadas-por-mi")
+    suspend fun boardAsignadasPorMi(
+        @retrofit2.http.Query("desde") desde: String? = null,
+        @retrofit2.http.Query("hasta") hasta: String? = null,
+    ): ResponseBody
 
     @GET("me/board/{userId}")
-    suspend fun boardUser(@Path("userId") userId: Long): TeamBoardUserDto
+    suspend fun boardUser(
+        @Path("userId") userId: Long,
+        @retrofit2.http.Query("desde") desde: String? = null,
+        @retrofit2.http.Query("hasta") hasta: String? = null,
+    ): TeamBoardUserDto
 
     @GET("me/board/{userId}/history")
-    suspend fun boardUserHistory(@Path("userId") userId: Long): List<TeamBoardHistoryItemDto>
+    suspend fun boardUserHistory(
+        @Path("userId") userId: Long,
+        @retrofit2.http.Query("desde") desde: String? = null,
+        @retrofit2.http.Query("hasta") hasta: String? = null,
+    ): List<TeamBoardHistoryItemDto>
 
     @GET("me/activities/{id}/evidencias")
     suspend fun teamEvidence(@Path("id") activityId: Long): TeamEvidenceResponseDto
