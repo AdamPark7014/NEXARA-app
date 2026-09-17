@@ -46,3 +46,18 @@ describe("íconos de cumpleaños y aniversarios", () => {
     expect(notificationKind("celebraciones", null)).toBe("aniversario");
   });
 });
+
+describe("checadas marcadas (ATTENDANCE_FLAGGED)", () => {
+  it("fuera de sitio no es una entrada cualquiera", () => {
+    expect(notificationKind("attendance", "Ana López: checada fuera de sitio")).toBe("asistencia_alerta");
+  });
+
+  it("el cierre automático de la jornada tampoco", () => {
+    expect(notificationKind("attendance", "Jornada cerrada automáticamente")).toBe("asistencia_alerta");
+  });
+
+  it("y una checada normal sigue con su ícono de siempre", () => {
+    expect(notificationKind("attendance", "Registraste tu entrada")).toBe("entrada");
+    expect(notificationKind("attendance", "Registraste tu salida")).toBe("salida");
+  });
+});
