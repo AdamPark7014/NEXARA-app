@@ -318,6 +318,17 @@ export class MyActivitiesService {
             correctionSubmittedAt: true,
           },
         },
+        reassignments: {
+          select: {
+            deUsuarioId: true,
+            aUsuarioId: true,
+            motivo: true,
+            createdAt: true,
+            aUsuario: { select: { nombre: true } },
+            movidaPor: { select: { nombre: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         evidenceReviews: {
           select: {
             id: true,
@@ -385,8 +396,21 @@ export class MyActivitiesService {
       m.userId !== viewer.id &&
       !reparteM(m) &&
       (todo || esResponsable || Boolean(jefesDe.get(m.userId)?.has(viewer.id)) || encimaDe(m));
+    // A quién reemplazó quien consulta (y a quién reemplazaron esos): ve su avance para continuarlo.
+    const reemplazados = new Set<number>();
+    {
+      let frontera = [viewer.id];
+      for (let nivel = 0; nivel < 5 && frontera.length; nivel++) {
+        const siguiente = activity.reassignments
+          .filter((r) => frontera.includes(r.aUsuarioId) && r.deUsuarioId != null && !reemplazados.has(r.deUsuarioId))
+          .map((r) => r.deUsuarioId as number);
+        siguiente.forEach((id) => reemplazados.add(id));
+        frontera = siguiente;
+      }
+    }
     const puedeVer = (m: Eslabon) =>
       m.userId === viewer.id ||
+      reemplazados.has(m.userId) ||
       todo ||
       esResponsable ||
       esCreador ||
@@ -424,7 +448,23 @@ export class MyActivitiesService {
 
     const members = visibles.map((m) => {
       const e = evidenciaDe.get(m.userId) ?? null;
+      // Salió porque se la pasaron a otro: su avance parcial se muestra como «Avance anterior».
+      const entrega = m.retiradoAt
+        ? [...activity.reassignments].reverse().find((r) => r.deUsuarioId === m.userId) ?? null
+        : null;
       return {
+        /** Se la pasaron a otro compañero: quién la continúa, quién la movió y por qué. */
+        pasadaA: entrega
+          ? {
+              userId: entrega.aUsuarioId,
+              nombre: entrega.aUsuario?.nombre ?? '—',
+              motivo: entrega.motivo,
+              at: entrega.createdAt,
+              por: entrega.movidaPor?.nombre ?? null,
+            }
+          : null,
+        /** «Avance anterior de <nombre>»: solo lectura para quien continúa y para revisores. */
+        avanceAnterior: entrega ? `Avance anterior de ${m.user?.nombre ?? '—'}` : null,
         userId: m.userId,
         nombre: m.user?.nombre ?? '—',
         puesto: m.user?.puesto ?? null,
@@ -440,7 +480,7 @@ export class MyActivitiesService {
           .map((o) => ({ nombre: o.user?.nombre ?? '—', at: o.asignadoAt })),
         progressPct: e ? evidenceProgressPct(e.status, activity.coreKind) : 0,
         /** Puedo aprobarla o devolverla (ya la envió y soy su superior en la cadena). */
-        puedoRevisar: puedeRevisar(m) && e?.status === 'COMPLETED',
+        puedoRevisar: puedeRevisar(m) && e?.status === 'COMPLETED' && !entrega,
         rejectedSteps: e ? (textos(e.rejectedSteps).length ? textos(e.rejectedSteps) : e.rejectedStep ? [e.rejectedStep] : []) : [],
         eficienciaScore: e?.eficienciaScore ?? null,
         /** Salidas de zona (radio 100 m del punto de inicio), la más reciente primero. */
@@ -503,9 +543,10 @@ export class MyActivitiesService {
       /** No puedo revisar a nadie de lo que veo (p. ej. quien la creó). */
       soloLectura: !visibles.some((m) => puedeRevisar(m)),
       resumen: {
-        ejecutores: members.filter((m) => !m.reparte).length,
-        terminaron: members.filter((m) => !m.reparte && m.evidence?.status === 'COMPLETED').length,
-        aprobadas: members.filter((m) => !m.reparte && m.evidence?.reviewStatus === 'APPROVED').length,
+        // Quien pasó la actividad a otro ya no cuenta como ejecutor.
+        ejecutores: members.filter((m) => !m.reparte && !m.pasadaA).length,
+        terminaron: members.filter((m) => !m.reparte && !m.pasadaA && m.evidence?.status === 'COMPLETED').length,
+        aprobadas: members.filter((m) => !m.reparte && !m.pasadaA && m.evidence?.reviewStatus === 'APPROVED').length,
         porRevisarMias: members.filter(
           (m) => m.puedoRevisar && m.evidence?.reviewStatus !== 'APPROVED' && m.evidence?.reviewStatus !== 'REJECTED',
         ).length,

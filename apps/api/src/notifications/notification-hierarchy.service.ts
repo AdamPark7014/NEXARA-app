@@ -1130,7 +1130,7 @@ export class NotificationHierarchyService {
       const [activity, personas] = await Promise.all([
         this.prisma.activity.findUnique({
           where: { id: activityId },
-          select: { titulo: true, creadoPorId: true, client: { select: { name: true } } },
+          select: { titulo: true, creadoPorId: true, responsableId: true, client: { select: { name: true } } },
         }),
         this.prisma.user.findMany({
           where: { id: { in: [actorId, aUsuarioId, ...(deUsuarioId ? [deUsuarioId] : [])] } },
@@ -1157,8 +1157,13 @@ export class NotificationHierarchyService {
       await this.notificationsService.createNotification({
         ...base,
         userId: aUsuarioId,
-        title: `Te reasignaron ${actividad}`,
-        message: unir(`${nombreDe(actorId)} te la pasó`, cliente, motivo),
+        title: `Te asignaron ${actividad} para continuarla`,
+        message: unir(
+          motivo,
+          deUsuarioId ? `Continúas donde se quedó ${nombreDe(deUsuarioId)}` : null,
+          `${nombreDe(actorId)} te la pasó`,
+          cliente,
+        ),
         priority: 'high',
       });
 
@@ -1168,15 +1173,21 @@ export class NotificationHierarchyService {
           userId: deUsuarioId,
           title: `${actividad} pasó a ${nombreDe(aUsuarioId)}`,
           message: unir(
-            `${nombreDe(actorId)} la reasignó`,
-            params.retiradoAnterior ? 'Ya no estás en el equipo' : 'Sigues en el equipo como apoyo',
             motivo,
+            `${nombreDe(actorId)} la reasignó`,
+            params.retiradoAnterior ? 'Tu avance quedó guardado' : 'Sigues en el equipo como apoyo',
           ),
         });
       }
 
+      // Responsable, quien la creó, jefes de quien salió y de quien entra, y Christian.
       const observadores = new Set<number>(await this.getCeoUserIds());
       if (activity.creadoPorId) observadores.add(activity.creadoPorId);
+      if (activity.responsableId) observadores.add(activity.responsableId);
+      for (const id of [deUsuarioId, aUsuarioId]) {
+        if (id) for (const jefe of await this.lunchReviewerIds(id)) observadores.add(jefe);
+      }
+      observadores.delete(actorId);
       observadores.delete(aUsuarioId);
       if (deUsuarioId) observadores.delete(deUsuarioId);
       for (const userId of observadores) {
