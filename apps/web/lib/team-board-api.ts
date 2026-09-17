@@ -3,6 +3,12 @@ import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 
 export type BoardActivityBucket = "daily" | "projects" | "services";
 export type BoardUserStatus = "activo" | "inactivo" | "atrasado" | "libre" | "sin_actividad";
+export type Prioridad = "ALTA" | "MEDIA" | "BAJA";
+export type Semaforo = "rojo" | "amarillo" | "verde";
+export type BoardAceptacion = "PENDIENTE" | "ACEPTADA" | "RECHAZADA";
+
+/** Rango de la pizarra en `AAAA-MM-DD`; sin nada, la API responde el día de hoy. */
+export type BoardRange = { desde?: string | null; hasta?: string | null };
 
 export type TeamBoardActivity = {
   id: number;
@@ -29,6 +35,32 @@ export type TeamBoardOpenActivity = {
   teamEmails?: string[];
   /** Día/hora programada (reprogramable por quien reparte). */
   fechaInicio?: string | null;
+  /** Contrato C (API vieja: puede no venir). */
+  prioridad?: Prioridad;
+  semaforo?: Semaforo;
+  minutosPlan?: number | null;
+  minutosReales?: number | null;
+  excedida?: boolean;
+  /** Hora real de arranque, no la programada. */
+  inicioRealAt?: string | null;
+  finRealAt?: string | null;
+  asignadoPor?: { id: number; nombre: string } | null;
+  aceptacion?: BoardAceptacion;
+};
+
+/** Contrato C: cómo le fue a la persona en el rango consultado. */
+export type BoardKpis = {
+  asignadas: number;
+  cerradas: number;
+  aTiempo: number;
+  aTiempoPct: number | null;
+  minutosPlan: number;
+  minutosReales: number;
+  eficienciaPct: number | null;
+  minutosAsistidos: number | null;
+  minutosEnActividad: number;
+  productividadPct: number | null;
+  rechazadas: number;
 };
 
 export type TeamBoardUser = {
@@ -60,6 +92,8 @@ export type TeamBoardUser = {
   enEsperaAprobacion?: number;
   /** Actividades con evidencia devuelta que está corrigiendo. */
   enCorreccion?: number;
+  /** Contrato C (API vieja: puede no venir). */
+  kpis?: BoardKpis;
 };
 
 export type TeamBoardHistoryItem = {
@@ -73,6 +107,13 @@ export type TeamBoardHistoryItem = {
   assignmentCharge?: string | null;
   fechaAsignacion: string;
   fechaFinalizacion: string | null;
+  /** La sacaron del equipo: sigue en su historial, no en sus KPI. */
+  retirado?: boolean;
+  retiradoAt?: string | null;
+  prioridad?: Prioridad;
+  semaforo?: Semaforo;
+  minutosPlan?: number | null;
+  minutosReales?: number | null;
   evidence: {
     status: string;
     progressPct: number;
@@ -86,7 +127,39 @@ export type TeamBoardHistoryItem = {
 
 export type TeamBoardResponse = {
   scope: "company" | "subtree";
+  /** Rango que respondió la API, en `AAAA-MM-DD`. */
+  desde?: string;
+  hasta?: string;
   users: TeamBoardUser[];
+};
+
+/** Contrato C: lo que repartió quien mira. */
+export type AsignadaPorMiItem = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  coreKind: string | null;
+  assignmentCharge?: string | null;
+  fechaAsignacion: string;
+  fechaMaxima: string | null;
+  fechaFinalizacion: string | null;
+  persona: { id: number; nombre: string; avatarUrl: string | null; puesto: string | null };
+  prioridad: Prioridad;
+  semaforo: Semaforo;
+  minutosPlan: number | null;
+  minutosReales: number | null;
+  excedida: boolean;
+  terminada: boolean;
+  retirado: boolean;
+  aceptacion: BoardAceptacion;
+  motivoRechazo: string | null;
+};
+
+export type AsignadasPorMiResponse = {
+  desde: string;
+  hasta: string;
+  items: AsignadaPorMiItem[];
 };
 
 export const STATUS_LABELS: Record<BoardUserStatus, string> = {
@@ -105,12 +178,74 @@ export const STATUS_COLORS: Record<BoardUserStatus, string> = {
   inactivo: "#94a3b8",
 };
 
+export const SEMAFORO_COLORS: Record<Semaforo, string> = {
+  rojo: "#dc2626",
+  amarillo: "#d97706",
+  verde: "#16a34a",
+};
+
+export const SEMAFORO_LABELS: Record<Semaforo, string> = {
+  rojo: "Atención",
+  amarillo: "Va justa",
+  verde: "En orden",
+};
+
+export const PRIORIDAD_LABELS: Record<Prioridad, string> = {
+  ALTA: "Alta",
+  MEDIA: "Media",
+  BAJA: "Baja",
+};
+
+export const PRIORIDAD_COLORS: Record<Prioridad, string> = {
+  ALTA: "#dc2626",
+  MEDIA: "#d97706",
+  BAJA: "#64748b",
+};
+
+/** Porcentaje de KPI; `null` = no hay con qué calcularlo todavía. */
+export function formatPct(valor: number | null | undefined): string {
+  if (valor == null || !Number.isFinite(valor)) return "—";
+  return `${Math.round(valor)} %`;
+}
+
 export function formatMinutes(mins: number | null | undefined): string {
   if (mins == null || !Number.isFinite(mins)) return "—";
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   if (h <= 0) return `${m} min`;
   return `${h} h ${m.toString().padStart(2, "0")} min`;
+}
+
+export type RangoPreset = "hoy" | "semana" | "mes" | "personalizado";
+
+export const RANGO_LABELS: Record<RangoPreset, string> = {
+  hoy: "Hoy",
+  semana: "Semana",
+  mes: "Mes",
+  personalizado: "Personalizado",
+};
+
+/** Día de hoy en hora de México (`AAAA-MM-DD`), que es como razona la API. */
+export function fechaMx(d: Date = new Date()): string {
+  return d.toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+}
+
+function suma(dia: string, dias: number): string {
+  const [y, m, d] = dia.split("-").map(Number);
+  const t = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+  t.setUTCDate(t.getUTCDate() + dias);
+  return t.toISOString().slice(0, 10);
+}
+
+/** Semana = del lunes a hoy; mes = del día 1 a hoy. */
+export function rangoDePreset(preset: RangoPreset, hoy: string = fechaMx()): BoardRange {
+  if (preset === "semana") {
+    const [y, m, d] = hoy.split("-").map(Number);
+    const dow = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1)).getUTCDay(); // 0 = domingo
+    return { desde: suma(hoy, -((dow + 6) % 7)), hasta: hoy };
+  }
+  if (preset === "mes") return { desde: `${hoy.slice(0, 7)}-01`, hasta: hoy };
+  return { desde: hoy, hasta: hoy };
 }
 
 export function formatClock(iso: string | null | undefined): string {
@@ -120,14 +255,34 @@ export function formatClock(iso: string | null | undefined): string {
   return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-export async function fetchTeamBoard(token: string): Promise<TeamBoardResponse> {
-  const board = await erpFetch<TeamBoardResponse>("me/board", token);
+/** `?desde=&hasta=` solo cuando hay rango: sin nada, la API responde hoy. */
+export function rangeQuery(rango?: BoardRange): string {
+  const q = new URLSearchParams();
+  if (rango?.desde) q.set("desde", rango.desde);
+  if (rango?.hasta) q.set("hasta", rango.hasta);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export async function fetchTeamBoard(token: string, rango?: BoardRange): Promise<TeamBoardResponse> {
+  const board = await erpFetch<TeamBoardResponse>(`me/board${rangeQuery(rango)}`, token);
   // Safety net: Christian/Adam/Claudia/cuenta demo no deben verse como equipo/empleados.
   return { ...board, users: (board.users ?? []).filter((u) => !isNonEmployeeEmail(u.email)) };
 }
 
-export function fetchTeamBoardUser(token: string, userId: number): Promise<TeamBoardUser> {
-  return erpFetch<TeamBoardUser>(`me/board/${userId}`, token);
+export function fetchTeamBoardUser(
+  token: string,
+  userId: number,
+  rango?: BoardRange,
+): Promise<TeamBoardUser> {
+  return erpFetch<TeamBoardUser>(`me/board/${userId}${rangeQuery(rango)}`, token);
+}
+
+export function fetchAsignadasPorMi(
+  token: string,
+  rango?: BoardRange,
+): Promise<AsignadasPorMiResponse> {
+  return erpFetch<AsignadasPorMiResponse>(`me/board/asignadas-por-mi${rangeQuery(rango)}`, token);
 }
 
 export function fetchTeamBoardHistory(

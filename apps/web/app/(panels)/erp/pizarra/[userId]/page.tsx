@@ -18,9 +18,18 @@ import {
   fetchTeamBoardUser,
   formatClock,
   formatMinutes,
+  type BoardRange,
+  type RangoPreset,
   type TeamBoardHistoryItem,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
+import {
+  Chip,
+  KpiStrip,
+  PrioridadChip,
+  RangoSelector,
+  SemaforoDot,
+} from "@/components/pizarra/PizarraKpi";
 import { digitalFormLabels } from "@/lib/evidence-flow-helpers";
 import { labelForAssignmentCharge } from "@/lib/activity-kinds";
 import DespachoPendingPanel from "@/components/pizarra/DespachoPendingPanel";
@@ -66,6 +75,10 @@ export default function PizarraPersonaPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [preset, setPreset] = useState<RangoPreset>("hoy");
+  const [rango, setRango] = useState<BoardRange>({});
+  const desde = rango.desde ?? null;
+  const hasta = rango.hasta ?? null;
 
   const load = useCallback(async () => {
     if (!token || !Number.isFinite(userId)) {
@@ -77,7 +90,7 @@ export default function PizarraPersonaPage() {
     setError(null);
     try {
       const [card, hist] = await Promise.all([
-        fetchTeamBoardUser(token, userId),
+        fetchTeamBoardUser(token, userId, { desde, hasta }),
         fetchTeamBoardHistory(token, userId).catch(() => [] as TeamBoardHistoryItem[]),
       ]);
       setUser(card);
@@ -88,7 +101,7 @@ export default function PizarraPersonaPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, userId]);
+  }, [token, userId, desde, hasta]);
 
   useEffect(() => {
     void load();
@@ -202,15 +215,38 @@ export default function PizarraPersonaPage() {
         </div>
       </header>
 
+      <RangoSelector
+        preset={preset}
+        rango={rango}
+        onChange={(p, r) => {
+          setPreset(p);
+          setRango(p === "hoy" ? {} : r);
+        }}
+      />
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-        <Stat label="Entrada hoy" value={formatClock(user.clockInAt)} hint={user.clockInAt ? "Check-in" : "Sin registro"} />
-        <Stat label="Tiempo en sitio" value={formatMinutes(user.workedMinutes)} hint="Desde la entrada" />
+        <Stat
+          label={preset === "hoy" ? "Entrada hoy" : "Última entrada"}
+          value={formatClock(user.clockInAt)}
+          hint={user.clockInAt ? "Check-in" : "Sin registro"}
+        />
+        <Stat
+          label="Horas trabajadas"
+          value={formatMinutes(user.workedMinutes)}
+          hint="Entrada a salida, sin la comida"
+        />
         <Stat
           label="En actividad"
           value={formatMinutes(user.activityElapsedMinutes)}
-          hint={user.activityStartedAt ? `Desde ${formatClock(user.activityStartedAt)}` : "Sin actividad"}
+          hint={
+            user.activityStartedAt
+              ? `Desde ${formatClock(user.activityStartedAt)} (entrada real)`
+              : "Sin actividad iniciada"
+          }
         />
       </div>
+
+      <KpiStrip kpis={user.kpis} />
 
       <section
         style={{
@@ -301,15 +337,28 @@ export default function PizarraPersonaPage() {
                     color: "inherit",
                   }}
                 >
-                  <div style={{ fontWeight: 800, fontSize: 14 }}>
-                    {h.anNumber} · {h.titulo}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    <SemaforoDot semaforo={h.semaforo} />
+                    <span style={{ fontWeight: 800, fontSize: 14 }}>
+                      {h.anNumber} · {h.titulo}
+                    </span>
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                    <PrioridadChip prioridad={h.prioridad} />
+                    {h.retirado ? (
+                      <Chip color="#64748b" title="La sacaron del equipo de esta actividad">
+                        Retirado
+                      </Chip>
+                    ) : null}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
                     {h.estatus}
                     {ev ? ` · avance ${ev.progressPct}%` : ""}
                     {h.coreKind ? ` · ${h.coreKind}` : ""}
                     {h.coreKind === "tarea" && h.ticketTypeCustom ? ` · ${h.ticketTypeCustom}` : ""}
                     {chargeLabel ? ` · ${chargeLabel.badge}` : ""}
+                    {h.minutosPlan != null ? ` · plan ${formatMinutes(h.minutosPlan)}` : ""}
+                    {h.minutosReales != null ? ` · real ${formatMinutes(h.minutosReales)}` : ""}
                   </div>
                 </button>
                 {open && ev ? (
