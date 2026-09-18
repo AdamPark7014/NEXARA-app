@@ -56,6 +56,7 @@ import {
 import { avanceActividadPorEstado } from './estado-cotizacion.js';
 import { isPdfUrl, pasoCubiertoPorCotizacion } from '../activities/evidence/evidence-flow.helpers.js';
 import { generarPropuestaTecnicaPdf } from './propuesta-tecnica-pdf.js';
+import { payloadDePropuesta } from './propuesta-payload.js';
 import { leerObjetivo, objetivoDePropuesta } from './objetivo-plantilla.js';
 import { normalizarBloques, plantillasDeCotizacion } from './alcance-bloques.js';
 import { ordenarPlanos } from './planos-cotizacion.js';
@@ -404,7 +405,8 @@ export class CotizacionesService {
   async findOne(id: number, companyId?: number | null) {
     const quote = await this.db.cotizacion.findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
-      include: { items: true, createdBy: true, company: true },
+      // Las partidas en el orden en que se capturaron: así salen en el editor y en el PDF.
+      include: { items: { orderBy: { id: 'asc' } }, createdBy: true, company: true },
     });
     assertCompanyAccess(quote, companyId, 'Cotizacion');
     return quote;
@@ -1059,7 +1061,7 @@ export class CotizacionesService {
   async send(id: number, dto: SendCotizacionDto, senderId?: number, companyId?: number | null) {
     const quote = await this.db.cotizacion.findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
-      include: { items: true },
+      include: { items: { orderBy: { id: 'asc' } } },
     });
     assertCompanyAccess(quote, companyId, 'Cotizacion');
 
@@ -1584,11 +1586,6 @@ export class CotizacionesService {
    * es la única que lleva costo de proveedor y margen.
    */
   private async buildPropuesta(quote: any): Promise<Buffer> {
-    const partidas = this.partidasParaGrupos(quote.items ?? []);
-    const segmento = normalizarSegmento(quote.segmento);
-    const instalacion = incluyeInstalacion(partidas);
-    const vigenciaDias = diasDeVigencia(quote.issueDate, quote.validUntil);
-
     let company = quote.company;
     if (!company && quote.companyId) {
       company = await this.db.companyProfile.findUnique({ where: { id: quote.companyId } });
@@ -1599,110 +1596,23 @@ export class CotizacionesService {
       this.core.participantesParaApi(quote.id),
     ]);
 
-    // Sin bloques vacíos (en el PDF saldrían como un número sin nada) y con viñetas limpias.
-    const bloques = normalizarBloques(quote.alcanceBloques) as any[];
-    const fecha = (valor: unknown) => {
-      if (!valor) return null;
-      const d = new Date(valor as string);
-      return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
-    };
-
-    // Términos por partes: los del segmento, con lo que reescribió quien cotiza (`note`).
-    const terminos = terminosDeCotizacion({
-      segmento,
-      incluyeInstalacion: instalacion,
-      anticipoPct: quote.depositPercent,
-      vigenciaDias,
-      personalizados: quote.note,
-    });
-
-    /**
-     * Lo que el editor de Core captura y `PropuestaPayload` todavía no declara. Va con spread para no
-     * tocar el tipo del generador desde aquí; el generador lo imprime cuando lo conoce:
-     *  - version: «1.0», «2.0»… (portada; sale de la revisión enviada)
-     *  - alcanceTitulo: encabezado de 02 (el título del proyecto)
-     *  - alcanceIntro: párrafo de entrada de 02, debajo del título (`Cotizacion.scope`)
-     *  - anticipoPct / vigenciaDias: cifras de los términos, por si el PDF las quiere aparte
-     * Además `terminos.partes` trae los términos con título (`{ clave, titulo, texto, personalizado }`).
-     */
-    // Un borrador que ya salió antes es la siguiente revisión en preparación (la vista previa
-    // dice 2.0 mientras se edita la R2); al enviarse, `send` pasa la revisión nueva y el estado.
-    const enPreparacion = Boolean(quote.sentAt) && estadoDesdeDb(quote.status) === ESTADO.BORRADOR;
-    const extras = {
-      version: `${Math.max(1, Number(quote.revision || 1) + (enPreparacion ? 1 : 0))}.0`,
-      alcanceTitulo: quote.projectName?.trim() || null,
-      alcanceIntro: quote.scope?.trim() || null,
-      anticipoPct: Number(quote.depositPercent ?? 0) || null,
-      vigenciaDias,
-    };
-
-    return generarPropuestaTecnicaPdf({
-      ...extras,
-      folio: quote.quoteNumber,
-      revision: Number(quote.revision || 1),
-      issueDate: fecha(quote.issueDate) ?? new Date().toISOString().slice(0, 10),
-      validUntil: fecha(quote.validUntil),
-      segmentoEtiqueta: ETIQUETA_SEGMENTO[segmento as Segmento],
-      cliente: {
-        nombre: quote.clientName,
-        empresa: quote.clientCompany,
-        telefono: quote.clientPhone,
-        correo: quote.clientEmail,
-        direccion: quote.clientAddress,
-      },
-      proyecto: quote.projectName,
-      objetivo: objetivoDePropuesta({
-        segmento,
-        partidas,
-        proyecto: quote.projectName,
-        objetivoLibre: quote.objetivo,
-        vigenciaDias,
+    // Qué campo del editor va a qué parte del documento: `propuesta-payload.ts`.
+    return generarPropuestaTecnicaPdf(
+      payloadDePropuesta(quote, {
+        planos,
+        participantes: participantes.map((p) => ({ nombre: p.nombre, rolEtiqueta: p.rolEtiqueta, siglas: p.siglas })),
+        empresa: company
+          ? {
+              legalName: company.legalName,
+              tradeName: company.tradeName,
+              contactEmail: company.contactEmail,
+              contactPhone: company.contactPhone,
+              websiteUrl: company.websiteUrl,
+              fiscalAddress: company.fiscalAddress,
+            }
+          : null,
       }),
-      alcance: bloques.map((b) => ({
-        titulo: String(b?.titulo ?? b?.clave ?? 'Alcance'),
-        texto: b?.texto ?? null,
-        vinetas: Array.isArray(b?.vinetas) ? b.vinetas.map(String) : [],
-        parametros: b?.parametros ?? null,
-      })),
-      planos: planos.map((p: any) => ({
-        url: String(p?.url ?? ''),
-        nombre: p?.nombre ?? null,
-        tipo: p?.tipo ?? null,
-      })),
-      grupos: agruparPartidas(partidas).map((g) => ({
-        grupo: g.grupo,
-        etiqueta: g.etiqueta,
-        subtotal: g.subtotal,
-        partidas: g.partidas.map((p) => ({
-          name: String(p.name ?? ''),
-          description: p.description ?? null,
-          unit: p.unit ?? null,
-          qty: Number(p.qty ?? 0),
-          unitPrice: Number(p.unitPrice ?? 0),
-          lineTotal: Number(p.lineTotal ?? 0),
-        })),
-      })),
-      subtotal: Number(quote.subtotal ?? 0),
-      iva: Number(quote.taxTotal ?? 0),
-      total: Number(quote.total ?? 0),
-      currency: quote.currency || 'MXN',
-      terminos,
-      participantes: participantes.map((p) => ({
-        nombre: p.nombre,
-        rolEtiqueta: p.rolEtiqueta,
-        siglas: p.siglas,
-      })),
-      empresa: company
-        ? {
-            legalName: company.legalName,
-            tradeName: company.tradeName,
-            contactEmail: company.contactEmail,
-            contactPhone: company.contactPhone,
-            websiteUrl: company.websiteUrl,
-            fiscalAddress: company.fiscalAddress,
-          }
-        : null,
-    });
+    );
   }
 
   private async buildPdf(quote: any, internal = false) {

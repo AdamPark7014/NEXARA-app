@@ -71,6 +71,11 @@
 
 .primaryBtn:hover {
   background: var(--primary-hover, var(--primary));
+  color: #fff;
+}
+
+.secondaryBtn:hover {
+  color: inherit;
 }
 
 .secondaryBtn {
@@ -333,6 +338,8 @@
 
 .row:hover {
   background: color-mix(in srgb, var(--acento) 5%, var(--surface));
+  /* El hover global de los enlaces pinta todo de naranja: aquí manda el renglón. */
+  color: inherit;
 }
 
 .cell {

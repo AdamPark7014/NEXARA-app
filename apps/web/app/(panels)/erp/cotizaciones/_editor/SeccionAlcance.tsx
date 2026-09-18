@@ -134,11 +134,17 @@ export default function SeccionAlcance({
         <ol className={styles.subsecciones}>
           {bloques.map((b, i) => {
             const nota = origen(b);
+            // Como en el PDF: solo las subsecciones con título llevan número.
+            const numero = bloques.slice(0, i + 1).filter((x) => x.titulo.trim()).length;
             return (
               <li key={b.key} className={styles.subseccion}>
                 <div className={styles.subseccionCabeza}>
-                  <span className={styles.subseccionNumero} aria-hidden>
-                    {i + 1}.
+                  <span
+                    className={styles.subseccionNumero}
+                    aria-hidden
+                    title={b.titulo.trim() ? undefined : "Sin título sale como párrafo, sin número"}
+                  >
+                    {b.titulo.trim() ? `${numero}.` : "¶"}
                   </span>
                   <TextoAuto
                     ref={(el) => {
