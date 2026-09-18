@@ -152,6 +152,8 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/erp\/recruiting(\/.*)?$/, '/ops/recruiting'],
   // `/erp/cotizaciones` ya no viaja a CRM: es la página de Core (ver el atajo de arriba).
   [/^\/erp\/quotes(\/.*)?$/, '/erp/cotizaciones'],
+  // Inglés → Proyectos Core (misma idea que quotes → cotizaciones).
+  [/^\/erp\/projects(\/.*)?$/, '/erp/proyectos'],
   [/^\/erp\/multas(\/?.*)$/, '/erp/hr/fines'],
   [/^\/erp\/fines(\/?.*)$/, '/erp/hr/fines'],
   [/^\/erp\/sanciones(\/?.*)$/, '/erp/hr/fines'],
@@ -213,6 +215,11 @@ export function remapLegacySlugs(pathname: string): string {
   // Cotizaciones Core: desde el contrato del viernes son una página propia de /erp. Antes esta
   // ruta se remapeaba a /crm/quotes y, en superficie Core, terminaba rebotando a la pizarra.
   if (pathname === '/erp/cotizaciones' || pathname.startsWith('/erp/cotizaciones/')) {
+    return pathname;
+  }
+  // Proyectos Core: la página del proyecto completo. Sin este atajo el alias
+  // `proyectos`→`projects` la mandaba a `/erp/projects`, que no existe.
+  if (pathname === '/erp/proyectos' || pathname.startsWith('/erp/proyectos/')) {
     return pathname;
   }
   // Mis actividades Core: no traducir "mis-actividades"→"my-activities" (eso es OPS).
