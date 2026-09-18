@@ -3,7 +3,7 @@
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-18
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** 9ac41ade (+ este commit de relevo) — desplegado en Hetzner (prueba) hasta 9ac41ade
+- **HEAD:** e6f885ff (+ este commit de relevo) — desplegado en Hetzner (prueba) hasta e6f885ff
 
 ## Puente — no cambiar
 
@@ -33,13 +33,25 @@ Requisitos de Adam: tabla «Tareas/Dashboard» (evidencia, aceptación, periodo,
    contrato), fix `RefObject` del build web, fix tenencia al crear proyecto. Otra sesión dejó la web en verde
    (`62b3bb93`, 744/744 vitest) — detalle en su commit.
 
-### En curso (agentes retomados tras límite de uso; ramas sin mergear)
+6. **KPIs** (`d9677c98`, migración `20260918130000_asistencia_uniforme` APLICADA): `GET /api/me/kpis/equipo`
+   (+ `/:userId`), `PATCH /api/attendance/:id/uniforme`; web `/erp/asistencias/indicadores` (+ detalle por
+   persona) y ✓/✗ de uniforme junto a la foto de entrada. Supuestos por confirmar con Adam: oficina 09:00 /
+   campo 08:00 con 15 min, extra > 8 h netas entre semana o todo sáb/dom, comida sin regreso = 60 min.
+7. **Editor de cotizaciones** (`e6f885ff`): tipo documento en el orden del PDF (portada, 01–04), autoguardado,
+   vista previa real, «Enviar por correo», folio explicado en lista y detalle, «Asignar folio»
+   (`POST /cotizaciones/:id/refoliar`), `propuesta-payload.ts` arma el payload del PDF. Filas del PDF sin IVA
+   (antes no cuadraban con el subtotal) y en el orden del editor.
 
-- `feat/cotizaciones-ui-nueva` — editor tipo documento con las secciones del PDF, vista previa, enviar por
-  correo, folio explicado, `scripts/refoliar-borradores.js` (NO correr sin revisar; los 12 borradores del
-  servidor tienen folio viejo `NXR-2026-…`).
-- `feat/kpis-dashboard` — retardos, uniforme (campo nuevo por checada que marca el jefe), horas laboradas vs
-  productivas, inactividad, en `/erp`.
+### Decisiones pendientes de Adam
+
+- **Estilo visual**: dijo que la UI de los módulos y el PDF siguen sin convencerle. Se le mostraron 3
+  direcciones de PDF (A corporativo sobrio / B tecnológico oscuro / C editorial) y 3 de pantallas
+  (1 minimalista / 2 panel ejecutivo / 3 documento con vista previa) y se le pidió una referencia real.
+  Plan: guía visual → muestra aprobada → aplicar a todos los módulos. Para revisar pantallas hace falta
+  que él inicie sesión en el panel lateral.
+- `scripts/refoliar-borradores.js` (dry-run por defecto, `CONFIRMAR=SI`) — gasta un número del contador
+  del autor por borrador; no correr sin su sí.
+- Partidas del editor: hacerlas más compactas (tipo hoja de cálculo).
 
 ### Pendiente / conocido
 
