@@ -1,0 +1,358 @@
+/* KPIs del equipo («Minimalista»): ranking por persona y línea de tiempo por día. */
+
+/* ─── Ranking ──────────────────────────────────────────────────────────── */
+
+.fila {
+  display: grid;
+  grid-template-columns: 24px minmax(180px, 250px) minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: var(--ui-s4);
+  padding: var(--ui-s3) var(--ui-s4);
+  border-bottom: 1px solid var(--ui-border);
+  color: inherit;
+  text-decoration: none;
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lista > li:last-child > .fila {
+  border-bottom: none;
+}
+
+.fila:hover {
+  background: var(--ui-surface-2);
+  color: inherit;
+}
+
+.fila:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-brand) 55%, transparent);
+}
+
+.pos {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.persona {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.nombre {
+  font-size: var(--ui-text-base);
+  font-weight: 500;
+  color: var(--ui-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.puesto {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.medio {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.barra {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--ui-track);
+}
+
+.barraProductiva {
+  background: var(--ui-brand);
+}
+
+.detalle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px var(--ui-s2);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pct {
+  text-align: right;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.pctCritico { color: var(--ui-danger-text); }
+.pctSinDatos { color: var(--ui-fg-3); }
+
+@media (max-width: 720px) {
+  .fila {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "persona pct"
+      "medio medio";
+    gap: var(--ui-s2) var(--ui-s3);
+  }
+  .pos {
+    display: none;
+  }
+  .persona { grid-area: persona; }
+  .medio { grid-area: medio; }
+  .pct { grid-area: pct; }
+}
+
+.leyenda {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s3);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+.leyenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.muestra {
+  width: 12px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--ui-track);
+}
+
+.muestraProductiva { background: var(--ui-brand); }
+
+.muestraComida {
+  background: repeating-linear-gradient(135deg, var(--ui-border-strong) 0 2px, transparent 2px 5px);
+  box-shadow: inset 0 0 0 1px var(--ui-border-strong);
+}
+
+.muestraJornada {
+  background: var(--ui-track);
+  box-shadow: inset 0 0 0 1px var(--ui-border-strong);
+}
+
+/* ─── Línea de tiempo por día ──────────────────────────────────────────── */
+
+.regla,
+.dia {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr) 132px;
+  grid-template-areas: "etiqueta pista resumen";
+  column-gap: var(--ui-s4);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.dia:last-child {
+  border-bottom: none;
+}
+
+.reglaHoras {
+  grid-area: pista;
+  position: relative;
+  height: 28px;
+}
+
+.reglaHora {
+  position: absolute;
+  bottom: 6px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.diaEtiqueta,
+.diaPista,
+.diaResumen {
+  padding: var(--ui-s3) 0;
+  min-width: 0;
+}
+
+.diaEtiqueta {
+  grid-area: etiqueta;
+  padding-left: var(--ui-s4);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.diaFecha {
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  color: var(--ui-fg);
+}
+
+.diaHoras {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.diaPista {
+  grid-area: pista;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+
+.pista {
+  position: relative;
+  height: 22px;
+  background-image: linear-gradient(to right, var(--ui-border) 1px, transparent 1px);
+  background-size: var(--paso-hora, 12.5%) 100%;
+}
+
+.bloque {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 3px;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+.bloqueJornada {
+  top: 2px;
+  bottom: 2px;
+  background: var(--ui-track);
+  box-shadow: inset 0 0 0 1px var(--ui-border-strong);
+}
+
+.bloqueProductivo {
+  background: var(--ui-brand);
+  color: #fff;
+  font-weight: 500;
+}
+
+.bloqueComida {
+  background: repeating-linear-gradient(135deg, var(--ui-border-strong) 0 2px, var(--ui-surface) 2px 5px);
+}
+
+.sinJornada {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.diaResumen {
+  grid-area: resumen;
+  padding-right: var(--ui-s4);
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.diaPct {
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.diaSub {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* ─── Actividades del rango ────────────────────────────────────────────── */
+
+.actFila {
+  grid-template-columns: 88px minmax(0, 1.6fr) 104px 84px 84px minmax(0, 1.5fr);
+  column-gap: var(--ui-s4);
+}
+
+.folio {
+  font-family: var(--ui-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-brand-text);
+  text-decoration: none;
+}
+
+.folio:hover {
+  color: var(--ui-brand-text);
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .actCabeza {
+    display: none !important;
+  }
+  .actFila {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "act cuenta"
+      "dia dur"
+      "porque porque";
+    row-gap: 4px;
+  }
+  .actFila > :nth-child(1) { grid-area: dia; }
+  .actFila > :nth-child(2) { grid-area: act; }
+  .actFila > :nth-child(3) { display: none; }
+  .actFila > :nth-child(4) { grid-area: dur; }
+  .actFila > :nth-child(5) { grid-area: cuenta; }
+  .actFila > :nth-child(4)::before { content: "Duró "; color: var(--ui-fg-3); font-weight: 400; }
+  .actFila > :nth-child(5)::before { content: "Cuenta "; color: var(--ui-fg-3); font-weight: 400; }
+  .actFila > :nth-child(6) { grid-area: porque; }
+  .actFila > :nth-child(6) > * { white-space: normal; height: auto; padding: 3px 8px; line-height: 1.35; }
+}
+
+@media (max-width: 720px) {
+  .horaImpar {
+    display: none;
+  }
+  .regla {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "pista";
+    padding: 0 var(--ui-s4);
+  }
+  .dia {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "etiqueta resumen"
+      "pista pista";
+  }
+  .diaEtiqueta,
+  .diaResumen {
+    padding-bottom: 4px;
+  }
+  .diaPista {
+    padding: 0 var(--ui-s4) var(--ui-s3);
+  }
+}

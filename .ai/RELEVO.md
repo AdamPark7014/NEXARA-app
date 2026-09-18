@@ -2,12 +2,29 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-18
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** e6f885ff (+ este commit de relevo) — desplegado en Hetzner (prueba) hasta e6f885ff
+- **Rama:** muestra/ui-minimalista (sale de mejora/calidad-y-web 494debf6) — MUESTRA para Adam, sin push ni deploy
+- **HEAD:** este commit — lo desplegado en Hetzner (prueba) sigue siendo e6f885ff de mejora/calidad-y-web
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
+
+## Muestra «1 · Minimalista» (rama muestra/ui-minimalista, 18-09) — espera visto bueno de Adam
+
+- Base: tokens `--ui-*` en `apps/web/app/ui-tokens.scss` (claro + `body.dark`), Inter 14 px (`--nx-font-app`,
+  sin preload) y piezas en `apps/web/components/base/` (PageHead, Tabs, Button/ButtonLink, Badge, Card/CardHead,
+  StatRow/Stat, Segmented, Toolbar/SearchInput, EmptyState, Skeleton/SkeletonRows, Alert, Avatar, InfoPopover,
+  clases `tabla`).
+- Shell (`components/app-shell`): menú blanco con renglones de 32 px y activo teal, barra superior de 52 px
+  quieta (rol y «En línea» en gris), migas con «Detalle» para ids y solo la página actual en teléfono.
+  Vale para todos los paneles que usan AppShell.
+- Pantallas: `/erp/pizarra` (equipo), `/erp/cotizaciones` (lista), `/erp/asistencias/indicadores` (ranking por
+  persona) y su detalle (frase en palabras + línea de tiempo con escala común + actividades con «por qué cuenta»).
+  Lógica de lectura nueva en `lib/kpis-lectura.ts` (con spec). Se quitaron `KpiResumen`/`KpiLineaDeTiempo`.
+- Capturas antes/después (claro/oscuro, 1440/390) en el scratchpad de la sesión `muestra-ui\`.
+- Si Adam aprueba: migrar módulo por módulo con las piezas de `components/base` (ver el reporte del commit).
+- Ojo para capturar en worktrees con junction de node_modules: `next.config.js` hace `poll: 1000` en dev y el
+  servidor se queda girando; para capturas se apagó el poll localmente (NO se commiteó).
 
 ## Este turno (claude-code, 18-09) — requisitos «Tareas/Dashboard» y cotizaciones
 

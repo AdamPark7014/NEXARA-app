@@ -1,0 +1,267 @@
+/* NEXARA · Base de la interfaz de paneles («Minimalista»). Consume los tokens --ui-* de app/ui-tokens.scss. */
+
+/* ─── Encabezado de página ─────────────────────────────────────────────── */
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  margin-bottom: var(--ui-s5);
+  min-width: 0;
+}
+
+.headTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-s4);
+  flex-wrap: wrap;
+}
+
+.headText {
+  min-width: 0;
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s1);
+}
+
+.headBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  font-size: var(--ui-text-xs);
+  font-weight: 500;
+  color: var(--ui-fg-3);
+  text-decoration: none;
+  margin-bottom: 2px;
+}
+
+.headBack:hover {
+  color: var(--ui-fg);
+}
+
+.headTitle {
+  margin: 0;
+  font-family: var(--ui-font);
+  font-size: var(--ui-text-title);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--ui-fg);
+}
+
+.headDesc {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+  max-width: 44rem;
+}
+
+.headMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-s2);
+  align-items: center;
+  margin-top: var(--ui-s1);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .headActions {
+    justify-content: flex-start;
+  }
+}
+
+.headTabs {
+  border-bottom: 1px solid var(--ui-border);
+  margin-top: var(--ui-s1);
+}
+
+/* ─── Pestañas (subrayado) ─────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: var(--ui-s5);
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: -1px;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--ui-fg-2);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--ui-fg);
+  transform: none;
+  box-shadow: none;
+}
+
+.tab[aria-selected="true"],
+.tab[aria-pressed="true"] {
+  color: var(--ui-fg);
+  border-bottom-color: var(--ui-brand);
+}
+
+.tab svg {
+  font-size: 16px !important;
+  color: var(--ui-fg-3);
+}
+
+.tab[aria-selected="true"] svg,
+.tab[aria-pressed="true"] svg {
+  color: var(--ui-brand-text);
+}
+
+.count {
+  font-size: var(--ui-text-xs);
+  font-weight: 500;
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Botones ──────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--ui-control-h);
+  padding: 0 12px;
+  border-radius: var(--ui-radius);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.btn:hover:not(:disabled),
+.btn:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.btn svg {
+  font-size: 16px !important;
+}
+
+.btnLg {
+  height: var(--ui-control-h-lg);
+  padding: 0 14px;
+}
+
+.btnIcon {
+  width: var(--ui-control-h);
+  padding: 0;
+}
+
+.btnPrimary {
+  background: var(--ui-brand);
+  color: var(--ui-brand-fg);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--ui-brand-hover);
+  color: var(--ui-brand-fg);
+}
+
+.btnSecondary {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+  color: var(--ui-fg);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--ui-fg-2);
+}
+
+.btnGhost:hover:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-fg);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.75;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.linkBtn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ui-brand-text);
+  cursor: pointer;
+}
+
+.linkBtn:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transform: none;
+  box-shadow: none;
+}
