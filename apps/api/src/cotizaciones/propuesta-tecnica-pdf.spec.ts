@@ -1,4 +1,3 @@
-import zlib from 'zlib';
 import {
   datosEmpresaPropuesta,
   fechaLarga,
@@ -9,6 +8,7 @@ import { agruparPartidas } from './partidas-grupos.js';
 import { objetivoDePropuesta } from './objetivo-plantilla.js';
 import { bloqueAlcanceDePaquete, buscarPaquete, partidasDePaquete } from './paquetes.js';
 import { terminosDeCotizacion } from './terminos-segmento.js';
+import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
 
 function payloadDePrueba(): PropuestaPayload {
   const paquete = buscarPaquete('camara-bala-instalada')!;
@@ -58,32 +58,6 @@ function payloadDePrueba(): PropuestaPayload {
   };
 }
 
-/**
- * Texto de cada hoja del PDF.
- *
- * PDFKit comprime cada hoja en un flujo propio y los escribe en orden; el texto va en arreglos
- * `[<hex> kern <hex>] TJ` con la codificación WinAnsi, que en latin1 se lee tal cual.
- */
-function textoPorHoja(pdf: Buffer): string[] {
-  const hojas: string[] = [];
-  const fuente = pdf.toString('latin1');
-  const flujos = fuente.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g);
-  for (const [, crudo] of flujos) {
-    let contenido: string;
-    try {
-      contenido = zlib.inflateSync(Buffer.from(crudo!, 'latin1')).toString('latin1');
-    } catch {
-      continue;
-    }
-    if (!/\bcm\b/.test(contenido) || !contenido.includes('TJ')) continue;
-    const renglones = [...contenido.matchAll(/\[([^\]]*)\] TJ/g)].map(([, arreglo]) =>
-      [...arreglo!.matchAll(/<([0-9a-fA-F]*)>/g)].map(([, hex]) => Buffer.from(hex!, 'hex').toString('latin1')).join(''),
-    );
-    hojas.push(renglones.join('\n'));
-  }
-  return hojas;
-}
-
 const cuentaDe = (pdf: Buffer, patron: RegExp) => (pdf.toString('latin1').match(patron) ?? []).length;
 const paginas = (pdf: Buffer) => cuentaDe(pdf, /\/Type \/Page\b/g);
 
@@ -92,9 +66,11 @@ describe('PDF Propuesta técnica', () => {
     const pdf = await generarPropuestaTecnicaPdf(payloadDePrueba());
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     const texto = textoPorHoja(pdf).join('\n');
-    for (const esperado of ['PROPUESTA', 'TÉCNICA', 'VERSIÓN 1.0', 'OBJETIVO DEL PROYECTO', 'ALCANCE DEL PROYECTO', 'PLANOS', 'COTIZACIÓN']) {
+    for (const esperado of ['PROPUESTA TÉCNICA', 'OBJETIVO DEL PROYECTO', 'ALCANCE DEL PROYECTO', 'PLANOS', 'COTIZACIÓN']) {
       expect(texto).toContain(esperado);
     }
+    // La versión va en la rejilla de la portada: etiqueta y, debajo, el valor.
+    expect(texto).toMatch(/VERSIÓN\n1\.0/);
   });
 
   it('imprime todos los campos de la hoja de cotización del modelo', async () => {
@@ -103,15 +79,15 @@ describe('PDF Propuesta técnica', () => {
       'Santiago Momoxpan, 72775 Cholula de Rivadavia, Pue.',
       'Correo electrónico: gerencia@nexara.com.mx',
       'Teléfonos:',
-      'Fecha de emisión:',
+      'Fecha de emisión',
       '17 de septiembre de 2026',
-      'Cotización N°:',
+      'Cotización N°',
       'NEX-LJ75100126-0007-JA.CE',
-      'Validez:',
+      'Validez',
       '2 de octubre de 2026',
-      'Cliente:',
+      'CLIENTE',
       'Empresa S.A. de C.V.',
-      'Teléfono:',
+      'Teléfono',
       '2221234567',
       'DESCRIPCIÓN',
       'UNIDAD',
@@ -189,7 +165,7 @@ describe('PDF Propuesta técnica', () => {
     const pdf = await generarPropuestaTecnicaPdf(payload);
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     const [portada, ...resto] = textoPorHoja(pdf);
-    expect(portada).toContain('sin anexos');
+    expect(portada).toMatch(/sin anexos/i);
     expect(resto.join('\n')).not.toContain('ALCANCE DEL PROYECTO');
     // Portada, objetivo y cotización.
     expect(paginas(pdf)).toBe(3);
