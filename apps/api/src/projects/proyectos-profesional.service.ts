@@ -293,7 +293,9 @@ export class ProyectosProfesionalService {
     const client = await this.prisma.serviceClient.findUnique({ where: { id: dto.clientId } });
     if (!client) throw new NotFoundException('Cliente no encontrado');
 
-    const tenantId = await resolveRequiredCompanyId(this.prisma, companyId ?? (client as any).companyId);
+    const tenantId = await resolveRequiredCompanyId(this.prisma, companyId ?? client.companyId);
+    // Un cliente de otra empresa no se puede ligar: se contesta igual que si no existiera.
+    if (client.companyId !== tenantId) throw new NotFoundException('Cliente no encontrado');
 
     const startDate = this.fecha(dto.startDate)!;
     const endDate = this.fecha(dto.endDate ?? null);
