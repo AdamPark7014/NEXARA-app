@@ -260,6 +260,18 @@ function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean })
                 </span>
                 {a.prioridad === "ALTA" ? <PrioridadChip prioridad={a.prioridad} /> : null}
               </div>
+              {a.periodo ? (
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    marginBottom: 3,
+                    color: a.periodo.estado === "vencida" ? "#dc2626" : "var(--text-tertiary)",
+                  }}
+                >
+                  {a.periodo.etiqueta}
+                </div>
+              ) : null}
               <div
                 style={{
                   height: 6,

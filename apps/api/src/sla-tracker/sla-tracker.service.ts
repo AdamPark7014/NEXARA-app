@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OPEN_ACTIVITY_WHERE, isClosedStatus } from '../activities/activity-status.js';
 import { normalizarPrioridad } from '../activities/actividad-tiempos.js';
+import { finDelPeriodo, periodoDeActividad } from '../activities/actividad-periodo.js';
 
 // Las claves son la prioridad normalizada (ALTA | MEDIA | BAJA); los textos viejos
 // («Alta», «urgente», «P1») se traducen con normalizarPrioridad antes de buscar.
@@ -45,6 +46,8 @@ export class SlaTrackerService {
         fechaInicio: true,
         fechaFinalizacion: true,
         fechaEntregaEsperada: true,
+        periodoInicio: true,
+        periodoFin: true,
         responsable: { select: { id: true, nombre: true } },
         branchName: true,
       },
@@ -67,6 +70,27 @@ export class SlaTrackerService {
       const asignado = t.fechaAsignacion;
       if (!asignado) {
         stillOpen++;
+        continue;
+      }
+      // Actividad con periodo (varios días): su plazo es el fin del periodo, no «N horas desde
+      // que se asignó». Solo cuenta como tarde si se cerró (o sigue abierta) pasado su último día.
+      const periodo = periodoDeActividad(t);
+      if (periodo) {
+        const limite = finDelPeriodo(periodo.fin).getTime();
+        if (t.fechaFinalizacion) {
+          const hrs = (t.fechaFinalizacion.getTime() - asignado.getTime()) / 3600000;
+          resolutionHours.push(hrs);
+          if (t.fechaFinalizacion.getTime() <= limite) resolvedOnTime++;
+          else {
+            resolvedLate++;
+            breaches.push({ id: t.id, anNumber: t.anNumber, titulo: t.titulo, type: 'resolution', priority: t.prioridad, hoursLate: +((t.fechaFinalizacion.getTime() - limite) / 3600000).toFixed(1) });
+          }
+        } else if (!isClosedStatus(t.estatus)) {
+          stillOpen++;
+          if (Date.now() > limite) {
+            breaches.push({ id: t.id, anNumber: t.anNumber, titulo: t.titulo, type: 'resolution_open', priority: t.prioridad, hoursLate: +((Date.now() - limite) / 3600000).toFixed(1) });
+          }
+        }
         continue;
       }
       if (t.fechaInicio) {

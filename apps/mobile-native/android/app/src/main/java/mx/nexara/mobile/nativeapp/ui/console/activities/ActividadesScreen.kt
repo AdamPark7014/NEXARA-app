@@ -998,9 +998,12 @@ private fun OpenActivityCard(
                     }
                 }
                 val meta = buildList {
+                    // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
                     add(
-                        (CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima) ?: "Sin fecha") to
-                            NxIcons.Calendar,
+                        (
+                            ActivityPeriodo.cuandoTexto(a.periodo, CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima))
+                                ?: "Sin fecha"
+                            ) to NxIcons.Calendar,
                     )
                     a.tiempoEstimadoMin?.takeIf { it > 0 }?.let { est ->
                         val tope = a.tiempoMaximoMin?.takeIf { it > 0 }?.let { " · tope ${CoreActivityRules.formatMinutes(it)}" }.orEmpty()

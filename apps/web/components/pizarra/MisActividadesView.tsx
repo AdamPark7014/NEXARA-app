@@ -391,7 +391,8 @@ export default function MisActividadesPage() {
       <div style={{ display: "grid", gap: 12 }}>
         {open.map((a, i) => {
           const pr = priorityUi(a.prioridad);
-          const when = formatWhen(a.fechaInicio ?? a.fechaMaxima);
+          // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
+          const when = a.periodo?.etiqueta ?? formatWhen(a.fechaInicio ?? a.fechaMaxima);
           const est = formatMinutes(a.tiempoEstimadoMin);
           const max = formatMinutes(a.tiempoMaximoMin);
           // «Plan 2 h · real 2 h 35 min» (el tiempo estimado por persona manda sobre el viejo).

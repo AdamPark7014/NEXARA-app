@@ -489,6 +489,28 @@ struct MyActivityReschedule: Decodable, Hashable {
     let motivo: String?
 }
 
+/// Periodo de una actividad de varios días (regla del 18-09): sigue en la lista cada día
+/// hasta su fin. La frase («Día 3 de 10 · termina vie 25 sep») la arma la API con el «hoy»
+/// de México; la app solo la pinta. Ausente en APIs viejas.
+struct ActivityPeriodo: Decodable, Hashable {
+    let inicio: String?
+    let fin: String?
+    let dias: Int?
+    let dia: Int?
+    /// programada | en_curso | vencida | cerrada
+    let estado: String?
+    let etiqueta: String?
+    let multiDia: Bool?
+
+    /// La frase lista para mostrar, o nil si viene vacía.
+    var texto: String? {
+        let t = (etiqueta ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? nil : t
+    }
+
+    var vencido: Bool { estado == "vencida" }
+}
+
 struct MyActivityItem: Decodable, Identifiable, Hashable {
     let id: Int
     let anNumber: String?
@@ -519,6 +541,8 @@ struct MyActivityItem: Decodable, Identifiable, Hashable {
     let porRepartir: Bool?
     let pasadaA: [MyActivityPassedTo]?
     let ultimaReprogramacion: MyActivityReschedule?
+    /// Actividad de varios días: «Día 3 de 10 · termina vie 25 sep».
+    let periodo: ActivityPeriodo?
 
     var displayTitle: String {
         let title = (titulo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -575,6 +599,8 @@ struct TeamBoardOpenActivity: Decodable, Identifiable, Hashable {
     let teamEmails: [String]?
     let reparte: Bool?
     let fechaInicio: String?
+    /// Actividad de varios días: sigue en la pizarra cada día hasta su fin.
+    let periodo: ActivityPeriodo?
 }
 
 struct TeamBoardUser: Decodable, Identifiable, Hashable {

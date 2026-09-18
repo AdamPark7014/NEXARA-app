@@ -9,6 +9,7 @@
  * papel en el equipo copian `proyecto-estado.ts` de la API, que es la fuente.
  */
 import { buildApiUrl } from "@/lib/api-base";
+import type { PeriodoActividad } from "@/lib/actividad-periodo";
 
 // ---------------------------------------------------------------------------
 // Vocabulario
@@ -258,6 +259,70 @@ export type ActividadDeProyecto = {
   fechaEntregaEsperada?: string | null;
   fechaFinalizacion?: string | null;
   responsable?: Persona | null;
+  /** Periodo de ejecución y etapa que ejecuta (si se programó desde el proyecto). */
+  periodoInicio?: string | null;
+  periodoFin?: string | null;
+  projectMilestoneId?: number | null;
+  periodo?: PeriodoActividad | null;
+};
+
+// ---------------------------------------------------------------------------
+// Programar actividades del proyecto
+// ---------------------------------------------------------------------------
+
+export type ActividadProgramada = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  sitio: string | null;
+  responsableId: number;
+  periodo: PeriodoActividad | null;
+};
+
+/** Una etapa del cronograma con el periodo que le toca (propuesta de la API). */
+export type EtapaPropuesta = {
+  hitoId: number;
+  nombre: string;
+  descripcion: string | null;
+  estado: EstadoHito;
+  responsableId: number | null;
+  inicio: string;
+  fin: string;
+  dias: number;
+  /** Su fecha planeada quedaba antes de que terminara la anterior: se recorrió. */
+  ajustada: boolean;
+  programadas: ActividadProgramada[];
+  sugerida: boolean;
+};
+
+export type PropuestaProgramacion = {
+  proyecto: {
+    id: number;
+    title: string;
+    status: EstadoProyecto;
+    inicio: string | null;
+    fin: string | null;
+    siteCount: number | null;
+    responsableId: number | null;
+  };
+  etapas: EtapaPropuesta[];
+};
+
+export type EtapaAProgramar = {
+  hitoId: number;
+  inicio: string;
+  fin: string;
+  responsableId: number;
+  apoyoIds?: number[];
+  titulo?: string;
+  indicaciones?: string;
+};
+
+export type ResultadoProgramacion = {
+  creadas: Array<ActividadProgramada & { hitoId: number }>;
+  omitidas: Array<{ hitoId: number; sitio: string | null; motivo: string; activityId: number }>;
+  proyecto: ProyectoDetalle;
 };
 
 export type ProyectoDetalle = CabeceraProyecto & {
@@ -521,6 +586,20 @@ export function subirDocumentos(
 
 export function borrarDocumento(token: string, id: number, docId: number) {
   return pedir<ProyectoDetalle>(`proyectos/${id}/documentos/${docId}`, token, json("DELETE"));
+}
+
+/** Etapas con su periodo encadenado y lo que ya tienen programado. No crea nada. */
+export function obtenerProgramacion(token: string, id: number) {
+  return pedir<PropuestaProgramacion>(`proyectos/${id}/programacion`, token);
+}
+
+/** Crea de una vez una actividad por etapa (o por etapa × sitio), cada una con su periodo. */
+export function programarActividades(
+  token: string,
+  id: number,
+  datos: { porSitio?: boolean; etapas: EtapaAProgramar[] },
+) {
+  return pedir<ResultadoProgramacion>(`proyectos/${id}/programar-actividades`, token, json("POST", datos));
 }
 
 // ---------------------------------------------------------------------------

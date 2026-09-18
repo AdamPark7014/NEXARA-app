@@ -41,6 +41,24 @@ data class MyActivityPasadaDto(
     val evidenceStatus: String? = null,
 )
 
+/**
+ * Periodo de una actividad de varios días (regla del 18-09): sigue en la lista cada día
+ * hasta su fin. La frase ya viene hecha por la API con el «hoy» de México
+ * («Día 3 de 10 · termina vie 25 sep»); la app solo la pinta. Ausente en APIs viejas.
+ */
+data class ActivityPeriodoDto(
+    /** Primer y último día, `AAAA-MM-DD`. */
+    val inicio: String? = null,
+    val fin: String? = null,
+    val dias: Int? = null,
+    /** N en «Día N de M»; null si todavía no empieza o ya terminó. */
+    val dia: Int? = null,
+    /** programada | en_curso | vencida | cerrada */
+    val estado: String? = null,
+    val etiqueta: String? = null,
+    val multiDia: Boolean? = null,
+)
+
 /** Última reprogramación de día y hora (quién, cuándo, de → a). */
 data class MyActivityReprogramacionDto(
     val at: String? = null,
@@ -101,6 +119,8 @@ data class MyActivityItemDto(
     /** La empezó habiendo otra de más prioridad sin terminar. */
     val saltoPrioridad: Boolean? = null,
     val justificacionOrden: String? = null,
+    /** Actividad de varios días: «Día 3 de 10 · termina vie 25 sep». */
+    val periodo: ActivityPeriodoDto? = null,
 ) {
     /** El contrato dice `asignadoPor`; las respuestas de hoy traen `asignadaPor`. */
     val quienAsigno: MyActivityRefDto? get() = asignadoPor ?: asignadaPor
@@ -151,6 +171,7 @@ data class TeamBoardActivityDto(
     val estatus: String? = null,
     val fechaMaxima: String? = null,
     val bucket: String? = null,
+    val periodo: ActivityPeriodoDto? = null,
 )
 
 data class TeamBoardOpenActivityDto(
@@ -178,6 +199,8 @@ data class TeamBoardOpenActivityDto(
     val reparte: Boolean? = null,
     /** Día y hora programados (reprogramable por quien reparte). */
     val fechaInicio: String? = null,
+    /** Actividad de varios días: sigue en la pizarra cada día hasta su fin. */
+    val periodo: ActivityPeriodoDto? = null,
 )
 
 /** Última actividad que la persona terminó hoy (estado `libre`). */
