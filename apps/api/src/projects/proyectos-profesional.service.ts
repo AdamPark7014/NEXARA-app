@@ -26,6 +26,7 @@ import type { Alcanzador } from '../me/equipo-alcance.js';
 import {
   calcularSalud,
   resumirRequerimientos,
+  siguienteHito,
   type ResumenSalud,
 } from './proyecto-salud.js';
 import {
@@ -102,7 +103,9 @@ const listaInclude = {
   client: { select: { id: true, name: true } },
   cotizacion: { select: { id: true, quoteNumber: true } },
   activities: { select: { id: true, estatus: true } },
-  milestones: { select: { plannedDate: true, actualDate: true, status: true } },
+  milestones: {
+    select: { id: true, name: true, orden: true, plannedDate: true, actualDate: true, status: true },
+  },
   requirements: { select: { status: true } },
   _count: { select: { documents: true, members: true } },
 } satisfies Prisma.OperationalProjectInclude;
@@ -178,12 +181,24 @@ export class ProyectosProfesionalService {
     const conResumen = filas.map((p) => {
       const resumen = this.resumen(p as any);
       const { activities, milestones, requirements, _count, ...cabecera } = p as any;
+      const siguiente = siguienteHito<{
+        id: number;
+        name: string;
+        plannedDate: Date | null;
+        actualDate: Date | null;
+        status: string;
+        orden: number;
+      }>(milestones ?? []);
       return {
         ...cabecera,
         budgetAmount: cabecera.budgetAmount == null ? null : Number(cabecera.budgetAmount),
         documentosCount: _count?.documents ?? 0,
         equipoCount: _count?.members ?? 0,
         hitosCount: milestones?.length ?? 0,
+        // La etapa que sigue, para que la lista diga «qué toca» sin abrir el proyecto.
+        proximoHito: siguiente
+          ? { id: siguiente.id, name: siguiente.name, plannedDate: siguiente.plannedDate, status: siguiente.status }
+          : null,
         resumen,
       };
     });

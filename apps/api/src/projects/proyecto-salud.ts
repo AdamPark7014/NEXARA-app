@@ -288,6 +288,31 @@ export function calcularSalud(entrada: EntradaSalud, hoy: Date = new Date()): Re
   };
 }
 
+export type HitoConNombre = HitoDeProyecto & {
+  id?: number;
+  name?: string | null;
+  orden?: number | null;
+};
+
+/**
+ * La siguiente etapa por cumplir, para la fila de la lista: entre las que siguen
+ * abiertas, la de fecha planeada más próxima. Las que no tienen fecha van al final,
+ * en su orden del cronograma. `null` si ya no queda ninguna.
+ */
+export function siguienteHito<T extends HitoConNombre>(hitos: T[] = []): T | null {
+  const abiertos = hitos.filter(
+    (h) => h && h.status !== 'CUMPLIDO' && h.status !== 'CANCELADO' && !h.actualDate,
+  );
+  if (!abiertos.length) return null;
+  const fecha = (h: T) => aFecha(h.plannedDate)?.getTime() ?? Number.POSITIVE_INFINITY;
+  return [...abiertos].sort((a, b) => {
+    const fa = fecha(a);
+    const fb = fecha(b);
+    if (fa !== fb) return fa < fb ? -1 : 1;
+    return (a.orden ?? 0) - (b.orden ?? 0);
+  })[0];
+}
+
 /** ¿Cuántos requerimientos están cumplidos? Para la barra de la pestaña Alcance. */
 export function resumirRequerimientos(
   requerimientos: Array<{ status?: string | null }> = [],

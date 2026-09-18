@@ -487,6 +487,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `erp-clients, mis-actividades`,
   },
+  'erp-proyectos': {
+    id: 'erp-proyectos',
+    summary: `El proyecto completo: fechas planeadas y reales, cronograma por etapas, alcance, requerimientos, equipo, presupuesto y documentos.`,
+    audience: `Dirección, administración y coordinadores (quienes llevan proyectos).`,
+    how: `El avance sale de las actividades ligadas (o de las etapas cumplidas) y la salud de comparar el fin planeado contra hoy: no se capturan a mano.`,
+    steps: [
+      `Crea el proyecto con su cliente, fechas y etapas`,
+      `Marca cada etapa como cumplida cuando se entregue`,
+      `Sube planos, actas y minutas en Documentos`,
+    ],
+    connects: `erp-clients, erp-cotizaciones, pizarra`,
+  },
   'crm-dashboard': {
     id: 'crm-dashboard',
     summary: `Home comercial: pipeline, actividad del equipo e insights (LTV, forecast).`,

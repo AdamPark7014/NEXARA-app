@@ -8,6 +8,8 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'erp-clients',
   // Cotizaciones entra a Core: sin esto el módulo existe pero el sidebar lo esconde.
   'erp-cotizaciones',
+  // Proyectos (plan, cronograma, alcance, equipo y documentos), mismo motivo.
+  'erp-proyectos',
 ];
 export const CORE_PANEL_ID = 'erp' as const;
 
@@ -23,8 +25,8 @@ const NON_ERP_PANEL_RE =
 
 /**
  * Core-only: destino dentro de /erp para una ruta de otro panel, o null si no aplica.
- * Detalle de actividad y evidencias conservan el id; «Mi perfil» y «Mis actividades»
- * van a su equivalente; todo lo demás cae en CORE_HOME_PATH.
+ * Detalle de actividad, evidencias y proyecto conservan el id; «Mi perfil» y «Mis
+ * actividades» van a su equivalente; todo lo demás cae en CORE_HOME_PATH.
  */
 export function coreSurfaceRedirect(
   pathname: string,
@@ -38,6 +40,12 @@ export function coreSurfaceRedirect(
     return /^\/(evidences|evidencias)(\/|$)/.test(act[2] || '')
       ? `/erp/actividades/${act[1]}/evidencias`
       : `/erp/actividades/${act[1]}`;
+  }
+
+  // Proyectos operativos: el mismo registro vive ahora en /erp/proyectos, con el mismo id.
+  const proyecto = clean.match(/^\/ops\/(?:projects|proyectos)(?:\/(\d+))?(?:\/.*)?$/);
+  if (proyecto) {
+    return proyecto[1] ? `/erp/proyectos/${proyecto[1]}` : '/erp/proyectos';
   }
 
   const params = typeof search === 'string' ? new URLSearchParams(search) : (search ?? null);

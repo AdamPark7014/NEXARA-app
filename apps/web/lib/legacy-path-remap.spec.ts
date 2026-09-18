@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { coreSurfaceRedirect } from './core-surface';
 import { LEGACY_PANEL_PREFIX_MAP, normalizeLegacyPath, remapLegacySlugs } from './legacy-path-remap';
 
 describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
@@ -24,6 +25,29 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     expect(normalizeLegacyPath('/erp/cotizaciones/12')).toBe('/erp/cotizaciones/12');
     expect(normalizeLegacyPath('/erp/cotizaciones/nueva')).toBe('/erp/cotizaciones/nueva');
     expect(normalizeLegacyPath('/erp/quotes')).toBe('/erp/cotizaciones');
+  });
+
+  it('los proyectos de Core se quedan en /erp/proyectos', () => {
+    // Sin el atajo, el alias `proyectos`→`projects` mandaba la página a `/erp/projects`
+    // (308 del middleware a una ruta que no existe).
+    expect(normalizeLegacyPath('/erp/proyectos')).toBe('/erp/proyectos');
+    expect(normalizeLegacyPath('/erp/proyectos/nuevo')).toBe('/erp/proyectos/nuevo');
+    expect(normalizeLegacyPath('/erp/proyectos/42')).toBe('/erp/proyectos/42');
+    expect(remapLegacySlugs('/erp/proyectos/42')).toBe('/erp/proyectos/42');
+    expect(normalizeLegacyPath('/erp/projects')).toBe('/erp/proyectos');
+    expect(normalizeLegacyPath('/erp/projects/42')).toBe('/erp/proyectos/42');
+    // Las actividades de proyecto siguen siendo su propio bucket.
+    expect(normalizeLegacyPath('/erp/actividades/proyectos')).toBe('/erp/actividades/proyectos');
+  });
+
+  it('en superficie Core, los proyectos de OPS abren el mismo proyecto en /erp', () => {
+    expect(coreSurfaceRedirect('/ops/projects')).toBe('/erp/proyectos');
+    expect(coreSurfaceRedirect('/ops/projects/42')).toBe('/erp/proyectos/42');
+    expect(coreSurfaceRedirect('/ops/proyectos/42/')).toBe('/erp/proyectos/42');
+    // Lo que ya vive en /erp no se toca.
+    expect(coreSurfaceRedirect('/erp/proyectos/42')).toBeNull();
+    // Otras rutas de OPS siguen cayendo en la pizarra.
+    expect(coreSurfaceRedirect('/ops/work-projects')).toBe('/erp/pizarra');
   });
 
   it('aplica los remapeos cross-panel conservando el resto de la ruta', () => {
