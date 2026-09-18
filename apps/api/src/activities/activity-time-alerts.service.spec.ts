@@ -49,4 +49,26 @@ describe('aviso de tiempo excedido', () => {
 
     expect(avisos.notifyActivityOvertime).not.toHaveBeenCalled();
   });
+
+  it('una actividad de varios días no se da por excedida por el reloj corrido', async () => {
+    const { service, avisos, update } = build([
+      fila({
+        inicioRealAt: hace(3 * 24 * 60),
+        activity: { estatus: 'En Proceso', periodoInicio: '2026-09-16', periodoFin: '2026-09-25' },
+      }),
+    ]);
+    await (service as never as { escanear: (d: Date) => Promise<void> }).escanear(AHORA);
+
+    expect(update).not.toHaveBeenCalled();
+    expect(avisos.notifyActivityOvertime).not.toHaveBeenCalled();
+  });
+
+  it('con periodo de un solo día el tiempo estimado sí cuenta', async () => {
+    const { service, avisos } = build([
+      fila({ activity: { estatus: 'En Proceso', periodoInicio: '2026-09-18', periodoFin: '2026-09-18' } }),
+    ]);
+    await (service as never as { escanear: (d: Date) => Promise<void> }).escanear(AHORA);
+
+    expect(avisos.notifyActivityOvertime).toHaveBeenCalled();
+  });
 });

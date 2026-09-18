@@ -116,6 +116,8 @@ data class ActivityDto(
     val minutosReales: Double? = null,
     val excedida: Boolean? = null,
     val asignadoPor: ActivityPersonRefDto? = null,
+    /** Actividad de varios días (la frase la arma la API). */
+    val periodo: ActivityPeriodoDto? = null,
 )
 
 /** `{ id, nombre }` con nombre opcional: una persona borrada no debe tumbar el detalle. */

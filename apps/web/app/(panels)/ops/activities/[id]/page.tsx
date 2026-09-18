@@ -455,6 +455,16 @@ export default function ActivityDetailPage() {
               <DetailField label="Creador" value={activity.creador?.nombre} />
               <DetailField label="Asignación" value={formatDateTime(activity.fechaAsignacion)} />
               <DetailField label="Inicio" value={formatDateTime(activity.fechaInicio)} />
+              {activity.periodo ? (
+                <DetailField
+                  label={activity.projectMilestone ? `Periodo · ${activity.projectMilestone.name}` : "Periodo"}
+                  value={
+                    <span style={activity.periodo.estado === "vencida" ? { color: "#dc2626", fontWeight: 600 } : undefined}>
+                      {activity.periodo.etiqueta}
+                    </span>
+                  }
+                />
+              ) : null}
               {activity.acsEnteredAt && (
                 <DetailField
                   label="ACS"

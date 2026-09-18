@@ -119,7 +119,7 @@ export default function AsignadasPorMiView({
               {a.persona.nombre}
             </Link>
             {` · ${a.estatus} · asignada ${fecha(a.fechaAsignacion)}`}
-            {a.fechaMaxima ? ` · vence ${fecha(a.fechaMaxima)}` : ""}
+            {a.periodo ? ` · ${a.periodo.etiqueta}` : a.fechaMaxima ? ` · vence ${fecha(a.fechaMaxima)}` : ""}
             {a.minutosPlan != null
               ? ` · plan ${formatMinutes(a.minutosPlan)}${
                   a.minutosReales != null ? ` / real ${formatMinutes(a.minutosReales)}` : ""

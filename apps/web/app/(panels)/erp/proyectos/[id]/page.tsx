@@ -429,7 +429,7 @@ function DetalleProyecto() {
         ) : pestana === "documentos" ? (
           <SeccionDocumentos {...seccion} />
         ) : (
-          <SeccionActividades proyecto={p} hoy={hoy} />
+          <SeccionActividades {...seccion} />
         )}
       </div>
 

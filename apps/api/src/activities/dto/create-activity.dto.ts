@@ -5,6 +5,7 @@ import {
   IsInt,
   IsDateString,
   IsEnum,
+  Matches,
 } from 'class-validator';
 import { ActivityType, ActivityWorkType, TicketType } from '@prisma/client';
 
@@ -120,6 +121,23 @@ export class CreateActivityDto {
   @IsOptional()
   @IsDateString()
   fechaFinalizacion?: string;
+
+  /**
+   * Periodo de ejecución, `AAAA-MM-DD` (ambos días incluidos). Con periodo, la fecha máxima
+   * y la entrega esperada son el fin de `periodoFin`; `null` en los dos lo quita al editar.
+   */
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}/, { message: 'periodoInicio debe ser AAAA-MM-DD' })
+  periodoInicio?: string | null;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}/, { message: 'periodoFin debe ser AAAA-MM-DD' })
+  periodoFin?: string | null;
+
+  /** Etapa del cronograma del proyecto que ejecuta esta actividad. */
+  @IsOptional()
+  @IsInt()
+  projectMilestoneId?: number | null;
 
   /** Tipo Core: tarea|proyecto|obra|servicio|comercial */
   @IsOptional()

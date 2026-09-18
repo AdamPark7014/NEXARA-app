@@ -7,6 +7,8 @@
  *
  * Contrato del viernes, sección C (y la prioridad/semáforo de la B).
  */
+import { workDateKey } from '../common/time/workday.js';
+import { esMultiDia, finDelPeriodo, periodoFuturo, type Periodo } from '../activities/actividad-periodo.js';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 export type Semaforo = 'rojo' | 'amarillo' | 'verde';
@@ -124,6 +126,12 @@ export type ActividadPizarra = {
   minutosPlan?: number | null;
   inicio?: Date | null;
   fin?: Date | null;
+  /**
+   * Periodo de varios días (`actividad-periodo.ts`): vence al terminar su último día,
+   * no a la hora citada; antes de empezar no se le exige nada, y el tiempo estimado
+   * (que es de una jornada) no la marca excedida mientras corre.
+   */
+  periodo?: Periodo | null;
 };
 
 export type ActividadCalculada = {
@@ -159,18 +167,24 @@ export function calculaActividad(act: ActividadPizarra, ahora: Date): ActividadC
   const minutosReales = minutosEntre(inicio, fin, ahora);
   const iniciada = inicio != null || estatusArrancado(act.estatus) || terminada;
   const referencia = terminada ? (fin ?? ahora) : ahora;
-  const vencida =
-    act.fechaMaxima != null && referencia.getTime() > act.fechaMaxima.getTime();
-  const excedida = minutosPlan != null && minutosReales != null && minutosReales > minutosPlan;
+  const periodo = act.periodo ?? null;
+  const limite = periodo ? finDelPeriodo(periodo.fin) : (act.fechaMaxima ?? null);
+  const vencida = limite != null && referencia.getTime() > limite.getTime();
+  const variosDias = esMultiDia(periodo);
+  const excedida =
+    !variosDias && minutosPlan != null && minutosReales != null && minutosReales > minutosPlan;
+  // Todavía no llega su primer día: no está «sin iniciar», está programada.
+  const programada = !terminada && periodoFuturo(periodo, workDateKey(ahora));
 
   let semaforo: Semaforo = 'verde';
-  if (!cancelada) {
+  if (!cancelada && !programada) {
     if (vencida || excedida || (prioridad === 'ALTA' && !iniciada)) {
       semaforo = 'rojo';
     } else if (
       (prioridad === 'MEDIA' && !iniciada) ||
       (iniciada &&
         !terminada &&
+        !variosDias &&
         minutosPlan != null &&
         minutosReales != null &&
         minutosReales >= (minutosPlan * PCT_ALERTA_PLAN) / 100)

@@ -192,6 +192,45 @@ describe('tiemposDto', () => {
   });
 });
 
+describe('periodo de varios días', () => {
+  const periodo = { periodoInicio: new Date('2026-09-16T00:00:00Z'), periodoFin: new Date('2026-09-25T00:00:00Z') };
+
+  it('el tiempo estimado no la pone roja ni excedida mientras corre', () => {
+    const dto = tiemposDto(
+      { aceptadaAt: hace(3000), inicioRealAt: hace(2900), horasPlan: '2' },
+      { prioridad: 'Media', fechaMaxima: new Date('2026-09-16T15:00:00Z'), estatus: 'En Proceso', ...periodo },
+      AHORA,
+    );
+    expect(dto.excedida).toBe(false);
+    expect(dto.semaforo).toBe('verde');
+    // Sin periodo, la misma fila está roja: excedida y pasada de su fecha máxima.
+    const sinPeriodo = tiemposDto(
+      { aceptadaAt: hace(3000), inicioRealAt: hace(2900), horasPlan: '2' },
+      { prioridad: 'Media', fechaMaxima: new Date('2026-09-16T15:00:00Z'), estatus: 'En Proceso' },
+      AHORA,
+    );
+    expect(sinPeriodo.semaforo).toBe('rojo');
+  });
+
+  it('pasado el último día sí es roja', () => {
+    expect(
+      semaforoDe({
+        prioridad: 'Media',
+        inicioRealAt: hace(60),
+        periodoInicio: '2026-09-10',
+        periodoFin: '2026-09-17',
+        ahora: AHORA,
+      }),
+    ).toBe('rojo');
+  });
+
+  it('programada para después: verde aunque sea ALTA y no haya empezado', () => {
+    expect(
+      semaforoDe({ prioridad: 'Alta', periodoInicio: '2026-09-21', periodoFin: '2026-09-30', ahora: AHORA }),
+    ).toBe('verde');
+  });
+});
+
 describe('horasPlan al asignar', () => {
   it('redondea a dos decimales y descarta lo inválido', () => {
     expect(horasPlanValidas('2.333')).toBe(2.33);

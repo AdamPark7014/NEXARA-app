@@ -5,6 +5,8 @@
  * las mismas definiciones (contrato del 18-09, sección B) y para poder probarlas
  * sin base de datos.
  */
+import { workDateKey } from '../common/time/workday.js';
+import { esMultiDia, finDelPeriodo, periodoDeActividad, periodoFuturo } from './actividad-periodo.js';
 
 export type Prioridad = 'ALTA' | 'MEDIA' | 'BAJA';
 export type Aceptacion = 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA';
@@ -152,20 +154,30 @@ export function semaforoDe(params: {
   /** Cerrada (finalizada, aprobada o cancelada): ya no se le exige fecha. */
   cerrada?: boolean;
   ahora?: Date;
+  /**
+   * Periodo de la actividad (`actividad-periodo.ts`). Con él, «vencida» es pasar el fin
+   * de su último día; antes de su primer día está programada (verde); y si dura varios
+   * días, el tiempo estimado de una jornada no la pone roja ni amarilla mientras corre.
+   */
+  periodoInicio?: Date | string | null;
+  periodoFin?: Date | string | null;
 }): Semaforo {
   const ahora = params.ahora ?? new Date();
-  const plan = params.minutosPlan ?? null;
+  const periodo = periodoDeActividad(params);
+  const variosDias = esMultiDia(periodo);
+  const plan = variosDias ? null : (params.minutosPlan ?? null);
   const reales = params.minutosReales ?? null;
   if (estaExcedida(plan, reales)) return 'rojo';
 
   const terminada = Boolean(aFecha(params.finRealAt)) || Boolean(params.cerrada);
   if (terminada) return 'verde';
 
-  const maxima = aFecha(params.fechaMaxima);
+  const maxima = periodo ? finDelPeriodo(periodo.fin) : aFecha(params.fechaMaxima);
   if (maxima && maxima.getTime() < ahora.getTime()) return 'rojo';
 
   const iniciada = Boolean(aFecha(params.inicioRealAt));
   if (!iniciada) {
+    if (periodoFuturo(periodo, workDateKey(ahora))) return 'verde';
     const prioridad = normalizarPrioridad(params.prioridad);
     if (prioridad === 'ALTA') return 'rojo';
     if (prioridad === 'MEDIA') return 'amarillo';
@@ -191,12 +203,16 @@ export function tiemposDto(
     prioridad?: string | null;
     fechaMaxima?: Date | null;
     estatus?: string | null;
+    periodoInicio?: Date | string | null;
+    periodoFin?: Date | string | null;
   },
   ahora: Date = new Date(),
 ) {
   const plan = minutosPlan(fila.horasPlan);
   const reales = minutosReales(fila.inicioRealAt, fila.finRealAt, ahora);
   const cerrada = esCerrada(actividad.estatus);
+  // Varios días: el plan es de una jornada y el reloj corre de corrido; no se compara.
+  const variosDias = esMultiDia(periodoDeActividad(actividad));
   return {
     aceptacion: aceptacionDe(fila),
     motivoRechazo: fila.motivoRechazo ?? null,
@@ -210,10 +226,12 @@ export function tiemposDto(
       minutosReales: reales,
       cerrada,
       ahora,
+      periodoInicio: actividad.periodoInicio ?? null,
+      periodoFin: actividad.periodoFin ?? null,
     }),
     minutosPlan: plan,
     minutosReales: reales,
-    excedida: estaExcedida(plan, reales),
+    excedida: variosDias ? false : estaExcedida(plan, reales),
     inicioRealAt: fila.inicioRealAt ?? null,
     finRealAt: fila.finRealAt ?? null,
     saltoPrioridad: Boolean(fila.saltoPrioridad),
