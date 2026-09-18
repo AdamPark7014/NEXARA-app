@@ -452,5 +452,13 @@ export function formatoFecha(valor?: string | null) {
   if (!valor) return "—";
   const fecha = new Date(valor);
   if (Number.isNaN(fecha.getTime())) return "—";
-  return fecha.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  // Emisión y vigencia son fechas sin hora (se guardan a medianoche UTC): en hora de México
+  // «2026-09-18» se leía 17 de septiembre.
+  const soloFecha = /^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z)?$/.test(String(valor));
+  return fecha.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    ...(soloFecha ? { timeZone: "UTC" } : {}),
+  });
 }

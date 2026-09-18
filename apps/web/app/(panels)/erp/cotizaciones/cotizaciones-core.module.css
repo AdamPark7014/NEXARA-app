@@ -411,6 +411,17 @@
   text-align: right;
 }
 
+.cell.derecha {
+  align-items: flex-end;
+}
+
+.fecha {
+  font-size: 0.8rem;
+  font-weight: 650;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .chip,
 .badge {
   display: inline-flex;
@@ -603,6 +614,11 @@
 @media (max-width: 960px) {
   .head {
     display: none;
+  }
+  /* En la tarjeta el folio completo cabe partido: es lo que se busca con la vista. */
+  .folio {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .row {
     grid-template-columns: minmax(0, 1fr) auto;
