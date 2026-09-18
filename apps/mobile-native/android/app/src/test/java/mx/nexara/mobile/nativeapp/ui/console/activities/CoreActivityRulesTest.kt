@@ -2,8 +2,14 @@ package mx.nexara.mobile.nativeapp.ui.console.activities
 
 import java.time.Instant
 import java.time.ZoneId
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotoDto
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotosDto
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCamposJson
+import mx.nexara.mobile.nativeapp.data.api.EvidenceFlowDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.TeamEvidenceDto
@@ -421,25 +427,106 @@ class CoreActivityRulesTest {
 
     // ── Evidencia por campos ────────────────────────────────────────────────
 
+    private fun foto(url: String?) = url?.let { EvidenceCampoFotoDto(photoUrl = it) }
+
     private fun campo(
         id: Long,
         nombre: String,
         orden: Int? = null,
-        momentos: List<String>? = listOf("antes", "despues"),
+        momentos: List<String>? = listOf("ANTES", "DESPUES"),
         antes: String? = null,
-        progreso: String? = null,
+        enProgreso: String? = null,
         despues: String? = null,
     ) = EvidenceCampoDto(
         id = id,
         nombre = nombre,
         orden = orden,
         momentos = momentos,
-        fotos = EvidenceCampoFotosDto(antes = antes, progreso = progreso, despues = despues),
+        fotos = EvidenceCampoFotosDto(antes = foto(antes), enProgreso = foto(enProgreso), despues = foto(despues)),
     )
+
+    /** Misma configuración que ApiClient: Moshi reflexivo de Kotlin. */
+    private val moshi: Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+
+    /**
+     * `GET activity-evidence/:id` tal como lo arma el API (activity-evidence.service.ts
+     * `getActivityEvidence` + `listarCamposDeActividad`): fotos por momento con
+     * claves en mayúsculas y cada foto como objeto.
+     */
+    private val flujoConCamposJson = """
+        {
+          "id": 55,
+          "activityId": 812,
+          "userId": 31,
+          "status": "EVIDENCE_PHOTOS",
+          "reviewStatus": null,
+          "rejectedSteps": null,
+          "entryPhotoUrl": "/uploads/activities/entrada.jpg",
+          "entryLatitude": "19.0433",
+          "entryLongitude": "-98.1981",
+          "evidencePhotos": [],
+          "createdAt": "2026-09-17T14:58:00.000Z",
+          "activity": {
+            "id": 812,
+            "indicaciones": null,
+            "coreKind": "obra",
+            "evidencePhotoRequired": 4,
+            "responsableId": 7,
+            "companyId": 1,
+            "estatus": "En Proceso",
+            "assignees": [{ "userId": 31, "indicaciones": null, "rol": "TECNICO" }]
+          },
+          "assigneeIndicaciones": null,
+          "stepsForKind": ["ENTRY_PHOTO", "EVIDENCE_PHOTOS", "SERVICE_SHEET_DATA", "EXIT_PHOTO"],
+          "progressPct": 25,
+          "campos": [
+            {
+              "id": 102,
+              "nombre": "Rack",
+              "momentos": ["DESPUES"],
+              "notas": null,
+              "orden": 1,
+              "fotos": { "ANTES": null, "EN_PROGRESO": null, "DESPUES": null },
+              "pendientes": ["DESPUES"],
+              "completo": false
+            },
+            {
+              "id": 101,
+              "nombre": "Cámara 1",
+              "momentos": ["ANTES", "EN_PROGRESO", "DESPUES"],
+              "notas": "Pasillo norte",
+              "orden": 0,
+              "fotos": {
+                "ANTES": {
+                  "id": 900,
+                  "momento": "ANTES",
+                  "photoUrl": "/uploads/activities/camara1-antes.jpg",
+                  "latitude": 19.0433,
+                  "longitude": -98.1981,
+                  "capturedAt": "2026-09-17T15:04:05.000Z",
+                  "por": { "id": 31, "nombre": "Joan Sánchez" }
+                },
+                "EN_PROGRESO": null,
+                "DESPUES": null
+              },
+              "pendientes": ["EN_PROGRESO", "DESPUES"],
+              "completo": false
+            }
+          ],
+          "camposProgreso": {
+            "requeridas": 4,
+            "cumplidas": 1,
+            "pct": 25,
+            "completo": false,
+            "faltantes": ["Cámara 1 (en progreso)", "Cámara 1 (después)", "Rack (después)"]
+          },
+          "avancesAnteriores": []
+        }
+    """.trimIndent()
 
     @Test
     fun `sin campos nada bloquea la salida`() {
-        // La API de hoy no manda campos: la captura es la de siempre.
+        // Actividad sin campos: la captura es la de siempre (fotos libres).
         assertTrue(CoreActivityRules.camposListos(null))
         assertTrue(CoreActivityRules.camposListos(emptyList()))
         assertNull(CoreActivityRules.camposBloqueoSalida(null))
@@ -447,23 +534,36 @@ class CoreActivityRulesTest {
     }
 
     @Test
-    fun `los momentos se normalizan y se ordenan`() {
-        assertEquals("antes", CoreActivityRules.normMomento(" ANTES "))
-        assertEquals("progreso", CoreActivityRules.normMomento("en progreso"))
-        assertEquals("despues", CoreActivityRules.normMomento("después"))
+    fun `los momentos se normalizan como en el API`() {
+        // El API manda y recibe ANTES | EN_PROGRESO | DESPUES; también acepta minúsculas.
+        assertEquals("ANTES", CoreActivityRules.normMomento(" ANTES "))
+        assertEquals("ANTES", CoreActivityRules.normMomento("antes"))
+        assertEquals("EN_PROGRESO", CoreActivityRules.normMomento("EN_PROGRESO"))
+        assertEquals("EN_PROGRESO", CoreActivityRules.normMomento("en_progreso"))
+        assertEquals("EN_PROGRESO", CoreActivityRules.normMomento("en progreso"))
+        assertEquals("EN_PROGRESO", CoreActivityRules.normMomento("En-Progreso"))
+        assertEquals("EN_PROGRESO", CoreActivityRules.normMomento("progreso"))
+        assertEquals("EN_PROGRESO", CoreActivityRules.normMomento("durante"))
+        assertEquals("DESPUES", CoreActivityRules.normMomento("DESPUES"))
+        assertEquals("DESPUES", CoreActivityRules.normMomento("después"))
+        assertEquals("DESPUES", CoreActivityRules.normMomento("DESPUÉS"))
         assertNull(CoreActivityRules.normMomento("al rato"))
-        assertEquals("En progreso", CoreActivityRules.momentoLabel("progreso"))
+        assertNull(CoreActivityRules.normMomento(""))
+        assertNull(CoreActivityRules.normMomento(null))
+        // Lo que ve la persona sigue en español.
+        assertEquals("Antes", CoreActivityRules.momentoLabel("ANTES"))
+        assertEquals("En progreso", CoreActivityRules.momentoLabel("EN_PROGRESO"))
         assertEquals("Después", CoreActivityRules.momentoLabel("DESPUES"))
         // Llegue como llegue, siempre se pide en el mismo orden y sin repetidos.
-        val c = campo(1, "Cámara 1", momentos = listOf("despues", "antes", "ANTES", "al rato"))
-        assertEquals(listOf("antes", "despues"), CoreActivityRules.momentosDeCampo(c))
+        val c = campo(1, "Cámara 1", momentos = listOf("DESPUES", "antes", "ANTES", "al rato"))
+        assertEquals(listOf("ANTES", "DESPUES"), CoreActivityRules.momentosDeCampo(c))
     }
 
     @Test
     fun `la salida espera a que no falte ninguna foto de campo`() {
         val campos = listOf(
-            campo(1, "Cámara 1", orden = 1, momentos = listOf("antes", "despues"), antes = "https://a.jpg"),
-            campo(2, "Rack", orden = 2, momentos = listOf("progreso")),
+            campo(1, "Cámara 1", orden = 1, momentos = listOf("ANTES", "DESPUES"), antes = "https://a.jpg"),
+            campo(2, "Rack", orden = 2, momentos = listOf("EN_PROGRESO")),
         )
         assertEquals(3, CoreActivityRules.camposRequeridos(campos))
         assertEquals(2, CoreActivityRules.camposFaltantes(campos))
@@ -475,8 +575,8 @@ class CoreActivityRulesTest {
         )
 
         val completos = listOf(
-            campo(1, "Cámara 1", momentos = listOf("antes"), antes = "https://a.jpg"),
-            campo(2, "Rack", momentos = listOf("progreso"), progreso = "https://b.jpg"),
+            campo(1, "Cámara 1", momentos = listOf("ANTES"), antes = "https://a.jpg"),
+            campo(2, "Rack", momentos = listOf("EN_PROGRESO"), enProgreso = "https://b.jpg"),
         )
         assertTrue(CoreActivityRules.camposListos(completos))
         assertNull(CoreActivityRules.camposBloqueoSalida(completos))
@@ -485,11 +585,22 @@ class CoreActivityRulesTest {
 
     @Test
     fun `una sola foto pendiente se dice en singular`() {
-        val campos = listOf(campo(1, "Rack", momentos = listOf("antes")))
+        val campos = listOf(campo(1, "Rack", momentos = listOf("ANTES")))
         assertEquals(
             "Falta 1 foto por campo antes de cerrar la actividad.",
             CoreActivityRules.camposBloqueoSalida(campos),
         )
+    }
+
+    @Test
+    fun `una foto sin URL sigue siendo hueco pendiente`() {
+        val c = EvidenceCampoDto(
+            id = 1,
+            momentos = listOf("ANTES"),
+            fotos = EvidenceCampoFotosDto(antes = EvidenceCampoFotoDto(id = 3, photoUrl = "  ")),
+        )
+        assertNull(CoreActivityRules.fotoDeCampo(c, "ANTES"))
+        assertEquals(listOf("ANTES"), CoreActivityRules.momentosPendientes(c))
     }
 
     @Test
@@ -502,30 +613,138 @@ class CoreActivityRulesTest {
     }
 
     @Test
-    fun `la respuesta del POST no borra lo que ya estaba`() {
-        val previo = campo(1, "Cámara 1", orden = 1, momentos = listOf("antes", "despues"), antes = "https://a.jpg")
-        val nuevo = EvidenceCampoDto(id = 1, fotos = EvidenceCampoFotosDto(despues = "https://d.jpg"))
-        val mezcla = CoreActivityRules.mezclaCampo(previo, nuevo)
-        assertEquals("Cámara 1", mezcla.nombre)
-        assertEquals(listOf("antes", "despues"), mezcla.momentos)
-        assertEquals("https://a.jpg", CoreActivityRules.fotoDeCampo(mezcla, "antes"))
-        assertEquals("https://d.jpg", CoreActivityRules.fotoDeCampo(mezcla, "despues"))
-        assertTrue(CoreActivityRules.campoListo(mezcla))
-        // Sin respuesta (cola sin conexión) se queda lo que había.
-        assertEquals(previo, CoreActivityRules.mezclaCampo(previo, null))
+    fun `el GET del API se lee con fotos por momento`() {
+        val flow = moshi.adapter(EvidenceFlowDto::class.java).fromJson(flujoConCamposJson)!!
+        val campos = CoreActivityRules.camposOrdenados(flow.campos)
+        assertEquals(listOf("Cámara 1", "Rack"), campos.map { it.nombre })
+
+        val camara = campos[0]
+        assertEquals(listOf("ANTES", "EN_PROGRESO", "DESPUES"), CoreActivityRules.momentosDeCampo(camara))
+        // La foto que ya se tomó se encuentra (antes se perdía: claves y forma no cuadraban).
+        assertEquals("/uploads/activities/camara1-antes.jpg", CoreActivityRules.fotoDeCampo(camara, "ANTES"))
+        assertNull(CoreActivityRules.fotoDeCampo(camara, "EN_PROGRESO"))
+        assertNull(CoreActivityRules.fotoDeCampo(camara, "DESPUES"))
+        val antes = camara.fotos?.antes
+        assertEquals("Joan Sánchez", antes?.por?.nombre)
+        assertEquals(19.0433, CoreActivityRules.anyToDouble(antes?.latitude)!!, 1e-9)
+        assertEquals("2026-09-17T15:04:05.000Z", antes?.capturedAt)
+
+        // Lo que falta, igual que lo calcula el API (`pendientes` / `camposProgreso`).
+        assertEquals(camara.pendientes, CoreActivityRules.momentosPendientes(camara))
+        assertEquals(listOf("EN_PROGRESO", "DESPUES"), CoreActivityRules.momentosPendientes(camara))
+        assertEquals(listOf("DESPUES"), CoreActivityRules.momentosPendientes(campos[1]))
+        assertEquals(4, CoreActivityRules.camposRequeridos(campos))
+        assertEquals(3, CoreActivityRules.camposFaltantes(campos))
+        assertEquals("1 de 4 fotos por campo", CoreActivityRules.camposResumen(campos))
+        assertFalse(CoreActivityRules.campoListo(camara))
+        assertEquals(listOf("/uploads/activities/camara1-antes.jpg"), CoreActivityRules.camposFotoUrls(campos))
+        assertEquals(
+            "Faltan 3 fotos por campo antes de cerrar la actividad.",
+            CoreActivityRules.camposBloqueoSalida(campos),
+        )
+    }
+
+    @Test
+    fun `la foto de campo viaja con el cuerpo que espera el API`() {
+        val json = moshi.adapter(EvidenceCampoFotoRequest::class.java).toJson(
+            EvidenceCampoFotoRequest(
+                momento = CoreActivityRules.MOMENTO_EN_PROGRESO,
+                photoUrl = "data:image/jpeg;base64,/9j/4AAQ",
+                latitude = 19.04,
+                longitude = -98.19,
+                capturedAt = "2026-09-17T15:04:05Z",
+            ),
+        )
+        assertTrue(json, json.contains("\"momento\":\"EN_PROGRESO\""))
+        assertTrue(json, json.contains("\"photoUrl\":\"data:image/jpeg;base64,/9j/4AAQ\""))
+        assertTrue(json, json.contains("\"latitude\":19.04"))
+        assertTrue(json, json.contains("\"longitude\":-98.19"))
+        assertTrue(json, json.contains("\"capturedAt\":\"2026-09-17T15:04:05Z\""))
+        assertFalse(json, json.contains("fotoBase64"))
+        assertFalse(json, json.contains("\"lat\""))
+    }
+
+    @Test
+    fun `la respuesta del POST reemplaza todos los campos`() {
+        val previos = moshi.adapter(EvidenceFlowDto::class.java).fromJson(flujoConCamposJson)!!.campos
+        // El API responde con la lista COMPLETA de campos, no con uno solo.
+        val respuesta = EvidenceCamposJson.lista(
+            """
+            [
+              {
+                "id": 101, "nombre": "Cámara 1", "momentos": ["ANTES", "EN_PROGRESO", "DESPUES"],
+                "notas": "Pasillo norte", "orden": 0,
+                "fotos": {
+                  "ANTES": { "id": 900, "momento": "ANTES", "photoUrl": "/uploads/activities/camara1-antes.jpg",
+                             "latitude": 19.0433, "longitude": -98.1981, "capturedAt": "2026-09-17T15:04:05.000Z",
+                             "por": { "id": 31, "nombre": "Joan Sánchez" } },
+                  "EN_PROGRESO": null,
+                  "DESPUES": null
+                },
+                "pendientes": ["EN_PROGRESO", "DESPUES"], "completo": false
+              },
+              {
+                "id": 102, "nombre": "Rack", "momentos": ["DESPUES"], "notas": null, "orden": 1,
+                "fotos": {
+                  "ANTES": null,
+                  "EN_PROGRESO": null,
+                  "DESPUES": { "id": 901, "momento": "DESPUES", "photoUrl": "/uploads/activities/rack-despues.jpg",
+                               "latitude": null, "longitude": null, "capturedAt": null, "por": null }
+                },
+                "pendientes": [], "completo": true
+              }
+            ]
+            """.trimIndent(),
+        )!!
+        val campos = CoreActivityRules.camposTrasFoto(
+            previos = previos,
+            respuesta = respuesta,
+            campoId = 102,
+            momento = "DESPUES",
+            urlLocal = "data:image/jpeg;base64,xx",
+        )
+        assertEquals(respuesta, campos)
+        val rack = campos.first { it.id == 102L }
+        assertEquals("/uploads/activities/rack-despues.jpg", CoreActivityRules.fotoDeCampo(rack, "DESPUES"))
+        assertTrue(CoreActivityRules.campoListo(rack))
+        assertEquals(2, CoreActivityRules.camposFaltantes(campos))
+        // Lo que ya estaba en otros campos sigue ahí.
+        assertEquals(
+            "/uploads/activities/camara1-antes.jpg",
+            CoreActivityRules.fotoDeCampo(campos.first { it.id == 101L }, "ANTES"),
+        )
+    }
+
+    @Test
+    fun `sin conexion la respuesta es la cola y no una lista`() {
+        assertNull(EvidenceCamposJson.lista("""{"queued":true,"offline":true}"""))
+        assertNull(EvidenceCamposJson.lista(""))
+        assertNull(EvidenceCamposJson.lista(null))
+        assertEquals(emptyList<EvidenceCampoDto>(), EvidenceCamposJson.lista("[]"))
     }
 
     @Test
     fun `sin conexion el hueco igual se marca tomado`() {
-        val vacio = campo(1, "Rack", momentos = listOf("progreso"))
-        val marcado = CoreActivityRules.conFoto(vacio, "progreso", "data:image/jpeg;base64,xx")
-        assertEquals("data:image/jpeg;base64,xx", CoreActivityRules.fotoDeCampo(marcado, "progreso"))
-        assertTrue(CoreActivityRules.campoListo(marcado))
+        val previos = listOf(
+            campo(1, "Rack", momentos = listOf("EN_PROGRESO")),
+            campo(2, "Cámara 1", momentos = listOf("ANTES"), antes = "https://a.jpg"),
+        )
+        val marcados = CoreActivityRules.camposTrasFoto(
+            previos = previos,
+            respuesta = null,
+            campoId = 1,
+            momento = "en progreso",
+            urlLocal = "data:image/jpeg;base64,xx",
+        )
+        val rack = marcados.first { it.id == 1L }
+        assertEquals("data:image/jpeg;base64,xx", CoreActivityRules.fotoDeCampo(rack, "EN_PROGRESO"))
+        assertTrue(CoreActivityRules.campoListo(rack))
+        assertEquals(previos[1], marcados.first { it.id == 2L })
         // Lo que ya venía del servidor manda sobre la copia local.
-        val servido = campo(1, "Rack", momentos = listOf("progreso"), progreso = "https://real.jpg")
+        val servido = campo(1, "Rack", momentos = listOf("EN_PROGRESO"), enProgreso = "https://real.jpg")
         assertEquals(
             "https://real.jpg",
-            CoreActivityRules.fotoDeCampo(CoreActivityRules.conFoto(servido, "progreso", "data:x"), "progreso"),
+            CoreActivityRules.fotoDeCampo(CoreActivityRules.conFoto(servido, "EN_PROGRESO", "data:x"), "EN_PROGRESO"),
         )
     }
 }
