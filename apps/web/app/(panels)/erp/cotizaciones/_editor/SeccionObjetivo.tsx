@@ -52,13 +52,13 @@ export default function SeccionObjetivo({
   return (
     <Hoja
       id="objetivo"
-      numero="01."
+      numero="01"
       titulo="Objetivo del proyecto"
-      ayuda="Qué gana el cliente con este proyecto. Lo que dejes vacío lo completa el PDF con la plantilla del segmento y las cifras de tus partidas."
+      ayuda="Qué gana el cliente. Lo que dejes vacío lo completa el PDF con la plantilla del segmento."
       acciones={
         editable ? (
           <button type="button" className={styles.secondaryBtn} onClick={pedirBorrador}>
-            ✦ Redactar borrador
+            Redactar borrador
           </button>
         ) : null
       }
@@ -67,7 +67,7 @@ export default function SeccionObjetivo({
         <div className={`${styles.aviso} ${styles.avisoAlerta}`} role="alert">
           <p>¿Reemplazar lo que escribiste con el borrador del segmento y tus partidas?</p>
           <span className={styles.hojaAcciones}>
-            <button type="button" className={styles.primaryBtn} onClick={redactar}>
+            <button type="button" className={styles.secondaryBtn} onClick={redactar}>
               Reemplazar
             </button>
             <button type="button" className={styles.ghostBtn} onClick={() => setConfirmar(false)}>
@@ -78,12 +78,12 @@ export default function SeccionObjetivo({
       ) : null}
 
       {vacio && editable ? (
-        <div style={{ marginBottom: 14 }}>
+        <div className={styles.bloque}>
           <Vacio
             titulo="Empieza con un borrador y ajústalo"
             acciones={
               <>
-                <button type="button" className={styles.primaryBtn} onClick={redactar}>
+                <button type="button" className={styles.secondaryBtn} onClick={redactar}>
                   Redactar borrador
                 </button>
                 <button type="button" className={styles.ghostBtn} onClick={() => introRef.current?.focus()}>
@@ -98,8 +98,10 @@ export default function SeccionObjetivo({
         </div>
       ) : null}
 
-      <label className={styles.soloLector} htmlFor="obj-intro">
-        Introducción del objetivo
+      <div className={styles.campos}>
+      <div className={styles.campo}>
+      <label className={styles.etiqueta} htmlFor="obj-intro">
+        Introducción
       </label>
       <TextoAuto
         id="obj-intro"
@@ -109,8 +111,10 @@ export default function SeccionObjetivo({
         placeholder={plantilla?.intro ?? "Este proyecto permitirá contar con…"}
         disabled={!editable}
       />
+      </div>
 
-      <p className={styles.frase}>Entre los principales beneficios se encuentran:</p>
+      <div className={styles.campo}>
+      <span className={styles.etiqueta}>Beneficios · «Entre los principales beneficios se encuentran:»</span>
       <ListaEditable
         items={objetivo.beneficios}
         onCambio={(beneficios) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, beneficios } }))}
@@ -144,10 +148,11 @@ export default function SeccionObjetivo({
           ) : null}
         </div>
       ) : null}
+      </div>
 
-      <div style={{ marginTop: 14 }}>
-        <label className={styles.soloLector} htmlFor="obj-cierre">
-          Cierre del objetivo
+      <div className={styles.campo}>
+        <label className={styles.etiqueta} htmlFor="obj-cierre">
+          Cierre
         </label>
         <TextoAuto
           id="obj-cierre"
@@ -156,6 +161,7 @@ export default function SeccionObjetivo({
           placeholder={plantilla?.cierre ?? "Como resultado, el cliente dispondrá de…"}
           disabled={!editable}
         />
+      </div>
       </div>
     </Hoja>
   );

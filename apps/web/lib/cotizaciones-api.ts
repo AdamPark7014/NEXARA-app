@@ -426,6 +426,38 @@ export async function pdfDeCotizacion(token: string, id: number, signal?: AbortS
   return res.blob();
 }
 
+/**
+ * Vista previa en vivo: el PDF del borrador que está en pantalla, sin guardarlo.
+ *
+ * `borrador` es lo mismo que guarda el autoguardado (`payloadDeDocumento`). La API responde el PDF y,
+ * en `X-Propuesta-Secciones`, la página donde empieza cada sección.
+ */
+export async function vistaPreviaEnVivo(
+  token: string,
+  id: number,
+  borrador: GuardarCotizacion,
+  signal?: AbortSignal,
+): Promise<{ bytes: Uint8Array; secciones: string | null }> {
+  const res = await fetch(buildApiUrl(`cotizaciones/${id}/pdf/vista-previa`), {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/pdf" },
+    body: JSON.stringify(borrador),
+    signal,
+  });
+  if (!res.ok) {
+    let mensaje = `No se pudo armar la vista previa (HTTP ${res.status})`;
+    try {
+      const cuerpo = (await res.json()) as { message?: string | string[] };
+      if (cuerpo?.message) mensaje = Array.isArray(cuerpo.message) ? cuerpo.message.join(", ") : cuerpo.message;
+    } catch {
+      /* cuerpo no JSON: se queda el mensaje genérico */
+    }
+    throw new Error(mensaje);
+  }
+  return { bytes: new Uint8Array(await res.arrayBuffer()), secciones: res.headers.get("X-Propuesta-Secciones") };
+}
+
 export type PlantillasSegmento = {
   segmento: Segmento;
   etiqueta: string;
