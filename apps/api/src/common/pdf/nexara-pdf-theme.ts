@@ -77,6 +77,78 @@ export const loadPdfAsset = (nombre: string): Buffer | null =>
     path.resolve(process.cwd(), 'apps/api/src/assets', nombre),
   ]);
 
+/**
+ * Tipografía corporativa: Montserrat para títulos y la marca, Inter para texto, tablas y etiquetas.
+ * Ambas con licencia SIL Open Font License 1.1 (texto en `src/assets/fonts/OFL-*.txt`), que permite
+ * embeberlas en documentos. Son los cortes «latin» de Fontsource 5.3.0 (@fontsource/montserrat e
+ * @fontsource/inter): cubren el español completo (acentos, ñ, ¿¡, °, «», —, €) y PDFKit solo embebe
+ * los glifos que se usan.
+ *
+ * Van en TTF y no en el WOFF original: fontkit 1.x vuelve a descomprimir la tabla `glyf` del WOFF en
+ * cada glifo que lee, y la propuesta pasaba de ~35 ms a ~500 ms. El TTF es el mismo archivo con las
+ * tablas descomprimidas (fontTools, sin cambiar un solo contorno).
+ */
+export const PDF_FUENTES = {
+  titulo: 'NX-Montserrat-SemiBold',
+  tituloFuerte: 'NX-Montserrat-Bold',
+  marca: 'NX-Montserrat-Medium',
+  texto: 'NX-Inter-Regular',
+  medio: 'NX-Inter-Medium',
+  semi: 'NX-Inter-SemiBold',
+  fuerte: 'NX-Inter-Bold',
+} as const;
+
+export type PdfFuente = (typeof PDF_FUENTES)[keyof typeof PDF_FUENTES];
+
+/** Archivo de cada fuente y la estándar que la sustituye si el archivo falta o no se puede leer. */
+const ARCHIVOS_FUENTE: Record<keyof typeof PDF_FUENTES, [string, string]> = {
+  titulo: ['montserrat-latin-600-normal.ttf', 'Helvetica-Bold'],
+  tituloFuerte: ['montserrat-latin-700-normal.ttf', 'Helvetica-Bold'],
+  marca: ['montserrat-latin-500-normal.ttf', 'Helvetica'],
+  texto: ['inter-latin-400-normal.ttf', 'Helvetica'],
+  medio: ['inter-latin-500-normal.ttf', 'Helvetica'],
+  semi: ['inter-latin-600-normal.ttf', 'Helvetica-Bold'],
+  fuerte: ['inter-latin-700-normal.ttf', 'Helvetica-Bold'],
+};
+
+/** Los bytes de cada fuente se leen de disco una sola vez por proceso. */
+const fuentesEnCache = new Map<string, Buffer | null>();
+
+/** TrueType u OpenType por su firma: lo que no la trae no se le pasa a PDFKit. */
+const esFuente = (bytes: Buffer | null): bytes is Buffer => {
+  if (!bytes || bytes.length < 1024) return false;
+  const firma = bytes.readUInt32BE(0);
+  return firma === 0x00010000 || firma === 0x4f54544f /* OTTO */ || firma === 0x74727565 /* true */;
+};
+
+/**
+ * Registra en el documento las fuentes corporativas con los nombres de `PDF_FUENTES`.
+ *
+ * Registrar no abre nada: PDFKit lee y embebe solo las que el documento usa. Si un archivo falta
+ * (por ejemplo, un build que no copió `assets/fonts`), ese nombre apunta a Helvetica y el documento
+ * sale igual. Devuelve `true` si todas son las corporativas.
+ */
+export const registrarFuentesCorporativas = (doc: typeof PDFDocument.prototype): boolean => {
+  let todas = true;
+  for (const clave of Object.keys(PDF_FUENTES) as Array<keyof typeof PDF_FUENTES>) {
+    const nombre = PDF_FUENTES[clave];
+    const [archivo, respaldo] = ARCHIVOS_FUENTE[clave];
+    let bytes = fuentesEnCache.get(archivo);
+    if (bytes === undefined) {
+      bytes = loadPdfAsset(`fonts/${archivo}`);
+      if (!esFuente(bytes)) bytes = null;
+      fuentesEnCache.set(archivo, bytes);
+    }
+    if (bytes) {
+      doc.registerFont(nombre, bytes);
+    } else {
+      todas = false;
+      doc.registerFont(nombre, respaldo);
+    }
+  }
+  return todas;
+};
+
 export const loadNexaraLogo = (): Buffer | null =>
   loadPdfAsset('logo-nexara.png') ??
   leerPrimero([
