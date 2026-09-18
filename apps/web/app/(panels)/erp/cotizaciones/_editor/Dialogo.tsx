@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import styles from "./editor.module.css";
 
 /** Diálogo modal con Esc, clic fuera y foco atrapado (sin depender de `<dialog>`). */
@@ -19,8 +20,12 @@ export default function Dialogo({
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const tituloId = useId();
+  // En el <body>: dentro del contenido quedaba debajo de la barra del panel sin oscurecerla.
+  const [destino, setDestino] = useState<HTMLElement | null>(null);
+  useEffect(() => setDestino(document.body), []);
 
   useEffect(() => {
+    if (!destino) return;
     const previo = document.activeElement as HTMLElement | null;
     const primero = panel.current?.querySelector<HTMLElement>("input, textarea, select, button");
     primero?.focus();
@@ -51,11 +56,11 @@ export default function Dialogo({
       document.removeEventListener("keydown", alTeclear);
       previo?.focus?.();
     };
-    // Solo al abrir/cerrar.
+    // Solo al abrir/cerrar (y cuando el portal ya existe).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [destino]);
 
-  return (
+  const contenido = (
     <div
       className={styles.fondo}
       onMouseDown={(e) => {
@@ -71,4 +76,5 @@ export default function Dialogo({
       </div>
     </div>
   );
+  return destino ? createPortal(contenido, destino) : null;
 }

@@ -412,7 +412,7 @@ export default function CotizacionesPage() {
           </button>
         </div>
       ) : visibles.length ? (
-        <div className={styles.list} role="list" aria-label="Cotizaciones">
+        <nav className={styles.list} aria-label="Cotizaciones">
           <div className={styles.head} aria-hidden>
             <span>Folio</span>
             <span>Cliente · proyecto</span>
@@ -423,7 +423,7 @@ export default function CotizacionesPage() {
             <span className={styles.derecha}>Fecha</span>
           </div>
           {visibles.map((row) => (
-            <Link key={row.id} href={`/erp/cotizaciones/${row.id}`} className={styles.row} role="listitem">
+            <Link key={row.id} href={`/erp/cotizaciones/${row.id}`} className={styles.row}>
               <span className={styles.cell}>
                 <FolioColor folio={row.folio} />
                 {row.necesitaRefolio || !partesDelFolio(row.folio) ? (
@@ -442,12 +442,13 @@ export default function CotizacionesPage() {
               <span className={claseEstado(row.estado)}>{row.estadoEtiqueta}</span>
               <span className={styles.importe}>{formatoMoneda(row.total, row.currency ?? "MXN")}</span>
               <Intervinieron row={row} />
-              <span className={`${styles.rowSub} ${styles.derecha}`}>
-                {row.sentAt ? `enviada ${formatoFecha(row.sentAt)}` : formatoFecha(row.issueDate)}
+              <span className={`${styles.cell} ${styles.derecha}`}>
+                <span className={styles.fecha}>{formatoFecha(row.sentAt ?? row.issueDate)}</span>
+                <span className={styles.rowSub}>{row.sentAt ? "enviada" : "emitida"}</span>
               </span>
             </Link>
           ))}
-        </div>
+        </nav>
       ) : null}
     </div>
   );

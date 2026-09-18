@@ -19,7 +19,7 @@ import {
   sumarDias,
   totalesDePartidas,
 } from "./cotizacion-documento";
-import type { CotizacionDetalle } from "./cotizaciones-api";
+import { formatoFecha, type CotizacionDetalle } from "./cotizaciones-api";
 
 /** Mismos casos que `apps/api/src/cotizaciones/alcance-y-objetivo.spec.ts`: web y PDF leen igual. */
 describe("objetivo como texto", () => {
@@ -207,5 +207,11 @@ describe("documento y autoguardado", () => {
 
   it("suma días sin tropezar con el cambio de mes", () => {
     expect(sumarDias("2026-09-25", 15)).toBe("2026-10-10");
+  });
+
+  it("una fecha de emisión (medianoche UTC) se lee en su día, no el anterior", () => {
+    expect(formatoFecha("2026-09-18T00:00:00.000Z")).toMatch(/^18 /);
+    expect(formatoFecha("2026-09-18")).toMatch(/^18 /);
+    expect(formatoFecha(null)).toBe("—");
   });
 });

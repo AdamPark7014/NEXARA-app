@@ -20,7 +20,7 @@ const useMedirLayout = typeof window === "undefined" ? useEffect : useLayoutEffe
 type TextoAutoProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> & {
   value: string;
   onValor: (valor: string) => void;
-  variante?: "texto" | "titulo" | "campo" | "portada";
+  variante?: "texto" | "titulo" | "campo" | "portada" | "celda";
 };
 
 /** Textarea que crece con lo que se escribe: se lee como un párrafo del documento. */
@@ -45,7 +45,9 @@ export const TextoAuto = forwardRef<HTMLTextAreaElement, TextoAutoProps>(functio
         ? styles.textoCampo
         : variante === "portada"
           ? styles.portadaTitulo
-          : styles.texto;
+          : variante === "celda"
+            ? `${styles.celdaInput} ${styles.celdaTexto}`
+            : styles.texto;
 
   return (
     <textarea

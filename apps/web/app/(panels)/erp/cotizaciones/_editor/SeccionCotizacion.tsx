@@ -218,10 +218,10 @@ function FilaNueva({
         onKeyDown={alTeclear}
         aria-label="Precio unitario de la nueva partida"
       />
-      <span className={styles.celdaTotal}>{nombre.trim() ? formatoMoneda(importe) : ""}</span>
-      <span>
-        <button type="button" className={styles.secondaryBtn} onClick={agregarLibre} disabled={!nombre.trim()} style={{ padding: "0.42rem 0.6rem" }}>
-          Agregar
+      <span className={styles.celdaFinal}>
+        <span className={styles.celdaTotal}>{nombre.trim() ? formatoMoneda(importe) : ""}</span>
+        <button type="button" className={styles.secondaryBtn} onClick={agregarLibre} disabled={!nombre.trim()} style={{ padding: "0.36rem 0.6rem" }}>
+          Agregar ↵
         </button>
       </span>
     </div>
@@ -376,38 +376,25 @@ export default function SeccionCotizacion({
       </div>
 
       <div className={styles.tabla} role="group" aria-label="Partidas">
-        <div className={styles.filaCabeza}>
-          <span className={styles.celdaDerecha}>
-            #
-          </span>
+        <div className={styles.filaCabeza} aria-hidden>
+          <span className={styles.celdaDerecha}>#</span>
           <span>Descripción</span>
           <span>Unidad</span>
-          <span className={styles.celdaDerecha}>
-            Cantidad
-          </span>
-          <span className={styles.celdaDerecha}>
-            Precio
-          </span>
-          <span className={styles.celdaDerecha}>
-            Total
-          </span>
-          <span>
-            <span className={styles.soloLector}>Acciones</span>
-          </span>
+          <span className={styles.celdaDerecha}>Cantidad</span>
+          <span className={styles.celdaDerecha}>Precio</span>
+          <span className={styles.celdaDerecha}>Total</span>
         </div>
 
         {doc.partidas.map((p, i) => (
           <div className={styles.fila} key={p.key}>
-            <span className={styles.celdaNumero}>
-              {i + 1}
-            </span>
+            <span className={styles.celdaNumero}>{i + 1}</span>
             <div className={styles.celdaDescripcion}>
-              <input
-                className={styles.celdaInput}
+              <TextoAuto
+                variante="celda"
                 value={p.name}
                 disabled={!editable}
                 aria-label={`Descripción de la partida ${i + 1}`}
-                onChange={(e) => cambiarPartida(p.key, { name: e.target.value })}
+                onValor={(v) => cambiarPartida(p.key, { name: v.replace(/\n/g, " ") })}
               />
               <span className={styles.celdaMeta}>
                 <select
@@ -415,6 +402,7 @@ export default function SeccionCotizacion({
                   value={(p.grupo as string) ?? ""}
                   disabled={!editable}
                   aria-label={`Grupo de la partida ${i + 1}`}
+                  title="Equipos, materiales o mano de obra: decide los términos (suministro o suministro e instalación)"
                   onChange={(e) => cambiarPartida(p.key, { grupo: (e.target.value || null) as GrupoPartida | null })}
                 >
                   <option value="">Grupo automático</option>
@@ -425,11 +413,43 @@ export default function SeccionCotizacion({
                   ))}
                 </select>
                 {p.paqueteClave ? <span>· paquete ×{p.paqueteCantidad ?? "?"}</span> : null}
+                {editable ? (
+                  <span className={styles.controles}>
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      aria-label={`Subir partida ${i + 1}`}
+                      title="Subir"
+                      disabled={i === 0}
+                      onClick={() => setPartidas((l) => mover(l, i, i - 1))}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.iconBtn}
+                      aria-label={`Bajar partida ${i + 1}`}
+                      title="Bajar"
+                      disabled={i === doc.partidas.length - 1}
+                      onClick={() => setPartidas((l) => mover(l, i, i + 1))}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.iconBtn} ${styles.iconBtnPeligro}`}
+                      aria-label={`Quitar partida ${i + 1}`}
+                      title="Quitar"
+                      onClick={() => setPartidas((l) => l.filter((x) => x.key !== p.key))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ) : null}
               </span>
             </div>
             <select
               className={styles.celdaInput}
-             
               value={p.unit ?? "Pieza"}
               disabled={!editable}
               aria-label={`Unidad de la partida ${i + 1}`}
@@ -441,7 +461,6 @@ export default function SeccionCotizacion({
             </select>
             <input
               className={styles.celdaInput}
-             
               type="number"
               min={1}
               inputMode="numeric"
@@ -452,7 +471,6 @@ export default function SeccionCotizacion({
             />
             <input
               className={styles.celdaInput}
-             
               type="number"
               min={0}
               step="0.01"
@@ -462,40 +480,8 @@ export default function SeccionCotizacion({
               aria-label={`Precio unitario de la partida ${i + 1}`}
               onChange={(e) => cambiarPartida(p.key, { unitPrice: e.target.value === "" ? Number.NaN : Number(e.target.value) })}
             />
-            <span className={styles.celdaTotal}>
-              {formatoMoneda(importeDeLinea(p), moneda)}
-            </span>
-            <span className={styles.controles}>
-              {editable ? (
-                <>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
-                    aria-label={`Subir partida ${i + 1}`}
-                    disabled={i === 0}
-                    onClick={() => setPartidas((l) => mover(l, i, i - 1))}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.iconBtn}
-                    aria-label={`Bajar partida ${i + 1}`}
-                    disabled={i === doc.partidas.length - 1}
-                    onClick={() => setPartidas((l) => mover(l, i, i + 1))}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.iconBtn} ${styles.iconBtnPeligro}`}
-                    aria-label={`Quitar partida ${i + 1}`}
-                    onClick={() => setPartidas((l) => l.filter((x) => x.key !== p.key))}
-                  >
-                    ×
-                  </button>
-                </>
-              ) : null}
+            <span className={styles.celdaFinal}>
+              <span className={styles.celdaTotal}>{formatoMoneda(importeDeLinea(p), moneda)}</span>
             </span>
           </div>
         ))}
