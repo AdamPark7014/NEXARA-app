@@ -86,6 +86,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `pizarra, attendance legacy, gps`,
   },
+  'kpis-equipo': {
+    id: 'kpis-equipo',
+    summary: `KPIs del equipo: retardos, cumplimiento con uniforme, horas laboradas contra horas productivas, inactividad y tiempo extra real.`,
+    audience: `Dirección y encargados de gente (los mismos que ven al equipo en Asistencias).`,
+    how: `Sale de lo que ya se registra: checador, comidas y fotos de entrada/salida de las actividades. El uniforme lo marca el jefe (✓ / ✗) en la foto de entrada, en Asistencias.`,
+    steps: [
+      `Elige el rango (hoy, semana, mes o fechas)`,
+      `Ordena por semáforo para ver primero lo urgente`,
+      `Toca a una persona para ver su día a día y la línea de tiempo`,
+    ],
+    connects: `asistencias, pizarra`,
+  },
   'activities-daily': {
     id: 'activities-daily',
     summary: `Órdenes de trabajo diarias sin proyecto ni cliente de servicio.`,

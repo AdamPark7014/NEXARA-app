@@ -296,6 +296,9 @@ export function shouldShowModuleInSidebar(
       return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2) || v2 === ROLES.RH;
     case 'attendance':
       return v2 !== ROLES.CLIENTE;
+    case 'kpis-equipo':
+      // Los mismos que ven al equipo en Asistencias (dirección, RH y encargados de gente).
+      return getAttendanceViewMode(user) !== 'register';
     case 'lunch-breaks':
       // Alineado con PAGE_MATRIX / SELF_ATTENDANCE_PATHS (no solo ing. de campo).
       return canOpenPage(v2, '/erp/hr/lunch-breaks');
