@@ -33,7 +33,7 @@ object ActividadesUx {
         /** Despachador que aún no la pasa a nadie. */
         REPARTIR,
 
-        /** Sin foto de entrada todavía. */
+        /** Sin iniciar: «Iniciar actividad» (marca la hora real y abre Evidencias). */
         INICIAR,
 
         /** Ya empezó: le faltan pasos de evidencia. */
@@ -54,12 +54,20 @@ object ActividadesUx {
         val label: String,
         /** Pestaña del detalle que abre (`evidencias`) o null para Detalle. */
         val tab: String?,
+        /**
+         * Antes de abrir, guarda la hora real de inicio (`me/activities/:id/iniciar`).
+         * false con una API anterior al contrato: ahí la foto de entrada marca el inicio.
+         */
+        val marcaInicio: Boolean = false,
     )
 
     /**
      * Botón principal de una actividad en «Mis actividades». Todo lleva a la
      * pestaña Evidencias, donde viven la foto de entrada, la geocerca y los
      * pasos; aquí solo se elige la palabra que describe el siguiente paso.
+     *
+     * Quien la recibe no la acepta ni la rechaza (regla del 18-09): mientras no
+     * tenga inicio real, lo único que se le ofrece es «Iniciar actividad».
      */
     fun primaryAction(a: MyActivityItemDto): PrimaryAction {
         if (a.porRepartir == true) return PrimaryAction(PrimaryKind.REPARTIR, "Repartir", null)
@@ -72,9 +80,13 @@ object ActividadesUx {
                 PrimaryAction(PrimaryKind.CORREGIR, "Corregir evidencias", TAB_EVIDENCIAS)
             step == CoreActivityRules.STEP_COMPLETED || estatus.contains("validar") ->
                 PrimaryAction(PrimaryKind.VER, "Ver evidencias", TAB_EVIDENCIAS)
+            // Aunque un compañero ya la tenga «En Proceso», cada quien marca su propio inicio.
+            (step == null || step == CoreActivityRules.STEP_ENTRY) &&
+                ActivitySemaforo.puedeIniciar(a.aceptacion, a.inicioRealAt, a.despachador, a.estatus) ->
+                PrimaryAction(PrimaryKind.INICIAR, ActivitySemaforo.ACCION_INICIAR, TAB_EVIDENCIAS, marcaInicio = true)
             (step != null && step != CoreActivityRules.STEP_ENTRY) || estatus.contains("proceso") ->
                 PrimaryAction(PrimaryKind.CONTINUAR, "Continuar evidencias", TAB_EVIDENCIAS)
-            else -> PrimaryAction(PrimaryKind.INICIAR, "Iniciar", TAB_EVIDENCIAS)
+            else -> PrimaryAction(PrimaryKind.INICIAR, ActivitySemaforo.ACCION_INICIAR, TAB_EVIDENCIAS)
         }
     }
 

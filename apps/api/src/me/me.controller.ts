@@ -18,7 +18,6 @@ import { MeService } from './me.service.js';
 import {
   MyActivitiesService,
   type DispatchMyActivityDto,
-  type RechazarActividadDto,
   type ReorderMyActivitiesDto,
   type ReprogramarDespachoDto,
   type RevisarEvidenciaDto,
@@ -79,7 +78,27 @@ export class MeController {
     );
   }
 
-  /** Aceptar la actividad que le asignaron (las apps viejas la aceptan con la foto de entrada). */
+  /**
+   * Iniciar la actividad que le asignaron: marca su inicio real. Quien la recibe no
+   * la acepta ni la rechaza, únicamente la inicia (regla del dueño, 18-09).
+   */
+  @Post('activities/:id/iniciar')
+  iniciarActividad(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.myActivities.iniciar(
+      { id: Number(user.id), email: user.email ?? null },
+      companyId,
+      activityId,
+    );
+  }
+
+  /** Alias de `iniciar` para las apps ya instaladas (su botón «Comenzar actividad»). */
   @Post('activities/:id/aceptar')
   aceptarActividad(
     @CurrentUser() user: any,
@@ -96,23 +115,16 @@ export class MeController {
     );
   }
 
-  /** Rechazar con motivo: sigue asignada hasta que un superior la pase o la cancele. */
+  /**
+   * Ya no se rechazan actividades: responde 403 con el motivo para las apps instaladas
+   * que aún muestran «No puedo tomarla». Reasignar o cancelar es de los superiores.
+   */
   @Post('activities/:id/rechazar')
-  rechazarActividad(
-    @CurrentUser() user: any,
-    @CurrentCompanyId() companyId: number | null,
-    @Param('id', ParseIntPipe) activityId: number,
-    @Body() body: RechazarActividadDto,
-  ) {
+  rechazarActividad(@CurrentUser() user: any) {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
       throw new UnauthorizedException('Token de usuario inválido');
     }
-    return this.myActivities.rechazar(
-      { id: Number(user.id), email: user.email ?? null },
-      companyId,
-      activityId,
-      body,
-    );
+    return this.myActivities.rechazar();
   }
 
   /** Quien reparte un despacho lo pasa a su equipo (sin ACTIVITIES_MANAGE). */

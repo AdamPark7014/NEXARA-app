@@ -257,3 +257,54 @@ describe('enRango', () => {
     expect(enRango([null, undefined], T('09:00'), T('18:00'))).toBe(false);
   });
 });
+
+describe('actividad con periodo de varios días', () => {
+  // Del miércoles 16 al viernes 25 de septiembre; «ahora» es el jueves 17 a las 12:00 de México.
+  const periodo = { inicio: '2026-09-16', fin: '2026-09-25' };
+  const citada = new Date('2026-09-16T15:00:00.000Z');
+
+  it('no vence a la hora citada del primer día, sino al terminar el último', () => {
+    const sinPeriodo = calculaActividad({ prioridad: 'MEDIA', fechaMaxima: citada, inicio: T('15:00') }, ahora);
+    expect(sinPeriodo.vencida).toBe(true);
+    const conPeriodo = calculaActividad(
+      { prioridad: 'MEDIA', fechaMaxima: citada, inicio: T('15:00'), periodo },
+      ahora,
+    );
+    expect(conPeriodo.vencida).toBe(false);
+    expect(conPeriodo.semaforo).toBe('verde');
+    const despues = calculaActividad(
+      { prioridad: 'MEDIA', fechaMaxima: citada, inicio: T('15:00'), periodo },
+      new Date('2026-09-26T07:00:00.000Z'),
+    );
+    expect(despues.vencida).toBe(true);
+    expect(despues.semaforo).toBe('rojo');
+  });
+
+  it('el tiempo estimado de una jornada no la marca excedida mientras dura', () => {
+    const c = calculaActividad(
+      { prioridad: 'MEDIA', minutosPlan: 120, inicio: new Date('2026-09-16T15:00:00.000Z'), periodo },
+      ahora,
+    );
+    expect(c.minutosReales).toBeGreaterThan(120);
+    expect(c.excedida).toBe(false);
+    expect(c.semaforo).toBe('verde');
+  });
+
+  it('antes de su primer día está programada, no «ALTA sin iniciar»', () => {
+    const c = calculaActividad({ prioridad: 'ALTA', periodo: { inicio: '2026-09-21', fin: '2026-09-30' } }, ahora);
+    expect(c.semaforo).toBe('verde');
+    const yaEmpezo = calculaActividad(
+      { prioridad: 'ALTA', periodo: { inicio: '2026-09-17', fin: '2026-09-30' } },
+      ahora,
+    );
+    expect(yaEmpezo.semaforo).toBe('rojo');
+  });
+
+  it('cerrada antes de su fin cuenta a tiempo', () => {
+    const c = calculaActividad(
+      { fechaMaxima: citada, terminada: true, inicio: citada, fin: T('17:00'), periodo },
+      ahora,
+    );
+    expect(c.aTiempo).toBe(true);
+  });
+});

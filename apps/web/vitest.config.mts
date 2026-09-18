@@ -6,6 +6,12 @@ import { defineConfig } from 'vitest/config';
 const here = dirname(fileURLToPath(import.meta.url));
 const r = (p: string) => resolve(here, p);
 
+// Zona fija para todo el runner: las fechas del formulario se arman en hora local y
+// sin esto la misma prueba daba otra hora en CI (UTC) que en la oficina. Ciudad de
+// México no tiene horario de verano desde 2022, así que el desfase es siempre UTC-6.
+// Se fija aquí, antes de levantar los workers, para que lo hereden.
+process.env.TZ = 'America/Mexico_City';
+
 /**
  * Runner de tests de `apps/web`.
  *

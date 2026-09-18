@@ -13,12 +13,18 @@
  * Como se intersectan, el resultado es siempre la MÁS restrictiva. Aquí se fija
  * el conjunto exacto que ve cada rol y, sobre todo, se exige que las tres capas
  * digan lo mismo: cualquier módulo que 1 y 2 concedan y 3 recorte es un bug.
+ *
+ * El catálogo que se fija es el del «Menú avanzado»: todo lo que el puesto
+ * alcanza. El menú operativo (el de arranque) solo esconde `ADVANCED_ONLY_MODULE_IDS`,
+ * y eso tiene su propia prueba abajo.
  */
 import { describe, expect, it } from 'vitest';
-import { MODULES, type ModuleEntry } from '@/lib/access-matrix';
+import { MODULES, getModuleUrl, type ModuleEntry } from '@/lib/access-matrix';
 import { canUserAccessPath } from '@/lib/user-access';
 import { shouldShowModuleInSidebar } from '@/lib/section-views';
 import { filterModulesByNavigation, type MeNavigation } from '@/lib/me-navigation';
+import { ADVANCED_ONLY_MODULE_IDS } from '@/lib/nav-mode';
+import { CORE_OLA1_MODULE_IDS } from '@/lib/core-surface';
 import { canOpenPage } from '@/lib/rbac/page-matrix';
 import { ALL_ROLES, ROLES, type RoleKey } from '@/lib/rbac/roles';
 // La API es la tercera capa: se importa de verdad para que un recorte allí
@@ -27,11 +33,6 @@ import { URL_MATRIX } from '../../../api/src/common/rbac/url-matrix';
 import { deriveModuleKeysFromPaths } from '../../../api/src/me/navigation-module-map';
 
 const ALL_MODULES = Object.values(MODULES) as ModuleEntry[];
-
-function moduleUrl(m: ModuleEntry): string {
-  const p = m.path ?? '/';
-  return `/${m.panel}${p === '/' ? '' : p.startsWith('/') ? p : `/${p}`}`;
-}
 
 function userFor(role: RoleKey) {
   return { roleKey: role, isSuperAdmin: role === ROLES.SUPER_ADMIN };
@@ -44,17 +45,20 @@ function navigationFor(role: RoleKey): MeNavigation {
   return { roleKey: role, orgRoleKey: null, panels: [], paths, moduleKeys, webModuleIds };
 }
 
+/** Misma URL que enlaza el menú: Finanzas y RRHH viven en /erp (`routePanel`), no en /finance ni /hr. */
 function passesPageMatrix(role: RoleKey, m: ModuleEntry): boolean {
-  return canUserAccessPath(userFor(role), moduleUrl(m));
+  return canUserAccessPath(userFor(role), getModuleUrl(m.id));
 }
 
-function passesSidebarRules(role: RoleKey, m: ModuleEntry): boolean {
-  return shouldShowModuleInSidebar(userFor(role), m);
+function passesSidebarRules(role: RoleKey, m: ModuleEntry, advanced = true): boolean {
+  return shouldShowModuleInSidebar(userFor(role), m, { advanced });
 }
 
-/** Módulos que el usuario ve de verdad, tras las tres capas. */
-function visibleModules(role: RoleKey): string[] {
-  const afterWeb = ALL_MODULES.filter((m) => passesPageMatrix(role, m) && passesSidebarRules(role, m));
+/** Módulos que el usuario ve de verdad, tras las tres capas (menú avanzado salvo que se pida el operativo). */
+function visibleModules(role: RoleKey, advanced = true): string[] {
+  const afterWeb = ALL_MODULES.filter(
+    (m) => passesPageMatrix(role, m) && passesSidebarRules(role, m, advanced),
+  );
   return filterModulesByNavigation(afterWeb, navigationFor(role))
     .map((m) => m.id)
     .sort();
@@ -69,6 +73,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'accounting',
     'approvals',
     'architecture',
+    'asistencias',
     'attendance',
     'audit',
     'banking',
@@ -148,6 +153,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'ops-tools',
     'ops-vehicles',
     'orgchart',
+    'pizarra',
     'procurement',
     'reuniones',
     'settings',
@@ -169,6 +175,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'accounting',
     'approvals',
     'architecture',
+    'asistencias',
     'attendance',
     'audit',
     'banking',
@@ -248,6 +255,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'ops-tools',
     'ops-vehicles',
     'orgchart',
+    'pizarra',
     'procurement',
     'reuniones',
     'settings',
@@ -267,6 +275,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
   ],
   arquitecto: [
     'approvals',
+    'asistencias',
     'attendance',
     'calendar',
     'chat',
@@ -315,6 +324,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'ops-tools',
     'ops-viatics',
     'orgchart',
+    'pizarra',
     'reuniones',
   ],
   dir_operaciones: [
@@ -388,6 +398,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'accounting',
     'approvals',
     'architecture',
+    'asistencias',
     'attendance',
     'audit',
     'banking',
@@ -431,6 +442,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'ops-activities',
     'ops-projects',
     'orgchart',
+    'pizarra',
     'procurement',
     'reuniones',
     'settings',
@@ -482,6 +494,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
   ],
   administrativo: [
     'approvals',
+    'asistencias',
     'attendance',
     'calendar',
     'chat',
@@ -502,6 +515,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'news',
     'notifications-center',
     'ops-vehicles',
+    'pizarra',
     'procurement',
     'reuniones',
     'viatics-admin',
@@ -509,6 +523,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
   ],
   coord_operaciones: [
     'approvals',
+    'asistencias',
     'attendance',
     'calendar',
     'chat',
@@ -556,9 +571,11 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'ops-vehicles',
     'ops-viatics',
     'orgchart',
+    'pizarra',
     'reuniones',
   ],
   ing_campo: [
+    'asistencias',
     'attendance',
     'calendar',
     'chat',
@@ -573,9 +590,11 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'ops-my-vehicles',
     'ops-my-viatics',
     'ops-tools',
+    'pizarra',
     'reuniones',
   ],
   ing_soporte: [
+    'asistencias',
     'attendance',
     'calendar',
     'chat',
@@ -612,6 +631,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'ops-support-inbox',
     'ops-support-sla',
     'ops-tools',
+    'pizarra',
     'reuniones',
   ],
   coord_ventas: [
@@ -667,6 +687,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'reuniones',
   ],
   lider_diseno: [
+    'asistencias',
     'attendance',
     'calendar',
     'chat',
@@ -676,6 +697,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'lunch-breaks',
     'my-profile',
     'notifications-center',
+    'pizarra',
     'reuniones',
     'studio-cases',
     'studio-chat',
@@ -801,9 +823,16 @@ describe('modulos visibles por rol', () => {
   it('el super admin ve el catalogo completo salvo bandejas personales y pestanas', () => {
     // `ops-my-*` son bandejas de otro; evidencias y contratos viven como pestana
     // dentro de Actividades y Mantenimiento; el ejecutivo sustituye al dashboard.
+    // Tareas/Proyectos/Servicios y «Mis actividades» se consolidaron en la Pizarra;
+    // Clientes de Core se concede por persona (sectores por correo), no por rol.
     const shown = new Set(EXPECTED_MODULES.super_admin);
     expect(ALL_MODULES.filter((m) => !shown.has(m.id)).map((m) => m.id).sort()).toEqual([
+      'activities-daily',
+      'activities-projects',
+      'activities-services',
       'dashboard',
+      'erp-clients',
+      'mis-actividades',
       'ops-evidences',
       'ops-maintenance-contracts',
       'ops-my-activities',
@@ -812,6 +841,39 @@ describe('modulos visibles por rol', () => {
       'ops-my-viatics',
       'ops-viatics',
     ]);
+  });
+
+  it('el menu operativo solo esconde los modulos del menu avanzado', () => {
+    // El menú de arranque es el operativo: Analítica, Calendario, KB, etc. se
+    // reactivan con «Menú avanzado». Esconder cualquier otra cosa sería un recorte.
+    const advancedOnly = new Set<string>(ADVANCED_ONLY_MODULE_IDS);
+    for (const role of ALL_ROLES) {
+      expect(visibleModules(role, false), role).toEqual(
+        visibleModules(role).filter((id) => !advancedOnly.has(id)),
+      );
+    }
+  });
+});
+
+describe('Core: todo vive en /erp', () => {
+  it('cada modulo del menu de Core enlaza dentro de /erp', () => {
+    for (const id of CORE_OLA1_MODULE_IDS) {
+      expect(getModuleUrl(id as ModuleEntry['id']), id).toMatch(/^\/erp\//);
+    }
+  });
+
+  it('quien tiene paginas de Core llega a la pizarra y a sus asistencias', () => {
+    // Mismos puestos que reciben `CORE_OLA1_URL_RULES` en la API.
+    for (const role of [
+      ROLES.ARQUITECTO,
+      ROLES.ADMINISTRATIVO,
+      ROLES.COORD_OPERACIONES,
+      ROLES.ING_CAMPO,
+      ROLES.ING_SOPORTE,
+      ROLES.LIDER_DISENO,
+    ]) {
+      expect(visibleModules(role), role).toEqual(expect.arrayContaining(['pizarra', 'asistencias']));
+    }
   });
 });
 
@@ -980,6 +1042,7 @@ describe('cada puesto llega a su objeto de trabajo', () => {
     );
   });
 
+  // Calendario está en el menú avanzado desde el menú operativo; el puesto lo sigue alcanzando.
   it('el equipo de diseno conserva chat y calendario', () => {
     for (const role of [ROLES.LIDER_DISENO, ROLES.DISENADOR]) {
       expect(visibleModules(role)).toEqual(expect.arrayContaining(['chat', 'calendar']));

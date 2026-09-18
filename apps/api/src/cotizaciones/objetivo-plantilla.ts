@@ -142,7 +142,7 @@ export function objetivoDePropuesta(input: {
     );
   }
   if (cifras.importeEquipos > 0 && cifras.importeManoObra > 0) {
-    beneficios.push('Presupuesto desglosado en equipos, materiales y mano de obra: se ve qué es producto y qué es trabajo.');
+    beneficios.push('Presupuesto detallado partida por partida: cada equipo, material y servicio con su cantidad y su precio.');
   }
   if (segmento === 'LICITACION') {
     beneficios.push('Propuesta alineada al catálogo de conceptos y a las condiciones de las bases.');

@@ -328,6 +328,8 @@ struct ActivityCoreDetailView: View {
 
             Section("Fechas y tiempos") {
                 infoRow("Programada", CoreFormat.when(text("fechaInicio")))
+                // Varios días: la frase del periodo la manda la API («Día 3 de 10 · termina vie 25 sep»).
+                infoRow("Periodo", ActivityParse.str((raw["periodo"] as? [String: Any])?["etiqueta"]))
                 infoRow("Fecha máxima", CoreFormat.when(text("fechaMaxima")))
                 infoRow("Finalizada", CoreFormat.when(text("fechaFinalizacion")))
                 infoRow("Tiempo estimado", CoreFormat.minutes(ActivityParse.int(raw["tiempoEstimadoMin"])))

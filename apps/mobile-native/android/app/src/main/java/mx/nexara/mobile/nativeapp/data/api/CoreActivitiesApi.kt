@@ -41,6 +41,24 @@ data class MyActivityPasadaDto(
     val evidenceStatus: String? = null,
 )
 
+/**
+ * Periodo de una actividad de varios días (regla del 18-09): sigue en la lista cada día
+ * hasta su fin. La frase ya viene hecha por la API con el «hoy» de México
+ * («Día 3 de 10 · termina vie 25 sep»); la app solo la pinta. Ausente en APIs viejas.
+ */
+data class ActivityPeriodoDto(
+    /** Primer y último día, `AAAA-MM-DD`. */
+    val inicio: String? = null,
+    val fin: String? = null,
+    val dias: Int? = null,
+    /** N en «Día N de M»; null si todavía no empieza o ya terminó. */
+    val dia: Int? = null,
+    /** programada | en_curso | vencida | cerrada */
+    val estado: String? = null,
+    val etiqueta: String? = null,
+    val multiDia: Boolean? = null,
+)
+
 /** Última reprogramación de día y hora (quién, cuándo, de → a). */
 data class MyActivityReprogramacionDto(
     val at: String? = null,
@@ -101,6 +119,8 @@ data class MyActivityItemDto(
     /** La empezó habiendo otra de más prioridad sin terminar. */
     val saltoPrioridad: Boolean? = null,
     val justificacionOrden: String? = null,
+    /** Actividad de varios días: «Día 3 de 10 · termina vie 25 sep». */
+    val periodo: ActivityPeriodoDto? = null,
 ) {
     /** El contrato dice `asignadoPor`; las respuestas de hoy traen `asignadaPor`. */
     val quienAsigno: MyActivityRefDto? get() = asignadoPor ?: asignadaPor
@@ -131,11 +151,6 @@ data class DispatchMyActivityRequest(
     val horasPlan: Double? = null,
 )
 
-/** `POST me/activities/:id/rechazar` — el motivo es obligatorio (≥ 10). */
-data class RechazarActividadRequest(
-    val motivo: String,
-)
-
 data class ReprogramarDespachoRequest(
     /** Día y hora nuevos en ISO-8601 (UTC). */
     val fecha: String,
@@ -151,6 +166,7 @@ data class TeamBoardActivityDto(
     val estatus: String? = null,
     val fechaMaxima: String? = null,
     val bucket: String? = null,
+    val periodo: ActivityPeriodoDto? = null,
 )
 
 data class TeamBoardOpenActivityDto(
@@ -178,6 +194,8 @@ data class TeamBoardOpenActivityDto(
     val reparte: Boolean? = null,
     /** Día y hora programados (reprogramable por quien reparte). */
     val fechaInicio: String? = null,
+    /** Actividad de varios días: sigue en la pizarra cada día hasta su fin. */
+    val periodo: ActivityPeriodoDto? = null,
 )
 
 /** Última actividad que la persona terminó hoy (estado `libre`). */
@@ -248,7 +266,10 @@ data class BoardAsignadaPorMiDto(
     val semaforo: String? = null,
     /** PENDIENTE | ACEPTADA | RECHAZADA */
     val aceptacion: String? = null,
+    /** Solo histórico: rechazos de antes del 18-09 (ya no se puede rechazar). */
     val motivoRechazo: String? = null,
+    /** Hora real en que la inició; null = sin iniciar. */
+    val inicioRealAt: String? = null,
     val fechaMaxima: String? = null,
     val minutosPlan: Double? = null,
     val minutosReales: Double? = null,
@@ -738,16 +759,12 @@ interface CoreActivitiesApi {
     @POST("me/activities")
     suspend fun selfAssign(@Body body: CreateActivityRequest): ResponseBody
 
-    /** Contrato B: quien la recibe acepta… */
-    @POST("me/activities/{id}/aceptar")
-    suspend fun aceptarActividad(@Path("id") activityId: Long): ResponseBody
-
-    /** …o la rechaza con motivo; sigue asignada hasta que un superior la mueva. */
-    @POST("me/activities/{id}/rechazar")
-    suspend fun rechazarActividad(
-        @Path("id") activityId: Long,
-        @Body body: RechazarActividadRequest,
-    ): ResponseBody
+    /**
+     * Quien la recibe no la acepta ni la rechaza: la inicia (regla del 18-09).
+     * Guarda la hora real de inicio; tocarlo otra vez no la mueve.
+     */
+    @POST("me/activities/{id}/iniciar")
+    suspend fun iniciarActividad(@Path("id") activityId: Long): ResponseBody
 
     @POST("me/activities/{id}/despacho")
     suspend fun dispatch(

@@ -395,6 +395,9 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── LÍDER DISEÑO — Studio + material comercial (CRM) + cuenta ERP ─────
   [ROLES.LIDER_DISENO]: [
+    // Daniela también es personal Core: la API ya le da estas páginas (`CORE_OLA1_URL_RULES`)
+    // desde dad8869a; sin ellas aquí, la web Core-only le bloqueaba pizarra y asistencias.
+    ...CORE_OLA1_PAGE_PATHS,
     '/studio/**',
     '/crm/quotes/**',
     '/crm/products/**',

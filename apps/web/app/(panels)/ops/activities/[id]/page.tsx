@@ -22,10 +22,11 @@ import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missi
 import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
-import AceptarRechazar from "@/components/pizarra/AceptarRechazar";
+import IniciarActividad from "@/components/pizarra/IniciarActividad";
 import {
   normalizarPrioridad,
   PRIORIDAD_UI,
+  puedeIniciar,
   SEMAFORO_UI,
   textoPlanVsReal,
 } from "@/lib/actividad-tiempos";
@@ -210,7 +211,7 @@ export default function ActivityDetailPage() {
   const activeFlowKey = flowStepForStatus(activity.estatus);
   const activeFlowIdx = Math.max(0, activityFlow.findIndex((s) => s.key === activeFlowKey));
   const priorityDisplay = normalizePriorityDisplay(activity.prioridad) || activity.prioridad || "—";
-  // Mi fila del equipo: de ahí salen aceptación, semáforo y tiempo planeado vs real.
+  // Mi fila del equipo: de ahí salen el inicio real, el semáforo y el tiempo planeado vs real.
   const miFila = (activity.assignees ?? []).find(
     (m) => (m.userId ?? m.user?.id) === user?.id && !m.retiradoAt,
   );
@@ -228,11 +229,22 @@ export default function ActivityDetailPage() {
   const coordinan = nombres((activity.assignees ?? []).filter((m) => m.rol === "LEAD"));
   const ejecutores = nombres((activity.assignees ?? []).filter((m) => m.rol !== "LEAD"));
   const ejecutaLabel = ejecutores.length ? ejecutores.join(", ") : "Por asignar";
+  // Quien la recibe no la acepta ni la rechaza: únicamente la inicia (el LEAD de un despacho solo reparte).
+  const mostrarIniciar = Boolean(
+    token &&
+      miFila &&
+      puedeIniciar({
+        aceptacion: miFila.aceptacion,
+        inicioRealAt: miFila.inicioRealAt,
+        despachador: despacho && miFila.rol === "LEAD",
+        estatus: activity.estatus,
+      }),
+  );
 
   return (
     <>
       <ActivitySuperiorActions activityId={activity.id} token={token} onDone={reload} />
-      {token && miFila && miFila.aceptacion && miFila.aceptacion !== "ACEPTADA" ? (
+      {mostrarIniciar ? (
         <div
           style={{
             marginBottom: 14,
@@ -245,14 +257,7 @@ export default function ActivityDetailPage() {
           }}
         >
           <div style={{ fontSize: 13, fontWeight: 700 }}>Te asignaron esta actividad</div>
-          <AceptarRechazar
-            token={token}
-            activityId={activity.id}
-            aceptacion={miFila.aceptacion}
-            motivoRechazo={miFila.motivoRechazo}
-            titulo={activity.titulo}
-            onDone={reload}
-          />
+          <IniciarActividad token={token} activityId={activity.id} onDone={reload} />
         </div>
       ) : null}
       {/cancel/i.test(activity.estatus) && (activity.cancelReason || activity.cancelledAt) ? (
@@ -450,6 +455,16 @@ export default function ActivityDetailPage() {
               <DetailField label="Creador" value={activity.creador?.nombre} />
               <DetailField label="Asignación" value={formatDateTime(activity.fechaAsignacion)} />
               <DetailField label="Inicio" value={formatDateTime(activity.fechaInicio)} />
+              {activity.periodo ? (
+                <DetailField
+                  label={activity.projectMilestone ? `Periodo · ${activity.projectMilestone.name}` : "Periodo"}
+                  value={
+                    <span style={activity.periodo.estado === "vencida" ? { color: "#dc2626", fontWeight: 600 } : undefined}>
+                      {activity.periodo.etiqueta}
+                    </span>
+                  }
+                />
+              ) : null}
               {activity.acsEnteredAt && (
                 <DetailField
                   label="ACS"

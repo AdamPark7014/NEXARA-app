@@ -26,8 +26,9 @@ class OfflineQueueRulesTest {
     }
 
     @Test
-    fun `aceptar o rechazar una actividad solo en linea`() {
-        // Las dos avisan a quien asignó: encoladas mentirían en la tarjeta.
+    fun `iniciar una actividad solo en linea`() {
+        // Guarda la hora real de inicio: encolada quedaría la hora de cuando regrese la señal.
+        assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/iniciar", "POST"))
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/aceptar", "POST"))
         assertFalse(OfflineHttpInterceptor.isQueueable("$base/me/activities/9/rechazar", "POST"))
     }
