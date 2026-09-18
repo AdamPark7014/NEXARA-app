@@ -77,6 +77,8 @@ describe('PDF Propuesta técnica', () => {
     const texto = textoPorHoja(await generarPropuestaTecnicaPdf(payloadDePrueba())).join('\n');
     for (const esperado of [
       'Santiago Momoxpan, 72775 Cholula de Rivadavia, Pue.',
+      // La oficina de la barra de contacto del modelo: ahora va al pie de la portada.
+      'Malltertaiment, Explanada Puebla, Cholula, Puebla 72774, México',
       'Correo electrónico: gerencia@nexara.com.mx',
       'Teléfonos:',
       'Fecha de emisión',
