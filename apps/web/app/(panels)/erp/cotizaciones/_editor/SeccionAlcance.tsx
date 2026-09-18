@@ -94,39 +94,44 @@ export default function SeccionAlcance({
   return (
     <Hoja
       id="alcance"
-      numero="02."
+      numero="02"
       titulo="Alcance del proyecto"
-      ayuda="Qué se hace, subsección por subsección. Cada una lleva su título, uno o más párrafos y, si hace falta, viñetas."
+      ayuda="Qué se hace, por subsección: título, párrafos y viñetas."
       acciones={
         editable ? (
           <button type="button" className={styles.secondaryBtn} onClick={() => setVerPlantillas((v) => !v)} aria-expanded={verPlantillas}>
-            ☰ Plantillas
+            Plantillas
           </button>
         ) : null
       }
     >
-      <label className={styles.soloLector} htmlFor="alc-titulo">
-        Título del proyecto (encabezado del alcance)
-      </label>
-      <TextoAuto
-        id="alc-titulo"
-        variante="titulo"
-        className={styles.encabezadoAlcance}
-        value={doc.projectName}
-        onValor={(v) => cambiar((d) => ({ ...d, projectName: v.replace(/\n/g, " ") }))}
-        placeholder="Título del proyecto (es el mismo de la portada)"
-        disabled={!editable}
-      />
-      <label className={styles.soloLector} htmlFor="alc-intro">
-        Introducción del alcance
-      </label>
-      <TextoAuto
-        id="alc-intro"
-        value={doc.alcanceIntro}
-        onValor={(v) => cambiar((d) => ({ ...d, alcanceIntro: v }))}
-        placeholder="El presente proyecto tiene como objetivo… (párrafo de entrada, opcional)"
-        disabled={!editable}
-      />
+      <div className={styles.campos}>
+        <div className={styles.campo}>
+          <label className={styles.etiqueta} htmlFor="alc-titulo">
+            Título (el mismo de la portada)
+          </label>
+          <TextoAuto
+            id="alc-titulo"
+            variante="titulo"
+            value={doc.projectName}
+            onValor={(v) => cambiar((d) => ({ ...d, projectName: v.replace(/\n/g, " ") }))}
+            placeholder="Título del proyecto"
+            disabled={!editable}
+          />
+        </div>
+        <div className={styles.campo}>
+          <label className={styles.etiqueta} htmlFor="alc-intro">
+            Párrafo de entrada (opcional)
+          </label>
+          <TextoAuto
+            id="alc-intro"
+            value={doc.alcanceIntro}
+            onValor={(v) => cambiar((d) => ({ ...d, alcanceIntro: v }))}
+            placeholder="El presente proyecto tiene como objetivo…"
+            disabled={!editable}
+          />
+        </div>
+      </div>
 
       {panel}
 
@@ -216,12 +221,12 @@ export default function SeccionAlcance({
           })}
         </ol>
       ) : editable ? (
-        <div style={{ marginTop: 14 }}>
+        <div className={styles.bloque}>
           <Vacio
             titulo="Todavía no hay subsecciones"
             acciones={
               <>
-                <button type="button" className={styles.primaryBtn} onClick={() => setVerPlantillas(true)}>
+                <button type="button" className={styles.secondaryBtn} onClick={() => setVerPlantillas(true)}>
                   Elegir de las plantillas
                 </button>
                 <button type="button" className={styles.ghostBtn} onClick={() => agregar(nuevoBloque())}>
@@ -240,7 +245,7 @@ export default function SeccionAlcance({
       )}
 
       {bloques.length && editable ? (
-        <button type="button" className={styles.agregar} style={{ marginLeft: 0 }} onClick={() => agregar(nuevoBloque())}>
+        <button type="button" className={`${styles.agregar} ${styles.agregarSolo}`} onClick={() => agregar(nuevoBloque())}>
           + Subsección
         </button>
       ) : null}

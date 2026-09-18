@@ -121,7 +121,7 @@ export default function SeccionPlanos({
           }}
         />
       ) : (
-        <strong style={{ fontSize: "0.8rem" }}>{p.nombre ?? "Anexo"}</strong>
+        <strong className={styles.planoNombre}>{p.nombre ?? "Anexo"}</strong>
       )}
       <div className={styles.planoPie}>
         <span className={styles.planoOrigen}>
@@ -164,9 +164,9 @@ export default function SeccionPlanos({
   return (
     <Hoja
       id="planos"
-      numero="03."
+      numero="03"
       titulo="Planos"
-      ayuda="Plano CAD, sembrado de cámaras, fotos del levantamiento. Cada imagen sale en el PDF a página completa, en el orden de aquí."
+      ayuda="Plano CAD, sembrado o fotos: cada imagen sale a página completa, en este orden."
     >
       <label
         className={`${styles.zona} ${encima ? styles.zonaActiva : ""} ${puede ? "" : styles.zonaDeshabilitada}`}
@@ -206,7 +206,7 @@ export default function SeccionPlanos({
           {heredados.map((p, i) => tarjeta(p, i, false))}
         </ol>
       ) : (
-        <p className={styles.pista} style={{ marginTop: 10 }}>
+        <p className={`${styles.pista} ${styles.bloque}`}>
           Sin planos todavía. Si ligas la cotización a la actividad comercial del levantamiento, sus fotos
           entran aquí solas.
         </p>

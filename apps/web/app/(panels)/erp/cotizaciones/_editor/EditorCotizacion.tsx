@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import { useUser } from "@/components/UserContext";
 import { triggerFileDownload } from "@/lib/file-download";
 import {
@@ -37,6 +37,7 @@ import {
   type DocumentoCotizacion,
 } from "@/lib/cotizacion-documento";
 import { folioAlEnviar } from "@/lib/cotizacion-folio";
+import { esSeccionPropuesta, type SeccionPropuesta } from "@/lib/vista-previa-vivo";
 import { useAutoguardado, type EstadoGuardado } from "./useAutoguardado";
 import SeccionPortada from "./SeccionPortada";
 import SeccionObjetivo from "./SeccionObjetivo";
@@ -77,6 +78,26 @@ const SECCIONES = [
   { id: "planos", numero: "03", titulo: "Planos" },
   { id: "cotizacion", numero: "04", titulo: "Cotización" },
 ] as const;
+
+/**
+ * Alto de la barra fija del panel que tapa la parte de arriba (0 si no hay): el primer ancestro
+ * `sticky`/`fixed` del elemento que está en la orilla superior, sobre la columna del editor.
+ */
+function altoCabeceraFija(editor: HTMLElement): number {
+  if (typeof document.elementFromPoint !== "function") return 0;
+  const caja = editor.getBoundingClientRect();
+  let el = document.elementFromPoint(Math.max(1, caja.left + Math.min(40, caja.width / 2)), 1) as HTMLElement | null;
+  while (el && el !== document.body && el !== document.documentElement) {
+    if (editor.contains(el)) return 0;
+    const posicion = getComputedStyle(el).position;
+    if (posicion === "sticky" || posicion === "fixed") {
+      const r = el.getBoundingClientRect();
+      return r.top <= 1 && r.bottom < window.innerHeight / 3 ? Math.round(r.bottom) : 0;
+    }
+    el = el.parentElement;
+  }
+  return 0;
+}
 
 function useEsAncho() {
   const [ancho, setAncho] = useState(false);
@@ -122,7 +143,12 @@ export default function EditorCotizacion({
   const [versiones, setVersiones] = useState<VersionCotizacion[]>([]);
   const [plantillas, setPlantillas] = useState<PlantillasSegmento[]>([]);
   const [paquetes, setPaquetes] = useState<PaqueteCotizacion[]>([]);
-  const [versionPdf, setVersionPdf] = useState(0);
+  /** Sube cuando cambió algo del lado del servidor que el borrador no trae (planos, paquete, envío). */
+  const [recargaVista, setRecargaVista] = useState(0);
+  /** Sección donde está el cursor: la vista previa va a su hoja. */
+  const [seccionCursor, setSeccionCursor] = useState<SeccionPropuesta | null>(null);
+  /** Sección que se está leyendo (se marca en la navegación). */
+  const [seccionVista, setSeccionVista] = useState<string>("portada");
   const [pestana, setPestana] = useState<"documento" | "vista">("documento");
   const [desbloqueando, setDesbloqueando] = useState(false);
   const [envio, setEnvio] = useState(false);
@@ -185,8 +211,8 @@ export default function EditorCotizacion({
       } else {
         await actualizarCotizacion(token, idRef.current, cambios);
       }
+      // La vista previa no espera al guardado: ya se arma con lo que está en pantalla.
       await recargar();
-      setVersionPdf((v) => v + 1);
     },
     [token, activityId, recargar],
   );
@@ -239,6 +265,7 @@ export default function EditorCotizacion({
     try {
       await actualizarCotizacion(token, idRef.current, { status: "BORRADOR" });
       await recargar();
+      setRecargaVista((v) => v + 1);
       setAviso("Listo: la versión enviada quedó guardada y ya puedes editar.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo retomar la cotización");
@@ -271,7 +298,7 @@ export default function EditorCotizacion({
       const nuevo = { ...docRef.current, partidas: partidasDesdeApi(d.items), bloques: bloquesDesdeApi(d.alcanceBloques) };
       setDoc(nuevo);
       auto.fijarBase(payloadDeDocumento(nuevo));
-      setVersionPdf((v) => v + 1);
+      setRecargaVista((v) => v + 1);
       setAviso("Paquete agregado: partidas y alcance actualizados.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo agregar el paquete");
@@ -282,7 +309,7 @@ export default function EditorCotizacion({
     (d: CotizacionDetalle | null) => {
       if (d) setDetalle(d);
       else void recargar();
-      setVersionPdf((v) => v + 1);
+      setRecargaVista((v) => v + 1);
     },
     [recargar],
   );
@@ -311,6 +338,63 @@ export default function EditorCotizacion({
         })}${siglasUsuario === undefined ? " (más tus siglas)" : ""}.`
       : null;
 
+  // ─── Debajo de la barra fija del panel ─────────────────────────────────
+  // La barra y la navegación del editor se quedan fijas justo debajo de la barra del panel, mida
+  // lo que mida (cambia con el tamaño de pantalla y con el estilo del panel).
+  const editorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || typeof window === "undefined") return;
+    const medir = () => {
+      const alto = altoCabeceraFija(editor);
+      editor.style.setProperty("--shell-alto", `${alto}px`);
+    };
+    medir();
+    window.addEventListener("resize", medir);
+    const t = setTimeout(medir, 400);
+    return () => {
+      window.removeEventListener("resize", medir);
+      clearTimeout(t);
+    };
+  }, []);
+
+  // ─── Dónde está quien edita ────────────────────────────────────────────
+  // El cursor manda la vista previa a su hoja; lo que se está leyendo se marca en la navegación.
+  const documentoRef = useRef<HTMLDivElement>(null);
+  const alEnfocar = useCallback((e: FocusEvent<HTMLDivElement>) => {
+    const seccion = (e.target as HTMLElement).closest?.("[data-seccion]")?.getAttribute("data-seccion");
+    if (esSeccionPropuesta(seccion)) setSeccionCursor(seccion);
+  }, []);
+
+  useEffect(() => {
+    const raiz = documentoRef.current;
+    if (!raiz || typeof IntersectionObserver === "undefined") return;
+    const visibles = new Map<string, number>();
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        for (const e of entradas) {
+          const idSeccion = (e.target as HTMLElement).id;
+          if (e.isIntersecting) visibles.set(idSeccion, e.boundingClientRect.top);
+          else visibles.delete(idSeccion);
+        }
+        // La de más arriba que cruza la franja de lectura.
+        const primera = [...visibles.entries()].sort((a, b) => a[1] - b[1])[0];
+        if (primera) setSeccionVista(primera[0]);
+      },
+      { rootMargin: "-140px 0px -55% 0px" },
+    );
+    raiz.querySelectorAll("section[id]").forEach((s) => obs.observe(s));
+    return () => obs.disconnect();
+  }, [Boolean(detalle)]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const irASeccion = (idSeccion: string) => {
+    const destino = document.getElementById(idSeccion);
+    if (!destino) return;
+    destino.scrollIntoView({ behavior: "smooth", block: "start" });
+    setSeccionVista(idSeccion);
+    if (esSeccionPropuesta(idSeccion)) setSeccionCursor(idSeccion);
+  };
+
   const claseGuardado = [
     styles.guardado,
     auto.estado === "guardado" ? styles.gGuardado : "",
@@ -322,7 +406,7 @@ export default function EditorCotizacion({
   const pausa = falta ?? (bloqueada && auto.hayPendientes() ? "En pausa: la cotización ya salió" : null);
 
   return (
-    <div className={styles.editor}>
+    <div className={styles.editor} ref={editorRef}>
       <header className={styles.barra}>
         <div className={styles.barraIzq}>
           <Link href="/erp/cotizaciones" className={styles.volver} aria-label="Volver a cotizaciones" title="Cotizaciones">
@@ -349,8 +433,14 @@ export default function EditorCotizacion({
               Reintentar
             </button>
           ) : null}
-          <button type="button" className={styles.secondaryBtn} onClick={() => void descargarPdf()} disabled={!id}>
-            ⤓ Descargar PDF
+          <button
+            type="button"
+            className={styles.secondaryBtn}
+            onClick={() => void descargarPdf()}
+            disabled={!id}
+            title="Descarga la versión guardada"
+          >
+            Descargar PDF
           </button>
           <button
             type="button"
@@ -359,29 +449,44 @@ export default function EditorCotizacion({
             disabled={!id || aprobada || (bloqueada && detalle?.estado !== "ENVIADA")}
             title={aprobada ? "Ya está aprobada" : undefined}
           >
-            ✉ Enviar por correo
+            Enviar por correo
           </button>
         </div>
       </header>
 
       <nav className={styles.indice} aria-label="Secciones del documento">
-        {SECCIONES.map((s) => {
-          const hecho =
-            s.id === "portada"
-              ? Boolean(doc.projectName.trim() && doc.clientName.trim())
-              : completas[s.id as keyof typeof completas];
-          return (
-            <a key={s.id} href={`#${s.id}`} className={`${styles.indiceItem} ${hecho ? styles.indiceHecho : ""}`}>
-              {s.numero ? <span className={styles.indiceNumero}>{s.numero}</span> : null}
-              {s.titulo}
-            </a>
-          );
-        })}
-        {detalle ? (
-          <a href="#seguimiento" className={styles.indiceItem}>
-            Seguimiento
-          </a>
-        ) : null}
+        <ol className={styles.indiceLista}>
+          {[...SECCIONES, ...(detalle ? [{ id: "seguimiento", numero: "", titulo: "Seguimiento" } as const] : [])].map((s) => {
+            const hecho =
+              s.id === "seguimiento"
+                ? false
+                : s.id === "portada"
+                  ? Boolean(doc.projectName.trim() && doc.clientName.trim())
+                  : completas[s.id as keyof typeof completas];
+            const actual = seccionVista === s.id;
+            return (
+              <li key={s.id}>
+                <a
+                  href={`#${s.id}`}
+                  className={`${styles.indiceItem} ${actual ? styles.indiceActual : ""}`}
+                  aria-current={actual ? "location" : undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    irASeccion(s.id);
+                  }}
+                >
+                  {s.id === "seguimiento" ? null : (
+                    <span className={`${styles.indiceMarca} ${hecho ? styles.indiceHecho : ""}`} aria-hidden>
+                      {hecho ? "✓" : s.numero || "·"}
+                    </span>
+                  )}
+                  <span>{s.titulo}</span>
+                  {hecho ? <span className={styles.soloLector}> (completa)</span> : null}
+                </a>
+              </li>
+            );
+          })}
+        </ol>
       </nav>
 
       <div className={styles.pestanas} role="tablist" aria-label="Ver">
@@ -399,10 +504,7 @@ export default function EditorCotizacion({
           role="tab"
           aria-selected={pestana === "vista"}
           className={`${styles.pestana} ${pestana === "vista" ? styles.pestanaActiva : ""}`}
-          onClick={() => {
-            setPestana("vista");
-            void auto.guardarAhora();
-          }}
+          onClick={() => setPestana("vista")}
         >
           Vista previa (PDF)
         </button>
@@ -447,7 +549,11 @@ export default function EditorCotizacion({
       ) : null}
 
       <div className={styles.cuerpo}>
-        <div className={`${styles.documento} ${pestana === "vista" ? styles.ocultoEnAngosto : ""}`}>
+        <div
+          ref={documentoRef}
+          className={`${styles.documento} ${pestana === "vista" ? styles.ocultoEnAngosto : ""}`}
+          onFocusCapture={alEnfocar}
+        >
           <SeccionPortada
             doc={doc}
             cambiar={cambiar}
@@ -457,7 +563,7 @@ export default function EditorCotizacion({
             esNueva={!inicial}
           />
           {!id ? (
-            <div className={`${styles.aviso} ${styles.avisoInfo}`} style={{ marginBottom: 0 }}>
+            <div className={`${styles.aviso} ${styles.avisoInfo}`}>
               <p>
                 Se guarda solo en cuanto escribas el cliente. En ese momento se emite el folio con tu nomenclatura
                 (NEX-tu clave-consecutivo) y aparece la vista previa del PDF.
@@ -505,8 +611,15 @@ export default function EditorCotizacion({
             />
           ) : null}
         </div>
-        <div className={pestana === "documento" ? styles.ocultoEnAngosto : ""}>
-          <VistaPrevia cotizacionId={id} token={token} version={versionPdf} visible={ancho || pestana === "vista"} />
+        <div className={`${styles.columnaVista} ${pestana === "documento" ? styles.ocultoEnAngosto : ""}`}>
+          <VistaPrevia
+            cotizacionId={id}
+            token={token}
+            borrador={payload}
+            visible={ancho || pestana === "vista"}
+            seccion={seccionCursor}
+            recarga={recargaVista}
+          />
         </div>
       </div>
 
@@ -524,7 +637,7 @@ export default function EditorCotizacion({
             const enviada = await enviarCotizacion(token, idRef.current, datos);
             setEnvio(false);
             await recargar();
-            setVersionPdf((v) => v + 1);
+            setRecargaVista((v) => v + 1);
             setAviso(`Enviada a ${datos.email} como ${enviada.quoteNumber}.`);
           }}
         />

@@ -62,7 +62,7 @@ export default function Seguimiento({
     <section id="seguimiento" className={styles.seguimiento} aria-labelledby="seguimiento-titulo">
       <div className={styles.hojaCabeza}>
         <div className={styles.hojaTitulos}>
-          <h2 id="seguimiento-titulo" className={styles.tituloSeccion} style={{ marginTop: 0 }}>
+          <h2 id="seguimiento-titulo" className={styles.tituloSeccion}>
             Seguimiento
           </h2>
           <p className={styles.ayudaSeccion}>
@@ -83,7 +83,7 @@ export default function Seguimiento({
           {estado === "ENVIADA" ? (
             <button
               type="button"
-              className={styles.primaryBtn}
+              className={styles.secondaryBtn}
               disabled={ocupado}
               onClick={() => void hacer(() => aprobarCotizacion(token!, detalle.id), "Cotización aprobada.")}
             >
@@ -106,7 +106,7 @@ export default function Seguimiento({
           </p>
           <button
             type="button"
-            className={styles.primaryBtn}
+            className={styles.secondaryBtn}
             disabled={ocupado}
             onClick={() => void hacer(() => refoliarCotizacion(token!, detalle.id), "Folio asignado con nomenclatura.")}
           >

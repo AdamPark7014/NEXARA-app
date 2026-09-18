@@ -44,9 +44,9 @@ export const TextoAuto = forwardRef<HTMLTextAreaElement, TextoAutoProps>(functio
       : variante === "campo"
         ? styles.textoCampo
         : variante === "portada"
-          ? styles.portadaTitulo
+          ? `${styles.textoTitulo} ${styles.textoProyecto}`
           : variante === "celda"
-            ? `${styles.celdaInput} ${styles.celdaTexto}`
+            ? `${styles.celda} ${styles.celdaTexto}`
             : styles.texto;
 
   return (
@@ -204,7 +204,11 @@ export function ListaEditable({
   );
 }
 
-/** Una sección del documento, con su número y título como en la propuesta. */
+/**
+ * Una sección del documento. Todas con el mismo encabezado: número pequeño en verde, título y una
+ * línea de ayuda; acciones secundarias a la derecha. `data-seccion` es lo que usa la vista previa
+ * para saber dónde está el cursor.
+ */
 export function Hoja({
   id,
   numero,
@@ -214,6 +218,7 @@ export function Hoja({
   children,
 }: {
   id: string;
+  /** «01»…«04»; vacío en la portada. */
   numero: string;
   titulo: string;
   ayuda?: ReactNode;
@@ -221,22 +226,81 @@ export function Hoja({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className={styles.hoja} aria-labelledby={`${id}-titulo`}>
+    <section id={id} data-seccion={id} className={styles.hoja} aria-labelledby={`${id}-titulo`}>
       <div className={styles.hojaCabeza}>
         <div className={styles.hojaTitulos}>
-          <span className={styles.numero} aria-hidden>
-            {numero}
-          </span>
-          <h2 id={`${id}-titulo`} className={styles.tituloSeccion}>
-            <span className={styles.soloLector}>{numero} </span>
-            {titulo}
-          </h2>
+          <div className={styles.hojaLinea}>
+            {numero ? (
+              <span className={styles.numero} aria-hidden>
+                {numero}
+              </span>
+            ) : null}
+            <h2 id={`${id}-titulo`} className={styles.tituloSeccion}>
+              {numero ? <span className={styles.soloLector}>{numero}. </span> : null}
+              {titulo}
+            </h2>
+          </div>
           {ayuda ? <p className={styles.ayudaSeccion}>{ayuda}</p> : null}
         </div>
         {acciones ? <div className={styles.hojaAcciones}>{acciones}</div> : null}
       </div>
       {children}
     </section>
+  );
+}
+
+/** Control segmentado tranquilo (segmento, validez rápida): una opción activa, flechas para moverse. */
+export function Segmentado<V extends string>({
+  opciones,
+  valor,
+  onValor,
+  etiqueta,
+  deshabilitado,
+  chico,
+}: {
+  opciones: Array<{ valor: V; etiqueta: string }>;
+  valor: V | null;
+  onValor: (v: V) => void;
+  etiqueta: string;
+  deshabilitado?: boolean;
+  chico?: boolean;
+}) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const activo = Math.max(0, opciones.findIndex((o) => o.valor === valor));
+  const alTeclear = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    const siguiente = (i + delta + opciones.length) % opciones.length;
+    const opcion = opciones[siguiente];
+    if (!opcion) return;
+    onValor(opcion.valor);
+    refs.current[siguiente]?.focus();
+  };
+  return (
+    <div className={`${styles.segmentado} ${chico ? styles.segmentadoChico : ""}`} role="radiogroup" aria-label={etiqueta}>
+      {opciones.map((o, i) => {
+        const on = o.valor === valor;
+        return (
+          <button
+            key={o.valor}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={i === activo ? 0 : -1}
+            className={`${styles.segmentadoOpcion} ${on ? styles.segmentadoOn : ""}`}
+            disabled={deshabilitado}
+            onClick={() => onValor(o.valor)}
+            onKeyDown={(e) => alTeclear(e, i)}
+          >
+            {o.etiqueta}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
