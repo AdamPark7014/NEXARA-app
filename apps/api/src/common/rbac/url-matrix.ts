@@ -124,6 +124,7 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/api/activities/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   { path: '/api/activity-evidence/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   { path: '/api/operational-projects/**', methods: ['GET'], scope: 'read' },
+  { path: '/api/proyectos/**', methods: ['GET'], scope: 'read' },
 ];
 
 /**
@@ -150,6 +151,7 @@ export const ACTIVITY_SUPERIOR_URL_RULES: UrlRule[] = [
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
 export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', scope: 'write' },
+  { path: '/api/proyectos/**', scope: 'write' },
 ];
 
 /** APIs de sesión propias — todo rol autenticado (deny-by-default no las bloquea). */
