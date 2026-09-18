@@ -766,7 +766,10 @@ function portada(ctx: Ctx, indice: Array<{ numero: string; titulo: string; nota?
     }
   });
 
-  // Leyenda legal.
+  // La oficina (la barra de contacto del modelo) y la leyenda legal.
+  if (empresa.oficina !== empresa.direccion) {
+    renglon(doc, empresa.oficina, X, 739, { tamano: 8, color: C.tenue, max: COL_ANCHO });
+  }
   renglon(doc, `${dominio(empresa.web)}  ·  Propuesta técnica sujeta a contratación formal.`, X, 752, {
     tamano: 8,
     color: C.pizarra,
