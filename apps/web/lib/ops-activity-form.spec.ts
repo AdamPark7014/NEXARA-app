@@ -3,6 +3,7 @@ import {
   EMPTY_ACTIVITY_FORM,
   buildActivityPayload,
   formFromActivityRecord,
+  periodoDelFormulario,
   toDateInputValue,
   type OperationalProjectOption,
 } from './ops-activity-form';
@@ -124,5 +125,58 @@ describe('buildActivityPayload · lo que se manda al API', () => {
   it('sin fecha no manda fechaInicio', () => {
     const payload = buildActivityPayload({ ...EMPTY_ACTIVITY_FORM, projectId: '11', responsableId: '8' }, project, {});
     expect(payload.fechaInicio).toBeUndefined();
+  });
+});
+
+describe('periodo de la actividad', () => {
+  const base = { ...EMPTY_ACTIVITY_FORM, projectId: '11', responsableId: '8', fecha: '2026-09-16' };
+
+  it('del día elegido al día de fin, con la etapa del proyecto', () => {
+    const payload = buildActivityPayload({ ...base, periodoFin: '2026-09-25', projectMilestoneId: '101' }, project, {});
+    expect(payload.periodoInicio).toBe('2026-09-16');
+    expect(payload.periodoFin).toBe('2026-09-25');
+    expect(payload.projectMilestoneId).toBe(101);
+  });
+
+  it('sin día de fin es de un solo momento: al crear no manda periodo', () => {
+    const payload = buildActivityPayload(base, project, {});
+    expect(payload).not.toHaveProperty('periodoInicio');
+    expect(payload).not.toHaveProperty('projectMilestoneId');
+  });
+
+  it('al editar sin día de fin lo quita (null)', () => {
+    const payload = buildActivityPayload(base, project, { isEdit: true });
+    expect(payload.periodoInicio).toBeNull();
+    expect(payload.periodoFin).toBeNull();
+  });
+
+  it('un fin anterior al inicio no es periodo', () => {
+    expect(periodoDelFormulario({ fecha: '2026-09-16', periodoFin: '2026-09-10' })).toBeNull();
+    expect(periodoDelFormulario({ fecha: '', periodoFin: '2026-09-10' })).toBeNull();
+    expect(periodoDelFormulario({ fecha: '2026-09-16', periodoFin: '2026-09-16' })).toEqual({
+      inicio: '2026-09-16',
+      fin: '2026-09-16',
+    });
+  });
+
+  it('la etapa sin proyecto no viaja', () => {
+    const payload = buildActivityPayload(
+      { ...base, projectMode: 'without_project', projectId: '', projectMilestoneId: '101' },
+      undefined,
+      {},
+    );
+    expect(payload).not.toHaveProperty('projectMilestoneId');
+  });
+
+  it('al abrir una actividad con periodo, los días salen sin correrse por la zona', () => {
+    const form = formFromActivityRecord({
+      fechaInicio: '2026-09-17T16:00:00.000Z',
+      periodoInicio: '2026-09-16T00:00:00.000Z',
+      periodoFin: '2026-09-25T00:00:00.000Z',
+      projectMilestoneId: 101,
+    });
+    expect(form.fecha).toBe('2026-09-16');
+    expect(form.periodoFin).toBe('2026-09-25');
+    expect(form.projectMilestoneId).toBe('101');
   });
 });

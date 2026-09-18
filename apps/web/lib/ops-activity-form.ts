@@ -1,4 +1,5 @@
 /** Formulario moderno de OT — extraído del legacy `ActivitiesTable`. */
+import { aInputFecha } from "@/lib/proyecto-plan";
 
 export type ActivityProjectMode = 'with_project' | 'without_project';
 
@@ -9,8 +10,16 @@ export const EMPTY_ACTIVITY_FORM = {
   responsableId: "",
   tiempoEstimadoMin: "",
   tiempoMaximoMin: "",
+  /** Día (y primer día del periodo, si lo hay). */
   fecha: "",
   hora: "09:00",
+  /**
+   * Último día del periodo (`AAAA-MM-DD`). Vacío = actividad de un solo momento, como
+   * siempre. Con valor, la actividad sigue en la pizarra cada día hasta ese día.
+   */
+  periodoFin: "",
+  /** Etapa del cronograma del proyecto que ejecuta (id, o vacío). */
+  projectMilestoneId: "",
   clientId: "",
   projectId: "",
   ticketType: "PREVENTIVO",
@@ -63,9 +72,14 @@ export function formFromActivityRecord(record: Record<string, unknown>): Activit
     responsableId: record.responsableId ? String(record.responsableId) : "",
     tiempoEstimadoMin: record.tiempoEstimadoMin != null ? String(record.tiempoEstimadoMin) : "",
     tiempoMaximoMin: record.tiempoMaximoMin != null ? String(record.tiempoMaximoMin) : "",
-    fecha: toDateInputValue(
-      (record.fechaInicio as string) ?? (record.fechaEntregaEsperada as string) ?? (record.fechaMaxima as string),
-    ),
+    // Con periodo, el día de inicio es el del periodo (columna de fecha: se lee sin zona).
+    fecha: record.periodoInicio
+      ? aInputFecha(record.periodoInicio as string)
+      : toDateInputValue(
+          (record.fechaInicio as string) ?? (record.fechaEntregaEsperada as string) ?? (record.fechaMaxima as string),
+        ),
+    periodoFin: record.periodoFin ? aInputFecha(record.periodoFin as string) : "",
+    projectMilestoneId: record.projectMilestoneId ? String(record.projectMilestoneId) : "",
     hora: (() => {
       const raw =
         (record.fechaInicio as string) ??
@@ -134,12 +148,36 @@ export function buildActivityPayload(
     assignmentCharge: form.assignmentCharge || undefined,
   };
 
+  // Periodo: del día elegido al día de fin. La API fija la fecha máxima y la entrega al fin
+  // del último día. Al editar se manda siempre (null = quitarlo); al crear, solo si hay.
+  const periodo = periodoDelFormulario(form);
+  if (periodo) {
+    payload.periodoInicio = periodo.inicio;
+    payload.periodoFin = periodo.fin;
+  } else if (options.isEdit) {
+    payload.periodoInicio = null;
+    payload.periodoFin = null;
+  }
+  if (form.projectMilestoneId && payload.projectId) {
+    payload.projectMilestoneId = Number(form.projectMilestoneId);
+  } else if (options.isEdit) {
+    payload.projectMilestoneId = null;
+  }
+
   if (!options.isEdit) {
     payload.estatus = "Pendiente";
     if (options.userId) payload.creadoPorId = options.userId;
   }
 
   return payload;
+}
+
+/** Periodo que captura el formulario, o null si es de un solo momento (o va al revés). */
+export function periodoDelFormulario(
+  form: Pick<ActivityFormState, "fecha" | "periodoFin">,
+): { inicio: string; fin: string } | null {
+  if (!form.fecha || !form.periodoFin || form.periodoFin < form.fecha) return null;
+  return { inicio: form.fecha, fin: form.periodoFin };
 }
 
 export function activitySubmitLabel(form: ActivityFormState, isEdit: boolean, tone: 'ops' | 'core' = 'ops'): string {

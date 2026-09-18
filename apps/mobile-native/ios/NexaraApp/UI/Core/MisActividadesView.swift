@@ -188,7 +188,8 @@ struct MisActividadesView: View {
         let estatus = CoreStatusUI.estatus(item.estatus)
         let first = index == 0
         let lugar = item.cliente ?? item.proyecto ?? ""
-        let whenText = CoreFormat.when(item.fechaInicio ?? item.fechaMaxima) ?? "Sin fecha"
+        // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
+        let whenText = item.periodo?.texto ?? CoreFormat.when(item.fechaInicio ?? item.fechaMaxima) ?? "Sin fecha"
         let estimate = CoreFormat.minutes(item.tiempoEstimadoMin)
         let cap = CoreFormat.minutes(item.tiempoMaximoMin)
         let timeText = estimate.map { $0 + (cap.map { " · tope " + $0 } ?? "") }

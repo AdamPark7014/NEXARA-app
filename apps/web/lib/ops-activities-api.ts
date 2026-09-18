@@ -3,6 +3,7 @@ import { isNonEmployeeEmail } from "@/lib/platform-accounts";
 
 import type { ActivityEvidenceDetail } from "@/lib/evidence-display";
 import type { Aceptacion, Semaforo } from "@/lib/actividad-tiempos";
+import type { PeriodoActividad } from "@/lib/actividad-periodo";
 
 export type ActivityDetail = {
   id: number;
@@ -84,6 +85,13 @@ export type ActivityDetail = {
   cancelledAt?: string | null;
   cancelledById?: number | null;
   cancelledBy?: { id: number; nombre: string } | null;
+  /** Periodo de varios días (días `AAAA-MM-DD`); la API manda también `periodo` ya calculado. */
+  periodoInicio?: string | null;
+  periodoFin?: string | null;
+  periodo?: PeriodoActividad | null;
+  /** Etapa del cronograma que ejecuta. */
+  projectMilestoneId?: number | null;
+  projectMilestone?: { id: number; name: string } | null;
 };
 
 export type ViaticoRow = {
@@ -286,6 +294,9 @@ export type OperationalProjectRow = {
   title: string;
   status: string;
   client: { id: number; name: string };
+  /** Ventana planeada del proyecto: de aquí sale el periodo por omisión de sus actividades. */
+  startDate?: string | null;
+  endDate?: string | null;
 };
 
 export function listApprovedTicketRequests(token: string) {
