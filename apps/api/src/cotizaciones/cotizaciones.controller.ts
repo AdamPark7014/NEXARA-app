@@ -69,6 +69,14 @@ export class CotizacionesController {
     return this.cotizacionesService.paquetes();
   }
 
+  /** Plantillas del editor por segmento (objetivo y subsecciones de alcance). Antes de `:id`. */
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
+  @Get('plantillas')
+  plantillas() {
+    return this.cotizacionesService.plantillas();
+  }
+
   /** Detalle de Core: estado y segmento en español, términos, partidas agrupadas y participantes. */
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
@@ -201,6 +209,18 @@ export class CotizacionesController {
       userId: user?.id,
       companyId,
     });
+  }
+
+  /** Borrador viejo sin nomenclatura → folio de quien la hizo (el anterior queda en versiones). */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/refoliar')
+  refoliar(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.refoliar(id, user?.id, companyId);
   }
 
   /** 03 Planos: sube un plano o anexo propio de la cotización. */
