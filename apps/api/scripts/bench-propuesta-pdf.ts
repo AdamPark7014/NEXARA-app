@@ -237,19 +237,121 @@ function payload(planos: PropuestaPayload['planos']): PropuestaPayload {
   };
 }
 
-/** Copia un PNG grande a `UPLOADS_ROOT` para medir el costo real de un plano anexo. */
-function prepararPlano(): { url: string; bytes: number } | null {
+/** `UPLOADS_ROOT` temporal del banco: ahí se copian el plano y las fotos de producto. */
+let raizUploads: string | null = null;
+
+/** Copia un archivo de `apps/web/public` a los uploads del banco; `null` si no está. */
+function subir(relativo: string, nombre: string): { url: string; bytes: number } | null {
   const origen = [
-    path.resolve(process.cwd(), '../web/public/mapa-operaciones.png'),
-    path.resolve(process.cwd(), '../../apps/web/public/mapa-operaciones.png'),
+    path.resolve(process.cwd(), '../web/public', relativo),
+    path.resolve(process.cwd(), '../../apps/web/public', relativo),
   ].find((p) => fs.existsSync(p));
   if (!origen) return null;
-
-  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'nexara-bench-'));
-  process.env['UPLOADS_ROOT'] = raiz;
-  const destino = path.join(raiz, 'plano-demo.png');
+  if (!raizUploads) {
+    raizUploads = fs.mkdtempSync(path.join(os.tmpdir(), 'nexara-bench-'));
+    process.env['UPLOADS_ROOT'] = raizUploads;
+  }
+  const destino = path.join(raizUploads, nombre);
   fs.copyFileSync(origen, destino);
-  return { url: '/uploads/plano-demo.png', bytes: fs.statSync(destino).size };
+  return { url: `/uploads/${nombre}`, bytes: fs.statSync(destino).size };
+}
+
+/** Copia un PNG grande a `UPLOADS_ROOT` para medir el costo real de un plano anexo. */
+function prepararPlano(): { url: string; bytes: number } | null {
+  return subir('mapa-operaciones.png', 'plano-demo.png');
+}
+
+/**
+ * Fotos de producto de muestra (las del sitio público; el repositorio no trae fotos de catálogo):
+ * cámaras para las cámaras y el ícono de NEXARA, en PNG, para los servicios.
+ */
+function prepararFotos() {
+  return {
+    bala: subir('servicios/square-1.jpg', 'producto-bala.jpg')?.url ?? null,
+    domo: subir('servicios/square-2.jpg', 'producto-domo.jpg')?.url ?? null,
+    dvr: subir('ventas-equipos.jpg', 'producto-dvr.jpg')?.url ?? null,
+    servicio: subir('icon-192.png', 'producto-servicio.png')?.url ?? null,
+  };
+}
+
+/** Marca, modelo, foto y descuento de las partidas de la muestra personalizada, por su posición. */
+const DETALLE_PERSONALIZADO: Record<number, { marca?: string; modelo?: string; foto?: keyof ReturnType<typeof prepararFotos>; descuento?: number }> = {
+  0: { marca: 'Hikvision', modelo: 'THC-B129-MS', foto: 'bala', descuento: 10 },
+  1: { marca: 'Hikvision', modelo: 'iDS-7232HQHI-M2/S', foto: 'dvr', descuento: 5 },
+  2: { foto: 'servicio' },
+  3: { foto: 'servicio' },
+  4: { foto: 'servicio' },
+  6: { marca: 'Hikvision', modelo: 'THC-T120-PC', foto: 'domo', descuento: 10 },
+  7: { marca: 'Epcom', modelo: 'PL-12-16-A' },
+  8: { marca: 'Epcom', modelo: 'TT-4K-PUSH', descuento: 5 },
+  13: { marca: 'Saxxon', modelo: 'OUTP5ECCA', descuento: 5 },
+  21: { marca: 'Western Digital', modelo: 'WD121PURP' },
+  24: { foto: 'servicio' },
+};
+
+/** Tipo de cambio con el que la muestra personalizada pasa los precios a dólares. */
+const TIPO_DE_CAMBIO = 17.45;
+
+/**
+ * Propuesta personalizada: carta de presentación, todas las columnas (foto, marca y modelo,
+ * descuento), importes en dólares con su nota y dos firmas.
+ */
+function payloadPersonalizado(): PropuestaPayload {
+  const fotos = prepararFotos();
+  const partidas = partidasDePrueba().map((p, i) => {
+    const extra = DETALLE_PERSONALIZADO[i] ?? {};
+    const unitPrice = Math.round((p.unitPrice / TIPO_DE_CAMBIO) * 100) / 100;
+    const descuentoPct = extra.descuento ?? 0;
+    return {
+      ...p,
+      unitPrice,
+      lineTotal: Math.round(p.qty * unitPrice * (1 - descuentoPct / 100) * 100) / 100,
+      marca: extra.marca ?? null,
+      modelo: extra.modelo ?? null,
+      imagenUrl: extra.foto ? fotos[extra.foto] : null,
+      descuentoPct,
+    };
+  });
+  // Como se guarda: subtotal antes de descuento; IVA sobre la base ya descontada.
+  const subtotal = Math.round(partidas.reduce((acc, p) => acc + p.qty * p.unitPrice, 0) * 100) / 100;
+  const base = Math.round(partidas.reduce((acc, p) => acc + p.lineTotal, 0) * 100) / 100;
+  const iva = Math.round(base * 0.16 * 100) / 100;
+  return {
+    ...payload([]),
+    grupos: [{ grupo: 'PARTIDAS', etiqueta: 'Partidas', subtotal: base, partidas }],
+    subtotal,
+    iva,
+    total: Math.round((base + iva) * 100) / 100,
+    currency: 'USD',
+    opciones: {
+      secciones: { objetivo: true, alcance: true, planos: true, terminos: true, firma: true },
+      columnas: { marcaModelo: true, imagen: true, descuento: true, precioUnitario: true },
+      carta: {
+        dirigidaA: 'Ing. Carlos Mendoza',
+        cargo: 'Gerente de Compras',
+        mensaje: [
+          'Estimado ingeniero Mendoza:',
+          'Agradecemos la oportunidad de presentarle esta propuesta para la renovación, el mantenimiento y la ampliación del sistema de videovigilancia de sus instalaciones. La elaboramos a partir del levantamiento técnico que realizamos en sitio y de las necesidades de operación que su equipo nos compartió.',
+          'En las siguientes páginas encontrará el objetivo del proyecto, el alcance detallado de cada actividad y la cotización con los equipos, materiales y servicios considerados. Los precios incluyen los descuentos por volumen acordados y se expresan en dólares, conforme a su solicitud.',
+          'Quedamos a sus órdenes para revisar juntos cualquier punto de la propuesta y, en su caso, programar el inicio de los trabajos.',
+        ].join('\n'),
+      },
+      moneda: 'USD',
+      tipoCambioNota: `Tipo de cambio de referencia: ${TIPO_DE_CAMBIO} MXN por dólar al 17 de septiembre de 2026. Se factura al tipo de cambio del día de pago.`,
+      firmas: [
+        { nombre: 'Luis Joel Aguilar', cargo: 'Ejecutivo de proyectos', rol: 'Elaboró' },
+        { nombre: 'María Fernanda López', cargo: 'Dirección comercial', rol: 'Autorizó' },
+      ],
+    },
+  };
+}
+
+/** Solo la cotización: objetivo y alcance apagados, el índice se renumera (01 Planos, 02 Cotización). */
+function payloadSoloCotizacion(): PropuestaPayload {
+  return {
+    ...payload([]),
+    opciones: { secciones: { objetivo: false, alcance: false } },
+  };
 }
 
 async function medir(nombre: string, datos: PropuestaPayload, vueltas = 5) {
@@ -292,6 +394,8 @@ async function main() {
   if (plano) {
     await medir('25 partidas + plano grande', payload([{ url: plano.url, nombre: 'Plano CCTV-01', tipo: 'imagen' }]));
   }
+  await medir('personalizada', payloadPersonalizado());
+  await medir('solo cotizacion', payloadSoloCotizacion());
 }
 
 main().catch((err) => {
