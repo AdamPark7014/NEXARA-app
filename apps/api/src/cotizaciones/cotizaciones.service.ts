@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -55,8 +57,9 @@ import {
 } from './terminos-segmento.js';
 import { avanceActividadPorEstado } from './estado-cotizacion.js';
 import { isPdfUrl, pasoCubiertoPorCotizacion } from '../activities/evidence/evidence-flow.helpers.js';
-import { generarPropuestaTecnicaPdf } from './propuesta-tecnica-pdf.js';
+import { generarPropuestaTecnicaPdf, type SeccionesPropuesta } from './propuesta-tecnica-pdf.js';
 import { payloadDePropuesta } from './propuesta-payload.js';
+import { LIMITES_VISTA_PREVIA, borradorSobreGuardada } from './propuesta-vista-previa.js';
 import { leerObjetivo, objetivoDePropuesta } from './objetivo-plantilla.js';
 import { normalizarBloques, plantillasDeCotizacion } from './alcance-bloques.js';
 import { ordenarPlanos } from './planos-cotizacion.js';
@@ -771,6 +774,41 @@ export class CotizacionesService {
     const quote = await this.findOne(id, companyId);
     return this.buildPdf(quote, internal);
   }
+
+  /**
+   * Vista previa en vivo: el PDF del borrador que está en pantalla, sin guardarlo.
+   *
+   * Misma búsqueda (y el mismo candado de empresa) que la descarga; el borrador se mezcla en memoria
+   * con `borradorSobreGuardada` y el PDF sale del mismo generador. No escribe nada: ni la cotización,
+   * ni sus partidas, ni versiones. Devuelve también la página donde empieza cada sección.
+   */
+  async vistaPreviaPdf(
+    id: number,
+    borrador: UpdateCotizacionDto,
+    companyId?: number | null,
+    userId?: number | null,
+  ): Promise<{ pdf: Buffer; secciones: SeccionesPropuesta }> {
+    const clave = userId ?? 0;
+    const enCurso = this.vistasEnCurso.get(clave) ?? 0;
+    if (enCurso >= LIMITES_VISTA_PREVIA.enCursoPorPersona) {
+      throw new HttpException('Demasiadas vistas previas a la vez: espera un momento.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    this.vistasEnCurso.set(clave, enCurso + 1);
+    try {
+      const guardada = await this.findOne(id, companyId);
+      const quote = borradorSobreGuardada(guardada, borrador);
+      const secciones: SeccionesPropuesta = {};
+      const pdf = await this.buildPropuesta(quote, secciones);
+      return { pdf, secciones };
+    } finally {
+      const quedan = (this.vistasEnCurso.get(clave) ?? 1) - 1;
+      if (quedan > 0) this.vistasEnCurso.set(clave, quedan);
+      else this.vistasEnCurso.delete(clave);
+    }
+  }
+
+  /** Vistas previas que se están armando, por persona (tope en `LIMITES_VISTA_PREVIA`). */
+  private readonly vistasEnCurso = new Map<number, number>();
 
   async getInternalPdfBuffer(id: number, companyId?: number | null) {
     return this.getPdfBuffer(id, companyId, true);
@@ -1585,7 +1623,7 @@ export class CotizacionesService {
    * El PDF viejo (una tabla y un párrafo de términos fijo) se conserva para la vista interna, que
    * es la única que lleva costo de proveedor y margen.
    */
-  private async buildPropuesta(quote: any): Promise<Buffer> {
+  private async buildPropuesta(quote: any, secciones?: SeccionesPropuesta): Promise<Buffer> {
     let company = quote.company;
     if (!company && quote.companyId) {
       company = await this.db.companyProfile.findUnique({ where: { id: quote.companyId } });
@@ -1612,6 +1650,7 @@ export class CotizacionesService {
             }
           : null,
       }),
+      secciones,
     );
   }
 
