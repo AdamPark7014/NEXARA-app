@@ -1,9 +1,15 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import {
   datosEmpresaPropuesta,
   fechaLarga,
   generarPropuestaTecnicaPdf,
+  OPCIONES_POR_OMISION,
+  opcionesDePropuesta,
   type PropuestaPayload,
 } from './propuesta-tecnica-pdf.js';
+import { loadNexaraLogo } from '../common/pdf/nexara-pdf-theme.js';
 import { agruparPartidas } from './partidas-grupos.js';
 import { objetivoDePropuesta } from './objetivo-plantilla.js';
 import { bloqueAlcanceDePaquete, buscarPaquete, partidasDePaquete } from './paquetes.js';
@@ -192,5 +198,170 @@ describe('datos de la propuesta', () => {
     const empresa = datosEmpresaPropuesta({ contactEmail: '  ', tradeName: 'Nexara' });
     expect(empresa.correo).toBe('gerencia@nexara.com.mx');
     expect(empresa.nombre).toBe('NEXARA');
+  });
+});
+
+describe('PDF Propuesta técnica · personalización', () => {
+  const hojasDe = async (p: PropuestaPayload) => textoPorHoja(await generarPropuestaTecnicaPdf(p));
+  const imagenes = (pdf: Buffer) => cuentaDe(pdf, /\/Subtype \/Image/g);
+
+  it('sin opciones y con las opciones por omisión sale el mismo documento', async () => {
+    const base = payloadDePrueba();
+    const sin = await hojasDe(base);
+    const con = await hojasDe({ ...base, opciones: OPCIONES_POR_OMISION });
+    expect(con).toEqual(sin);
+  });
+
+  it('las secciones apagadas desaparecen y el índice se renumera', async () => {
+    const hojas = await hojasDe({
+      ...payloadDePrueba(),
+      opciones: { secciones: { objetivo: false, alcance: false, planos: false } },
+    });
+    const todo = hojas.join('\n');
+    expect(todo).not.toContain('Objetivo del proyecto');
+    expect(todo).not.toContain('ALCANCE DEL PROYECTO');
+    expect(todo).not.toContain('Plano CCTV-01');
+    // La cotización queda como única sección: «01» en el índice de la portada y en su apertura.
+    expect(hojas[0]).toMatch(/^01\nCotización$/m);
+    expect(hojas[1]).toMatch(/^01\nCotización$/m);
+  });
+
+  it('con el objetivo apagado, el alcance es la 01 y sus apartados 1.1, 1.2…', async () => {
+    const todo = (await hojasDe({ ...payloadDePrueba(), opciones: { secciones: { objetivo: false } } })).join('\n');
+    expect(todo).toMatch(/^01\nAlcance del proyecto$/m);
+    expect(todo).toMatch(/^1\.1$/m);
+    expect(todo).toMatch(/^03\nCotización$/m);
+  });
+
+  it('términos y firma se pueden quitar', async () => {
+    const todo = (
+      await hojasDe({ ...payloadDePrueba(), opciones: { secciones: { terminos: false, firma: false } } })
+    ).join('\n');
+    expect(todo).not.toContain('TÉRMINOS Y CONDICIONES');
+    expect(todo).not.toContain('Luis Joel Aguilar');
+  });
+
+  it('marca y modelo, descuento por renglón, sin precio unitario y el descuento en los totales', async () => {
+    const payload = payloadDePrueba();
+    const partidas = payload.grupos.flatMap((g) => g.partidas);
+    const primera = partidas[0]!;
+    partidas[0] = {
+      ...primera,
+      marca: 'Hikvision',
+      modelo: 'DS-2CE16D0T-EXIPF',
+      descuentoPct: 10,
+      lineTotal: Math.round(primera.qty * primera.unitPrice * 0.9 * 100) / 100,
+    };
+    payload.grupos = [{ ...payload.grupos[0]!, partidas }];
+    payload.opciones = { columnas: { marcaModelo: true, descuento: true, precioUnitario: false } };
+    const todo = (await hojasDe(payload)).join('\n');
+    for (const esperado of ['Hikvision', 'DS-2CE16D0T-EXIPF', 'CANT.', 'DESC.', '10 %', 'DESCUENTO']) {
+      expect(todo).toContain(esperado);
+    }
+    // Sin precio unitario la tabla no lo trae; con descuento la unidad va bajo la cantidad.
+    expect(todo).not.toMatch(/^PRECIO$/m);
+    expect(todo).not.toMatch(/^UNIDAD$/m);
+  });
+
+  it('la foto de un producto se embebe una sola vez aunque se repita en varias partidas', async () => {
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'nexara-propuesta-'));
+    fs.writeFileSync(path.join(carpeta, 'producto.png'), loadNexaraLogo()!);
+    const antes = process.env['UPLOADS_ROOT'];
+    process.env['UPLOADS_ROOT'] = carpeta;
+    try {
+      const payload = payloadDePrueba();
+      payload.grupos = payload.grupos.map((g) => ({
+        ...g,
+        partidas: g.partidas.map((p) => ({ ...p, imagenUrl: '/uploads/producto.png' })),
+      }));
+      expect(payload.grupos.flatMap((g) => g.partidas).length).toBeGreaterThan(1);
+      const sinFotos = await generarPropuestaTecnicaPdf(payload);
+      const conFotos = await generarPropuestaTecnicaPdf({ ...payload, opciones: { columnas: { imagen: true } } });
+      expect(imagenes(conFotos)).toBe(imagenes(sinFotos) + 1);
+    } finally {
+      if (antes === undefined) delete process.env['UPLOADS_ROOT'];
+      else process.env['UPLOADS_ROOT'] = antes;
+      fs.rmSync(carpeta, { recursive: true, force: true });
+    }
+  });
+
+  it('en dólares dice la moneda en el total y lleva la nota del tipo de cambio', async () => {
+    const todo = (
+      await hojasDe({
+        ...payloadDePrueba(),
+        opciones: { moneda: 'USD', tipoCambioNota: 'Tipo de cambio de referencia: 17.45 MXN por dólar.' },
+      })
+    ).join('\n');
+    expect(todo).toContain('Importes en USD.');
+    expect(todo).toContain('TOTAL USD');
+    expect(todo).toContain('Tipo de cambio de referencia: 17.45 MXN por dólar.');
+  });
+
+  it('la carta de presentación va en la hoja 2, firmada por quien elaboró', async () => {
+    const base = payloadDePrueba();
+    const sinCarta = await hojasDe(base);
+    const hojas = await hojasDe({
+      ...base,
+      opciones: {
+        carta: {
+          dirigidaA: 'Ing. Carlos Mendoza',
+          cargo: 'Gerente de Compras',
+          mensaje: 'Estimado ingeniero:\nGracias por la oportunidad.',
+        },
+        firmas: [{ nombre: 'Luis Joel Aguilar', cargo: 'Ejecutivo de proyectos', rol: 'Elaboró' }],
+      },
+    });
+    expect(hojas).toHaveLength(sinCarta.length + 1);
+    for (const esperado of [
+      'CARTA DE PRESENTACIÓN',
+      'DIRIGIDA A',
+      'Ing. Carlos Mendoza',
+      'Gerente de Compras',
+      'Presente',
+      'NEX-LJ75100126-0007-JA.CE',
+      'Estimado ingeniero:',
+      'Gracias por la oportunidad.',
+      'Atentamente,',
+      'Luis Joel Aguilar',
+      'Ejecutivo de proyectos',
+    ]) {
+      expect(hojas[1]).toContain(esperado);
+    }
+  });
+
+  it('dos firmas: cada una con su nombre, cargo y rol', async () => {
+    const todo = (
+      await hojasDe({
+        ...payloadDePrueba(),
+        opciones: {
+          firmas: [
+            { nombre: 'Luis Joel Aguilar', cargo: 'Ejecutivo de proyectos', rol: 'Elaboró' },
+            { nombre: 'María Fernanda López', cargo: 'Dirección comercial', rol: 'Autorizó' },
+          ],
+        },
+      })
+    ).join('\n');
+    for (const esperado of [
+      'Luis Joel Aguilar',
+      'Ejecutivo de proyectos',
+      'Elaboró',
+      'María Fernanda López',
+      'Dirección comercial',
+      'Autorizó',
+    ]) {
+      expect(todo).toContain(esperado);
+    }
+  });
+
+  it('las opciones parciales se completan con los valores por omisión', () => {
+    expect(opcionesDePropuesta({ currency: 'MXN' })).toEqual(OPCIONES_POR_OMISION);
+    const o = opcionesDePropuesta({
+      currency: 'USD',
+      opciones: { secciones: { planos: false }, carta: { dirigidaA: 'X', mensaje: '   ' } },
+    });
+    expect(o.moneda).toBe('USD');
+    expect(o.secciones).toEqual({ ...OPCIONES_POR_OMISION.secciones, planos: false });
+    // Una carta sin mensaje no se imprime.
+    expect(o.carta).toBeNull();
   });
 });

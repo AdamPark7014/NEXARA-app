@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
-import { bufferParaPdf, imagenParaPdf } from '../common/pdf/imagen-para-pdf.js';
+import { bufferParaPdf, imagenParaPdf, type ImagenPdf } from '../common/pdf/imagen-para-pdf.js';
 import { loadNexaraLogo, PDF_FUENTES, registrarFuentesCorporativas } from '../common/pdf/nexara-pdf-theme.js';
 
 /**
@@ -19,6 +19,11 @@ import { loadNexaraLogo, PDF_FUENTES, registrarFuentesCorporativas } from '../co
  * - 01 Objetivo, 02 Alcance (título del proyecto, introducción y apartados 2.1, 2.2… con párrafos y
  *   viñetas), 03 Planos a página completa y 04 Cotización (emisor, cliente, folio, fecha, validez,
  *   tabla, totales, términos y quién la elaboró).
+ *
+ * - Personalización por cotización (`PropuestaPayload.opciones`, ver `PropuestaOpciones`): secciones
+ *   que se apagan (el índice se renumera 01…n), carta de presentación tras la portada, columnas de
+ *   foto, marca y modelo y descuento, PRECIO opcional, moneda con nota de tipo de cambio y una o dos
+ *   firmas. Sin `opciones` el documento sale idéntico al de siempre.
  *
  * Todo va en vectores: pesa poco, imprime nítido y el pie lleva los datos reales y la paginación.
  *
@@ -93,12 +98,15 @@ const EMPRESA_POR_OMISION = {
   lema: 'Conectando Ecosistemas de Tecnología',
 };
 
+/** Secciones del índice, en orden. El número se asigna al armar el documento (las apagadas no cuentan). */
 const SECCIONES = [
-  { numero: '01', titulo: 'Objetivo del proyecto' },
-  { numero: '02', titulo: 'Alcance del proyecto' },
-  { numero: '03', titulo: 'Planos' },
-  { numero: '04', titulo: 'Cotización' },
+  { clave: 'objetivo', titulo: 'Objetivo del proyecto' },
+  { clave: 'alcance', titulo: 'Alcance del proyecto' },
+  { clave: 'planos', titulo: 'Planos' },
+  { clave: 'cotizacion', titulo: 'Cotización' },
 ] as const;
+
+type ClaveSeccion = (typeof SECCIONES)[number]['clave'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
@@ -110,7 +118,43 @@ export type PropuestaPartida = {
   unit?: string | null;
   qty: number;
   unitPrice: number;
+  /** Importe del renglón antes de IVA y YA con el descuento aplicado (así lo arma `propuesta-payload`). */
   lineTotal: number;
+  marca?: string | null;
+  modelo?: string | null;
+  /** Imagen del producto (`/uploads/...`), como los planos; las remotas no se descargan. */
+  imagenUrl?: string | null;
+  /** Descuento del renglón, 0–100. Solo se informa: `lineTotal` ya lo trae aplicado. */
+  descuentoPct?: number | null;
+};
+
+export type PropuestaFirma = { nombre: string; cargo?: string | null; rol: 'Elaboró' | 'Autorizó' };
+
+/**
+ * Personalización por cotización (la captura el editor). Todo es opcional: sin `opciones`, o con
+ * sus valores por omisión, el documento sale exactamente como sin personalizar.
+ */
+export type PropuestaOpciones = {
+  /** Secciones que se imprimen; las apagadas desaparecen y el índice se renumera. */
+  secciones: { objetivo: boolean; alcance: boolean; planos: boolean; terminos: boolean; firma: boolean };
+  /** Columnas extra de la tabla; `precioUnitario: false` quita PRECIO (el TOTAL del renglón se queda). */
+  columnas: { marcaModelo: boolean; imagen: boolean; descuento: boolean; precioUnitario: boolean };
+  /** Carta de presentación: hoja propia justo después de la portada. */
+  carta: { dirigidaA: string; cargo?: string | null; mensaje: string } | null;
+  moneda: 'MXN' | 'USD';
+  /** P. ej. «Tipo de cambio de referencia: $17.45 MXN por USD al 17 de septiembre de 2026». */
+  tipoCambioNota?: string | null;
+  /** Una o dos firmas (Elaboró / Autorizó); vacío = quien elaboró, como sin personalizar. */
+  firmas: PropuestaFirma[];
+};
+
+export const OPCIONES_POR_OMISION: PropuestaOpciones = {
+  secciones: { objetivo: true, alcance: true, planos: true, terminos: true, firma: true },
+  columnas: { marcaModelo: false, imagen: false, descuento: false, precioUnitario: true },
+  carta: null,
+  moneda: 'MXN',
+  tipoCambioNota: null,
+  firmas: [],
 };
 
 export type PropuestaGrupo = {
@@ -169,7 +213,27 @@ export type PropuestaPayload = {
   terminos: { titulo: string; lineas: string[] };
   participantes: Array<{ nombre: string; rolEtiqueta: string; siglas: string }>;
   empresa?: PropuestaEmpresa | null;
+  /** Personalización; parcial o ausente = valores de `OPCIONES_POR_OMISION`. */
+  opciones?: Partial<Omit<PropuestaOpciones, 'secciones' | 'columnas'>> & {
+    secciones?: Partial<PropuestaOpciones['secciones']>;
+    columnas?: Partial<PropuestaOpciones['columnas']>;
+  } | null;
 };
+
+/** Opciones completas: lo que trae el payload sobre los valores por omisión. */
+export function opcionesDePropuesta(payload: Pick<PropuestaPayload, 'opciones' | 'currency'>): PropuestaOpciones {
+  const o = payload.opciones ?? {};
+  const moneda = o.moneda ?? (String(payload.currency ?? '').toUpperCase() === 'USD' ? 'USD' : 'MXN');
+  const carta = o.carta && String(o.carta.mensaje ?? '').trim() ? o.carta : null;
+  return {
+    secciones: { ...OPCIONES_POR_OMISION.secciones, ...(o.secciones ?? {}) },
+    columnas: { ...OPCIONES_POR_OMISION.columnas, ...(o.columnas ?? {}) },
+    carta,
+    moneda,
+    tipoCambioNota: o.tipoCambioNota?.trim() || null,
+    firmas: (o.firmas ?? []).filter((f) => f?.nombre?.trim()),
+  };
+}
 
 type Doc = InstanceType<typeof PDFDocument>;
 type Modo = 'portada' | 'seccion' | 'plano';
@@ -405,6 +469,14 @@ type Ctx = {
    */
   paginas: Modo[];
   pintandoMarco?: boolean;
+  /** Personalización ya completada con los valores por omisión. */
+  opciones: PropuestaOpciones;
+  /** Número de cada sección que se imprime («01»…), el mismo en el índice y en su apertura. */
+  numeros: Partial<Record<ClaveSeccion, string>>;
+  /** Miniaturas de producto abiertas en este documento: una por archivo. */
+  miniaturas: Map<string, Imagen>;
+  /** Bytes de miniaturas ya embebidos, para no pasar del presupuesto. */
+  bytesMiniaturas: number;
 };
 
 /** Márgenes de las hojas interiores: el `maxY` de PDFKit queda encima del pie. */
@@ -742,10 +814,10 @@ function portada(ctx: Ctx, indice: Array<{ numero: string; titulo: string; nota?
     yFila += 7 + altoFila + 20;
   }
 
-  // Índice: una franja discreta de cuatro columnas.
+  // Índice: una franja discreta en la rejilla de cuatro columnas (con menos secciones sobran columnas).
   const yIndice = Math.max(yFila + 2, 656);
   filete(doc, X, COL_DER, yIndice);
-  const anchoIndice = COL_ANCHO / indice.length;
+  const anchoIndice = COL_ANCHO / Math.max(4, indice.length);
   indice.forEach(({ numero, titulo: nombre, nota }, i) => {
     const x = X + i * anchoIndice;
     const apagada = Boolean(nota);
@@ -778,12 +850,84 @@ function portada(ctx: Ctx, indice: Array<{ numero: string; titulo: string; nota?
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Carta de presentación
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Carta de presentación: hoja propia justo después de la portada, con el encabezado de las hojas
+ * interiores. Fecha a la derecha, destinatario (nombre, cargo, empresa), asunto con el folio, el
+ * mensaje a medida de carta (440 pt, renglón de 16.5 pt, 10 pt entre párrafos) y la firma de quien
+ * elaboró la propuesta.
+ */
+function cartaDePresentacion(ctx: Ctx) {
+  const carta = ctx.opciones.carta;
+  if (!carta) return;
+  const { doc, payload, empresa } = ctx;
+  const MEDIDA = 440;
+  const RENGLON_CARTA = 16.5;
+  ctx.seccion = 'Carta de presentación';
+  abrirPagina(ctx, 'seccion');
+
+  // Fecha y destinatario, en la misma línea base donde las secciones ponen su número.
+  renglon(doc, fechaLarga(payload.issueDate) ?? '', COL_DER, APERTURA.numero, {
+    tamano: 9.5,
+    color: C.pizarra,
+    alinear: 'der',
+  });
+  renglon(doc, 'DIRIGIDA A', COL_X, APERTURA.numero, { tamano: 7.5, fuente: F.medio, color: C.tenue, espaciado: 1.3 });
+  const destinatario = carta.dirigidaA.trim() || payload.cliente.nombre?.trim() || payload.cliente.empresa?.trim() || '';
+  doc.font(F.titulo).fontSize(13).fillColor(C.tinta);
+  doc.text(destinatario, COL_X, APERTURA.numero + 10, { width: MEDIDA, lineGap: interlinea(doc, 17) });
+  const empresaCliente = payload.cliente.empresa?.trim();
+  const lineas = [carta.cargo?.trim(), empresaCliente && empresaCliente !== destinatario ? empresaCliente : null];
+  doc.font(F.texto).fontSize(10).fillColor(C.pizarra);
+  for (const linea of lineas) {
+    if (linea) doc.text(linea, COL_X, doc.y, { width: MEDIDA, lineGap: interlinea(doc, 14.5) });
+  }
+  doc.font(F.texto).fontSize(10).fillColor(C.tinta);
+  doc.text('Presente', COL_X, doc.y + 2, { width: MEDIDA, lineGap: interlinea(doc, 14.5) });
+
+  // Asunto: la propuesta que acompaña.
+  const proyecto = payload.proyecto?.trim();
+  doc.y += 18;
+  doc.font(F.semi).fontSize(10).fillColor(C.tinta);
+  const gapAsunto = interlinea(doc, 14.5);
+  doc.text('Asunto: ', COL_X, doc.y, { width: MEDIDA, lineGap: gapAsunto, continued: true });
+  doc.font(F.texto).text(`Propuesta técnica ${payload.folio}${proyecto ? `, ${proyecto}` : ''}.`);
+  doc.y += 16;
+
+  // Mensaje: cada salto de línea es un párrafo; ninguno deja un renglón huérfano al pie.
+  for (const texto of parrafosDe(carta.mensaje)) {
+    const alto = altoTexto(doc, texto, MEDIDA, F.texto, CUERPO, RENGLON_CARTA);
+    asegurarEspacio(ctx, Math.min(alto, RENGLON_CARTA * 2));
+    doc.font(F.texto).fontSize(CUERPO).fillColor(C.tinta);
+    doc.text(texto, COL_X, doc.y, { width: MEDIDA, lineGap: interlinea(doc, RENGLON_CARTA) });
+    doc.y += 10;
+  }
+
+  // Despedida y firma de quien elaboró; van juntas.
+  const elaboro = ctx.opciones.firmas.find((f) => f.rol === 'Elaboró') ?? ctx.opciones.firmas[0];
+  const nombre = elaboro?.nombre?.trim() || ctx.payload.participantes.find((p) => p?.nombre?.trim())?.nombre.trim() || '';
+  const cargo = elaboro?.cargo?.trim() || null;
+  const anchoFirma = (COL_ANCHO - 28 * 2) / 3;
+  asegurarEspacio(ctx, 6 + RENGLON_CARTA + (nombre ? 44 + (cargo ? 40 : 28) : 0));
+  doc.y += 6;
+  doc.font(F.texto).fontSize(CUERPO).fillColor(C.tinta).text('Atentamente,', COL_X, doc.y, { width: MEDIDA });
+  if (nombre) {
+    const yLinea = doc.y + 44;
+    dibujarFirma(doc, { nombre, cargo, rol: empresa.nombre }, COL_X, yLinea, anchoFirma, Boolean(cargo));
+    doc.y = yLinea + (cargo ? 40 : 28);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 01 Objetivo y 02 Alcance
 // ─────────────────────────────────────────────────────────────────────────────
 
 function seccionObjetivo(ctx: Ctx) {
   const { payload } = ctx;
-  abrirSeccion(ctx, '01', 'Objetivo del proyecto');
+  if (!ctx.numeros.objetivo) return;
+  abrirSeccion(ctx, ctx.numeros.objetivo, 'Objetivo del proyecto');
 
   for (const texto of parrafosDe(payload.objetivo.intro)) parrafo(ctx, texto);
 
@@ -807,9 +951,12 @@ function seccionAlcance(ctx: Ctx) {
   const bloques = payload.alcance.filter(
     (b) => b && (b.titulo?.trim() || b.texto?.trim() || (b.vinetas ?? []).some((v) => String(v).trim())),
   );
-  if (!bloques.length) return;
+  const numeroSeccion = ctx.numeros.alcance;
+  if (!bloques.length || !numeroSeccion) return;
 
-  abrirSeccion(ctx, '02', 'Alcance del proyecto');
+  abrirSeccion(ctx, numeroSeccion, 'Alcance del proyecto');
+  // Los apartados llevan el número de la sección: 2.1, 2.2… (o 1.1 si el objetivo no se imprime).
+  const prefijo = String(Number(numeroSeccion));
 
   const proyecto = payload.proyecto?.trim();
   if (proyecto) {
@@ -839,7 +986,7 @@ function seccionAlcance(ctx: Ctx) {
           : 0;
       asegurarEspacio(ctx, alto + 6 + siguiente);
       const y = doc.y;
-      renglon(doc, `2.${numero}`, COL_X, baseDesde(doc, y, F.titulo, SUBTITULO), {
+      renglon(doc, `${prefijo}.${numero}`, COL_X, baseDesde(doc, y, F.titulo, SUBTITULO), {
         tamano: SUBTITULO,
         fuente: F.titulo,
         color: C.acento,
@@ -901,6 +1048,8 @@ function prepararPlanos(planos: PropuestaPlano[]): Planos {
  */
 function seccionPlanos(ctx: Ctx, planos: Planos) {
   const { doc } = ctx;
+  const numeroSeccion = ctx.numeros.planos;
+  if (!numeroSeccion) return;
   for (const { nombre, imagen: preparada } of planos.imagenes) {
     const escala = LADO_PLANO / Math.max(preparada.ancho, preparada.alto);
     const ancho = Math.round(preparada.ancho * escala);
@@ -916,7 +1065,7 @@ function seccionPlanos(ctx: Ctx, planos: Planos) {
     doc.restore();
     filete(doc, 0, ancho, alto, C.linea, 0.8);
     const base = alto + FRANJA_PLANO / 2 + 3.5;
-    const ancho03 = renglon(doc, '03', 28, base, { tamano: 10, fuente: F.semi, color: C.acento, espaciado: 1 });
+    const ancho03 = renglon(doc, numeroSeccion, 28, base, { tamano: 10, fuente: F.semi, color: C.acento, espaciado: 1 });
     renglon(doc, `PLANOS  ·  ${nombre.toUpperCase()}`, 28 + ancho03 + 12, base, {
       tamano: 9,
       fuente: F.medio,
@@ -929,7 +1078,7 @@ function seccionPlanos(ctx: Ctx, planos: Planos) {
   const nombres = planos.otros;
   if (!nombres.length) return;
 
-  abrirSeccion(ctx, '03', 'Planos');
+  abrirSeccion(ctx, numeroSeccion, 'Planos');
   parrafo(ctx, 'Anexos que acompañan a esta propuesta:', 7, true);
   nombres.forEach((n, i) => vineta(ctx, n, conQuienViaja(nombres, i)));
 }
@@ -938,31 +1087,49 @@ function seccionPlanos(ctx: Ctx, planos: Planos) {
 // 04 Cotización
 // ─────────────────────────────────────────────────────────────────────────────
 
-const COLUMNAS = (() => {
-  const definicion: Array<[string, number, 'izq' | 'centro' | 'der']> = [
-    ['DESCRIPCIÓN', 228, 'izq'],
-    ['UNIDAD', 50, 'centro'],
-    ['CANTIDAD', 54, 'centro'],
-    ['PRECIO', 72, 'der'],
-    ['TOTAL', 80, 'der'],
-  ];
-  let x = COL_X;
-  return definicion.map(([titulo, ancho, alinear]) => {
-    const col = { titulo, x, ancho, alinear };
-    x += ancho;
-    return col;
-  });
-})();
-
 /** Filas de la tabla: descripción 9.5 pt; importes 9 pt con cifras tabulares. */
 const FILA = { tamano: 9.5, importe: 9, relleno: 7.5, renglon: 13, minimo: 27, pad: 8 };
 const ENCABEZADO_TABLA = 24;
+/** Lado de la miniatura del producto. */
+const MINIATURA = 36;
 
-function encabezadoTabla(doc: Doc, y: number) {
+type ClaveColumna = 'imagen' | 'descripcion' | 'unidad' | 'cantidad' | 'precio' | 'descuento' | 'total';
+type Columna = { clave: ClaveColumna; titulo: string; x: number; ancho: number; alinear: 'izq' | 'centro' | 'der' };
+
+/**
+ * Columnas de la tabla según la personalización. Sin columnas extra son las de siempre:
+ * descripción 228 · unidad 50 · cantidad 54 · precio 72 · total 80.
+ *
+ * Con imagen o descuento la unidad pasa debajo de la cantidad («CANT.»): con una columna más la
+ * descripción bajaría a ~140 pt y cada partida se iría a seis renglones. Marca y modelo no son
+ * columna sino un renglón tenue bajo la descripción, por lo mismo: el ancho que se le quite a la
+ * descripción se paga en alto de toda la tabla, y marca y modelo varían mucho de largo.
+ */
+function columnasDe(o: PropuestaOpciones['columnas']): Columna[] {
+  const compacta = o.imagen || o.descuento;
+  const fijas: Array<[ClaveColumna, string, number, Columna['alinear']]> = [];
+  if (o.imagen) fijas.push(['imagen', '', MINIATURA + FILA.pad + 6, 'izq']);
+  fijas.push(['descripcion', 'DESCRIPCIÓN', 0, 'izq']);
+  if (!compacta) fijas.push(['unidad', 'UNIDAD', 50, 'centro']);
+  fijas.push(['cantidad', compacta ? 'CANT.' : 'CANTIDAD', compacta ? 52 : 54, 'centro']);
+  if (o.precioUnitario) fijas.push(['precio', 'PRECIO', 72, 'der']);
+  if (o.descuento) fijas.push(['descuento', 'DESC.', 46, 'centro']);
+  fijas.push(['total', 'TOTAL', 80, 'der']);
+  const descripcion = COL_ANCHO - fijas.reduce((acc, [, , ancho]) => acc + ancho, 0);
+  let x = COL_X;
+  return fijas.map(([clave, titulo, ancho, alinear]) => {
+    const col = { clave, titulo, x, ancho: clave === 'descripcion' ? descripcion : ancho, alinear };
+    x += col.ancho;
+    return col;
+  });
+}
+
+function encabezadoTabla(doc: Doc, y: number, columnas: Columna[]) {
   doc.save();
   doc.rect(COL_X, y, COL_ANCHO, ENCABEZADO_TABLA).fill(C.cabecera);
   doc.restore();
-  for (const col of COLUMNAS) {
+  for (const col of columnas) {
+    if (!col.titulo) continue;
     const base = y + ENCABEZADO_TABLA / 2 + 2.6;
     const x =
       col.alinear === 'izq' ? col.x + FILA.pad : col.alinear === 'der' ? col.x + col.ancho - FILA.pad : col.x + col.ancho / 2;
@@ -989,6 +1156,77 @@ function importe(doc: Doc, valor: number, x: number, ancho: number, base: number
     max: ancho - FILA.pad * 2 - 8,
     tabular: true,
   });
+}
+
+/**
+ * Miniaturas preparadas, por archivo, fecha y tamaño: la vista previa del editor vuelve a pedir el
+ * mismo documento a cada rato y reducir un PNG cuesta más que dibujar la tabla.
+ */
+const miniaturasEnCache = new Map<string, ImagenPdf | null>();
+/** Tope de bytes de miniaturas por documento; pasado, las partidas siguientes van sin imagen. */
+const PRESUPUESTO_MINIATURAS = 1.5 * 1024 * 1024;
+/** Un JPEG no se puede reducir aquí (no hay codificador): más pesado que esto, no entra. */
+const MAX_BYTES_MINIATURA = 200 * 1024;
+
+/** Imagen del producto lista para embeber: 3× el lado impreso (~216 ppp), alfa aplanado en blanco. */
+function prepararMiniatura(url: string): ImagenPdf | null {
+  const archivo = archivoDePlano(url);
+  if (!archivo || !/\.(png|jpe?g)$/i.test(archivo)) return null;
+  let llave: string;
+  try {
+    const datos = fs.statSync(archivo);
+    llave = `${archivo}|${datos.mtimeMs}|${datos.size}`;
+  } catch {
+    return null;
+  }
+  if (miniaturasEnCache.has(llave)) return miniaturasEnCache.get(llave)!;
+  let imagen = imagenParaPdf(archivo, { maxLado: MINIATURA * 3, maxBytes: 16 * 1024 });
+  if (imagen && (!imagen.ancho || !imagen.alto || imagen.datos.length > MAX_BYTES_MINIATURA)) imagen = null;
+  if (miniaturasEnCache.size >= 200) miniaturasEnCache.delete(miniaturasEnCache.keys().next().value!);
+  miniaturasEnCache.set(llave, imagen);
+  return imagen;
+}
+
+/** La miniatura de una partida, abierta una sola vez por documento aunque se repita. */
+function miniaturaDe(ctx: Ctx, url?: string | null): Imagen {
+  const limpio = String(url ?? '').trim();
+  if (!limpio) return null;
+  if (ctx.miniaturas.has(limpio)) return ctx.miniaturas.get(limpio)!;
+  let abierta: Imagen = null;
+  const imagen = prepararMiniatura(limpio);
+  if (imagen && ctx.bytesMiniaturas + imagen.datos.length <= PRESUPUESTO_MINIATURAS) {
+    try {
+      const objeto = (ctx.doc as unknown as { openImage: (src: Buffer) => { width: number; height: number } }).openImage(
+        imagen.datos,
+      );
+      abierta = { objeto, ancho: objeto.width, alto: objeto.height };
+      ctx.bytesMiniaturas += imagen.datos.length;
+    } catch {
+      abierta = null;
+    }
+  }
+  ctx.miniaturas.set(limpio, abierta);
+  return abierta;
+}
+
+/** Miniatura centrada en un cuadro de `MINIATURA` pt con filete, como una ficha de catálogo. */
+function dibujarMiniatura(doc: Doc, imagen: NonNullable<Imagen>, x: number, y: number) {
+  const escala = Math.min(MINIATURA / imagen.ancho, MINIATURA / imagen.alto);
+  const ancho = imagen.ancho * escala;
+  const alto = imagen.alto * escala;
+  try {
+    (doc as unknown as { image: (src: unknown, x: number, y: number, o: object) => void }).image(
+      imagen.objeto,
+      x + (MINIATURA - ancho) / 2,
+      y + (MINIATURA - alto) / 2,
+      { width: ancho, height: alto },
+    );
+  } catch {
+    return;
+  }
+  doc.save();
+  doc.rect(x, y, MINIATURA, MINIATURA).lineWidth(0.5).strokeColor(C.linea).stroke();
+  doc.restore();
 }
 
 /**
@@ -1046,7 +1284,7 @@ function recuadro(
 
 function seccionCotizacion(ctx: Ctx) {
   const { doc, payload, empresa } = ctx;
-  abrirSeccion(ctx, '04', 'Cotización');
+  abrirSeccion(ctx, ctx.numeros.cotizacion ?? '04', 'Cotización');
 
   // Emisor, alineado a la derecha frente al título, como el membrete de la cotización del modelo.
   const telefonos = empresa.telefonoAlterno ? `${empresa.telefono}  /  ${empresa.telefonoAlterno}` : empresa.telefono;
@@ -1084,32 +1322,77 @@ function seccionCotizacion(ctx: Ctx) {
   recuadro(doc, COL_X, yRecuadros, anchoRecuadro, 'Cliente', filasCliente, { alto });
   recuadro(doc, xDatos, yRecuadros, anchoRecuadro, 'Datos de la cotización', filasDatos, { alto });
 
-  let y = encabezadoTabla(doc, yRecuadros + alto + 24);
+  const { opciones } = ctx;
+  const columnas = columnasDe(opciones.columnas);
+  const columna = (clave: ClaveColumna) => columnas.find((c) => c.clave === clave);
+  const cDescripcion = columna('descripcion')!;
+  const compacta = !columna('unidad');
+
+  let y = encabezadoTabla(doc, yRecuadros + alto + 24, columnas);
 
   // Las partidas van seguidas, sin subtotales por grupo (el modelo no los tiene).
   const partidas = payload.grupos.flatMap((g) => g.partidas);
-  const anchoDescripcion = COLUMNAS[0]!.ancho - FILA.pad * 2;
+  const xDescripcion = cDescripcion.x + FILA.pad;
+  const anchoDescripcion = cDescripcion.ancho - FILA.pad * 2;
   const nuevaHojaDeTabla = () => {
     abrirPagina(ctx, 'seccion');
-    return encabezadoTabla(doc, INICIO_CONTINUACION);
+    return encabezadoTabla(doc, INICIO_CONTINUACION, columnas);
   };
+
+  // `lineTotal` ya viene descontado y `subtotal` es la base antes de descuento (así se guardan):
+  // si los renglones no suman el subtotal, la diferencia es el descuento y se imprime para que
+  // SUBTOTAL − DESCUENTO + IVA = TOTAL cuadre a la vista.
+  const sumaRenglones = partidas.reduce((acc, p) => acc + (Number(p.lineTotal) || 0), 0);
+  const descuento = partidas.length ? Math.round(((Number(payload.subtotal) || 0) - sumaRenglones) * 100) / 100 : 0;
+  const filasTotales: Array<[string, number]> = [['SUBTOTAL', Number(payload.subtotal) || 0]];
+  if (descuento > Math.max(0.01, partidas.length * 0.005)) filasTotales.push(['DESCUENTO', -descuento]);
+  filasTotales.push(['IVA', Number(payload.iva) || 0]);
+  const moneda = String(payload.opciones?.moneda ?? payload.currency ?? '').trim().toUpperCase() || 'MXN';
   // Los totales nunca quedan solos en una hoja: viajan con la última partida.
   const altoFilaTotal = 24;
-  const altoTotales = 12 + altoFilaTotal * 2 + 34;
+  const altoTotales = 12 + altoFilaTotal * filasTotales.length + 34;
+
+  const MARCA = { tamano: 8.5, renglon: 12 };
+  const SEPARADOR = '  ·  ';
 
   partidas.forEach((partida, i) => {
     const nombre = String(partida.name ?? '').trim();
     const descripcion = String(partida.description ?? '').trim();
     const detalle = descripcion && descripcion !== nombre ? descripcion : '';
+    const marcaModelo = opciones.columnas.marcaModelo
+      ? ([
+          ['Marca', String(partida.marca ?? '').trim()],
+          ['Modelo', String(partida.modelo ?? '').trim()],
+        ] as Array<[string, string]>).filter(([, valor]) => valor)
+      : [];
+    const miniatura = opciones.columnas.imagen ? miniaturaDe(ctx, partida.imagenUrl) : null;
+
     doc.font(detalle ? F.medio : F.texto).fontSize(FILA.tamano);
     const gapNombre = interlinea(doc, FILA.renglon);
     const altoNombre = nombre ? doc.heightOfString(nombre, { width: anchoDescripcion, lineGap: gapNombre }) - gapNombre : 0;
+    // Marca y modelo en un renglón si caben; si no, cada uno en el suyo, para que «Modelo» nunca se
+    // quede al final de un renglón y su valor en el siguiente.
+    doc.font(F.texto).fontSize(MARCA.tamano);
+    const gapMarca = interlinea(doc, MARCA.renglon);
+    const textoDe = (pares: Array<[string, string]>) => pares.map(([e, v]) => `${e} ${v}`).join(SEPARADOR);
+    const renglonesMarca = !marcaModelo.length
+      ? []
+      : doc.widthOfString(textoDe(marcaModelo)) <= anchoDescripcion
+        ? [marcaModelo]
+        : marcaModelo.map((par) => [par]);
+    const altosMarca = renglonesMarca.map((pares) =>
+      doc.heightOfString(textoDe(pares), { width: anchoDescripcion, lineGap: gapMarca }),
+    );
+    const altoMarca = altosMarca.length ? altosMarca.reduce((a, b) => a + b, 0) - gapMarca + 3 : 0;
     doc.font(F.texto).fontSize(FILA.tamano - 1);
     const gapDetalle = interlinea(doc, FILA.renglon - 1);
     const altoDetalle = detalle
       ? doc.heightOfString(detalle, { width: anchoDescripcion, lineGap: gapDetalle }) - gapDetalle + 3
       : 0;
-    const alto = Math.max(FILA.minimo, altoNombre + altoDetalle + FILA.relleno * 2);
+    let alto = Math.max(FILA.minimo, altoNombre + altoMarca + altoDetalle + FILA.relleno * 2);
+    if (miniatura) alto = Math.max(alto, MINIATURA + FILA.relleno * 2);
+    // Cantidad con la unidad debajo.
+    if (compacta) alto = Math.max(alto, FILA.relleno * 2 + 20);
 
     const reserva = i === partidas.length - 1 ? altoTotales : 0;
     if (y + alto + reserva > LIMITE_CUERPO) y = nuevaHojaDeTabla();
@@ -1119,30 +1402,65 @@ function seccionCotizacion(ctx: Ctx) {
     const yTexto = y + FILA.relleno;
     if (nombre) {
       doc.font(detalle ? F.medio : F.texto).fontSize(FILA.tamano).fillColor(C.tinta);
-      doc.text(nombre, COLUMNAS[0]!.x + FILA.pad, yTexto, { width: anchoDescripcion, lineGap: gapNombre });
+      doc.text(nombre, xDescripcion, yTexto, { width: anchoDescripcion, lineGap: gapNombre });
     }
+    // Etiqueta tenue y valor en pizarra; cada renglón es un párrafo que corta igual que al medirlo.
+    let yMarca = yTexto + altoNombre + 3;
+    renglonesMarca.forEach((pares, r) => {
+      doc.font(F.texto).fontSize(MARCA.tamano);
+      pares.forEach(([etiqueta, valor], k) => {
+        const ultimo = k === pares.length - 1;
+        const o = { width: anchoDescripcion, lineGap: gapMarca, continued: true };
+        if (k === 0) doc.fillColor(C.tenue).text(`${etiqueta} `, xDescripcion, yMarca, o);
+        else doc.fillColor(C.tenue).text(`${etiqueta} `, o);
+        doc.fillColor(C.pizarra).text(ultimo ? valor : `${valor}${SEPARADOR}`, { ...o, continued: !ultimo });
+      });
+      yMarca += altosMarca[r]!;
+    });
     if (detalle) {
       doc.font(F.texto).fontSize(FILA.tamano - 1).fillColor(C.pizarra);
-      doc.text(detalle, COLUMNAS[0]!.x + FILA.pad, yTexto + altoNombre + 3, {
+      doc.text(detalle, xDescripcion, yTexto + altoNombre + altoMarca + 3, {
         width: anchoDescripcion,
         lineGap: gapDetalle,
       });
     }
     // Unidad, cantidad e importes en la línea base del primer renglón de la descripción.
     const base = baseDesde(doc, yTexto, detalle ? F.medio : F.texto, FILA.tamano);
-    renglon(doc, partida.unit?.trim() || 'Pieza', COLUMNAS[1]!.x + COLUMNAS[1]!.ancho / 2, base, {
-      tamano: FILA.importe,
-      color: C.pizarra,
-      alinear: 'centro',
-      max: COLUMNAS[1]!.ancho - 8,
-    });
-    renglon(doc, cantidadMx.format(Number(partida.qty) || 0), COLUMNAS[2]!.x + COLUMNAS[2]!.ancho / 2, base, {
-      tamano: FILA.importe,
-      alinear: 'centro',
-      tabular: true,
-    });
-    importe(doc, partida.unitPrice, COLUMNAS[3]!.x, COLUMNAS[3]!.ancho, base, FILA.importe);
-    importe(doc, partida.lineTotal, COLUMNAS[4]!.x, COLUMNAS[4]!.ancho, base, FILA.importe);
+    for (const col of columnas) {
+      const centro = col.x + col.ancho / 2;
+      if (col.clave === 'imagen' && miniatura) dibujarMiniatura(doc, miniatura, col.x + FILA.pad, yTexto);
+      else if (col.clave === 'unidad') {
+        renglon(doc, partida.unit?.trim() || 'Pieza', centro, base, {
+          tamano: FILA.importe,
+          color: C.pizarra,
+          alinear: 'centro',
+          max: col.ancho - 8,
+        });
+      } else if (col.clave === 'cantidad') {
+        renglon(doc, cantidadMx.format(Number(partida.qty) || 0), centro, base, {
+          tamano: FILA.importe,
+          alinear: 'centro',
+          tabular: true,
+        });
+        if (compacta) {
+          renglon(doc, partida.unit?.trim() || 'Pieza', centro, base + 11, {
+            tamano: 7.5,
+            color: C.pizarra,
+            alinear: 'centro',
+            max: col.ancho - 8,
+          });
+        }
+      } else if (col.clave === 'precio') importe(doc, partida.unitPrice, col.x, col.ancho, base, FILA.importe);
+      else if (col.clave === 'descuento') {
+        const pct = Math.min(100, Math.max(0, Number(partida.descuentoPct) || 0));
+        renglon(doc, pct ? `${cantidadMx.format(pct)} %` : '—', centro, base, {
+          tamano: FILA.importe,
+          color: pct ? C.tinta : C.tenue,
+          alinear: 'centro',
+          tabular: true,
+        });
+      } else if (col.clave === 'total') importe(doc, partida.lineTotal, col.x, col.ancho, base, FILA.importe);
+    }
     y += alto;
   });
   if (!partidas.length) {
@@ -1153,17 +1471,14 @@ function seccionCotizacion(ctx: Ctx) {
 
   // Totales a la derecha, con el signo de pesos en una sola columna; nota de moneda a la izquierda.
   y += 12;
-  const totX = COLUMNAS[3]!.x - 34;
-  const cifraTotal = numeroMx.format(Number(payload.total) || 0);
+  const totX = COL_DER - 186;
+  const cifra = (valor: number) => `${valor < 0 ? '−' : ''}${numeroMx.format(Math.abs(Number(valor) || 0))}`;
+  const cifraTotal = cifra(Number(payload.total) || 0);
   const anchoCifras = Math.max(
     anchoDe(doc, cifraTotal, F.fuerte, 12, 0, true),
-    anchoDe(doc, numeroMx.format(Number(payload.subtotal) || 0), F.texto, 10, 0, true),
+    ...filasTotales.map(([, valor]) => anchoDe(doc, cifra(valor), F.texto, 10, 0, true)),
   );
   const xSigno = COL_DER - FILA.pad - anchoCifras - 14;
-  const filasTotales: Array<[string, number]> = [
-    ['SUBTOTAL', payload.subtotal],
-    ['IVA', payload.iva],
-  ];
   filasTotales.forEach(([etiqueta, valor], i) => {
     const fy = y + i * altoFilaTotal;
     // El filete bajo el IVA lo pone el filete verde del total.
@@ -1172,28 +1487,40 @@ function seccionCotizacion(ctx: Ctx) {
     const base = fy + altoFilaTotal / 2 + 3.4;
     renglon(doc, etiqueta, totX + FILA.pad, base, { tamano: 7.5, fuente: F.semi, color: C.pizarra, espaciado: 1.2 });
     renglon(doc, '$', xSigno, base, { tamano: 10, color: C.pizarra });
-    renglon(doc, numeroMx.format(Number(valor) || 0), COL_DER - FILA.pad, base, {
-      tamano: 10,
-      alinear: 'der',
-      tabular: true,
-    });
+    renglon(doc, cifra(valor), COL_DER - FILA.pad, base, { tamano: 10, alinear: 'der', tabular: true });
   });
   const yTotal = y + altoFilaTotal * filasTotales.length;
   barra(doc, totX, yTotal, COL_DER - totX, 2);
   const baseTotal = yTotal + 23;
-  renglon(doc, 'TOTAL', totX + FILA.pad, baseTotal, { tamano: 9, fuente: F.fuerte, color: C.tinta, espaciado: 1.4 });
+  // En otra moneda el total dice cuál: el «$» solo no distingue pesos de dólares.
+  renglon(doc, moneda === 'MXN' ? 'TOTAL' : `TOTAL ${moneda}`, totX + FILA.pad, baseTotal, {
+    tamano: 9,
+    fuente: F.fuerte,
+    color: C.tinta,
+    espaciado: 1.4,
+  });
   renglon(doc, '$', xSigno, baseTotal, { tamano: 12, fuente: F.fuerte, color: C.tinta });
   renglon(doc, cifraTotal, COL_DER - FILA.pad, baseTotal, { tamano: 12, fuente: F.fuerte, alinear: 'der', tabular: true });
-  renglon(doc, `Importes en ${payload.currency || 'MXN'}.`, COL_X, y + altoFilaTotal / 2 + 3.4, {
-    tamano: 8,
-    color: C.pizarra,
-  });
+  const baseNota = y + altoFilaTotal / 2 + 3.4;
+  renglon(doc, `Importes en ${moneda}.`, COL_X, baseNota, { tamano: 8, color: C.pizarra });
+  let finNota = baseNota;
+  if (opciones.tipoCambioNota) {
+    doc.font(F.texto).fontSize(8).fillColor(C.tenue);
+    doc.text(opciones.tipoCambioNota, COL_X, baseNota + 5, { width: totX - COL_X - 28, lineGap: interlinea(doc, 11.5) });
+    finNota = doc.y;
+  }
   doc.x = COL_X;
-  doc.y = baseTotal + 30;
+  doc.y = Math.max(baseTotal + 30, finNota + 20);
 
   // Términos y condiciones y firma: van juntos a la hoja siguiente si ahí caben enteros.
-  const lineas = payload.terminos.lineas.map((l) => l.trim()).filter(Boolean);
-  const participantes = payload.participantes.filter((p) => p?.nombre?.trim());
+  const lineas = opciones.secciones.terminos ? payload.terminos.lineas.map((l) => l.trim()).filter(Boolean) : [];
+  const firmas = opciones.secciones.firma ? firmasDe(ctx) : [];
+  const conCargo = firmas.some((f) => f.cargo);
+  // Bloque de firma: línea, nombre, cargo (si alguno lo trae) y rol; y el paso entre filas.
+  const altoFirma = conCargo ? 40 : 28;
+  const pasoFirmas = altoFirma + 20;
+  const filasFirma = Math.ceil(firmas.length / 3);
+  const altoFirmas = firmas.length ? 44 + (filasFirma - 1) * pasoFirmas + altoFirma : 0;
   const TAMANO_TERMINOS = 9;
   const RENGLON_TERMINOS = 13.5;
   const xTerminos = COL_X + 16;
@@ -1210,7 +1537,7 @@ function seccionCotizacion(ctx: Ctx) {
           (acc, l) => acc + altoTexto(doc, textoDeTermino(l), COL_DER - xTerminos, F.texto, TAMANO_TERMINOS, RENGLON_TERMINOS) + 5,
           -5,
         )
-      : 0) + (participantes.length ? 44 + (Math.ceil(participantes.length / 3) - 1) * 48 + 28 : 0);
+      : 0) + altoFirmas;
   if (doc.y + altoCierre > LIMITE_CUERPO && altoCierre <= LIMITE_CUERPO - INICIO_CONTINUACION) {
     abrirPagina(ctx, 'seccion');
   }
@@ -1251,23 +1578,47 @@ function seccionCotizacion(ctx: Ctx) {
     }
   }
 
-  // Quién la elaboró, con línea de firma.
-  if (participantes.length) {
+  // Firmas: una sola va a la izquierda; dos, a los extremos (Elaboró · Autorizó); más, en rejilla
+  // de tres. Todas con el mismo ancho de línea.
+  if (firmas.length) {
     const porFila = 3;
     const anchoFirma = (COL_ANCHO - 28 * (porFila - 1)) / porFila;
-    const filasFirma = Math.ceil(participantes.length / porFila);
-    asegurarEspacio(ctx, 44 + (filasFirma - 1) * 48 + 28);
+    asegurarEspacio(ctx, altoFirmas);
     let yf = doc.y + 44;
-    participantes.forEach((p, i) => {
-      const col = i % porFila;
-      if (i > 0 && col === 0) yf += 48;
+    firmas.forEach((f, i) => {
+      const col = firmas.length === 2 ? i * 2 : i % porFila;
+      if (i > 0 && i % porFila === 0) yf += pasoFirmas;
       const x = COL_X + col * (anchoFirma + 28);
-      filete(doc, x, x + anchoFirma, yf, C.tenue, 0.6);
-      renglon(doc, p.nombre.trim(), x, yf + 14, { tamano: 9.5, fuente: F.semi, max: anchoFirma });
-      renglon(doc, p.rolEtiqueta?.trim() || 'Elaboró', x, yf + 26, { tamano: 8, color: C.pizarra, max: anchoFirma });
+      dibujarFirma(doc, f, x, yf, anchoFirma, conCargo);
     });
-    doc.y = yf + 30;
+    doc.y = yf + altoFirma + 2;
   }
+}
+
+type Firma = { nombre: string; cargo: string | null; rol: string };
+
+/**
+ * Quién firma: las firmas personalizadas si las hay; si no, quien elaboró la cotización (como sin
+ * personalizar).
+ */
+function firmasDe(ctx: Ctx): Firma[] {
+  if (ctx.opciones.firmas.length) {
+    return ctx.opciones.firmas.map((f) => ({ nombre: f.nombre.trim(), cargo: f.cargo?.trim() || null, rol: f.rol }));
+  }
+  return ctx.payload.participantes
+    .filter((p) => p?.nombre?.trim())
+    .map((p) => ({ nombre: p.nombre.trim(), cargo: null, rol: p.rolEtiqueta?.trim() || 'Elaboró' }));
+}
+
+/**
+ * Bloque de firma: espacio para firmar, línea, nombre, cargo y rol. Si alguna firma de la fila trae
+ * cargo, el rol baja un renglón en todas para que queden alineados.
+ */
+function dibujarFirma(doc: Doc, f: Firma, x: number, yLinea: number, ancho: number, conCargo: boolean) {
+  filete(doc, x, x + ancho, yLinea, C.tenue, 0.6);
+  renglon(doc, f.nombre, x, yLinea + 14, { tamano: 9.5, fuente: F.semi, max: ancho });
+  if (f.cargo) renglon(doc, f.cargo, x, yLinea + 26, { tamano: 8.5, max: ancho });
+  renglon(doc, f.rol, x, yLinea + (conCargo ? 38 : 26), { tamano: 8, color: C.pizarra, max: ancho });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1316,6 +1667,15 @@ export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload): Pro
     doc.on('error', reject);
   });
 
+  // Secciones que se imprimen, numeradas 01…n: el mismo número en el índice y en cada apertura. Una
+  // sección encendida pero vacía (alcance sin bloques, planos sin anexos) conserva su número y el
+  // índice lo dice; una apagada desaparece y las siguientes se recorren.
+  const opciones = opcionesDePropuesta(payload);
+  const incluidas = SECCIONES.filter((s) => s.clave === 'cotizacion' || opciones.secciones[s.clave]);
+  const numeros: Ctx['numeros'] = Object.fromEntries(
+    incluidas.map((s, i) => [s.clave, String(i + 1).padStart(2, '0')]),
+  );
+
   const ctx: Ctx = {
     doc,
     payload,
@@ -1324,6 +1684,10 @@ export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload): Pro
     modo: 'portada',
     seccion: null,
     paginas: [],
+    opciones,
+    numeros,
+    miniaturas: new Map(),
+    bytesMiniaturas: 0,
   };
 
   doc.on('pageAdded', () => {
@@ -1335,19 +1699,21 @@ export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload): Pro
   const hayAlcance = payload.alcance.some(
     (b) => b && (b.titulo?.trim() || b.texto?.trim() || (b.vinetas ?? []).some((v) => String(v).trim())),
   );
-  const planos = prepararPlanos(payload.planos);
+  const planos: Planos = numeros.planos ? prepararPlanos(payload.planos) : { imagenes: [], otros: [] };
   const hayPlanos = planos.imagenes.length + planos.otros.length > 0;
-  const indice = SECCIONES.map((s) => ({
-    ...s,
+  const indice = incluidas.map((s) => ({
+    numero: numeros[s.clave]!,
+    titulo: s.titulo,
     nota:
-      s.numero === '02' && !hayAlcance
+      s.clave === 'alcance' && !hayAlcance
         ? 'Detallado en la cotización'
-        : s.numero === '03' && !hayPlanos
+        : s.clave === 'planos' && !hayPlanos
           ? 'Sin anexos'
           : undefined,
   }));
 
   portada(ctx, indice);
+  cartaDePresentacion(ctx);
   seccionObjetivo(ctx);
   seccionAlcance(ctx);
   seccionPlanos(ctx, planos);
