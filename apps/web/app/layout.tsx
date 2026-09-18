@@ -1,8 +1,9 @@
 import "./globals.scss";
 import "./utilities.scss";
 import "./ecosystem.scss";
+import "./ui-tokens.scss";
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Inter_Tight, Manrope, Fraunces, JetBrains_Mono } from "next/font/google";
+import { Space_Grotesk, Inter, Inter_Tight, Manrope, Fraunces, JetBrains_Mono } from "next/font/google";
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
@@ -27,6 +28,15 @@ const interTight = Inter_Tight({
   display: "swap",
   weight: ["400", "500", "600", "700"],
   variable: "--nx-font-ui",
+});
+
+// Paneles (ERP y demás): Inter a 14 px. Sin preload para no cargarlo en el sitio público.
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600"],
+  variable: "--nx-font-app",
+  preload: false,
 });
 
 const manrope = Manrope({
@@ -250,7 +260,7 @@ export default function RootLayout({
     <html
       lang="es-MX"
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${interTight.variable} ${manrope.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
+      className={`${spaceGrotesk.variable} ${inter.variable} ${interTight.variable} ${manrope.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
     >
       <body suppressHydrationWarning>
         {/* Organization structured data */}

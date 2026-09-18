@@ -1,0 +1,222 @@
+/* Actividades · pizarra del equipo («Minimalista», tokens --ui-*). */
+
+.pagina {
+  max-width: 1120px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.filtros {
+  margin-bottom: var(--ui-s4);
+}
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+  transition: border-color 120ms ease;
+}
+
+.tarjeta:hover {
+  border-color: var(--ui-border-strong);
+  color: inherit;
+}
+
+.tarjeta:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.tarjetaYo {
+  border-color: color-mix(in srgb, var(--ui-brand) 45%, var(--ui-border));
+}
+
+.cabeza {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.avatar {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.punto {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--ui-surface);
+}
+
+.nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-text-base);
+  font-weight: 500;
+  color: var(--ui-fg);
+  min-width: 0;
+}
+
+.nombre > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.puesto {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estado {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+}
+
+.estadoSub {
+  font-size: var(--ui-text-xs);
+  font-weight: 400;
+  color: var(--ui-fg-3);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: var(--ui-s2) 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.kpi {
+  min-width: 0;
+}
+
+.kpi dt {
+  font-size: 11px;
+  color: var(--ui-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpi dd {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.acts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.act {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.actLinea {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-2);
+}
+
+.actTitulo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actPeriodo {
+  font-size: 11px;
+  color: var(--ui-fg-3);
+}
+
+.actPeriodoVencido {
+  color: var(--ui-danger-text);
+}
+
+.progreso {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ui-track);
+  overflow: hidden;
+}
+
+.progreso > span {
+  display: block;
+  height: 100%;
+  background: var(--ui-brand);
+  border-radius: 2px;
+}
+
+.progresoCompleto > span {
+  background: var(--ui-success);
+}
+
+.nada {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+.cerradas {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.esqueleto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  padding: var(--ui-s4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+}

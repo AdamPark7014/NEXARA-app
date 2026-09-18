@@ -1,486 +1,45 @@
-/* Cotizaciones Core: lista con la nomenclatura de seguimiento a la vista. Mismo lenguaje que Proyectos. */
+/* Cotizaciones Core: lista («Minimalista», tokens --ui-*). El editor ([id]) usa wrap, migas, esqueleto, errorBox y linkBtn. */
 
 .wrap {
-  --acento: #168f79;
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
   min-width: 0;
 }
 
-:global(body.dark) .wrap {
-  --acento: #3cc9ad;
-}
-
-.top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.title {
-  margin: 0;
-  font-size: 1.45rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.sub {
-  margin: 4px 0 0;
-  font-size: 0.84rem;
-  color: var(--text-secondary);
-  line-height: 1.45;
-  max-width: 46rem;
-}
-
-.migas {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  text-decoration: none;
-}
-
-.migas:hover {
-  color: var(--primary);
-}
-
-.primaryBtn,
-.secondaryBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 10px;
-  font-family: inherit;
-  font-size: 0.8125rem;
-  padding: 0.6rem 1rem;
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-}
-
-.primaryBtn {
-  border: 1px solid transparent;
-  background: var(--primary);
-  color: #fff;
-  font-weight: 750;
-}
-
-.primaryBtn:hover {
-  background: var(--primary-hover, var(--primary));
-  color: #fff;
-}
-
-.secondaryBtn:hover {
-  color: inherit;
-}
-
-.secondaryBtn {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: inherit;
-  font-weight: 650;
-}
-
-.linkBtn {
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-weight: 650;
-  color: var(--primary);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.primaryBtn:focus-visible,
-.secondaryBtn:focus-visible,
-.linkBtn:focus-visible,
-.filterBtn:focus-visible,
-.row:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.tecla {
-  display: inline-grid;
-  place-items: center;
-  min-width: 1.2rem;
-  height: 1.2rem;
-  padding: 0 0.25rem;
-  border-radius: 5px;
-  border: 1px solid color-mix(in srgb, #fff 45%, transparent);
-  font-size: 0.66rem;
-  font-weight: 800;
-  opacity: 0.85;
-}
-
-/* ─── Cifras ──────────────────────────────────────────────────────────── */
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: 8px;
-}
-
-.stat {
-  padding: 0.75rem 0.9rem;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.statValue {
-  font-size: 1.2rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.statLabel {
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-}
-
-/* ─── Cómo se lee el folio ────────────────────────────────────────────── */
-
-.explica {
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--acento) 35%, var(--border));
-  background: color-mix(in srgb, var(--acento) 6%, var(--surface));
-  padding: 0.2rem 1rem;
-}
-
-.explica summary {
-  cursor: pointer;
-  padding: 0.7rem 0;
-  font-weight: 750;
-  font-size: 0.86rem;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.explica summary::-webkit-details-marker {
-  display: none;
-}
-
-.explica summary::after {
-  content: "▾";
-  color: var(--text-secondary);
-  transition: transform 150ms ease;
-}
-
-.explica[open] summary::after {
-  transform: rotate(180deg);
-}
-
-.explicaCuerpo {
-  padding: 0 0 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.explicaCuerpo p {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-/* ─── Filtros ─────────────────────────────────────────────────────────── */
-
-.toolbar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.search {
-  flex: 1;
-  min-width: 14rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: inherit;
-  font-family: inherit;
-  font-size: 0.875rem;
-}
-
-.search:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--acento) 55%, var(--border));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 16%, transparent);
-}
-
-.filtros {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  align-items: center;
-}
-
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.filtersLabel {
-  font-size: 0.7rem;
-  font-weight: 750;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  margin-right: 2px;
-}
-
-.filterBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: inherit;
-  border-radius: 999px;
-  padding: 0.34rem 0.72rem;
-  font-size: 0.74rem;
-  font-weight: 650;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.filterBtn:hover {
-  border-color: var(--acento);
-}
-
-.filterBtnOn {
-  border-color: var(--acento);
-  background: color-mix(in srgb, var(--acento) 12%, var(--surface));
-}
-
-.conteo {
-  font-size: 0.68rem;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.metaRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 0.76rem;
-  color: var(--text-secondary);
-}
-
-/* ─── Lista ───────────────────────────────────────────────────────────── */
-
-.list {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  overflow: hidden;
-  background: var(--surface);
-}
-
-.row,
-.head {
-  display: grid;
-  grid-template-columns:
-    minmax(13rem, 1.35fr) minmax(0, 1.3fr) 6.2rem 6.6rem minmax(7rem, 0.7fr) minmax(6rem, 0.8fr)
-    6.6rem;
-  gap: 12px;
-  align-items: center;
-  padding: 0.8rem 1rem;
-}
-
-.head {
-  font-size: 0.66rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--surface-2, #f4f7fb) 70%, var(--surface));
-  border-bottom: 1px solid var(--border);
-  padding-top: 0.6rem;
-  padding-bottom: 0.6rem;
-}
-
-.row {
-  text-decoration: none;
-  color: inherit;
-  border-bottom: 1px solid var(--border);
-  transition: background-color 100ms ease;
-}
-
-.row:last-child {
-  border-bottom: none;
-}
-
-.row:hover {
-  background: color-mix(in srgb, var(--acento) 5%, var(--surface));
-  /* El hover global de los enlaces pinta todo de naranja: aquí manda el renglón. */
-  color: inherit;
-}
-
-.cell {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
+/* ─── Folio ────────────────────────────────────────────────────────────── */
 
 .folio {
-  font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
-  font-weight: 800;
-  font-size: 0.86rem;
-  letter-spacing: 0.01em;
+  font-family: var(--ui-font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ui-fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .folioClave {
-  color: var(--acento);
+  color: var(--ui-brand-text);
 }
 
 .folioCadena {
-  color: #7c3aed;
+  color: var(--ui-violet-text);
 }
 
 .folioRevision {
-  color: #c2410c;
-}
-
-:global(body.dark) .folioCadena {
-  color: #c4b5fd;
-}
-
-:global(body.dark) .folioRevision {
-  color: #fdba74;
+  color: var(--ui-warning-text);
 }
 
 .folioViejo {
-  color: var(--text-secondary);
-}
-
-.rowSub {
-  font-size: 0.74rem;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cliente {
-  font-weight: 700;
-  font-size: 0.86rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.importe {
-  font-weight: 750;
-  font-size: 0.88rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.derecha {
-  text-align: right;
-}
-
-.cell.derecha {
-  align-items: flex-end;
-}
-
-.fecha {
-  font-size: 0.8rem;
-  font-weight: 650;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.chip,
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  width: fit-content;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.18rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  white-space: nowrap;
-  line-height: 1.3;
-}
-
-.badge::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.chipInfo {
-  border-color: color-mix(in srgb, #0ea5e9 45%, var(--border));
-  background: color-mix(in srgb, #0ea5e9 8%, transparent);
-  color: #0369a1;
-}
-
-.chipOk {
-  border-color: color-mix(in srgb, #16a34a 45%, var(--border));
-  background: color-mix(in srgb, #16a34a 8%, transparent);
-  color: #15803d;
-}
-
-.chipAlerta {
-  border-color: color-mix(in srgb, #dc2626 45%, var(--border));
-  background: color-mix(in srgb, #dc2626 8%, transparent);
-  color: #b91c1c;
-}
-
-:global(body.dark) .chipInfo {
-  color: #7dd3fc;
-}
-
-:global(body.dark) .chipOk {
-  color: #86efac;
-}
-
-:global(body.dark) .chipAlerta {
-  color: #fca5a5;
+  color: var(--ui-fg-3);
 }
 
 .viejo {
-  composes: chip;
-  border-style: dashed;
-  color: #b45309;
-  border-color: color-mix(in srgb, #d97706 50%, var(--border));
+  height: 20px;
+  font-size: 11px;
 }
 
 .siglasFila {
@@ -490,111 +49,103 @@
 }
 
 .siglas {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.9rem;
-  height: 1.35rem;
-  padding: 0 0.3rem;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--acento) 12%, var(--surface));
-  color: var(--acento);
-  border: 1px solid color-mix(in srgb, var(--acento) 35%, var(--border));
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, monospace;
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--ui-hover);
+  color: var(--ui-fg-2);
+  font-family: var(--ui-font-mono);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .siglasTenue {
   composes: siglas;
   background: transparent;
-  border-style: dashed;
-  opacity: 0.8;
+  box-shadow: inset 0 0 0 1px var(--ui-border-strong);
+  color: var(--ui-fg-3);
 }
 
-/* ─── Estados de la página ────────────────────────────────────────────── */
+/* ─── Cómo se lee el folio (plegable, neutro) ──────────────────────────── */
 
-.empty {
+.explica {
+  margin-bottom: var(--ui-s4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+}
+
+.explica summary {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 2.5rem 1.25rem;
-  text-align: center;
-  border-radius: 16px;
-  border: 1px dashed color-mix(in srgb, var(--acento) 40%, var(--border));
-  background: color-mix(in srgb, var(--acento) 5%, var(--surface));
+  padding: 10px var(--ui-s4);
+  font-size: var(--ui-text-sm);
+  font-weight: 500;
+  color: var(--ui-fg-2);
+  cursor: pointer;
+  list-style: none;
 }
 
-.emptyTitle {
-  margin: 0;
-  font-weight: 800;
-  font-size: 1rem;
+.explica summary::-webkit-details-marker {
+  display: none;
 }
 
-.emptyText {
-  margin: 0;
-  max-width: 34rem;
-  font-size: 0.84rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
+.explica summary::before {
+  content: "›";
+  display: inline-block;
+  width: 10px;
+  color: var(--ui-fg-3);
+  transition: transform 120ms ease;
 }
 
-.aviso {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 0.7rem 0.9rem;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, #d97706 45%, var(--border));
-  background: color-mix(in srgb, #d97706 8%, var(--surface));
-  font-size: 0.8rem;
-  line-height: 1.45;
+.explica[open] summary::before {
+  transform: rotate(90deg);
 }
 
-.errorBox {
-  margin: 0;
-  padding: 0.7rem 0.9rem;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, #dc2626 40%, var(--border));
-  background: color-mix(in srgb, #dc2626 7%, var(--surface));
-  color: #b91c1c;
-  font-size: 0.82rem;
+.explica summary:hover {
+  color: var(--ui-fg);
 }
 
-.esqueleto {
+.explicaCuerpo {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 0 var(--ui-s4) var(--ui-s4);
 }
 
-.esqueleto span {
-  display: block;
-  height: 3.2rem;
-  border-radius: 14px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--border) 50%, transparent) 0%,
-    color-mix(in srgb, var(--border) 20%, transparent) 50%,
-    color-mix(in srgb, var(--border) 50%, transparent) 100%
-  );
-  background-size: 200% 100%;
-  animation: brillo 1.4s ease-in-out infinite;
+.explicaCuerpo p {
+  margin: 0;
+  font-size: var(--ui-text-xs);
+  line-height: 1.55;
+  color: var(--ui-fg-2);
 }
 
-@keyframes brillo {
-  to {
-    background-position: -200% 0;
-  }
+/* ─── Lista (rejilla con los estilos de `tabla`) ───────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--ui-text-sm);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .esqueleto span {
-    animation: none;
-  }
+.rejilla {
+  grid-template-columns:
+    minmax(12.5rem, 1.3fr) minmax(0, 1.4fr) 6.5rem 6.5rem minmax(6.5rem, 0.7fr) minmax(5.5rem, 0.7fr)
+    6rem;
+  column-gap: var(--ui-s4);
+}
+
+.rejilla.row {
+  min-height: 52px;
+}
+
+.derecha {
+  align-items: flex-end;
+  text-align: right;
 }
 
 .soloLector {
@@ -609,58 +160,93 @@
   border: 0;
 }
 
-/* ─── Pantallas angostas: cada cotización es una tarjeta ──────────────── */
-
+/* Teléfono y tableta: cada cotización es una tarjeta de tres renglones. */
 @media (max-width: 960px) {
-  .head {
+  .list > :first-child {
     display: none;
   }
-  /* En la tarjeta el folio completo cabe partido: es lo que se busca con la vista. */
   .folio {
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  .row {
-    grid-template-columns: minmax(0, 1fr) auto;
+  .rejilla {
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "folio estado"
-      "cliente total"
-      "siglas fecha"
-      "segmento segmento";
-    gap: 6px 12px;
-    padding: 0.9rem 1rem;
+      "folio folio estado"
+      "cliente cliente total"
+      "segmento siglas fecha";
+    gap: 6px 8px;
   }
-  .row > :nth-child(1) {
-    grid-area: folio;
+  .rejilla.row {
+    padding-top: 12px;
+    padding-bottom: 12px;
   }
-  .row > :nth-child(2) {
-    grid-area: cliente;
-  }
-  .row > :nth-child(3) {
-    grid-area: segmento;
-  }
-  .row > :nth-child(4) {
-    grid-area: estado;
-    justify-self: end;
-  }
-  .row > :nth-child(5) {
-    grid-area: total;
-    justify-self: end;
-  }
-  .row > :nth-child(6) {
-    grid-area: siglas;
-  }
-  .row > :nth-child(7) {
-    grid-area: fecha;
-    justify-self: end;
+  .row > :nth-child(1) { grid-area: folio; }
+  .row > :nth-child(2) { grid-area: cliente; }
+  .row > :nth-child(3) { grid-area: segmento; }
+  .row > :nth-child(4) { grid-area: estado; justify-self: end; }
+  .row > :nth-child(5) { grid-area: total; justify-self: end; }
+  .row > :nth-child(6) { grid-area: siglas; }
+  .row > :nth-child(7) { grid-area: fecha; justify-self: end; }
+}
+
+/* ─── Editor ([id]): migas, carga y error ──────────────────────────────── */
+
+.migas {
+  font-size: var(--ui-text-xs);
+  font-weight: 500;
+  color: var(--ui-fg-3);
+  text-decoration: none;
+}
+
+.migas:hover {
+  color: var(--ui-fg);
+}
+
+.linkBtn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ui-brand-text);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.errorBox {
+  margin: 0;
+  padding: 10px var(--ui-s4);
+  border-radius: var(--ui-radius);
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger-text);
+  font-size: var(--ui-text-sm);
+}
+
+.esqueleto {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.esqueleto span {
+  display: block;
+  height: 3.2rem;
+  border-radius: var(--ui-radius-lg);
+  background: linear-gradient(90deg, var(--ui-hover) 0%, var(--ui-surface-2) 50%, var(--ui-hover) 100%);
+  background-size: 200% 100%;
+  animation: brillo 1.4s ease-in-out infinite;
+}
+
+@keyframes brillo {
+  to {
+    background-position: -200% 0;
   }
 }
 
-@media (max-width: 560px) {
-  .top > * {
-    width: 100%;
-  }
-  .search {
-    min-width: 0;
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto span {
+    animation: none;
   }
 }

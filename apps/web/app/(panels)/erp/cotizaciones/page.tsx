@@ -3,6 +3,28 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import RequestQuoteOutlinedIcon from "@mui/icons-material/RequestQuoteOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import {
+  Alert,
+  Badge,
+  Button,
+  ButtonLink,
+  EmptyState,
+  Kbd,
+  LinkButton,
+  PageHead,
+  SearchInput,
+  Segmented,
+  SkeletonRows,
+  Stat,
+  StatRow,
+  Tabs,
+  Toolbar,
+  tabla,
+  type Tone,
+} from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import {
   ESTADOS,
@@ -31,13 +53,14 @@ const ROL: Record<string, string> = {
 
 const CLAVE_EXPLICACION = "nexara.cotizaciones.explicaFolio";
 
-function claseEstado(estado: EstadoCotizacion) {
-  const tono = ESTADO_TONO[estado];
-  const extra = tono === "info" ? styles.chipInfo : tono === "ok" ? styles.chipOk : tono === "alerta" ? styles.chipAlerta : "";
-  return `${styles.badge} ${extra}`;
-}
+const TONO_ESTADO: Record<"neutral" | "info" | "ok" | "alerta", Tone> = {
+  neutral: "neutral",
+  info: "info",
+  ok: "success",
+  alerta: "danger",
+};
 
-/** El folio con sus piezas en color: clave de quien la hizo, cadena y revisión. */
+/** El folio con sus piezas: clave de quien la hizo, cadena y revisión. */
 function FolioColor({ folio }: { folio: string }) {
   const partes = partesDelFolio(folio);
   if (!partes) return <span className={`${styles.folio} ${styles.folioViejo}`}>{folio}</span>;
@@ -88,7 +111,7 @@ function Intervinieron({ row }: { row: CotizacionRow }) {
       </span>
     );
   }
-  if (!vistas.size) return <span className={styles.rowSub}>—</span>;
+  if (!vistas.size) return <span className={tabla.tenue}>—</span>;
   return (
     <span className={styles.siglasFila}>
       {[...vistas.entries()].map(([siglas, titulos]) => (
@@ -200,6 +223,7 @@ export default function CotizacionesPage() {
       enviadas: visibles.filter((r) => r.estado === "ENVIADA").length,
       porCerrar: sumar((r) => r.estado === "ENVIADA"),
       aprobadas: sumar((r) => r.estado === "APROBADA"),
+      nAprobadas: visibles.filter((r) => r.estado === "APROBADA").length,
       borradores: visibles.filter((r) => r.estado === "BORRADOR").length,
     };
   }, [visibles]);
@@ -211,21 +235,66 @@ export default function CotizacionesPage() {
     items.find((r) => partesDelFolio(r.folio)?.cadena.length) ?? items.find((r) => partesDelFolio(r.folio)) ?? null;
 
   const hayFiltros = Boolean(segmento || estado || q.trim());
+  const quitarFiltros = () => {
+    setQ("");
+    setSegmento(null);
+    setEstado(null);
+  };
+
+  const pestanasEstado = [
+    { id: "TODAS" as const, label: "Todas", count: ESTADOS.reduce((a, e) => a + (conteoEstado[e] ?? 0), 0) },
+    ...ESTADOS.map((e) => ({ id: e, label: ESTADO_LABEL[e], count: conteoEstado[e] ?? 0 })),
+  ];
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.top}>
-        <div>
-          <h1 className={styles.title}>Cotizaciones</h1>
-          <p className={styles.sub}>
-            Cada folio dice de quién es, qué número lleva, quién intervino y en qué revisión va. Se segmentan en
-            comercial, obra, licitación y servicio.
-          </p>
-        </div>
-        <Link className={styles.primaryBtn} href="/erp/cotizaciones/nueva">
-          + Nueva cotización <span className={styles.tecla} aria-hidden>N</span>
-        </Link>
-      </div>
+      <PageHead
+        title="Cotizaciones"
+        description="Propuestas técnicas con folio de seguimiento: de quién es, quién intervino y en qué revisión va."
+        actions={
+          <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
+            Nueva cotización <Kbd>N</Kbd>
+          </ButtonLink>
+        }
+      />
+
+      {!cargando && items.length ? (
+        <StatRow>
+          <Stat label="En la vista" value={visibles.length} hint={`de ${items.length} cotizaciones`} />
+          <Stat label="Borradores" value={cifras.borradores} hint="por terminar y enviar" />
+          <Stat
+            label="Enviadas por cerrar"
+            value={formatoMoneda(cifras.porCerrar)}
+            hint={cifras.enviadas === 1 ? "1 enviada" : `${cifras.enviadas} enviadas`}
+            tone="brand"
+          />
+          <Stat
+            label="Aprobadas"
+            value={formatoMoneda(cifras.aprobadas)}
+            hint={cifras.nAprobadas === 1 ? "1 aprobada" : `${cifras.nAprobadas} aprobadas`}
+          />
+        </StatRow>
+      ) : null}
+
+      {viejos ? (
+        <Alert
+          tone="warning"
+          icon={<WarningAmberRoundedIcon aria-hidden="true" />}
+          action={
+            <LinkButton
+              onClick={() => {
+                setEstado("BORRADOR");
+                setQ("");
+              }}
+            >
+              Ver borradores
+            </LinkButton>
+          }
+        >
+          {viejos === 1 ? "1 borrador trae" : `${viejos} borradores traen`} folio viejo, sin nomenclatura (no dice de quién
+          es). Ábrelo y usa «Asignar folio» en Seguimiento.
+        </Alert>
+      ) : null}
 
       <details
         className={styles.explica}
@@ -256,200 +325,126 @@ export default function CotizacionesPage() {
         </div>
       </details>
 
-      {!cargando && items.length ? (
-        <div className={styles.stats}>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>{visibles.length}</span>
-            <span className={styles.statLabel}>cotizaciones en la vista</span>
+      <div className={tabla.marco}>
+        <div className={tabla.barra}>
+          <div className={tabla.barraTabs}>
+            <Tabs
+              modo="filtro"
+              ariaLabel="Filtrar por estado"
+              items={pestanasEstado}
+              value={estado ?? "TODAS"}
+              onChange={(id) => setEstado(id === "TODAS" || id === estado ? null : id)}
+            />
           </div>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>{cifras.borradores}</span>
-            <span className={styles.statLabel}>borradores por terminar</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>{formatoMoneda(cifras.porCerrar)}</span>
-            <span className={styles.statLabel}>enviadas por cerrar ({cifras.enviadas})</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>{formatoMoneda(cifras.aprobadas)}</span>
-            <span className={styles.statLabel}>aprobadas</span>
-          </div>
-        </div>
-      ) : null}
-
-      {viejos ? (
-        <div className={styles.aviso}>
-          <span>
-            {viejos === 1 ? "1 borrador trae" : `${viejos} borradores traen`} folio viejo, sin nomenclatura (no dice de
-            quién es). Ábrelo y usa «Asignar folio» en Seguimiento.
-          </span>
-          <button
-            type="button"
-            className={styles.linkBtn}
-            onClick={() => {
-              setEstado("BORRADOR");
-              setQ("");
-            }}
+          <Toolbar
+            end={
+              <>
+                <span>
+                  {cargando ? "Cargando…" : `${visibles.length} de ${items.length} · ${formatoMoneda(cifras.total)}`}
+                </span>
+                {hayFiltros ? <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton> : null}
+              </>
+            }
           >
-            Ver borradores
-          </button>
+            <label htmlFor="buscar-cotizaciones" className={styles.soloLector}>
+              Buscar cotizaciones
+            </label>
+            <SearchInput
+              id="buscar-cotizaciones"
+              ref={buscador}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Folio, cliente, proyecto o persona"
+              shortcut="/"
+            />
+            <Segmented
+              ariaLabel="Filtrar por segmento"
+              items={[
+                { id: "TODOS" as const, label: "Todos" },
+                ...SEGMENTOS.map((s) => ({ id: s, label: SEGMENTO_LABEL[s], count: conteoSegmento[s] ?? 0 })),
+              ]}
+              value={segmento ?? "TODOS"}
+              onChange={(id) => setSegmento(id === "TODOS" || id === segmento ? null : id)}
+            />
+          </Toolbar>
         </div>
-      ) : null}
 
-      <div className={styles.toolbar}>
-        <label htmlFor="buscar-cotizaciones" className={styles.soloLector}>
-          Buscar cotizaciones
-        </label>
-        <input
-          id="buscar-cotizaciones"
-          ref={buscador}
-          className={styles.search}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar folio, cliente, proyecto o quién intervino…   ( / )"
-        />
-      </div>
+        {error ? (
+          <div style={{ padding: "12px 16px 0" }}>
+            <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
+              {error}
+            </Alert>
+          </div>
+        ) : null}
 
-      <div className={styles.filtros}>
-        <div className={styles.filters} role="group" aria-label="Filtrar por segmento">
-          <span className={styles.filtersLabel}>Segmento</span>
-          <button
-            type="button"
-            className={`${styles.filterBtn} ${segmento === null ? styles.filterBtnOn : ""}`}
-            aria-pressed={segmento === null}
-            onClick={() => setSegmento(null)}
-          >
-            Todos
-          </button>
-          {SEGMENTOS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`${styles.filterBtn} ${segmento === s ? styles.filterBtnOn : ""}`}
-              aria-pressed={segmento === s}
-              onClick={() => setSegmento(segmento === s ? null : s)}
-            >
-              {SEGMENTO_LABEL[s]} <span className={styles.conteo}>{conteoSegmento[s] ?? 0}</span>
-            </button>
-          ))}
-        </div>
-        <div className={styles.filters} role="group" aria-label="Filtrar por estado">
-          <span className={styles.filtersLabel}>Estado</span>
-          {ESTADOS.map((e) => (
-            <button
-              key={e}
-              type="button"
-              className={`${styles.filterBtn} ${estado === e ? styles.filterBtnOn : ""}`}
-              aria-pressed={estado === e}
-              onClick={() => setEstado(estado === e ? null : e)}
-            >
-              {ESTADO_LABEL[e]} <span className={styles.conteo}>{conteoEstado[e] ?? 0}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.metaRow}>
-        <span>
-          {cargando ? "Cargando…" : `${visibles.length} de ${items.length} · ${formatoMoneda(cifras.total)} en la vista`}
-        </span>
-        {hayFiltros ? (
-          <button
-            type="button"
-            className={styles.linkBtn}
-            onClick={() => {
-              setQ("");
-              setSegmento(null);
-              setEstado(null);
-            }}
-          >
-            Quitar filtros
-          </button>
+        {cargando ? (
+          <SkeletonRows rows={5} label="Cargando cotizaciones" />
+        ) : !items.length && !error ? (
+          <EmptyState
+            icon={<RequestQuoteOutlinedIcon />}
+            title="Todavía no hay cotizaciones"
+            description="Aquí se arma la propuesta técnica completa, como la recibe el cliente: objetivo, alcance, planos y la tabla de precios con sus términos. Se guarda sola mientras escribes y el PDF se ve al lado."
+            action={
+              <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
+                Crear la primera
+              </ButtonLink>
+            }
+          />
+        ) : !visibles.length && !error ? (
+          <EmptyState
+            icon={<FilterAltOffOutlinedIcon />}
+            title="Nada con estos filtros"
+            description="Prueba con otro segmento o estado, o busca por el nombre del cliente."
+            action={<Button onClick={quitarFiltros}>Quitar filtros</Button>}
+          />
+        ) : visibles.length ? (
+          <nav className={styles.list} aria-label="Cotizaciones">
+            <div className={`${tabla.cabeza} ${styles.rejilla}`} aria-hidden>
+              <span>Folio</span>
+              <span>Cliente · proyecto</span>
+              <span>Segmento</span>
+              <span>Estado</span>
+              <span className={tabla.num}>Total</span>
+              <span>Intervinieron</span>
+              <span className={tabla.num}>Fecha</span>
+            </div>
+            {visibles.map((row) => (
+              <Link key={row.id} href={`/erp/cotizaciones/${row.id}`} className={`${tabla.fila} ${styles.rejilla} ${styles.row}`}>
+                <span className={tabla.celda}>
+                  <FolioColor folio={row.folio} />
+                  {row.necesitaRefolio || !partesDelFolio(row.folio) ? (
+                    <Badge tone="warning" className={styles.viejo} title="Borrador de antes de la nomenclatura">
+                      Sin nomenclatura
+                    </Badge>
+                  ) : (
+                    <span className={tabla.tenue}>{folioEnPalabras(row)}</span>
+                  )}
+                </span>
+                <span className={tabla.celda}>
+                  <span className={tabla.fuerte}>{row.clienteNombre || row.clienteEmpresa || "Sin cliente"}</span>
+                  <span className={tabla.tenue}>
+                    {row.projectName || (row.clienteEmpresa !== row.clienteNombre ? row.clienteEmpresa : "") || "—"}
+                  </span>
+                </span>
+                <span>
+                  <Badge tone="outline">{row.segmentoEtiqueta}</Badge>
+                </span>
+                <span>
+                  <Badge tone={TONO_ESTADO[ESTADO_TONO[row.estado]]} dot>
+                    {row.estadoEtiqueta}
+                  </Badge>
+                </span>
+                <span className={`${tabla.num} ${tabla.fuerte}`}>{formatoMoneda(row.total, row.currency ?? "MXN")}</span>
+                <Intervinieron row={row} />
+                <span className={`${tabla.celda} ${styles.derecha}`}>
+                  <span className={tabla.num}>{formatoFecha(row.sentAt ?? row.issueDate)}</span>
+                  <span className={tabla.tenue}>{row.sentAt ? "enviada" : "emitida"}</span>
+                </span>
+              </Link>
+            ))}
+          </nav>
         ) : null}
       </div>
-
-      {error ? (
-        <p className={styles.errorBox} role="alert">
-          {error}{" "}
-          <button type="button" className={styles.linkBtn} onClick={() => void cargar()}>
-            Reintentar
-          </button>
-        </p>
-      ) : null}
-
-      {cargando ? (
-        <div className={styles.esqueleto} aria-busy="true" aria-label="Cargando cotizaciones">
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-      ) : !items.length && !error ? (
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>Todavía no hay cotizaciones</p>
-          <p className={styles.emptyText}>
-            Aquí se arma la propuesta técnica completa, como la recibe el cliente: objetivo, alcance, planos y la tabla
-            de precios con sus términos. Se guarda sola mientras escribes y el PDF se ve al lado.
-          </p>
-          <Link className={styles.primaryBtn} href="/erp/cotizaciones/nueva">
-            Crear la primera
-          </Link>
-        </div>
-      ) : !visibles.length && !error ? (
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>Nada con estos filtros</p>
-          <p className={styles.emptyText}>Prueba con otro segmento o estado, o busca por el nombre del cliente.</p>
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            onClick={() => {
-              setQ("");
-              setSegmento(null);
-              setEstado(null);
-            }}
-          >
-            Quitar filtros
-          </button>
-        </div>
-      ) : visibles.length ? (
-        <nav className={styles.list} aria-label="Cotizaciones">
-          <div className={styles.head} aria-hidden>
-            <span>Folio</span>
-            <span>Cliente · proyecto</span>
-            <span>Segmento</span>
-            <span>Estado</span>
-            <span className={styles.derecha}>Total</span>
-            <span>Intervinieron</span>
-            <span className={styles.derecha}>Fecha</span>
-          </div>
-          {visibles.map((row) => (
-            <Link key={row.id} href={`/erp/cotizaciones/${row.id}`} className={styles.row}>
-              <span className={styles.cell}>
-                <FolioColor folio={row.folio} />
-                {row.necesitaRefolio || !partesDelFolio(row.folio) ? (
-                  <span className={styles.viejo} title="Borrador de antes de la nomenclatura">
-                    Sin nomenclatura
-                  </span>
-                ) : (
-                  <span className={styles.rowSub}>{folioEnPalabras(row)}</span>
-                )}
-              </span>
-              <span className={styles.cell}>
-                <span className={styles.cliente}>{row.clienteNombre || row.clienteEmpresa || "Sin cliente"}</span>
-                <span className={styles.rowSub}>{row.projectName || (row.clienteEmpresa !== row.clienteNombre ? row.clienteEmpresa : "") || "—"}</span>
-              </span>
-              <span className={styles.chip}>{row.segmentoEtiqueta}</span>
-              <span className={claseEstado(row.estado)}>{row.estadoEtiqueta}</span>
-              <span className={styles.importe}>{formatoMoneda(row.total, row.currency ?? "MXN")}</span>
-              <Intervinieron row={row} />
-              <span className={`${styles.cell} ${styles.derecha}`}>
-                <span className={styles.fecha}>{formatoFecha(row.sentAt ?? row.issueDate)}</span>
-                <span className={styles.rowSub}>{row.sentAt ? "enviada" : "emitida"}</span>
-              </span>
-            </Link>
-          ))}
-        </nav>
-      ) : null}
     </div>
   );
 }

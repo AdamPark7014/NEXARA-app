@@ -1,102 +1,74 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { SvgIconComponent } from "@mui/icons-material";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ReplayIcon from "@mui/icons-material/Replay";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import OutboxOutlinedIcon from "@mui/icons-material/OutboxOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import { Alert, Avatar, Badge, Button, EmptyState, PageHead, Skeleton, Stat, StatRow, Tabs, TONE_COLOR, type Tone } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
 import AsignadasPorMiView from "@/components/pizarra/AsignadasPorMiView";
-import { KpiStrip, PrioridadChip, RangoSelector, SemaforoDot } from "@/components/pizarra/PizarraKpi";
+import { PrioridadChip, RangoSelector, SemaforoDot } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
-import { resolveAssetUrl } from "@/lib/evidence-display";
 import {
-  STATUS_COLORS,
   STATUS_LABELS,
   fetchTeamBoard,
   formatMinutes,
+  formatPct,
   type BoardRange,
   type BoardUserStatus,
   type RangoPreset,
   type TeamBoardResponse,
   type TeamBoardUser,
 } from "@/lib/team-board-api";
+import p from "./pizarra.module.css";
 
 /** Actividades tiene tres vistas: lo mío, mi equipo y lo que repartí (se recuerda la última). */
 type Vista = "mias" | "equipo" | "asignadas";
 const VISTA_KEY = "nx-actividades-vista";
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0] ?? "")
-    .join("")
-    .toUpperCase();
-}
+/** Estado de la persona → tono de la base (el mismo en el punto, el texto y la cifra de arriba). */
+const TONO_ESTADO: Record<BoardUserStatus, Tone> = {
+  activo: "success",
+  atrasado: "danger",
+  libre: "info",
+  sin_actividad: "neutral",
+  inactivo: "neutral",
+};
 
-function Avatar({ url, name, size = 80 }: { url: string | null; name: string; size?: number }) {
-  const src = url ? resolveAssetUrl(url) : null;
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt=""
-        width={size}
-        height={size}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover" }}
-      />
-    );
-  }
-  return (
-    <div
-      aria-hidden
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        display: "grid",
-        placeItems: "center",
-        fontSize: size * 0.28,
-        fontWeight: 700,
-        color: "var(--primary)",
-        background: "color-mix(in srgb, var(--primary) 14%, var(--surface))",
-      }}
-    >
-      {initials(name)}
-    </div>
-  );
-}
+const TEXTO_TONO: Record<Tone, string> = {
+  success: "var(--ui-success-text)",
+  danger: "var(--ui-danger-text)",
+  info: "var(--ui-info-text)",
+  warning: "var(--ui-warning-text)",
+  violet: "var(--ui-violet-text)",
+  brand: "var(--ui-brand-text)",
+  neutral: "var(--ui-fg-2)",
+  outline: "var(--ui-fg-2)",
+};
 
-function MiniChip({ children, color, icon: Icon }: { children: ReactNode; color: string; icon?: SvgIconComponent }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 3,
-        fontSize: 10.5,
-        fontWeight: 650,
-        lineHeight: 1.2,
-        padding: "2px 7px",
-        borderRadius: 999,
-        color,
-        background: `color-mix(in srgb, ${color} 10%, var(--surface))`,
-        border: `1px solid color-mix(in srgb, ${color} 30%, var(--border))`,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {Icon ? <Icon aria-hidden="true" sx={{ fontSize: 13, flex: "0 0 auto" }} /> : null}
-      {children}
-    </span>
-  );
-}
+/** Cifras de arriba: cuántas personas hay en cada estado. */
+const ETIQUETA_CIFRA: Record<BoardUserStatus, string> = {
+  activo: "Activos",
+  atrasado: "Atrasados",
+  libre: "Terminaron",
+  sin_actividad: "Sin actividad",
+  inactivo: "Inactivos",
+};
+
+/** Qué dice cada cifra de arriba. */
+const PISTA_ESTADO: Partial<Record<BoardUserStatus, string>> = {
+  activo: "con una actividad en curso",
+  atrasado: "pasados de su fecha máxima",
+  libre: "ya cerraron lo que tenían",
+  sin_actividad: "sin nada abierto",
+  inactivo: "sin registro reciente",
+};
 
 /** Estado con detalle: cuánto atraso lleva o desde cuándo terminó su última actividad. */
 function estadoTexto(u: TeamBoardUser, ahora: number): string {
@@ -111,211 +83,139 @@ function estadoTexto(u: TeamBoardUser, ahora: number): string {
 }
 
 function terminoTexto(f: NonNullable<TeamBoardUser["lastFinished"]>): string {
-  const hora = new Date(f.finishedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  const hora = new Date(f.finishedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
   if (f.lateMinutes == null) return `Finalizó a las ${hora}`;
   if (f.lateMinutes <= 0) return `Finalizó a las ${hora}, a tiempo`;
   return `Finalizó a las ${hora} con ${formatMinutes(f.lateMinutes)} de atraso`;
 }
 
 function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean }) {
-  const color = STATUS_COLORS[user.status];
+  const tono = TONO_ESTADO[user.status];
   const act = user.currentActivity;
   const open = user.openActivities ?? [];
-  const ahora = Date.now();
   const fin = user.lastFinished;
+  const k = user.kpis;
   return (
-    <Link
-      href={`/erp/pizarra/${user.id}`}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 12,
-        padding: "22px 14px 16px",
-        borderRadius: 20,
-        border: isSelf
-          ? "2px solid color-mix(in srgb, var(--primary) 55%, var(--border))"
-          : "1px solid var(--border)",
-        background: isSelf
-          ? "color-mix(in srgb, var(--primary) 6%, var(--surface))"
-          : "var(--surface)",
-        textDecoration: "none",
-        color: "inherit",
-        boxShadow: "0 6px 18px rgba(15, 23, 42, 0.04)",
-      }}
-    >
-      <div style={{ position: "relative" }}>
-        <Avatar url={user.avatarUrl} name={user.nombre} />
-        <span
-          style={{
-            position: "absolute",
-            right: 0,
-            bottom: 2,
-            width: 16,
-            height: 16,
-            borderRadius: "50%",
-            background: color,
-            border: "3px solid var(--surface)",
-            boxShadow: `0 0 0 3px color-mix(in srgb, ${color} 25%, transparent)`,
-          }}
-          title={STATUS_LABELS[user.status]}
-        />
+    <Link href={`/erp/pizarra/${user.id}`} className={`${p.tarjeta} ${isSelf ? p.tarjetaYo : ""}`}>
+      <div className={p.cabeza}>
+        <span className={p.avatar}>
+          <Avatar url={user.avatarUrl} name={user.nombre} size={36} />
+          <span className={p.punto} style={{ background: TONE_COLOR[tono] }} title={STATUS_LABELS[user.status]} />
+        </span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span className={p.nombre}>
+            <span>{user.nombre}</span>
+            {isSelf ? <Badge tone="brand">Tú</Badge> : null}
+          </span>
+          <span className={p.puesto} style={{ display: "block" }}>
+            {user.puesto || "Sin puesto"}
+          </span>
+        </span>
       </div>
-      <div style={{ width: "100%", textAlign: "center", minWidth: 0 }}>
-        <div
-          style={{
-            fontWeight: 750,
-            fontSize: 14,
-            lineHeight: 1.25,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {user.nombre}
-        </div>
-        {isSelf ? (
-          <div
-            style={{
-              marginTop: 4,
-              fontSize: 11,
-              fontWeight: 750,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              color: "var(--primary)",
-            }}
-          >
-            Tú
-          </div>
-        ) : null}
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 12,
-            fontWeight: 650,
-            color,
-          }}
-        >
-          {estadoTexto(user, ahora)}
-        </div>
-        {user.status === "libre" && fin ? (
-          <div
-            style={{
-              marginTop: 4,
-              fontSize: 11.5,
-              lineHeight: 1.35,
-              fontWeight: 600,
-              color: fin.lateMinutes && fin.lateMinutes > 0 ? "#dc2626" : "#16a34a",
-            }}
-          >
-            {terminoTexto(fin)}
-          </div>
-        ) : null}
-        {user.enCorreccion || user.enEsperaAprobacion ? (
-          <div style={{ marginTop: 6, display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
-            {user.enCorreccion ? (
-              <MiniChip color="#d97706" icon={ReplayIcon}>
-                Corrigiendo evidencia
-              </MiniChip>
-            ) : null}
-            {user.enEsperaAprobacion ? (
-              <MiniChip color="#7c3aed" icon={HourglassTopIcon}>
-                {user.enEsperaAprobacion > 1 ? `${user.enEsperaAprobacion} en espera de aprobación` : "En espera de aprobación"}
-              </MiniChip>
-            ) : null}
-          </div>
-        ) : null}
+
+      <div className={p.estado} style={{ color: TEXTO_TONO[tono] }}>
+        <span>{estadoTexto(user, Date.now())}</span>
+        {user.status === "libre" && fin ? <span className={p.estadoSub}>{terminoTexto(fin)}</span> : null}
       </div>
-      <KpiStrip kpis={user.kpis} compacta />
+
+      {user.enCorreccion || user.enEsperaAprobacion ? (
+        <div className={p.chips}>
+          {user.enCorreccion ? (
+            <Badge tone="warning">
+              <ReplayIcon aria-hidden="true" />
+              Corrigiendo evidencia
+            </Badge>
+          ) : null}
+          {user.enEsperaAprobacion ? (
+            <Badge tone="violet">
+              <HourglassTopIcon aria-hidden="true" />
+              {user.enEsperaAprobacion > 1 ? `${user.enEsperaAprobacion} en espera de aprobación` : "En espera de aprobación"}
+            </Badge>
+          ) : null}
+        </div>
+      ) : null}
+
+      {k ? (
+        <dl className={p.kpis}>
+          <div className={p.kpi} title={`${k.aTiempo} de ${k.cerradas} cerradas dentro de su fecha máxima`}>
+            <dt>A tiempo</dt>
+            <dd>{formatPct(k.aTiempoPct)}</dd>
+          </div>
+          <div className={p.kpi} title={`Plan ${formatMinutes(k.minutosPlan)} contra real ${formatMinutes(k.minutosReales)}`}>
+            <dt>Eficiencia</dt>
+            <dd>{formatPct(k.eficienciaPct)}</dd>
+          </div>
+          <div
+            className={p.kpi}
+            title={`${formatMinutes(k.minutosEnActividad)} en actividad de ${formatMinutes(k.minutosAsistidos)} asistidos`}
+          >
+            <dt>Productividad</dt>
+            <dd>{formatPct(k.productividadPct)}</dd>
+          </div>
+        </dl>
+      ) : null}
+
       {open.length > 0 ? (
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
+        <ul className={p.acts}>
           {open.slice(0, 3).map((a) => (
-            <div key={a.id} title={`${a.anNumber} · ${a.titulo}`}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  marginBottom: 3,
-                  minWidth: 0,
-                }}
-              >
-                <SemaforoDot semaforo={a.semaforo} size={8} />
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 650,
-                    color: "var(--text-secondary)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+            <li key={a.id} className={p.act} title={`${a.anNumber} · ${a.titulo}`}>
+              <span className={p.actLinea}>
+                <SemaforoDot semaforo={a.semaforo} size={7} />
+                <span className={p.actTitulo}>
                   {a.titulo}
-                  {a.assignmentCharge === "despacho"
-                    ? " · Despacho"
-                    : a.assignmentCharge === "ejecucion"
-                      ? " · Ejecución"
-                      : ""}
+                  {a.assignmentCharge === "despacho" ? " · Despacho" : a.assignmentCharge === "ejecucion" ? " · Ejecución" : ""}
                 </span>
                 {a.prioridad === "ALTA" ? <PrioridadChip prioridad={a.prioridad} /> : null}
-              </div>
+              </span>
               {a.periodo ? (
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    marginBottom: 3,
-                    color: a.periodo.estado === "vencida" ? "#dc2626" : "var(--text-tertiary)",
-                  }}
-                >
+                <span className={`${p.actPeriodo} ${a.periodo.estado === "vencida" ? p.actPeriodoVencido : ""}`}>
                   {a.periodo.etiqueta}
-                </div>
+                </span>
               ) : null}
-              <div
-                style={{
-                  height: 6,
-                  borderRadius: 999,
-                  background: "color-mix(in srgb, var(--border) 80%, transparent)",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${Math.min(100, Math.max(0, a.progressPct))}%`,
-                    borderRadius: 999,
-                    background:
-                      a.progressPct >= 100
-                        ? "#16a34a"
-                        : a.progressPct > 0
-                          ? "var(--primary)"
-                          : "transparent",
-                  }}
-                />
-              </div>
-            </div>
+              <span className={`${p.progreso} ${a.progressPct >= 100 ? p.progresoCompleto : ""}`} aria-label={`Avance ${a.progressPct} %`}>
+                <span style={{ width: `${Math.min(100, Math.max(0, a.progressPct))}%` }} />
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : (
-        <div
-          style={{
-            width: "100%",
-            minHeight: 44,
-            paddingTop: 10,
-            borderTop: "1px solid var(--border)",
-            fontSize: 12,
-            lineHeight: 1.35,
-            color: "var(--text-secondary)",
-            textAlign: "center",
-          }}
-        >
-          {act ? act.titulo : fin ? `Última: ${fin.titulo}` : "Sin actividades hoy"}
-        </div>
+        <span className={p.nada}>{act ? act.titulo : fin ? `Última: ${fin.titulo}` : "Sin actividades hoy"}</span>
       )}
+
+      {k ? (
+        <span className={p.cerradas}>
+          {k.cerradas}/{k.asignadas} cerradas{k.rechazadas > 0 ? ` · ${k.rechazadas} rechazada${k.rechazadas > 1 ? "s" : ""}` : ""}
+        </span>
+      ) : null}
     </Link>
   );
 }
+
+function TarjetasCargando() {
+  return (
+    <div className={p.rejilla} aria-busy="true" aria-label="Cargando al equipo">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className={p.esqueleto}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <Skeleton width={36} height={36} radius={18} />
+            <div style={{ flex: 1, display: "grid", gap: 6 }}>
+              <Skeleton width="60%" />
+              <Skeleton width="40%" height={10} />
+            </div>
+          </div>
+          <Skeleton height={32} />
+          <Skeleton width="80%" height={10} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const PESTANAS = [
+  { id: "mias" as const, label: "Mis actividades", icon: TaskAltIcon },
+  { id: "equipo" as const, label: "Mi equipo", icon: GroupsOutlinedIcon },
+  { id: "asignadas" as const, label: "Asignadas por mí", icon: OutboxOutlinedIcon },
+];
 
 export default function PizarraPage() {
   const { token, user } = useUser();
@@ -331,8 +231,7 @@ export default function PizarraPage() {
     try {
       const q = new URLSearchParams(window.location.search).get("vista");
       const guardada = window.localStorage.getItem(VISTA_KEY);
-      const valida = (v: string | null): v is Vista =>
-        v === "mias" || v === "equipo" || v === "asignadas";
+      const valida = (v: string | null): v is Vista => v === "mias" || v === "equipo" || v === "asignadas";
       setVista(valida(q) ? q : valida(guardada) ? guardada : "mias");
     } catch {
       /* sin storage: queda «mias» */
@@ -393,11 +292,7 @@ export default function PizarraPage() {
   const sinEquipo = !isCeo && !tieneEquipo && (data != null || Boolean(error));
   // Christian solo asigna: ve el tablero y lo que repartió. Encargados con subordinados,
   // además lo suyo.
-  const pestanas: Vista[] = isCeo
-    ? ["equipo", "asignadas"]
-    : tieneEquipo
-      ? ["mias", "equipo", "asignadas"]
-      : [];
+  const pestanas: Vista[] = isCeo ? ["equipo", "asignadas"] : tieneEquipo ? ["mias", "equipo", "asignadas"] : [];
   const conPestanas = pestanas.length > 0;
   const vistaActiva: Vista = conPestanas && pestanas.includes(vista) ? vista : pestanas[0] ?? "equipo";
   const verMias = vistaActiva === "mias";
@@ -414,9 +309,10 @@ export default function PizarraPage() {
 
   if (cargandoEquipo) {
     return (
-      <p style={{ color: "var(--text-secondary)", fontSize: 14, maxWidth: 1100, margin: "0 auto" }}>
-        Cargando actividades…
-      </p>
+      <div className={p.pagina}>
+        <PageHead title="Actividades" description="Cargando actividades…" />
+        <TarjetasCargando />
+      </div>
     );
   }
 
@@ -424,160 +320,91 @@ export default function PizarraPage() {
     return <MisActividadesView />;
   }
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 1100, margin: "0 auto" }}>
-      <header style={{ display: "flex", gap: 12, alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em" }}>Actividades</h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-            {verMias
-              ? "Lo tuyo, en orden. En «Mi equipo» ves a tu gente y le asignas trabajo."
-              : verAsignadas
-                ? "Lo que repartiste en el rango, con quién lo tiene y cómo va"
-                : "Tú y tu equipo — toca a alguien para ver su día o asignarle trabajo"}
-          </p>
-        </div>
-        {verMias ? null : (
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading || !token}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            fontWeight: 650,
-            fontSize: 13,
-            cursor: loading ? "wait" : "pointer",
-            fontFamily: "inherit",
-          }}
-        >
-          Actualizar
-        </button>
-        )}
-      </header>
+  const estados = (Object.keys(STATUS_LABELS) as BoardUserStatus[])
+    // «Inactivo» ya no se asigna; solo aparece si una API vieja lo manda.
+    .filter((key) => key !== "inactivo" || (counts[key] ?? 0) > 0);
 
-      {conPestanas ? (
-        <div
-          role="tablist"
-          aria-label="Vista de actividades"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 6,
-            padding: 4,
-            alignSelf: "flex-start",
-            borderRadius: 14,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-          }}
-        >
-          {(
-            [
-              ["mias", "Mis actividades", TaskAltIcon],
-              ["equipo", "Mi equipo", GroupsOutlinedIcon],
-              ["asignadas", "Asignadas por mí", OutboxOutlinedIcon],
-            ] as const
+  return (
+    <div className={p.pagina}>
+      <PageHead
+        title="Actividades"
+        description={
+          verMias
+            ? "Lo tuyo, en orden. En «Mi equipo» ves a tu gente y le asignas trabajo."
+            : verAsignadas
+              ? "Lo que repartiste en el rango, con quién lo tiene y cómo va."
+              : "Tú y tu equipo. Toca a alguien para ver su día o asignarle trabajo."
+        }
+        actions={
+          verMias ? null : (
+            <Button onClick={() => void load()} disabled={loading || !token}>
+              <RefreshIcon aria-hidden="true" />
+              Actualizar
+            </Button>
           )
-            .filter(([id]) => pestanas.includes(id))
-            .map(([id, label, Icon]) => {
-            const on = vistaActiva === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                onClick={() => cambiarVista(id)}
-                style={{
-                  minHeight: 44,
-                  padding: "8px 16px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: on ? "var(--primary)" : "transparent",
-                  color: on ? "#fff" : "inherit",
-                  fontWeight: on ? 750 : 650,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <Icon aria-hidden="true" sx={{ fontSize: 18 }} />
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+        }
+        tabs={
+          conPestanas ? (
+            <Tabs
+              ariaLabel="Vista de actividades"
+              items={PESTANAS.filter((t) => pestanas.includes(t.id))}
+              value={vistaActiva}
+              onChange={cambiarVista}
+            />
+          ) : null
+        }
+      />
 
       {verMias ? (
         <MisActividadesView />
       ) : (
-      <>
-      <RangoSelector
-        preset={preset}
-        rango={rango}
-        onChange={(p, r) => {
-          setPreset(p);
-          setRango(p === "hoy" ? {} : r);
-        }}
-      />
+        <>
+          <div className={p.filtros}>
+            <RangoSelector
+              preset={preset}
+              rango={rango}
+              onChange={(np, r) => {
+                setPreset(np);
+                setRango(np === "hoy" ? {} : r);
+              }}
+            />
+          </div>
 
-      {verAsignadas ? (
-        <AsignadasPorMiView token={token} rango={preset === "hoy" ? {} : rango} />
-      ) : (
-      <>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {(Object.keys(STATUS_LABELS) as BoardUserStatus[])
-          // «Inactivo» ya no se asigna; solo aparece si una API vieja lo manda.
-          .filter((key) => key !== "inactivo" || (counts[key] ?? 0) > 0)
-          .map((key) => (
-          <span
-            key={key}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 7,
-              padding: "5px 10px",
-              borderRadius: 999,
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_COLORS[key] }} />
-            {STATUS_LABELS[key]} {counts[key] ?? 0}
-          </span>
-        ))}
-      </div>
+          {verAsignadas ? (
+            <AsignadasPorMiView token={token} rango={preset === "hoy" ? {} : rango} />
+          ) : (
+            <>
+              <StatRow cols={estados.length}>
+                {estados.map((key) => (
+                  <Stat
+                    key={key}
+                    label={ETIQUETA_CIFRA[key]}
+                    dot={TONE_COLOR[TONO_ESTADO[key]]}
+                    value={counts[key] ?? 0}
+                    hint={PISTA_ESTADO[key]}
+                    tone={key === "atrasado" && (counts[key] ?? 0) > 0 ? "danger" : "default"}
+                  />
+                ))}
+              </StatRow>
 
-      {loading && !data ? (
-        <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>Cargando…</p>
-      ) : error ? (
-        <p style={{ color: "#dc2626", fontSize: 14 }}>{error}</p>
-      ) : users.length === 0 ? (
-        <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>Nadie en tu equipo por ahora.</p>
-      ) : (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(168px, 1fr))",
-            gap: 12,
-          }}
-        >
-          {users.map((u) => (
-            <PersonCard key={u.id} user={u} isSelf={u.id === user?.id} />
-          ))}
-        </div>
-      )}
-      </>
-      )}
-      </>
+              {loading && !data ? (
+                <TarjetasCargando />
+              ) : error ? (
+                <Alert tone="danger" role="alert">
+                  {error}
+                </Alert>
+              ) : users.length === 0 ? (
+                <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu equipo por ahora." />
+              ) : (
+                <div className={p.rejilla}>
+                  {users.map((u) => (
+                    <PersonCard key={u.id} user={u} isSelf={u.id === user?.id} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   );
