@@ -55,7 +55,7 @@ export async function fetchMeNavigationAuthed(token: string): Promise<MeNavigati
  * Filtra módulos web por navegación servidor.
  * Preferencia: webModuleIds; fallback: paths de página; nunca clippea si nav vacía.
  */
-export function filterModulesByNavigation<T extends { id: string; panel?: string; path?: string }>(
+export function filterModulesByNavigation<T extends { id: string; panel?: string; routePanel?: string; path?: string }>(
   modules: T[],
   navigation: MeNavigation | null | undefined,
 ): T[] {
@@ -77,7 +77,10 @@ export function filterModulesByNavigation<T extends { id: string; panel?: string
   return modules.filter((m) => {
     if (idSet.has(m.id)) return true;
     if (!m.panel || m.path === undefined) return idSet.size === 0;
-    const full = `/${m.panel}${m.path === "/" ? "" : m.path.startsWith("/") ? m.path : `/${m.path}`}`;
+    // Misma URL que `getModuleUrl`: Finanzas y RRHH viven en /erp (`routePanel`), y
+    // con `panel` se comparaba contra /finance/... o /hr/..., que la API nunca lista.
+    const prefix = m.routePanel ?? m.panel;
+    const full = `/${prefix}${m.path === "/" ? "" : m.path.startsWith("/") ? m.path : `/${m.path}`}`;
     return pagePaths.some((rule) => {
       const base = rule.replace(/\/\*\*$/, "").replace(/\/\*$/, "").replace(/\/$/, "");
       if (!base) return false;

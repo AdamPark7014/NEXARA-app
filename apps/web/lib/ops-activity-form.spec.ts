@@ -14,9 +14,23 @@ const project: OperationalProjectOption = {
   client: { id: 77, name: 'CFE' },
 };
 
+// `vitest.config.mts` fija TZ=America/Mexico_City: UTC-6 todo el año. Las horas
+// esperadas van en UTC con ese desfase escrito a mano, no calculadas con Date.
+describe('zona horaria de las pruebas', () => {
+  it('corre en hora de Ciudad de Mexico, UTC-6', () => {
+    expect(new Date('2026-04-15T12:00:00.000Z').getTimezoneOffset()).toBe(360);
+    expect(new Date('2026-12-15T12:00:00.000Z').getTimezoneOffset()).toBe(360);
+  });
+});
+
 describe('toDateInputValue', () => {
   it('convierte un ISO a valor de <input type="date">', () => {
-    expect(toDateInputValue('2026-03-09T15:30:00.000Z')).toMatch(/^2026-03-0[89]$/);
+    // 15:30Z son las 09:30 del mismo dia en CDMX.
+    expect(toDateInputValue('2026-03-09T15:30:00.000Z')).toBe('2026-03-09');
+  });
+
+  it('usa el dia local: las 03:00Z todavia son la noche anterior en CDMX', () => {
+    expect(toDateInputValue('2026-03-10T03:00:00.000Z')).toBe('2026-03-09');
   });
 
   it('devuelve cadena vacía ante nulo o fecha inválida', () => {
@@ -112,13 +126,33 @@ describe('buildActivityPayload · lo que se manda al API', () => {
     expect(editado).not.toHaveProperty('creadoPorId');
   });
 
-  it('la fecha se ancla a las 08:00 locales, no a medianoche UTC', () => {
+  it('sin hora elegida, la fecha se ancla a las 09:00 locales, no a medianoche UTC', () => {
+    // El formulario tiene campo de hora desde 6994dbbf y arranca en 09:00.
     const payload = buildActivityPayload(
       { ...EMPTY_ACTIVITY_FORM, projectId: '11', responsableId: '8', fecha: '2026-04-15' },
       project,
       {},
     );
-    expect(new Date(payload.fechaInicio as string).getHours()).toBe(8);
+    // 09:00 en CDMX (UTC-6) = 15:00Z.
+    expect(payload.fechaInicio).toBe('2026-04-15T15:00:00.000Z');
+    expect(payload.fechaEntregaEsperada).toBe('2026-04-15T15:00:00.000Z');
+    expect(payload.fechaMaxima).toBe('2026-04-15T15:00:00.000Z');
+  });
+
+  it('la hora elegida viaja tal cual, en hora local', () => {
+    const payload = buildActivityPayload(
+      { ...EMPTY_ACTIVITY_FORM, projectId: '11', responsableId: '8', fecha: '2026-04-15', hora: '19:30' },
+      project,
+      {},
+    );
+    // 19:30 en CDMX = 01:30Z del dia siguiente: el API recibe el instante correcto.
+    expect(payload.fechaInicio).toBe('2026-04-16T01:30:00.000Z');
+  });
+
+  it('al reabrir la actividad el formulario recupera la misma fecha y hora local', () => {
+    const form = formFromActivityRecord({ fechaInicio: '2026-04-16T01:30:00.000Z' });
+    expect(form.fecha).toBe('2026-04-15');
+    expect(form.hora).toBe('19:30');
   });
 
   it('sin fecha no manda fechaInicio', () => {

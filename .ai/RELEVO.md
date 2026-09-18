@@ -3,25 +3,26 @@
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-18
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** 6a1ffeb0 (+ este commit de relevo)
+- **HEAD:** 428091d6 (+ este commit: pruebas web en verde)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno (claude-code, 17→18-09) — Proyectos, evidencia por campos, logo PDF
+## Este turno (claude-code, 18-09 noche) — las 26 pruebas web que fallaban
 
-### Hecho y desplegado en Hetzner (prueba)
+`apps/web`: `npx vitest run` 725/725 (antes 692 + 26 rojas), `tsc --noEmit` limpio. **Sin desplegar.**
 
-1. **Proyectos API** `/api/proyectos` (`ProyectosProfesionalController`): lista con salud, detalle, alta completa, cabecera, estado (reusa `operational-projects` changeStatus), hitos, alcance (+ importar de cotización), requerimientos, equipo, documentos (`uploads/project-docs`). `url-matrix`: `/api/proyectos/**`. Fix de tenencia: no se liga cliente de otra empresa (`9bc054e8`).
-2. **Proyectos web** `/erp/proyectos` (lista, alta en 7 pasos con un solo POST, detalle con Gantt CSS, pestañas) — merge `feat/erp-proyectos-web`.
-3. **Evidencia por campos**: web define campos al asignar (`OpsActivityForm`), los ve/edita en `/erp/actividades/:id` y baja el ZIP (`EvidenciaPorCampos.tsx`, `DescargarEvidenciaZip.tsx`). Apps alineadas al contrato del API (antes mandaban `fotoBase64/lat/lng` y esperaban un campo, el API devuelve `CampoDto[]` con claves `ANTES/EN_PROGRESO/DESPUES`). Android e iOS mandan lista vacía en «Fotos en sitio» cuando hay campos (se duplicaban en el ZIP). iOS **sin compilar**.
-4. **Build web**: `useVisibleOnce` devuelve `RefObject<T>` (era el Type error del build).
-5. **Logo en PDFs de producción**: `loadNexaraLogo` solo probaba rutas relativas al cwd (`/app`); ahora prueba `__dirname/../../assets` (`6a1ffeb0`). Afectaba TODOS los PDFs.
-6. **Arte de la propuesta**: `apps/api/src/assets/propuesta-portada.jpg` y `propuesta-membrete.jpg` sacados del PDF de referencia de Adam (`Downloads/Primera cotizacion  (1).pdf`).
-7. **E2E en servidor** (JWT firmado dentro del contenedor, limpio al final): 15/15 (proyectos, campos, ZIP).
+Causa y lado corregido por prueba:
 
-### En curso (agentes en worktrees, ramas sin mergear)
+1. **Spec vieja — URLs de Finanzas/RRHH.** `be3f71f6` (Cursor, 11-09) les puso `routePanel: erp`; la spec armaba la URL con `panel` (`/finance/...`, `/hr/...`) y la matriz de páginas la negaba. Ahora usa `getModuleUrl`, igual que el menú.
+2. **Spec vieja — menú operativo/avanzado** (mismo commit). El catálogo por rol se fija con «Menú avanzado» (todo lo que el puesto alcanza) y una prueba nueva exige que el operativo esconda exactamente `ADVANCED_ONLY_MODULE_IDS` (calendario, KB, BI…).
+3. **Código — `/me/navigation` recortaba Finanzas/RRHH.** `filterModulesByNavigation` (`lib/me-navigation.ts`) comparaba contra `/{panel}/...` en vez de `routePanel`: CEO, direcciones, coord_admin, RH y contabilidad perdían contabilidad, facturación, pagos al personal, organigrama, etc. Hoy no se ve en producción porque Core-only solo pinta módulos de `/erp` sin `routePanel`; aparecía al apagar Core-only.
+4. **Código — `lider_diseno` sin páginas de Core en la web.** `dad8869a` le dio `CORE_OLA1_URL_RULES` en la API («Daniela también es personal Core») pero no `CORE_OLA1_PAGE_PATHS` en `lib/rbac/page-matrix.ts`: en la web Core-only no abría `/erp/pizarra` ni `/erp/asistencias`. Corregido; **necesita deploy de la web** para que Daniela lo vea.
+5. **Spec vieja — Core.** `pizarra` y `asistencias` entran al catálogo de los roles con páginas de Core; en la lista de «lo que el super admin no ve» entran `activities-*` (consolidadas en la pizarra, `visible: false`), `mis-actividades` (pestaña) y `erp-clients` (se da por persona/correo). Prueba nueva: todo módulo de Core enlaza bajo `/erp`.
+6. **Spec vieja + no determinista — fecha de actividad.** `6994dbbf` (12-09) añadió campo de hora que arranca en 09:00; la prueba esperaba 08:00 y comparaba hora local contra hora local. `vitest.config.mts` fija `TZ=America/Mexico_City` y las pruebas esperan ISO UTC con el desfase escrito (09:00 → 15:00Z). Comprobado con la máquina en UTC, Tokio y Los Ángeles. Ojo: en Git Bash `TZ=... npx` no llega a Node; para probar otra zona usa PowerShell (`$env:TZ`).
+
+### En curso (agentes en worktrees, ramas sin mergear) — sin cambios de este turno
 
 - `feat/pdf-propuesta-identica` — PDF cliente idéntico a la referencia (portada/membrete como fondo).
 - `feat/cotizaciones-ui-nueva` — editor tipo documento + vista previa PDF + nomenclatura visible + `scripts/refoliar-borradores.js` (NO correr sin revisar).
@@ -32,8 +33,8 @@ Requisitos de Adam: tabla «Tareas/Dashboard» + `Downloads/gantt_seguimiento_pr
 
 ### Pendiente / conocido
 
+- **Pregunta para Adam — puestos sin Core.** `dir_operaciones`, `coord_admin`, `coord_ventas`, `vendedor`, `disenador`, `rh` y `contabilidad` no tienen las páginas de Core ni en la web ni en la API (coherente, pero con Core-only no abren `/erp/pizarra` ni `/erp/asistencias`). Si alguien real tiene esos puestos, hay que sumar `CORE_OLA1_PAGE_PATHS` (web) y `CORE_OLA1_URL_RULES` (API) juntos; la prueba «quien tiene paginas de Core llega a la pizarra» lista los puestos.
 - **Google Maps**: sin cuenta de facturación activa; la clave web no tiene restricción de aplicación; Android usa otra clave (`local.properties`). No borrar la vieja. Ver memoria `nexara-google-maps-claves`.
-- 26 pruebas web ya fallaban antes (`lib/rbac/role-modules.spec.ts`, timezone en `lib/ops-activity-form.spec.ts`).
 - API de proyectos: al cambiar responsable queda el anterior como RESPONSABLE; PLANNED→ACTIVE no pone `actualStartDate`; borrar documento no borra el archivo.
 - Web: el flujo de captura de evidencia del navegador no sabe de campos (solo apps).
 
