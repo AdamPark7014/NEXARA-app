@@ -51,6 +51,10 @@ export const pdfTruncate = (value: string | null | undefined, maxLength: number)
 
 export const loadNexaraLogo = (): Buffer | null => {
   const candidates = [
+    // Junto al código compilado (dist/common/pdf → dist/assets; en dev src/common/pdf → src/assets).
+    // En Docker el cwd es /app y el build vive en /app/apps/api/dist: las rutas relativas al cwd de
+    // abajo no lo encontraban y ningún PDF de producción llevaba logo.
+    path.resolve(__dirname, '../../assets/logo-nexara.png'),
     path.resolve(process.cwd(), '../web/public/logo-nexara.png'),
     path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
     // Producción (Docker): el API no incluye apps/web — usar assets propios
