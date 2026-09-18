@@ -64,6 +64,7 @@ import { buildCrossPanelUrl, detectCurrentPanelId, isCrossPanelHref, resolveCros
 import { buildFreshLoginUrl } from "@/lib/tab-session";
 import { buildApiUrl } from "@/lib/api-base";
 import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
+import { rutaActivaDelMenu } from "@/lib/menu-activo";
 import {
   fetchMeNavigationAuthed,
   filterModulesByNavigation,
@@ -550,11 +551,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
 
-  const isPathActive = (target: string) => {
-    if (!pathname) return false;
-    if (pathname === target) return true;
-    return pathname.startsWith(`${target}/`);
-  };
+  // Solo la opción más específica: en «KPIs del equipo» no se marca también «Asistencias».
+  const activeMenuTarget = rutaActivaDelMenu(
+    pathname,
+    filteredGroups.flatMap((group) => group.items.map((item) => getModuleUrl(item.id))),
+  );
 
   const handleLogout = () => {
     logout?.();
@@ -708,7 +709,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
               <p className={styles.groupTitle}>{group.title}</p>
               {group.items.map((item) => {
                 const target = getModuleUrl(item.id);
-                const active = isPathActive(target);
+                const active = target === activeMenuTarget;
                 return (
                   <Link
                     key={item.id}
