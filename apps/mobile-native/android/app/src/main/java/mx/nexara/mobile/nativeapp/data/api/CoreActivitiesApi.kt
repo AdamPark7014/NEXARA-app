@@ -1,5 +1,10 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -502,44 +507,96 @@ data class EvidenceFlowDto(
     /** Lo que dejó quien la tenía antes de que te la pasaran (solo lectura). Solo en el GET. */
     val avancesAnteriores: List<AvanceAnteriorDto>? = null,
     /**
-     * Evidencia por campos. Nulo o vacío contra la API de hoy: entonces la
-     * captura sigue siendo la de siempre (fotos libres).
+     * Evidencia por campos. Vacío cuando la actividad no pide campos: entonces
+     * la captura sigue siendo la de siempre (fotos libres). Solo en el GET.
+     *
+     * El GET también trae `camposProgreso`; no se lee a propósito: la app lo
+     * recalcula de `campos` (CoreActivityRules), que se actualiza tras cada foto.
      */
     val campos: List<EvidenceCampoDto>? = null,
 )
 
 /**
  * Un «campo» es una cosa concreta que hay que fotografiar («Cámara 1»,
- * «Rack»). `momentos` dice en qué momentos pide foto — antes, progreso,
+ * «Rack»). `momentos` dice en qué momentos pide foto — antes, en progreso,
  * después — en cualquier combinación.
+ *
+ * Espejo de `CampoDto` en apps/api/src/activities/evidence/activity-evidence-fields.service.ts.
  */
 data class EvidenceCampoDto(
     val id: Long? = null,
     val nombre: String? = null,
     val orden: Int? = null,
-    /** antes | progreso | despues */
+    /** ANTES | EN_PROGRESO | DESPUES (se lee con `CoreActivityRules.normMomento`). */
     val momentos: List<String>? = null,
+    val notas: String? = null,
     val fotos: EvidenceCampoFotosDto? = null,
-)
-
-/** URL de lo ya guardado en cada momento; el hueco que falta viene nulo. */
-data class EvidenceCampoFotosDto(
-    val antes: String? = null,
-    val progreso: String? = null,
-    val despues: String? = null,
+    /** Momentos que le faltan según el API (la app los recalcula con `fotos`). */
+    val pendientes: List<String>? = null,
+    val completo: Boolean? = null,
 )
 
 /**
- * `POST activity-evidence/:id/campos/:campoId/foto` — responde con el campo
- * actualizado (no con el flujo completo).
+ * Lo ya guardado en cada momento; el hueco que falta viene `null`. El API usa
+ * las claves en mayúsculas del enum de momentos.
+ */
+data class EvidenceCampoFotosDto(
+    @Json(name = "ANTES") val antes: EvidenceCampoFotoDto? = null,
+    @Json(name = "EN_PROGRESO") val enProgreso: EvidenceCampoFotoDto? = null,
+    @Json(name = "DESPUES") val despues: EvidenceCampoFotoDto? = null,
+)
+
+/** Una foto de campo (`FotoDeCampoDto` del API). */
+data class EvidenceCampoFotoDto(
+    val id: Long? = null,
+    val momento: String? = null,
+    val photoUrl: String? = null,
+    val latitude: Any? = null,
+    val longitude: Any? = null,
+    val capturedAt: String? = null,
+    /** Quién la tomó. */
+    val por: MyActivityRefDto? = null,
+)
+
+/**
+ * `POST activity-evidence/:id/campos/:fieldId/foto` — mismo cuerpo que las
+ * fotos de entrada y salida: la imagen va como data URL en `photoUrl` y el API
+ * la guarda en disco. Responde con la lista COMPLETA de campos de la actividad.
  */
 data class EvidenceCampoFotoRequest(
-    /** antes | progreso | despues */
+    /** ANTES | EN_PROGRESO | DESPUES */
     val momento: String,
-    val fotoBase64: String,
-    val lat: Double? = null,
-    val lng: Double? = null,
+    /** `data:image/jpeg;base64,…` */
+    val photoUrl: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    /** ISO-8601 de cuando se tomó. */
+    val capturedAt: String? = null,
 )
+
+/**
+ * Respuesta de `POST activity-evidence/:id/campos/:fieldId/foto` (y de `…/foto/quitar`).
+ *
+ * El API contesta con la lista completa de campos (`CampoDto[]`). Sin red, el
+ * interceptor offline contesta `{"queued":true}` y la foto se manda sola después.
+ */
+object EvidenceCamposJson {
+    private val listAdapter: JsonAdapter<List<EvidenceCampoDto>> by lazy {
+        Moshi.Builder()
+            .add(KotlinJsonAdapterFactory())
+            .build()
+            .adapter<List<EvidenceCampoDto>>(
+                Types.newParameterizedType(List::class.java, EvidenceCampoDto::class.java),
+            )
+    }
+
+    /** Los campos que devolvió el API; `null` si la petición quedó en la cola sin red. */
+    fun lista(raw: String?): List<EvidenceCampoDto>? {
+        val texto = raw?.trim().orEmpty()
+        if (!texto.startsWith("[")) return null
+        return listAdapter.fromJson(texto).orEmpty()
+    }
+}
 
 /**
  * «Avance anterior de X»: evidencia parcial de quien dejó la actividad. Quien
@@ -757,13 +814,17 @@ interface CoreActivitiesApi {
         @Body body: EvidencePhotosWithGeoRequest,
     ): EvidenceFlowDto
 
-    /** Evidencia por campos: una foto de un campo en un momento. Devuelve el campo. */
+    /**
+     * Evidencia por campos: una foto de un campo en un momento. El API devuelve
+     * todos los campos (`CampoDto[]`), pero sin red el interceptor contesta
+     * `{"queued":true}`: se lee crudo con [EvidenceCamposJson.lista].
+     */
     @POST("activity-evidence/{id}/campos/{campoId}/foto")
     suspend fun evidenceCampoFoto(
         @Path("id") activityId: Long,
         @Path("campoId") campoId: Long,
         @Body body: EvidenceCampoFotoRequest,
-    ): EvidenceCampoDto
+    ): ResponseBody
 
     @POST("activity-evidence/{id}/service-sheet-pdf")
     suspend fun serviceSheetPdf(

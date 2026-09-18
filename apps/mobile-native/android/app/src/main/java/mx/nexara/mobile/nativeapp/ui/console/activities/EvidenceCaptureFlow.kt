@@ -339,9 +339,9 @@ fun EvidenceCaptureFlow(
 
     /**
      * Evidencia por campos: una foto del campo en un momento. El API responde
-     * con el campo actualizado; el flujo completo no cambia, así que se mezcla
-     * en sitio. Sin conexión (`null`) el hueco se marca igual para que la
-     * persona no vuelva a tomar la misma foto.
+     * con la lista completa de campos y esa reemplaza la local (el resto del
+     * flujo no cambia). Sin conexión (`null`) el hueco se marca igual para que
+     * la persona no vuelva a tomar la misma foto.
      */
     suspend fun sendCampoFoto(campoId: Long, momento: String, photo: GeoPhoto): Boolean {
         busy = true
@@ -352,22 +352,19 @@ fun EvidenceCaptureFlow(
                     activityId = activity.id,
                     campoId = campoId,
                     momento = momento,
-                    fotoBase64 = photo.dataUrl,
+                    photoUrl = photo.dataUrl,
                     lat = photo.latitude,
                     lng = photo.longitude,
+                    capturedAt = photo.capturedAt,
                 )
             }
-            val actualizados = flow?.campos.orEmpty().map { campo ->
-                if (campo.id != campoId) {
-                    campo
-                } else {
-                    CoreActivityRules.conFoto(
-                        CoreActivityRules.mezclaCampo(campo, guardado),
-                        momento,
-                        photo.dataUrl,
-                    )
-                }
-            }
+            val actualizados = CoreActivityRules.camposTrasFoto(
+                previos = flow?.campos,
+                respuesta = guardado,
+                campoId = campoId,
+                momento = momento,
+                urlLocal = photo.dataUrl,
+            )
             flow = flow?.copy(campos = actualizados)
             thumbnailOf(photo.preview)?.let { thumb ->
                 camposThumbs = camposThumbs + (campoSlotKey(campoId, momento) to thumb)

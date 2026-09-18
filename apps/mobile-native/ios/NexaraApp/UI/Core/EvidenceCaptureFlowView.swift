@@ -601,8 +601,31 @@ struct EvidenceCaptureFlowView: View {
 
     // MARK: Cámara
 
+    /// «Cámara 1 · Antes»: lo que se está fotografiando.
+    private func campoCameraTitle(campoId: Int, momento: String) -> String {
+        let nombre = campos.first(where: { $0.id == campoId }).map { CoreEvidence.campoName($0) } ?? "Campo"
+        return "\(nombre) · \(CoreEvidence.momentoLabel(momento))"
+    }
+
     @ViewBuilder
     private func cameraView(for request: CameraRequest) -> some View {
+        if let campoId = request.campoId, let momento = request.momento {
+            // Evidencia por campos: la foto viaja sola al campo y momento que se tocó.
+            GeoPhotoCaptureView(
+                title: campoCameraTitle(campoId: campoId, momento: momento),
+                confirmLabel: "Enviar esta foto",
+                // El campo se fotografía donde esté; la ubicación viaja si la hay.
+                requireLocation: false,
+                onConfirm: { photo in await sendCampoPhoto(campoId: campoId, momento: momento, photo: photo) },
+                onCancel: { camera = nil }
+            )
+        } else {
+            stepCameraView(for: request)
+        }
+    }
+
+    @ViewBuilder
+    private func stepCameraView(for request: CameraRequest) -> some View {
         switch request.step {
         case CoreEvidence.entryPhoto:
             GeoPhotoCaptureView(
@@ -641,6 +664,8 @@ struct EvidenceCaptureFlowView: View {
     private func load() async {
         do {
             flow = try await CoreRepository.shared.evidenceFlow(activityId: activityId)
+            // Solo el GET trae los campos: los POST de cada paso no los mandan.
+            campos = flow?.campos ?? []
             loadError = nil
         } catch {
             loadError = error.toUserMessage(fallback: "No se pudo cargar tu evidencia")
@@ -767,6 +792,45 @@ struct EvidenceCaptureFlowView: View {
                 geofenceRefresh += 1
             }
             return text
+        }
+    }
+
+    /// Evidencia por campos: la foto de un campo en un momento. El API responde
+    /// con todos los campos y esa lista reemplaza la local; sin conexión el hueco
+    /// se marca igual para que no se vuelva a tomar la misma foto.
+    @MainActor
+    private func sendCampoPhoto(campoId: Int, momento: String, photo: CapturedGeoPhoto) async -> String? {
+        busy = true
+        defer { busy = false }
+        do {
+            let respuesta = try await CoreRepository.shared.submitCampoPhoto(
+                activityId: activityId,
+                campoId: campoId,
+                momento: momento,
+                photoUrl: photo.dataUrl,
+                latitude: photo.coords?.latitude,
+                longitude: photo.coords?.longitude,
+                capturedAt: CoreFormat.isoString(photo.capturedAt)
+            )
+            campos = CoreEvidence.camposAfterPhoto(
+                campos,
+                respuesta: respuesta,
+                campoId: campoId,
+                momento: momento,
+                localUrl: photo.dataUrl
+            )
+            campoThumbs[campoSlotKey(campoId, momento)] = photo.image
+            errorText = nil
+            if respuesta == nil {
+                message = CoreError.queuedOffline.errorDescription
+            } else {
+                message = "Foto guardada · \(CoreEvidence.momentoLabel(momento))"
+            }
+            camera = nil
+            onChanged?()
+            return nil
+        } catch {
+            return error.toUserMessage(fallback: "No se pudo guardar la foto del campo")
         }
     }
 
