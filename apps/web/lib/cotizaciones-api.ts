@@ -84,11 +84,49 @@ export type PartidaCotizacion = {
   paqueteCantidad?: number | null;
 };
 
+/** 02 Alcance: una subsección numerada (título, párrafo y viñetas). */
 export type BloqueAlcance = {
   clave: string;
   titulo: string;
   texto?: string | null;
-  parametros?: Record<string, string | number | null>;
+  vinetas?: string[];
+  parametros?: Record<string, unknown> | null;
+};
+
+/** 01 Objetivo en sus tres partes, como lo imprime el PDF. */
+export type ObjetivoPartes = { intro: string; beneficios: string[]; cierre: string };
+
+export const CLAVES_TERMINO = ["pago", "alcance", "noIncluye", "disponibilidad", "otras"] as const;
+export type ClaveTermino = (typeof CLAVES_TERMINO)[number];
+
+export const TITULO_TERMINO: Record<ClaveTermino, string> = {
+  pago: "Forma de pago",
+  alcance: "Alcance de la cotización",
+  noIncluye: "No incluye",
+  disponibilidad: "Disponibilidad",
+  otras: "Otras condiciones",
+};
+
+export type ParteTermino = {
+  clave: ClaveTermino | "vigencia";
+  titulo: string;
+  texto: string;
+  personalizado: boolean;
+};
+
+export type TerminosCotizacion = {
+  modalidad: string;
+  titulo: string;
+  lineas: string[];
+  partes?: ParteTermino[];
+};
+
+/** Quien hizo la cotización, con la clave (nomenclatura) de la que sale su folio. */
+export type AutorCotizacion = {
+  id: number;
+  nombre: string;
+  clave?: string | null;
+  siglas?: string | null;
 };
 
 export type PlanoCotizacion = {
@@ -114,7 +152,16 @@ export type CotizacionRow = {
   validUntil?: string | null;
   sentAt?: string | null;
   revision?: number;
-  elaboro?: { id: number; nombre: string } | null;
+  /** El folio sigue la nomenclatura (`NEX-LJ75100126-0007…`). Los viejos (`NXR-2026-…`) no. */
+  conNomenclatura?: boolean;
+  /** Borrador viejo que nunca salió: se le puede dar folio con nomenclatura. */
+  necesitaRefolio?: boolean;
+  folioNomenclatura?: string | null;
+  folioConsecutivo?: number | null;
+  projectName?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  elaboro?: AutorCotizacion | null;
   intervinieron: Array<{ userId: number; nombre: string; siglas: string; rol: string }>;
   actividades?: Array<{ id: number; anNumber?: string | null }>;
 };
@@ -129,9 +176,19 @@ export type CotizacionDetalle = {
   segmento: Segmento;
   segmentoEtiqueta: string;
   revision: number;
+  folioBase?: string | null;
+  folioEnviado?: string | null;
+  folioNomenclatura?: string | null;
+  folioConsecutivo?: number | null;
+  conNomenclatura?: boolean;
+  necesitaRefolio?: boolean;
+  cadenaParticipantes?: string | null;
+  elaboro?: AutorCotizacion | null;
+  createdById?: number | null;
   issueDate?: string | null;
   validUntil?: string | null;
   sentAt?: string | null;
+  sentToEmail?: string | null;
   clientName?: string | null;
   clientCompany?: string | null;
   clientEmail?: string | null;
@@ -139,7 +196,12 @@ export type CotizacionDetalle = {
   clientAddress?: string | null;
   salesClientId?: number | null;
   projectName?: string | null;
+  /** Párrafo de entrada de 02 Alcance (debajo del título del proyecto). */
+  scope?: string | null;
   objetivo?: string | null;
+  objetivoPartes?: ObjetivoPartes | null;
+  /** Lo que el PDF pondría con las partidas si el objetivo se deja vacío. */
+  objetivoSugerido?: ObjetivoPartes | null;
   alcanceBloques?: BloqueAlcance[] | null;
   planos?: PlanoCotizacion[] | null;
   note?: string | null;
@@ -151,7 +213,10 @@ export type CotizacionDetalle = {
   rejectedReason?: string | null;
   rejectedByName?: string | null;
   incluyeInstalacion: boolean;
-  terminos: { modalidad: string; titulo: string; lineas: string[] };
+  /** Los que salen en el PDF (con lo reescrito por quien cotiza). */
+  terminos: TerminosCotizacion;
+  /** Los del segmento sin tocar (para «Restablecer»). */
+  terminosBase?: TerminosCotizacion | null;
   grupos: Array<{ grupo: GrupoPartida; etiqueta: string; subtotal: number; partidas: PartidaCotizacion[] }>;
   totalesPorGrupo: Record<GrupoPartida, number>;
   items: PartidaCotizacion[];
@@ -203,21 +268,26 @@ export type GuardarCotizacion = {
   clientAddress?: string | null;
   clientCompany?: string | null;
   projectName?: string | null;
+  scope?: string | null;
   objetivo?: string | null;
   alcanceBloques?: BloqueAlcance[];
   planos?: PlanoCotizacion[];
   issueDate?: string;
   validUntil?: string;
   depositPercent?: number;
+  /** Términos reescritos por quien cotiza (solo los que cambió), con sus títulos. */
   note?: string | null;
   activityId?: number;
-  items: PartidaCotizacion[];
+  items?: PartidaCotizacion[];
+  /** Solo para retomar como borrador una enviada/rechazada/vencida (la API guarda la versión). */
+  status?: "BORRADOR";
 };
 
 export function crearCotizacion(token: string, payload: GuardarCotizacion) {
   return cotFetch<{ id: number; quoteNumber: string }>("cotizaciones", token, {
     method: "POST",
-    body: JSON.stringify(payload),
+    // La API pide la lista de partidas aunque vaya vacía (el borrador nace sin partidas).
+    body: JSON.stringify({ ...payload, items: payload.items ?? [] }),
   });
 }
 
@@ -228,7 +298,11 @@ export function actualizarCotizacion(token: string, id: number, payload: Partial
   });
 }
 
-export function enviarCotizacion(token: string, id: number, datos: { email: string; message?: string }) {
+export function enviarCotizacion(
+  token: string,
+  id: number,
+  datos: { email: string; cc?: string[]; message?: string },
+) {
   return cotFetch<{ id: number; quoteNumber: string }>(`cotizaciones/${id}/send`, token, {
     method: "POST",
     body: JSON.stringify(datos),
@@ -283,6 +357,14 @@ export async function subirPlano(token: string, id: number, archivo: File, nombr
   return (await res.json()) as CotizacionDetalle;
 }
 
+/** 03 Planos: nuevo orden y nombres de los anexos propios (la API no acepta URLs nuevas por aquí). */
+export function ordenarPlanos(token: string, id: number, planos: Array<Pick<PlanoCotizacion, "url" | "nombre">>) {
+  return cotFetch<{ id: number }>(`cotizaciones/${id}`, token, {
+    method: "PUT",
+    body: JSON.stringify({ planos }),
+  });
+}
+
 export function quitarPlano(token: string, id: number, url: string) {
   return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/planos/quitar`, token, {
     method: "POST",
@@ -324,6 +406,41 @@ export function aplicarPaquete(
 /** URL del PDF «Propuesta técnica» (requiere sesión). */
 export function urlPdfCotizacion(id: number) {
   return buildApiUrl(`cotizaciones/${id}/pdf`);
+}
+
+/**
+ * El PDF real, tal como lo recibe el cliente, para la vista previa.
+ *
+ * Misma autenticación que «Descargar PDF» (`Authorization` + cookie): un `<iframe src>` directo a la
+ * API no mandaría el token.
+ */
+export async function pdfDeCotizacion(token: string, id: number, signal?: AbortSignal): Promise<Blob> {
+  const res = await fetch(urlPdfCotizacion(id), {
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}` },
+    signal,
+  });
+  if (!res.ok) {
+    throw new Error(`No se pudo generar el PDF (HTTP ${res.status})`);
+  }
+  return res.blob();
+}
+
+export type PlantillasSegmento = {
+  segmento: Segmento;
+  etiqueta: string;
+  objetivo: { intro: string; cierre: string };
+  bloques: Array<{ clave: string; titulo: string; texto: string | null; vinetas: string[] }>;
+};
+
+/** Puntos de partida del editor por segmento (objetivo y subsecciones de alcance). */
+export function listarPlantillas(token: string) {
+  return cotFetch<PlantillasSegmento[]>("cotizaciones/plantillas", token);
+}
+
+/** Borrador viejo sin nomenclatura → folio de quien la hizo (el anterior queda en versiones). */
+export function refoliarCotizacion(token: string, id: number) {
+  return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/refoliar`, token, { method: "POST" });
 }
 
 export function formatoMoneda(valor: number | null | undefined, moneda = "MXN") {

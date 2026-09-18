@@ -4,9 +4,11 @@ import {
   folioEnviado,
   folioSinCadena,
   inicialesParaFolio,
+  necesitaRefolio,
   nomenclaturaCompleta,
   nomenclaturaParaFolio,
   siglasDeNomenclatura,
+  tieneNomenclatura,
 } from './folio-core.js';
 
 describe('nomenclatura para el folio', () => {
@@ -115,5 +117,64 @@ describe('cadena de quién intervino', () => {
 
   it('recupera el folio base de uno ya enviado', () => {
     expect(folioSinCadena('NEX-LJ75100126-0007-JA.CE-R2')).toBe('NEX-LJ75100126-0007');
+  });
+});
+
+describe('reenvío', () => {
+  it('reenviar no vuelve a pegar la cadena: se parte del folio base', () => {
+    // Al enviar, `quoteNumber` se queda con el folio con cadena. El siguiente envío debe partir
+    // de la base, o saldría NEX-…-0007-JA-JA.CE-R2.
+    const primero = folioEnviado({ base: 'NEX-LJ75100126-0007', siglasAutor: 'LJ', participantes: ['JA'] });
+    expect(primero).toBe('NEX-LJ75100126-0007-JA');
+    const segundo = folioEnviado({
+      base: folioSinCadena(primero),
+      siglasAutor: 'LJ',
+      participantes: ['JA', 'CE'],
+      revision: 2,
+    });
+    expect(segundo).toBe('NEX-LJ75100126-0007-JA.CE-R2');
+  });
+});
+
+describe('borradores viejos sin nomenclatura', () => {
+  const borrador = {
+    status: 'DRAFT',
+    quoteNumber: 'NXR-2026-763366',
+    folioNomenclatura: null,
+    sentAt: null,
+    folioEnviado: null,
+    createdById: 4,
+    deletedAt: null,
+  };
+
+  it('reconoce un folio con nomenclatura, con o sin cadena y revisión', () => {
+    expect(tieneNomenclatura('NEX-LJ75100126-0007')).toBe(true);
+    expect(tieneNomenclatura('NEX-LJ75100126-0007-JA.CE-R2')).toBe(true);
+    expect(tieneNomenclatura('nex-ce00000000-0001')).toBe(true);
+    expect(tieneNomenclatura('NXR-2026-763366')).toBe(false);
+    expect(tieneNomenclatura('COT-0001')).toBe(false);
+    expect(tieneNomenclatura('')).toBe(false);
+  });
+
+  it('un borrador nunca enviado con folio viejo se refolia', () => {
+    expect(necesitaRefolio(borrador)).toBe(true);
+  });
+
+  it('si ya tiene folio con nomenclatura se deja como está', () => {
+    expect(
+      necesitaRefolio({ ...borrador, quoteNumber: 'NEX-LJ75100126-0007', folioNomenclatura: 'LJ75100126' }),
+    ).toBe(false);
+  });
+
+  it('lo que ya vio el cliente no se toca, aunque su folio sea viejo', () => {
+    expect(necesitaRefolio({ ...borrador, sentAt: new Date() })).toBe(false);
+    expect(necesitaRefolio({ ...borrador, folioEnviado: 'NXR-2026-763366' })).toBe(false);
+    expect(necesitaRefolio({ ...borrador, status: 'SENT' })).toBe(false);
+    expect(necesitaRefolio({ ...borrador, status: 'APPROVED' })).toBe(false);
+  });
+
+  it('sin autor no hay de quién sacar la nomenclatura; borradas tampoco', () => {
+    expect(necesitaRefolio({ ...borrador, createdById: null })).toBe(false);
+    expect(necesitaRefolio({ ...borrador, deletedAt: new Date() })).toBe(false);
   });
 });
