@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsEmail, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsDateString, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CotizacionItemDto } from './cotizacion-item.dto.js';
 import { SEGMENTOS } from '../terminos-segmento.js';
 
@@ -30,6 +30,11 @@ export class CreateCotizacionDto {
   @IsOptional()
   @IsArray()
   planos?: unknown[];
+
+  /** Personalización del PDF (`cotizaciones/personalizacion.ts`); se normaliza al guardar. */
+  @IsOptional()
+  @IsObject()
+  opciones?: Record<string, unknown>;
 
   /** Actividad comercial que origina la cotización (queda ligada en los dos sentidos). */
   @IsOptional()

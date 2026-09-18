@@ -2065,6 +2065,9 @@ model Cotizacion {
   alcanceBloques    Json?
   /// 03 Planos: anexos propios o heredados de la actividad `[{ url, nombre, tipo, origen }]`.
   planos            Json?
+  /// Personalización del PDF (`cotizaciones/personalizacion.ts`): secciones, columnas, carta,
+  /// condiciones comerciales y firmas. Sin ella, el PDF de siempre.
+  opciones          Json?
   rejectedAt        DateTime?
   rejectedReason    String?                @db.Text
   rejectedByName    String?                @db.VarChar(180)
@@ -2144,6 +2147,8 @@ model CotizacionItem {
   scope                 String?
   brand                 String?    @db.VarChar(120)
   model                 String?    @db.VarChar(120)
+  /// Imagen del producto para la columna opcional «Imagen» del PDF (catálogo o URL propia).
+  imagenUrl             String?    @db.VarChar(500)
   sku                   String?    @db.VarChar(120)
   partNumber            String?    @db.VarChar(120)
   batchReference        String?    @db.VarChar(120)
@@ -2229,6 +2234,25 @@ model CotizacionVersion {
   @@unique([cotizacionId, version])
   @@index([cotizacionId])
   @@map("cotizacion_versions")
+}
+
+/// Plantilla de cotización de la empresa: textos, secciones, columnas, términos y (si se pidió)
+/// partidas, para empezar una nueva desde ahí. La ve todo el que cotiza en esa empresa.
+model CotizacionPlantilla {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  nombre      String   @db.VarChar(120)
+  segmento    CotizacionSegmento @default(COMERCIAL)
+  /// `ContenidoPlantilla` de `cotizaciones/personalizacion.ts`.
+  contenido   Json
+  conPartidas Boolean  @default(false)
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  archivadaAt DateTime?
+
+  @@index([companyId])
+  @@map("cotizacion_plantillas")
 }
 
 /// Pedido a mayorista (CT API, etc.) generado desde cotización aprobada.
