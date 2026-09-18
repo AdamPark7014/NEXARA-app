@@ -79,7 +79,8 @@ export function normalizarBloques(crudos: unknown): BloqueAlcance[] {
 
     salida.push({
       clave,
-      titulo: titulo || 'Alcance',
+      // Sin título el PDF lo imprime como párrafo suelto, sin número (no como «3. Alcance»).
+      titulo,
       texto: cuerpo || null,
       vinetas,
       ...(parametros ? { parametros } : {}),

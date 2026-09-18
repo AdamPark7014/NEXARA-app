@@ -264,6 +264,13 @@ export default function SeccionCotizacion({
 
   const base = (clave: ClaveTermino) => detalle?.terminosBase?.partes?.find((p) => p.clave === clave)?.texto ?? "";
   const esLicitacion = (detalle?.terminos.modalidad ?? "") === "LICITACION" || doc.segmento === "LICITACION";
+  // Títulos y orden como los imprime el PDF (en licitación se llaman como en las bases).
+  const partesBase = (detalle?.terminosBase?.partes ?? []).filter((p) => p.clave !== "vigencia");
+  const tituloDe = (clave: ClaveTermino) => partesBase.find((p) => p.clave === clave)?.titulo ?? TITULO_TERMINO[clave];
+  const orden: ClaveTermino[] = [
+    ...partesBase.map((p) => p.clave as ClaveTermino),
+    ...TERMINOS_EDITABLES.filter((c) => !partesBase.some((p) => p.clave === c)),
+  ];
 
   return (
     <Hoja
@@ -606,7 +613,7 @@ export default function SeccionCotizacion({
 
       {detalle ? (
         <ul className={styles.terminos}>
-          {TERMINOS_EDITABLES.map((clave) => {
+          {orden.map((clave) => {
             const textoBase = base(clave);
             const propio = doc.terminos[clave];
             const editado = propio != null && propio.trim() !== textoBase.trim();
@@ -615,7 +622,7 @@ export default function SeccionCotizacion({
             return (
               <li key={clave} className={styles.termino}>
                 <div className={styles.terminoCabeza}>
-                  <span className={styles.terminoTitulo}>{TITULO_TERMINO[clave]}</span>
+                  <span className={styles.terminoTitulo}>{tituloDe(clave)}</span>
                   {editado ? <span className={styles.editado}>Editado</span> : null}
                   {clave === "pago" && !esLicitacion ? (
                     <label className={styles.anticipo}>
@@ -652,7 +659,7 @@ export default function SeccionCotizacion({
                 <TextoAuto
                   value={valor}
                   disabled={!editable}
-                  aria-label={TITULO_TERMINO[clave]}
+                  aria-label={tituloDe(clave)}
                   placeholder={clave === "otras" ? "Otra condición (opcional): garantías, tiempos de entrega, moneda…" : ""}
                   onValor={(v) =>
                     cambiar((d) => {
@@ -667,9 +674,9 @@ export default function SeccionCotizacion({
             );
           })}
           <li className={styles.termino}>
-            <span className={styles.terminoTitulo}>Vigencia de esta propuesta</span>
+            <span className={styles.terminoTitulo}>Vigencia</span>
             <p className={styles.frase} style={{ margin: "4px 0 0" }}>
-              {vigencia ? `${vigencia} días naturales a partir de su fecha de emisión.` : "Pon la fecha de validez arriba y se escribe sola."}
+              {vigencia ? `${vigencia} días naturales a partir de la fecha de emisión de esta propuesta.` : "Pon la fecha de validez arriba y se escribe sola."}
             </p>
           </li>
         </ul>

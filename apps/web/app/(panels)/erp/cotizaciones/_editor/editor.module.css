@@ -199,6 +199,7 @@
 
 .primaryBtn:hover:not(:disabled) {
   background: var(--primary-hover, var(--primary));
+  color: #fff;
 }
 
 .secondaryBtn {
@@ -210,6 +211,7 @@
 
 .secondaryBtn:hover:not(:disabled) {
   border-color: var(--border-strong, var(--doc-borde));
+  color: inherit;
 }
 
 .ghostBtn {
@@ -327,6 +329,7 @@
 
 .indiceItem:hover {
   border-color: var(--doc-acento);
+  color: inherit;
 }
 
 .indiceNumero {
