@@ -769,6 +769,7 @@ model User {
   faltasJustificadas        AttendanceJustification[]  @relation("AttendanceJustificationUser")
   faltasJustificadasPor     AttendanceJustification[]  @relation("AttendanceJustificationAuthor")
   checadasCorregidas        AttendanceCorrection[]     @relation("AttendanceCorrectionAuthor")
+  uniformesRevisados        Attendance[]               @relation("AttendanceUniformeRevisor")
   lunchBreaks               LunchBreak[]
   employeePayments          EmployeePayment[]
   employeePaymentsCreated   EmployeePayment[]          @relation("EmployeePaymentCreator")
@@ -1682,6 +1683,12 @@ model Attendance {
   sitioNombre      String?
   /// Salida inventada por la tarea de las 23:30 porque nadie la registró.
   cierreAutomatico Boolean      @default(false)
+  /// Solo entradas: el jefe revisa la foto y marca si traía uniforme (✓ true / ✗ false).
+  /// null = nadie lo ha revisado. De aquí sale el KPI «cumplimiento con uniforme».
+  uniformeOk            Boolean?
+  uniformeRevisadoPorId Int?
+  uniformeRevisadoAt    DateTime?
+  uniformeRevisadoPor   User?     @relation("AttendanceUniformeRevisor", fields: [uniformeRevisadoPorId], references: [id], onDelete: SetNull)
   companyId      Int
   user           User           @relation(fields: [userId], references: [id])
   company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)

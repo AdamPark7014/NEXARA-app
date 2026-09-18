@@ -13,6 +13,8 @@ import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import GpsTrajectoryPreview from "@/components/GpsTrajectoryPreview";
 import SessionImage from "@/components/SessionImage";
 import ComidasPanel from "@/components/asistencias/ComidasPanel";
+import UniformeControl from "@/components/kpis/UniformeControl";
+import { KPIS_PATH } from "@/lib/kpis-equipo";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, getSocketBaseUrl, parseResponseJson } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
@@ -524,6 +526,22 @@ export default function ErpAsistenciasPage() {
     }
   };
 
+  /** Refleja el ✓ / ✗ de uniforme sin recargar todo el equipo. */
+  const actualizarUniforme = (userId: number, attendanceId: number, ok: boolean | null, at: string | null) => {
+    setMembers((prev) =>
+      prev.map((u) =>
+        u.userId !== userId
+          ? u
+          : {
+              ...u,
+              attendances: (u.attendances ?? []).map((a) =>
+                a.id === attendanceId ? { ...a, uniformeOk: ok, uniformeRevisadoAt: at } : a,
+              ),
+            },
+      ),
+    );
+  };
+
   const abrirJustificar = (userId: number, nombre: string) => {
     setMotivoFalta("");
     setErrorFalta(null);
@@ -595,21 +613,41 @@ export default function ErpAsistenciasPage() {
         title="Asistencias"
         subtitle="Tu checada (foto + GPS) · equipo · comidas · trayectoria"
         actions={
-          <input
-            type="date"
-            value={dateFilter}
-            max={todayIso()}
-            onChange={(e) => setDateFilter(e.target.value)}
-            style={{
-              padding: "7px 10px",
-              border: "1px solid var(--nx-panel-hairline)",
-              borderRadius: 8,
-              background: "var(--nx-panel-surface-overlay)",
-              color: "var(--text-primary)",
-              fontSize: 12.5,
-              fontFamily: "inherit",
-            }}
-          />
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+            {isManager ? (
+              <Link
+                href={KPIS_PATH}
+                style={{
+                  padding: "7px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--nx-panel-hairline)",
+                  background: "var(--nx-panel-surface-overlay)",
+                  color: "var(--primary)",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                KPIs del equipo
+              </Link>
+            ) : null}
+            <input
+              type="date"
+              value={dateFilter}
+              max={todayIso()}
+              onChange={(e) => setDateFilter(e.target.value)}
+              style={{
+                padding: "7px 10px",
+                border: "1px solid var(--nx-panel-hairline)",
+                borderRadius: 8,
+                background: "var(--nx-panel-surface-overlay)",
+                color: "var(--text-primary)",
+                fontSize: 12.5,
+                fontFamily: "inherit",
+              }}
+            />
+          </div>
         }
       />
 
@@ -1036,8 +1074,8 @@ export default function ErpAsistenciasPage() {
                             </div>
                           </div>
 
-                          {(entryPhoto?.photoUrl || exitPhoto?.photoUrl) && (
-                            <div style={{ display: "flex", gap: 8 }}>
+                          {(entryPhoto?.photoUrl || exitPhoto?.photoUrl || checadaEntrada?.id) && (
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                               {entryPhoto?.photoUrl && (
                                 <SessionImage
                                   src={resolveAssetUrl(entryPhoto.photoUrl)}
@@ -1052,6 +1090,17 @@ export default function ErpAsistenciasPage() {
                                   style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10 }}
                                 />
                               )}
+                              {/* KPI «cumplimiento con uniforme»: el jefe lo marca viendo la foto de entrada. */}
+                              {checadaEntrada?.id ? (
+                                <UniformeControl
+                                  attendanceId={checadaEntrada.id}
+                                  uniformeOk={checadaEntrada.uniformeOk}
+                                  revisadoAt={checadaEntrada.uniformeRevisadoAt}
+                                  editable={m.userId !== user?.id}
+                                  token={token}
+                                  onCambio={(ok, at) => actualizarUniforme(m.userId, checadaEntrada.id!, ok, at)}
+                                />
+                              ) : null}
                             </div>
                           )}
 

@@ -24,6 +24,7 @@ import {
   type RevisarEvidenciaDto,
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
+import { KpisEquipoService } from './kpis-equipo.service.js';
 
 @Controller('me')
 @UseGuards(AuthGuard('jwt'))
@@ -32,6 +33,7 @@ export class MeController {
     private readonly me: MeService,
     private readonly teamBoard: TeamBoardService,
     private readonly myActivities: MyActivitiesService,
+    private readonly kpis: KpisEquipoService,
   ) {}
 
   /** Mis actividades: cola personal (todos menos el CEO). */
@@ -285,6 +287,55 @@ export class MeController {
       companyId,
       userId,
     );
+  }
+
+  /**
+   * KPI del equipo (dashboard): retardos, uniforme, horas laboradas contra productivas,
+   * inactividad y tiempo extra, por persona y en total. Mismo alcance que la pizarra.
+   * `desde`/`hasta` en `AAAA-MM-DD` (por omisión, hoy; máximo 93 días); `userId` deja una sola fila.
+   */
+  @Get('kpis/equipo')
+  kpisEquipo(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+    @Query('userId') userId?: string,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    const solo = Number(userId);
+    return this.kpis.getEquipo(
+      this.viewer(user),
+      companyId,
+      this.kpis.resolveDias(desde, hasta),
+      Number.isInteger(solo) && solo > 0 ? solo : null,
+    );
+  }
+
+  /** Detalle de una persona, día por día, con la línea de tiempo (jornada, comida, productivo, inactivo). */
+  @Get('kpis/equipo/:userId')
+  kpisPersona(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.kpis.getPersona(this.viewer(user), companyId, userId, this.kpis.resolveDias(desde, hasta));
+  }
+
+  private viewer(user: any) {
+    return {
+      id: Number(user.id),
+      roleKey: user.roleKey ?? null,
+      email: user.email ?? null,
+      isSuperAdmin: Boolean(user.isSuperAdmin),
+    };
   }
 
   @Get('board/:userId')
