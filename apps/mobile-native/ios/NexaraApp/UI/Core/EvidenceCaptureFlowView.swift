@@ -327,7 +327,8 @@ struct EvidenceCaptureFlowView: View {
 
     private func stepTitle(_ step: String) -> String {
         switch step {
-        case CoreEvidence.evidencePhotos: return "Fotos en sitio (mínimo \(photoRequired))"
+        case CoreEvidence.evidencePhotos:
+            return porCampos ? "Fotos en sitio (por campo)" : "Fotos en sitio (mínimo \(photoRequired))"
         default: return CoreEvidence.label(step)
         }
     }
@@ -399,7 +400,11 @@ struct EvidenceCaptureFlowView: View {
                 }
             }
         case CoreEvidence.evidencePhotos:
-            evidencePhotosAction
+            if porCampos {
+                camposStepAction
+            } else {
+                evidencePhotosAction
+            }
         case CoreEvidence.serviceSheetPdf:
             VStack(alignment: .leading, spacing: 8) {
                 Text("Sube el PDF de la hoja de servicio firmada.")
@@ -419,6 +424,27 @@ struct EvidenceCaptureFlowView: View {
             formAction
         default:
             EmptyView()
+        }
+    }
+
+    /// Con campos, las fotos ya viajaron una por una desde «Fotos por campo»:
+    /// este paso solo avanza cuando no falta ninguna.
+    private var camposStepAction: some View {
+        let faltan = CoreEvidence.missingCampoPhotos(campos)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(faltan == 0
+                 ? "Ya documentaste todos los campos. Continúa al siguiente paso."
+                 : "Toma las fotos de cada campo en «Fotos por campo». Faltan \(faltan).")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button {
+                Task { await sendEvidencePhotos() }
+            } label: {
+                Label(busy ? "Enviando…" : "Continuar", systemImage: "arrow.right.circle.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(busy || faltan > 0)
         }
     }
 
@@ -836,20 +862,34 @@ struct EvidenceCaptureFlowView: View {
 
     @MainActor
     private func sendEvidencePhotos() async {
-        guard pendingPhotos.count >= photoRequired else {
-            errorText = "Se requieren al menos \(photoRequired) fotos de evidencia."
-            return
+        if porCampos {
+            let faltan = CoreEvidence.missingCampoPhotos(campos)
+            guard faltan == 0 else {
+                errorText = faltan == 1 ? "Falta 1 foto por campo." : "Faltan \(faltan) fotos por campo."
+                return
+            }
+        } else {
+            guard pendingPhotos.count >= photoRequired else {
+                errorText = "Se requieren al menos \(photoRequired) fotos de evidencia."
+                return
+            }
         }
         busy = true
         defer { busy = false }
-        let urls = pendingPhotos.map(\.dataUrl)
-        let geo: [PhotoGeoPayload?] = pendingPhotos.map { photo -> PhotoGeoPayload? in
-            guard let coords = photo.coords else { return nil }
-            return PhotoGeoPayload(
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-                capturedAt: CoreFormat.isoString(photo.capturedAt)
-            )
+        // Con campos se manda la lista vacía: el API ya las tiene por campo, y
+        // reenviarlas las guardaba otra vez como fotos libres (salían dobles en el ZIP).
+        var urls: [String] = []
+        var geo: [PhotoGeoPayload?] = []
+        if !porCampos {
+            urls = pendingPhotos.map(\.dataUrl)
+            geo = pendingPhotos.map { photo -> PhotoGeoPayload? in
+                guard let coords = photo.coords else { return nil }
+                return PhotoGeoPayload(
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
+                    capturedAt: CoreFormat.isoString(photo.capturedAt)
+                )
+            }
         }
         let correction = isCorrection
         do {
