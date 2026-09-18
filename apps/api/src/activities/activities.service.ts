@@ -9,7 +9,14 @@ import { generateTicketReportPdf } from './ticket-report-pdf.js';
 import { generateActivitiesReportPdf } from './activities-report-pdf.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, isFinishedStatus } from './activity-status.js';
-import { normalizarPrioridad, tiemposDto } from './actividad-tiempos.js';
+import { esCerrada, normalizarPrioridad, tiemposDto } from './actividad-tiempos.js';
+import {
+  camposDePeriodo,
+  periodoDeActividad,
+  periodoDto,
+  validarPeriodo,
+  type PeriodoValidado,
+} from './actividad-periodo.js';
 import {
   assertCanCancel,
   cleanMotivo,
@@ -86,14 +93,25 @@ export class ActivitiesService {
       8,
       Math.max(2, Math.round(Number(createActivityDto.evidencePhotoRequired ?? 4)) || 4),
     );
-    const { evidencePhotoRequired: _drop, assignmentCharge: _charge, ...rest } = createActivityDto as CreateActivityDto & {
+    const {
+      evidencePhotoRequired: _drop,
+      assignmentCharge: _charge,
+      periodoInicio,
+      periodoFin,
+      ...rest
+    } = createActivityDto as CreateActivityDto & {
       evidencePhotoRequired?: number;
       assignmentCharge?: string;
     };
+    // Periodo de varios días: la fecha máxima y la entrega pasan a ser el fin de su último día.
+    const leido = validarPeriodo(periodoInicio, periodoFin);
+    if (leido.error) throw new BadRequestException(leido.error);
+    const conPeriodo = leido.periodo ? camposDePeriodo(leido.periodo, rest.fechaInicio ?? null) : {};
 
     const activity = await this.prisma['activity'].create({
       data: {
         ...rest,
+        ...conPeriodo,
         anNumber,
         companyId: resolvedCompanyId,
         evidencePhotoRequired,
@@ -405,6 +423,7 @@ export class ActivitiesService {
           },
         },
         project: { select: { id: true, title: true } },
+        projectMilestone: { select: { id: true, name: true } },
         serviceSheet: true,
         // Actividad comercial: su cotización, para abrirla desde el detalle.
         cotizacion: { select: { id: true, quoteNumber: true, status: true, total: true, segmento: true } },
@@ -453,6 +472,8 @@ export class ActivitiesService {
       minutosPlan: propia?.minutosPlan ?? null,
       minutosReales: propia?.minutosReales ?? null,
       excedida: Boolean(propia?.excedida),
+      /** «Día 3 de 10 · termina vie 25 sep»; null si es de un solo momento. */
+      periodo: periodoDto(activity, ahora, esCerrada(activity.estatus)),
     };
   }
 
@@ -999,6 +1020,8 @@ export class ActivitiesService {
         companyId: true,
         fechaInicio: true,
         fechaMaxima: true,
+        periodoInicio: true,
+        periodoFin: true,
       },
     });
     assertCompanyAccess(prev, companyId, 'Actividad');
@@ -1021,23 +1044,59 @@ export class ActivitiesService {
       }
     }
 
+    // Periodo: lo que mande el cliente, o el que ya tenía. Mientras tenga periodo, la fecha
+    // máxima y la entrega son el fin de su último día, venga lo que venga en esos campos
+    // (el formulario viejo manda inicio = entrega = máximo y la daría por tarde a la hora citada).
+    const tocaPeriodo = 'periodoInicio' in updateActivityDto || 'periodoFin' in updateActivityDto;
+    const { periodoInicio: pIni, periodoFin: pFin, ...sinPeriodo } = updateActivityDto;
+    updateActivityDto = sinPeriodo;
+    let periodoData: Record<string, Date | null> = {};
+    const previo = periodoDeActividad(prev);
+    const quitar = tocaPeriodo && (pIni === null || pIni === '') && (pFin === null || pFin === '');
+    if (quitar) {
+      periodoData = { periodoInicio: null, periodoFin: null };
+    } else {
+      const leido: PeriodoValidado = tocaPeriodo
+        ? validarPeriodo(pIni ?? previo?.inicio ?? null, pFin ?? previo?.fin ?? null)
+        : { periodo: previo };
+      if (leido.error) throw new BadRequestException(leido.error);
+      if (leido.periodo) {
+        const campos = camposDePeriodo(leido.periodo, updateActivityDto.fechaInicio ?? prev?.fechaInicio ?? null);
+        // El inicio se revisa si lo mandaron o si se tocó el periodo: se conserva si cae dentro,
+        // si no pasa al primer día a las 9:00.
+        const { fechaInicio: inicioDelPeriodo, ...resto } = campos;
+        periodoData = { ...resto };
+        if (updateActivityDto.fechaInicio != null || tocaPeriodo) {
+          updateActivityDto = { ...updateActivityDto, fechaInicio: inicioDelPeriodo.toISOString() };
+        }
+        delete updateActivityDto.fechaMaxima;
+        delete updateActivityDto.fechaEntregaEsperada;
+      }
+    }
+
     if (updateActivityDto.fechaInicio != null && updateActivityDto.fechaInicio !== '') {
       const start = new Date(updateActivityDto.fechaInicio);
       if (Number.isNaN(start.getTime())) {
         throw new BadRequestException('fechaInicio inválida');
       }
-      const effectiveMax = updateActivityDto.fechaMaxima
-        ? new Date(updateActivityDto.fechaMaxima)
-        : prev?.fechaMaxima
-          ? new Date(prev.fechaMaxima)
-          : null;
+      const effectiveMax = periodoData.fechaMaxima
+        ? periodoData.fechaMaxima
+        : updateActivityDto.fechaMaxima
+          ? new Date(updateActivityDto.fechaMaxima)
+          : prev?.fechaMaxima
+            ? new Date(prev.fechaMaxima)
+            : null;
       if (effectiveMax && !Number.isNaN(effectiveMax.getTime()) && start.getTime() > effectiveMax.getTime()) {
         throw new BadRequestException('fechaInicio no puede ser posterior a fechaMaxima');
       }
+      // La ventana solo aplica a un inicio **nuevo** y sin periodo: al editar otra cosa de una
+      // actividad de varios días el formulario reenvía el inicio que ya tenía (días atrás), y con
+      // periodo el inicio lo ordena el periodo que eligió quien la asigna.
+      const mismoInicio = prev?.fechaInicio != null && new Date(prev.fechaInicio).getTime() === start.getTime();
       const startOfYesterday = new Date();
       startOfYesterday.setHours(0, 0, 0, 0);
       startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-      if (start.getTime() < startOfYesterday.getTime()) {
+      if (!periodoData.periodoInicio && !mismoInicio && start.getTime() < startOfYesterday.getTime()) {
         throw new BadRequestException('fechaInicio está fuera de la ventana permitida');
       }
     }
@@ -1085,7 +1144,7 @@ export class ActivitiesService {
 
     const updatedActivity = await this.prisma['activity'].update({
       where: { id },
-      data: updateActivityDto,
+      data: { ...updateActivityDto, ...periodoData },
       include: { responsable: { select: { nombre: true, id: true } } },
     });
 

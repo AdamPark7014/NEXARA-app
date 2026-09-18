@@ -297,6 +297,8 @@ model ProjectMilestone {
 
   project     OperationalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   responsable User?              @relation("ProjectMilestoneResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  /// Actividades programadas para ejecutar esta etapa (con su periodo).
+  activities  Activity[]
 
   @@index([projectId])
   @@index([responsableId])
@@ -1076,6 +1078,14 @@ model Activity {
   fechaMaxima             DateTime?
   fechaEntregaEsperada    DateTime?
   fechaFinalizacion       DateTime?
+  /// Periodo de ejecución (días de calendario, ambos incluidos). Una actividad de varios días
+  /// sigue en la pizarra cada día hasta su fin y no se da por tarde antes: con periodo,
+  /// `fechaMaxima` y `fechaEntregaEsperada` son el fin de `periodoFin` (ver `actividad-periodo.ts`).
+  periodoInicio           DateTime?                @db.Date
+  periodoFin              DateTime?                @db.Date
+  /// Etapa del cronograma del proyecto que ejecuta esta actividad («Programar actividades del proyecto»).
+  projectMilestoneId      Int?
+  projectMilestone        ProjectMilestone?        @relation(fields: [projectMilestoneId], references: [id], onDelete: SetNull)
   clientSurveyRequestedAt DateTime?
   clientSurveyCompletedAt DateTime?
   ticketReportUrl         String?                  @db.VarChar(500)
@@ -1144,6 +1154,7 @@ model Activity {
   @@unique([companyId, anNumber])
   @@index([cotizacionId])
   @@index([projectId])
+  @@index([projectMilestoneId])
   @@index([clientId])
   @@index([companyId])
   @@index([acsEnteredAt])

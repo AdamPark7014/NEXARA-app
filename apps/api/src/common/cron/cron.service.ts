@@ -9,6 +9,7 @@ import { WebhooksService } from '../../webhooks/webhooks.service.js';
 import { DomainEventBusService } from '../../domain-events/domain-event-bus.service.js';
 import { OPEN_ACTIVITY_WHERE } from '../../activities/activity-status.js';
 import { normalizarPrioridad } from '../../activities/actividad-tiempos.js';
+import { finDelPeriodo, periodoDeActividad } from '../../activities/actividad-periodo.js';
 
 @Injectable()
 export class CronService {
@@ -431,6 +432,8 @@ export class CronService {
         fechaAsignacion: true,
         responsableId: true,
         companyId: true,
+        periodoInicio: true,
+        periodoFin: true,
       },
       take: 200,
     });
@@ -438,6 +441,9 @@ export class CronService {
     const limits: Record<string, number> = { ALTA: 8, MEDIA: 24, BAJA: 72 };
     const breaches = open.filter((t) => {
       if (!t.fechaAsignacion) return false;
+      // Actividad con periodo: su plazo es el fin del periodo, no «24 h desde que se asignó».
+      const periodo = periodoDeActividad(t);
+      if (periodo && finDelPeriodo(periodo.fin).getTime() >= now) return false;
       const hrs = (now - t.fechaAsignacion.getTime()) / 3600000;
       return hrs > (limits[normalizarPrioridad(t.prioridad)] ?? 24);
     });

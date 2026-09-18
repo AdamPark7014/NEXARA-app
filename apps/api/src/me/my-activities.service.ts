@@ -18,6 +18,7 @@ import {
   type Prioridad,
   type Semaforo,
 } from '../activities/actividad-tiempos.js';
+import { periodoDto, type PeriodoDto } from '../activities/actividad-periodo.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { extrasDeAsignacion, reportesDirectos } from './equipo-alcance.js';
 
@@ -148,6 +149,11 @@ export type MyActivityItem = {
   asignadoPor: { id: number; nombre: string } | null;
   /** Inició teniendo otra del día con más prioridad sin terminar. */
   saltoPrioridad: boolean;
+  /**
+   * Actividad de varios días: «Día 3 de 10 · termina vie 25 sep». Sigue aquí cada día
+   * hasta que se termina; null si es de un solo momento.
+   */
+  periodo: PeriodoDto | null;
 };
 
 export type MyActivitiesResponse = {
@@ -821,6 +827,8 @@ export class MyActivitiesService {
             fechaMaxima: true,
             fechaAsignacion: true,
             fechaFinalizacion: true,
+            periodoInicio: true,
+            periodoFin: true,
             tiempoEstimadoMin: true,
             tiempoMaximoMin: true,
             creadoPorId: true,
@@ -925,6 +933,7 @@ export class MyActivitiesService {
             ? { id: a.creador.id, nombre: a.creador.nombre }
             : null,
         saltoPrioridad: tiempos.saltoPrioridad,
+        periodo: periodoDto(a, ahora, isClosed(a.estatus)),
       };
     });
 
@@ -934,11 +943,13 @@ export class MyActivitiesService {
     const seguimiento = items
       .filter((item) => !isClosed(item.estatus) && repartida(item))
       .sort((a, b) => a.fechaAsignacion.getTime() - b.fechaAsignacion.getTime());
-    // Orden sugerido (nunca bloquea): lo ya iniciado primero, luego orden personal,
-    // prioridad, fecha programada y fecha de asignación.
+    // Orden sugerido (nunca bloquea): lo ya iniciado primero, lo que todavía no empieza
+    // su periodo al final, luego orden personal, prioridad, fecha programada y asignación.
+    const programada = (item: MyActivityItem) => Number(item.periodo?.estado === 'programada');
     open.sort(
       (a, b) =>
         Number(Boolean(b.inicioRealAt)) - Number(Boolean(a.inicioRealAt)) ||
+        programada(a) - programada(b) ||
         nullsLast(a.orden, b.orden) ||
         rangoPrioridad(a.prioridad) - rangoPrioridad(b.prioridad) ||
         nullsLast(a.fechaInicio?.getTime(), b.fechaInicio?.getTime()) ||

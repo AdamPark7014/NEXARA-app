@@ -1,5 +1,6 @@
 import type { GeocercaAlerta } from "@/lib/activity-geofence";
 import type { Aceptacion, Semaforo } from "@/lib/actividad-tiempos";
+import type { PeriodoActividad } from "@/lib/actividad-periodo";
 import { erpFetch } from "@/lib/erp-api";
 
 /** Fila de Mis actividades (GET /me/activities). Fechas en ISO. */
@@ -64,6 +65,8 @@ export type MyActivityItem = {
   finRealAt?: string | null;
   asignadoPor?: { id: number; nombre: string } | null;
   saltoPrioridad?: boolean;
+  /** Actividad de varios días: «Día 3 de 10 · termina vie 25 sep» (lo calcula la API). */
+  periodo?: PeriodoActividad | null;
 };
 
 export type MyActivitiesResponse = {
