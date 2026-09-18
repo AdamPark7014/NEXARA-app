@@ -390,8 +390,7 @@ fun EvidenceCaptureFlow(
     }
 
     fun savePhotos() {
-        // Con campos las fotos ya viajaron una por una: aquí solo se avanza el
-        // paso mandando lo que quedó guardado por campo.
+        // Con campos las fotos ya viajaron una por una: aquí solo se avanza el paso.
         if (!porCampos && drafts.size < photoRequired) {
             error = "Se requieren al menos $photoRequired fotos (tienes ${drafts.size})"
             return
@@ -400,7 +399,9 @@ fun EvidenceCaptureFlow(
             busy = true
             error = null
             try {
-                val urls = if (porCampos) CoreActivityRules.camposFotoUrls(campos) else drafts.map { it.url }
+                // Con campos se manda la lista vacía: el API ya las tiene por campo, y
+                // reenviarlas las guardaba otra vez como fotos libres (salían dobles en el ZIP).
+                val urls = if (porCampos) emptyList() else drafts.map { it.url }
                 val geo: List<EvidencePhotoGeoRequest?> =
                     if (porCampos) List(urls.size) { null } else drafts.map { it.geo }
                 val saved = withContext(Dispatchers.IO) {
