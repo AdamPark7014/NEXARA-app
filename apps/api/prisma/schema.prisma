@@ -297,6 +297,8 @@ model ProjectMilestone {
 
   project     OperationalProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   responsable User?              @relation("ProjectMilestoneResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  /// Actividades programadas para ejecutar esta etapa (con su periodo).
+  activities  Activity[]
 
   @@index([projectId])
   @@index([responsableId])
@@ -1077,6 +1079,14 @@ model Activity {
   fechaMaxima             DateTime?
   fechaEntregaEsperada    DateTime?
   fechaFinalizacion       DateTime?
+  /// Periodo de ejecución (días de calendario, ambos incluidos). Una actividad de varios días
+  /// sigue en la pizarra cada día hasta su fin y no se da por tarde antes: con periodo,
+  /// `fechaMaxima` y `fechaEntregaEsperada` son el fin de `periodoFin` (ver `actividad-periodo.ts`).
+  periodoInicio           DateTime?                @db.Date
+  periodoFin              DateTime?                @db.Date
+  /// Etapa del cronograma del proyecto que ejecuta esta actividad («Programar actividades del proyecto»).
+  projectMilestoneId      Int?
+  projectMilestone        ProjectMilestone?        @relation(fields: [projectMilestoneId], references: [id], onDelete: SetNull)
   clientSurveyRequestedAt DateTime?
   clientSurveyCompletedAt DateTime?
   ticketReportUrl         String?                  @db.VarChar(500)
@@ -1145,6 +1155,7 @@ model Activity {
   @@unique([companyId, anNumber])
   @@index([cotizacionId])
   @@index([projectId])
+  @@index([projectMilestoneId])
   @@index([clientId])
   @@index([companyId])
   @@index([acsEnteredAt])
@@ -2781,9 +2792,9 @@ enum NotificationType {
   ACTIVITY_OUT_OF_ZONE
   /// Un superior canceló la actividad (con motivo).
   ACTIVITY_CANCELLED
-  /// Quien la recibió la aceptó (aviso a quien la asignó).
+  /// Quien la recibió la inició (aviso a quien la asignó). El nombre se quedó de cuando se aceptaba.
   ACTIVITY_ACCEPTED_BY_ASSIGNEE
-  /// Quien la recibió la rechazó con motivo (aviso a quien asignó, responsable y jefes).
+  /// Histórico: ya no se rechazan actividades (regla del 18-09); el valor sigue en el enum de la base.
   ACTIVITY_REJECTED_BY_ASSIGNEE
   /// Pasó del tiempo estimado (aviso a la persona y a sus superiores).
   ACTIVITY_OVERTIME
@@ -5870,13 +5881,14 @@ model ActivityAssignee {
   asignadoPorId      Int?
   /// Fecha de salida del equipo; null mientras sigue asignado.
   retiradoAt         DateTime?
-  /// Aceptación de la asignación: quien la recibe confirma que la hará.
-  /// null en las dos = pendiente (la foto de entrada acepta sola, para apps viejas).
+  /// Desde el 18-09 quien la recibe no acepta ni rechaza: la inicia. Iniciarla (o subir la
+  /// foto de entrada) llena `aceptadaAt`; null = todavía no la inicia.
   aceptadaAt         DateTime?
+  /// Solo histórico: rechazos de antes de la regla (la API ya no deja rechazar).
   rechazadaAt        DateTime?
-  /// Por qué la rechazó (mínimo 10 caracteres); sigue asignada hasta que un superior la mueva.
   motivoRechazo      String?              @db.VarChar(500)
-  /// Tiempo real: la foto de entrada fija el inicio y la de salida el fin.
+  /// Tiempo real: «Iniciar actividad» (o la foto de entrada, si no lo tocó) fija el inicio;
+  /// la foto de salida, el fin.
   inicioRealAt       DateTime?
   finRealAt          DateTime?
   /// Metros entre la foto de entrada y la sucursal/cliente de la actividad (si hay coordenadas).

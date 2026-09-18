@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { esCerrada, estaExcedida, minutosPlan, minutosReales } from './actividad-tiempos.js';
+import { esMultiDia, periodoDeActividad } from './actividad-periodo.js';
 
 /**
  * Aviso de tiempo excedido (contrato del 18-09, sección B).
@@ -42,13 +43,16 @@ export class ActivityTimeAlertsService {
         activityId: true,
         horasPlan: true,
         inicioRealAt: true,
-        activity: { select: { estatus: true } },
+        activity: { select: { estatus: true, periodoInicio: true, periodoFin: true } },
       },
       take: 500,
     });
 
     for (const fila of enCurso) {
       if (esCerrada(fila.activity?.estatus)) continue;
+      // Actividad de varios días: el tiempo estimado es de una jornada y el reloj corre
+      // de corrido, así que «excedida» no significa nada. Lo tarde lo dice el fin del periodo.
+      if (esMultiDia(periodoDeActividad(fila.activity))) continue;
       const plan = minutosPlan(fila.horasPlan);
       const reales = minutosReales(fila.inicioRealAt, null, ahora);
       if (!estaExcedida(plan, reales)) continue;

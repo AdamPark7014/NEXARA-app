@@ -1,5 +1,6 @@
 import {
   aceptacionDe,
+  cambiosAlIniciar,
   debeAutoAceptar,
   estaExcedida,
   horasPlanValidas,
@@ -70,6 +71,46 @@ describe('aceptación', () => {
   it('la foto de entrada acepta sola solo si no estaba aceptada', () => {
     expect(debeAutoAceptar({})).toBe(true);
     expect(debeAutoAceptar({ aceptadaAt: hace(60) })).toBe(false);
+  });
+});
+
+describe('iniciar actividad (el asignado no acepta ni rechaza, solo inicia)', () => {
+  it('la primera vez marca el inicio real y vale como aceptación', () => {
+    const c = cambiosAlIniciar({}, { ahora: AHORA });
+    expect(c.data).toEqual({ aceptadaAt: AHORA, inicioRealAt: AHORA });
+    expect(c.recienIniciada).toBe(true);
+    expect(c.inicioRealAt).toEqual(AHORA);
+  });
+
+  it('tocarlo otra vez no mueve la hora de inicio', () => {
+    const c = cambiosAlIniciar({ aceptadaAt: hace(40), inicioRealAt: hace(30) }, { ahora: AHORA });
+    expect(c.data).toEqual({});
+    expect(c.recienIniciada).toBe(false);
+    expect(c.inicioRealAt).toEqual(hace(30));
+    expect(c.aceptadaAt).toEqual(hace(40));
+  });
+
+  it('aceptada con el botón viejo pero sin iniciar: ahora sí marca el inicio', () => {
+    const c = cambiosAlIniciar({ aceptadaAt: hace(90) }, { ahora: AHORA });
+    expect(c.data).toEqual({ inicioRealAt: AHORA });
+    expect(c.recienIniciada).toBe(true);
+  });
+
+  it('un rechazo de antes de la regla se limpia al iniciar', () => {
+    const c = cambiosAlIniciar({ rechazadaAt: hace(120) }, { ahora: AHORA });
+    expect(c.data).toEqual({
+      aceptadaAt: AHORA,
+      rechazadaAt: null,
+      motivoRechazo: null,
+      inicioRealAt: AHORA,
+    });
+  });
+
+  it('quien solo reparte un despacho no la ejecuta: sin inicio real', () => {
+    const c = cambiosAlIniciar({}, { despachador: true, ahora: AHORA });
+    expect(c.data).toEqual({ aceptadaAt: AHORA });
+    expect(c.recienIniciada).toBe(false);
+    expect(c.inicioRealAt).toBeNull();
   });
 });
 
@@ -148,6 +189,45 @@ describe('tiemposDto', () => {
     expect(dto.motivoRechazo).toContain('emergencia');
     expect(dto.minutosReales).toBeNull();
     expect(dto.semaforo).toBe('amarillo');
+  });
+});
+
+describe('periodo de varios días', () => {
+  const periodo = { periodoInicio: new Date('2026-09-16T00:00:00Z'), periodoFin: new Date('2026-09-25T00:00:00Z') };
+
+  it('el tiempo estimado no la pone roja ni excedida mientras corre', () => {
+    const dto = tiemposDto(
+      { aceptadaAt: hace(3000), inicioRealAt: hace(2900), horasPlan: '2' },
+      { prioridad: 'Media', fechaMaxima: new Date('2026-09-16T15:00:00Z'), estatus: 'En Proceso', ...periodo },
+      AHORA,
+    );
+    expect(dto.excedida).toBe(false);
+    expect(dto.semaforo).toBe('verde');
+    // Sin periodo, la misma fila está roja: excedida y pasada de su fecha máxima.
+    const sinPeriodo = tiemposDto(
+      { aceptadaAt: hace(3000), inicioRealAt: hace(2900), horasPlan: '2' },
+      { prioridad: 'Media', fechaMaxima: new Date('2026-09-16T15:00:00Z'), estatus: 'En Proceso' },
+      AHORA,
+    );
+    expect(sinPeriodo.semaforo).toBe('rojo');
+  });
+
+  it('pasado el último día sí es roja', () => {
+    expect(
+      semaforoDe({
+        prioridad: 'Media',
+        inicioRealAt: hace(60),
+        periodoInicio: '2026-09-10',
+        periodoFin: '2026-09-17',
+        ahora: AHORA,
+      }),
+    ).toBe('rojo');
+  });
+
+  it('programada para después: verde aunque sea ALTA y no haya empezado', () => {
+    expect(
+      semaforoDe({ prioridad: 'Alta', periodoInicio: '2026-09-21', periodoFin: '2026-09-30', ahora: AHORA }),
+    ).toBe('verde');
   });
 });
 

@@ -49,3 +49,24 @@ export function textoPlanVsReal(minutosPlan?: number | null, minutosReales?: num
   if (plan) return `Plan ${plan}`;
   return `Real ${real}`;
 }
+
+/** La única acción de quien recibe una actividad (regla del dueño, 18-09). */
+export const ACCION_INICIAR = "Iniciar actividad";
+
+/**
+ * ¿Se pinta «Iniciar actividad»? Quien recibe una actividad no la acepta ni la
+ * rechaza, únicamente la inicia: se ofrece mientras no tenga hora real de inicio.
+ * No a quien solo reparte un despacho (no la ejecuta) ni a lo ya cerrado. Sin
+ * `aceptacion` la API es anterior al contrato y no se pinta nada.
+ */
+export function puedeIniciar(a: {
+  aceptacion?: Aceptacion | null;
+  inicioRealAt?: string | null;
+  despachador?: boolean | null;
+  estatus?: string | null;
+}): boolean {
+  if (!a.aceptacion) return false;
+  if (a.despachador) return false;
+  if (/finalizada|completada|cancelada|aprobada/i.test(a.estatus ?? "")) return false;
+  return !a.inicioRealAt;
+}

@@ -4,6 +4,8 @@ import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/t
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { isClosedStatus } from './activity-status.js';
 import { horasPlanValidas } from './actividad-tiempos.js';
+import { camposDePeriodo, diasEntre, periodoDeActividad, sumarDias } from './actividad-periodo.js';
+import { workDateKey } from '../common/time/workday.js';
 import {
   canCancelActivity,
   canReassignFrom,
@@ -74,13 +76,24 @@ export class ActivityTeamService {
     const activity = await this.loadActivity(activityId, tenantId);
     const actual = await this.prisma.activity.findUnique({
       where: { id: activityId },
-      select: { fechaInicio: true },
+      select: { fechaInicio: true, periodoInicio: true, periodoFin: true },
     });
+
+    // Con periodo, reprogramar es recorrerlo entero: empieza el día nuevo y dura lo mismo.
+    // Si no, la fecha máxima caería en el primer día y la daría por tarde a la hora citada.
+    const periodo = periodoDeActividad(actual);
+    const agenda = periodo
+      ? (() => {
+          const inicio = workDateKey(nueva);
+          const recorrido = { inicio, fin: sumarDias(inicio, diasEntre(periodo.inicio, periodo.fin)) };
+          return camposDePeriodo(recorrido, nueva);
+        })()
+      : { fechaInicio: nueva, fechaEntregaEsperada: nueva, fechaMaxima: nueva };
 
     await this.prisma.$transaction([
       this.prisma.activity.update({
         where: { id: activityId },
-        data: { fechaInicio: nueva, fechaEntregaEsperada: nueva, fechaMaxima: nueva },
+        data: agenda,
       }),
       this.prisma.activityScheduleChange.create({
         data: {

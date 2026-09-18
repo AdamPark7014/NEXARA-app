@@ -45,6 +45,9 @@ import {
 } from "@/lib/client-sectors";
 import { TAREA_TIPOS, type ActivityKind } from "@/lib/activity-kinds";
 import { createMyActivity } from "@/lib/my-activities-api";
+import { obtenerProgramacion, type EtapaPropuesta } from "@/lib/proyectos-api";
+import { aInputFecha, hoyISO } from "@/lib/proyecto-plan";
+import { fechaCorta, periodoPorOmision, resumenDelRango } from "@/lib/actividad-periodo";
 
 type Props = {
   activityId?: number;
@@ -139,6 +142,13 @@ export default function OpsActivityForm({
 
   const [tareaOtroOpen, setTareaOtroOpen] = useState(false);
 
+  // Periodo: en una actividad de proyecto se propone la etapa que corre (o la ventana del
+  // proyecto) para no tener que cargarla cada día. Mientras nadie toque las fechas, cambiar
+  // de proyecto vuelve a proponer.
+  const [etapas, setEtapas] = useState<EtapaPropuesta[] | null>(null);
+  const [ventanaProyecto, setVentanaProyecto] = useState<{ inicio: string | null; fin: string | null } | null>(null);
+  const [periodoAuto, setPeriodoAuto] = useState(true);
+
   // «Qué hay que fotografiar»: se definen al crear y se mandan en cuanto existe la actividad.
   // La API pide gestión de actividades para definirlos; editar va en el detalle de la actividad.
   const puedeDefinirCampos = !isEdit && hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE);
@@ -148,6 +158,7 @@ export default function OpsActivityForm({
   const [camposPendiente, setCamposPendiente] = useState<{ id: number; error: string } | null>(null);
   const erroresCampos = useMemo(() => validarCampos(campos), [campos]);
   const camposTituloId = useId();
+  const periodoId = useId();
 
   const needsClientPicker = coreKind === "servicio" || coreKind === "comercial";
   const filtersProjectsBySector = coreKind === "proyecto" || coreKind === "obra";
@@ -274,6 +285,61 @@ export default function OpsActivityForm({
       .finally(() => setLoading(false));
   }, [token, isEdit, activityId]);
 
+  // Etapas y ventana del proyecto elegido: de ahí sale el periodo por omisión.
+  const proyectoElegido = form.projectMode === "with_project" ? form.projectId : "";
+  useEffect(() => {
+    if (!token || !proyectoElegido) {
+      setEtapas(null);
+      setVentanaProyecto(null);
+      return;
+    }
+    let cancelado = false;
+    const fila = projects.find((p) => String(p.id) === proyectoElegido);
+    const ventanaDeFila = {
+      inicio: fila?.startDate ? aInputFecha(fila.startDate) : null,
+      fin: fila?.endDate ? aInputFecha(fila.endDate) : null,
+    };
+    void obtenerProgramacion(token, Number(proyectoElegido))
+      .then((p) => ({ etapas: p.etapas, ventana: { inicio: p.proyecto.inicio, fin: p.proyecto.fin } }))
+      // Sin permiso para leer el cronograma (o API vieja): basta la ventana del proyecto.
+      .catch(() => ({ etapas: [] as EtapaPropuesta[], ventana: ventanaDeFila }))
+      .then(({ etapas: lista, ventana }) => {
+        if (cancelado) return;
+        setEtapas(lista);
+        setVentanaProyecto(ventana);
+        if (isEdit || !periodoAuto) return;
+        const propuesta = periodoPorOmision(lista, ventana, hoyISO());
+        if (!propuesta) return;
+        setForm((prev) => ({
+          ...prev,
+          fecha: propuesta.inicio,
+          periodoFin: propuesta.fin,
+          projectMilestoneId: propuesta.hitoId ? String(propuesta.hitoId) : "",
+        }));
+      });
+    return () => {
+      cancelado = true;
+    };
+    // `periodoAuto` se lee al llegar la respuesta; volver a pedir por él no aporta nada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, proyectoElegido, projects, isEdit]);
+
+  /** Elegir etapa pone su periodo (desde hoy si ya empezó); «todo el proyecto», la ventana. */
+  const elegirEtapa = (hitoId: string) => {
+    const hoy = hoyISO();
+    const etapa = etapas?.find((e) => String(e.hitoId) === hitoId);
+    // Una etapa que ya pasó se propone tal cual: quien asigna ve que quedó atrás.
+    const propuesta = etapa
+      ? (periodoPorOmision([etapa], {}, hoy) ?? { inicio: etapa.inicio, fin: etapa.fin })
+      : periodoPorOmision([], ventanaProyecto ?? {}, hoy);
+    setPeriodoAuto(false);
+    setForm((prev) => ({
+      ...prev,
+      projectMilestoneId: etapa ? hitoId : "",
+      ...(propuesta ? { fecha: propuesta.inicio, periodoFin: propuesta.fin } : {}),
+    }));
+  };
+
   const prefillFromRequest = useCallback((request: ClientTicketRequestRow) => {
     const isPreventiveInventory = request.requestType === "PREVENTIVE_INVENTORY";
     const clientId = request.client?.id ? String(request.client.id) : "";
@@ -349,6 +415,14 @@ export default function OpsActivityForm({
       setError("Indica día y hora de la agenda");
       return;
     }
+    if (form.periodoFin && !form.fecha) {
+      setError("Indica el primer día del periodo");
+      return;
+    }
+    if (form.periodoFin && form.fecha && form.periodoFin < form.fecha) {
+      setError("El último día del periodo no puede ser anterior al primero");
+      return;
+    }
     if (puedeDefinirCampos && campos.length > 0) {
       setCamposIntentado(true);
       if (hayErrores(erroresCampos)) {
@@ -415,6 +489,7 @@ export default function OpsActivityForm({
           : "OT creada",
     );
     setForm({ ...EMPTY_ACTIVITY_FORM });
+    setPeriodoAuto(true);
     setCampos([]);
     setCamposIntentado(false);
     setTareaOtroOpen(false);
@@ -642,6 +717,8 @@ export default function OpsActivityForm({
                   ...form,
                   projectId,
                   clientId: project ? String(project.client.id) : "",
+                  // La etapa es de otro proyecto: se vuelve a proponer con el nuevo.
+                  projectMilestoneId: "",
                 });
               }}
             >
@@ -793,15 +870,42 @@ export default function OpsActivityForm({
           onChange={(prioridad) => setForm({ ...form, prioridad })}
         />
         <div>
-          <label style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}>
-            {requireSchedule || tone === "core" ? "Día" : "Fecha"}
+          <label
+            htmlFor={`${periodoId}-del`}
+            style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}
+          >
+            {form.periodoFin ? "Del" : requireSchedule || tone === "core" ? "Día" : "Fecha"}
           </label>
           <input
+            id={`${periodoId}-del`}
             className="input"
             type="date"
             value={form.fecha}
-            onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+            onChange={(e) => {
+              setPeriodoAuto(false);
+              setForm({ ...form, fecha: e.target.value });
+            }}
             required={requireSchedule}
+          />
+        </div>
+        <div>
+          <label
+            htmlFor={`${periodoId}-al`}
+            style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}
+          >
+            Al (último día, si dura varios)
+          </label>
+          <input
+            id={`${periodoId}-al`}
+            className="input"
+            type="date"
+            value={form.periodoFin}
+            min={form.fecha || undefined}
+            onChange={(e) => {
+              setPeriodoAuto(false);
+              setForm({ ...form, periodoFin: e.target.value });
+            }}
+            aria-describedby={`${periodoId}-resumen`}
           />
         </div>
         {(requireSchedule || tone === "core") && (
@@ -818,6 +922,48 @@ export default function OpsActivityForm({
             />
           </div>
         )}
+        <div style={{ gridColumn: "1 / -1", display: "grid", gap: 6 }}>
+          {etapas && etapas.length > 0 ? (
+            <label style={{ display: "grid", gap: 4, maxWidth: 460 }}>
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Etapa del proyecto</span>
+              <select
+                className="input"
+                value={form.projectMilestoneId}
+                onChange={(e) => elegirEtapa(e.target.value)}
+              >
+                <option value="">
+                  Todo el proyecto
+                  {ventanaProyecto?.inicio && ventanaProyecto?.fin
+                    ? ` · ${fechaCorta(ventanaProyecto.inicio)} – ${fechaCorta(ventanaProyecto.fin)}`
+                    : ""}
+                </option>
+                {etapas.map((etapa) => (
+                  <option key={etapa.hitoId} value={etapa.hitoId}>
+                    {etapa.nombre} · {fechaCorta(etapa.inicio)} – {fechaCorta(etapa.fin)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <p
+            id={`${periodoId}-resumen`}
+            style={{
+              margin: 0,
+              fontSize: 12.5,
+              lineHeight: 1.4,
+              color:
+                form.periodoFin && form.fecha && form.periodoFin < form.fecha
+                  ? "var(--danger)"
+                  : "var(--text-secondary)",
+            }}
+          >
+            {form.periodoFin && form.fecha
+              ? form.periodoFin < form.fecha
+                ? "El último día no puede ser anterior al primero."
+                : `${resumenDelRango({ inicio: form.fecha, fin: form.periodoFin })}. Se queda en la pizarra cada día hasta terminarla y no cuenta como atrasada antes del último día.`
+              : "Sin último día es de un solo momento (día y hora). Si el trabajo dura varios días, pon hasta cuándo: así no hay que cargarla cada día."}
+          </p>
+        </div>
         <input
           className="input"
           type="number"

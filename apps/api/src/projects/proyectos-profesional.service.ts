@@ -22,6 +22,8 @@ import {
   resolveRequiredCompanyId,
 } from '../common/tenant/tenant-scope.js';
 import { fueraDeAlcance, mensajeFueraDeAlcance } from './proyecto-equipo-alcance.js';
+import { periodoDto } from '../activities/actividad-periodo.js';
+import { esCerrada } from '../activities/actividad-tiempos.js';
 import type { Alcanzador } from '../me/equipo-alcance.js';
 import {
   calcularSalud,
@@ -90,6 +92,9 @@ const detalleInclude = {
       fechaInicio: true,
       fechaEntregaEsperada: true,
       fechaFinalizacion: true,
+      periodoInicio: true,
+      periodoFin: true,
+      projectMilestoneId: true,
       responsable: { select: personaSelect },
     },
     orderBy: { fechaAsignacion: 'desc' as const },
@@ -219,6 +224,7 @@ export class ProyectosProfesionalService {
     assertCompanyAccess(proyecto as any, tenantId, 'Proyecto');
 
     const p = proyecto as NonNullable<typeof proyecto>;
+    const ahora = new Date();
     return {
       ...p,
       budgetAmount: p.budgetAmount == null ? null : Number(p.budgetAmount),
@@ -226,6 +232,8 @@ export class ProyectosProfesionalService {
         ? { ...p.cotizacion, total: p.cotizacion.total == null ? null : Number(p.cotizacion.total) }
         : null,
       members: p.members.map((m) => ({ ...m, rolEtiqueta: etiquetaRolEquipo(m.role) })),
+      // «Día 3 de 10 · termina vie 25 sep» por actividad, igual que en la pizarra.
+      activities: p.activities.map((a) => ({ ...a, periodo: periodoDto(a, ahora, esCerrada(a.estatus)) })),
       resumen: this.resumen(p as any),
     };
   }
@@ -257,8 +265,9 @@ export class ProyectosProfesionalService {
   /**
    * Solo puedes poner en un proyecto a gente a la que alcanzas. Se valida en el
    * servidor y no solo en el desplegable: el desplegable lo puede saltar cualquiera.
+   * (También lo usa «Programar actividades del proyecto» al asignar cada etapa.)
    */
-  private async assertAlcanzaA(
+  async assertAlcanzaA(
     actor: { id: number; isSuperAdmin?: boolean } | null | undefined,
     ids: Array<number | null | undefined>,
   ) {

@@ -24,6 +24,7 @@ struct MisActividadesView: View {
     @State private var despacho: DespachoTarget?
     @State private var reprogramar: ReprogramarTarget?
     @State private var notice: String?
+    @State private var iniciandoId: Int?
 
     private var open: [MyActivityItem] { data?.open ?? [] }
     private var done: [MyActivityItem] { data?.doneToday ?? [] }
@@ -188,7 +189,8 @@ struct MisActividadesView: View {
         let estatus = CoreStatusUI.estatus(item.estatus)
         let first = index == 0
         let lugar = item.cliente ?? item.proyecto ?? ""
-        let whenText = CoreFormat.when(item.fechaInicio ?? item.fechaMaxima) ?? "Sin fecha"
+        // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
+        let whenText = item.periodo?.texto ?? CoreFormat.when(item.fechaInicio ?? item.fechaMaxima) ?? "Sin fecha"
         let estimate = CoreFormat.minutes(item.tiempoEstimadoMin)
         let cap = CoreFormat.minutes(item.tiempoMaximoMin)
         let timeText = estimate.map { $0 + (cap.map { " · tope " + $0 } ?? "") }
@@ -246,6 +248,15 @@ struct MisActividadesView: View {
                 }
 
                 HStack(spacing: 8) {
+                    // Quien la recibe no la acepta ni la rechaza: únicamente la inicia.
+                    if item.puedeIniciar {
+                        Button(iniciandoId == item.id ? "Iniciando…" : MyActivityItem.accionIniciar) {
+                            Task { await iniciar(item) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(CorePalette.green)
+                        .disabled(iniciandoId != nil)
+                    }
                     if item.porRepartir == true {
                         Button("Repartir →") {
                             despacho = DespachoTarget(
@@ -286,6 +297,21 @@ struct MisActividadesView: View {
                 .fill(priority.color)
                 .frame(width: 4)
                 .padding(.vertical, 14)
+        }
+    }
+
+    /// Guarda la hora real de inicio; lo siguiente es la foto de entrada en «Abrir →».
+    @MainActor
+    private func iniciar(_ item: MyActivityItem) async {
+        iniciandoId = item.id
+        defer { iniciandoId = nil }
+        do {
+            try await CoreRepository.shared.iniciarActividad(activityId: item.id)
+            error = nil
+            notice = "Actividad iniciada. Sigue con la foto de entrada en «Abrir»."
+            await load()
+        } catch {
+            self.error = error.toUserMessage(fallback: "No se pudo iniciar la actividad")
         }
     }
 

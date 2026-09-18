@@ -116,6 +116,8 @@ data class ActivityDto(
     val minutosReales: Double? = null,
     val excedida: Boolean? = null,
     val asignadoPor: ActivityPersonRefDto? = null,
+    /** Actividad de varios días (la frase la arma la API). */
+    val periodo: ActivityPeriodoDto? = null,
 )
 
 /** `{ id, nombre }` con nombre opcional: una persona borrada no debe tumbar el detalle. */
@@ -164,6 +166,10 @@ data class ActivityAssigneeRefDto(
     val retiradoAt: String? = null,
     val indicaciones: String? = null,
     val user: ActivityAssigneeUserDto? = null,
+    // Contrato B por persona (la API vieja no lo manda): decide si se ofrece «Iniciar actividad».
+    /** PENDIENTE | ACEPTADA | RECHAZADA */
+    val aceptacion: String? = null,
+    val inicioRealAt: String? = null,
 )
 
 data class ActivityAssigneeUserDto(
