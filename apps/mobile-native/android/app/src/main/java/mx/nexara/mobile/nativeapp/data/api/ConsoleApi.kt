@@ -164,6 +164,10 @@ data class ActivityAssigneeRefDto(
     val retiradoAt: String? = null,
     val indicaciones: String? = null,
     val user: ActivityAssigneeUserDto? = null,
+    // Contrato B por persona (la API vieja no lo manda): decide si se ofrece «Iniciar actividad».
+    /** PENDIENTE | ACEPTADA | RECHAZADA */
+    val aceptacion: String? = null,
+    val inicioRealAt: String? = null,
 )
 
 data class ActivityAssigneeUserDto(

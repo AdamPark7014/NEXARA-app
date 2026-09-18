@@ -1,7 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.console.activities
 
 /**
- * Semáforo, plan contra real y aceptación de una actividad (contrato B).
+ * Semáforo, plan contra real e inicio de una actividad (contrato B).
  *
  * El semáforo lo calcula el servidor (`semaforo: rojo | amarillo | verde`):
  * aquí solo se le pone nombre y color. Lo que no venga se ignora — la app
@@ -19,19 +19,15 @@ object ActivitySemaforo {
     const val ACEPTADA = "ACEPTADA"
     const val RECHAZADA = "RECHAZADA"
 
-    /** El motivo lo pide el API con 10 caracteres mínimo. */
-    const val MIN_MOTIVO_RECHAZO = 10
-
     /**
-     * Quien recibe una actividad no decide si la toma: la empieza. Por eso la
-     * acción principal dice «Comenzar actividad» y la secundaria «No puedo
-     * tomarla» — esta última usa el mismo endpoint de rechazo con su motivo.
+     * Regla del dueño (18-09): «El asignado de realizar una tarea/actividad no
+     * tiene opción de aceptar o rechazar las actividades asignadas, únicamente
+     * iniciarlas». Esta es la única acción; marca la hora real de inicio.
      */
-    const val ACCION_COMENZAR = "Comenzar actividad"
-    const val ACCION_NO_PUEDO = "No puedo tomarla"
+    const val ACCION_INICIAR = "Iniciar actividad"
 
-    /** Chip de la lista mientras no la ha comenzado. */
-    const val CHIP_SIN_COMENZAR = "Sin comenzar"
+    /** Chip mientras no la ha iniciado. */
+    const val CHIP_SIN_INICIAR = "Sin iniciar"
 
     data class Luz(val clave: String, val etiqueta: String, val color: Long)
 
@@ -63,24 +59,41 @@ object ActivitySemaforo {
     fun planRealColor(excedida: Boolean?): Long =
         if (excedida == true) CoreActivityRules.ROJO else CoreActivityRules.GRIS
 
-    fun estaPendienteDeAceptar(aceptacion: String?): Boolean =
-        aceptacion?.trim()?.uppercase() == PENDIENTE
+    /**
+     * ¿Se ofrece «Iniciar actividad»? Mientras no tenga hora real de inicio, aunque
+     * la hubiera aceptado o rechazado antes de la regla. No a quien solo reparte un
+     * despacho ni a lo ya cerrado. `aceptacion == null` = API anterior al contrato:
+     * no se sabe, y la foto de entrada sigue marcando el inicio como siempre.
+     */
+    fun puedeIniciar(
+        aceptacion: String?,
+        inicioRealAt: String?,
+        despachador: Boolean?,
+        estatus: String?,
+    ): Boolean {
+        if (aceptacion.isNullOrBlank()) return false
+        if (despachador == true) return false
+        if (CERRADA.containsMatchIn(estatus.orEmpty())) return false
+        return inicioRealAt.isNullOrBlank()
+    }
 
+    /** Para quien asignó: todavía no la inicia (misma regla, sin despacho). */
+    fun sinIniciar(aceptacion: String?, inicioRealAt: String?, estatus: String?): Boolean =
+        puedeIniciar(aceptacion, inicioRealAt, despachador = false, estatus = estatus)
+
+    /** Histórico: rechazos de antes de la regla del 18-09 (ya no se puede rechazar). */
     fun fueRechazada(aceptacion: String?): Boolean =
         aceptacion?.trim()?.uppercase() == RECHAZADA
 
-    /** «No la tomaste: no tengo la llave del site» (sin motivo, solo «No la tomaste»). */
+    /** Lo lee quien asignó: «Rechazada: no tengo la llave del site». */
     fun rechazadaTexto(motivo: String?): String {
         val m = motivo?.trim().orEmpty()
-        return if (m.isEmpty()) "No la tomaste" else "No la tomaste: $m"
+        return if (m.isEmpty()) "Rechazada" else "Rechazada: $m"
     }
+
+    private val CERRADA = Regex("finalizada|completada|cancelada|aprobada", RegexOption.IGNORE_CASE)
 
     /** «Asignada por Luis»; `null` si nadie la asignó (auto-asignada). */
     fun asignadaPorTexto(nombre: String?): String? =
         nombre?.trim()?.takeIf { it.isNotEmpty() }?.let { "Asignada por ${CoreActivityRules.shortName(it)}" }
-
-    fun motivoRechazoOk(motivo: String?): Boolean =
-        motivoLimpio(motivo).length >= MIN_MOTIVO_RECHAZO
-
-    fun motivoLimpio(motivo: String?): String = motivo?.trim().orEmpty()
 }

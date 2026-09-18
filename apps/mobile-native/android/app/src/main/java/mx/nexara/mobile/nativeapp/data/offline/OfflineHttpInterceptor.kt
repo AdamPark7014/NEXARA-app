@@ -130,19 +130,25 @@ class OfflineHttpInterceptor(
          * actividades, justificar faltas): sin conexión deben fallar a la vista, no quedar en cola
          * dando por hecho algo que la API todavía puede rechazar.
          *
-         * Aceptar o rechazar una actividad va en la misma lista: las dos avisan a quien la asignó
-         * y a los jefes, y encoladas dejarían la tarjeta diciendo «aceptada» sin que nadie lo sepa.
+         * Iniciar una actividad (y `/aceptar`, su nombre en apps viejas) va en la misma lista: guarda
+         * la hora real de inicio, y encolada quedaría la hora de cuando regrese la señal. Sin red, la
+         * foto de entrada es la que marca el inicio al subirse.
          */
         private val SOLO_EN_LINEA = listOf(
             "/desactivar", "/reactivar", "/cancelar", "/reasignar", "/justificaciones",
             "/aceptar", "/rechazar",
         )
+
+        /** `/iniciar` solo de actividades propias: otras rutas con ese nombre sí se pueden encolar. */
+        private fun esIniciarActividad(ruta: String): Boolean =
+            ruta.contains("/me/activities/") && ruta.trimEnd('/').endsWith("/iniciar")
         private val BORRADO_SOLO_EN_LINEA = listOf("/ventas/clientes/", "/operational-projects/")
 
         fun isQueueable(url: String, method: String = "POST"): Boolean {
             val ruta = url.substringBefore('?')
             if (NOT_QUEUEABLE.any { ruta.contains(it) }) return false
             if (SOLO_EN_LINEA.any { ruta.contains(it) }) return false
+            if (esIniciarActividad(ruta)) return false
             if (method.equals("DELETE", ignoreCase = true) && BORRADO_SOLO_EN_LINEA.any { ruta.contains(it) }) return false
             return true
         }

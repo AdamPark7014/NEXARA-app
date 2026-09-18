@@ -519,6 +519,27 @@ struct MyActivityItem: Decodable, Identifiable, Hashable {
     let porRepartir: Bool?
     let pasadaA: [MyActivityPassedTo]?
     let ultimaReprogramacion: MyActivityReschedule?
+    /// Contrato B (opcional: la API vieja no lo manda). PENDIENTE | ACEPTADA | RECHAZADA.
+    let aceptacion: String?
+    /// Hora real en que la inició; nil = sin iniciar.
+    let inicioRealAt: String?
+
+    /// Única acción de quien recibe una actividad (regla del dueño, 18-09).
+    static let accionIniciar = "Iniciar actividad"
+
+    /// Quien la recibe no la acepta ni la rechaza, únicamente la inicia: se ofrece
+    /// mientras no tenga inicio real. No a quien solo reparte un despacho ni a lo
+    /// cerrado. Sin `aceptacion` la API es anterior al contrato: no se pinta.
+    var puedeIniciar: Bool {
+        guard let aceptacion, !aceptacion.isEmpty else { return false }
+        if despachador == true { return false }
+        let cerrada = (estatus ?? "").range(
+            of: "finalizada|completada|cancelada|aprobada",
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+        if cerrada { return false }
+        return (inicioRealAt ?? "").isEmpty
+    }
 
     var displayTitle: String {
         let title = (titulo ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
