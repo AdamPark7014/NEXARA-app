@@ -156,3 +156,35 @@ export function folioSinCadena(folio: string): string {
   const match = (folio || '').trim().toUpperCase().match(/^(NEX-[A-Z]{2}\d{8}-\d{4,})/);
   return match ? match[1]! : (folio || '').trim().toUpperCase();
 }
+
+/** ¿El folio sigue la nomenclatura (`NEX-LJ75100126-0007…`) o es de los viejos (`NXR-2026-763366`)? */
+export function tieneNomenclatura(folio: string | null | undefined): boolean {
+  return /^NEX-[A-Z]{2}\d{8}-\d{4,}(?:-[A-Z]{2}(?:\.[A-Z]{2})*)?(?:-R\d+)?$/.test(
+    String(folio ?? '').trim().toUpperCase(),
+  );
+}
+
+export type CotizacionParaRefolio = {
+  status: unknown;
+  quoteNumber: string;
+  folioNomenclatura?: string | null;
+  sentAt?: Date | string | null;
+  folioEnviado?: string | null;
+  createdById?: number | null;
+  deletedAt?: Date | string | null;
+};
+
+/**
+ * ¿A este borrador se le puede (y se le debe) dar folio con nomenclatura?
+ *
+ * Solo borradores que **nunca salieron**: un folio que ya vio el cliente no se cambia, aunque sea de
+ * los viejos. Y solo si hay autor, porque el folio es de esa persona.
+ */
+export function necesitaRefolio(quote: CotizacionParaRefolio): boolean {
+  if (quote.deletedAt) return false;
+  const estado = String(quote.status ?? '').trim().toUpperCase();
+  if (estado !== 'DRAFT' && estado !== 'BORRADOR') return false;
+  if (quote.sentAt || quote.folioEnviado) return false;
+  if (!quote.createdById) return false;
+  return !(quote.folioNomenclatura && tieneNomenclatura(quote.quoteNumber));
+}
