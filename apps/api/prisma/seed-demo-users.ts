@@ -116,15 +116,6 @@ const DEMO_USERS: DemoUser[] = [
     password: 'Nexara!NX302',
   },
   {
-    nombre: 'José Iván Tapia Reyes',
-    email: 'ivan.tapia@nexara.com.mx',
-    roleKey: 'ing_campo',
-    departmentName: 'Ingeniería',
-    employeeNumber: 'NX-401',
-    puesto: 'Ingeniero de Campo',
-    password: 'Nexara!NX401',
-  },
-  {
     nombre: 'Iván Camargo Cañete',
     email: 'administracion.ventas@nexara.com.mx',
     roleKey: 'ing_campo',
@@ -132,15 +123,6 @@ const DEMO_USERS: DemoUser[] = [
     employeeNumber: 'NX-402',
     puesto: 'Ingeniero de Campo',
     password: 'Nexara!NX402',
-  },
-  {
-    nombre: 'Isaías García Bustamante',
-    email: 'isaias.garcia@nexara.com.mx',
-    roleKey: 'ing_campo',
-    departmentName: 'Ingeniería',
-    employeeNumber: 'NX-403',
-    puesto: 'Ingeniero de Campo',
-    password: 'Nexara!NX403',
   },
   {
     nombre: 'Joan Sebastián Sánchez Espinoza',
@@ -159,15 +141,6 @@ const DEMO_USERS: DemoUser[] = [
     employeeNumber: 'NX-405',
     puesto: 'Ingeniera de Soporte',
     password: 'Nexara!NX405',
-  },
-  {
-    nombre: 'Ariadna Sierra Gallardo',
-    email: 'ariadna.sierra@nexara.com.mx',
-    roleKey: 'ing_campo',
-    departmentName: 'Ingeniería',
-    employeeNumber: 'NX-406',
-    puesto: 'Ingeniera de Campo',
-    password: 'Nexara!NX406',
   },
   {
     nombre: 'Alejandro González Bustamante',
