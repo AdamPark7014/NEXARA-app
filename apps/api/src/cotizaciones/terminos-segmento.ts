@@ -90,30 +90,30 @@ export function terminosDeCotizacion(input: TerminosInput): Terminos {
 
   if (modalidad === 'LICITACION') {
     lineas.push(
-      'Las condiciones de pago, garantías y penalizaciones se rigen por las bases de la licitación y por el contrato que de ella derive.',
-      'Esta propuesta se presenta como parte del procedimiento de contratación; su vigencia es la que señalen las bases.',
-      'No se solicita anticipo salvo que las bases lo prevean expresamente.',
-      'Cualquier trabajo fuera del catálogo de conceptos de las bases se cotiza por separado.',
+      'Condiciones de pago: las condiciones de pago, garantías y penalizaciones se rigen por las bases de la licitación y por el contrato que de ella derive.',
+      'Alcance de la propuesta: se presenta como parte del procedimiento de contratación; su vigencia es la que señalen las bases.',
+      'Anticipo: no se solicita anticipo salvo que las bases lo prevean expresamente.',
+      'Trabajos adicionales: cualquier trabajo fuera del catálogo de conceptos de las bases se cotiza por separado.',
     );
   } else if (modalidad === 'SUMINISTRO_INSTALACION') {
     lineas.push(
       `Forma de pago: ${pct} % de anticipo para confirmar el pedido y programar los trabajos; el ${resto} % restante contra entrega del sistema en operación.`,
-      'El precio cotizado cubre el suministro de los equipos y materiales descritos y la mano de obra de instalación, configuración y puesta en marcha señalada en el alcance.',
-      'No se incluyen trabajos de obra civil, canalizaciones no identificadas durante el levantamiento, adecuaciones eléctricas distintas a las descritas, ni el servicio de Internet del cliente.',
-      'La programación de los trabajos está sujeta a la disponibilidad de inventario y al acceso al sitio en los horarios acordados con el cliente.',
+      'Alcance de la cotización: el precio cotizado cubre el suministro de los equipos y materiales descritos y la mano de obra de instalación, configuración y puesta en marcha señalada en el alcance.',
+      'No incluye: trabajos de obra civil, canalizaciones no identificadas durante el levantamiento, adecuaciones eléctricas distintas a las descritas, ni el servicio de Internet del cliente.',
+      'Disponibilidad: la programación de los trabajos está sujeta a la disponibilidad de inventario y al acceso al sitio en los horarios acordados con el cliente.',
     );
   } else {
     lineas.push(
       `Forma de pago: ${pct} % de anticipo para confirmar el pedido y programar el suministro; el ${resto} % restante contra entrega del equipo.`,
-      'El precio cotizado cubre únicamente el suministro del equipo descrito en esta propuesta.',
-      'No se incluyen servicios de instalación, configuración, puesta en marcha, capacitación, adecuaciones eléctricas o de red, ni ningún otro servicio no especificado expresamente en la cotización.',
-      'La entrega está sujeta a la disponibilidad de inventario al momento de confirmar el pedido y recibir el anticipo.',
+      'Alcance de la cotización: el precio cotizado cubre únicamente el suministro del equipo descrito en esta propuesta.',
+      'No incluye: servicios de instalación, configuración, puesta en marcha, capacitación, adecuaciones eléctricas o de red, ni ningún otro servicio no especificado expresamente en la cotización.',
+      'Disponibilidad: la entrega está sujeta a la disponibilidad de inventario al momento de confirmar el pedido y recibir el anticipo.',
     );
   }
 
   const dias = Number(input.vigenciaDias);
   if (Number.isFinite(dias) && dias > 0) {
-    lineas.push(`Vigencia de esta propuesta: ${Math.round(dias)} días naturales a partir de su fecha de emisión.`);
+    lineas.push(`Vigencia: ${Math.round(dias)} días naturales a partir de la fecha de emisión de esta propuesta.`);
   }
 
   return { modalidad, titulo: 'Términos y condiciones', lineas };
