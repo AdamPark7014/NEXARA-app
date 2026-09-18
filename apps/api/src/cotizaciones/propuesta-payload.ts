@@ -15,12 +15,13 @@
  * Módulo puro (sin Nest ni Prisma): el servicio le pasa lo que busca en la base y la API de
  * mentira de la web puede armar el mismo PDF.
  */
-import type { PropuestaPayload } from './propuesta-tecnica-pdf.js';
+import type { PropuestaGrupo, PropuestaPartida, PropuestaPayload } from './propuesta-tecnica-pdf.js';
 import { normalizarBloques } from './alcance-bloques.js';
 import { objetivoDePropuesta } from './objetivo-plantilla.js';
 import { incluyeInstalacion, type PartidaAgrupable } from './partidas-grupos.js';
 import { ETIQUETA_SEGMENTO, diasDeVigencia, normalizarSegmento, terminosDeCotizacion } from './terminos-segmento.js';
 import { ESTADO, estadoDesdeDb } from './estado-cotizacion.js';
+import { normalizarMoneda, normalizarOpciones, opcionesDePropuesta, type Firmante, type OpcionesPropuesta } from './personalizacion.js';
 
 export type CotizacionParaPropuesta = {
   quoteNumber: string;
@@ -45,13 +46,37 @@ export type CotizacionParaPropuesta = {
   subtotal?: unknown;
   taxTotal?: unknown;
   total?: unknown;
-  items?: Array<PartidaAgrupable & { discount?: unknown }> | null;
+  /** Personalización (`Cotizacion.opciones`); sin ella, el PDF de siempre. */
+  opciones?: unknown;
+  items?: Array<
+    PartidaAgrupable & { discount?: unknown; brand?: string | null; model?: string | null; imagenUrl?: string | null }
+  > | null;
 };
 
 export type ExtrasPropuesta = {
   planos?: Array<{ url?: unknown; nombre?: unknown; tipo?: unknown }>;
   participantes?: Array<{ nombre: string; rolEtiqueta: string; siglas: string }>;
   empresa?: PropuestaPayload['empresa'];
+  /** Quien la elaboró (firma «Elaboró» por omisión). */
+  autor?: Firmante | null;
+};
+
+/** Partida del PDF con las columnas opcionales (marca/modelo, imagen, descuento). */
+export type PartidaPropuesta = PropuestaPartida & {
+  marca?: string;
+  modelo?: string;
+  imagenUrl?: string;
+  descuentoPct?: number;
+};
+
+/**
+ * Payload con la personalización. Es un `PropuestaPayload` válido (lo de más se ignora): el
+ * generador lo pinta según `opciones` cuando lo sepa leer; mientras, lo que se apaga ya no llega
+ * (alcance, planos, términos y firmas vacíos no se imprimen).
+ */
+export type PropuestaPayloadPersonalizada = Omit<PropuestaPayload, 'grupos'> & {
+  grupos: Array<Omit<PropuestaGrupo, 'partidas'> & { partidas: PartidaPropuesta[] }>;
+  opciones: OpcionesPropuesta;
 };
 
 function fecha(valor: unknown): string | null {
@@ -65,7 +90,9 @@ const numero = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function payloadDePropuesta(quote: CotizacionParaPropuesta, extras: ExtrasPropuesta = {}): PropuestaPayload {
+export function payloadDePropuesta(quote: CotizacionParaPropuesta, extras: ExtrasPropuesta = {}): PropuestaPayloadPersonalizada {
+  const personalizacion = normalizarOpciones(quote.opciones);
+  const { secciones } = personalizacion;
   const partidas = (quote.items ?? []).map((item) => ({
     ...item,
     qty: numero(item.qty),
@@ -99,16 +126,32 @@ export function payloadDePropuesta(quote: CotizacionParaPropuesta, extras: Extra
   // cotiza las acomodó (como en la propuesta modelo), no agrupadas por tipo.
   // El TOTAL de cada renglón es antes de IVA, como en el modelo: así la columna suma el SUBTOTAL.
   // (`CotizacionItem.lineTotal` guarda el importe con IVA, por eso no se usa aquí.)
-  const filas = partidas.map((p) => {
+  const filas = partidas.map((p): PartidaPropuesta => {
     const base = p.qty * p.unitPrice + p.laborHours * p.laborRate;
+    const descuento = Math.min(100, Math.max(0, p.discount));
+    const marca = String(p.brand ?? '').trim();
+    const modelo = String(p.model ?? '').trim();
+    const imagenUrl = String(p.imagenUrl ?? '').trim();
     return {
       name: String(p.name ?? ''),
       description: p.description ?? null,
       unit: p.unit ?? null,
       qty: p.qty,
       unitPrice: p.unitPrice,
-      lineTotal: Math.round(base * (1 - Math.min(100, Math.max(0, p.discount)) / 100) * 100) / 100,
+      lineTotal: Math.round(base * (1 - descuento / 100) * 100) / 100,
+      ...(marca ? { marca } : {}),
+      ...(modelo ? { modelo } : {}),
+      ...(imagenUrl ? { imagenUrl } : {}),
+      ...(descuento > 0 ? { descuentoPct: descuento } : {}),
     };
+  });
+  const terminos = terminosDeCotizacion({
+    segmento,
+    incluyeInstalacion: incluyeInstalacion(partidas),
+    anticipoPct: quote.depositPercent,
+    vigenciaDias,
+    personalizados: quote.note,
+    condiciones: personalizacion.condiciones,
   });
 
   return {
@@ -132,27 +175,24 @@ export function payloadDePropuesta(quote: CotizacionParaPropuesta, extras: Extra
       objetivoLibre: quote.objetivo,
       vigenciaDias,
     }),
-    alcance,
-    planos: (extras.planos ?? []).map((p) => ({
-      url: String(p?.url ?? ''),
-      nombre: p?.nombre != null ? String(p.nombre) : null,
-      tipo: p?.tipo != null ? String(p.tipo) : null,
-    })),
+    alcance: secciones.alcance ? alcance : [],
+    planos: secciones.planos
+      ? (extras.planos ?? []).map((p) => ({
+          url: String(p?.url ?? ''),
+          nombre: p?.nombre != null ? String(p.nombre) : null,
+          tipo: p?.tipo != null ? String(p.tipo) : null,
+        }))
+      : [],
     grupos: filas.length
       ? [{ grupo: 'PARTIDAS', etiqueta: 'Partidas', subtotal: filas.reduce((a, p) => a + p.lineTotal, 0), partidas: filas }]
       : [],
     subtotal: numero(quote.subtotal),
     iva: numero(quote.taxTotal),
     total: numero(quote.total),
-    currency: quote.currency || 'MXN',
-    terminos: terminosDeCotizacion({
-      segmento,
-      incluyeInstalacion: incluyeInstalacion(partidas),
-      anticipoPct: quote.depositPercent,
-      vigenciaDias,
-      personalizados: quote.note,
-    }),
-    participantes: extras.participantes ?? [],
+    currency: normalizarMoneda(quote.currency),
+    terminos: secciones.terminos ? terminos : { ...terminos, lineas: [], partes: [] },
+    participantes: secciones.firma ? (extras.participantes ?? []) : [],
     empresa: extras.empresa ?? null,
+    opciones: opcionesDePropuesta(personalizacion, { moneda: quote.currency, autor: extras.autor ?? null }),
   };
 }

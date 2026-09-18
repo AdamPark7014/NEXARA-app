@@ -44,6 +44,11 @@ export class CotizacionItemDto {
   @IsString()
   model?: string;
 
+  /** Imagen del producto (columna opcional «Imagen» del PDF). */
+  @IsOptional()
+  @IsString()
+  imagenUrl?: string;
+
   @IsOptional()
   @IsString()
   sku?: string;

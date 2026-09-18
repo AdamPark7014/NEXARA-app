@@ -21,6 +21,7 @@ export type RawCotizacionItem = {
   description?: string | null;
   scope?: string | null;
   brand?: string | null;
+  imagenUrl?: string | null;
   model?: string | null;
   sku?: string | null;
   partNumber?: string | null;
@@ -62,6 +63,7 @@ export type NormalizedCotizacionItem = {
   description: string | null;
   scope: string | null;
   brand: string | null;
+  imagenUrl: string | null;
   model: string | null;
   sku: string | null;
   partNumber: string | null;
@@ -201,6 +203,7 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
       description: item.description?.trim() || null,
       scope: item.scope?.trim() || null,
       brand: item.brand?.trim() || null,
+      imagenUrl: typeof item.imagenUrl === 'string' ? item.imagenUrl.trim().slice(0, 500) || null : null,
       model: item.model?.trim() || null,
       sku: item.sku?.trim() || null,
       partNumber: item.partNumber?.trim() || null,

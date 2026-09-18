@@ -29,6 +29,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { validarTamanoBorrador } from './propuesta-vista-previa.js';
+import { GuardarPlantillaDto } from './dto/plantilla-cotizacion.dto.js';
 
 @Controller('cotizaciones')
 @UseGuards(UrlAccessGuard)
@@ -78,6 +79,49 @@ export class CotizacionesController {
   @Get('plantillas')
   plantillas() {
     return this.cotizacionesService.plantillas();
+  }
+
+  /**
+   * Plantillas de cotización de la empresa («Nueva desde plantilla»). Van antes de `:id` para que
+   * Nest no tome «plantillas-guardadas» por un id.
+   */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('plantillas-guardadas')
+  listarPlantillasGuardadas(@CurrentCompanyId() companyId: number | null) {
+    return this.cotizacionesService.listarPlantillasGuardadas(companyId);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('plantillas-guardadas/:plantillaId')
+  plantillaGuardada(
+    @Param('plantillaId', ParseIntPipe) plantillaId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.plantillaGuardada(plantillaId, companyId);
+  }
+
+  /** «Guardar como plantilla»: de la cotización guardada, sin cliente ni folio. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post('plantillas-guardadas')
+  guardarPlantilla(
+    @CurrentUser() user: any,
+    @Body() dto: GuardarPlantillaDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.guardarPlantilla(dto, user?.id, companyId);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post('plantillas-guardadas/:plantillaId/archivar')
+  archivarPlantilla(
+    @Param('plantillaId', ParseIntPipe) plantillaId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.archivarPlantilla(plantillaId, companyId);
   }
 
   /** Detalle de Core: estado y segmento en español, términos, partidas agrupadas y participantes. */

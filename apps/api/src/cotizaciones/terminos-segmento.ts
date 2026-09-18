@@ -102,7 +102,8 @@ const TITULO_LICITACION: Record<ClaveTermino, string> = {
 const ORDEN_LICITACION: ClaveTermino[] = ['pago', 'alcance', 'disponibilidad', 'noIncluye', 'otras'];
 
 export type ParteTermino = {
-  clave: ClaveTermino | 'vigencia';
+  /** `entrega` y `garantia` salen de las condiciones comerciales (se editan en «Personalizar»). */
+  clave: ClaveTermino | 'vigencia' | 'entrega' | 'garantia';
   titulo: string;
   texto: string;
   /** Lo escribió quien cotiza (no es el texto del segmento). */
@@ -220,16 +221,28 @@ export function escribirTerminosPersonalizados(partes: Partial<Record<ClaveTermi
     .join('\n\n');
 }
 
+/** Condiciones comerciales de «Personalizar» (`Cotizacion.opciones.condiciones`). Vacío = no se imprime. */
+export type CondicionesTerminos = { formaPago?: string | null; tiempoEntrega?: string | null; garantia?: string | null };
+
+const minusculaInicial = (t: string) => (/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]/.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
+
 /** Términos y condiciones listos para imprimir en el PDF y mostrar en la web. */
 export function terminosDeCotizacion(
   input: TerminosInput & {
     /** Lo reescrito por quien cotiza (`Cotizacion.note`). */
     personalizados?: string | null;
+    condiciones?: CondicionesTerminos | null;
   },
 ): Terminos {
   const modalidad = modalidadDeCotizacion(input);
   const omision = terminosPorOmision(input);
   const propios = leerTerminosPersonalizados(input.personalizados);
+  const condicion = (v?: string | null) => String(v ?? '').replace(/\s+/g, ' ').trim();
+  const formaPago = condicion(input.condiciones?.formaPago);
+  // El medio de pago completa el texto del anticipo (si quien cotiza no lo reescribió a mano).
+  if (formaPago && omision.pago) {
+    omision.pago = `${omision.pago} Pago mediante ${minusculaInicial(formaPago).replace(/[.;]*$/, '')}.`;
+  }
 
   const licitacion = modalidad === 'LICITACION';
   const partes: ParteTermino[] = [];
@@ -243,6 +256,11 @@ export function terminosDeCotizacion(
       personalizado: propios[clave] != null && propios[clave] !== omision[clave],
     });
   }
+
+  const entrega = condicion(input.condiciones?.tiempoEntrega);
+  if (entrega) partes.push({ clave: 'entrega', titulo: 'Tiempo de entrega', texto: entrega, personalizado: false });
+  const garantia = condicion(input.condiciones?.garantia);
+  if (garantia) partes.push({ clave: 'garantia', titulo: 'Garantía', texto: garantia, personalizado: false });
 
   const dias = Number(input.vigenciaDias);
   if (Number.isFinite(dias) && dias > 0) {

@@ -60,6 +60,12 @@ import { isPdfUrl, pasoCubiertoPorCotizacion } from '../activities/evidence/evid
 import { generarPropuestaTecnicaPdf, type SeccionesPropuesta } from './propuesta-tecnica-pdf.js';
 import { payloadDePropuesta } from './propuesta-payload.js';
 import { LIMITES_VISTA_PREVIA, borradorSobreGuardada } from './propuesta-vista-previa.js';
+import {
+  condicionesPorOmision,
+  contenidoDesdeCotizacion,
+  normalizarContenidoPlantilla,
+  normalizarOpciones,
+} from './personalizacion.js';
 import { leerObjetivo, objetivoDePropuesta } from './objetivo-plantilla.js';
 import { normalizarBloques, plantillasDeCotizacion } from './alcance-bloques.js';
 import { ordenarPlanos } from './planos-cotizacion.js';
@@ -308,6 +314,10 @@ export class CotizacionesService {
       companyId: resolvedCompanyId,
       items: { create: this.buildItemData(items) },
     };
+    // `opciones` es JSON nuevo (migración 20260918180000): sin él, el PDF de siempre.
+    if (dto.opciones) {
+      (data as Record<string, unknown>)['opciones'] = normalizarOpciones(dto.opciones) as unknown as Prisma.InputJsonValue;
+    }
 
     let created: Awaited<ReturnType<typeof this.db.cotizacion.create>>;
     try {
@@ -452,6 +462,7 @@ export class CotizacionesService {
       quote.createdById ? this.core.claveDePersona(quote.createdById) : Promise.resolve(null),
     ]);
     const vigenciaDias = diasDeVigencia(quote.issueDate, quote.validUntil);
+    const opciones = normalizarOpciones(quote.opciones);
     const conNomenclatura = Boolean(quote.folioNomenclatura) && tieneNomenclatura(quote.quoteNumber);
     const claveAutor = quote.folioNomenclatura || autor?.clave || null;
 
@@ -494,6 +505,7 @@ export class CotizacionesService {
         anticipoPct: quote.depositPercent,
         vigenciaDias,
         personalizados: quote.note,
+        condiciones: opciones.condiciones,
       }),
       // …y los del segmento sin tocar, para que el editor pueda «Restablecer».
       terminosBase: terminosDeCotizacion({
@@ -501,7 +513,12 @@ export class CotizacionesService {
         incluyeInstalacion: instalacion,
         anticipoPct: quote.depositPercent,
         vigenciaDias,
+        condiciones: opciones.condiciones,
       }),
+      // Personalización (siempre completa: sin guardar, los valores de siempre) y lo que sugiere
+      // el segmento para las condiciones comerciales.
+      opciones,
+      condicionesSugeridas: condicionesPorOmision(segmento),
       grupos: agruparPartidas(partidas),
       totalesPorGrupo: totalesPorGrupo(partidas),
       participantes,
@@ -678,6 +695,7 @@ export class CotizacionesService {
       currency: dto.currency?.trim(),
       depositPercent: dto.depositPercent,
       note: dto.note?.trim(),
+      opciones: dto.opciones ? (normalizarOpciones(dto.opciones) as unknown as Prisma.InputJsonValue) : undefined,
     };
 
     const status = normalizeStatus(dto.status);
@@ -1377,6 +1395,86 @@ export class CotizacionesService {
   }
 
   /** Versiones guardadas (para la línea de tiempo de la web). */
+  // ─── Plantillas de cotización (por empresa) ───────────────────────────
+
+  /** El delegado de Prisma de las plantillas (modelo nuevo de la migración 20260918180000). */
+  private get plantillasDb() {
+    return (this.db as unknown as {
+      cotizacionPlantilla: {
+        findMany: (args: unknown) => Promise<any[]>;
+        findFirst: (args: unknown) => Promise<any | null>;
+        create: (args: unknown) => Promise<any>;
+        update: (args: unknown) => Promise<any>;
+      };
+    }).cotizacionPlantilla;
+  }
+
+  /** Plantillas vivas de la empresa, más recientes primero (sin el contenido pesado). */
+  async listarPlantillasGuardadas(companyId?: number | null) {
+    const resolved = await resolveRequiredCompanyId(this.db, companyId);
+    const filas = await this.plantillasDb.findMany({
+      where: { companyId: resolved, archivadaAt: null },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    });
+    return filas.map((f) => {
+      const contenido = normalizarContenidoPlantilla(f.contenido);
+      return {
+        id: f.id,
+        nombre: f.nombre,
+        segmento: contenido.segmento,
+        conPartidas: Boolean(f.conPartidas),
+        partidas: contenido.items.length,
+        projectName: contenido.projectName,
+        createdById: f.createdById ?? null,
+        updatedAt: f.updatedAt,
+      };
+    });
+  }
+
+  /** Una plantilla completa, para empezar una cotización nueva desde ella. */
+  async plantillaGuardada(id: number, companyId?: number | null) {
+    const resolved = await resolveRequiredCompanyId(this.db, companyId);
+    const fila = await this.plantillasDb.findFirst({ where: { id, companyId: resolved, archivadaAt: null } });
+    if (!fila) throw new NotFoundException('Plantilla no encontrada');
+    return { id: fila.id, nombre: fila.nombre, conPartidas: Boolean(fila.conPartidas), contenido: normalizarContenidoPlantilla(fila.contenido) };
+  }
+
+  /**
+   * «Guardar como plantilla»: toma la cotización **guardada** (el editor guarda antes) y se queda con
+   * sus textos, secciones, columnas, términos y, si se pide, sus partidas. Nada del cliente ni del folio.
+   */
+  async guardarPlantilla(
+    datos: { nombre: string; cotizacionId: number; conPartidas?: boolean },
+    userId?: number,
+    companyId?: number | null,
+  ) {
+    const nombre = String(datos.nombre ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (nombre.length < 2) throw new BadRequestException('Ponle nombre a la plantilla.');
+    const quote = await this.findOne(Number(datos.cotizacionId), companyId);
+    const contenido = contenidoDesdeCotizacion(quote as any, Boolean(datos.conPartidas));
+    const fila = await this.plantillasDb.create({
+      data: {
+        companyId: quote.companyId,
+        nombre,
+        segmento: contenido.segmento,
+        contenido: contenido as unknown as Prisma.InputJsonValue,
+        conPartidas: Boolean(datos.conPartidas) && contenido.items.length > 0,
+        createdById: userId ?? null,
+      },
+    });
+    return { id: fila.id, nombre: fila.nombre, conPartidas: Boolean(fila.conPartidas), partidas: contenido.items.length };
+  }
+
+  /** Quita una plantilla de la lista (se archiva: las cotizaciones hechas con ella no cambian). */
+  async archivarPlantilla(id: number, companyId?: number | null) {
+    const resolved = await resolveRequiredCompanyId(this.db, companyId);
+    const fila = await this.plantillasDb.findFirst({ where: { id, companyId: resolved, archivadaAt: null } });
+    if (!fila) throw new NotFoundException('Plantilla no encontrada');
+    await this.plantillasDb.update({ where: { id }, data: { archivadaAt: new Date() } });
+    return { id, archivada: true };
+  }
+
   async versiones(id: number, companyId?: number | null) {
     await this.findOne(id, companyId);
     const filas = await this.db.cotizacionVersion.findMany({
@@ -1639,6 +1737,11 @@ export class CotizacionesService {
       payloadDePropuesta(quote, {
         planos,
         participantes: participantes.map((p) => ({ nombre: p.nombre, rolEtiqueta: p.rolEtiqueta, siglas: p.siglas })),
+        // Firma «Elaboró» por omisión: quien la hizo, con su puesto.
+        autor: (() => {
+          const elaboro = participantes.find((p) => p.rol === 'ELABORO');
+          return elaboro?.nombre ? { nombre: elaboro.nombre, ...(elaboro.puesto ? { cargo: elaboro.puesto } : {}) } : null;
+        })(),
         empresa: company
           ? {
               legalName: company.legalName,
