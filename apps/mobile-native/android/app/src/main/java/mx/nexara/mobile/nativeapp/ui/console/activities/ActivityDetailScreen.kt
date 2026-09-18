@@ -146,23 +146,19 @@ fun ActivityDetailScreen(
     /** Sube tras cancelar o pasar la actividad: se vuelve a pedir el detalle y las acciones. */
     var recarga by remember(activity.id) { mutableIntStateOf(0) }
 
-    // Contrato B: comenzarla desde el detalle (es donde cae el push «actividad nueva»).
+    // Regla del 18-09: quien la recibe no la acepta ni la rechaza, únicamente la inicia.
+    // Aquí cae el push de «actividad nueva», así que el botón también vive en el detalle.
     val coreRepo = remember(context) { CoreActivitiesRepository(context) }
-    var aceptando by remember(activity.id) { mutableStateOf(false) }
-    var aceptacionError by remember(activity.id) { mutableStateOf<String?>(null) }
-    var rechazando by remember(activity.id) { mutableStateOf(false) }
-
-    if (rechazando) {
-        RechazarActividadDialog(
-            titulo = detail.titulo,
-            onDismiss = { rechazando = false },
-            onConfirm = { motivo ->
-                withContext(Dispatchers.IO) { coreRepo.rechazarActividad(detail.id, motivo) }
-                rechazando = false
-                recarga++
-            },
-        )
-    }
+    var iniciando by remember(activity.id) { mutableStateOf(false) }
+    var iniciarError by remember(activity.id) { mutableStateOf<String?>(null) }
+    val miFila = detail.assignees?.firstOrNull { it.user?.id == user?.id && it.retiradoAt.isNullOrBlank() }
+    val puedeIniciar = miFila != null && ActivitySemaforo.puedeIniciar(
+        aceptacion = miFila.aceptacion,
+        inicioRealAt = miFila.inicioRealAt,
+        // El LEAD de un despacho solo reparte: no la ejecuta.
+        despachador = detail.assignmentCharge == "despacho" && miFila.rol == "LEAD",
+        estatus = detail.estatus,
+    )
 
     LaunchedEffect(activity.id, recarga) {
         loadingDetail = true
@@ -291,36 +287,31 @@ fun ActivityDetailScreen(
                             onFechaFinChange = { editFechaFin = it },
                             onSave = { saveActivityEdits() },
                             topContent = {
-                                // Contrato B: comenzarla desde el detalle (aquí cae el push).
+                                // «Iniciar actividad»: la única acción de quien la recibe (aquí cae el push).
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (ActivitySemaforo.estaPendienteDeAceptar(detail.aceptacion)) {
-                                        AceptacionBanner(
-                                            onAceptar = {
+                                    if (puedeIniciar) {
+                                        IniciarActividadBanner(
+                                            onIniciar = {
                                                 scope.launch {
-                                                    aceptando = true
-                                                    aceptacionError = null
+                                                    iniciando = true
+                                                    iniciarError = null
                                                     try {
                                                         withContext(Dispatchers.IO) {
-                                                            coreRepo.aceptarActividad(detail.id)
+                                                            coreRepo.iniciarActividad(detail.id)
                                                         }
                                                         recarga++
-                                                        snackbarHostState.showSnackbar("Actividad comenzada")
+                                                        // Lo siguiente es la foto de entrada.
+                                                        selectedTab = ACTIVITY_TAB_EVIDENCIAS
+                                                        snackbarHostState.showSnackbar("Actividad iniciada")
                                                     } catch (e: Exception) {
-                                                        aceptacionError = e.toUserMessage("No se pudo comenzar")
+                                                        iniciarError = e.toUserMessage("No se pudo iniciar la actividad")
                                                     } finally {
-                                                        aceptando = false
+                                                        iniciando = false
                                                     }
                                                 }
                                             },
-                                            onRechazar = { rechazando = true },
-                                            guardando = aceptando,
-                                            error = aceptacionError,
-                                        )
-                                    }
-                                    if (ActivitySemaforo.fueRechazada(detail.aceptacion)) {
-                                        SoftNote(
-                                            text = ActivitySemaforo.rechazadaTexto(detail.motivoRechazo),
-                                            color = CoreActivityRules.ROJO,
+                                            guardando = iniciando,
+                                            error = iniciarError,
                                         )
                                     }
                                     val luz = ActivitySemaforo.luz(detail.semaforo)
