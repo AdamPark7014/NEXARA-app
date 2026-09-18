@@ -101,6 +101,14 @@ export const PROYECTOS_CORE_URL_RULES: UrlRule[] = [
   { path: '/api/proyectos/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
 ];
 
+/**
+ * Revisar el uniforme en la foto de entrada (KPI del equipo). Se abre a quien revisa checadas
+ * ajenas; quién puede de verdad (sus jefes, dirección y RH, nunca él mismo) lo decide el servicio.
+ */
+export const ATTENDANCE_UNIFORME_URL_RULES: UrlRule[] = [
+  { path: '/api/attendance/*/uniforme', methods: ['PATCH'], scope: 'approve' },
+];
+
 /** Core ola1 — páginas shell (Pizarra / Asistencias / Chat / Actividades). */
 export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/erp/mis-actividades', scope: 'write' },
@@ -132,6 +140,7 @@ export const CORE_OLA1_URL_RULES: UrlRule[] = [
   // APIs que usan las apps y la web Core para cualquier persona del equipo. Lo fino (solo lo
   // propio, solo jefes aprueban, solo quien ejecuta sube evidencia) lo decide cada servicio.
   ...SELF_ATTENDANCE_URL_RULES,
+  ...ATTENDANCE_UNIFORME_URL_RULES,
   // Aprobar/rechazar comida a destiempo: el servicio solo deja a los jefes de esa persona.
   { path: '/api/lunch-breaks/**', methods: ['PATCH'], scope: 'approve' },
   { path: '/api/integra/identity/me', methods: ['GET'], scope: 'read' },
@@ -206,6 +215,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/attendance/justificaciones/*', methods: ['DELETE'], scope: 'approve' },
     // Corregir la hora de una checada: dirección y RH (el servicio lo vuelve a exigir).
     { path: '/api/attendance/*/correccion', methods: ['PATCH'], scope: 'approve' },
+    ...ATTENDANCE_UNIFORME_URL_RULES,
     // Rutas específicas primero (first-match-wins)
     { path: '/erp/approvals/**', scope: 'approve' },
     { path: '/api/workflow/**', methods: ['POST'], scope: 'approve' },
@@ -284,6 +294,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
+    // Revisa el uniforme en la entrada de su gente (el servicio decide a quién).
+    ...ATTENDANCE_UNIFORME_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/executive', scope: 'read' },
@@ -334,6 +346,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
+    // Revisa el uniforme en la entrada de su gente (el servicio decide a quién).
+    ...ATTENDANCE_UNIFORME_URL_RULES,
     { path: '/erp/**', scope: 'admin' },
     { path: '/crm/dashboard', scope: 'read' },
     { path: '/crm/quotes/**', scope: 'approve' },
@@ -372,6 +386,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
+    // Revisa el uniforme en la entrada de su gente (el servicio decide a quién).
+    ...ATTENDANCE_UNIFORME_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/approvals/**', scope: 'approve' },

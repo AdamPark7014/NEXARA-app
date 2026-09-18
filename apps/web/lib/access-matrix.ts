@@ -203,6 +203,7 @@ export type ModuleId =
   | "chat"
   | "pizarra"
   | "asistencias"
+  | "kpis-equipo"
   | "erp-clients"
   | "erp-cotizaciones"
   | "erp-proyectos"
@@ -402,6 +403,19 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "asistencias", panel: PANELS.ERP, path: "/asistencias",
     label: "Asistencias", description: "Check-in, comidas y presencia",
     icon: "🗓️", allowedRoles: ANY_INTERNAL,
+    group: "Hoy", visible: true,
+  },
+  // Vive dentro de Asistencias: la misma página abre la misma gente. En el menú solo sale a
+  // quien ve al equipo en Asistencias (`shouldShowModuleInSidebar`).
+  "kpis-equipo": {
+    id: "kpis-equipo", panel: PANELS.ERP, path: "/asistencias/indicadores",
+    label: "KPIs del equipo", description: "Retardos, uniforme, horas laboradas vs productivas",
+    icon: "📈",
+    allowedRoles: [
+      R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ARQUITECTO, R.COORD_OPERACIONES,
+      R.PROJECT_MANAGER, R.MAINTENANCE_COORDINATOR, R.SENIOR_ENGINEER, R.SUPPORT_AGENT,
+      R.NOC_LEAD, R.ADMIN_STAFF, R.HR_SPECIALIST, R.WAREHOUSE_MANAGER, R.PROCUREMENT_OFFICER,
+    ],
     group: "Hoy", visible: true,
   },
   "erp-clients": {

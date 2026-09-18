@@ -32,6 +32,10 @@ export type ChecadaValidable = {
   cierreAutomatico?: boolean | null;
   accuracyM?: number | null;
   correcciones?: CorreccionChecada[] | null;
+  /** Solo entradas: ✓ / ✗ que marcó el jefe al revisar la foto; null = sin revisar. */
+  uniformeOk?: boolean | null;
+  uniformeRevisadoPorId?: number | null;
+  uniformeRevisadoAt?: string | null;
 };
 
 export type InsigniaChecada = {
