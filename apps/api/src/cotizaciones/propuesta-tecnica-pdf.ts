@@ -7,46 +7,113 @@ import { loadNexaraLogo } from '../common/pdf/nexara-pdf-theme.js';
 /**
  * PDF «Propuesta técnica» — el documento que ve el cliente.
  *
- * Copia la propuesta que NEXARA manda a mano (`Primera cotizacion .pdf`): portada negra con la
- * marca, «PROPUESTA TÉCNICA», la versión y el índice numerado; páginas interiores con el número de
- * sección grande en verde, las formas de la esquina, la marca arriba a la derecha y la barra de
- * contacto abajo; planos a página completa en horizontal; y la hoja de cotización con membrete,
- * los recuadros de fecha/folio/validez, la franja verde de cliente y la tabla con encabezado verde.
+ * Lleva todo lo que trae la propuesta que NEXARA arma a mano (`Primera cotizacion .pdf`), con el
+ * mismo orden y el mismo lenguaje de marca, pero dibujado en vectores para que imprima nítido:
  *
- * Diferencia con el documento hecho a mano: aquí los números del objetivo salen de las partidas y
- * los términos salen de lo que se cobra, así que la propuesta no puede cobrar instalación y decir
+ * - Portada oscura y tipográfica: marca, lema, «PROPUESTA TÉCNICA», versión, índice 01–04, datos
+ *   de la propuesta (cliente, proyecto, folio, fecha) y el pie con el sitio y la leyenda legal.
+ * - Hojas interiores con el membrete del modelo redibujado: rombo negro, rombo verde y el triángulo
+ *   de la esquina; la marca arriba a la derecha; la barra de contacto con el galón verde abajo; y
+ *   «Página n de N».
+ * - 01 Objetivo, 02 Alcance (título del proyecto, introducción y bloques numerados con párrafos y
+ *   viñetas), 03 Planos a página completa y 04 Cotización (emisor, cliente, folio, fecha, validez,
+ *   tabla, totales, términos y quién la elaboró).
+ *
+ * Por qué vectores y no el arte del modelo como fondo: el membrete del modelo es un JPEG de
+ * 1017×1600 px (≈125 ppp en carta) y sale borroso al imprimir; la portada es una captura de un
+ * video. Redibujados pesan unos cuantos KB, se imprimen a cualquier resolución y el pie puede
+ * llevar los datos reales de la empresa y el número de página.
+ *
+ * Diferencia con el documento hecho a mano: los números del objetivo salen de las partidas y los
+ * términos salen de lo que se cobra, así que la propuesta no puede cobrar instalación y decir
  * «solo suministro» tres párrafos abajo.
  *
- * Sobre el peso y el tiempo (era la otra queja): el documento se escribe de una pasada —sin
- * `bufferPages` ni segundo recorrido para los pies—, la marca se embebe UNA vez y se reutiliza en
- * todas las páginas, y los planos pasan por `imagenParaPdf`, que los baja a la resolución que de
- * verdad se imprime antes de que PDFKit los toque.
+ * Tipografía: Helvetica (el modelo usa Century Gothic, pero el repositorio no trae ninguna TTF que
+ * se pueda embeber). Una sola escala: 30 número de sección · 14 títulos · 10.5 subtítulos ·
+ * 9.8 cuerpo · 7.8 tabla · 7 etiquetas.
  */
 
-const COLOR = {
-  negro: '#0B1117',
-  grafito: '#2B3238',
-  teal: '#31A88F',
-  tealVivo: '#15C1A2',
-  tealSuave: '#E7F5F1',
-  texto: '#1A1A1A',
-  gris: '#5B6B7A',
-  grisClaro: '#C2CCD4',
-  linea: '#222A31',
-  lineaSuave: '#D5DDE4',
+// ─────────────────────────────────────────────────────────────────────────────
+// Paleta y medidas
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Colores tomados del arte y del PDF modelo. */
+const C = {
+  /** Verde de marca de las formas (triángulo, galón, cuña de portada). */
+  verde: '#3CB498',
+  /** Verde para texto y rellenos sobre blanco (el «01.» y los encabezados del modelo). */
+  verdeTexto: '#309C85',
+  /** Rombo pequeño. */
+  verdeClaro: '#66C3AE',
+  /** Cuña de la portada. */
+  verdeProfundo: '#018F81',
+  tinta: '#0A0E12',
+  panel: '#0E1A21',
+  /** Barra de contacto y loma del pie. */
+  carbon: '#363636',
+  loma: '#505052',
+  texto: '#1C2126',
+  suave: '#5F6B75',
+  tenue: '#8A949C',
+  linea: '#D6DCE1',
+  cebra: '#F3F6F6',
   blanco: '#FFFFFF',
 } as const;
 
-/** Pie de la propuesta modelo. Se sobrescribe con los datos fiscales de la empresa si existen. */
+const ANCHO = 612;
+const ALTO = 792;
+
+/** Columna de texto de las hojas interiores: libre del triángulo de la esquina. */
+const COL_X = 84;
+const COL_DER = 540;
+const COL_ANCHO = COL_DER - COL_X;
+
+/** Número de sección («01.») y título de sección. */
+const NUMERO = { base: 98, tamano: 30 };
+const TITULO = { base: 126, tamano: 14 };
+/** Primer renglón del cuerpo en la hoja donde empieza la sección y en las de continuación. */
+const INICIO_SECCION = 158;
+const INICIO_CONTINUACION = 124;
+
+/** Barra de contacto: de aquí para abajo no entra el cuerpo. */
+const PIE_Y = 748;
+const LIMITE_CUERPO = 712;
+
+/** Cuerpo: 9.8 pt con renglón de 14.2 pt. */
+const CUERPO = 9.8;
+const RENGLON = 14.2;
+/** `lineGap` que da ese renglón con Helvetica (su alto de línea es 1.156 em). */
+const INTERLINEA = RENGLON - CUERPO * 1.156;
+const ENTRE_PARRAFOS = 7;
+
+/** Alto de mayúsculas de Helvetica: PDFKit pone la línea base a 0.718 em del `y` que recibe. */
+const ASCENSO = 0.718;
+const arriba = (base: number, tamano: number) => base - ASCENSO * tamano;
+
+/** Datos de la empresa cuando el perfil no los trae: los de la propuesta modelo. */
 const EMPRESA_POR_OMISION = {
   web: 'https://nexara.com.mx/',
   telefono: '(22) 01 79 18 71',
   telefonoAlterno: '(222) 696 0350',
   correo: 'gerencia@nexara.com.mx',
-  direccion: 'Malltertaiment, Explanada Puebla, Cholula, Puebla 72774, México',
+  /** Dirección del membrete de la cotización del modelo. */
+  direccion: 'Santiago Momoxpan, 72775 Cholula de Rivadavia, Pue.',
+  /** Dirección de la barra de contacto del modelo (la oficina). */
+  oficina: 'Malltertaiment, Explanada Puebla, Cholula, Puebla 72774, México',
   nombre: 'NEXARA',
   lema: 'Conectando Ecosistemas de Tecnología',
 };
+
+const SECCIONES = [
+  { numero: '01.', titulo: 'OBJETIVO DEL PROYECTO' },
+  { numero: '02.', titulo: 'ALCANCE DEL PROYECTO' },
+  { numero: '03.', titulo: 'PLANOS' },
+  { numero: '04.', titulo: 'COTIZACIÓN' },
+] as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tipos públicos
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type PropuestaPartida = {
   name: string;
@@ -65,6 +132,7 @@ export type PropuestaGrupo = {
 };
 
 export type PropuestaBloque = {
+  /** Sin título, el bloque es la introducción del alcance y no se numera. */
   titulo: string;
   texto?: string | null;
   vinetas?: string[];
@@ -75,6 +143,15 @@ export type PropuestaPlano = {
   url: string;
   nombre?: string | null;
   tipo?: string | null;
+};
+
+export type PropuestaEmpresa = {
+  legalName?: string | null;
+  tradeName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  websiteUrl?: string | null;
+  fiscalAddress?: string | null;
 };
 
 export type PropuestaPayload = {
@@ -94,6 +171,7 @@ export type PropuestaPayload = {
   objetivo: { intro: string; beneficios: string[]; cierre: string };
   alcance: PropuestaBloque[];
   planos: PropuestaPlano[];
+  /** Partidas en el orden en que se imprimen; el PDF del cliente no imprime el grupo. */
   grupos: PropuestaGrupo[];
   subtotal: number;
   iva: number;
@@ -101,57 +179,66 @@ export type PropuestaPayload = {
   currency: string;
   terminos: { titulo: string; lineas: string[] };
   participantes: Array<{ nombre: string; rolEtiqueta: string; siglas: string }>;
-  empresa?: {
-    legalName?: string | null;
-    tradeName?: string | null;
-    contactEmail?: string | null;
-    contactPhone?: string | null;
-    websiteUrl?: string | null;
-    fiscalAddress?: string | null;
-  } | null;
+  empresa?: PropuestaEmpresa | null;
 };
 
-const ANCHO = 612;
-const ALTO = 792;
-const MARGEN = 48;
-const ANCHO_UTIL = ANCHO - MARGEN * 2;
-
-/** Las páginas 01/02/03 sangran el texto para dejar pasar el triángulo verde de la esquina. */
-const MARGEN_TEXTO = 88;
-const ANCHO_TEXTO = ANCHO - MARGEN_TEXTO - MARGEN;
-
-/** Altura de la barra de contacto; el cuerpo nunca baja de aquí. */
-const ALTO_PIE = 62;
-const LIMITE_CUERPO = ALTO - ALTO_PIE - 16;
-
-const INDICE: Array<[string, string]> = [
-  ['01.', 'OBJETIVO DEL PROYECTO'],
-  ['02.', 'ALCANCE DEL PROYECTO'],
-  ['03.', 'PLANOS'],
-  ['04.', 'COTIZACIÓN'],
-];
-
 type Doc = InstanceType<typeof PDFDocument>;
-type Modo = 'portada' | 'seccion' | 'plano' | 'cotizacion';
+type Modo = 'portada' | 'seccion' | 'plano';
 
 const numeroMx = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const cantidadMx = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 });
 
-function datosEmpresa(payload: PropuestaPayload) {
-  const e = payload.empresa;
+const MESES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/** `2026-09-17` → `17 de septiembre de 2026`, sin pasar por zonas horarias. */
+export function fechaLarga(valor?: string | null): string | null {
+  const texto = String(valor ?? '').trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(texto);
+  const mes = m ? MESES[Number(m[2]) - 1] : undefined;
+  if (!m || !mes) return texto || null;
+  return `${Number(m[3])} de ${mes} de ${m[1]}`;
+}
+
+/**
+ * Datos de contacto que imprime la propuesta: los del perfil de la empresa cuando existen, los del
+ * documento modelo cuando no.
+ */
+export function datosEmpresaPropuesta(e?: PropuestaEmpresa | null) {
+  const limpio = (v?: string | null) => (v ?? '').trim() || null;
+  const telefono = limpio(e?.contactPhone);
   return {
-    nombre: (e?.tradeName || e?.legalName || EMPRESA_POR_OMISION.nombre).toUpperCase(),
-    web: e?.websiteUrl || EMPRESA_POR_OMISION.web,
-    telefono: e?.contactPhone || EMPRESA_POR_OMISION.telefono,
-    telefonoAlterno: e?.contactPhone ? null : EMPRESA_POR_OMISION.telefonoAlterno,
-    correo: e?.contactEmail || EMPRESA_POR_OMISION.correo,
-    direccion: e?.fiscalAddress || EMPRESA_POR_OMISION.direccion,
+    nombre: (limpio(e?.tradeName) || EMPRESA_POR_OMISION.nombre).toUpperCase(),
+    web: limpio(e?.websiteUrl) || EMPRESA_POR_OMISION.web,
+    telefono: telefono || EMPRESA_POR_OMISION.telefono,
+    telefonoAlterno: telefono ? null : EMPRESA_POR_OMISION.telefonoAlterno,
+    correo: limpio(e?.contactEmail) || EMPRESA_POR_OMISION.correo,
+    direccion: limpio(e?.fiscalAddress) || EMPRESA_POR_OMISION.direccion,
+    oficina: limpio(e?.fiscalAddress) || EMPRESA_POR_OMISION.oficina,
     lema: EMPRESA_POR_OMISION.lema,
   };
 }
 
-/** `www.nexara.com.mx` a partir de la URL con esquema, para la portada. */
-const dominio = (url: string) => url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+type Empresa = ReturnType<typeof datosEmpresaPropuesta>;
+
+/** `https://nexara.com.mx/` → `www.nexara.com.mx`. */
+const dominio = (url: string) =>
+  url
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/+$/, '')
+    .replace(/^(?!www\.)/i, 'www.');
 
 /**
  * Archivo local de un anexo; `null` si es remoto o no existe.
@@ -183,45 +270,26 @@ function archivoDePlano(url: string): string | null {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Estado del documento
+// Marca: se lee una vez por proceso y se embebe una vez por documento
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Marca = { imagen: unknown; ancho: number; alto: number } | null;
-
-type Ctx = {
-  doc: Doc;
-  payload: PropuestaPayload;
-  empresa: ReturnType<typeof datosEmpresa>;
-  /** Marca con alfa; embebida UNA vez y reutilizada en cada página. */
-  marca: Marca;
-  modo: Modo;
-  seccion: { numero: string; titulo: string } | null;
-  /** La sección ya pintó su título: las páginas siguientes solo repiten el número. */
-  tituloPuesto: boolean;
-  /** Re-entrancia del marco (ver `marcoDePagina`). */
-  pintandoMarco?: boolean;
-  /** El membrete de la cotización ya se pintó: las hojas siguientes son solo tabla. */
-  membretePuesto?: boolean;
-};
+type Imagen = { objeto: unknown; ancho: number; alto: number } | null;
 
 /**
  * La marca reducida, calculada una sola vez por proceso.
  *
- * El archivo son 343×374 px y 39 KB; se imprime a 62 pt en las interiores y a 200 pt en la
- * portada, así que 260 px de lado sobran. Se conserva el alfa a propósito: con una sola versión
- * sirve para la portada negra y para el membrete blanco, y el documento la embebe una vez.
+ * El archivo son 343×374 px y 39 KB; se imprime a 60 pt como máximo, así que 260 px de lado sobran.
+ * Se conserva el alfa: la misma imagen va sobre la portada oscura y sobre las hojas blancas.
  */
 let marcaEnCache: Buffer | null | undefined;
 
 function bytesDeMarca(): Buffer | null {
   if (marcaEnCache !== undefined) return marcaEnCache;
-
   const original = loadNexaraLogo();
   let salida = original;
   if (original) {
     try {
-      const preparada = bufferParaPdf(original, { maxLado: 260, maxBytes: 0, conservarAlfa: true });
-      if (preparada) salida = preparada.datos;
+      salida = bufferParaPdf(original, { maxLado: 260, maxBytes: 0, conservarAlfa: true })?.datos ?? original;
     } catch {
       /* si algo falla se embebe la marca original */
     }
@@ -231,699 +299,994 @@ function bytesDeMarca(): Buffer | null {
 }
 
 /**
- * Abre la marca una sola vez por documento.
- *
- * `doc.image(buffer, …)` con un Buffer NO reutiliza nada: cada llamada embebe el PNG otra vez —
- * siete páginas, siete copias del mismo logo. Con `doc.openImage` se obtiene el objeto embebido y
- * todas las páginas comparten el mismo XObject.
+ * `doc.image(buffer, …)` con un Buffer NO reutiliza nada: cada llamada embebe el PNG otra vez —diez
+ * hojas, diez copias de la marca—. Con `doc.openImage` todas las hojas comparten el mismo XObject.
  */
-function abrirMarca(doc: Doc): Marca {
+function abrirMarca(doc: Doc): Imagen {
   const bytes = bytesDeMarca();
   if (!bytes) return null;
   try {
-    const imagen = (doc as unknown as { openImage: (src: Buffer) => { width: number; height: number } }).openImage(
-      bytes,
-    );
-    return { imagen, ancho: imagen.width, alto: imagen.height };
+    const objeto = (doc as unknown as { openImage: (src: Buffer) => { width: number; height: number } }).openImage(bytes);
+    return { objeto, ancho: objeto.width, alto: objeto.height };
   } catch {
     return null;
   }
 }
 
-function dibujarMarca(ctx: Ctx, marca: Marca, x: number, y: number, ancho: number, colorTexto: string) {
-  if (marca) {
-    const alto = (marca.alto / marca.ancho) * ancho;
-    try {
-      (ctx.doc as unknown as { image: (src: unknown, x: number, y: number, o: object) => void }).image(
-        marca.imagen,
-        x,
-        y,
-        { width: ancho },
-      );
-      ctx.doc
-        .font('Helvetica-Bold')
-        .fontSize(ancho * 0.145)
-        .fillColor(colorTexto)
-        .text(ctx.empresa.nombre, x - 12, y + alto + 3, {
-          width: ancho + 24,
-          align: 'center',
-          characterSpacing: ancho * 0.045,
-        });
-      return alto + ancho * 0.145 + 6;
-    } catch {
-      /* marca corrupta: se cae al texto */
-    }
-  }
-  ctx.doc
-    .font('Helvetica-Bold')
-    .fontSize(ancho * 0.2)
-    .fillColor(colorTexto)
-    .text(ctx.empresa.nombre, x, y, { width: ancho + 24, characterSpacing: ancho * 0.05 });
-  return ancho * 0.28;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Adornos
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Esquina de las páginas interiores: bloque negro, rombo verde y el triángulo grande. */
-function esquinaSeccion(doc: Doc) {
-  doc.save();
-  doc.roundedRect(-16, -16, 62, 58, 16).fill(COLOR.negro);
-  doc.save();
-  doc.rotate(45, { origin: [76, 52] });
-  doc.rect(76 - 9, 52 - 9, 18, 18).fill(COLOR.teal);
-  doc.restore();
-  doc.moveTo(0, 72).lineTo(104, 150).lineTo(0, 228).fill(COLOR.teal);
-  doc.restore();
-}
-
-/** Iconitos vectoriales del pie: 8×8 pt, sin un solo píxel. */
-function icono(doc: Doc, tipo: 'web' | 'tel' | 'mail' | 'pin', x: number, y: number) {
-  doc.save();
-  doc.strokeColor(COLOR.blanco).fillColor(COLOR.blanco).lineWidth(0.6);
-  if (tipo === 'web') {
-    doc.circle(x + 3.4, y + 3.4, 3.4).stroke();
-    doc.ellipse(x + 3.4, y + 3.4, 1.5, 3.4).stroke();
-    doc.moveTo(x, y + 3.4).lineTo(x + 6.8, y + 3.4).stroke();
-  } else if (tipo === 'tel') {
-    doc.save();
-    doc.rotate(-32, { origin: [x + 3.4, y + 3.4] });
-    doc.roundedRect(x + 2.1, y - 0.2, 2.6, 7.2, 1.2).fill();
-    doc.restore();
-  } else if (tipo === 'mail') {
-    doc.rect(x, y + 0.8, 7, 5).stroke();
-    doc.moveTo(x, y + 0.8).lineTo(x + 3.5, y + 3.8).lineTo(x + 7, y + 0.8).stroke();
-  } else {
-    doc.circle(x + 3.4, y + 2.8, 2.6).fill();
-    doc.moveTo(x + 1.2, y + 4).lineTo(x + 3.4, y + 7.4).lineTo(x + 5.6, y + 4).fill();
-  }
-  doc.restore();
-}
-
-/**
- * Dibuja por debajo del margen inferior sin que PDFKit abra una página.
- *
- * `doc.text()` compara `y + alto de línea` contra `page.maxY()` y, si se pasa, llama a `addPage()`.
- * Un pie vive justo ahí abajo: sin esto, pintar el pie abre una página, que dispara el pie otra
- * vez, y el documento se va en recursión.
- */
-function sinPaginacion(doc: Doc, dibujar: () => void) {
-  const bottom = doc.page.margins.bottom;
-  doc.page.margins.bottom = 0;
+/** Dibuja la marca a un ancho dado; devuelve el alto usado (0 si no hay marca). */
+function dibujarMarca(doc: Doc, marca: Imagen, x: number, y: number, ancho: number): number {
+  if (!marca) return 0;
+  const alto = (marca.alto / marca.ancho) * ancho;
   try {
-    dibujar();
-  } finally {
-    doc.page.margins.bottom = bottom;
+    (doc as unknown as { image: (src: unknown, x: number, y: number, o: object) => void }).image(marca.objeto, x, y, {
+      width: ancho,
+      height: alto,
+    });
+    return alto;
+  } catch {
+    return 0;
   }
 }
 
-/** Barra de contacto del pie, con la curva verde del documento modelo. */
-function pieDeSeccion(ctx: Ctx) {
-  const { doc, empresa } = ctx;
-  const base = ALTO;
-
-  doc.save();
-  // Curva verde: asoma por encima de la barra, a la derecha.
-  doc
-    .moveTo(398, base - 6)
-    .lineTo(486, base - 64)
-    .lineTo(574, base - 6)
-    .lineWidth(7)
-    .strokeColor(COLOR.teal)
-    .stroke();
-  // Loma gris a la derecha, como en el modelo.
-  doc.moveTo(512, base - 20).lineTo(556, base - 38).lineTo(612, base - 18).lineTo(612, base).lineTo(512, base).fill(COLOR.grafito);
-  // Barra oscura con el corte diagonal.
-  doc
-    .moveTo(0, base - 50)
-    .lineTo(372, base - 50)
-    .lineTo(410, base - 16)
-    .lineTo(612, base - 16)
-    .lineTo(612, base)
-    .lineTo(0, base)
-    .fill(COLOR.negro);
-  doc.restore();
-
-  const filas: Array<['web' | 'tel' | 'mail' | 'pin', string]> = [
-    ['web', empresa.web],
-    ['tel', empresa.telefono],
-    ['mail', empresa.correo],
-    ['pin', empresa.direccion],
-  ];
-  doc.font('Helvetica-Bold').fontSize(6.4).fillColor(COLOR.blanco);
-  sinPaginacion(doc, () => {
-    filas.forEach(([tipo, valor], i) => {
-      const y = base - 46 + i * 9.4;
-      icono(doc, tipo, MARGEN - 12, y - 0.6);
-      doc.text(valor, MARGEN, y, { width: 330, lineBreak: false });
-    });
-  });
-}
-
-/** Membrete de la hoja de cotización: marca a la izquierda, datos de contacto a la derecha. */
-function membrete(ctx: Ctx): number {
-  const { doc, empresa } = ctx;
-  const alto = dibujarMarca(ctx, ctx.marca, MARGEN + 8, 36, 96, COLOR.texto);
-  doc
-    .font('Helvetica')
-    .fontSize(6.4)
-    .fillColor(COLOR.gris)
-    .text(empresa.lema.toLowerCase(), MARGEN - 8, 36 + alto + 2, { width: 128, align: 'center' });
-
-  const x = MARGEN + 190;
-  const ancho = ANCHO - MARGEN - x;
-  doc.font('Helvetica').fontSize(9).fillColor(COLOR.texto);
-  doc.text(empresa.direccion, x, 40, { width: ancho });
-  doc.text(`Correo electrónico: ${empresa.correo}`, x, doc.y + 2, { width: ancho });
-  doc.text(
-    `Teléfonos: ${empresa.telefono}${empresa.telefonoAlterno ? `    /    ${empresa.telefonoAlterno}` : ''}`,
-    x,
-    doc.y + 2,
-    { width: ancho },
-  );
-
-  doc.font('Helvetica-Bold').fontSize(16).fillColor(COLOR.teal).text('COTIZACIÓN', x, 118, { width: ancho, align: 'center' });
-  return 150;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// Páginas
+// Primitivas
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Dibuja el marco de la página recién abierta y deja `doc.y` donde empieza el cuerpo.
+ * Texto de un renglón en una posición fija, sin que PDFKit lo envuelva.
  *
- * Va colgado de `pageAdded`, así que también cubre las páginas que abre PDFKit solo cuando un
- * párrafo se desborda: ninguna página puede salir sin su pie.
+ * Sin `width` PDFKit no usa su LineWrapper y nunca abre una página por su cuenta: es lo que permite
+ * escribir el pie (que vive debajo del margen inferior) y numerar las hojas al final.
  */
-function marcoDePagina(ctx: Ctx) {
+function renglon(
+  doc: Doc,
+  texto: string,
+  x: number,
+  base: number,
+  o: { tamano: number; fuente?: string; color?: string; alinear?: 'izq' | 'der' | 'centro'; espaciado?: number; max?: number },
+) {
+  doc.font(o.fuente ?? 'Helvetica').fontSize(o.tamano);
+  const espaciado = o.espaciado ?? 0;
+  let tamano = o.tamano;
+  let ancho = doc.widthOfString(texto, { characterSpacing: espaciado }) - espaciado;
+  if (o.max && ancho > o.max) {
+    tamano = Math.max(4.5, (tamano * o.max) / ancho);
+    doc.fontSize(tamano);
+    ancho = doc.widthOfString(texto, { characterSpacing: espaciado }) - espaciado;
+  }
+  const xReal = o.alinear === 'der' ? x - ancho : o.alinear === 'centro' ? x - ancho / 2 : x;
+  doc.fillColor(o.color ?? C.texto).text(texto, xReal, arriba(base, tamano), {
+    lineBreak: false,
+    characterSpacing: espaciado,
+  });
+  return ancho;
+}
+
+/** Polígono con esquinas redondeadas (el rombo, el triángulo y la barra del membrete). */
+function poligonoRedondeado(doc: Doc, puntos: Array<[number, number]>, radio: number) {
+  const n = puntos.length;
+  const recorte = (a: [number, number], b: [number, number]): [number, number] => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const largo = Math.hypot(dx, dy) || 1;
+    const t = Math.min(radio / largo, 0.5);
+    return [a[0] + dx * t, a[1] + dy * t];
+  };
+  for (let i = 0; i < n; i += 1) {
+    const actual = puntos[i]!;
+    const previo = puntos[(i - 1 + n) % n]!;
+    const siguiente = puntos[(i + 1) % n]!;
+    const entrada = recorte(actual, previo);
+    const salida = recorte(actual, siguiente);
+    if (i === 0) doc.moveTo(entrada[0], entrada[1]);
+    else doc.lineTo(entrada[0], entrada[1]);
+    doc.quadraticCurveTo(actual[0], actual[1], salida[0], salida[1]);
+  }
+  doc.closePath();
+}
+
+/** Rombo (cuadrado a 45°) de centro y semidiagonal dados. */
+function rombo(doc: Doc, cx: number, cy: number, r: number, radio: number, color: string) {
+  doc.save();
+  poligonoRedondeado(
+    doc,
+    [
+      [cx, cy - r],
+      [cx + r, cy],
+      [cx, cy + r],
+      [cx - r, cy],
+    ],
+    radio,
+  );
+  doc.fill(color);
+  doc.restore();
+}
+
+/** Iconitos vectoriales del pie: 7×7 pt. */
+function icono(doc: Doc, tipo: 'web' | 'tel' | 'mail' | 'pin', x: number, y: number, color: string) {
+  doc.save();
+  doc.strokeColor(color).fillColor(color).lineWidth(0.6);
+  if (tipo === 'web') {
+    doc.circle(x + 3.4, y + 3.4, 3.2).stroke();
+    doc.ellipse(x + 3.4, y + 3.4, 1.4, 3.2).stroke();
+    doc.moveTo(x + 0.2, y + 3.4).lineTo(x + 6.6, y + 3.4).stroke();
+  } else if (tipo === 'tel') {
+    // Auricular: la curva del mango y los dos extremos más gruesos.
+    doc.lineCap('round').lineWidth(1.3);
+    doc.moveTo(x + 1.5, y + 1.3).bezierCurveTo(x + 0.5, y + 3.6, x + 3.4, y + 6.6, x + 5.7, y + 5.7).stroke();
+    doc.lineWidth(2);
+    doc.moveTo(x + 0.9, y + 0.7).lineTo(x + 2.3, y + 2.0).stroke();
+    doc.moveTo(x + 5.0, y + 5.1).lineTo(x + 6.3, y + 6.4).stroke();
+  } else if (tipo === 'mail') {
+    doc.rect(x, y + 1, 6.8, 4.8).stroke();
+    doc.moveTo(x, y + 1).lineTo(x + 3.4, y + 3.9).lineTo(x + 6.8, y + 1).stroke();
+  } else {
+    doc.circle(x + 3.4, y + 2.6, 2.5).fill();
+    doc.moveTo(x + 1.2, y + 3.8).lineTo(x + 3.4, y + 7.2).lineTo(x + 5.6, y + 3.8).fill();
+    doc.circle(x + 3.4, y + 2.6, 0.9).fill(C.carbon);
+  }
+  doc.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Estado del documento
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Ctx = {
+  doc: Doc;
+  payload: PropuestaPayload;
+  empresa: Empresa;
+  marca: Imagen;
+  modo: Modo;
+  /** Número de la sección en curso («01.»); cada hoja de la sección lo repite. */
+  seccion: string | null;
+  /**
+   * Qué es cada hoja, para numerarlas al final. Se llena en `pageAdded`, que también ve las hojas
+   * que PDFKit abre solo cuando un párrafo se desborda.
+   */
+  paginas: Modo[];
+  pintandoMarco?: boolean;
+};
+
+/** Márgenes de las hojas interiores: el `maxY` de PDFKit queda encima de la barra de contacto. */
+const MARGENES_INTERIOR = {
+  top: INICIO_CONTINUACION,
+  bottom: ALTO - LIMITE_CUERPO,
+  left: COL_X,
+  right: ANCHO - COL_DER,
+};
+
+function abrirPagina(ctx: Ctx, modo: Modo, tamano?: [number, number]) {
+  ctx.modo = modo;
+  if (modo === 'seccion') ctx.doc.addPage({ size: 'LETTER', margins: MARGENES_INTERIOR });
+  else ctx.doc.addPage({ size: tamano ?? 'LETTER', margin: 0 });
+}
+
+/** Estilo del cuerpo; también es el que hereda un párrafo que PDFKit sigue en la hoja siguiente. */
+function estiloCuerpo(doc: Doc) {
+  doc.font('Helvetica').fontSize(CUERPO).fillColor(C.texto);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Membrete de las hojas interiores
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Esquina del membrete: rombo negro recortado por el borde, rombo verde grande (el «triángulo»)
+ * y el rombo pequeño. Proporciones del arte del modelo a escala uniforme.
+ */
+function esquina(doc: Doc) {
+  rombo(doc, 0, 28, 37, 5, '#000000');
+  rombo(doc, 0, 108.6, 64.3, 7, C.verde);
+  rombo(doc, 38.6, 54, 9.7, 2.2, C.verdeClaro);
+}
+
+/** Barra de contacto con la punta en flecha, el galón verde y la loma gris. */
+function pie(ctx: Ctx) {
+  const { doc, empresa } = ctx;
+  const alto = ALTO - PIE_Y;
+
+  doc.save();
+  // Loma gris, abajo a la derecha.
+  poligonoRedondeado(
+    doc,
+    [
+      [516, ALTO + 8],
+      [556, PIE_Y + 8],
+      [ANCHO + 20, PIE_Y + 8],
+      [ANCHO + 20, ALTO + 8],
+    ],
+    9,
+  );
+  doc.fill(C.loma);
+  // Galón verde.
+  doc
+    .moveTo(426, ALTO + 4)
+    .lineTo(484, PIE_Y - 4)
+    .lineTo(542, ALTO + 4)
+    .lineWidth(4.2)
+    .lineJoin('round')
+    .lineCap('butt')
+    .strokeColor(C.verde)
+    .stroke();
+  // Barra oscura con la punta en flecha.
+  poligonoRedondeado(
+    doc,
+    [
+      [-10, PIE_Y],
+      [388, PIE_Y],
+      [388 + alto * 0.98, PIE_Y + alto * 0.66],
+      [388 + alto * 0.56, ALTO + 6],
+      [-10, ALTO + 6],
+    ],
+    5,
+  );
+  doc.fill(C.carbon);
+  doc.restore();
+
+  // Contacto en dos columnas: sitio y teléfono / correo y dirección.
+  const telefonos = empresa.telefonoAlterno ? `${empresa.telefono}  ·  ${empresa.telefonoAlterno}` : empresa.telefono;
+  const filas: Array<['web' | 'tel' | 'mail' | 'pin', string, number, number, number]> = [
+    ['web', dominio(empresa.web), 30, PIE_Y + 16, 118],
+    ['tel', telefonos, 30, PIE_Y + 29, 118],
+    ['mail', empresa.correo, 168, PIE_Y + 16, 212],
+    ['pin', empresa.oficina, 168, PIE_Y + 29, 212],
+  ];
+  for (const [tipo, valor, x, base, max] of filas) {
+    icono(doc, tipo, x - 11, base - 6, C.blanco);
+    renglon(doc, valor, x, base, { tamano: 6.8, fuente: 'Helvetica-Bold', color: C.blanco, max });
+  }
+}
+
+/**
+ * Hoja interior: esquina, marca arriba a la derecha, pie y número de sección. Deja `doc.y` donde
+ * empieza el cuerpo de una hoja de continuación.
+ *
+ * Va colgado de `pageAdded`, así que también cubre las hojas que abre PDFKit cuando un párrafo se
+ * desborda: ninguna hoja interior sale sin su membrete.
+ */
+function marcoDeSeccion(ctx: Ctx) {
   const { doc } = ctx;
-  if (ctx.modo === 'portada' || ctx.modo === 'plano') return;
-  // Cinturón: si dibujar el marco abriera otra página, no se vuelve a entrar aquí.
-  if (ctx.pintandoMarco) return;
+  if (ctx.modo !== 'seccion' || ctx.pintandoMarco) return;
   ctx.pintandoMarco = true;
   try {
-    pintarMarco(ctx);
+    esquina(doc);
+    // Marca con su nombre debajo, alineada al margen derecho.
+    const anchoMarca = 44;
+    const centro = COL_DER - anchoMarca / 2;
+    const altoMarca = dibujarMarca(doc, ctx.marca, centro - anchoMarca / 2, 30, anchoMarca);
+    renglon(doc, ctx.empresa.nombre, centro, altoMarca ? 30 + altoMarca + 12 : 60, {
+      tamano: 8.4,
+      fuente: 'Helvetica-Bold',
+      alinear: 'centro',
+      espaciado: 2.6,
+    });
+    pie(ctx);
+    if (ctx.seccion) {
+      renglon(doc, ctx.seccion, COL_X, NUMERO.base, {
+        tamano: NUMERO.tamano,
+        fuente: 'Helvetica-Bold',
+        color: C.verdeTexto,
+      });
+    }
+    doc.x = COL_X;
+    doc.y = arriba(INICIO_CONTINUACION + 8, CUERPO);
+    estiloCuerpo(doc);
   } finally {
     ctx.pintandoMarco = false;
   }
 }
 
-function pintarMarco(ctx: Ctx) {
+/** Abre la primera hoja de una sección con su título; deja `doc.y` en el primer renglón. */
+function abrirSeccion(ctx: Ctx, numero: string, titulo: string) {
   const { doc } = ctx;
-
-  if (ctx.modo === 'cotizacion') {
-    // El membrete va solo en la primera hoja de la cotización; las de continuación son tabla
-    // limpia, como las páginas 9 y 10 del documento modelo.
-    if (ctx.membretePuesto) {
-      doc.y = 56;
-    } else {
-      doc.y = membrete(ctx);
-      ctx.membretePuesto = true;
-    }
-    doc.x = MARGEN;
-  } else {
-    esquinaSeccion(doc);
-    dibujarMarca(ctx, ctx.marca, ANCHO - MARGEN - 74, 26, 62, COLOR.texto);
-    pieDeSeccion(ctx);
-
-    if (ctx.seccion) {
-      doc.font('Helvetica-Bold').fontSize(24).fillColor(COLOR.teal).text(ctx.seccion.numero, MARGEN_TEXTO, 84);
-      if (!ctx.tituloPuesto) {
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(14)
-          .fillColor(COLOR.texto)
-          .text(ctx.seccion.titulo, MARGEN_TEXTO, 124, { width: ANCHO_TEXTO });
-        ctx.tituloPuesto = true;
-        doc.y = doc.y + 14;
-      } else {
-        doc.y = 124;
-      }
-    } else {
-      doc.y = 96;
-    }
-    doc.x = MARGEN_TEXTO;
-  }
-
-  // Estado por omisión del cuerpo: si PDFKit siguió un párrafo aquí, continúa con el mismo estilo.
-  doc.font('Helvetica').fontSize(9.5).fillColor(COLOR.texto);
+  ctx.seccion = numero;
+  abrirPagina(ctx, 'seccion');
+  renglon(doc, titulo, COL_X, TITULO.base, { tamano: TITULO.tamano, fuente: 'Helvetica-Bold', espaciado: 0.6 });
+  doc.save();
+  doc.rect(COL_X, TITULO.base + 9, 26, 2.2).fill(C.verde);
+  doc.restore();
+  doc.x = COL_X;
+  doc.y = arriba(INICIO_SECCION, CUERPO);
 }
 
-function abrirPagina(ctx: Ctx, modo: Modo, horizontal = false) {
-  ctx.modo = modo;
-  ctx.doc.addPage(
-    horizontal
-      ? { size: 'LETTER', layout: 'landscape', margin: 0 }
-      : { size: 'LETTER', layout: 'portrait', margin: MARGEN },
-  );
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Cuerpo de texto
+// ─────────────────────────────────────────────────────────────────────────────
 
-/** Abre página si lo que sigue no cabe encima del pie. */
+/** Abre hoja si lo que sigue no cabe encima del pie. */
 function asegurarEspacio(ctx: Ctx, alto: number) {
-  if (ctx.doc.y + alto > LIMITE_CUERPO) abrirPagina(ctx, ctx.modo);
+  if (ctx.doc.y + alto > LIMITE_CUERPO) abrirPagina(ctx, 'seccion');
 }
 
-function parrafo(ctx: Ctx, texto: string, opciones: { bold?: boolean; size?: number; color?: string; sangria?: number } = {}) {
+function altoTexto(doc: Doc, texto: string, ancho: number, fuente = 'Helvetica', tamano = CUERPO) {
+  doc.font(fuente).fontSize(tamano);
+  return doc.heightOfString(texto, { width: ancho, lineGap: INTERLINEA });
+}
+
+/**
+ * Párrafo del cuerpo. Un párrafo nunca deja un renglón huérfano al pie; `conSiguiente` reserva
+ * además el arranque de lo que sigue (la frase que presenta una lista no se queda sin su lista).
+ */
+function parrafo(ctx: Ctx, texto: string, despues = ENTRE_PARRAFOS, conSiguiente = false) {
   const { doc } = ctx;
-  const x = MARGEN_TEXTO + (opciones.sangria ?? 0);
-  doc
-    .font(opciones.bold ? 'Helvetica-Bold' : 'Helvetica')
-    .fontSize(opciones.size ?? 9.5)
-    .fillColor(opciones.color ?? COLOR.texto)
-    .text(texto, x, doc.y, {
-      width: ANCHO_TEXTO - (opciones.sangria ?? 0),
-      align: 'justify',
-      lineGap: 1.6,
-    });
-  doc.moveDown(0.55);
+  const alto = altoTexto(doc, texto, COL_ANCHO);
+  asegurarEspacio(ctx, conSiguiente ? alto + despues + RENGLON * 2 : Math.min(alto, RENGLON * 2));
+  estiloCuerpo(doc);
+  doc.text(texto, COL_X, doc.y, { width: COL_ANCHO, lineGap: INTERLINEA });
+  doc.y += despues;
 }
 
-function portada(ctx: Ctx) {
+/**
+ * Lo que un elemento de lista necesita libre al pie: sus dos primeros renglones, o —si es el
+ * penúltimo— todo él más el arranque del último, para que el último nunca quede solo en la hoja
+ * siguiente.
+ */
+function reservaDeLista(doc: Doc, texto: string, ancho: number, ultimo?: string) {
+  const alto = altoTexto(doc, texto, ancho);
+  if (ultimo === undefined) return Math.min(alto, RENGLON * 2);
+  return alto + 6 + Math.min(altoTexto(doc, ultimo, ancho), RENGLON * 2);
+}
+
+/** Elemento numerado (beneficios): número verde alineado a la derecha y texto colgado. */
+function elementoNumerado(ctx: Ctx, numero: number, texto: string, ultimo?: string) {
+  const { doc } = ctx;
+  const xTexto = COL_X + 26;
+  const ancho = COL_DER - xTexto;
+  asegurarEspacio(ctx, reservaDeLista(doc, texto, ancho, ultimo));
+  const y = doc.y;
+  renglon(doc, `${numero}.`, xTexto - 8, y + ASCENSO * CUERPO, {
+    tamano: CUERPO,
+    fuente: 'Helvetica-Bold',
+    color: C.verdeTexto,
+    alinear: 'der',
+  });
+  estiloCuerpo(doc);
+  doc.text(texto, xTexto, y, { width: ancho, lineGap: INTERLINEA });
+  doc.x = COL_X;
+  doc.y += 6;
+}
+
+/** Viñeta: el rombo de la marca en pequeño y el texto colgado. `ultimo`: ver `reservaDeLista`. */
+function vineta(ctx: Ctx, texto: string, ultimo?: string) {
+  const { doc } = ctx;
+  const xTexto = COL_X + 18;
+  const ancho = COL_DER - xTexto;
+  asegurarEspacio(ctx, reservaDeLista(doc, texto, ancho, ultimo));
+  const y = doc.y;
+  rombo(doc, COL_X + 6, y + CUERPO * 0.42, 2.3, 0.4, C.verde);
+  estiloCuerpo(doc);
+  doc.text(texto, xTexto, y, { width: ancho, lineGap: INTERLINEA });
+  doc.x = COL_X;
+  doc.y += 3;
+}
+
+/** Párrafos de un texto libre: cada salto de línea es un párrafo nuevo. */
+const parrafosDe = (texto?: string | null) =>
+  String(texto ?? '')
+    .split(/\r?\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+/** «Etiqueta: resto» → ['Etiqueta', 'resto'] cuando la etiqueta es corta; si no, `null`. */
+function conEtiqueta(texto: string): [string, string] | null {
+  const m = /^([^:.]{3,32}):\s+(.+)$/s.exec(texto.trim());
+  if (!m) return null;
+  const resto = m[2]!.trim();
+  return [m[1]!.trim(), resto.charAt(0).toUpperCase() + resto.slice(1)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Portada
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Hexágono regular (de punta) para el motivo de la portada. */
+function hexagono(doc: Doc, cx: number, cy: number, r: number) {
+  for (let i = 0; i < 6; i += 1) {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    const x = cx + r * Math.cos(a);
+    const y = cy + r * Math.sin(a);
+    if (i === 0) doc.moveTo(x, y);
+    else doc.lineTo(x, y);
+  }
+  doc.closePath();
+}
+
+/**
+ * Portada: oscura y tipográfica, con la estructura de la del modelo (marca y lema arriba,
+ * «PROPUESTA TÉCNICA», versión, índice, cuña verde y pie) y, en lugar de la ilustración, los datos
+ * de la propuesta y un motivo de hexágonos en líneas finas.
+ */
+function portada(ctx: Ctx, indice: Array<{ numero: string; titulo: string; nota?: string }>) {
   const { doc, payload, empresa } = ctx;
   abrirPagina(ctx, 'portada');
 
   doc.save();
-  doc.rect(0, 0, ANCHO, ALTO).fill(COLOR.negro);
+  doc.rect(0, 0, ANCHO, ALTO).fill(C.tinta);
+
+  // Motivo: hexágonos concéntricos del logotipo, en líneas finas, saliendo por la derecha.
+  const hx = 492;
+  const hy = 250;
+  [
+    [196, 0.1, 0.7],
+    [160, 0.16, 0.7],
+    [124, 0.26, 0.8],
+    [88, 0.5, 1.1],
+  ].forEach(([r, opacidad, grosor]) => {
+    doc.save();
+    hexagono(doc, hx, hy, r!);
+    doc.lineWidth(grosor!).strokeOpacity(opacidad!).strokeColor(C.verde).stroke();
+    doc.restore();
+  });
+
+  // Filete superior en ángulo, como el marco del arte original.
+  doc
+    .moveTo(0, 30)
+    .lineTo(150, 30)
+    .lineTo(176, 56)
+    .lineTo(ANCHO - 170, 56)
+    .lineWidth(0.6)
+    .strokeOpacity(0.5)
+    .strokeColor('#2C3A44')
+    .stroke();
+  doc.strokeOpacity(1);
+
   // Cuña verde de la esquina inferior izquierda.
-  doc.moveTo(0, ALTO - 214).lineTo(122, ALTO - 96).lineTo(122, ALTO).lineTo(0, ALTO).fill(COLOR.teal);
+  doc.moveTo(0, 548).lineTo(214, ALTO).lineTo(0, ALTO).fill(C.verdeProfundo);
   doc.restore();
 
-  // La marca preside la portada, como la ilustración del documento modelo.
-  if (ctx.marca) {
-    try {
-      (doc as unknown as { image: (s: unknown, x: number, y: number, o: object) => void }).image(
-        ctx.marca.imagen,
-        ANCHO - 250,
-        150,
-        { width: 200 },
-      );
-    } catch {
-      /* sin marca la portada sigue en pie */
+  // Marca y lema.
+  const xMarca = 56;
+  const altoMarca = dibujarMarca(doc, ctx.marca, xMarca, 104, 50);
+  const xNombre = altoMarca ? xMarca + 66 : xMarca;
+  renglon(doc, empresa.nombre, xNombre, 136, {
+    tamano: 30,
+    fuente: 'Helvetica-Bold',
+    color: C.blanco,
+    espaciado: 8,
+  });
+  renglon(doc, empresa.lema.toUpperCase(), xNombre + 1, 151, {
+    tamano: 6.8,
+    color: '#9FB0BA',
+    espaciado: 1.55,
+  });
+
+  // Título.
+  renglon(doc, 'PROPUESTA', 54, 288, { tamano: 44, color: C.blanco, espaciado: 1.5 });
+  renglon(doc, 'TÉCNICA', 54, 336, { tamano: 44, fuente: 'Helvetica-Bold', color: C.verde, espaciado: 1.5 });
+  doc.save();
+  doc.moveTo(56, 364).lineTo(300, 364).lineWidth(0.6).strokeColor('#2A353E').stroke();
+  doc.circle(60.5, 386, 3.6).fill(C.verde);
+  doc.restore();
+  renglon(doc, `VERSIÓN ${Math.max(1, Math.trunc(Number(payload.revision) || 1))}.0`, 72, 389.2, {
+    tamano: 8.6,
+    color: C.blanco,
+    espaciado: 1.2,
+  });
+
+  // Índice sobre un panel con el corte en diagonal del modelo.
+  const panelY = 440;
+  const fila = 46;
+  const altoPanel = fila * indice.length + 16;
+  doc.save();
+  doc
+    .moveTo(40, panelY)
+    .lineTo(290, panelY)
+    .lineTo(290 + altoPanel * 0.22, panelY + altoPanel)
+    .lineTo(40, panelY + altoPanel)
+    .closePath()
+    .fillOpacity(0.92)
+    .fill(C.panel);
+  doc.restore();
+  indice.forEach(({ numero, titulo, nota }, i) => {
+    const base = panelY + 32 + i * fila;
+    const apagada = Boolean(nota);
+    renglon(doc, numero, 62, base, {
+      tamano: 15,
+      fuente: 'Helvetica-Bold',
+      color: apagada ? '#3E5A57' : C.verde,
+    });
+    const ancho = renglon(doc, titulo, 110, base - 1.5, {
+      tamano: 8.4,
+      color: apagada ? '#62717B' : C.blanco,
+      espaciado: 0.9,
+    });
+    if (nota) renglon(doc, nota, 110 + ancho + 8, base - 1.5, { tamano: 7, color: '#62717B' });
+    if (i < indice.length - 1) {
+      const y = base + 16;
+      doc.save();
+      doc
+        .moveTo(62, y)
+        .lineTo(282 + (y - panelY) * 0.22, y)
+        .lineWidth(0.5)
+        .strokeColor('#233640')
+        .stroke();
+      doc.restore();
     }
+  });
+
+  // Datos de la propuesta, a la derecha del índice.
+  const x = 356;
+  const anchoDato = ANCHO - 48 - x;
+  doc.save();
+  doc.rect(x - 14, panelY + 6, 1.6, altoPanel - 12).fill(C.verde);
+  doc.restore();
+  const cliente = payload.cliente.empresa?.trim() || payload.cliente.nombre?.trim() || '';
+  const datos: Array<[string, string, number]> = [
+    ['PREPARADA PARA', cliente, 2],
+    ['PROYECTO', payload.proyecto?.trim() || '', 3],
+    ['FOLIO', payload.folio, 1],
+    ['FECHA DE EMISIÓN', fechaLarga(payload.issueDate) ?? '', 1],
+  ];
+  let y = panelY + 18;
+  for (const [etiqueta, valor, renglones] of datos) {
+    if (!valor) continue;
+    renglon(doc, etiqueta, x, y, { tamano: 6.6, color: '#7F909B', espaciado: 1.3 });
+    doc.font(etiqueta === 'PREPARADA PARA' ? 'Helvetica-Bold' : 'Helvetica').fontSize(9.6).fillColor(C.blanco);
+    const alto = Math.min(
+      doc.heightOfString(valor, { width: anchoDato, lineGap: 1.5 }),
+      renglones * (9.6 * 1.156 + 1.5),
+    );
+    doc.text(valor, x, y + 5, { width: anchoDato, lineGap: 1.5, height: alto, ellipsis: true });
+    y += 5 + alto + 16;
   }
 
-  // Bloque negro con la marca escrita, sobre la ilustración.
+  // Pie: sitio y leyenda.
+  icono(doc, 'web', 250, ALTO - 56.5, C.verde);
+  renglon(doc, dominio(empresa.web), 264, ALTO - 50, { tamano: 8.8, fuente: 'Helvetica-Bold', color: C.blanco });
   doc.save();
-  doc.rect(0, 62, 300, 190).fill('#05090D');
+  doc
+    .moveTo(392, ALTO - 66)
+    .lineTo(392, ALTO - 34)
+    .lineWidth(0.6)
+    .strokeColor('#46545E')
+    .stroke();
   doc.restore();
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(34)
-    .fillColor('#B8C0C7')
-    .text(empresa.nombre, MARGEN - 12, 128, { width: 300, characterSpacing: 7 });
-  doc
-    .font('Helvetica')
-    .fontSize(8.5)
-    .fillColor('#98A3AC')
-    .text(empresa.lema, MARGEN - 10, 180, { width: 290 });
-
-  doc.font('Helvetica').fontSize(27).fillColor(COLOR.blanco).text('PROPUESTA', MARGEN - 10, 276, { characterSpacing: 1.6 });
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(27)
-    .fillColor(COLOR.tealVivo)
-    .text('TÉCNICA', MARGEN - 10, 310, { characterSpacing: 1.6 });
-
-  doc.moveTo(MARGEN - 10, 362).lineTo(268, 362).lineWidth(0.5).strokeColor('#2C3945').stroke();
-  doc.circle(MARGEN - 4, 384, 4).fill(COLOR.tealVivo);
-  doc
-    .font('Helvetica')
-    .fontSize(9)
-    .fillColor(COLOR.blanco)
-    .text(`VERSIÓN ${Math.max(1, Number(payload.revision) || 1)}.0`, MARGEN + 8, 380, { characterSpacing: 0.8 });
-
-  // Índice numerado sobre un panel apenas más claro.
-  const indiceY = 438;
-  const altoFila = 52;
-  doc.save();
-  doc.rect(MARGEN - 12, indiceY - 20, 336, INDICE.length * altoFila + 12).fill('#10171E');
-  doc.restore();
-  INDICE.forEach(([numero, titulo], i) => {
-    const y = indiceY + i * altoFila;
-    doc.font('Helvetica-Bold').fontSize(15).fillColor(COLOR.tealVivo).text(numero, MARGEN + 6, y);
-    doc
-      .font('Helvetica')
-      .fontSize(8.5)
-      .fillColor(COLOR.blanco)
-      .text(titulo, MARGEN + 62, y + 4, { characterSpacing: 1.1, lineBreak: false });
-    if (i < INDICE.length - 1) {
-      doc
-        .moveTo(MARGEN + 6, y + 34)
-        .lineTo(MARGEN + 290, y + 34)
-        .lineWidth(0.5)
-        .strokeColor('#28343F')
-        .stroke();
-    }
-  });
-
-  // Folio y cliente: lo único que el documento hecho a mano no traía y aquí sí se sabe.
-  doc.font('Helvetica').fontSize(7).fillColor('#7E8B96').text('FOLIO', ANCHO - 236, 620, { width: 200 });
-  doc.font('Helvetica-Bold').fontSize(11).fillColor(COLOR.blanco).text(payload.folio, ANCHO - 236, 632, { width: 200 });
-  doc.font('Helvetica').fontSize(7).fillColor('#7E8B96').text('CLIENTE', ANCHO - 236, 660, { width: 200 });
-  doc
-    .font('Helvetica')
-    .fontSize(9.5)
-    .fillColor(COLOR.blanco)
-    .text(payload.cliente.empresa || payload.cliente.nombre || '—', ANCHO - 236, 672, { width: 200 });
-
-  // Pie de portada: dirección web y la leyenda del modelo.
-  sinPaginacion(doc, () => {
-    icono(doc, 'web', 250, ALTO - 58);
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(8.5)
-      .fillColor(COLOR.blanco)
-      .text(dominio(empresa.web).replace(/^(?!www\.)/, 'www.'), 266, ALTO - 58, { lineBreak: false });
-    doc.moveTo(400, ALTO - 64).lineTo(400, ALTO - 36).lineWidth(0.6).strokeColor('#4A5862').stroke();
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .fillColor('#C7D3DD')
-      .text('Propuesta técnica sujeta a\ncontratación formal.', 414, ALTO - 62, { width: 170 });
-  });
+  renglon(doc, 'Propuesta técnica sujeta a', 406, ALTO - 54, { tamano: 8.2, color: '#C9D3DA' });
+  renglon(doc, 'contratación formal.', 406, ALTO - 43, { tamano: 8.2, color: '#C9D3DA' });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 01 Objetivo y 02 Alcance
+// ─────────────────────────────────────────────────────────────────────────────
 
 function seccionObjetivo(ctx: Ctx) {
   const { payload } = ctx;
-  ctx.seccion = { numero: '01.', titulo: 'OBJETIVO DEL PROYECTO' };
-  ctx.tituloPuesto = false;
-  abrirPagina(ctx, 'seccion');
+  abrirSeccion(ctx, '01.', 'OBJETIVO DEL PROYECTO');
 
-  parrafo(ctx, payload.objetivo.intro);
+  for (const texto of parrafosDe(payload.objetivo.intro)) parrafo(ctx, texto);
 
-  if (payload.objetivo.beneficios.length) {
-    parrafo(ctx, 'Entre los principales beneficios se encuentran:');
-    payload.objetivo.beneficios.forEach((beneficio, i) => {
-      asegurarEspacio(ctx, 34);
-      const etiqueta = `${i + 1}.`;
-      const y = ctx.doc.y;
-      ctx.doc.font('Helvetica').fontSize(9.5).fillColor(COLOR.texto).text(etiqueta, MARGEN_TEXTO + 18, y, { width: 16 });
-      ctx.doc.text(beneficio, MARGEN_TEXTO + 36, y, {
-        width: ANCHO_TEXTO - 36,
-        align: 'justify',
-        lineGap: 1.6,
-      });
-      ctx.doc.moveDown(0.45);
-    });
-    ctx.doc.moveDown(0.3);
+  const beneficios = payload.objetivo.beneficios.map((b) => b.trim()).filter(Boolean);
+  if (beneficios.length) {
+    parrafo(ctx, 'Entre los principales beneficios se encuentran:', 6, true);
+    beneficios.forEach((beneficio, i) =>
+      elementoNumerado(ctx, i + 1, beneficio, i === beneficios.length - 2 ? beneficios[i + 1] : undefined),
+    );
+    ctx.doc.y += ENTRE_PARRAFOS - 6;
   }
 
-  asegurarEspacio(ctx, 52);
-  parrafo(ctx, payload.objetivo.cierre);
+  for (const texto of parrafosDe(payload.objetivo.cierre)) parrafo(ctx, texto);
 }
 
+/**
+ * 02: el nombre del proyecto como título, la introducción (bloques sin título) y los bloques
+ * numerados («1. Modernización del sistema de grabación») con sus párrafos y viñetas. Sin bloques
+ * la sección no se imprime y el índice de la portada lo dice.
+ */
 function seccionAlcance(ctx: Ctx) {
-  const { payload, doc } = ctx;
-  ctx.seccion = { numero: '02.', titulo: 'ALCANCE DEL PROYECTO' };
-  ctx.tituloPuesto = false;
-  abrirPagina(ctx, 'seccion');
+  const { doc, payload } = ctx;
+  const bloques = payload.alcance.filter(
+    (b) => b && (b.titulo?.trim() || b.texto?.trim() || (b.vinetas ?? []).some((v) => String(v).trim())),
+  );
+  if (!bloques.length) return;
 
-  if (!payload.alcance.length) {
-    parrafo(ctx, 'El alcance de esta propuesta es el detallado en la sección 04, Cotización.', {
-      color: COLOR.gris,
-    });
-    return;
+  abrirSeccion(ctx, '02.', 'ALCANCE DEL PROYECTO');
+
+  const proyecto = payload.proyecto?.trim();
+  if (proyecto) {
+    doc.font('Helvetica-Bold').fontSize(12.5).fillColor(C.texto);
+    doc.text(proyecto, COL_X, doc.y, { width: COL_ANCHO, lineGap: 2.5 });
+    doc.y += 8;
   }
 
-  payload.alcance.forEach((bloque, i) => {
-    asegurarEspacio(ctx, 58);
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(10)
-      .fillColor(COLOR.texto)
-      .text(`${i + 1}. ${bloque.titulo}`, MARGEN_TEXTO, doc.y, { width: ANCHO_TEXTO });
-    doc.moveDown(0.35);
-    if (bloque.texto) parrafo(ctx, bloque.texto);
-    for (const vineta of bloque.vinetas ?? []) {
-      asegurarEspacio(ctx, 24);
+  let numero = 0;
+  for (const bloque of bloques) {
+    const titulo = bloque.titulo?.trim();
+    const parrafos = parrafosDe(bloque.texto);
+    const vinetas = (bloque.vinetas ?? []).map((v) => String(v).trim()).filter(Boolean);
+
+    if (titulo) {
+      numero += 1;
+      doc.y += 7;
+      // El subtítulo no se queda solo al pie: necesita dos renglones de lo que le sigue.
+      const texto = `${numero}. ${titulo}`;
+      const alto = altoTexto(doc, texto, COL_ANCHO - 18, 'Helvetica-Bold', 10.5);
+      asegurarEspacio(ctx, alto + RENGLON * 2 + 6);
       const y = doc.y;
-      doc.font('Helvetica').fontSize(9.5).fillColor(COLOR.texto).text('•', MARGEN_TEXTO + 20, y, { width: 10 });
-      doc.text(vineta, MARGEN_TEXTO + 38, y, { width: ANCHO_TEXTO - 38, align: 'left', lineGap: 1.6 });
-      doc.moveDown(0.3);
+      renglon(doc, `${numero}.`, COL_X, y + ASCENSO * 10.5, {
+        tamano: 10.5,
+        fuente: 'Helvetica-Bold',
+        color: C.verdeTexto,
+      });
+      doc.font('Helvetica-Bold').fontSize(10.5).fillColor(C.texto);
+      doc.text(titulo, COL_X + 18, y, { width: COL_ANCHO - 18, lineGap: 2 });
+      doc.x = COL_X;
+      doc.y += 5;
     }
-    doc.moveDown(0.35);
-  });
+    parrafos.forEach((texto, i) =>
+      parrafo(ctx, texto, ENTRE_PARRAFOS, i === parrafos.length - 1 && vinetas.length > 0),
+    );
+    if (vinetas.length) {
+      vinetas.forEach((v, i) => vineta(ctx, v, i === vinetas.length - 2 ? vinetas[i + 1] : undefined));
+      doc.y += ENTRE_PARRAFOS - 3;
+    }
+  }
 }
 
-function seccionPlanos(ctx: Ctx) {
-  const { payload, doc } = ctx;
-  // Un plano se lee a página completa y en horizontal, como el CCTV-01 del modelo.
+// ─────────────────────────────────────────────────────────────────────────────
+// 03 Planos
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lado mayor de la hoja de un plano: 17 in, el tabloide de los planos de CAD. */
+const LADO_PLANO = 1224;
+/** Franja inferior de la hoja del plano (sección, nombre y número de página). */
+const FRANJA_PLANO = 34;
+
+type Planos = {
+  imagenes: Array<{ nombre: string; imagen: NonNullable<ReturnType<typeof imagenParaPdf>> }>;
+  /** Anexos que no son imagen local (PDF, enlaces o archivos que no están en disco). */
+  otros: string[];
+};
+
+/**
+ * Anexos listos para imprimir, preparados antes de la portada para que su índice diga exactamente
+ * lo que trae el documento.
+ */
+function prepararPlanos(planos: PropuestaPlano[]): Planos {
   const vistos = new Set<string>();
-  const imagenes: Array<{ nombre: string; ruta: string }> = [];
-  const otros: PropuestaPlano[] = [];
-
-  for (const plano of payload.planos) {
-    if (!plano.url || vistos.has(plano.url)) continue;
+  const listos: Planos = { imagenes: [], otros: [] };
+  for (const plano of planos) {
+    if (!plano?.url || vistos.has(plano.url)) continue;
     vistos.add(plano.url);
+    const nombre = plano.nombre?.trim() || plano.url;
     const archivo = archivoDePlano(plano.url);
-    if (archivo && /\.(png|jpe?g)$/i.test(archivo)) {
-      imagenes.push({ nombre: plano.nombre || 'Plano', ruta: archivo });
-    } else {
-      otros.push(plano);
-    }
+    const imagen = archivo && /\.(png|jpe?g)$/i.test(archivo) ? imagenParaPdf(archivo, { maxLado: 1600 }) : null;
+    if (imagen?.ancho && imagen.alto) listos.imagenes.push({ nombre, imagen });
+    else listos.otros.push(nombre);
   }
+  return listos;
+}
 
-  for (const imagen of imagenes) {
-    const preparada = imagenParaPdf(imagen.ruta, { maxLado: 1600 });
-    if (!preparada) continue;
-    abrirPagina(ctx, 'plano', true);
-    const anchoPagina = ALTO;
-    const altoPagina = ANCHO;
+/**
+ * Cada plano a página completa y a su propia proporción, con una franja fina abajo para la sección
+ * y el número de página; el plano trae su propio marco y cuadro de datos, como el CCTV-01 del
+ * modelo. Los anexos que no son imagen (PDF o enlaces) se enlistan en una hoja «03.».
+ */
+function seccionPlanos(ctx: Ctx, planos: Planos) {
+  const { doc } = ctx;
+  for (const { nombre, imagen: preparada } of planos.imagenes) {
+    const escala = LADO_PLANO / Math.max(preparada.ancho, preparada.alto);
+    const ancho = Math.round(preparada.ancho * escala);
+    const alto = Math.round(preparada.alto * escala);
+    abrirPagina(ctx, 'plano', [ancho, alto + FRANJA_PLANO]);
     try {
-      doc.image(preparada.datos, 24, 24, { fit: [anchoPagina - 48, altoPagina - 62], align: 'center', valign: 'center' });
+      doc.image(preparada.datos, 0, 0, { width: ancho, height: alto });
     } catch {
-      continue;
+      /* un plano corrupto deja su hoja en blanco, no tumba la propuesta */
     }
-    sinPaginacion(doc, () => {
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(7.5)
-        .fillColor(COLOR.gris)
-        .text(`03. PLANOS  ·  ${imagen.nombre}`, 24, altoPagina - 28, { width: anchoPagina - 48, lineBreak: false });
+    doc.save();
+    doc.rect(0, alto, ancho, FRANJA_PLANO).fill(C.blanco);
+    doc.moveTo(0, alto).lineTo(ancho, alto).lineWidth(0.8).strokeColor(C.linea).stroke();
+    doc.rect(0, alto, 6, FRANJA_PLANO).fill(C.verde);
+    doc.restore();
+    const ancho03 = renglon(doc, '03.', 24, alto + 22, { tamano: 12, fuente: 'Helvetica-Bold', color: C.verdeTexto });
+    renglon(doc, `PLANOS  ·  ${nombre}`, 24 + ancho03 + 10, alto + 22, {
+      tamano: 11,
+      color: C.suave,
+      espaciado: 0.6,
+      max: ancho * 0.6,
     });
   }
 
-  if (imagenes.length && !otros.length) return;
+  const nombres = planos.otros;
+  if (!nombres.length) return;
 
-  ctx.seccion = { numero: '03.', titulo: 'PLANOS' };
-  ctx.tituloPuesto = false;
-  abrirPagina(ctx, 'seccion');
-
-  if (!imagenes.length && !otros.length) {
-    parrafo(ctx, 'Esta propuesta no incluye planos anexos.', { color: COLOR.gris });
-    return;
-  }
-  if (otros.length) {
-    parrafo(ctx, 'Anexos que acompañan a esta propuesta:');
-    for (const plano of otros) {
-      asegurarEspacio(ctx, 22);
-      const y = doc.y;
-      doc.font('Helvetica').fontSize(9.5).fillColor(COLOR.texto).text('•', MARGEN_TEXTO + 20, y, { width: 10 });
-      doc.text(plano.nombre || plano.url, MARGEN_TEXTO + 38, y, { width: ANCHO_TEXTO - 38 });
-      doc.moveDown(0.3);
-    }
-  }
+  abrirSeccion(ctx, '03.', 'PLANOS');
+  parrafo(ctx, 'Anexos que acompañan a esta propuesta:', 6, true);
+  nombres.forEach((n, i) => vineta(ctx, n, i === nombres.length - 2 ? nombres[i + 1] : undefined));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 04 Cotización
 // ─────────────────────────────────────────────────────────────────────────────
 
-const COL = (() => {
-  const anchos = [228, 58, 58, 82, 90];
-  let x = MARGEN;
-  return (['DESCRIPCIÓN', 'UNIDAD', 'CANTIDAD', 'PRECIO', 'TOTAL'] as const).map((titulo, i) => {
-    const col = { titulo, x, ancho: anchos[i]! };
-    x += anchos[i]!;
+const COLUMNAS = (() => {
+  const definicion: Array<[string, number, 'izq' | 'centro' | 'der']> = [
+    ['DESCRIPCIÓN', 234, 'izq'],
+    ['UNIDAD', 46, 'centro'],
+    ['CANTIDAD', 46, 'centro'],
+    ['PRECIO', 62, 'der'],
+    ['TOTAL', 68, 'der'],
+  ];
+  let x = COL_X;
+  return definicion.map(([titulo, ancho, alinear]) => {
+    const col = { titulo, x, ancho, alinear };
+    x += ancho;
     return col;
   });
 })();
 
-/** Importe como en el modelo: el signo pegado a la izquierda y la cifra alineada a la derecha. */
-function importe(doc: Doc, valor: number, x: number, ancho: number, y: number) {
-  doc.text('$', x + 5, y, { width: 8, lineBreak: false });
-  doc.text(numeroMx.format(Number(valor) || 0), x + 5, y, { width: ancho - 10, align: 'right' });
-}
+const FILA = { tamano: 7.8, relleno: 6.5, interlinea: 1.4, minimo: 24 };
+const ENCABEZADO_TABLA = 20;
 
-function cabeceraTabla(ctx: Ctx) {
-  const { doc } = ctx;
-  const y = doc.y;
+function encabezadoTabla(doc: Doc, y: number) {
   doc.save();
-  doc.rect(MARGEN, y, ANCHO_UTIL, 22).fill(COLOR.teal);
+  doc.rect(COL_X, y, COL_ANCHO, ENCABEZADO_TABLA).fill(C.verdeTexto);
   doc.restore();
-  doc.font('Helvetica-Bold').fontSize(7.6).fillColor(COLOR.blanco);
-  for (const col of COL) {
-    doc.text(col.titulo, col.x, y + 7.5, { width: col.ancho, align: 'center' });
+  for (const col of COLUMNAS) {
+    const base = y + ENCABEZADO_TABLA / 2 + 2.4;
+    const x = col.alinear === 'izq' ? col.x + 8 : col.alinear === 'der' ? col.x + col.ancho - 8 : col.x + col.ancho / 2;
+    renglon(doc, col.titulo, x, base, {
+      tamano: 6.8,
+      fuente: 'Helvetica-Bold',
+      color: C.blanco,
+      espaciado: 0.6,
+      alinear: col.alinear,
+      max: col.ancho - 8,
+    });
   }
-  // Rejilla del encabezado, igual que la del cuerpo.
-  doc.save().lineWidth(0.5).strokeColor(COLOR.linea);
-  doc.rect(MARGEN, y, ANCHO_UTIL, 22).stroke();
-  for (const col of COL.slice(1)) doc.moveTo(col.x, y).lineTo(col.x, y + 22).stroke();
-  doc.restore();
-  doc.y = y + 22;
+  return y + ENCABEZADO_TABLA;
 }
 
-/** Marco de la fila y sus separadores verticales. */
-function rejillaFila(doc: Doc, y: number, alto: number) {
-  doc.save().lineWidth(0.5).strokeColor(COLOR.linea);
-  doc.rect(MARGEN, y, ANCHO_UTIL, alto).stroke();
-  for (const col of COL.slice(1)) doc.moveTo(col.x, y).lineTo(col.x, y + alto).stroke();
+/** Importe con el signo a la izquierda de la celda y la cifra alineada a la derecha. */
+function importe(doc: Doc, valor: number, x: number, ancho: number, base: number, tamano: number, fuente = 'Helvetica') {
+  const cifra = numeroMx.format(Number(valor) || 0);
+  renglon(doc, '$', x + 8, base, { tamano, fuente, color: C.texto });
+  renglon(doc, cifra, x + ancho - 8, base, { tamano, fuente, color: C.texto, alinear: 'der', max: ancho - 24 });
+}
+
+/** Tarjeta de pares etiqueta/valor con título en verde. */
+function tarjeta(
+  doc: Doc,
+  x: number,
+  y: number,
+  ancho: number,
+  titulo: string,
+  filas: Array<[string, string, boolean?]>,
+  anchoEtiqueta: number,
+) {
+  const alto = 26 + filas.length * 14 + 6;
+  doc.save();
+  doc.roundedRect(x, y, ancho, alto, 5).lineWidth(0.8).strokeColor(C.linea).stroke();
   doc.restore();
+  renglon(doc, titulo, x + 12, y + 16, { tamano: 6.8, fuente: 'Helvetica-Bold', color: C.verdeTexto, espaciado: 1.1 });
+  filas.forEach(([etiqueta, valor, fuerte], i) => {
+    const base = y + 34 + i * 14;
+    renglon(doc, etiqueta, x + 12, base, { tamano: 7.6, color: C.suave });
+    renglon(doc, valor || '—', x + 12 + anchoEtiqueta, base, {
+      tamano: 8.6,
+      fuente: fuerte ? 'Helvetica-Bold' : 'Helvetica',
+      max: ancho - 24 - anchoEtiqueta,
+    });
+  });
+  return alto;
 }
 
 function seccionCotizacion(ctx: Ctx) {
-  const { doc, payload } = ctx;
-  ctx.seccion = null;
-  abrirPagina(ctx, 'cotizacion');
+  const { doc, payload, empresa } = ctx;
+  abrirSeccion(ctx, '04.', 'COTIZACIÓN');
 
-  // Recuadros de fecha, folio y validez.
-  const cajaY = 150;
-  const cajaX = MARGEN + 190;
-  const cajaAncho = ANCHO - MARGEN - cajaX;
-  const altoFila = 26;
-  doc.save().lineWidth(1).strokeColor(COLOR.texto);
-  doc.roundedRect(cajaX - 6, cajaY, cajaAncho + 6, altoFila * 3, 6).stroke();
-  doc.restore();
+  // Emisor, como el membrete de la hoja de cotización del modelo.
+  const telefonos = empresa.telefonoAlterno ? `${empresa.telefono}  /  ${empresa.telefonoAlterno}` : empresa.telefono;
+  const emisor = [empresa.direccion, `Correo electrónico: ${empresa.correo}`, `Teléfonos: ${telefonos}`];
+  emisor.forEach((linea, i) => renglon(doc, linea, COL_X, 158 + i * 11, { tamano: 7.8, color: C.suave, max: COL_ANCHO }));
 
-  const campos: Array<[string, string]> = [
-    ['Fecha de emisión:', payload.issueDate],
-    ['Cotización N°:', payload.folio],
-    ['Validez:', payload.validUntil ?? 'Sujeta a confirmación'],
+  // Cliente y datos de la cotización.
+  const yTarjetas = 204;
+  const cliente = payload.cliente;
+  const razon = cliente.empresa?.trim() || '';
+  const contacto = cliente.nombre?.trim() || '';
+  const filasCliente: Array<[string, string, boolean?]> = [['Cliente:', razon || contacto, true]];
+  if (razon && contacto && razon !== contacto) filasCliente.push(['Atención:', contacto]);
+  filasCliente.push(['Teléfono:', cliente.telefono?.trim() || '']);
+  if (cliente.correo?.trim()) filasCliente.push(['Correo:', cliente.correo.trim()]);
+  const filasDatos: Array<[string, string, boolean?]> = [
+    ['Cotización N°:', payload.folio, true],
+    ['Fecha de emisión:', fechaLarga(payload.issueDate) ?? ''],
+    ['Validez:', fechaLarga(payload.validUntil) ?? 'Sujeta a confirmación'],
   ];
-  campos.forEach(([etiqueta, valor], i) => {
-    const y = cajaY + i * altoFila;
-    doc.font('Helvetica').fontSize(9).fillColor(COLOR.texto).text(etiqueta, cajaX + 4, y + 8, { width: 116 });
-    doc.save().lineWidth(0.8).strokeColor(COLOR.texto);
-    doc.rect(cajaX + 122, y, cajaAncho - 128, altoFila).stroke();
-    doc.restore();
-    doc
-      .font('Helvetica')
-      .fontSize(9)
-      .fillColor(COLOR.texto)
-      .text(valor, cajaX + 128, y + 8, { width: cajaAncho - 140, align: 'center', lineBreak: false });
-  });
+  const anchoCliente = 234;
+  const altoA = tarjeta(doc, COL_X, yTarjetas, anchoCliente, 'CLIENTE', filasCliente, 52);
+  const altoB = tarjeta(
+    doc,
+    COL_X + anchoCliente + 10,
+    yTarjetas,
+    COL_ANCHO - anchoCliente - 10,
+    'DATOS DE LA COTIZACIÓN',
+    filasDatos,
+    74,
+  );
 
-  // Franja verde de cliente y teléfono.
-  const clienteY = cajaY + altoFila * 3 + 16;
-  doc.save();
-  doc.rect(MARGEN, clienteY, 146, 34).fill(COLOR.teal);
-  doc.lineWidth(1).strokeColor(COLOR.texto).rect(MARGEN, clienteY, ANCHO_UTIL, 34).stroke();
-  doc.restore();
-  doc.font('Helvetica').fontSize(8.5).fillColor(COLOR.blanco);
-  doc.text('Cliente:', MARGEN + 6, clienteY + 5, { width: 100, lineBreak: false });
-  doc.text('Teléfono:', MARGEN + 6, clienteY + 18, { width: 100, lineBreak: false });
-  doc.fillColor(COLOR.texto);
-  doc.text(payload.cliente.empresa || payload.cliente.nombre || '—', MARGEN + 154, clienteY + 5, {
-    width: ANCHO_UTIL - 160,
-    lineBreak: false,
-  });
-  doc.text(payload.cliente.telefono || '—', MARGEN + 154, clienteY + 18, { width: ANCHO_UTIL - 160, lineBreak: false });
+  let y = encabezadoTabla(doc, yTarjetas + Math.max(altoA, altoB) + 18);
 
-  doc.y = clienteY + 46;
-  cabeceraTabla(ctx);
+  // Las partidas van seguidas, sin subtotales por grupo (el modelo no los tiene).
+  const partidas = payload.grupos.flatMap((g) => g.partidas);
+  const anchoDescripcion = COLUMNAS[0]!.ancho - 16;
+  const nuevaHojaDeTabla = () => {
+    abrirPagina(ctx, 'seccion');
+    return encabezadoTabla(doc, INICIO_CONTINUACION - 6);
+  };
+  // Los totales nunca quedan solos en una hoja: viajan con la última partida.
+  const altoTotal = 17;
+  const altoTotales = 10 + altoTotal * 3;
 
-  for (const grupo of payload.grupos) {
-    if (doc.y + 44 > LIMITE_CUERPO + 30) {
-      abrirPagina(ctx, 'cotizacion');
-      cabeceraTabla(ctx);
-    }
-    // Banda del grupo: el cliente ve cuánto es equipo y cuánto es trabajo.
-    const yGrupo = doc.y;
+  partidas.forEach((partida, i) => {
+    const nombre = String(partida.name ?? '').trim();
+    const descripcion = String(partida.description ?? '').trim();
+    const detalle = descripcion && descripcion !== nombre ? descripcion : '';
+    doc.font(detalle ? 'Helvetica-Bold' : 'Helvetica').fontSize(FILA.tamano);
+    const altoNombre = nombre ? doc.heightOfString(nombre, { width: anchoDescripcion, lineGap: FILA.interlinea }) : 0;
+    doc.font('Helvetica').fontSize(FILA.tamano - 0.4);
+    const altoDetalle = detalle ? doc.heightOfString(detalle, { width: anchoDescripcion, lineGap: FILA.interlinea }) + 2 : 0;
+    // `heightOfString` cuenta el interlineado bajo el último renglón, que no se ve.
+    const alto = Math.max(FILA.minimo, altoNombre + altoDetalle + FILA.relleno * 2 - FILA.interlinea - FILA.tamano * 0.2);
+
+    const reserva = i === partidas.length - 1 ? altoTotales : 0;
+    if (y + alto + reserva > LIMITE_CUERPO) y = nuevaHojaDeTabla();
+
     doc.save();
-    doc.rect(MARGEN, yGrupo, ANCHO_UTIL, 17).fill(COLOR.tealSuave);
+    if (i % 2 === 1) doc.rect(COL_X, y, COL_ANCHO, alto).fill(C.cebra);
+    doc.moveTo(COL_X, y + alto).lineTo(COL_DER, y + alto).lineWidth(0.5).strokeColor(C.linea).stroke();
     doc.restore();
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(7.8)
-      .fillColor(COLOR.texto)
-      .text(grupo.etiqueta.toUpperCase(), MARGEN + 6, yGrupo + 5, { width: 300, lineBreak: false });
-    doc.fillColor(COLOR.texto).font('Helvetica-Bold').fontSize(7.8);
-    importe(doc, grupo.subtotal, COL[4]!.x, COL[4]!.ancho, yGrupo + 5);
-    rejillaFila(doc, yGrupo, 17);
-    doc.y = yGrupo + 17;
 
-    for (const partida of grupo.partidas) {
-      const texto = partida.description ? `${partida.name}\n${partida.description}` : partida.name;
-      doc.font('Helvetica').fontSize(7.6);
-      const alto = Math.max(doc.heightOfString(texto, { width: COL[0]!.ancho - 12 }), 14) + 14;
-
-      if (doc.y + alto > ALTO - MARGEN) {
-        abrirPagina(ctx, 'cotizacion');
-        cabeceraTabla(ctx);
-      }
-
-      const y = doc.y;
-      doc.font('Helvetica').fontSize(7.6).fillColor(COLOR.texto);
-      doc.text(texto, COL[0]!.x + 6, y + 7, { width: COL[0]!.ancho - 12 });
-      const centro = y + alto / 2 - 4;
-      doc.text(partida.unit || 'Pieza', COL[1]!.x, centro, { width: COL[1]!.ancho, align: 'center', lineBreak: false });
-      doc.text(cantidadMx.format(Number(partida.qty) || 0), COL[2]!.x, centro, {
-        width: COL[2]!.ancho,
-        align: 'center',
-        lineBreak: false,
-      });
-      importe(doc, partida.unitPrice, COL[3]!.x, COL[3]!.ancho, centro);
-      importe(doc, partida.lineTotal, COL[4]!.x, COL[4]!.ancho, centro);
-      rejillaFila(doc, y, alto);
-      doc.y = y + alto;
+    const yTexto = y + FILA.relleno;
+    if (nombre) {
+      doc.font(detalle ? 'Helvetica-Bold' : 'Helvetica').fontSize(FILA.tamano).fillColor(C.texto);
+      doc.text(nombre, COLUMNAS[0]!.x + 8, yTexto, { width: anchoDescripcion, lineGap: FILA.interlinea });
     }
+    if (detalle) {
+      doc.font('Helvetica').fontSize(FILA.tamano - 0.4).fillColor(C.suave);
+      doc.text(detalle, COLUMNAS[0]!.x + 8, yTexto + altoNombre + 2, { width: anchoDescripcion, lineGap: FILA.interlinea });
+    }
+    // Unidad, cantidad e importes en el primer renglón, alineados con el nombre.
+    const base = yTexto + ASCENSO * FILA.tamano;
+    renglon(doc, partida.unit?.trim() || 'Pieza', COLUMNAS[1]!.x + COLUMNAS[1]!.ancho / 2, base, {
+      tamano: FILA.tamano,
+      alinear: 'centro',
+      max: COLUMNAS[1]!.ancho - 6,
+    });
+    renglon(doc, cantidadMx.format(Number(partida.qty) || 0), COLUMNAS[2]!.x + COLUMNAS[2]!.ancho / 2, base, {
+      tamano: FILA.tamano,
+      alinear: 'centro',
+    });
+    importe(doc, partida.unitPrice, COLUMNAS[3]!.x, COLUMNAS[3]!.ancho, base, FILA.tamano);
+    importe(doc, partida.lineTotal, COLUMNAS[4]!.x, COLUMNAS[4]!.ancho, base, FILA.tamano);
+    y += alto;
+  });
+  if (!partidas.length) {
+    renglon(doc, 'Sin partidas capturadas.', COL_X + 8, y + 16, { tamano: FILA.tamano, color: C.suave });
+    y += FILA.minimo;
   }
 
-  // Bloque de totales, pegado a la derecha como en el modelo.
-  if (doc.y + 70 > ALTO - MARGEN) abrirPagina(ctx, 'cotizacion');
-  const totY = doc.y + 8;
-  const totAncho = 194;
-  const totX = ANCHO - MARGEN - totAncho;
+  // Totales a la derecha; nota de moneda a la izquierda.
+  y += 10;
+  const totX = COLUMNAS[3]!.x - 40;
+  const totAncho = COL_DER - totX;
+  const anchoImporte = COLUMNAS[4]!.ancho + 20;
   const filas: Array<[string, number, boolean]> = [
     ['SUBTOTAL', payload.subtotal, false],
     ['IVA', payload.iva, false],
     ['TOTAL', payload.total, true],
   ];
-  doc.save().lineWidth(0.8).strokeColor(COLOR.linea);
-  doc.rect(totX, totY, totAncho, 17 * filas.length).stroke();
-  doc.moveTo(totX + 88, totY).lineTo(totX + 88, totY + 17 * filas.length).stroke();
-  doc.restore();
   filas.forEach(([etiqueta, valor, fuerte], i) => {
-    const y = totY + i * 17;
-    doc
-      .font(fuerte ? 'Helvetica-Bold' : 'Helvetica')
-      .fontSize(8.6)
-      .fillColor(COLOR.texto)
-      .text(etiqueta, totX + 4, y + 5, { width: 80, align: 'right', lineBreak: false });
-    importe(doc, valor, totX + 88, totAncho - 88, y + 5);
+    const fy = y + i * altoTotal;
+    doc.save();
+    if (fuerte) doc.rect(totX, fy, totAncho, altoTotal).fill(C.verdeTexto);
+    else doc.moveTo(totX, fy + altoTotal).lineTo(COL_DER, fy + altoTotal).lineWidth(0.5).strokeColor(C.linea).stroke();
+    doc.restore();
+    const base = fy + altoTotal / 2 + 3;
+    renglon(doc, etiqueta, COL_DER - anchoImporte - 12, base, {
+      tamano: fuerte ? 8.6 : 7.8,
+      fuente: 'Helvetica-Bold',
+      color: fuerte ? C.blanco : C.suave,
+      alinear: 'der',
+      espaciado: 0.8,
+    });
+    const color = fuerte ? C.blanco : C.texto;
+    const fuente = fuerte ? 'Helvetica-Bold' : 'Helvetica';
+    renglon(doc, '$', COL_DER - anchoImporte, base, { tamano: fuerte ? 9 : 8.2, fuente, color });
+    renglon(doc, numeroMx.format(Number(valor) || 0), COL_DER - 8, base, {
+      tamano: fuerte ? 9 : 8.2,
+      fuente,
+      color,
+      alinear: 'der',
+    });
   });
+  renglon(doc, `Importes en ${payload.currency || 'MXN'}.`, COL_X, y + 11, { tamano: 7.2, color: C.suave });
+  doc.x = COL_X;
+  doc.y = y + altoTotal * filas.length + 26;
 
-  // Términos y condiciones: por segmento y por lo que realmente se cobra.
-  const terY = Math.max(totY + 17 * filas.length + 18, doc.y + 8);
-  doc.y = terY;
-  if (doc.y + 90 > ALTO - MARGEN) abrirPagina(ctx, 'cotizacion');
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(7.4)
-    .fillColor(COLOR.texto)
-    .text(payload.terminos.titulo.toUpperCase(), MARGEN, doc.y, { width: 330 });
-  doc.moveDown(0.25);
-  for (const linea of payload.terminos.lineas) {
-    if (doc.y + 22 > ALTO - MARGEN) abrirPagina(ctx, 'cotizacion');
-    doc.font('Helvetica').fontSize(7.4).fillColor(COLOR.texto).text(linea, MARGEN, doc.y, { width: 330, lineGap: 0.6 });
-    doc.moveDown(0.14);
+  // Términos y condiciones: cada renglón con su etiqueta en negritas.
+  const lineas = payload.terminos.lineas.map((l) => l.trim()).filter(Boolean);
+  if (lineas.length) {
+    asegurarEspacio(ctx, 16 + 26);
+    renglon(doc, payload.terminos.titulo.toUpperCase(), COL_X, doc.y + 7, {
+      tamano: 7.4,
+      fuente: 'Helvetica-Bold',
+      color: C.verdeTexto,
+      espaciado: 1.1,
+    });
+    doc.y += 16;
+    for (const linea of lineas) {
+      const partes = conEtiqueta(linea);
+      const texto = partes ? `${partes[0]}. ${partes[1]}` : linea;
+      doc.font('Helvetica').fontSize(8);
+      const alto = doc.heightOfString(texto, { width: COL_ANCHO - 14, lineGap: 1.6 });
+      asegurarEspacio(ctx, alto);
+      const y0 = doc.y;
+      rombo(doc, COL_X + 3, y0 + 3.4, 1.9, 0.3, C.verde);
+      doc.fillColor(C.texto);
+      if (partes) {
+        doc.font('Helvetica-Bold').text(`${partes[0]}. `, COL_X + 14, y0, {
+          width: COL_ANCHO - 14,
+          lineGap: 1.6,
+          continued: true,
+        });
+        doc.font('Helvetica').text(partes[1]);
+      } else {
+        doc.text(linea, COL_X + 14, y0, { width: COL_ANCHO - 14, lineGap: 1.6 });
+      }
+      doc.x = COL_X;
+      doc.y += 3.5;
+    }
   }
 
-  if (payload.participantes.length) {
-    doc.moveDown(0.5);
-    if (doc.y + 20 > ALTO - MARGEN) abrirPagina(ctx, 'cotizacion');
-    doc
-      .font('Helvetica')
-      .fontSize(7)
-      .fillColor(COLOR.gris)
-      .text(
-        `Elaborada por: ${payload.participantes.map((p) => `${p.nombre} (${p.rolEtiqueta})`).join('  ·  ')}`,
-        MARGEN,
-        doc.y,
-        { width: 330 },
-      );
+  // Quién la elaboró, con línea de firma.
+  const participantes = payload.participantes.filter((p) => p?.nombre?.trim());
+  if (participantes.length) {
+    const porFila = 3;
+    const anchoFirma = (COL_ANCHO - 20 * (porFila - 1)) / porFila;
+    const filasFirma = Math.ceil(participantes.length / porFila);
+    asegurarEspacio(ctx, 30 + filasFirma * 44);
+    let yf = doc.y + 30;
+    participantes.forEach((p, i) => {
+      const col = i % porFila;
+      if (i > 0 && col === 0) yf += 44;
+      const x = COL_X + col * (anchoFirma + 20);
+      doc.save();
+      doc.moveTo(x, yf).lineTo(x + anchoFirma, yf).lineWidth(0.6).strokeColor(C.tenue).stroke();
+      doc.restore();
+      renglon(doc, p.nombre.trim(), x, yf + 12, { tamano: 8.4, fuente: 'Helvetica-Bold', max: anchoFirma });
+      renglon(doc, p.rolEtiqueta?.trim() || 'Elaboró', x, yf + 23, { tamano: 7.4, color: C.suave, max: anchoFirma });
+    });
+    doc.y = yf + 30;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Numeración
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** «Página n de N» en todas las hojas menos la portada; se escribe al final, ya con el total. */
+function numerarPaginas(ctx: Ctx) {
+  const { doc } = ctx;
+  const { start, count } = doc.bufferedPageRange();
+  for (let i = 0; i < count; i += 1) {
+    const modo = ctx.paginas[i];
+    if (!modo || modo === 'portada') continue;
+    doc.switchToPage(start + i);
+    const texto = `Página ${i + 1} de ${count}`;
+    if (modo === 'plano') {
+      const { width, height } = doc.page;
+      renglon(doc, texto, width - 24, height - FRANJA_PLANO + 22, { tamano: 11, color: C.suave, alinear: 'der' });
+    } else {
+      renglon(doc, texto, ANCHO - 18, ALTO - 13, {
+        tamano: 7,
+        fuente: 'Helvetica-Bold',
+        color: C.blanco,
+        alinear: 'der',
+      });
+    }
   }
 }
 
@@ -931,10 +1294,11 @@ function seccionCotizacion(ctx: Ctx) {
 
 /** Documento completo, listo para adjuntar al correo o descargar. */
 export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload): Promise<Buffer> {
-  // Sin `bufferPages`: el documento se escribe de una pasada y cada página sale con su pie puesto.
-  const doc = new PDFDocument({ size: 'LETTER', margin: MARGEN, autoFirstPage: false });
+  const empresa = datosEmpresaPropuesta(payload.empresa);
+  // `bufferPages` solo para escribir «Página n de N» al final: el total no se sabe antes.
+  const doc = new PDFDocument({ size: 'LETTER', margins: MARGENES_INTERIOR, autoFirstPage: false, bufferPages: true });
   doc.info.Title = `Propuesta técnica ${payload.folio}`;
-  doc.info.Author = datosEmpresa(payload).nombre;
+  doc.info.Author = empresa.nombre;
 
   const trozos: Buffer[] = [];
   doc.on('data', (trozo: Buffer) => trozos.push(trozo));
@@ -946,20 +1310,40 @@ export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload): Pro
   const ctx: Ctx = {
     doc,
     payload,
-    empresa: datosEmpresa(payload),
+    empresa,
     marca: abrirMarca(doc),
     modo: 'portada',
     seccion: null,
-    tituloPuesto: false,
+    paginas: [],
   };
 
-  doc.on('pageAdded', () => marcoDePagina(ctx));
+  doc.on('pageAdded', () => {
+    ctx.paginas.push(ctx.modo);
+    marcoDeSeccion(ctx);
+  });
 
-  portada(ctx);
+  // El índice de la portada dice qué secciones trae esta propuesta; se sabe de antemano.
+  const hayAlcance = payload.alcance.some(
+    (b) => b && (b.titulo?.trim() || b.texto?.trim() || (b.vinetas ?? []).some((v) => String(v).trim())),
+  );
+  const planos = prepararPlanos(payload.planos);
+  const hayPlanos = planos.imagenes.length + planos.otros.length > 0;
+  const indice = SECCIONES.map((s) => ({
+    ...s,
+    nota:
+      s.numero === '02.' && !hayAlcance
+        ? '· detallado en la cotización'
+        : s.numero === '03.' && !hayPlanos
+          ? '· sin anexos'
+          : undefined,
+  }));
+
+  portada(ctx, indice);
   seccionObjetivo(ctx);
   seccionAlcance(ctx);
-  seccionPlanos(ctx);
+  seccionPlanos(ctx, planos);
   seccionCotizacion(ctx);
+  numerarPaginas(ctx);
 
   doc.end();
   return listo;

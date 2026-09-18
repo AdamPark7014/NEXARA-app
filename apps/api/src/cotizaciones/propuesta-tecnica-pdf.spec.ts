@@ -1,4 +1,10 @@
-import { generarPropuestaTecnicaPdf, type PropuestaPayload } from './propuesta-tecnica-pdf.js';
+import zlib from 'zlib';
+import {
+  datosEmpresaPropuesta,
+  fechaLarga,
+  generarPropuestaTecnicaPdf,
+  type PropuestaPayload,
+} from './propuesta-tecnica-pdf.js';
 import { agruparPartidas } from './partidas-grupos.js';
 import { objetivoDePropuesta } from './objetivo-plantilla.js';
 import { bloqueAlcanceDePaquete, buscarPaquete, partidasDePaquete } from './paquetes.js';
@@ -52,24 +58,127 @@ function payloadDePrueba(): PropuestaPayload {
   };
 }
 
+/**
+ * Texto de cada hoja del PDF.
+ *
+ * PDFKit comprime cada hoja en un flujo propio y los escribe en orden; el texto va en arreglos
+ * `[<hex> kern <hex>] TJ` con la codificación WinAnsi, que en latin1 se lee tal cual.
+ */
+function textoPorHoja(pdf: Buffer): string[] {
+  const hojas: string[] = [];
+  const fuente = pdf.toString('latin1');
+  const flujos = fuente.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g);
+  for (const [, crudo] of flujos) {
+    let contenido: string;
+    try {
+      contenido = zlib.inflateSync(Buffer.from(crudo!, 'latin1')).toString('latin1');
+    } catch {
+      continue;
+    }
+    if (!/\bcm\b/.test(contenido) || !contenido.includes('TJ')) continue;
+    const renglones = [...contenido.matchAll(/\[([^\]]*)\] TJ/g)].map(([, arreglo]) =>
+      [...arreglo!.matchAll(/<([0-9a-fA-F]*)>/g)].map(([, hex]) => Buffer.from(hex!, 'hex').toString('latin1')).join(''),
+    );
+    hojas.push(renglones.join('\n'));
+  }
+  return hojas;
+}
+
+const cuentaDe = (pdf: Buffer, patron: RegExp) => (pdf.toString('latin1').match(patron) ?? []).length;
+const paginas = (pdf: Buffer) => cuentaDe(pdf, /\/Type \/Page\b/g);
+
 describe('PDF Propuesta técnica', () => {
-  it('genera un PDF válido con las cuatro secciones', async () => {
+  it('genera un PDF válido con portada y las cuatro secciones', async () => {
     const pdf = await generarPropuestaTecnicaPdf(payloadDePrueba());
-    expect(pdf.length).toBeGreaterThan(2000);
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    const texto = textoPorHoja(pdf).join('\n');
+    for (const esperado of ['PROPUESTA', 'TÉCNICA', 'VERSIÓN 1.0', 'OBJETIVO DEL PROYECTO', 'ALCANCE DEL PROYECTO', 'PLANOS', 'COTIZACIÓN']) {
+      expect(texto).toContain(esperado);
+    }
   });
 
-  it('un anexo que no existe en disco no tumba la propuesta', async () => {
+  it('imprime todos los campos de la hoja de cotización del modelo', async () => {
+    const texto = textoPorHoja(await generarPropuestaTecnicaPdf(payloadDePrueba())).join('\n');
+    for (const esperado of [
+      'Santiago Momoxpan, 72775 Cholula de Rivadavia, Pue.',
+      'Correo electrónico: gerencia@nexara.com.mx',
+      'Teléfonos:',
+      'Fecha de emisión:',
+      '17 de septiembre de 2026',
+      'Cotización N°:',
+      'NEX-LJ75100126-0007-JA.CE',
+      'Validez:',
+      '2 de octubre de 2026',
+      'Cliente:',
+      'Empresa S.A. de C.V.',
+      'Teléfono:',
+      '2221234567',
+      'DESCRIPCIÓN',
+      'UNIDAD',
+      'CANTIDAD',
+      'PRECIO',
+      'TOTAL',
+      'SUBTOTAL',
+      'IVA',
+      'TÉRMINOS Y CONDICIONES',
+      'Forma de pago.',
+      'Alcance de la cotización.',
+      'Disponibilidad.',
+      'Luis Joel Aguilar',
+    ]) {
+      expect(texto).toContain(esperado);
+    }
+  });
+
+  it('el cliente no ve subtotales por grupo: las partidas van seguidas, como en el modelo', async () => {
+    const texto = textoPorHoja(await generarPropuestaTecnicaPdf(payloadDePrueba())).join('\n');
+    expect(texto).not.toMatch(/^(EQUIPOS|MATERIALES|MANO DE OBRA)$/m);
+  });
+
+  it('numera todas las hojas menos la portada con «Página n de N»', async () => {
+    const payload = payloadDePrueba();
+    // Muchas partidas para que la tabla ocupe varias hojas.
+    const base = payload.grupos[0]!.partidas[0]!;
+    payload.grupos = [{ ...payload.grupos[0]!, partidas: Array.from({ length: 60 }, () => ({ ...base })) }];
+    const pdf = await generarPropuestaTecnicaPdf(payload);
+    const hojas = textoPorHoja(pdf);
+    const total = paginas(pdf);
+    expect(hojas).toHaveLength(total);
+    expect(hojas[0]).not.toContain('Página');
+    hojas.slice(1).forEach((hoja, i) => expect(hoja).toContain(`Página ${i + 2} de ${total}`));
+  });
+
+  it('la marca se embebe una sola vez aunque el documento tenga muchas hojas', async () => {
+    const corto = await generarPropuestaTecnicaPdf(payloadDePrueba());
+    const payload = payloadDePrueba();
+    const base = payload.grupos[0]!.partidas[0]!;
+    payload.grupos = [{ ...payload.grupos[0]!, partidas: Array.from({ length: 80 }, () => ({ ...base })) }];
+    const largo = await generarPropuestaTecnicaPdf(payload);
+    expect(paginas(largo)).toBeGreaterThan(paginas(corto));
+    expect(cuentaDe(largo, /\/Subtype \/Image/g)).toBe(cuentaDe(corto, /\/Subtype \/Image/g));
+  });
+
+  it('usa los datos del perfil de la empresa cuando existen', async () => {
+    const payload = payloadDePrueba();
+    payload.empresa = { contactEmail: 'contacto@nexara.com.mx', contactPhone: '222 000 1111' };
+    const texto = textoPorHoja(await generarPropuestaTecnicaPdf(payload)).join('\n');
+    expect(texto).toContain('contacto@nexara.com.mx');
+    expect(texto).toContain('222 000 1111');
+    expect(texto).not.toContain('gerencia@nexara.com.mx');
+  });
+
+  it('un anexo que no existe en disco no tumba la propuesta: se enlista en 03', async () => {
     const payload = payloadDePrueba();
     payload.planos = [
       { url: '/uploads/no-existe.png', nombre: 'Plano perdido', tipo: 'imagen' },
       { url: 'https://ejemplo.mx/plano.pdf', nombre: 'Plano remoto', tipo: 'pdf' },
     ];
-    const pdf = await generarPropuestaTecnicaPdf(payload);
-    expect(pdf.length).toBeGreaterThan(2000);
+    const texto = textoPorHoja(await generarPropuestaTecnicaPdf(payload)).join('\n');
+    expect(texto).toContain('Plano perdido');
+    expect(texto).toContain('Plano remoto');
   });
 
-  it('sin partidas ni alcance sigue produciendo el documento', async () => {
+  it('sin partidas, alcance ni planos sigue produciendo el documento y la portada lo dice', async () => {
     const payload = payloadDePrueba();
     payload.grupos = [];
     payload.alcance = [];
@@ -79,5 +188,31 @@ describe('PDF Propuesta técnica', () => {
     payload.total = 0;
     const pdf = await generarPropuestaTecnicaPdf(payload);
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    const [portada, ...resto] = textoPorHoja(pdf);
+    expect(portada).toContain('sin anexos');
+    expect(resto.join('\n')).not.toContain('ALCANCE DEL PROYECTO');
+    // Portada, objetivo y cotización.
+    expect(paginas(pdf)).toBe(3);
+  });
+});
+
+describe('datos de la propuesta', () => {
+  it('fecha larga en español sin corrimiento por zona horaria', () => {
+    expect(fechaLarga('2026-09-17')).toBe('17 de septiembre de 2026');
+    expect(fechaLarga('2026-01-01T00:00:00.000Z')).toBe('1 de enero de 2026');
+    expect(fechaLarga(null)).toBeNull();
+  });
+
+  it('sin perfil de empresa usa los datos de la propuesta modelo', () => {
+    const empresa = datosEmpresaPropuesta(null);
+    expect(empresa.correo).toBe('gerencia@nexara.com.mx');
+    expect(empresa.telefonoAlterno).toBe('(222) 696 0350');
+    expect(empresa.nombre).toBe('NEXARA');
+  });
+
+  it('un campo vacío del perfil no borra el dato del modelo', () => {
+    const empresa = datosEmpresaPropuesta({ contactEmail: '  ', tradeName: 'Nexara' });
+    expect(empresa.correo).toBe('gerencia@nexara.com.mx');
+    expect(empresa.nombre).toBe('NEXARA');
   });
 });
