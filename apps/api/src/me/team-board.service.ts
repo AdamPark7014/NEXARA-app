@@ -9,6 +9,12 @@ import {
   workDayEnd,
 } from '../common/time/workday.js';
 import { isNonEmployeeEmail } from '../common/platform-accounts.js';
+import {
+  limiteDeActividad,
+  periodoDeActividad,
+  periodoDto,
+  type PeriodoDto,
+} from '../activities/actividad-periodo.js';
 import { esDeTodaLaEmpresa, extrasDeTablero, subarbolIds, tiposVisibles } from './equipo-alcance.js';
 import {
   calculaActividad,
@@ -45,6 +51,8 @@ export type TeamBoardActivity = {
   estatus: string;
   fechaMaxima: Date | null;
   bucket: BoardActivityBucket;
+  /** Actividad de varios días: «Día 3 de 10 · termina vie 25 sep». */
+  periodo: PeriodoDto | null;
 };
 
 export type TeamBoardOpenActivity = {
@@ -76,6 +84,8 @@ export type TeamBoardOpenActivity = {
   asignadoPor: { id: number; nombre: string } | null;
   /** Sección B; sin sus columnas todo sale PENDIENTE. */
   aceptacion: BoardAceptacion;
+  /** Actividad de varios días: sigue en la pizarra cada día hasta su fin. */
+  periodo: PeriodoDto | null;
 };
 
 export type TeamBoardUser = {
@@ -169,6 +179,9 @@ export type AsignadaPorMiItem = {
   retirado: boolean;
   aceptacion: BoardAceptacion;
   motivoRechazo: string | null;
+  /** Hora real en que la inició («Iniciar actividad» o foto de entrada); null = sin iniciar. */
+  inicioRealAt: Date | null;
+  periodo: PeriodoDto | null;
 };
 
 export type AsignadasPorMiResponse = {
@@ -340,6 +353,8 @@ export class TeamBoardService {
         fechaAsignacion: true,
         fechaMaxima: true,
         fechaFinalizacion: true,
+        periodoInicio: true,
+        periodoFin: true,
         activityEvidences: {
           where: { userId },
           select: {
@@ -385,6 +400,7 @@ export class TeamBoardService {
           minutosPlan: minutosPlanDeHoras(numero(fila?.horasPlan)),
           inicio: tiempos.inicio,
           fin: tiempos.fin,
+          periodo: periodoDeActividad(a),
         },
         now,
       );
@@ -458,6 +474,8 @@ export class TeamBoardService {
             fechaInicio: true,
             fechaMaxima: true,
             fechaFinalizacion: true,
+            periodoInicio: true,
+            periodoFin: true,
             activityEvidences: {
               select: {
                 userId: true,
@@ -509,6 +527,7 @@ export class TeamBoardService {
           minutosPlan: minutosPlanDeHoras(numero(fila.horasPlan)),
           inicio: tiempos.inicio,
           fin: tiempos.fin,
+          periodo: periodoDeActividad(act),
         },
         now,
       );
@@ -537,6 +556,8 @@ export class TeamBoardService {
         retirado: calc.retirado,
         aceptacion: aceptacionDe(fila),
         motivoRechazo: textoOpcional(fila, 'motivoRechazo'),
+        inicioRealAt: tiempos.inicio,
+        periodo: periodoDto(act, now, terminada),
       });
     }
 
@@ -654,6 +675,8 @@ export class TeamBoardService {
               fechaAsignacion: true,
               fechaInicio: true,
               fechaFinalizacion: true,
+              periodoInicio: true,
+              periodoFin: true,
               coreKind: true,
               assignmentCharge: true,
               deletedAt: true,
@@ -762,6 +785,7 @@ export class TeamBoardService {
         cerrada: isClosed,
       });
       const terminada = isClosed || myEv?.status === 'COMPLETED';
+      const periodo = periodoDeActividad(act);
       const calc = calculaActividad(
         {
           prioridad: act.prioridad,
@@ -773,16 +797,23 @@ export class TeamBoardService {
           minutosPlan: minutosPlanDeHoras(numero(row.horasPlan)),
           inicio: tiempos.inicio,
           fin: tiempos.fin,
+          periodo,
         },
         now,
       );
-      // Entra al rango lo que pasó dentro y lo que sigue abierto de antes.
+      // Una etapa que empieza después del rango todavía no es trabajo de esos días: si no,
+      // al programar un proyecto todas sus etapas saldrían hoy en la pizarra.
+      const programadaDespues = !terminada && periodo != null && periodo.inicio > workDateKey(dayEnd);
+      // Entra al rango lo que pasó dentro y lo que sigue abierto de antes (así una actividad
+      // de varios días sale todos los días de su periodo, y después, mientras siga abierta).
       const dentroDelRango =
-        enRango(
+        !programadaDespues &&
+        (enRango(
           [tiempos.inicio, tiempos.fin, act.fechaFinalizacion, act.fechaInicio, act.fechaAsignacion],
           dayStart,
           dayEnd,
-        ) || (!terminada && act.fechaAsignacion.getTime() <= dayEnd.getTime());
+        ) ||
+          (!terminada && act.fechaAsignacion.getTime() <= dayEnd.getTime()));
       calculoPorFila.set(clave(row.userId, act.id), {
         calc,
         inicio: tiempos.inicio,
@@ -821,6 +852,7 @@ export class TeamBoardService {
           ? { id: row.asignadoPor.id, nombre: row.asignadoPor.nombre }
           : null,
         aceptacion: aceptacionDe(row),
+        periodo: periodoDto(act, now, terminada),
       };
       const list = openByUser.get(row.userId) ?? [];
       if (!list.some((x) => x.id === item.id)) list.push(item);
@@ -859,17 +891,14 @@ export class TeamBoardService {
           };
         });
       const enElRango = propias.filter((p) => p.calculo?.dentroDelRango);
-      // En curso: primero lo que ya arrancó, luego lo que vence antes.
+      // En curso: primero lo que ya arrancó, luego lo que vence antes (con periodo, su fin).
       const arranco = (estatus: string) => (/proceso|validar/i.test(estatus || '') ? 0 : 1);
+      const vence = (a: (typeof propias)[number]['a']) =>
+        limiteDeActividad(a)?.getTime() ?? Number.MAX_SAFE_INTEGER;
       const enCurso =
         enElRango
           .filter((p) => !p.terminada)
-          .sort(
-            (x, y) =>
-              arranco(x.a.estatus) - arranco(y.a.estatus) ||
-              (x.a.fechaMaxima?.getTime() ?? Number.MAX_SAFE_INTEGER) -
-                (y.a.fechaMaxima?.getTime() ?? Number.MAX_SAFE_INTEGER),
-          )[0] ?? null;
+          .sort((x, y) => arranco(x.a.estatus) - arranco(y.a.estatus) || vence(x.a) - vence(y.a))[0] ?? null;
       const act = enCurso?.a ?? null;
       // Entregó y nadie ha aprobado todavía / le devolvieron evidencia y la está corrigiendo.
       const enEsperaAprobacion = enElRango.filter((p) => p.envio && !p.aprobada && !p.cancelada).length;
@@ -883,10 +912,11 @@ export class TeamBoardService {
       let lastFinished: TeamBoardUser['lastFinished'] = null;
 
       if (act) {
-        const overdue = act.fechaMaxima != null && act.fechaMaxima.getTime() < now.getTime();
+        // Con periodo, «atrasado» es pasar el fin de su último día, no la hora citada del primero.
+        const limite = limiteDeActividad(act);
+        const overdue = limite != null && limite.getTime() < now.getTime();
         status = overdue ? 'atrasado' : 'activo';
-        currentLateMinutes =
-          overdue && act.fechaMaxima ? minutos(now.getTime() - act.fechaMaxima.getTime()) : null;
+        currentLateMinutes = overdue && limite ? minutos(now.getTime() - limite.getTime()) : null;
         currentActivity = {
           id: act.id,
           anNumber: act.anNumber,
@@ -894,6 +924,7 @@ export class TeamBoardService {
           estatus: act.estatus,
           fechaMaxima: act.fechaMaxima,
           bucket: act.projectId ? 'projects' : act.clientId ? 'services' : 'daily',
+          periodo: periodoDto(act, now, false),
         };
         // El inicio es el real (foto de entrada / `inicioRealAt`), no la hora a la que la citaron.
         activityStartedAt = enCurso?.calculo?.inicio ?? null;
@@ -908,14 +939,13 @@ export class TeamBoardService {
         if (ultima?.terminoAt) {
           status = 'libre';
           idleSinceAt = ultima.terminoAt;
+          const limite = limiteDeActividad(ultima.a);
           lastFinished = {
             id: ultima.a.id,
             anNumber: ultima.a.anNumber,
             titulo: ultima.a.titulo,
             finishedAt: ultima.terminoAt,
-            lateMinutes: ultima.a.fechaMaxima
-              ? minutos(ultima.terminoAt.getTime() - ultima.a.fechaMaxima.getTime())
-              : null,
+            lateMinutes: limite ? minutos(ultima.terminoAt.getTime() - limite.getTime()) : null,
           };
         }
       }

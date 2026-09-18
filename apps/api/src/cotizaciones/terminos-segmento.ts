@@ -81,14 +81,25 @@ export type TerminosInput = {
 export const CLAVES_TERMINO = ['pago', 'alcance', 'noIncluye', 'disponibilidad', 'otras'] as const;
 export type ClaveTermino = (typeof CLAVES_TERMINO)[number];
 
+/** Títulos con los que se guardan en `note` y se imprimen (fuera de licitación). */
 export const TITULO_TERMINO: Record<ClaveTermino | 'vigencia', string> = {
   pago: 'Forma de pago',
   alcance: 'Alcance de la cotización',
   noIncluye: 'No incluye',
   disponibilidad: 'Disponibilidad',
   otras: 'Otras condiciones',
-  vigencia: 'Vigencia de esta propuesta',
+  vigencia: 'Vigencia',
 };
+
+/** En licitación las partes se llaman como en las bases, y el anticipo va antes de los trabajos adicionales. */
+const TITULO_LICITACION: Record<ClaveTermino, string> = {
+  pago: 'Condiciones de pago',
+  alcance: 'Alcance de la propuesta',
+  noIncluye: 'Trabajos adicionales',
+  disponibilidad: 'Anticipo',
+  otras: 'Otras condiciones',
+};
+const ORDEN_LICITACION: ClaveTermino[] = ['pago', 'alcance', 'disponibilidad', 'noIncluye', 'otras'];
 
 export type ParteTermino = {
   clave: ClaveTermino | 'vigencia';
@@ -101,7 +112,7 @@ export type ParteTermino = {
 export type Terminos = {
   modalidad: Modalidad;
   titulo: string;
-  /** Una línea por parte, «Título: texto» (lo que imprime el PDF de lista). */
+  /** Una línea por parte, «Título: texto»: el PDF imprime el título como etiqueta en negritas. */
   lineas: string[];
   partes: ParteTermino[];
 };
@@ -120,28 +131,27 @@ export function terminosPorOmision(input: TerminosInput): Record<ClaveTermino, s
 
   if (modalidad === 'LICITACION') {
     return {
-      pago: 'Las condiciones de pago, garantías y penalizaciones se rigen por las bases de la licitación y por el contrato que de ella derive. No se solicita anticipo salvo que las bases lo prevean expresamente.',
-      alcance:
-        'Esta propuesta se presenta como parte del procedimiento de contratación y cubre los conceptos del catálogo de las bases.',
-      noIncluye: 'Cualquier trabajo fuera del catálogo de conceptos de las bases, que se cotiza por separado.',
-      disponibilidad: 'La vigencia de la propuesta y los plazos de entrega son los que señalen las bases.',
+      pago: 'Las condiciones de pago, garantías y penalizaciones se rigen por las bases de la licitación y por el contrato que de ella derive.',
+      alcance: 'Se presenta como parte del procedimiento de contratación; su vigencia es la que señalen las bases.',
+      noIncluye: 'Cualquier trabajo fuera del catálogo de conceptos de las bases se cotiza por separado.',
+      disponibilidad: 'No se solicita anticipo salvo que las bases lo prevean expresamente.',
       otras: '',
     };
   }
   if (modalidad === 'SUMINISTRO_INSTALACION') {
     return {
-      pago: `Se requiere un ${pct} % de anticipo para confirmar el pedido y programar los trabajos; el ${resto} % restante se liquida contra entrega del sistema en operación.`,
+      pago: `${pct} % de anticipo para confirmar el pedido y programar los trabajos; el ${resto} % restante contra entrega del sistema en operación.`,
       alcance:
         'El precio cotizado cubre el suministro de los equipos y materiales descritos y la mano de obra de instalación, configuración y puesta en marcha señalada en el alcance.',
       noIncluye:
-        'Trabajos de obra civil, canalizaciones no identificadas durante el levantamiento, adecuaciones eléctricas distintas a las descritas ni el servicio de Internet del cliente.',
+        'Trabajos de obra civil, canalizaciones no identificadas durante el levantamiento, adecuaciones eléctricas distintas a las descritas, ni el servicio de Internet del cliente.',
       disponibilidad:
         'La programación de los trabajos está sujeta a la disponibilidad de inventario y al acceso al sitio en los horarios acordados con el cliente.',
       otras: '',
     };
   }
   return {
-    pago: `Se requiere un ${pct} % de anticipo para confirmar el pedido y programar el suministro; el ${resto} % restante se liquida contra entrega del equipo.`,
+    pago: `${pct} % de anticipo para confirmar el pedido y programar el suministro; el ${resto} % restante contra entrega del equipo.`,
     alcance: 'El precio cotizado cubre únicamente el suministro del equipo descrito en esta propuesta.',
     noIncluye:
       'Servicios de instalación, configuración, puesta en marcha, capacitación, adecuaciones eléctricas o de red, ni ningún otro servicio no especificado expresamente en la cotización.',
@@ -165,9 +175,10 @@ function claveDeTitulo(titulo: string): ClaveTermino | null {
       .toLowerCase();
     if (limpio === esperado) return clave;
   }
-  if (limpio === 'no se incluye' || limpio === 'exclusiones') return 'noIncluye';
-  if (limpio === 'alcance') return 'alcance';
+  if (limpio === 'no se incluye' || limpio === 'exclusiones' || limpio === 'trabajos adicionales') return 'noIncluye';
+  if (limpio === 'alcance' || limpio === 'alcance de la propuesta') return 'alcance';
   if (limpio === 'pago' || limpio === 'condiciones de pago') return 'pago';
+  if (limpio === 'anticipo') return 'disponibilidad';
   return null;
 }
 
@@ -220,13 +231,14 @@ export function terminosDeCotizacion(
   const omision = terminosPorOmision(input);
   const propios = leerTerminosPersonalizados(input.personalizados);
 
+  const licitacion = modalidad === 'LICITACION';
   const partes: ParteTermino[] = [];
-  for (const clave of CLAVES_TERMINO) {
+  for (const clave of licitacion ? ORDEN_LICITACION : CLAVES_TERMINO) {
     const texto = (propios[clave] ?? omision[clave]).trim();
     if (!texto) continue;
     partes.push({
       clave,
-      titulo: TITULO_TERMINO[clave],
+      titulo: licitacion ? TITULO_LICITACION[clave] : TITULO_TERMINO[clave],
       texto,
       personalizado: propios[clave] != null && propios[clave] !== omision[clave],
     });
@@ -237,7 +249,7 @@ export function terminosDeCotizacion(
     partes.push({
       clave: 'vigencia',
       titulo: TITULO_TERMINO.vigencia,
-      texto: `${Math.round(dias)} días naturales a partir de su fecha de emisión.`,
+      texto: `${Math.round(dias)} días naturales a partir de la fecha de emisión de esta propuesta.`,
       personalizado: false,
     });
   }

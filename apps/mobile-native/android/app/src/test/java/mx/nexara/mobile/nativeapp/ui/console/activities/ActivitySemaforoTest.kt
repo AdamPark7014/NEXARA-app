@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Contrato B: semáforo del servidor, plan contra real y aceptación. */
+/** Contrato B: semáforo del servidor, plan contra real e inicio. */
 class ActivitySemaforoTest {
 
     @Test
@@ -42,37 +42,47 @@ class ActivitySemaforoTest {
     }
 
     @Test
-    fun `comenzar o decir que no puedes solo cuando esta pendiente`() {
-        assertTrue(ActivitySemaforo.estaPendienteDeAceptar("PENDIENTE"))
-        assertTrue(ActivitySemaforo.estaPendienteDeAceptar(" pendiente "))
-        assertFalse(ActivitySemaforo.estaPendienteDeAceptar("ACEPTADA"))
-        // Apps viejas contra API vieja: no hay botones que mostrar.
-        assertFalse(ActivitySemaforo.estaPendienteDeAceptar(null))
+    fun `la persona no acepta ni rechaza, solo inicia`() {
+        // Regla del dueño (18-09): la única acción es iniciarla.
+        assertEquals("Iniciar actividad", ActivitySemaforo.ACCION_INICIAR)
+        assertEquals("Sin iniciar", ActivitySemaforo.CHIP_SIN_INICIAR)
     }
 
     @Test
-    fun `la persona no decide si acepta, comienza`() {
-        // Adam: quien recibe la actividad no la «acepta», la comienza.
-        assertEquals("Comenzar actividad", ActivitySemaforo.ACCION_COMENZAR)
-        assertEquals("No puedo tomarla", ActivitySemaforo.ACCION_NO_PUEDO)
-        assertEquals("Sin comenzar", ActivitySemaforo.CHIP_SIN_COMENZAR)
+    fun `iniciar se ofrece mientras no tenga inicio real`() {
+        assertTrue(ActivitySemaforo.puedeIniciar("PENDIENTE", null, false, "Pendiente"))
+        // Aceptada con el botón viejo o rechazada antes de la regla: igual le falta iniciarla.
+        assertTrue(ActivitySemaforo.puedeIniciar("ACEPTADA", null, null, "Pendiente"))
+        assertTrue(ActivitySemaforo.puedeIniciar("RECHAZADA", "", false, "Pendiente"))
+        // Un compañero ya la tiene en proceso: cada quien marca su propio inicio.
+        assertTrue(ActivitySemaforo.puedeIniciar("PENDIENTE", null, false, "En Proceso"))
     }
 
     @Test
-    fun `cuando no pudo tomarla se lee con su motivo`() {
+    fun `iniciar no se ofrece si ya inicio, si esta cerrada o si solo reparte`() {
+        assertFalse(ActivitySemaforo.puedeIniciar("ACEPTADA", "2026-09-18T15:00:00.000Z", false, "En Proceso"))
+        assertFalse(ActivitySemaforo.puedeIniciar("PENDIENTE", null, false, "Finalizada"))
+        assertFalse(ActivitySemaforo.puedeIniciar("PENDIENTE", null, false, "Cancelada"))
+        assertFalse(ActivitySemaforo.puedeIniciar("PENDIENTE", null, true, "Pendiente"))
+        // API anterior al contrato: la foto de entrada marca el inicio como siempre.
+        assertFalse(ActivitySemaforo.puedeIniciar(null, null, false, "Pendiente"))
+    }
+
+    @Test
+    fun `quien asigno ve si ya la inicio`() {
+        assertTrue(ActivitySemaforo.sinIniciar("PENDIENTE", null, "Pendiente"))
+        assertFalse(ActivitySemaforo.sinIniciar("ACEPTADA", "2026-09-18T15:00:00.000Z", "En Proceso"))
+        assertFalse(ActivitySemaforo.sinIniciar(null, null, "Pendiente"))
+    }
+
+    @Test
+    fun `un rechazo de antes de la regla se lee con su motivo`() {
         assertTrue(ActivitySemaforo.fueRechazada("RECHAZADA"))
         assertEquals(
-            "No la tomaste: no tengo la llave del site",
+            "Rechazada: no tengo la llave del site",
             ActivitySemaforo.rechazadaTexto("no tengo la llave del site"),
         )
-        assertEquals("No la tomaste", ActivitySemaforo.rechazadaTexto("  "))
-    }
-
-    @Test
-    fun `el motivo de no poder tomarla pide diez caracteres`() {
-        assertFalse(ActivitySemaforo.motivoRechazoOk("no puedo"))
-        assertFalse(ActivitySemaforo.motivoRechazoOk(null))
-        assertTrue(ActivitySemaforo.motivoRechazoOk("  estoy en otra sucursal  "))
+        assertEquals("Rechazada", ActivitySemaforo.rechazadaTexto("  "))
     }
 
     @Test

@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -93,6 +94,7 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxIcons
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import java.io.IOException
 
 private const val ACTIVIDADES_PREFS = "nexara_actividades"
 private const val VISTA_KEY = "vista"
@@ -440,8 +442,8 @@ private fun AsignadaPorMiCard(a: BoardAsignadaPorMiDto, onClick: () -> Unit) {
             ) {
                 ActivitySemaforo.luz(a.semaforo)?.let { luz -> ToneChip("● ${luz.etiqueta}", luz.color) }
                 ToneChip(CoreActivityRules.estatusUi(a.estatus))
-                if (ActivitySemaforo.estaPendienteDeAceptar(a.aceptacion)) {
-                    ToneChip(ActivitySemaforo.CHIP_SIN_COMENZAR, CoreActivityRules.NARANJA)
+                if (ActivitySemaforo.sinIniciar(a.aceptacion, a.inicioRealAt, a.estatus)) {
+                    ToneChip(ActivitySemaforo.CHIP_SIN_INICIAR, CoreActivityRules.NARANJA)
                 }
                 ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
                     ToneChip(texto, ActivitySemaforo.planRealColor(a.excedida))
@@ -595,12 +597,11 @@ private fun MisActividadesContent(
     var showDone by remember { mutableStateOf(false) }
     var highlightId by remember(highlightActivityId) { mutableStateOf(highlightActivityId) }
     var pendingMove by remember { mutableStateOf<PendingMove?>(null) }
-    // Contrato B: comenzar lo que te asignaron (o decir que no puedes tomarla).
+    // Regla del 18-09: lo que te asignan no se acepta ni se rechaza, únicamente se inicia.
     val scope = rememberCoroutineScope()
-    var aceptandoId by remember { mutableStateOf<Long?>(null) }
-    var aceptacionError by remember { mutableStateOf<String?>(null) }
-    var aceptacionErrorId by remember { mutableStateOf<Long?>(null) }
-    var rechazando by remember { mutableStateOf<MyActivityItemDto?>(null) }
+    var iniciandoId by remember { mutableStateOf<Long?>(null) }
+    var iniciarError by remember { mutableStateOf<String?>(null) }
+    var iniciarErrorId by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(reload) {
         try {
@@ -727,24 +728,29 @@ private fun MisActividadesContent(
                     total = open.size,
                     highlighted = highlightId == a.id,
                     canReorder = canReorder,
-                    aceptando = aceptandoId == a.id,
-                    aceptacionError = aceptacionError?.takeIf { aceptacionErrorId == a.id },
-                    onAceptar = {
+                    iniciando = iniciandoId == a.id,
+                    iniciarError = iniciarError?.takeIf { iniciarErrorId == a.id },
+                    onIniciar = { tab ->
                         scope.launch {
-                            aceptandoId = a.id
-                            aceptacionError = null
+                            iniciandoId = a.id
+                            iniciarError = null
                             try {
-                                withContext(Dispatchers.IO) { repo.aceptarActividad(a.id) }
+                                withContext(Dispatchers.IO) { repo.iniciarActividad(a.id) }
                                 reload++
+                                onOpenActivity(a.id, tab)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: IOException) {
+                                // Sin señal no se inventa la hora: la foto de entrada marca el inicio al subirse.
+                                onOpenActivity(a.id, tab)
                             } catch (e: Exception) {
-                                aceptacionErrorId = a.id
-                                aceptacionError = e.toUserMessage("No se pudo comenzar la actividad")
+                                iniciarErrorId = a.id
+                                iniciarError = e.toUserMessage("No se pudo iniciar la actividad")
                             } finally {
-                                aceptandoId = null
+                                iniciandoId = null
                             }
                         }
                     },
-                    onRechazar = { rechazando = a },
                     onOpen = { tab -> onOpenActivity(a.id, tab) },
                     onRepartir = { user?.id?.let(onOpenPerson) },
                     onMove = { from, to -> if (to in open.indices && to != from) pendingMove = PendingMove(a, from, to) },
@@ -821,18 +827,6 @@ private fun MisActividadesContent(
         }
     }
 
-    rechazando?.let { actividad ->
-        RechazarActividadDialog(
-            titulo = actividad.titulo,
-            onDismiss = { rechazando = null },
-            onConfirm = { motivo ->
-                withContext(Dispatchers.IO) { repo.rechazarActividad(actividad.id, motivo) }
-                rechazando = null
-                reload++
-            },
-        )
-    }
-
     pendingMove?.let { move ->
         ReorderDialog(
             move = move,
@@ -865,10 +859,10 @@ private fun OpenActivityCard(
     onOpen: (String?) -> Unit,
     onRepartir: () -> Unit,
     onMove: (Int, Int) -> Unit,
-    aceptando: Boolean = false,
-    aceptacionError: String? = null,
-    onAceptar: () -> Unit = {},
-    onRechazar: () -> Unit = {},
+    iniciando: Boolean = false,
+    iniciarError: String? = null,
+    /** «Iniciar actividad»: guarda la hora real y abre la pestaña indicada. */
+    onIniciar: (String?) -> Unit = {},
 ) {
     val pr = CoreActivityRules.priorityUi(a.prioridad)
     val first = index == 0
@@ -920,22 +914,8 @@ private fun OpenActivityCard(
                     Text(a.titulo.orEmpty(), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
                     a.anNumber?.let { Text("Folio $it", fontSize = 12.sp, color = NxColors.Muted) }
                 }
-                // Contrato B: sin aceptar todavía. No bloquea trabajarla.
-                if (ActivitySemaforo.estaPendienteDeAceptar(a.aceptacion)) {
-                    AceptacionBanner(
-                        onAceptar = onAceptar,
-                        onRechazar = onRechazar,
-                        guardando = aceptando,
-                        error = aceptacionError,
-                    )
-                }
-                if (ActivitySemaforo.fueRechazada(a.aceptacion)) {
-                    SoftNote(
-                        text = ActivitySemaforo.rechazadaTexto(a.motivoRechazo),
-                        color = CoreActivityRules.ROJO,
-                    )
-                }
                 // Una acción principal que dice el siguiente paso; el detalle queda como secundaria.
+                // Sin inicio real es «Iniciar actividad»: no hay aceptar ni rechazar (regla del 18-09).
                 val accion = ActividadesUx.primaryAction(a)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -958,17 +938,23 @@ private fun OpenActivityCard(
                         else -> {
                             Button(
                                 onClick = {
-                                    if (accion.kind == ActividadesUx.PrimaryKind.REPARTIR) onRepartir() else onOpen(accion.tab)
+                                    when {
+                                        accion.kind == ActividadesUx.PrimaryKind.REPARTIR -> onRepartir()
+                                        accion.marcaInicio -> onIniciar(accion.tab)
+                                        else -> onOpen(accion.tab)
+                                    }
                                 },
+                                enabled = !iniciando,
                                 colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
                                 modifier = Modifier.heightIn(min = 48.dp),
-                            ) { Text(accion.label, fontWeight = FontWeight.Bold) }
+                            ) { Text(if (iniciando) "Iniciando…" else accion.label, fontWeight = FontWeight.Bold) }
                             TextButton(onClick = { onOpen(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
                                 Text("Detalle", color = NxColors.Brand)
                             }
                         }
                     }
                 }
+                iniciarError?.let { Text(it, fontSize = 12.5.sp, color = Color(CoreActivityRules.ROJO)) }
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -998,9 +984,12 @@ private fun OpenActivityCard(
                     }
                 }
                 val meta = buildList {
+                    // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
                     add(
-                        (CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima) ?: "Sin fecha") to
-                            NxIcons.Calendar,
+                        (
+                            ActivityPeriodo.cuandoTexto(a.periodo, CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima))
+                                ?: "Sin fecha"
+                            ) to NxIcons.Calendar,
                     )
                     a.tiempoEstimadoMin?.takeIf { it > 0 }?.let { est ->
                         val tope = a.tiempoMaximoMin?.takeIf { it > 0 }?.let { " · tope ${CoreActivityRules.formatMinutes(it)}" }.orEmpty()

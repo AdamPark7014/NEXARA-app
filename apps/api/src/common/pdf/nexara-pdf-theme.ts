@@ -49,18 +49,8 @@ export const pdfTruncate = (value: string | null | undefined, maxLength: number)
   return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
 };
 
-export const loadNexaraLogo = (): Buffer | null => {
-  const candidates = [
-    // Junto al código compilado (dist/common/pdf → dist/assets; en dev src/common/pdf → src/assets).
-    // En Docker el cwd es /app y el build vive en /app/apps/api/dist: las rutas relativas al cwd de
-    // abajo no lo encontraban y ningún PDF de producción llevaba logo.
-    path.resolve(__dirname, '../../assets/logo-nexara.png'),
-    path.resolve(process.cwd(), '../web/public/logo-nexara.png'),
-    path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
-    // Producción (Docker): el API no incluye apps/web — usar assets propios
-    path.resolve(process.cwd(), 'dist/assets/logo-nexara.png'),
-    path.resolve(process.cwd(), 'src/assets/logo-nexara.png'),
-  ];
+/** Primer archivo legible de la lista, o `null`. */
+const leerPrimero = (candidates: string[]): Buffer | null => {
   for (const filePath of candidates) {
     try {
       if (fs.existsSync(filePath)) return fs.readFileSync(filePath);
@@ -70,6 +60,29 @@ export const loadNexaraLogo = (): Buffer | null => {
   }
   return null;
 };
+
+/**
+ * Archivo de `src/assets` (copiado a `dist/assets` por `nest-cli.json`).
+ *
+ * Se busca primero junto al código compilado (dist/common/pdf → dist/assets; en dev
+ * src/common/pdf → src/assets). En Docker el cwd es /app y el build vive en /app/apps/api/dist: las
+ * rutas relativas al cwd solo sirven de respaldo para scripts y pruebas.
+ */
+export const loadPdfAsset = (nombre: string): Buffer | null =>
+  leerPrimero([
+    path.resolve(__dirname, '../../assets', nombre),
+    path.resolve(process.cwd(), 'dist/assets', nombre),
+    path.resolve(process.cwd(), 'src/assets', nombre),
+    path.resolve(process.cwd(), 'apps/api/dist/assets', nombre),
+    path.resolve(process.cwd(), 'apps/api/src/assets', nombre),
+  ]);
+
+export const loadNexaraLogo = (): Buffer | null =>
+  loadPdfAsset('logo-nexara.png') ??
+  leerPrimero([
+    path.resolve(process.cwd(), '../web/public/logo-nexara.png'),
+    path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
+  ]);
 
 export type PdfHeaderOptions = {
   /** Título del documento, p. ej. "Control de viáticos". */

@@ -658,6 +658,9 @@ export class AttendanceService {
     try {
       const { start, end } = workDayBounds(at);
       const enElDia = { gte: start, lte: end };
+      // Columna `@db.Date` del día: una actividad de varios días vale todos los días de su
+      // periodo (si no, el día 3 de una obra la sucursal ya no contaba como sitio válido).
+      const dia = workDateColumn(at);
       const actividades = await prisma.activity.findMany({
         where: {
           ...companyWhere(tenantId),
@@ -674,6 +677,7 @@ export class AttendanceService {
                 { fechaInicio: enElDia },
                 { fechaMaxima: enElDia },
                 { fechaEntregaEsperada: enElDia },
+                { periodoInicio: { lte: dia }, periodoFin: { gte: dia } },
               ],
             },
           ],

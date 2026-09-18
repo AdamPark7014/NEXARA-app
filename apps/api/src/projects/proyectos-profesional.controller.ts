@@ -30,6 +30,8 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { ProyectosProfesionalService } from './proyectos-profesional.service.js';
 import { OperationalProjectsService } from './operational-projects.service.js';
+import { ProyectoProgramacionService } from './proyecto-programacion.service.js';
+import { ProgramarActividadesDto } from './dto/programar-actividades.dto.js';
 import {
   ActualizarProyectoProfesionalDto,
   CambiarEstadoProyectoDto,
@@ -60,6 +62,7 @@ export class ProyectosProfesionalController {
   constructor(
     private readonly proyectos: ProyectosProfesionalService,
     private readonly operativos: OperationalProjectsService,
+    private readonly programador: ProyectoProgramacionService,
   ) {}
 
   private numero(valor?: string): number | undefined {
@@ -188,6 +191,29 @@ export class ProyectosProfesionalController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.proyectos.borrarHito(id, hitoId, companyId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Programar actividades del proyecto (periodos por etapa)
+  // ---------------------------------------------------------------------------
+
+  /** Propuesta: una actividad por etapa con su periodo encadenado; nada se crea aquí. */
+  @Get(':id/programacion')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  programacion(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.programador.propuesta(id, companyId);
+  }
+
+  /** Crea de una vez las actividades de las etapas elegidas, cada una con su periodo. */
+  @Post(':id/programar-actividades')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  programarActividades(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ProgramarActividadesDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.programador.programar(id, dto, this.actor(user), companyId);
   }
 
   // ---------------------------------------------------------------------------

@@ -1365,13 +1365,15 @@ export class NotificationHierarchyService {
   }
 
   /**
-   * Aceptó la actividad que le asignaron: le llega a quien se la pasó (y al responsable),
-   * que es quien está esperando saber si cuenta con esa persona.
+   * Inició la actividad que le asignaron (quien la recibe ya no acepta ni rechaza,
+   * solo inicia): le llega a quien se la pasó y al responsable, con la hora real.
+   * El tipo sigue siendo ACTIVITY_ACCEPTED_BY_ASSIGNEE para no tocar el enum de la base.
    */
-  async notifyActivityAcceptedByAssignee(params: {
+  async notifyActivityStartedByAssignee(params: {
     activityId: number;
     userId: number;
     asignadoPorId: number | null;
+    inicioRealAt?: Date;
   }) {
     try {
       const activity = await this.prisma.activity.findUnique({
@@ -1391,8 +1393,8 @@ export class NotificationHierarchyService {
           userId,
           type: 'ACTIVITY_ACCEPTED_BY_ASSIGNEE',
           category: 'activities',
-          title: `${quien} aceptó ${nombreActividad(activity.titulo)}`,
-          message: unir(activity.client?.name, `Aceptada a las ${horaAviso(new Date())}`),
+          title: `${quien} inició ${nombreActividad(activity.titulo)}`,
+          message: unir(activity.client?.name, `Inició a las ${horaAviso(params.inicioRealAt ?? new Date())}`),
           icon: 'aceptada',
           triggerUserId: params.userId,
           relatedEntityId: params.activityId,
@@ -1405,54 +1407,7 @@ export class NotificationHierarchyService {
         });
       }
     } catch (error) {
-      this.logger.error('notifyActivityAcceptedByAssignee', error);
-    }
-  }
-
-  /**
-   * Rechazó con motivo: se enteran quien se la asignó, el responsable y sus jefes.
-   * La actividad sigue siendo suya hasta que alguien la mueva: el aviso es la señal.
-   */
-  async notifyActivityRejectedByAssignee(params: {
-    activityId: number;
-    userId: number;
-    motivo: string;
-    asignadoPorId: number | null;
-  }) {
-    try {
-      const activity = await this.prisma.activity.findUnique({
-        where: { id: params.activityId },
-        select: { titulo: true, responsableId: true, creadoPorId: true, client: { select: { name: true } } },
-      });
-      if (!activity) return;
-      const quien = persona(await this.resolveActorName(params.userId));
-      const targets = new Set<number>(await this.lunchReviewerIds(params.userId));
-      for (const id of [params.asignadoPorId, activity.responsableId, activity.creadoPorId]) {
-        if (id) targets.add(id);
-      }
-      targets.delete(params.userId);
-      const title = `${quien} rechazó ${nombreActividad(activity.titulo)}`;
-      const message = unir(`Motivo: ${params.motivo.trim().slice(0, 200)}`, activity.client?.name);
-      for (const userId of targets) {
-        await this.notificationsService.createNotification({
-          userId,
-          type: 'ACTIVITY_REJECTED_BY_ASSIGNEE',
-          category: 'activities',
-          title,
-          message,
-          icon: 'rechazada',
-          triggerUserId: params.userId,
-          relatedEntityId: params.activityId,
-          entityType: 'Activity',
-          relatedUrl: `/erp/actividades/${params.activityId}`,
-          priority: 'high',
-          channel: 'ops',
-          collapseKey: `nx_rech_${params.activityId}_u${params.userId}`,
-          dedupeSeconds: 0,
-        });
-      }
-    } catch (error) {
-      this.logger.error('notifyActivityRejectedByAssignee', error);
+      this.logger.error('notifyActivityStartedByAssignee', error);
     }
   }
 

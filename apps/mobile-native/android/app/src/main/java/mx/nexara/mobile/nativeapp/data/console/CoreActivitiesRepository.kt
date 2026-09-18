@@ -25,7 +25,6 @@ import mx.nexara.mobile.nativeapp.data.api.EvidencePhotoGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidencePhotosWithGeoRequest
 import mx.nexara.mobile.nativeapp.data.api.EvidenceResubmitRequest
 import mx.nexara.mobile.nativeapp.data.api.MyActivitiesResponseDto
-import mx.nexara.mobile.nativeapp.data.api.RechazarActividadRequest
 import mx.nexara.mobile.nativeapp.data.api.ReorderMyActivitiesRequest
 import mx.nexara.mobile.nativeapp.data.api.ReprogramarDespachoRequest
 import mx.nexara.mobile.nativeapp.data.api.RevisarEvidenciaRequest
@@ -106,14 +105,13 @@ class CoreActivitiesRepository(context: Context) {
         return runCatching { org.json.JSONObject(raw).optString("next", "") }.getOrDefault("")
     }
 
-    /** Contrato B: aceptar lo que te asignaron (avisa a quien la asignó). */
-    suspend fun aceptarActividad(activityId: Long) {
-        api.aceptarActividad(activityId).close()
-    }
-
-    /** Rechazar con motivo (≥ 10). Sigue asignada hasta que un superior la mueva. */
-    suspend fun rechazarActividad(activityId: Long, motivo: String) {
-        api.rechazarActividad(activityId, RechazarActividadRequest(motivo.trim())).close()
+    /**
+     * «Iniciar actividad»: guarda la hora real de inicio y avisa a quien la asignó.
+     * No hay aceptar ni rechazar (regla del 18-09). Solo en línea: encolada, la hora
+     * sería la de cuando regrese la señal.
+     */
+    suspend fun iniciarActividad(activityId: Long) {
+        api.iniciarActividad(activityId).close()
     }
 
     /** @param horasPlan «Tiempo estimado» de quien reparte (contrato B). */
