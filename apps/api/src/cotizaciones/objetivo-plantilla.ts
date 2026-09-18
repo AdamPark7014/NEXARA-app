@@ -78,6 +78,114 @@ export type Objetivo = {
   cierre: string;
 };
 
+/**
+ * Cómo se guarda el objetivo que escribe quien cotiza (`Cotizacion.objetivo`, texto).
+ *
+ * Texto legible en cualquier lado (apps, correo, base), no JSON:
+ *
+ *   Este proyecto permitirá contar con…      ← introducción (uno o más párrafos)
+ *
+ *   Beneficios:
+ *   1. Mayor cobertura de vigilancia…         ← un beneficio por línea, numerado
+ *   2. Recuperación y modernización…
+ *
+ *   Cierre:
+ *   Como resultado, el cliente dispondrá…     ← párrafo de cierre
+ *
+ * Las marcas «Beneficios:» y «Cierre:» son las que permiten guardar un cierre sin beneficios sin
+ * que se confunda con la introducción. Un texto sin marcas (lo que se guardaba antes, o lo que
+ * escriba el CRM viejo) se sigue leyendo: todo es introducción, salvo una lista numerada, que son
+ * los beneficios, y lo que venga después de ella, que es el cierre.
+ */
+const MARCA_BENEFICIOS = /^\s*beneficios\s*:?\s*$/i;
+const MARCA_CIERRE = /^\s*(cierre|conclusi[oó]n)\s*:?\s*$/i;
+/** La frase la imprime el PDF; si alguien la pega del documento modelo no debe salir dos veces. */
+const FRASE_BENEFICIOS = /^\s*entre los principales beneficios se encuentran\s*:?\s*$/i;
+const ITEM_LISTA = /^\s*(?:\d{1,2}\s*[.)-]|[-•*])\s+(.*\S)\s*$/;
+
+function unirParrafos(lineas: string[]): string {
+  return lineas
+    .join('\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** Separa el objetivo guardado en introducción, beneficios y cierre. */
+export function leerObjetivo(texto: string | null | undefined): Objetivo {
+  const lineas = String(texto ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const intro: string[] = [];
+  const beneficios: string[] = [];
+  const cierre: string[] = [];
+  let fase: 'intro' | 'beneficios' | 'cierre' = 'intro';
+  let huboBlanco = false;
+
+  for (const linea of lineas) {
+    if (MARCA_CIERRE.test(linea)) {
+      fase = 'cierre';
+      continue;
+    }
+    if (fase !== 'cierre' && (MARCA_BENEFICIOS.test(linea) || FRASE_BENEFICIOS.test(linea))) {
+      fase = 'beneficios';
+      huboBlanco = false;
+      continue;
+    }
+
+    if (fase === 'cierre') {
+      cierre.push(linea);
+      continue;
+    }
+
+    const item = linea.match(ITEM_LISTA);
+    if (fase === 'intro') {
+      if (item && /^\s*\d/.test(linea)) {
+        fase = 'beneficios';
+        beneficios.push(item[1]!.trim());
+        huboBlanco = false;
+      } else {
+        intro.push(linea);
+      }
+      continue;
+    }
+
+    // fase === 'beneficios'
+    if (item) {
+      beneficios.push(item[1]!.trim());
+      huboBlanco = false;
+    } else if (!linea.trim()) {
+      huboBlanco = true;
+    } else if (huboBlanco || !beneficios.length) {
+      // Texto suelto después de la lista (y de un renglón en blanco): es el cierre.
+      fase = 'cierre';
+      cierre.push(linea);
+    } else {
+      // Renglón que continúa el beneficio anterior.
+      beneficios[beneficios.length - 1] = `${beneficios[beneficios.length - 1]} ${linea.trim()}`;
+    }
+  }
+
+  return {
+    intro: unirParrafos(intro),
+    beneficios: beneficios.map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean),
+    cierre: unirParrafos(cierre),
+  };
+}
+
+/** Lo contrario de `leerObjetivo`: el texto que se guarda en `Cotizacion.objetivo`. */
+export function escribirObjetivo(partes: Partial<Objetivo>): string {
+  const intro = unirParrafos([String(partes.intro ?? '')]);
+  const beneficios = (partes.beneficios ?? [])
+    .map((b) => String(b ?? '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const cierre = unirParrafos([String(partes.cierre ?? '')]);
+
+  const bloques: string[] = [];
+  if (intro) bloques.push(intro);
+  if (beneficios.length) bloques.push(['Beneficios:', ...beneficios.map((b, i) => `${i + 1}. ${b}`)].join('\n'));
+  if (cierre) bloques.push(`Cierre:\n${cierre}`);
+  return bloques.join('\n\n');
+}
+
 const INTRO: Record<Segmento, string> = {
   COMERCIAL:
     'Este proyecto permitirá contar con una solución tecnológica confiable, moderna y preparada para las necesidades actuales y futuras de la operación.',
@@ -153,12 +261,25 @@ export function objetivoDePropuesta(input: {
     beneficios.push(`Precios firmes durante ${Math.round(input.vigenciaDias)} días naturales a partir de la emisión.`);
   }
 
+  // Lo que escribió quien cotiza manda, parte por parte: si dejó vacíos los beneficios, salen de las
+  // partidas; si dejó vacío el cierre, va el del segmento.
+  const escrito = leerObjetivo(input.objetivoLibre);
   const proyecto = input.proyecto?.trim();
-  const intro = input.objetivoLibre?.trim()
-    ? input.objetivoLibre.trim()
+  const intro = escrito.intro
+    ? escrito.intro
     : proyecto
       ? `${INTRO[segmento]} Proyecto: ${proyecto} (${ETIQUETA_SEGMENTO[segmento]}).`
       : INTRO[segmento];
 
-  return { intro, beneficios: beneficios.slice(0, 8), cierre: CIERRE[segmento] };
+  return {
+    intro,
+    beneficios: escrito.beneficios.length ? escrito.beneficios.slice(0, 20) : beneficios.slice(0, 8),
+    cierre: escrito.cierre || CIERRE[segmento],
+  };
+}
+
+/** Texto de partida del objetivo para un segmento (lo que ofrece el editor como plantilla). */
+export function plantillaObjetivo(segmento: unknown): { intro: string; cierre: string } {
+  const s = normalizarSegmento(segmento);
+  return { intro: INTRO[s], cierre: CIERRE[s] };
 }

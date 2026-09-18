@@ -56,7 +56,17 @@ import {
 import { avanceActividadPorEstado } from './estado-cotizacion.js';
 import { isPdfUrl, pasoCubiertoPorCotizacion } from '../activities/evidence/evidence-flow.helpers.js';
 import { generarPropuestaTecnicaPdf } from './propuesta-tecnica-pdf.js';
-import { objetivoDePropuesta } from './objetivo-plantilla.js';
+import { payloadDePropuesta } from './propuesta-payload.js';
+import { leerObjetivo, objetivoDePropuesta } from './objetivo-plantilla.js';
+import { normalizarBloques, plantillasDeCotizacion } from './alcance-bloques.js';
+import { ordenarPlanos } from './planos-cotizacion.js';
+import {
+  folioSinCadena,
+  necesitaRefolio,
+  nomenclaturaParaFolio,
+  siglasDeNomenclatura,
+  tieneNomenclatura,
+} from './folio-core.js';
 import {
   PAQUETES,
   bloqueAlcanceDePaquete,
@@ -168,7 +178,9 @@ export class CotizacionesService {
   }
 
   async create(dto: CreateCotizacionDto, createdById?: number, companyId?: number | null) {
-    const items = this.normalizeItems(dto.items);
+    // El editor de Core guarda el borrador en cuanto hay cliente, antes de la primera partida: una
+    // cotización sin partidas es un borrador válido (lo que no puede es enviarse así).
+    const items = dto.items?.length ? this.normalizeItems(dto.items) : [];
     const totals = this.calculateTotals(items);
     const status = normalizeStatus(dto.status) || CotizacionStatus.DRAFT;
     const segmento = normalizarSegmento(dto.segmento);
@@ -263,7 +275,9 @@ export class CotizacionesService {
       folioNomenclatura: emitido?.nomenclatura ?? null,
       folioConsecutivo: emitido?.consecutivo ?? null,
       objetivo: dto.objetivo?.trim() || null,
-      alcanceBloques: (dto.alcanceBloques as Prisma.InputJsonValue) ?? Prisma.DbNull,
+      alcanceBloques: dto.alcanceBloques
+        ? (normalizarBloques(dto.alcanceBloques) as unknown as Prisma.InputJsonValue)
+        : Prisma.DbNull,
       planos: (dto.planos as Prisma.InputJsonValue) ?? Prisma.DbNull,
       salesClientId,
       opportunityId,
@@ -391,7 +405,8 @@ export class CotizacionesService {
   async findOne(id: number, companyId?: number | null) {
     const quote = await this.db.cotizacion.findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
-      include: { items: true, createdBy: true, company: true },
+      // Las partidas en el orden en que se capturaron: así salen en el editor y en el PDF.
+      include: { items: { orderBy: { id: 'asc' } }, createdBy: true, company: true },
     });
     assertCompanyAccess(quote, companyId, 'Cotizacion');
     return quote;
@@ -426,29 +441,63 @@ export class CotizacionesService {
     const estado = estadoDesdeDb(quote.status);
     const segmento = normalizarSegmento(quote.segmento);
 
-    const [participantes, actividades, cadena, planos] = await Promise.all([
+    const [participantes, actividades, cadena, planos, autor] = await Promise.all([
       this.core.participantesParaApi(quote.id),
       this.actividadesLigadas(quote.id),
       this.core.cadenaDeParticipantes(quote.id, quote.createdById ?? null),
       this.planosDePropuesta(quote),
+      quote.createdById ? this.core.claveDePersona(quote.createdById) : Promise.resolve(null),
     ]);
+    const vigenciaDias = diasDeVigencia(quote.issueDate, quote.validUntil);
+    const conNomenclatura = Boolean(quote.folioNomenclatura) && tieneNomenclatura(quote.quoteNumber);
+    const claveAutor = quote.folioNomenclatura || autor?.clave || null;
 
     return {
       ...quote,
       folio: quote.quoteNumber,
-      folioBase: quote.folioEnviado ? quote.quoteNumber : quote.quoteNumber,
+      folioBase: conNomenclatura ? folioSinCadena(quote.quoteNumber) : quote.quoteNumber,
+      conNomenclatura,
+      // Borrador viejo (folio sin nomenclatura) que nunca salió: el editor ofrece darle folio.
+      necesitaRefolio: necesitaRefolio(quote),
+      elaboro: quote.createdById
+        ? {
+            id: quote.createdById,
+            nombre: autor?.nombre ?? quote.createdBy?.nombre ?? '',
+            clave: claveAutor,
+            siglas: claveAutor ? siglasDeNomenclatura(claveAutor) : null,
+          }
+        : null,
       cadenaParticipantes: cadena,
+      // 01 Objetivo en sus tres partes (el texto guardado lleva marcas) y lo que el PDF pondría solo.
+      objetivoPartes: leerObjetivo(quote.objetivo),
+      objetivoSugerido: objetivoDePropuesta({
+        segmento,
+        partidas,
+        proyecto: quote.projectName,
+        objetivoLibre: null,
+        vigenciaDias,
+      }),
+      alcanceBloques: normalizarBloques(quote.alcanceBloques),
       estado,
       estadoEtiqueta: ETIQUETA_ESTADO[estado],
       bloqueada: estaBloqueada(quote.status),
       segmento,
       segmentoEtiqueta: ETIQUETA_SEGMENTO[segmento as Segmento],
       incluyeInstalacion: instalacion,
+      // Los que salen en el PDF (con lo que reescribió quien cotiza, guardado en `note`)…
       terminos: terminosDeCotizacion({
         segmento,
         incluyeInstalacion: instalacion,
         anticipoPct: quote.depositPercent,
-        vigenciaDias: diasDeVigencia(quote.issueDate, quote.validUntil),
+        vigenciaDias,
+        personalizados: quote.note,
+      }),
+      // …y los del segmento sin tocar, para que el editor pueda «Restablecer».
+      terminosBase: terminosDeCotizacion({
+        segmento,
+        incluyeInstalacion: instalacion,
+        anticipoPct: quote.depositPercent,
+        vigenciaDias,
       }),
       grupos: agruparPartidas(partidas),
       totalesPorGrupo: totalesPorGrupo(partidas),
@@ -486,7 +535,15 @@ export class CotizacionesService {
       take: query?.take ?? 200,
       skip: query?.skip ?? 0,
       include: {
-        createdBy: { select: { id: true, nombre: true } },
+        createdBy: {
+          select: {
+            id: true,
+            nombre: true,
+            employeeNumber: true,
+            fechaIngreso: true,
+            perfil: { select: { curp: true, fechaNacimiento: true } },
+          },
+        },
         participantes: {
           orderBy: { at: 'asc' },
           include: { user: { select: { id: true, nombre: true } } },
@@ -498,9 +555,30 @@ export class CotizacionesService {
     return filas.map((quote) => {
       const estado = estadoDesdeDb(quote.status);
       const segmento = normalizarSegmento(quote.segmento);
+      // Clave de quien la hizo: la congelada en el folio o, en los borradores viejos, la que tendría
+      // hoy (misma regla que al emitir). Así la lista dice de quién es aunque nadie más haya intervenido.
+      const autor = quote.createdBy;
+      const claveAutor =
+        quote.folioNomenclatura ||
+        (autor
+          ? nomenclaturaParaFolio({
+              nombre: autor.nombre,
+              employeeNumber: autor.employeeNumber,
+              curp: autor.perfil?.curp ?? null,
+              fechaNacimiento: autor.perfil?.fechaNacimiento ?? null,
+              fechaIngreso: autor.fechaIngreso ?? null,
+            })
+          : null);
       return {
         id: quote.id,
         folio: quote.quoteNumber,
+        conNomenclatura: Boolean(quote.folioNomenclatura) && tieneNomenclatura(quote.quoteNumber),
+        necesitaRefolio: necesitaRefolio(quote),
+        folioNomenclatura: quote.folioNomenclatura,
+        folioConsecutivo: quote.folioConsecutivo,
+        projectName: quote.projectName,
+        createdAt: quote.createdAt,
+        updatedAt: quote.updatedAt,
         clienteNombre: quote.clientName,
         clienteEmpresa: quote.clientCompany,
         segmento,
@@ -513,7 +591,14 @@ export class CotizacionesService {
         validUntil: quote.validUntil,
         sentAt: quote.sentAt,
         revision: quote.revision,
-        elaboro: quote.createdBy ? { id: quote.createdBy.id, nombre: quote.createdBy.nombre } : null,
+        elaboro: autor
+          ? {
+              id: autor.id,
+              nombre: autor.nombre,
+              clave: claveAutor,
+              siglas: claveAutor ? siglasDeNomenclatura(claveAutor) : null,
+            }
+          : null,
         intervinieron: quote.participantes.map((p) => ({
           userId: p.userId,
           nombre: p.user?.nombre ?? '',
@@ -565,8 +650,13 @@ export class CotizacionesService {
       quoteNumber: existing.folioNomenclatura ? undefined : dto.quoteNumber?.trim(),
       segmento: dto.segmento ? (normalizarSegmento(dto.segmento) as any) : undefined,
       objetivo: dto.objetivo?.trim(),
-      alcanceBloques: dto.alcanceBloques as Prisma.InputJsonValue | undefined,
-      planos: dto.planos as Prisma.InputJsonValue | undefined,
+      alcanceBloques: dto.alcanceBloques
+        ? (normalizarBloques(dto.alcanceBloques) as unknown as Prisma.InputJsonValue)
+        : undefined,
+      // Solo reordena y renombra los planos que ya están (agregar = subir; quitar = su endpoint).
+      planos: dto.planos
+        ? (ordenarPlanos(existing.planos, dto.planos) as unknown as Prisma.InputJsonValue)
+        : undefined,
       issueDate: this.parseDate(dto.issueDate),
       validUntil: this.parseDate(dto.validUntil),
       salesClientId: dto.salesClientId !== undefined ? (dto.salesClientId ? Number(dto.salesClientId) : null) : undefined,
@@ -602,7 +692,8 @@ export class CotizacionesService {
     let finalItems: Array<{ discount: number }>;
 
     if (dto.items) {
-      const items = this.normalizeItems(dto.items);
+      // Quitar la última partida deja el borrador sin partidas, no es un error.
+      const items = dto.items.length ? this.normalizeItems(dto.items) : [];
       const totals = this.calculateTotals(items);
       const itemData = this.buildItemData(items);
 
@@ -970,7 +1061,7 @@ export class CotizacionesService {
   async send(id: number, dto: SendCotizacionDto, senderId?: number, companyId?: number | null) {
     const quote = await this.db.cotizacion.findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
-      include: { items: true },
+      include: { items: { orderBy: { id: 'asc' } } },
     });
     assertCompanyAccess(quote, companyId, 'Cotizacion');
 
@@ -980,6 +1071,14 @@ export class CotizacionesService {
     if (!transicionPermitida(quote.status, ESTADO.ENVIADA)) {
       throw new BadRequestException(motivoTransicionInvalida(quote.status, ESTADO.ENVIADA));
     }
+    if (!quote.items?.length) {
+      throw new BadRequestException('Agrega al menos una partida antes de enviar la cotización.');
+    }
+
+    // Copias: sin repetir al destinatario principal.
+    const copias = [...new Set((dto.cc ?? []).map((c) => c.trim().toLowerCase()).filter(Boolean))].filter(
+      (c) => c !== email.toLowerCase(),
+    );
 
     const token = quote.publicToken || randomBytes(24).toString('hex');
 
@@ -988,10 +1087,9 @@ export class CotizacionesService {
 
     // Primer envío = revisión 1; cada envío posterior agrega -R2, -R3 al folio.
     const revision = quote.sentAt ? (quote.revision || 1) + 1 : 1;
-    const base = quote.folioNomenclatura
-      ? quote.quoteNumber
-      : // Folios viejos (armados en el cliente) no tienen cadena: se envían tal cual.
-        quote.quoteNumber;
+    // Al enviar, `quoteNumber` se queda con el folio con cadena: el reenvío parte de la base, o la
+    // cadena se pegaría dos veces (`…-0007-JA-JA.CE-R2`). Los folios viejos se envían tal cual.
+    const base = quote.folioNomenclatura ? folioSinCadena(quote.quoteNumber) : quote.quoteNumber;
     const folio = quote.folioNomenclatura
       ? await this.core.folioParaEnvio(id, base, quote.createdById, revision)
       : quote.quoteNumber;
@@ -1003,8 +1101,8 @@ export class CotizacionesService {
      * cotización quedaba bloqueada como enviada y el cliente nunca la recibió. Ahora, si el correo
      * no sale, el estado no se toca y se puede reintentar.
      */
-    const pdf = await this.buildPdf({ ...quote, quoteNumber: folio, revision });
-    await this.sendEmail({ ...quote, quoteNumber: folio }, email, dto.message, pdf, token);
+    const pdf = await this.buildPdf({ ...quote, quoteNumber: folio, revision, status: CotizacionStatus.SENT });
+    await this.sendEmail({ ...quote, quoteNumber: folio }, email, dto.message, pdf, token, copias);
 
     const updated = await this.db.cotizacion.update({
       where: { id },
@@ -1118,6 +1216,48 @@ export class CotizacionesService {
       bloqueAlcance: paquete.bloqueAlcance ?? null,
       partidas: paquete.partidas,
     }));
+  }
+
+  /** Puntos de partida del editor por segmento: objetivo (entrada y cierre) y subsecciones de alcance. */
+  plantillas() {
+    return plantillasDeCotizacion();
+  }
+
+  /**
+   * Da folio con nomenclatura a un borrador viejo (`NXR-2026-763366`) que nunca salió.
+   *
+   * El folio es de quien la hizo (su nomenclatura y su contador), no de quien aprieta el botón. El
+   * folio anterior queda en el historial de versiones, y quien la hizo queda como «Elaboró» para
+   * que la lista diga quién intervino. Es la misma lógica que `scripts/refoliar-borradores.js`.
+   */
+  async refoliar(id: number, userId?: number, companyId?: number | null) {
+    const quote = await this.findOne(id, companyId);
+    if (!necesitaRefolio(quote)) {
+      throw new BadRequestException(
+        quote.sentAt || quote.folioEnviado
+          ? 'Esta cotización ya salió al cliente con ese folio: no se cambia.'
+          : quote.createdById
+            ? 'Esta cotización ya tiene folio con nomenclatura.'
+            : 'No se sabe quién hizo esta cotización: no hay nomenclatura de la cual sacar el folio.',
+      );
+    }
+
+    const anterior = quote.quoteNumber;
+    await this.guardarVersion(quote, userId, `Refoliado: antes ${anterior}`);
+    const emitido = await this.core.siguienteFolio(quote.createdById!);
+    const quoteNumber = await this.ensureUniqueQuoteNumber(emitido.folio, quote.companyId);
+
+    await this.db.cotizacion.update({
+      where: { id },
+      data: {
+        quoteNumber,
+        folioNomenclatura: emitido.nomenclatura,
+        folioConsecutivo: emitido.consecutivo,
+      },
+    });
+    await this.core.registrarParticipante(id, quote.createdById, 'ELABORO');
+
+    return this.detalleCore(id, companyId);
   }
 
   /**
@@ -1446,11 +1586,6 @@ export class CotizacionesService {
    * es la única que lleva costo de proveedor y margen.
    */
   private async buildPropuesta(quote: any): Promise<Buffer> {
-    const partidas = this.partidasParaGrupos(quote.items ?? []);
-    const segmento = normalizarSegmento(quote.segmento);
-    const instalacion = incluyeInstalacion(partidas);
-    const vigenciaDias = diasDeVigencia(quote.issueDate, quote.validUntil);
-
     let company = quote.company;
     if (!company && quote.companyId) {
       company = await this.db.companyProfile.findUnique({ where: { id: quote.companyId } });
@@ -1461,84 +1596,23 @@ export class CotizacionesService {
       this.core.participantesParaApi(quote.id),
     ]);
 
-    const bloques = Array.isArray(quote.alcanceBloques) ? (quote.alcanceBloques as any[]) : [];
-    const fecha = (valor: unknown) => {
-      if (!valor) return null;
-      const d = new Date(valor as string);
-      return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
-    };
-
-    return generarPropuestaTecnicaPdf({
-      folio: quote.quoteNumber,
-      revision: Number(quote.revision || 1),
-      issueDate: fecha(quote.issueDate) ?? new Date().toISOString().slice(0, 10),
-      validUntil: fecha(quote.validUntil),
-      segmentoEtiqueta: ETIQUETA_SEGMENTO[segmento as Segmento],
-      cliente: {
-        nombre: quote.clientName,
-        empresa: quote.clientCompany,
-        telefono: quote.clientPhone,
-        correo: quote.clientEmail,
-        direccion: quote.clientAddress,
-      },
-      proyecto: quote.projectName,
-      objetivo: objetivoDePropuesta({
-        segmento,
-        partidas,
-        proyecto: quote.projectName,
-        objetivoLibre: quote.objetivo,
-        vigenciaDias,
+    // Qué campo del editor va a qué parte del documento: `propuesta-payload.ts`.
+    return generarPropuestaTecnicaPdf(
+      payloadDePropuesta(quote, {
+        planos,
+        participantes: participantes.map((p) => ({ nombre: p.nombre, rolEtiqueta: p.rolEtiqueta, siglas: p.siglas })),
+        empresa: company
+          ? {
+              legalName: company.legalName,
+              tradeName: company.tradeName,
+              contactEmail: company.contactEmail,
+              contactPhone: company.contactPhone,
+              websiteUrl: company.websiteUrl,
+              fiscalAddress: company.fiscalAddress,
+            }
+          : null,
       }),
-      alcance: bloques.map((b) => ({
-        titulo: String(b?.titulo ?? b?.clave ?? 'Alcance'),
-        texto: b?.texto ?? null,
-        vinetas: Array.isArray(b?.vinetas) ? b.vinetas.map(String) : [],
-        parametros: b?.parametros ?? null,
-      })),
-      planos: planos.map((p: any) => ({
-        url: String(p?.url ?? ''),
-        nombre: p?.nombre ?? null,
-        tipo: p?.tipo ?? null,
-      })),
-      grupos: agruparPartidas(partidas).map((g) => ({
-        grupo: g.grupo,
-        etiqueta: g.etiqueta,
-        subtotal: g.subtotal,
-        partidas: g.partidas.map((p) => ({
-          name: String(p.name ?? ''),
-          description: p.description ?? null,
-          unit: p.unit ?? null,
-          qty: Number(p.qty ?? 0),
-          unitPrice: Number(p.unitPrice ?? 0),
-          lineTotal: Number(p.lineTotal ?? 0),
-        })),
-      })),
-      subtotal: Number(quote.subtotal ?? 0),
-      iva: Number(quote.taxTotal ?? 0),
-      total: Number(quote.total ?? 0),
-      currency: quote.currency || 'MXN',
-      terminos: terminosDeCotizacion({
-        segmento,
-        incluyeInstalacion: instalacion,
-        anticipoPct: quote.depositPercent,
-        vigenciaDias,
-      }),
-      participantes: participantes.map((p) => ({
-        nombre: p.nombre,
-        rolEtiqueta: p.rolEtiqueta,
-        siglas: p.siglas,
-      })),
-      empresa: company
-        ? {
-            legalName: company.legalName,
-            tradeName: company.tradeName,
-            contactEmail: company.contactEmail,
-            contactPhone: company.contactPhone,
-            websiteUrl: company.websiteUrl,
-            fiscalAddress: company.fiscalAddress,
-          }
-        : null,
-    });
+    );
   }
 
   private async buildPdf(quote: any, internal = false) {
@@ -1643,7 +1717,14 @@ export class CotizacionesService {
     });
   }
 
-  private async sendEmail(quote: any, email: string, message: string | undefined, pdf: Buffer, token: string) {
+  private async sendEmail(
+    quote: any,
+    email: string,
+    message: string | undefined,
+    pdf: Buffer,
+    token: string,
+    cc: string[] = [],
+  ) {
     const transporter = this.buildTransporter();
     const from = process.env['SMTP_VENTAS_USER'] || process.env['SMTP_FROM'] || 'ventas@nexara.com.mx';
     const baseUrl = process.env['PUBLIC_WEB_URL'] || 'http://localhost:3000';
@@ -1666,6 +1747,7 @@ export class CotizacionesService {
       await transporter.sendMail({
         from,
         to: email,
+        ...(cc.length ? { cc } : {}),
         subject: `Cotizacion ${quote.quoteNumber}`,
         html: htmlMessage,
         attachments: [
