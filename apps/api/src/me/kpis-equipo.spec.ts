@@ -176,6 +176,18 @@ describe('tramosDeActividades', () => {
     expect(vieja.fin.getTime()).toBe(M('16', '00:00').getTime() - 1);
   });
 
+  it('periodo de varios días abierto: cuenta hasta ahora o hasta el fin de su último día', () => {
+    const [sigue, vencio] = tramosDeActividades(
+      [
+        { ...actividad(1, M('15', '10:00'), null, false), periodoFin: '2026-09-25' },
+        { ...actividad(2, M('14', '10:00'), null, false), periodoFin: '2026-09-16' },
+      ],
+      ahora,
+    );
+    expect(sigue).toMatchObject({ enCurso: true, fin: ahora });
+    expect(vencio.fin.getTime()).toBe(M('17', '00:00').getTime() - 1);
+  });
+
   it('terminada sin fin conocido o sin inicio no suma', () => {
     expect(
       tramosDeActividades([actividad(1, M('18', '10:00'), null, true), actividad(2, null, M('18', '11:00'))], ahora),
@@ -282,6 +294,22 @@ describe('calculaKpisPersona', () => {
     });
     expect(dias.find((d) => d.fecha === '2026-09-15')!.minutosProductivos).toBe(480);
     expect(dias.find((d) => d.fecha === '2026-09-16')!.minutosProductivos).toBe(0);
+  });
+
+  it('una obra de varios días iniciada el lunes cuenta en cada jornada de su periodo', () => {
+    const { dias } = calcula({
+      desde: '2026-09-15',
+      hasta: '2026-09-16',
+      ahora: M('16', '19:00'),
+      checadas: [entrada('15', '09:00'), salida('15', '18:00'), entrada('16', '09:00'), salida('16', '18:00')],
+      comidas: [
+        { inicio: M('15', '15:00'), fin: M('15', '16:00') },
+        { inicio: M('16', '15:00'), fin: M('16', '16:00') },
+      ],
+      actividades: [{ ...actividad(1, M('15', '10:00'), null, false), periodoFin: '2026-09-18' }],
+    });
+    expect(dias.find((d) => d.fecha === '2026-09-15')!.minutosProductivos).toBe(420);
+    expect(dias.find((d) => d.fecha === '2026-09-16')!.minutosProductivos).toBe(480);
   });
 
   it('medianoche: lo trabajado después de las 00:00 es del día de la entrada', () => {

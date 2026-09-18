@@ -31,6 +31,7 @@ import { horaCierreAutomatico } from '../attendance/asistencia-confiable.js';
 import { expectedStartHm, RETARDO_GRACE_MINUTES } from '../attendance/attendance-hybrid.match.js';
 import {
   WORKDAY_TIMEZONE,
+  parseWorkDate,
   workDateKey,
   workDayAtClock,
   workDayEnd,
@@ -296,6 +297,12 @@ export type ActividadKpi = {
   fin: Date | null;
   /** Entregó o se cerró. Terminada y sin fin conocido: no se inventa su duración. */
   terminada: boolean;
+  /**
+   * Último día (`AAAA-MM-DD`) de un periodo de varios días (`Activity.periodoFin`). Una obra de
+   * diez días que se inició el lunes y sigue abierta es trabajo de cada día hasta ese fin, no
+   * solo del lunes. null = actividad de un día.
+   */
+  periodoFin?: string | null;
 };
 
 export type TramoActividad = {
@@ -312,8 +319,10 @@ export type TramoActividad = {
  * Tramo real de cada actividad.
  *
  * Una actividad abierta cuenta hasta ahora solo si empezó hoy; si empezó otro
- * día se corta al final de ese día. Sin ese tope, una foto de entrada olvidada
- * de hace semanas volvía «productivo» cada minuto de cada jornada posterior.
+ * día se corta al final de ese día. Sin ese tope, un «Iniciar» o una foto de
+ * entrada olvidados de hace semanas volvían «productivo» cada minuto de cada
+ * jornada posterior. La excepción es un periodo de varios días: abierta, cuenta
+ * hasta ahora o hasta el final de su último día, lo que llegue antes.
  */
 export function tramosDeActividades(
   actividades: ActividadKpi[],
@@ -328,7 +337,15 @@ export function tramosDeActividades(
     if (!fin) {
       if (a.terminada) continue;
       enCurso = true;
-      fin = workDateKey(a.inicio, tz) === workDateKey(ahora, tz) ? ahora : workDayEnd(a.inicio, tz);
+      const diaInicio = workDateKey(a.inicio, tz);
+      const hoy = workDateKey(ahora, tz);
+      const periodoFin = a.periodoFin && /^\d{4}-\d{2}-\d{2}$/.test(a.periodoFin) ? a.periodoFin : null;
+      if (periodoFin && periodoFin > diaInicio) {
+        const finPeriodo = workDayEnd(parseWorkDate(periodoFin, tz), tz);
+        fin = finPeriodo.getTime() < ahora.getTime() ? finPeriodo : ahora;
+      } else {
+        fin = diaInicio === hoy ? ahora : workDayEnd(a.inicio, tz);
+      }
     }
     if (fin.getTime() > ahora.getTime()) fin = ahora;
     if (fin.getTime() <= a.inicio.getTime()) continue;
@@ -747,8 +764,8 @@ export function supuestosKpi(): string[] {
     'Jornada: de la entrada a la salida. Si hoy no hay salida, cuenta hasta ahora; en un día pasado sin salida se cierra como el cierre automático (entrada + 9 h, a más tardar 23:30).',
     'La jornada es del día de la entrada, aunque la salida caiga después de medianoche.',
     `Horas laboradas: jornada menos la comida registrada; comida sin regreso = ${MINUTOS_COMIDA_POR_OMISION} min.`,
-    'Horas productivas: tiempo en actividades (foto de entrada → foto de salida o fin) dentro de las horas laboradas. Dos actividades a la vez no cuentan doble y lo hecho fuera de la jornada no suma.',
-    'Una actividad abierta cuenta hasta ahora solo si empezó hoy; si empezó otro día se corta al final de ese día.',
+    'Horas productivas: tiempo en actividades («Iniciar» o foto de entrada → foto de salida o fin) dentro de las horas laboradas. Dos actividades a la vez no cuentan doble y lo hecho fuera de la jornada no suma.',
+    'Una actividad abierta cuenta hasta ahora solo si empezó hoy; si empezó otro día se corta al final de ese día. Las de un periodo de varios días cuentan en cada jornada de su periodo, hasta su último día.',
     'Inactividad: horas laboradas menos horas productivas.',
     `Retardo: entrada después de su hora (oficina 09:00, contratista 08:00) más ${RETARDO_GRACE_MINUTES} min de gracia, de lunes a viernes. Los minutos tarde se cuentan desde su hora de entrada. Dirección (24/7) no tiene retardos.`,
     `Tiempo extra: lo laborado arriba de ${JORNADA_ORDINARIA_MIN / 60} h en día laborable, o todo lo laborado en sábado o domingo. Sin horario no se calcula.`,

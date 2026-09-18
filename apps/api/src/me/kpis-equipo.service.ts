@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { resolveAccessScheduleKey } from '../integra/access-schedule-defaults.js';
 import { workDateColumn, workDateKey, workDayEnd, workDayStart, parseWorkDate } from '../common/time/workday.js';
+import { esMultiDia, periodoDeActividad } from '../activities/actividad-periodo.js';
 import { tiposVisibles } from './equipo-alcance.js';
 import { estatusCerrado, tiemposReales } from './pizarra-kpi.js';
 import { TeamBoardService } from './team-board.service.js';
@@ -293,6 +294,8 @@ export class KpisEquipoService {
               estatus: true,
               coreKind: true,
               fechaFinalizacion: true,
+              periodoInicio: true,
+              periodoFin: true,
               deletedAt: true,
             },
           }),
@@ -373,6 +376,7 @@ export class KpisEquipoService {
         cerrada,
       });
       const visible = !tipos || (act.coreKind != null && tipos.includes(act.coreKind));
+      const periodo = periodoDeActividad(act);
       out.get(userId)?.actividades.push({
         activityId,
         anNumber: visible ? act.anNumber : null,
@@ -380,6 +384,7 @@ export class KpisEquipoService {
         inicio: tiempos.inicio,
         fin: tiempos.fin,
         terminada: cerrada || ev?.status === 'COMPLETED',
+        periodoFin: esMultiDia(periodo) ? periodo!.fin : null,
       });
     }
 
