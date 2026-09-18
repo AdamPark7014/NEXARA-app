@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.activities
 
+import java.text.Normalizer
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -11,6 +12,7 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import mx.nexara.mobile.nativeapp.access.PlatformAccounts
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoDto
+import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotoDto
 import mx.nexara.mobile.nativeapp.data.api.EvidenceCampoFotosDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardOpenActivityDto
 import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
@@ -173,26 +175,41 @@ object CoreActivityRules {
     // «Rack»). Cada campo pide foto en los momentos que diga el API: antes, en
     // progreso, después — cualquier combinación. La actividad que no trae
     // campos se captura como siempre (fotos libres): todo esto queda inerte.
+    //
+    // Los momentos son los del API (`MOMENTOS` de evidence-fields.helpers.ts):
+    // ANTES | EN_PROGRESO | DESPUES. Así llegan en `momentos`, así se llaman las
+    // claves de `fotos` y así se mandan en el POST de la foto.
 
-    const val MOMENTO_ANTES = "antes"
-    const val MOMENTO_PROGRESO = "progreso"
-    const val MOMENTO_DESPUES = "despues"
+    const val MOMENTO_ANTES = "ANTES"
+    const val MOMENTO_EN_PROGRESO = "EN_PROGRESO"
+    const val MOMENTO_DESPUES = "DESPUES"
 
     /** Orden en que se piden y se pintan. */
-    val MOMENTOS = listOf(MOMENTO_ANTES, MOMENTO_PROGRESO, MOMENTO_DESPUES)
+    val MOMENTOS = listOf(MOMENTO_ANTES, MOMENTO_EN_PROGRESO, MOMENTO_DESPUES)
 
-    /** Acepta lo que mande el API: «ANTES », «en progreso», «después». */
-    fun normMomento(momento: String?): String? =
-        when (momento?.trim()?.lowercase(ES_MX)) {
-            "antes" -> MOMENTO_ANTES
-            "progreso", "en progreso", "durante" -> MOMENTO_PROGRESO
-            "despues", "después" -> MOMENTO_DESPUES
+    private val MOMENTO_SEPARADOR = Regex("[\\s-]+")
+    private val MARCAS_DIACRITICAS = Regex("\\p{Mn}+")
+
+    /**
+     * Espejo de `normalizarMomento` del API: acepta «ANTES», «antes»,
+     * «EN_PROGRESO», «en progreso», «progreso», «durante», «después»…
+     * Devuelve el momento del API o `null` si no es un momento.
+     */
+    fun normMomento(momento: String?): String? {
+        val limpio = Normalizer.normalize(momento?.trim()?.lowercase(ES_MX).orEmpty(), Normalizer.Form.NFD)
+            .replace(MARCAS_DIACRITICAS, "")
+            .replace(MOMENTO_SEPARADOR, "_")
+        return when (limpio) {
+            "antes", "before" -> MOMENTO_ANTES
+            "en_progreso", "progreso", "durante", "during" -> MOMENTO_EN_PROGRESO
+            "despues", "after" -> MOMENTO_DESPUES
             else -> null
         }
+    }
 
     fun momentoLabel(momento: String?): String = when (normMomento(momento)) {
         MOMENTO_ANTES -> "Antes"
-        MOMENTO_PROGRESO -> "En progreso"
+        MOMENTO_EN_PROGRESO -> "En progreso"
         MOMENTO_DESPUES -> "Después"
         else -> momento?.trim().orEmpty()
     }
@@ -214,16 +231,21 @@ object CoreActivityRules {
             ?: campo.id?.let { "Campo $it" }
             ?: "Campo"
 
-    /** URL ya guardada en ese momento; `null` si el hueco sigue vacío. */
-    fun fotoDeCampo(campo: EvidenceCampoDto, momento: String): String? {
-        val url = when (normMomento(momento)) {
-            MOMENTO_ANTES -> campo.fotos?.antes
-            MOMENTO_PROGRESO -> campo.fotos?.progreso
-            MOMENTO_DESPUES -> campo.fotos?.despues
+    /** La foto que el API trae en ese momento (puede venir sin URL). */
+    private fun fotoEn(fotos: EvidenceCampoFotosDto?, momento: String?): EvidenceCampoFotoDto? =
+        when (normMomento(momento)) {
+            MOMENTO_ANTES -> fotos?.antes
+            MOMENTO_EN_PROGRESO -> fotos?.enProgreso
+            MOMENTO_DESPUES -> fotos?.despues
             else -> null
         }
-        return url?.trim()?.takeIf { it.isNotEmpty() }
-    }
+
+    private fun urlDe(foto: EvidenceCampoFotoDto?): String? =
+        foto?.photoUrl?.trim()?.takeIf { it.isNotEmpty() }
+
+    /** URL ya guardada en ese momento; `null` si el hueco sigue vacío. */
+    fun fotoDeCampo(campo: EvidenceCampoDto, momento: String): String? =
+        urlDe(fotoEn(campo.fotos, momento))
 
     fun momentosPendientes(campo: EvidenceCampoDto): List<String> =
         momentosDeCampo(campo).filter { fotoDeCampo(campo, it) == null }
@@ -261,30 +283,35 @@ object CoreActivityRules {
             momentosDeCampo(campo).mapNotNull { fotoDeCampo(campo, it) }
         }
 
-    /** El POST responde con el campo actualizado; lo que no mande se conserva. */
-    fun mezclaCampo(previo: EvidenceCampoDto, nuevo: EvidenceCampoDto?): EvidenceCampoDto {
-        if (nuevo == null) return previo
-        return previo.copy(
-            nombre = nuevo.nombre ?: previo.nombre,
-            orden = nuevo.orden ?: previo.orden,
-            momentos = nuevo.momentos ?: previo.momentos,
-            fotos = EvidenceCampoFotosDto(
-                antes = nuevo.fotos?.antes ?: previo.fotos?.antes,
-                progreso = nuevo.fotos?.progreso ?: previo.fotos?.progreso,
-                despues = nuevo.fotos?.despues ?: previo.fotos?.despues,
-            ),
-        )
-    }
+    /**
+     * Campos después de mandar la foto de uno. El POST responde con la lista
+     * COMPLETA de campos de la actividad: esa manda y reemplaza la local. Sin
+     * conexión (`respuesta == null`, quedó en la cola) el hueco se marca con la
+     * copia local para que la persona no vuelva a tomar la misma foto.
+     */
+    fun camposTrasFoto(
+        previos: List<EvidenceCampoDto>?,
+        respuesta: List<EvidenceCampoDto>?,
+        campoId: Long,
+        momento: String,
+        urlLocal: String,
+    ): List<EvidenceCampoDto> =
+        respuesta ?: previos.orEmpty().map { campo ->
+            if (campo.id == campoId) conFoto(campo, momento, urlLocal) else campo
+        }
 
     /** Marca el hueco como tomado aunque el API no devuelva la URL (o no haya red). */
     fun conFoto(campo: EvidenceCampoDto, momento: String, url: String): EvidenceCampoDto {
+        val m = normMomento(momento) ?: return campo
         val fotos = campo.fotos ?: EvidenceCampoFotosDto()
+        // Lo que ya venía del servidor manda sobre la copia local.
+        val foto = fotoEn(fotos, m)?.takeIf { urlDe(it) != null }
+            ?: EvidenceCampoFotoDto(momento = m, photoUrl = url)
         return campo.copy(
-            fotos = when (normMomento(momento)) {
-                MOMENTO_ANTES -> fotos.copy(antes = fotos.antes ?: url)
-                MOMENTO_PROGRESO -> fotos.copy(progreso = fotos.progreso ?: url)
-                MOMENTO_DESPUES -> fotos.copy(despues = fotos.despues ?: url)
-                else -> fotos
+            fotos = when (m) {
+                MOMENTO_ANTES -> fotos.copy(antes = foto)
+                MOMENTO_EN_PROGRESO -> fotos.copy(enProgreso = foto)
+                else -> fotos.copy(despues = foto)
             },
         )
     }

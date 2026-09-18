@@ -38,13 +38,18 @@ struct ServiceSheetPdfPayload: Encodable {
     let pdfUrl: String
 }
 
-/// `POST activity-evidence/:id/campos/:campoId/foto` (evidencia por campos).
+/// `POST activity-evidence/:id/campos/:fieldId/foto` (evidencia por campos). Mismo
+/// cuerpo que la foto de entrada: la imagen va como data URL en `photoUrl` y el
+/// API la guarda en disco.
 struct CampoPhotoPayload: Encodable {
-    /// antes | progreso | despues
+    /// ANTES | EN_PROGRESO | DESPUES
     let momento: String
-    let fotoBase64: String
-    let lat: Double?
-    let lng: Double?
+    /// `data:image/jpeg;base64,…`
+    let photoUrl: String
+    let latitude: Double?
+    let longitude: Double?
+    /// ISO-8601 de cuando se tomó.
+    let capturedAt: String?
 }
 
 struct ServiceSheetFormPayload: Encodable {
@@ -260,27 +265,30 @@ final class CoreRepository {
         return try await postEvidence("activity-evidence/\(activityId)/evidence-photos", body: photos)
     }
 
-    /// Evidencia por campos: una foto de un campo en un momento. Responde con
-    /// el campo actualizado (no con el flujo); `nil` si quedó en la cola.
+    /// Evidencia por campos: una foto de un campo en un momento. El API responde
+    /// con la lista COMPLETA de campos de la actividad (`CampoDto[]`, no el
+    /// flujo); `nil` si quedó en la cola sin conexión.
     func submitCampoPhoto(
         activityId: Int,
         campoId: Int,
         momento: String,
-        fotoBase64: String,
+        photoUrl: String,
         latitude: Double?,
-        longitude: Double?
-    ) async throws -> EvidenceCampo? {
+        longitude: Double?,
+        capturedAt: String?
+    ) async throws -> [EvidenceCampo]? {
         let data = try await api.postJSON(
             "activity-evidence/\(activityId)/campos/\(campoId)/foto",
             body: CampoPhotoPayload(
                 momento: momento,
-                fotoBase64: fotoBase64,
-                lat: latitude,
-                lng: longitude
+                photoUrl: photoUrl,
+                latitude: latitude,
+                longitude: longitude,
+                capturedAt: capturedAt
             )
         )
         if CoreRepository.isQueuedOffline(data) { return nil }
-        return try decode(EvidenceCampo.self, from: data)
+        return try decode([EvidenceCampo].self, from: data)
     }
 
     func submitServiceSheetPdf(activityId: Int, pdfDataUrl: String, correction: Bool) async throws -> EvidenceFlowState? {
