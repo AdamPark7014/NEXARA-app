@@ -8,6 +8,7 @@ import InlineAlert from "@/components/ui/InlineAlert";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
+import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
@@ -580,6 +581,13 @@ export default function ActivityDetailPage() {
       <DetailSection title="Evidencias del equipo">
         <EquipoEvidencias activityId={activity.id} compact verMasHref={hrefs.evidences} />
       </DetailSection>
+
+      <EvidenciaPorCampos
+        activityId={activity.id}
+        anNumber={activity.anNumber}
+        titulo={activity.titulo}
+        style={{ margin: "20px 0" }}
+      />
 
       <DetailSection title="Incidencias y recomendaciones">
         <ActivityIssuesPanel activityId={Number(id)} token={token} canManage={Boolean(canEdit)} />

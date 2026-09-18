@@ -6,6 +6,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
+import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -69,6 +70,13 @@ export default function ActivityEvidencesPage() {
           <ActivityEvidenceFlow />
         </DetailSection>
       )}
+
+      <EvidenciaPorCampos
+        activityId={activity.id}
+        anNumber={activity.anNumber}
+        titulo={activity.titulo}
+        style={{ marginBottom: 20 }}
+      />
 
       <div style={{ marginBottom: 16 }}>
         <EquipoEvidencias activityId={activity.id} />

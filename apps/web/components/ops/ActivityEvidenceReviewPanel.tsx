@@ -13,6 +13,7 @@ import {
 import type { ActivityDetail } from "@/lib/ops-activities-api";
 import { activityDisplayLabel, activityDisplayVariant } from "@/lib/activity-status";
 import { IconLabel } from "@/components/ui/IconBadge";
+import DescargarEvidenciaZip from "@/components/ops/DescargarEvidenciaZip";
 import CheckIcon from "@mui/icons-material/Check";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
@@ -78,9 +79,12 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
                   {activity.anNumber} · {activity.titulo}
                 </div>
               </div>
-              <Tag variant={activityDisplayVariant(activity.estatus, ev)}>
-                {activityDisplayLabel(activity.estatus, ev)}
-              </Tag>
+              <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+                <Tag variant={activityDisplayVariant(activity.estatus, ev)}>
+                  {activityDisplayLabel(activity.estatus, ev)}
+                </Tag>
+                <DescargarEvidenciaZip activityId={activity.id} anNumber={activity.anNumber} titulo={activity.titulo} />
+              </div>
             </div>
 
             <div
