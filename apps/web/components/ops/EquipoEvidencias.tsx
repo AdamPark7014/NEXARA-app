@@ -45,7 +45,7 @@ import {
   type TeamEvidenceSnapshot,
 } from "@/lib/my-activities-api";
 
-type Foto = { url: string; titulo: string; at?: string | null; lat?: number | null; lng?: number | null };
+export type Foto = { url: string; titulo: string; at?: string | null; lat?: number | null; lng?: number | null };
 type AbrirVisor = (fotos: Foto[], index: number) => void;
 type RevisionInicial = { decision: "aprobar" | "devolver"; pasos?: string[] };
 
@@ -524,7 +524,7 @@ function Miniatura({ foto, onOpen, alto = 132 }: { foto: Foto; onOpen: () => voi
 }
 
 /** Visor grande de fotos: anterior/siguiente con flechas, Esc para cerrar. */
-function Visor({
+export function Visor({
   fotos,
   index,
   onClose,

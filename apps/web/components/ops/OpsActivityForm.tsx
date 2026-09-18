@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Section from "@/components/ui/Section";
 import { useUser } from "@/components/UserContext";
+import EvidenciaCamposEditor from "@/components/ops/EvidenciaCamposEditor";
+import {
+  definirCamposEvidencia,
+  hayErrores,
+  validarCampos,
+  type CampoBorrador,
+} from "@/lib/evidencia-campos";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import {
@@ -18,6 +25,7 @@ import {
 import PrioritySemaforo from "@/components/ops/PrioritySemaforo";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import {
+  apiErrorMessage,
   assignTicketRequest,
   createActivity,
   fetchNextAnNumber,
@@ -130,6 +138,16 @@ export default function OpsActivityForm({
   >([]);
 
   const [tareaOtroOpen, setTareaOtroOpen] = useState(false);
+
+  // «Qué hay que fotografiar»: se definen al crear y se mandan en cuanto existe la actividad.
+  // La API pide gestión de actividades para definirlos; editar va en el detalle de la actividad.
+  const puedeDefinirCampos = !isEdit && hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE);
+  const [campos, setCampos] = useState<CampoBorrador[]>([]);
+  const [camposIntentado, setCamposIntentado] = useState(false);
+  /** La actividad ya se creó pero el PUT de campos falló: no se vuelve a crear, se reintenta. */
+  const [camposPendiente, setCamposPendiente] = useState<{ id: number; error: string } | null>(null);
+  const erroresCampos = useMemo(() => validarCampos(campos), [campos]);
+  const camposTituloId = useId();
 
   const needsClientPicker = coreKind === "servicio" || coreKind === "comercial";
   const filtersProjectsBySector = coreKind === "proyecto" || coreKind === "obra";
@@ -331,6 +349,13 @@ export default function OpsActivityForm({
       setError("Indica día y hora de la agenda");
       return;
     }
+    if (puedeDefinirCampos && campos.length > 0) {
+      setCamposIntentado(true);
+      if (hayErrores(erroresCampos)) {
+        setError("Revisa «Qué hay que fotografiar»: hay puntos incompletos.");
+        return;
+      }
+    }
 
     const project = activeProjects.find((p) => String(p.id) === form.projectId);
     const payload = buildActivityPayload(form, project, {
@@ -349,30 +374,90 @@ export default function OpsActivityForm({
           ? await createMyActivity(token, payload)
           : await createActivity(token, payload);
         const newId = Number(created?.id);
-        if (pendingRequestId && newId > 0) {
+        if (puedeDefinirCampos && campos.length > 0 && newId > 0) {
           try {
-            await assignTicketRequest(token, pendingRequestId, newId);
-            setPendingRequestId(null);
-          } catch {
-            setError(tone === "core" ? "Actividad creada pero no se pudo vincular al ticket" : "OT creada pero no se pudo vincular al ticket de soporte");
+            await definirCamposEvidencia(token, newId, campos);
+          } catch (e) {
+            setCamposPendiente({
+              id: newId,
+              error: apiErrorMessage(e, "No se pudo guardar qué hay que fotografiar"),
+            });
             return;
           }
         }
-        setSuccess(
-          tone === "core"
-            ? form.responsableId
-              ? "Actividad asignada"
-              : "Actividad creada"
-            : form.responsableId
-              ? "OT asignada"
-              : "OT creada",
-        );
-        setForm({ ...EMPTY_ACTIVITY_FORM });
-        setTareaOtroOpen(false);
-        const next = await fetchNextAnNumber(token);
-        setNextAn(typeof next?.next === "string" ? next.next : "");
-        if (newId > 0) onSuccess?.(newId);
+        await terminarCreacion(newId);
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Lo que sigue a crear la actividad: ligar el ticket, avisar, limpiar y avisar al padre. */
+  const terminarCreacion = async (newId: number) => {
+    if (pendingRequestId && newId > 0) {
+      try {
+        await assignTicketRequest(token, pendingRequestId, newId);
+        setPendingRequestId(null);
+      } catch {
+        setError(tone === "core" ? "Actividad creada pero no se pudo vincular al ticket" : "OT creada pero no se pudo vincular al ticket de soporte");
+        return;
+      }
+    }
+    setSuccess(
+      tone === "core"
+        ? form.responsableId
+          ? "Actividad asignada"
+          : "Actividad creada"
+        : form.responsableId
+          ? "OT asignada"
+          : "OT creada",
+    );
+    setForm({ ...EMPTY_ACTIVITY_FORM });
+    setCampos([]);
+    setCamposIntentado(false);
+    setTareaOtroOpen(false);
+    const next = await fetchNextAnNumber(token);
+    setNextAn(typeof next?.next === "string" ? next.next : "");
+    if (newId > 0) onSuccess?.(newId);
+  };
+
+  /** La actividad ya existe: solo se reintenta guardar los puntos (nunca se crea otra). */
+  const reintentarCampos = async () => {
+    if (!camposPendiente || !token) return;
+    const { id } = camposPendiente;
+    if (hayErrores(erroresCampos)) {
+      setCamposIntentado(true);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await definirCamposEvidencia(token, id, campos);
+    } catch (e) {
+      setCamposPendiente({ id, error: apiErrorMessage(e, "No se pudo guardar qué hay que fotografiar") });
+      setSaving(false);
+      return;
+    }
+    setCamposPendiente(null);
+    try {
+      await terminarCreacion(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const seguirSinCampos = async () => {
+    if (!camposPendiente) return;
+    const { id } = camposPendiente;
+    setCamposPendiente(null);
+    setSaving(true);
+    setError(null);
+    try {
+      await terminarCreacion(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al guardar");
     } finally {
@@ -823,18 +908,86 @@ export default function OpsActivityForm({
         ) : null}
       </div>
 
+      {puedeDefinirCampos ? (
+        <section
+          aria-labelledby={camposTituloId}
+          style={{
+            marginTop: 16,
+            padding: 14,
+            borderRadius: 14,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <div>
+            <h3 id={camposTituloId} style={{ margin: 0, fontSize: 14, fontWeight: 750 }}>
+              Qué hay que fotografiar{" "}
+              <span style={{ fontWeight: 500, fontSize: 12, color: "var(--text-tertiary)" }}>(opcional)</span>
+            </h3>
+            <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+              {campos.length
+                ? "Quien la ejecute verá estos puntos en la app y no podrá avanzar sin la foto de cada momento marcado. Las fotos libres quedan como extra."
+                : "Define cada cosa que se debe documentar (Cámara 1, Rack, Canalización…) y en qué momento se pide la foto: antes, en progreso o después. Si no defines nada, se piden fotos libres como hasta ahora."}
+            </p>
+          </div>
+          <EvidenciaCamposEditor
+            value={campos}
+            onChange={setCampos}
+            errores={camposIntentado ? erroresCampos : null}
+            disabled={saving}
+          />
+        </section>
+      ) : null}
+
+      {camposPendiente ? (
+        <div
+          role="alert"
+          style={{
+            marginTop: 16,
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "1px solid color-mix(in srgb, #d97706 45%, var(--border))",
+            background: "color-mix(in srgb, #d97706 9%, var(--surface))",
+            display: "grid",
+            gap: 10,
+            fontSize: 13,
+            lineHeight: 1.45,
+          }}
+        >
+          <span>
+            <strong>{tone === "core" ? "La actividad ya se creó" : "La OT ya se creó"}</strong>, pero no se guardó qué hay
+            que fotografiar: {camposPendiente.error}
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <Button size="sm" variant="primary" onClick={() => void reintentarCampos()} loading={saving}>
+              Reintentar guardar los puntos
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void seguirSinCampos()} disabled={saving}>
+              Seguir sin puntos
+            </Button>
+          </div>
+          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            Si sigues sin puntos, puedes definirlos después desde el detalle de la actividad.
+          </span>
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginTop: 16 }}>
-        {onCancel && (
+        {onCancel && !camposPendiente && (
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
         )}
-        <Button
-          size="sm"
-          variant={tone === "core" ? "primary" : undefined}
-          onClick={() => void handleSubmit()}
-          disabled={saving}
-        >
-          {saving ? "Guardando…" : activitySubmitLabel(form, isEdit, tone)}
-        </Button>
+        {!camposPendiente ? (
+          <Button
+            size="sm"
+            variant={tone === "core" ? "primary" : undefined}
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+          >
+            {saving ? "Guardando…" : activitySubmitLabel(form, isEdit, tone)}
+          </Button>
+        ) : null}
         {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
         {success && <span style={{ color: "var(--success)", fontSize: 13 }}>{success}</span>}
       </div>
