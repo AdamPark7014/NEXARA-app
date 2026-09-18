@@ -88,6 +88,30 @@ export class AttendanceController {
     return this.attendanceService.corregirChecada(this.actor(req), id, body, companyId);
   }
 
+  /**
+   * Uniforme en la entrada: { ok: true | false | null }. Lo marcan sus jefes (organigrama y
+   * despacho), dirección y RH al revisar la foto; nadie el suyo. El servicio lo vuelve a exigir.
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ATTENDANCE_VIEW,
+      PERMISSIONS.ATTENDANCE_MANAGE,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.HR_MANAGE,
+    ],
+  })
+  @Patch(':id/uniforme')
+  uniforme(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { ok?: boolean | null },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.attendanceService.marcarUniforme(this.actor(req), id, body, companyId);
+  }
+
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   @Post()

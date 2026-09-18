@@ -543,7 +543,11 @@ export class TeamBoardService {
     return { desde: workDateKey(r.desde), hasta: workDateKey(r.hasta), items };
   }
 
-  private async resolveScope(viewer: Viewer, companyId: number | null) {
+  /**
+   * A quién alcanza quien mira (organigrama + despacho; dirección = todos), sin cuentas que no son
+   * empleados. Pública porque los KPI del equipo (`kpis-equipo.service.ts`) usan el mismo alcance.
+   */
+  async resolveScope(viewer: Viewer, companyId: number | null) {
     let email = viewer.email ?? null;
     if (!email && !viewer.isSuperAdmin && viewer.roleKey !== 'ceo') {
       const row = await this.prisma.user.findUnique({

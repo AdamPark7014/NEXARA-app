@@ -27,6 +27,7 @@ import { NotificationType, Prisma } from '@prisma/client';
 import { saveBase64Photo } from '../common/file-upload.util';
 import { horaAviso } from '../notifications/notification-push-meta.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
+import { alcanzaA, esDeTodaLaEmpresa } from '../me/equipo-alcance.js';
 import {
   AttendanceJustificationsService,
   type AttendanceJustificationDto,
@@ -315,6 +316,9 @@ export class AttendanceService {
       offline?: boolean | null;
       cierreAutomatico?: boolean | null;
       accuracyM?: number | null;
+      uniformeOk?: boolean | null;
+      uniformeRevisadoPorId?: number | null;
+      uniformeRevisadoAt?: Date | null;
     },
     correcciones?: Map<number, Array<Record<string, unknown>>>,
   ) {
@@ -328,6 +332,10 @@ export class AttendanceService {
       cierreAutomatico: Boolean(att.cierreAutomatico),
       accuracyM: att.accuracyM ?? null,
       correcciones: (att.id != null && correcciones?.get(att.id)) || [],
+      // Uniforme (solo entradas): ✓ / ✗ del jefe; null = sin revisar.
+      uniformeOk: att.uniformeOk ?? null,
+      uniformeRevisadoPorId: att.uniformeRevisadoPorId ?? null,
+      uniformeRevisadoAt: att.uniformeRevisadoAt ? att.uniformeRevisadoAt.toISOString() : null,
     };
   }
 
@@ -922,6 +930,71 @@ export class AttendanceService {
         correcciones: await this.correccionesDe([checada.id]).then((m) => m.get(checada.id) ?? []),
       },
     };
+  }
+
+  /**
+   * Uniforme en la entrada: quien revisa la foto marca ✓ (`ok: true`) o ✗ (`ok: false`);
+   * `ok: null` la deja otra vez sin revisar. De aquí sale el KPI «cumplimiento con uniforme».
+   *
+   * Pueden sus jefes (organigrama hacia arriba y el flujo de despacho, la misma regla de la
+   * pizarra), dirección y RH. Nadie califica su propio uniforme.
+   */
+  async marcarUniforme(
+    actor: { id: number; email?: string | null; permissions?: string[]; roleKey?: string | null; isSuperAdmin?: boolean },
+    attendanceId: number,
+    body: { ok?: boolean | null },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const ok = body?.ok;
+    if (ok !== true && ok !== false && ok !== null) {
+      throw new BadRequestException('ok debe ser true (con uniforme), false (sin uniforme) o null (sin revisar)');
+    }
+    const checada = await this.prisma.attendance.findFirst({
+      where: { id: attendanceId, ...companyWhere(tenantId) },
+      select: { id: true, userId: true, type: true },
+    });
+    if (!checada) throw new NotFoundException('Checada no encontrada');
+    if (checada.type !== 'entrada') {
+      throw new BadRequestException('El uniforme se revisa en la foto de entrada');
+    }
+    if (checada.userId === actor.id) {
+      throw new ForbiddenException('No puedes revisar tu propio uniforme');
+    }
+    if (!(await this.puedeRevisarUniforme(actor, checada.userId, tenantId))) {
+      throw new ForbiddenException('Solo sus jefes, dirección o RH revisan el uniforme');
+    }
+
+    const revisado = ok !== null;
+    const actualizada = await this.prisma.attendance.update({
+      where: { id: checada.id },
+      data: {
+        uniformeOk: ok,
+        uniformeRevisadoPorId: revisado ? actor.id : null,
+        uniformeRevisadoAt: revisado ? new Date() : null,
+      },
+      select: { id: true, userId: true, uniformeOk: true, uniformeRevisadoPorId: true, uniformeRevisadoAt: true },
+    });
+    return {
+      message: ok === null ? 'Uniforme sin revisar' : ok ? 'Con uniforme' : 'Sin uniforme',
+      data: {
+        ...actualizada,
+        uniformeRevisadoAt: actualizada.uniformeRevisadoAt?.toISOString() ?? null,
+      },
+    };
+  }
+
+  private async puedeRevisarUniforme(
+    actor: { id: number; email?: string | null; roleKey?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
+    targetId: number,
+    tenantId: number,
+  ): Promise<boolean> {
+    if (this.puedeCorregirChecadas(actor) || esDeTodaLaEmpresa(actor)) return true;
+    const users = await this.prisma.user.findMany({
+      where: { isActive: true, companyMemberships: { some: { companyId: tenantId } } },
+      select: { id: true, email: true, managerId: true },
+    });
+    return alcanzaA(actor, users, targetId);
   }
 
   /** Dirección (CEO-equivalentes) y RH: los únicos que pueden mover una hora. */
