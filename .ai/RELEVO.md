@@ -1,42 +1,41 @@
 # RELEVO
 
-- **Último turno:** cursor
-- **Fecha:** 2026-09-17
+- **Último turno:** claude-code
+- **Fecha:** 2026-09-18
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** 3485041a
+- **HEAD:** 6a1ffeb0 (+ este commit de relevo)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Integración agentes + Maps key
+## Este turno (claude-code, 17→18-09) — Proyectos, evidencia por campos, logo PDF
 
-### Hecho
+### Hecho y desplegado en Hetzner (prueba)
 
-1. **Maps API key en Hetzner:** actualizada en `.env`, `deploy/.env` y `deploy/.env.nexara`; web rebuild bakeado (`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` len=39). **Atención:** al verificar con `docker compose config` la clave salió otra vez en el historial de este chat → Adam debe **rotar otra vez** y no pegarla aquí; pegarla solo en el servidor con `read -s` / sed.
-2. **Cruce Iván/David:** ya estaba corregido en `59e8d41d` (caché offline apagada en el navegador; solo queda en la app móvil). Cada quien debe recargar una vez.
-3. **Merge + push + deploy** de las 5 ramas de agentes:
-   - `feat/maps-consumo-minimo` — lazy load, static map cache API, autocomplete acotado
-   - `feat/evidencia-campos` — foto por campo + ZIP + fix salida al corregir
-   - `feat/cotizaciones-pdf-fiel` — PDF propuesta más fiel/liviano
-   - `feat/apps-comenzar-y-campos` — «Comenzar actividad» + captura por campos (Android/iOS)
-   - `feat/proyectos-profesional` — modelo (fechas plan/real, cronograma, alcance, equipo, docs) + salud calculada
-4. **Fix post-merge:** ZIP de evidencia usaba `project.name`; OperationalProject es `title` (`3485041a`).
-5. **Verificado local:** maps 18, evidencia 21, pdf 7, proyectos salud/alcance 28, Android `CoreActivityRules`+`ActivitySemaforo` BUILD SUCCESSFUL, `tsc` API 0 errores.
-6. **Servidor prueba:** migraciones `20260917230000_evidencia_campos` y `20260917240000_proyectos_profesional` aplicadas; tablas `activity_evidence_fields*` y `project_*` existen; api/web HTTP 200; api healthy.
+1. **Proyectos API** `/api/proyectos` (`ProyectosProfesionalController`): lista con salud, detalle, alta completa, cabecera, estado (reusa `operational-projects` changeStatus), hitos, alcance (+ importar de cotización), requerimientos, equipo, documentos (`uploads/project-docs`). `url-matrix`: `/api/proyectos/**`. Fix de tenencia: no se liga cliente de otra empresa (`9bc054e8`).
+2. **Proyectos web** `/erp/proyectos` (lista, alta en 7 pasos con un solo POST, detalle con Gantt CSS, pestañas) — merge `feat/erp-proyectos-web`.
+3. **Evidencia por campos**: web define campos al asignar (`OpsActivityForm`), los ve/edita en `/erp/actividades/:id` y baja el ZIP (`EvidenciaPorCampos.tsx`, `DescargarEvidenciaZip.tsx`). Apps alineadas al contrato del API (antes mandaban `fotoBase64/lat/lng` y esperaban un campo, el API devuelve `CampoDto[]` con claves `ANTES/EN_PROGRESO/DESPUES`). Android e iOS mandan lista vacía en «Fotos en sitio» cuando hay campos (se duplicaban en el ZIP). iOS **sin compilar**.
+4. **Build web**: `useVisibleOnce` devuelve `RefObject<T>` (era el Type error del build).
+5. **Logo en PDFs de producción**: `loadNexaraLogo` solo probaba rutas relativas al cwd (`/app`); ahora prueba `__dirname/../../assets` (`6a1ffeb0`). Afectaba TODOS los PDFs.
+6. **Arte de la propuesta**: `apps/api/src/assets/propuesta-portada.jpg` y `propuesta-membrete.jpg` sacados del PDF de referencia de Adam (`Downloads/Primera cotizacion  (1).pdf`).
+7. **E2E en servidor** (JWT firmado dentro del contenedor, limpio al final): 15/15 (proyectos, campos, ZIP).
 
-### A medias
+### En curso (agentes en worktrees, ramas sin mergear)
 
-- **Proyectos HTTP:** `ProyectosProfesionalService` está en el repo pero **no** está en `ProjectsModule` ni tiene controller (los drafts de Ollama inventaron AuthUser/JwtAuthGuard). Falta cablear bajo `/proyectos` con el patrón de `operational-projects.controller.ts`.
-- **Google Cloud billing:** cuenta de facturación / alerta $200 / topes diarios / desactivar Places API (New) siguen pendientes de Adam (cuentas cerradas).
-- Build web en server reportó Type error `RefObject` (LegacyRef); la imagen igual se construyó.
+- `feat/pdf-propuesta-identica` — PDF cliente idéntico a la referencia (portada/membrete como fondo).
+- `feat/cotizaciones-ui-nueva` — editor tipo documento + vista previa PDF + nomenclatura visible + `scripts/refoliar-borradores.js` (NO correr sin revisar).
+- `feat/actividades-solo-iniciar` — el asignado solo «Iniciar actividad» (sin rechazar), `POST me/activities/:id/iniciar`.
+- `feat/periodos-actividades` — periodo de actividades desde el proyecto (sin recargar diario).
+- `feat/kpis-dashboard` — retardos, uniforme (campo nuevo por checada), horas laboradas vs productivas, inactividad.
+Requisitos de Adam: tabla «Tareas/Dashboard» + `Downloads/gantt_seguimiento_proyectos (1).xlsx` (hoja Desarrollo) + `V1_Nomenglaturas_Nexara.xlsx`.
 
-### Siguiente
+### Pendiente / conocido
 
-1. Cablear controller + provider de proyectos profesional.
-2. Rotar Maps key (filtrada) + presupuesto/quotas en consola Google.
-3. Probar en app: Comenzar actividad + captura por campos; ZIP evidencia en web.
-4. EXEC-PACKET de UX (13-09) sigue desactualizado respecto a este trabajo.
+- **Google Maps**: sin cuenta de facturación activa; la clave web no tiene restricción de aplicación; Android usa otra clave (`local.properties`). No borrar la vieja. Ver memoria `nexara-google-maps-claves`.
+- 26 pruebas web ya fallaban antes (`lib/rbac/role-modules.spec.ts`, timezone en `lib/ops-activity-form.spec.ts`).
+- API de proyectos: al cambiar responsable queda el anterior como RESPONSABLE; PLANNED→ACTIVE no pone `actualStartDate`; borrar documento no borra el archivo.
+- Web: el flujo de captura de evidencia del navegador no sabe de campos (solo apps).
 
 ### No tocar
 
