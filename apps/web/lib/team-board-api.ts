@@ -153,7 +153,10 @@ export type AsignadaPorMiItem = {
   terminada: boolean;
   retirado: boolean;
   aceptacion: BoardAceptacion;
+  /** Solo histórico: rechazos de antes del 18-09 (ya no se puede rechazar). */
   motivoRechazo: string | null;
+  /** Hora real en que la inició; null = sin iniciar (API anterior: no viene). */
+  inicioRealAt?: string | null;
 };
 
 export type AsignadasPorMiResponse = {

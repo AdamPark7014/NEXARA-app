@@ -131,11 +131,6 @@ data class DispatchMyActivityRequest(
     val horasPlan: Double? = null,
 )
 
-/** `POST me/activities/:id/rechazar` — el motivo es obligatorio (≥ 10). */
-data class RechazarActividadRequest(
-    val motivo: String,
-)
-
 data class ReprogramarDespachoRequest(
     /** Día y hora nuevos en ISO-8601 (UTC). */
     val fecha: String,
@@ -248,7 +243,10 @@ data class BoardAsignadaPorMiDto(
     val semaforo: String? = null,
     /** PENDIENTE | ACEPTADA | RECHAZADA */
     val aceptacion: String? = null,
+    /** Solo histórico: rechazos de antes del 18-09 (ya no se puede rechazar). */
     val motivoRechazo: String? = null,
+    /** Hora real en que la inició; null = sin iniciar. */
+    val inicioRealAt: String? = null,
     val fechaMaxima: String? = null,
     val minutosPlan: Double? = null,
     val minutosReales: Double? = null,
@@ -738,16 +736,12 @@ interface CoreActivitiesApi {
     @POST("me/activities")
     suspend fun selfAssign(@Body body: CreateActivityRequest): ResponseBody
 
-    /** Contrato B: quien la recibe acepta… */
-    @POST("me/activities/{id}/aceptar")
-    suspend fun aceptarActividad(@Path("id") activityId: Long): ResponseBody
-
-    /** …o la rechaza con motivo; sigue asignada hasta que un superior la mueva. */
-    @POST("me/activities/{id}/rechazar")
-    suspend fun rechazarActividad(
-        @Path("id") activityId: Long,
-        @Body body: RechazarActividadRequest,
-    ): ResponseBody
+    /**
+     * Quien la recibe no la acepta ni la rechaza: la inicia (regla del 18-09).
+     * Guarda la hora real de inicio; tocarlo otra vez no la mueve.
+     */
+    @POST("me/activities/{id}/iniciar")
+    suspend fun iniciarActividad(@Path("id") activityId: Long): ResponseBody
 
     @POST("me/activities/{id}/despacho")
     suspend fun dispatch(

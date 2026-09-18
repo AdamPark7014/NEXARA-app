@@ -22,8 +22,8 @@ import { useUser } from "@/components/UserContext";
 import { ACTIVITY_KINDS, isCeoEmail, type ActivityIconKey, type ActivityKind } from "@/lib/activity-kinds";
 import { formatApiError } from "@/lib/erp-api";
 import ReprogramarDespacho from "@/components/pizarra/ReprogramarDespacho";
-import AceptarRechazar from "@/components/pizarra/AceptarRechazar";
-import { normalizarPrioridad, SEMAFORO_UI, textoPlanVsReal } from "@/lib/actividad-tiempos";
+import IniciarActividad from "@/components/pizarra/IniciarActividad";
+import { normalizarPrioridad, puedeIniciar, SEMAFORO_UI, textoPlanVsReal } from "@/lib/actividad-tiempos";
 import ActivityKindIcon from "@/components/ops/ActivityKindIcon";
 import { IconBadge, IconLabel } from "@/components/ui/IconBadge";
 import {
@@ -490,8 +490,7 @@ export default function MisActividadesPage() {
                       {SEMAFORO_UI[a.semaforo].label}
                     </Chip>
                   ) : null}
-                  {a.aceptacion === "PENDIENTE" ? <Chip color="#d97706">Por aceptar</Chip> : null}
-                  {a.aceptacion === "RECHAZADA" ? <Chip color="#dc2626">Rechazada por ti</Chip> : null}
+                  {puedeIniciar(a) ? <Chip color="#d97706">Sin iniciar</Chip> : null}
                   <Chip>
                     <ActivityKindIcon kind={kindIcon(a)} size={15} />
                     {kindLabel(a)}
@@ -555,15 +554,9 @@ export default function MisActividadesPage() {
                     <strong>Por qué va aquí:</strong> {a.ordenJustificacion}
                   </p>
                 ) : null}
-                {token ? (
-                  <AceptarRechazar
-                    token={token}
-                    activityId={a.id}
-                    aceptacion={a.aceptacion}
-                    motivoRechazo={a.motivoRechazo}
-                    titulo={a.titulo}
-                    onDone={() => void load()}
-                  />
+                {/* Quien la recibe no la acepta ni la rechaza: únicamente la inicia. */}
+                {token && puedeIniciar(a) ? (
+                  <IniciarActividad token={token} activityId={a.id} onDone={() => void load()} />
                 ) : null}
                 {canReorder ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

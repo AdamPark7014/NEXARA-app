@@ -16,20 +16,47 @@ class ActividadesUxTest {
         evidenceStatus: String? = null,
         porRepartir: Boolean? = null,
         despachador: Boolean? = null,
+        aceptacion: String? = null,
+        inicioRealAt: String? = null,
     ) = MyActivityItemDto(
         id = 1L,
         estatus = estatus,
         evidenceStatus = evidenceStatus,
         porRepartir = porRepartir,
         despachador = despachador,
+        aceptacion = aceptacion,
+        inicioRealAt = inicioRealAt,
     )
 
     @Test
     fun sinEvidenciaEsIniciarYAbreEvidencias() {
         val a = ActividadesUx.primaryAction(act())
         assertEquals(PrimaryKind.INICIAR, a.kind)
-        assertEquals("Iniciar", a.label)
+        assertEquals("Iniciar actividad", a.label)
         assertEquals("evidencias", a.tab)
+        // API anterior al contrato: no hay a dónde mandar la hora; la foto de entrada la marca.
+        assertFalse(a.marcaInicio)
+    }
+
+    @Test
+    fun sinInicioRealLaUnicaAccionEsIniciarActividad() {
+        val a = ActividadesUx.primaryAction(act(aceptacion = "PENDIENTE"))
+        assertEquals(PrimaryKind.INICIAR, a.kind)
+        assertEquals("Iniciar actividad", a.label)
+        assertTrue(a.marcaInicio)
+        // Aunque un compañero ya la tenga en proceso, a mí me falta iniciarla.
+        val enProceso = ActividadesUx.primaryAction(act(estatus = "En Proceso", aceptacion = "ACEPTADA"))
+        assertEquals(PrimaryKind.INICIAR, enProceso.kind)
+        assertTrue(enProceso.marcaInicio)
+    }
+
+    @Test
+    fun yaIniciadaSigueConLasEvidencias() {
+        val a = ActividadesUx.primaryAction(
+            act(estatus = "En Proceso", aceptacion = "ACEPTADA", inicioRealAt = "2026-09-18T15:00:00.000Z"),
+        )
+        assertEquals(PrimaryKind.CONTINUAR, a.kind)
+        assertFalse(a.marcaInicio)
     }
 
     @Test

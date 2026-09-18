@@ -169,6 +169,8 @@ export type AsignadaPorMiItem = {
   retirado: boolean;
   aceptacion: BoardAceptacion;
   motivoRechazo: string | null;
+  /** Hora real en que la inició («Iniciar actividad» o foto de entrada); null = sin iniciar. */
+  inicioRealAt: Date | null;
 };
 
 export type AsignadasPorMiResponse = {
@@ -537,6 +539,7 @@ export class TeamBoardService {
         retirado: calc.retirado,
         aceptacion: aceptacionDe(fila),
         motivoRechazo: textoOpcional(fila, 'motivoRechazo'),
+        inicioRealAt: tiempos.inicio,
       });
     }
 

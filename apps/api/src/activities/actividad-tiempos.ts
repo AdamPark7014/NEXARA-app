@@ -86,6 +86,57 @@ export function debeAutoAceptar(fila: { aceptadaAt?: Date | null }): boolean {
 }
 
 /**
+ * Regla del dueño (18-09): «El asignado de realizar una tarea/actividad no tiene
+ * opción de aceptar o rechazar las actividades asignadas, únicamente iniciarlas».
+ * Es lo que recibe una app instalada que todavía intenta rechazar.
+ */
+export const MENSAJE_SIN_RECHAZO =
+  'Ya no se rechazan actividades: iníciala o habla con tu jefe para reasignarla';
+
+export type CambiosAlIniciar = {
+  /** Lo que se guarda en `ActivityAssignee` (vacío = nada que cambiar). */
+  data: {
+    aceptadaAt?: Date;
+    rechazadaAt?: null;
+    motivoRechazo?: null;
+    inicioRealAt?: Date;
+  };
+  aceptadaAt: Date;
+  inicioRealAt: Date | null;
+  /** Se marcó el inicio en esta llamada (para avisar y mover el estatus una sola vez). */
+  recienIniciada: boolean;
+};
+
+/**
+ * Qué guarda «Iniciar actividad» en la fila de quien la recibe:
+ * - El inicio real se marca la primera vez y ya no se mueve (tocarlo otra vez, o la
+ *   foto de entrada después, respetan esa hora).
+ * - Iniciar vale como aceptación y limpia un rechazo de antes de la regla.
+ * - Quien solo reparte un despacho no la ejecuta: queda constancia de que la vio,
+ *   sin inicio real (su trabajo es pasarla a su gente).
+ */
+export function cambiosAlIniciar(
+  fila: { aceptadaAt?: Date | null; rechazadaAt?: Date | null; inicioRealAt?: Date | null },
+  opciones: { despachador?: boolean; ahora?: Date } = {},
+): CambiosAlIniciar {
+  const ahora = opciones.ahora ?? new Date();
+  const data: CambiosAlIniciar['data'] = {};
+  if (!fila.aceptadaAt) data.aceptadaAt = ahora;
+  if (fila.rechazadaAt) {
+    data.rechazadaAt = null;
+    data.motivoRechazo = null;
+  }
+  const marcarInicio = !opciones.despachador && !fila.inicioRealAt;
+  if (marcarInicio) data.inicioRealAt = ahora;
+  return {
+    data,
+    aceptadaAt: fila.aceptadaAt ?? ahora,
+    inicioRealAt: fila.inicioRealAt ?? (marcarInicio ? ahora : null),
+    recienIniciada: marcarInicio,
+  };
+}
+
+/**
  * Semáforo del contrato:
  * - rojo: vencida (pasó `fechaMaxima`), excedida, o prioridad ALTA sin iniciar.
  * - amarillo: prioridad MEDIA sin iniciar, o en curso con más del 80 % del plan consumido.

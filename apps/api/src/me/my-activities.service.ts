@@ -9,7 +9,9 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
 import { tiposVisibles } from './equipo-alcance.js';
 import {
+  cambiosAlIniciar,
   horasPlanValidas,
+  MENSAJE_SIN_RECHAZO,
   rangoPrioridad,
   tiemposDto,
   type Aceptacion,
@@ -58,9 +60,6 @@ export type DispatchMyActivityDto = {
   /** Tiempo estimado para cada persona del reparto (la web de asignar lo pide). */
   horasPlan?: number | null;
 };
-
-/** Rechazo con motivo: la actividad sigue asignada hasta que un superior la mueva. */
-export type RechazarActividadDto = { motivo: string };
 
 export type ReprogramarDespachoDto = { fecha: string; motivo?: string };
 
@@ -135,7 +134,7 @@ export type MyActivityItem = {
     a: Date;
     motivo: string | null;
   } | null;
-  /** Aceptación de la asignación (la foto de entrada acepta sola en apps viejas). */
+  /** Aceptación de la asignación: iniciarla (o la foto de entrada) la marca como ACEPTADA. */
   aceptacion: Aceptacion;
   motivoRechazo: string | null;
   semaforo: Semaforo;
@@ -190,62 +189,68 @@ export class MyActivitiesService {
   ) {}
 
   /**
-   * Aceptar la asignación: quien la recibe confirma que la hará.
-   * Sin aceptación nada se bloquea (las apps publicadas no tienen el botón y la
-   * foto de entrada acepta sola), pero quien asignó se entera en cuanto pasa.
+   * Iniciar la actividad asignada. Regla del dueño (18-09): quien la recibe no la
+   * acepta ni la rechaza, únicamente la inicia.
+   *
+   * Marca el inicio real con la hora del servidor (trazabilidad: inicio aquí, fin con
+   * la foto de salida), vale como aceptación y pasa la actividad de «Pendiente» a
+   * «En Proceso». Tocarlo dos veces no mueve la hora. Quien solo reparte un despacho
+   * no la ejecuta: queda constancia de que la vio, sin inicio real.
    */
-  async aceptar(viewer: MyActivitiesViewer, companyId: number | null, activityId: number) {
+  async iniciar(viewer: MyActivitiesViewer, companyId: number | null, activityId: number) {
     const fila = await this.filaAsignada(viewer, companyId, activityId);
-    if (fila.aceptadaAt) {
-      return { ok: true, aceptacion: 'ACEPTADA' as const, aceptadaAt: fila.aceptadaAt };
+    const despachador =
+      fila.activity.assignmentCharge === 'despacho' && String(fila.rol) === 'LEAD';
+    const ahora = new Date();
+    const cambios = cambiosAlIniciar(fila, { despachador, ahora });
+    if (Object.keys(cambios.data).length > 0) {
+      await this.prisma.activityAssignee.update({ where: { id: fila.id }, data: cambios.data });
     }
-    const aceptadaAt = new Date();
-    await this.prisma.activityAssignee.update({
-      where: { id: fila.id },
-      // Aceptar borra un rechazo anterior: la última decisión es la que vale.
-      data: { aceptadaAt, rechazadaAt: null, motivoRechazo: null },
-    });
-    void this.notificationHierarchy.notifyActivityAcceptedByAssignee({
-      activityId,
-      userId: viewer.id,
-      asignadoPorId: fila.asignadoPorId ?? null,
-    });
-    return { ok: true, aceptacion: 'ACEPTADA' as const, aceptadaAt };
+    if (cambios.recienIniciada) {
+      // Igual que la foto de entrada: «Pendiente» → «En Proceso»; el resto de estatus no se toca.
+      if (/^pendiente/i.test(fila.activity.estatus || '')) {
+        await this.prisma.activity.update({
+          where: { id: activityId },
+          data: {
+            estatus: 'En Proceso',
+            ...(fila.activity.fechaInicio ? {} : { fechaInicio: ahora }),
+          },
+        });
+      }
+      void this.notificationHierarchy.notifyActivityStartedByAssignee({
+        activityId,
+        userId: viewer.id,
+        asignadoPorId: fila.asignadoPorId ?? null,
+        inicioRealAt: ahora,
+      });
+    }
+    return {
+      ok: true,
+      aceptacion: 'ACEPTADA' as const,
+      aceptadaAt: cambios.aceptadaAt,
+      inicioRealAt: cambios.inicioRealAt,
+    };
   }
 
   /**
-   * Rechazar la asignación con motivo. La actividad **sigue siendo suya** hasta que
-   * un superior la pase a alguien más o la cancele: rechazar avisa, no descarga.
+   * `POST me/activities/:id/aceptar` de las apps ya instaladas: su botón
+   * «Comenzar actividad» llama aquí, así que hace exactamente lo mismo que iniciar.
    */
-  async rechazar(
-    viewer: MyActivitiesViewer,
-    companyId: number | null,
-    activityId: number,
-    dto: RechazarActividadDto,
-  ) {
-    const motivo = String(dto?.motivo ?? '').trim();
-    if (motivo.length < 10) {
-      throw new BadRequestException('Explica por qué no puedes hacerla (mínimo 10 caracteres)');
-    }
-    const fila = await this.filaAsignada(viewer, companyId, activityId);
-    if (fila.inicioRealAt) {
-      throw new BadRequestException('Ya la iniciaste: habla con tu encargado para moverla');
-    }
-    const rechazadaAt = new Date();
-    await this.prisma.activityAssignee.update({
-      where: { id: fila.id },
-      data: { rechazadaAt, motivoRechazo: motivo.slice(0, 500), aceptadaAt: null },
-    });
-    void this.notificationHierarchy.notifyActivityRejectedByAssignee({
-      activityId,
-      userId: viewer.id,
-      motivo: motivo.slice(0, 500),
-      asignadoPorId: fila.asignadoPorId ?? null,
-    });
-    return { ok: true, aceptacion: 'RECHAZADA' as const, rechazadaAt, motivoRechazo: motivo.slice(0, 500) };
+  aceptar(viewer: MyActivitiesViewer, companyId: number | null, activityId: number) {
+    return this.iniciar(viewer, companyId, activityId);
   }
 
-  /** Su fila de equipo en una actividad abierta (la que aceptan o rechazan). */
+  /**
+   * Rechazar ya no existe para quien recibe la actividad (regla del dueño, 18-09).
+   * La ruta sigue viva solo para que las apps instaladas muestren un mensaje claro
+   * en vez de un error genérico. Pasarla a alguien más o cancelarla sigue siendo
+   * de los superiores (`activities/:id/reasignar` y `cancelar`).
+   */
+  rechazar(): never {
+    throw new ForbiddenException(MENSAJE_SIN_RECHAZO);
+  }
+
+  /** Su fila de equipo en una actividad abierta (la que inicia). */
   private async filaAsignada(
     viewer: MyActivitiesViewer,
     companyId: number | null,
@@ -261,11 +266,12 @@ export class MyActivitiesService {
       },
       select: {
         id: true,
+        rol: true,
         aceptadaAt: true,
         rechazadaAt: true,
         inicioRealAt: true,
         asignadoPorId: true,
-        activity: { select: { estatus: true } },
+        activity: { select: { estatus: true, assignmentCharge: true, fechaInicio: true } },
       },
     });
     if (!fila) throw new NotFoundException('Esta actividad no está asignada a ti');
