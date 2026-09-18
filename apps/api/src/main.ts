@@ -406,6 +406,8 @@ async function bootstrap() {
       'Sec-CH-UA-Model',
       'Sec-CH-UA-Platform',
     ],
+    // La vista previa en vivo de cotizaciones dice en qué página empieza cada sección.
+    exposedHeaders: ['Content-Disposition', 'X-Propuesta-Secciones'],
   });
 
   // Servir archivos estáticos desde uploads (en raíz del proyecto)
