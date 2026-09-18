@@ -205,6 +205,7 @@ export type ModuleId =
   | "asistencias"
   | "erp-clients"
   | "erp-cotizaciones"
+  | "erp-proyectos"
   | "activities-daily"
   | "activities-projects"
   | "activities-services"
@@ -414,6 +415,18 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     label: "Cotizaciones", description: "Propuestas técnicas: folio, envío y seguimiento",
     icon: "🧾",
     // Dirección, administración y coordinadores: los encargados de área que cotizan.
+    allowedRoles: [
+      R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL,
+      R.SALES_MANAGER, R.PROJECT_MANAGER, R.SENIOR_ENGINEER,
+      R.ADMIN_STAFF, R.MAINTENANCE_COORDINATOR,
+    ],
+    group: "Hoy", visible: true,
+  },
+  "erp-proyectos": {
+    id: "erp-proyectos", panel: PANELS.ERP, path: "/proyectos",
+    label: "Proyectos", description: "Fechas, cronograma, alcance, equipo, presupuesto y documentos",
+    icon: "📁",
+    // Mismo público que Cotizaciones: ahí se ve el presupuesto y la cartera de clientes.
     allowedRoles: [
       R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL,
       R.SALES_MANAGER, R.PROJECT_MANAGER, R.SENIOR_ENGINEER,
