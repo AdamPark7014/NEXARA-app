@@ -116,6 +116,16 @@ final class CoreRepository {
         return try decode(MyActivitiesResponse.self, from: data)
     }
 
+    /// «Iniciar actividad»: guarda la hora real de inicio (`POST me/activities/:id/iniciar`).
+    /// No hay aceptar ni rechazar (regla del 18-09). Solo en línea: encolada, la hora
+    /// sería la de cuando regrese la señal; sin red, la foto de entrada marca el inicio.
+    func iniciarActividad(activityId: Int) async throws {
+        struct Empty: Encodable {}
+        try await CoreRepository.requireOnline()
+        let data = try await api.postJSON("me/activities/\(activityId)/iniciar", body: Empty())
+        if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
+    }
+
     /// Quien reparte un despacho lo pasa a su equipo. Devuelve cuántos quedaron asignados.
     func dispatchActivity(activityId: Int, userIds: [Int], indicaciones: String?) async throws -> Int {
         struct Body: Encodable {

@@ -21,10 +21,28 @@ describe('términos por partes', () => {
       'Alcance de la cotización',
       'No incluye',
       'Disponibilidad',
-      'Vigencia de esta propuesta',
+      'Vigencia',
     ]);
-    expect(t.lineas[0]).toBe(`Forma de pago: ${t.partes[0]!.texto}`);
+    expect(t.lineas[0]).toBe('Forma de pago: 50 % de anticipo para confirmar el pedido y programar los trabajos; el 50 % restante contra entrega del sistema en operación.');
+    expect(t.lineas.at(-1)).toBe('Vigencia: 15 días naturales a partir de la fecha de emisión de esta propuesta.');
     expect(t.partes.every((p) => !p.personalizado)).toBe(true);
+  });
+
+  it('en licitación las partes se llaman como en las bases', () => {
+    const t = terminosDeCotizacion({ segmento: 'LICITACION', incluyeInstalacion: true });
+    expect(t.partes.map((p) => p.titulo)).toEqual([
+      'Condiciones de pago',
+      'Alcance de la propuesta',
+      'Anticipo',
+      'Trabajos adicionales',
+    ]);
+    // Reescribir el anticipo en licitación se guarda y se lee en su parte.
+    const propia = terminosDeCotizacion({
+      segmento: 'LICITACION',
+      incluyeInstalacion: true,
+      personalizados: escribirTerminosPersonalizados({ disponibilidad: 'Anticipo del 30 % según bases.' }),
+    });
+    expect(propia.lineas[2]).toBe('Anticipo: Anticipo del 30 % según bases.');
   });
 
   it('lo reescrito manda sobre el texto del segmento, parte por parte', () => {

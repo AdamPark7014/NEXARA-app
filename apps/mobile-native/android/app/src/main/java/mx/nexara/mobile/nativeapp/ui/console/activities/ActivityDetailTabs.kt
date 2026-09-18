@@ -185,6 +185,7 @@ fun ActivityInfoTab(
                         if (!a.ticketType.isNullOrBlank()) ADetailRow("Tipo de servicio", a.ticketType!!)
                         ADetailRow("Asignación", a.fechaAsignacion?.take(16)?.replace('T', ' ') ?: "—")
                         ADetailRow("Inicio", a.fechaInicio?.take(16)?.replace('T', ' ') ?: "—")
+                        ActivityPeriodo.cuandoTexto(a.periodo, null)?.let { ADetailRow("Periodo", it) }
                         ADetailRow("Entrega esperada", a.fechaEntregaEsperada?.take(10) ?: "—")
                         ADetailRow("Finalización", a.fechaFinalizacion?.take(16)?.replace('T', ' ') ?: "—")
                     }

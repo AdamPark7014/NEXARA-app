@@ -1,5 +1,6 @@
 import { erpFetch } from "@/lib/erp-api";
 import { isNonEmployeeEmail } from "@/lib/platform-accounts";
+import type { PeriodoActividad } from "@/lib/actividad-periodo";
 
 export type BoardActivityBucket = "daily" | "projects" | "services";
 export type BoardUserStatus = "activo" | "inactivo" | "atrasado" | "libre" | "sin_actividad";
@@ -17,6 +18,8 @@ export type TeamBoardActivity = {
   estatus: string;
   fechaMaxima: string | null;
   bucket: BoardActivityBucket;
+  /** Actividad de varios días (API vieja: no viene). */
+  periodo?: PeriodoActividad | null;
 };
 
 export type TeamBoardOpenActivity = {
@@ -46,6 +49,8 @@ export type TeamBoardOpenActivity = {
   finRealAt?: string | null;
   asignadoPor?: { id: number; nombre: string } | null;
   aceptacion?: BoardAceptacion;
+  /** Actividad de varios días: sigue en la pizarra cada día hasta su fin. */
+  periodo?: PeriodoActividad | null;
 };
 
 /** Contrato C: cómo le fue a la persona en el rango consultado. */
@@ -144,6 +149,8 @@ export type AsignadaPorMiItem = {
   fechaAsignacion: string;
   fechaMaxima: string | null;
   fechaFinalizacion: string | null;
+  /** Actividad de varios días (API vieja: no viene). */
+  periodo?: PeriodoActividad | null;
   persona: { id: number; nombre: string; avatarUrl: string | null; puesto: string | null };
   prioridad: Prioridad;
   semaforo: Semaforo;
@@ -153,7 +160,10 @@ export type AsignadaPorMiItem = {
   terminada: boolean;
   retirado: boolean;
   aceptacion: BoardAceptacion;
+  /** Solo histórico: rechazos de antes del 18-09 (ya no se puede rechazar). */
   motivoRechazo: string | null;
+  /** Hora real en que la inició; null = sin iniciar (API anterior: no viene). */
+  inicioRealAt?: string | null;
 };
 
 export type AsignadasPorMiResponse = {

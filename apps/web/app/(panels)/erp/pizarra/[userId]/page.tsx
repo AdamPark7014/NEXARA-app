@@ -266,6 +266,17 @@ export default function PizarraPersonaPage() {
             <div style={{ fontSize: 15, fontWeight: 800 }}>{act.anNumber}</div>
             <div style={{ fontSize: 16, lineHeight: 1.4 }}>{act.titulo}</div>
             <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Estatus: {act.estatus}</div>
+            {act.periodo ? (
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 650,
+                  color: act.periodo.estado === "vencida" ? "#dc2626" : "var(--text-secondary)",
+                }}
+              >
+                {act.periodo.etiqueta}
+              </div>
+            ) : null}
             <Link
               href={`/erp/actividades/${act.id}`}
               style={{ marginTop: 4, fontWeight: 700, color: "var(--primary)", width: "fit-content" }}

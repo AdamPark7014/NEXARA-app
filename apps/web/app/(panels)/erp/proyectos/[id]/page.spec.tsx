@@ -210,4 +210,59 @@ describe("detalle del proyecto", () => {
 
     expect(await screen.findByText("Beto Ruiz está fuera de tu equipo: no puedes asignarle este proyecto.")).toBeInTheDocument();
   });
+
+  it("programar actividades: propone periodos encadenados, recorre la siguiente y crea todo en un POST", async () => {
+    const propuesta = {
+      proyecto: { id: 7, title: "Videovigilancia Plaza Norte", status: "ACTIVE", inicio: "2026-09-01", fin: "2026-10-30", siteCount: 2, responsableId: 1 },
+      etapas: [
+        { hitoId: 11, nombre: "Levantamiento", descripcion: null, estado: "PENDIENTE", responsableId: 1, inicio: "2026-09-01", fin: "2026-09-10", dias: 10, ajustada: false, programadas: [], sugerida: true },
+        { hitoId: 12, nombre: "Instalación", descripcion: null, estado: "PENDIENTE", responsableId: null, inicio: "2026-09-11", fin: "2026-09-30", dias: 20, ajustada: false, programadas: [], sugerida: true },
+      ],
+    };
+    const llamadas = servidor([
+      (l) => (l.method === "GET" && l.url.includes("proyectos/7/programacion") ? json(propuesta) : undefined),
+      (l) =>
+        l.method === "POST" && l.url.includes("proyectos/7/programar-actividades")
+          ? json({
+              creadas: [
+                { hitoId: 11, id: 90, anNumber: "AN-0090", titulo: "Levantamiento", estatus: "Pendiente", sitio: null, responsableId: 1, periodo: null },
+                { hitoId: 12, id: 91, anNumber: "AN-0091", titulo: "Instalación", estatus: "Pendiente", sitio: null, responsableId: 1, periodo: null },
+              ],
+              omitidas: [],
+              proyecto: proyecto(),
+            })
+          : undefined,
+    ]);
+    const user = userEvent.setup();
+    render(<ProyectoDetallePage />);
+
+    await user.click(await screen.findByRole("tab", { name: /Actividades/ }));
+    await user.click(screen.getByRole("button", { name: "Programar actividades" }));
+    const etapas = await screen.findByRole("list", { name: "Etapas a programar" });
+
+    // La etapa sin responsable no se puede crear hasta elegir a alguien.
+    await user.click(within(etapas.parentElement as HTMLElement).getByRole("button", { name: "Crear 2 actividades" }));
+    expect(await screen.findByText("Elige quién la lleva.")).toBeInTheDocument();
+    expect(llamadas.some((l) => l.method === "POST")).toBe(false);
+
+    // Alargar el levantamiento recorre la instalación sin cambiar su duración (20 días).
+    const fin = screen.getByLabelText("Al", { selector: "#prog-11-al" });
+    await user.clear(fin);
+    await user.type(fin, "2026-09-12");
+    expect(screen.getByLabelText("Del", { selector: "#prog-12-del" })).toHaveValue("2026-09-13");
+    expect(screen.getByLabelText("Al", { selector: "#prog-12-al" })).toHaveValue("2026-10-02");
+
+    await user.selectOptions(screen.getByLabelText("La lleva", { selector: "#prog-12-resp" }), "1");
+    await user.click(screen.getByRole("button", { name: "Crear 2 actividades" }));
+
+    await waitFor(() => expect(llamadas.find((l) => l.method === "POST")).toBeTruthy());
+    expect(llamadas.find((l) => l.method === "POST")?.body).toEqual({
+      porSitio: false,
+      etapas: [
+        { hitoId: 11, inicio: "2026-09-01", fin: "2026-09-12", responsableId: 1 },
+        { hitoId: 12, inicio: "2026-09-13", fin: "2026-10-02", responsableId: 1 },
+      ],
+    });
+    expect(await screen.findByText(/Se crearon 2 actividades: AN-0090/)).toBeInTheDocument();
+  });
 });

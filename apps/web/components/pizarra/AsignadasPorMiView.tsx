@@ -100,12 +100,13 @@ export default function AsignadasPorMiView({
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
             <PrioridadChip prioridad={a.prioridad} />
-            {a.aceptacion === "RECHAZADA" ? (
+            {/* Ya no se acepta ni se rechaza: lo que importa es si ya la inició. */}
+            {a.inicioRealAt ? (
+              <Chip color="#16a34a">Iniciada</Chip>
+            ) : a.aceptacion === "RECHAZADA" ? (
               <Chip color="#dc2626" title={a.motivoRechazo ?? undefined}>
                 Rechazada
               </Chip>
-            ) : a.aceptacion === "ACEPTADA" ? (
-              <Chip color="#16a34a">Aceptada</Chip>
             ) : null}
             {a.excedida ? <Chip color="#dc2626">Excedió el plan</Chip> : null}
             {a.retirado ? <Chip color="#64748b">Retirado</Chip> : null}
@@ -118,7 +119,7 @@ export default function AsignadasPorMiView({
               {a.persona.nombre}
             </Link>
             {` · ${a.estatus} · asignada ${fecha(a.fechaAsignacion)}`}
-            {a.fechaMaxima ? ` · vence ${fecha(a.fechaMaxima)}` : ""}
+            {a.periodo ? ` · ${a.periodo.etiqueta}` : a.fechaMaxima ? ` · vence ${fecha(a.fechaMaxima)}` : ""}
             {a.minutosPlan != null
               ? ` · plan ${formatMinutes(a.minutosPlan)}${
                   a.minutosReales != null ? ` / real ${formatMinutes(a.minutosReales)}` : ""

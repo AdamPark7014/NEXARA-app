@@ -1,5 +1,6 @@
 import type { GeocercaAlerta } from "@/lib/activity-geofence";
 import type { Aceptacion, Semaforo } from "@/lib/actividad-tiempos";
+import type { PeriodoActividad } from "@/lib/actividad-periodo";
 import { erpFetch } from "@/lib/erp-api";
 
 /** Fila de Mis actividades (GET /me/activities). Fechas en ISO. */
@@ -64,6 +65,8 @@ export type MyActivityItem = {
   finRealAt?: string | null;
   asignadoPor?: { id: number; nombre: string } | null;
   saltoPrioridad?: boolean;
+  /** Actividad de varios días: «Día 3 de 10 · termina vie 25 sep» (lo calcula la API). */
+  periodo?: PeriodoActividad | null;
 };
 
 export type MyActivitiesResponse = {
@@ -104,27 +107,18 @@ export function dispatchMyActivity(
   });
 }
 
-/** Aceptar la actividad asignada (POST /me/activities/:id/aceptar). */
-export function aceptarMiActividad(
+/**
+ * Iniciar la actividad asignada (POST /me/activities/:id/iniciar): guarda la hora real
+ * de inicio. Quien la recibe no la acepta ni la rechaza, únicamente la inicia.
+ */
+export function iniciarMiActividad(
   token: string,
   activityId: number,
-): Promise<{ ok: boolean; aceptacion: Aceptacion }> {
-  return erpFetch<{ ok: boolean; aceptacion: Aceptacion }>(`me/activities/${activityId}/aceptar`, token, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
-
-/** Rechazar con motivo (POST /me/activities/:id/rechazar); sigue asignada hasta que la muevan. */
-export function rechazarMiActividad(
-  token: string,
-  activityId: number,
-  motivo: string,
-): Promise<{ ok: boolean; aceptacion: Aceptacion; motivoRechazo: string }> {
-  return erpFetch<{ ok: boolean; aceptacion: Aceptacion; motivoRechazo: string }>(
-    `me/activities/${activityId}/rechazar`,
+): Promise<{ ok: boolean; aceptacion: Aceptacion; inicioRealAt: string | null }> {
+  return erpFetch<{ ok: boolean; aceptacion: Aceptacion; inicioRealAt: string | null }>(
+    `me/activities/${activityId}/iniciar`,
     token,
-    { method: "POST", body: JSON.stringify({ motivo }) },
+    { method: "POST", body: JSON.stringify({}) },
   );
 }
 
