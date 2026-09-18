@@ -64,6 +64,13 @@ export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
 export const COTIZACIONES_CORE_PATHS: PageRule[] = ['/erp/cotizaciones', '/erp/cotizaciones/**'];
 
 /**
+ * Proyectos en Core (`/erp/proyectos`): fechas, cronograma, alcance, equipo, presupuesto y
+ * documentos. Mismo público que las cotizaciones de Core, por el mismo motivo: ahí se ve el
+ * presupuesto y la cartera. El personal de campo sigue viendo sus actividades en la pizarra.
+ */
+export const PROYECTOS_CORE_PATHS: PageRule[] = ['/erp/proyectos', '/erp/proyectos/**'];
+
+/**
  * Mapeo legacy documentado en `lib/legacy-path-remap.ts`.
  */
 
@@ -94,6 +101,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ARQUITECTO]: [
     '/ops/**',
     ...COTIZACIONES_CORE_PATHS,
+    ...PROYECTOS_CORE_PATHS,
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
@@ -119,6 +127,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.DIR_OPERACIONES]: [
     '/erp',
     ...COTIZACIONES_CORE_PATHS,
+    ...PROYECTOS_CORE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
@@ -183,6 +192,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_ADMIN]: [
     '/erp',
     ...COTIZACIONES_CORE_PATHS,
+    ...PROYECTOS_CORE_PATHS,
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
@@ -236,6 +246,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ADMINISTRATIVO]: [
     '/erp',
     ...COTIZACIONES_CORE_PATHS,
+    ...PROYECTOS_CORE_PATHS,
     '/erp/dashboard',
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
@@ -272,6 +283,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_OPERACIONES]: [
     '/ops/**',
     ...COTIZACIONES_CORE_PATHS,
+    ...PROYECTOS_CORE_PATHS,
     '/ops/chat',
     ...CORE_OLA1_PAGE_PATHS,
     '/erp/chat',
@@ -346,6 +358,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_VENTAS]: [
     '/crm/**',
     ...COTIZACIONES_CORE_PATHS,
+    ...PROYECTOS_CORE_PATHS,
     '/crm/chat',
     '/erp/dashboard',
     '/erp/chat',

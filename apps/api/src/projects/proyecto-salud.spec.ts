@@ -3,6 +3,7 @@ import {
   calcularSalud,
   diasEntre,
   resumirRequerimientos,
+  siguienteHito,
 } from './proyecto-salud.js';
 import { etiquetaEstadoProyecto, puedeTransicionar } from './proyecto-estado.js';
 
@@ -207,5 +208,44 @@ describe('vocabulario de estados', () => {
     expect(puedeTransicionar('COMPLETED', 'ACTIVE')).toBe(true);
     expect(puedeTransicionar('COMPLETED', 'ON_HOLD')).toBe(false);
     expect(puedeTransicionar('ACTIVE', 'ACTIVE')).toBe(true);
+  });
+});
+
+describe('siguiente etapa del cronograma', () => {
+  it('es la abierta con la fecha planeada más próxima', () => {
+    const h = siguienteHito([
+      { id: 1, name: 'Levantamiento', plannedDate: '2026-09-01', status: 'CUMPLIDO', orden: 0 },
+      { id: 2, name: 'Instalación', plannedDate: '2026-10-10', status: 'PENDIENTE', orden: 2 },
+      { id: 3, name: 'Compras', plannedDate: '2026-09-25', status: 'EN_CURSO', orden: 1 },
+    ]);
+    expect(h?.id).toBe(3);
+  });
+
+  it('las que tienen fecha real o están canceladas ya no cuentan', () => {
+    const h = siguienteHito([
+      { id: 1, name: 'Compras', plannedDate: '2026-09-20', actualDate: '2026-09-19', status: 'PENDIENTE' },
+      { id: 2, name: 'Permisos', plannedDate: '2026-09-21', status: 'CANCELADO' },
+      { id: 3, name: 'Pruebas', plannedDate: '2026-10-01', status: 'PENDIENTE' },
+    ]);
+    expect(h?.id).toBe(3);
+  });
+
+  it('sin fecha van al final, en su orden', () => {
+    const h = siguienteHito([
+      { id: 1, name: 'Entrega', plannedDate: null, status: 'PENDIENTE', orden: 3 },
+      { id: 2, name: 'Capacitación', plannedDate: null, status: 'PENDIENTE', orden: 1 },
+    ]);
+    expect(h?.id).toBe(2);
+    expect(
+      siguienteHito([
+        { id: 1, name: 'Sin fecha', plannedDate: null, status: 'PENDIENTE', orden: 0 },
+        { id: 2, name: 'Con fecha', plannedDate: '2027-01-01', status: 'PENDIENTE', orden: 5 },
+      ])?.id,
+    ).toBe(2);
+  });
+
+  it('si ya no queda ninguna abierta devuelve null', () => {
+    expect(siguienteHito([{ id: 1, status: 'CUMPLIDO' }])).toBeNull();
+    expect(siguienteHito([])).toBeNull();
   });
 });

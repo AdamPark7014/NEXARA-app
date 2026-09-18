@@ -87,6 +87,20 @@ export const COTIZACIONES_CORE_URL_RULES: UrlRule[] = [
   { path: '/api/smart-quote/search', methods: ['GET'], scope: 'read' },
 ];
 
+/**
+ * Proyectos en Core (`/erp/proyectos`): mismo público que las cotizaciones de Core.
+ *
+ * Las páginas van aquí para que `/me/navigation` no recorte el módulo del menú. La escritura en
+ * `/api/proyectos` hace falta porque, para varios de estos puestos, su única regla sobre `/api/**`
+ * es de lectura y el alta respondía 403. Quién puede de verdad crear o editar lo sigue decidiendo
+ * el controlador (`ACTIVITIES_MANAGE`) y el alcance de equipo del servicio.
+ */
+export const PROYECTOS_CORE_URL_RULES: UrlRule[] = [
+  { path: '/erp/proyectos', scope: 'write' },
+  { path: '/erp/proyectos/**', scope: 'write' },
+  { path: '/api/proyectos/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
+];
+
 /** Core ola1 — páginas shell (Pizarra / Asistencias / Chat / Actividades). */
 export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/erp/mis-actividades', scope: 'write' },
@@ -184,6 +198,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
     ...COTIZACIONES_CORE_URL_RULES,
+    ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     // Faltas justificadas: solo Christian (el servicio lo vuelve a exigir por correo).
@@ -219,6 +234,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
     ...COTIZACIONES_CORE_URL_RULES,
+    ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     // OPS — lectura total + aprobación de actividades y evidencias
@@ -265,6 +281,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
     ...COTIZACIONES_CORE_URL_RULES,
+    ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
@@ -314,6 +331,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
     ...COTIZACIONES_CORE_URL_RULES,
+    ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp/**', scope: 'admin' },
@@ -351,6 +369,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
     ...COTIZACIONES_CORE_URL_RULES,
+    ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
@@ -422,6 +441,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
     ...COTIZACIONES_CORE_URL_RULES,
+    ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     { path: '/erp', scope: 'read' },
@@ -479,6 +499,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
     ...COTIZACIONES_CORE_URL_RULES,
+    ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     { path: '/ops', scope: 'read' },
@@ -630,6 +651,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
     ...COTIZACIONES_CORE_URL_RULES,
+    ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/crm/**', scope: 'approve' },
