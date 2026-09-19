@@ -32,7 +32,12 @@ export default function SeccionAlcance({
   cambiar,
   editable,
   plantillas,
+  excluida,
+  onIncluir,
 }: {
+  /** Apagada en «Personalizar». */
+  excluida?: boolean;
+  onIncluir?: () => void;
   doc: DocumentoCotizacion;
   cambiar: Cambiar;
   editable: boolean;
@@ -93,6 +98,8 @@ export default function SeccionAlcance({
 
   return (
     <Hoja
+      excluida={excluida}
+      onIncluir={onIncluir}
       id="alcance"
       numero="02"
       titulo="Alcance del proyecto"

@@ -1276,7 +1276,8 @@ export class CotizacionesService {
 
   /** Puntos de partida del editor por segmento: objetivo (entrada y cierre) y subsecciones de alcance. */
   plantillas() {
-    return plantillasDeCotizacion();
+    // Con las condiciones comerciales del segmento: una cotización nueva las trae ya escritas.
+    return plantillasDeCotizacion().map((p) => ({ ...p, condiciones: condicionesPorOmision(p.segmento) }));
   }
 
   /**

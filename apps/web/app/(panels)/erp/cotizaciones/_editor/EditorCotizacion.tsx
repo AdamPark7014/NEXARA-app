@@ -11,6 +11,8 @@ import {
   aplicarPaquete,
   crearCotizacion,
   enviarCotizacion,
+  guardarComoPlantilla,
+  obtenerPlantillaGuardada,
   formatoMoneda,
   listarPaquetes,
   listarPlantillas,
@@ -27,6 +29,7 @@ import {
 import {
   bloquesDesdeApi,
   documentoDesdeDetalle,
+  documentoDesdePlantilla,
   documentoVacio,
   faltaParaEnviar,
   faltaParaGuardar,
@@ -38,6 +41,9 @@ import {
 } from "@/lib/cotizacion-documento";
 import { folioAlEnviar } from "@/lib/cotizacion-folio";
 import { esSeccionPropuesta, type SeccionPropuesta } from "@/lib/vista-previa-vivo";
+import { conCondicionesSugeridas, type SeccionesOpcionales } from "@/lib/cotizacion-personalizacion";
+import PanelPersonalizar from "./PanelPersonalizar";
+import ElegirPlantilla from "./ElegirPlantilla";
 import { useAutoguardado, type EstadoGuardado } from "./useAutoguardado";
 import SeccionPortada from "./SeccionPortada";
 import SeccionObjetivo from "./SeccionObjetivo";
@@ -73,6 +79,7 @@ function textoGuardado(estado: EstadoGuardado, guardadoEn: Date | null, pausa: s
 
 const SECCIONES = [
   { id: "portada", numero: "", titulo: "Portada" },
+  { id: "personalizar", numero: "", titulo: "Personalizar" },
   { id: "objetivo", numero: "01", titulo: "Objetivo" },
   { id: "alcance", numero: "02", titulo: "Alcance" },
   { id: "planos", numero: "03", titulo: "Planos" },
@@ -124,9 +131,12 @@ function useEsAncho() {
 export default function EditorCotizacion({
   inicial,
   activityId,
+  plantillaId,
 }: {
   inicial: CotizacionDetalle | null;
   activityId?: number | null;
+  /** «Nueva desde plantilla» (`/erp/cotizaciones/nueva?plantilla=`). */
+  plantillaId?: number | null;
 }) {
   const { token, user } = useUser();
   const [arranque] = useState(() => {
@@ -154,6 +164,7 @@ export default function EditorCotizacion({
   const [envio, setEnvio] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [plantillaElegida, setPlantillaElegida] = useState<number | null>(null);
   const ancho = useEsAncho();
 
   const aprobada = detalle?.estado === "APROBADA";
@@ -305,6 +316,57 @@ export default function EditorCotizacion({
     }
   }
 
+  // ─── Personalizar y plantillas ─────────────────────────────────────────
+  // Cotización nueva: las condiciones comerciales ya escritas con las del segmento.
+  const condicionesPuestas = useRef(Boolean(inicial));
+  useEffect(() => {
+    if (condicionesPuestas.current || !plantillas.length) return;
+    const sugeridas = plantillas.find((p) => p.segmento === docRef.current.segmento)?.condiciones;
+    if (!sugeridas) return;
+    condicionesPuestas.current = true;
+    setDoc((d) => ({ ...d, opciones: conCondicionesSugeridas(d.opciones, sugeridas) }));
+  }, [plantillas]);
+
+  const usarPlantilla = useCallback(
+    async (plantilla: number) => {
+      if (!token) return;
+      try {
+        const { contenido, nombre } = await obtenerPlantillaGuardada(token, plantilla);
+        const sugeridas = plantillas.find((p) => p.segmento === contenido.segmento)?.condiciones ?? null;
+        condicionesPuestas.current = true;
+        setDoc((d) => documentoDesdePlantilla(contenido, d, sugeridas));
+        setPlantillaElegida(plantilla);
+        setAviso(`Plantilla «${nombre}» aplicada: escribe el cliente y se guarda sola.`);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo abrir la plantilla");
+      }
+    },
+    [token, plantillas],
+  );
+
+  // `/erp/cotizaciones/nueva?plantilla=ID`: se aplica en cuanto hay sesión.
+  const plantillaAplicada = useRef(false);
+  useEffect(() => {
+    if (plantillaAplicada.current || !plantillaId || inicial || !token) return;
+    plantillaAplicada.current = true;
+    void usarPlantilla(plantillaId);
+  }, [plantillaId, inicial, token, usarPlantilla]);
+
+  async function guardarPlantilla(nombre: string, conPartidas: boolean) {
+    if (!token || !idRef.current || !(await asegurarGuardado())) return;
+    try {
+      const hecha = await guardarComoPlantilla(token, { nombre, cotizacionId: idRef.current, conPartidas });
+      setAviso(
+        `Plantilla «${hecha.nombre}» guardada${hecha.conPartidas ? ` con ${hecha.partidas} partidas` : ""}. Aparece en «Nueva cotización».`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la plantilla");
+    }
+  }
+
+  const incluirSeccion = (clave: keyof SeccionesOpcionales) =>
+    cambiar((d) => ({ ...d, opciones: { ...d.opciones, secciones: { ...d.opciones.secciones, [clave]: true } } }));
+
   const onDetalle = useCallback(
     (d: CotizacionDetalle | null) => {
       if (d) setDetalle(d);
@@ -394,6 +456,20 @@ export default function EditorCotizacion({
     setSeccionVista(idSeccion);
     if (esSeccionPropuesta(idSeccion)) setSeccionCursor(idSeccion);
   };
+
+  // Firmas: «Elaboró» es el autor (con su puesto); «Autorizó» se elige de quienes intervinieron.
+  const elaboroParticipante = detalle?.participantes.find((p) => p.rol === "ELABORO");
+  const autorFirma = detalle?.elaboro?.nombre
+    ? { nombre: detalle.elaboro.nombre, cargo: elaboroParticipante?.puesto ?? null }
+    : user?.nombre
+      ? { nombre: user.nombre, cargo: null }
+      : null;
+  const personasFirma = useMemo(() => {
+    const vistas = new Map<string, { nombre: string; cargo?: string | null; userId?: number | null }>();
+    for (const p of detalle?.participantes ?? []) vistas.set(p.nombre, { nombre: p.nombre, cargo: p.puesto ?? null, userId: p.userId });
+    if (user?.nombre && !vistas.has(user.nombre)) vistas.set(user.nombre, { nombre: user.nombre, userId: user.id });
+    return [...vistas.values()].filter((p) => p.nombre);
+  }, [detalle, user]);
 
   const claseGuardado = [
     styles.guardado,
@@ -554,6 +630,9 @@ export default function EditorCotizacion({
           className={`${styles.documento} ${pestana === "vista" ? styles.ocultoEnAngosto : ""}`}
           onFocusCapture={alEnfocar}
         >
+          {!id && !inicial ? (
+            <ElegirPlantilla token={token} elegida={plantillaElegida} onElegir={usarPlantilla} onError={setError} />
+          ) : null}
           <SeccionPortada
             doc={doc}
             cambiar={cambiar}
@@ -571,14 +650,33 @@ export default function EditorCotizacion({
               </p>
             </div>
           ) : null}
+          <PanelPersonalizar
+            doc={doc}
+            cambiar={cambiar}
+            editable={editable}
+            sugeridas={detalle?.condicionesSugeridas ?? plantillaSegmento?.condiciones ?? null}
+            autor={autorFirma}
+            personas={personasFirma}
+            puedeGuardarPlantilla={Boolean(id) && !falta}
+            onGuardarPlantilla={guardarPlantilla}
+          />
           <SeccionObjetivo
             doc={doc}
             cambiar={cambiar}
             editable={editable}
             sugerido={detalle?.objetivoSugerido ?? null}
             plantilla={plantillaSegmento?.objetivo ?? null}
+            excluida={!doc.opciones.secciones.objetivo}
+            onIncluir={() => incluirSeccion("objetivo")}
           />
-          <SeccionAlcance doc={doc} cambiar={cambiar} editable={editable} plantillas={plantillaSegmento?.bloques ?? []} />
+          <SeccionAlcance
+            doc={doc}
+            cambiar={cambiar}
+            editable={editable}
+            plantillas={plantillaSegmento?.bloques ?? []}
+            excluida={!doc.opciones.secciones.alcance}
+            onIncluir={() => incluirSeccion("alcance")}
+          />
           <SeccionPlanos
             cotizacionId={id}
             token={token}
@@ -586,6 +684,8 @@ export default function EditorCotizacion({
             editable={editable}
             onDetalle={onDetalle}
             onError={setError}
+            excluida={!doc.opciones.secciones.planos}
+            onIncluir={() => incluirSeccion("planos")}
           />
           <SeccionCotizacion
             doc={doc}
@@ -595,6 +695,7 @@ export default function EditorCotizacion({
             token={token}
             paquetes={paquetes}
             onAplicarPaquete={onAplicarPaquete}
+            onIncluirTerminos={() => incluirSeccion("terminos")}
           />
           {detalle ? (
             <Seguimiento

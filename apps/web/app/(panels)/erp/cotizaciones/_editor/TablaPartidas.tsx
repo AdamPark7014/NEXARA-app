@@ -11,7 +11,47 @@ import {
   type PartidaEditor,
   type Totales,
 } from "@/lib/cotizacion-documento";
+import { columnasDeTabla, type ColumnasOpcionales } from "@/lib/cotizacion-personalizacion";
 import styles from "./editor.module.css";
+
+const SIN_EXTRAS: ColumnasOpcionales = { marcaModelo: false, imagen: false, descuento: false, precioUnitario: true };
+const hayExtras = (c: ColumnasOpcionales) => c.marcaModelo || c.descuento || c.imagen;
+
+/** Miniatura de la imagen del producto; clic para pegar o cambiar la URL. */
+function CeldaImagen({
+  url,
+  editable,
+  etiqueta,
+  onUrl,
+}: {
+  url?: string | null;
+  editable: boolean;
+  etiqueta: string;
+  onUrl: (u: string | null) => void;
+}) {
+  const pedir = () => {
+    const nueva = window.prompt("URL de la imagen del producto (vacío para quitarla)", url ?? "");
+    if (nueva === null) return;
+    onUrl(nueva.trim() || null);
+  };
+  return (
+    <button
+      type="button"
+      className={styles.celdaImagen}
+      onClick={editable ? pedir : undefined}
+      disabled={!editable && !url}
+      aria-label={etiqueta}
+      title={url ?? "Agregar imagen"}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" loading="lazy" />
+      ) : (
+        <span aria-hidden>+</span>
+      )}
+    </button>
+  );
+}
 
 type Columna = "desc" | "unidad" | "cant" | "precio";
 const NUEVA = "nueva";
@@ -188,6 +228,7 @@ export default function TablaPartidas({
   moneda,
   token,
   totales,
+  columnas = SIN_EXTRAS,
 }: {
   partidas: PartidaEditor[];
   setPartidas: (f: (p: PartidaEditor[]) => PartidaEditor[]) => void;
@@ -195,6 +236,8 @@ export default function TablaPartidas({
   moneda: string;
   token: string | null;
   totales: Totales;
+  /** Columnas opcionales de «Personalizar» (marca/modelo, descuento, imagen). */
+  columnas?: ColumnasOpcionales;
 }) {
   const celdas = useRef(new Map<string, HTMLInputElement | HTMLSelectElement>());
   const enfocar = useRef<{ key: string; col: Columna } | null>(null);
@@ -262,8 +305,15 @@ export default function TablaPartidas({
 
   const gruposConImporte = GRUPOS_PARTIDA.filter((g) => totales.porGrupo[g] > 0);
 
+  const extras = hayExtras(columnas);
+
   return (
-    <div className={styles.tabla} role="table" aria-label="Partidas">
+    <div
+      className={`${styles.tabla} ${extras ? styles.tablaExtras : ""}`}
+      role="table"
+      aria-label="Partidas"
+      style={{ ["--cols" as string]: columnasDeTabla(columnas) }}
+    >
       <div className={styles.filaCabeza} role="row">
         <span role="columnheader" className={styles.celdaIndice}>
           #
@@ -273,9 +323,29 @@ export default function TablaPartidas({
         <span role="columnheader" className={styles.derecha}>
           Cant.
         </span>
-        <span role="columnheader" className={styles.derecha}>
+        <span
+          role="columnheader"
+          className={`${styles.derecha} ${columnas.precioUnitario ? "" : styles.cabeceraApagada}`}
+          title={columnas.precioUnitario ? undefined : "A precio alzado: el PDF solo imprime el total del renglón"}
+        >
           Precio
         </span>
+        {extras ? (
+          <span className={styles.celdaExtras} role="presentation">
+            {columnas.marcaModelo ? (
+              <>
+                <span role="columnheader">Marca</span>
+                <span role="columnheader">Modelo</span>
+              </>
+            ) : null}
+            {columnas.descuento ? (
+              <span role="columnheader" className={styles.derecha}>
+                Desc. %
+              </span>
+            ) : null}
+            {columnas.imagen ? <span role="columnheader">Img.</span> : null}
+          </span>
+        ) : null}
         <span role="columnheader" className={styles.derecha}>
           Total
         </span>
@@ -284,10 +354,10 @@ export default function TablaPartidas({
 
       {partidas.map((p, i) => (
         <div className={styles.fila} role="row" key={p.key}>
-          <span role="cell" className={styles.celdaIndice}>
+          <span role="cell" className={styles.celdaIndice} data-area="idx">
             {i + 1}
           </span>
-          <span role="cell" className={styles.celdaDesc}>
+          <span role="cell" className={styles.celdaDesc} data-area="desc">
             <input
               ref={refDe(p.key, "desc")}
               className={styles.celda}
@@ -305,7 +375,7 @@ export default function TablaPartidas({
               </span>
             ) : null}
           </span>
-          <span role="cell">
+          <span role="cell" data-area="unidad">
             <select
               ref={refDe(p.key, "unidad")}
               className={styles.celda}
@@ -320,7 +390,7 @@ export default function TablaPartidas({
               ))}
             </select>
           </span>
-          <span role="cell">
+          <span role="cell" data-area="cant">
             <CeldaNumero
               refCelda={refDe(p.key, "cant")}
               valor={p.qty}
@@ -330,7 +400,7 @@ export default function TablaPartidas({
               onKeyDown={teclado(p.key, "cant")}
             />
           </span>
-          <span role="cell">
+          <span role="cell" data-area="precio">
             <CeldaNumero
               refCelda={refDe(p.key, "precio")}
               valor={p.unitPrice}
@@ -342,10 +412,59 @@ export default function TablaPartidas({
               onKeyDown={teclado(p.key, "precio")}
             />
           </span>
-          <span role="cell" className={styles.celdaTotal}>
+          {extras ? (
+            <span className={styles.celdaExtras} data-area="extras" role="presentation">
+              {columnas.marcaModelo ? (
+                <>
+                  <span role="cell">
+                    <input
+                      className={styles.celda}
+                      value={p.brand ?? ""}
+                      placeholder="Marca"
+                      disabled={!editable}
+                      aria-label={`Marca de la partida ${i + 1}`}
+                      onChange={(e) => cambiar(p.key, { brand: e.target.value || null })}
+                    />
+                  </span>
+                  <span role="cell">
+                    <input
+                      className={styles.celda}
+                      value={p.model ?? ""}
+                      placeholder="Modelo"
+                      disabled={!editable}
+                      aria-label={`Modelo de la partida ${i + 1}`}
+                      onChange={(e) => cambiar(p.key, { model: e.target.value || null })}
+                    />
+                  </span>
+                </>
+              ) : null}
+              {columnas.descuento ? (
+                <span role="cell">
+                  <CeldaNumero
+                    valor={Number(p.discount ?? 0)}
+                    editable={editable}
+                    etiqueta={`Descuento de la partida ${i + 1} (%)`}
+                    placeholder="0"
+                    onValor={(n) => cambiar(p.key, { discount: Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0 })}
+                  />
+                </span>
+              ) : null}
+              {columnas.imagen ? (
+                <span role="cell">
+                  <CeldaImagen
+                    url={p.imagenUrl}
+                    editable={editable}
+                    etiqueta={`Imagen de la partida ${i + 1}`}
+                    onUrl={(u) => cambiar(p.key, { imagenUrl: u })}
+                  />
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+          <span role="cell" className={styles.celdaTotal} data-area="total">
             {p.name.trim() ? formatoMoneda(importeDeLinea(p), moneda) : ""}
           </span>
-          <span role="cell" className={styles.celdaMenu}>
+          <span role="cell" className={styles.celdaMenu} data-area="menu">
             {editable ? (
               <MenuFila
                 partida={p}
@@ -363,6 +482,7 @@ export default function TablaPartidas({
       {editable ? (
         <FilaNueva
           numero={partidas.length + 1}
+          columnas={columnas}
           token={token}
           moneda={moneda}
           refDe={refDe}
@@ -406,6 +526,7 @@ export default function TablaPartidas({
 /** Última fila: se escribe (o se busca en el catálogo) y Enter la agrega. */
 function FilaNueva({
   numero,
+  columnas,
   token,
   moneda,
   refDe,
@@ -413,6 +534,7 @@ function FilaNueva({
   alSubir,
 }: {
   numero: number;
+  columnas: ColumnasOpcionales;
   token: string | null;
   moneda: string;
   refDe: (key: string, col: Columna) => (el: HTMLInputElement | HTMLSelectElement | null) => void;
@@ -486,6 +608,9 @@ function FilaNueva({
         qty: cantidadSana,
         unitPrice: Number(o.sellPriceSuggested || o.precio || 0),
         grupo: "EQUIPOS",
+        brand: o.marca ?? null,
+        model: o.modelo ?? null,
+        imagenUrl: o.imagen ?? null,
       }),
     );
     limpiar();
@@ -515,10 +640,10 @@ function FilaNueva({
 
   return (
     <div className={`${styles.fila} ${styles.filaNueva}`} role="row">
-      <span role="cell" className={styles.celdaIndice} aria-hidden>
+      <span role="cell" className={styles.celdaIndice} aria-hidden data-area="idx">
         {numero}
       </span>
-      <span role="cell" className={`${styles.celdaDesc} ${styles.combo}`}>
+      <span role="cell" className={`${styles.celdaDesc} ${styles.combo}`} data-area="desc">
         <input
           ref={refDe(NUEVA, "desc")}
           data-col="desc"
@@ -558,7 +683,7 @@ function FilaNueva({
           </ul>
         ) : null}
       </span>
-      <span role="cell">
+      <span role="cell" data-area="unidad">
         <select
           ref={refDe(NUEVA, "unidad")}
           className={styles.celda}
@@ -572,7 +697,7 @@ function FilaNueva({
           ))}
         </select>
       </span>
-      <span role="cell">
+      <span role="cell" data-area="cant">
         <CeldaNumero
           refCelda={refDe(NUEVA, "cant")}
           valor={cantidad}
@@ -582,7 +707,7 @@ function FilaNueva({
           onKeyDown={alTeclear}
         />
       </span>
-      <span role="cell">
+      <span role="cell" data-area="precio">
         <CeldaNumero
           refCelda={refDe(NUEVA, "precio")}
           valor={precio}
@@ -594,10 +719,22 @@ function FilaNueva({
           onKeyDown={alTeclear}
         />
       </span>
-      <span role="cell" className={styles.celdaTotal}>
+      {hayExtras(columnas) ? (
+        <span className={`${styles.celdaExtras} ${styles.celdaExtrasVacias}`} data-area="extras" role="presentation">
+          {columnas.marcaModelo ? (
+            <>
+              <span role="cell" />
+              <span role="cell" />
+            </>
+          ) : null}
+          {columnas.descuento ? <span role="cell" /> : null}
+          {columnas.imagen ? <span role="cell" /> : null}
+        </span>
+      ) : null}
+      <span role="cell" className={styles.celdaTotal} data-area="total">
         {nombre.trim() ? formatoMoneda(cantidadSana * (Number.isFinite(precio) ? precio : 0), moneda) : ""}
       </span>
-      <span role="cell" className={styles.celdaMenu}>
+      <span role="cell" className={styles.celdaMenu} data-area="menu">
         <button
           type="button"
           className={styles.menuFilaBtn}

@@ -20,7 +20,12 @@ export default function SeccionObjetivo({
   editable,
   sugerido,
   plantilla,
+  excluida,
+  onIncluir,
 }: {
+  /** Apagada en «Personalizar». */
+  excluida?: boolean;
+  onIncluir?: () => void;
   doc: DocumentoCotizacion;
   cambiar: Cambiar;
   editable: boolean;
@@ -51,6 +56,8 @@ export default function SeccionObjetivo({
 
   return (
     <Hoja
+      excluida={excluida}
+      onIncluir={onIncluir}
       id="objetivo"
       numero="01"
       titulo="Objetivo del proyecto"

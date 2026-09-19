@@ -27,7 +27,12 @@ export default function SeccionPlanos({
   editable,
   onDetalle,
   onError,
+  excluida,
+  onIncluir,
 }: {
+  /** Apagada en «Personalizar». */
+  excluida?: boolean;
+  onIncluir?: () => void;
   cotizacionId: number | null;
   token: string | null;
   planos: PlanoCotizacion[];
@@ -163,6 +168,8 @@ export default function SeccionPlanos({
 
   return (
     <Hoja
+      excluida={excluida}
+      onIncluir={onIncluir}
       id="planos"
       numero="03"
       titulo="Planos"

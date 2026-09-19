@@ -40,7 +40,10 @@ export default function SeccionCotizacion({
   token,
   paquetes,
   onAplicarPaquete,
+  onIncluirTerminos,
 }: {
+  /** Los términos están apagados en «Personalizar»: se ofrece volver a incluirlos. */
+  onIncluirTerminos?: () => void;
   doc: DocumentoCotizacion;
   cambiar: Cambiar;
   editable: boolean;
@@ -55,14 +58,18 @@ export default function SeccionCotizacion({
 
   const totales = useMemo(() => totalesDePartidas(doc.partidas), [doc.partidas]);
   const vigencia = diasEntre(doc.issueDate, doc.validUntil);
-  const moneda = detalle?.currency || "MXN";
+  const moneda = doc.moneda;
+  const terminosIncluidos = doc.opciones.secciones.terminos;
 
   const setPartidas = (f: (p: PartidaEditor[]) => PartidaEditor[]) => cambiar((d) => ({ ...d, partidas: f(d.partidas) }));
 
   const base = (clave: ClaveTermino) => detalle?.terminosBase?.partes?.find((p) => p.clave === clave)?.texto ?? "";
   const esLicitacion = (detalle?.terminos.modalidad ?? "") === "LICITACION" || doc.segmento === "LICITACION";
   // Títulos y orden como los imprime el PDF (en licitación se llaman como en las bases).
-  const partesBase = (detalle?.terminosBase?.partes ?? []).filter((p) => p.clave !== "vigencia");
+  // Vigencia, tiempo de entrega y garantía no se reescriben aquí: salen de las fechas y de «Personalizar».
+  const partesBase = (detalle?.terminosBase?.partes ?? []).filter(
+    (p) => p.clave !== "vigencia" && p.clave !== "entrega" && p.clave !== "garantia",
+  );
   const tituloDe = (clave: ClaveTermino) => partesBase.find((p) => p.clave === clave)?.titulo ?? TITULO_TERMINO[clave];
   const orden: ClaveTermino[] = [
     ...partesBase.map((p) => p.clave as ClaveTermino),
@@ -238,6 +245,7 @@ export default function SeccionCotizacion({
           moneda={moneda}
           token={token}
           totales={totales}
+          columnas={doc.opciones.columnas}
         />
       </div>
 
@@ -245,13 +253,20 @@ export default function SeccionCotizacion({
         <div className={styles.bloqueCabeza}>
           <span className={styles.etiqueta}>Términos y condiciones</span>
           <span className={styles.pista}>
-            {detalle
-              ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Vienen del segmento; lo que reescribas se queda.`
-              : "Se arman al guardar, según el segmento y lo que cobres."}
+            {!terminosIncluidos
+              ? "No van en el PDF de esta cotización (Personalizar)."
+              : detalle
+                ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Vienen del segmento; lo que reescribas se queda.`
+                : "Se arman al guardar, según el segmento y lo que cobres."}
           </span>
+          {!terminosIncluidos && editable && onIncluirTerminos ? (
+            <button type="button" className={styles.secondaryBtn} onClick={onIncluirTerminos}>
+              Incluir
+            </button>
+          ) : null}
         </div>
 
-        {detalle ? (
+        {detalle && terminosIncluidos ? (
           <ul className={styles.terminos}>
             {orden.map((clave) => {
               const textoBase = base(clave);
@@ -312,6 +327,18 @@ export default function SeccionCotizacion({
                 </li>
               );
             })}
+            {doc.opciones.condiciones.tiempoEntrega.trim() ? (
+              <li className={styles.termino}>
+                <span className={styles.terminoTitulo}>Tiempo de entrega</span>
+                <p className={styles.pista}>{doc.opciones.condiciones.tiempoEntrega} · se cambia en Personalizar</p>
+              </li>
+            ) : null}
+            {doc.opciones.condiciones.garantia.trim() ? (
+              <li className={styles.termino}>
+                <span className={styles.terminoTitulo}>Garantía</span>
+                <p className={styles.pista}>{doc.opciones.condiciones.garantia} · se cambia en Personalizar</p>
+              </li>
+            ) : null}
             <li className={styles.termino}>
               <span className={styles.terminoTitulo}>Vigencia</span>
               <p className={styles.pista}>
