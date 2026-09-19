@@ -216,6 +216,8 @@ export function Hoja({
   ayuda,
   acciones,
   children,
+  excluida,
+  onIncluir,
 }: {
   id: string;
   /** «01»…«04»; vacío en la portada. */
@@ -224,7 +226,39 @@ export function Hoja({
   ayuda?: ReactNode;
   acciones?: ReactNode;
   children: ReactNode;
+  /** Apagada en «Personalizar»: se ve la cabecera y cómo volver a incluirla. */
+  excluida?: boolean;
+  onIncluir?: () => void;
 }) {
+  if (excluida) {
+    return (
+      <section id={id} data-seccion={id} className={`${styles.hoja} ${styles.hojaExcluida}`} aria-labelledby={`${id}-titulo`}>
+        <div className={styles.hojaCabeza} style={{ marginBottom: 0 }}>
+          <div className={styles.hojaTitulos}>
+            <div className={styles.hojaLinea}>
+              {numero ? (
+                <span className={styles.numero} aria-hidden>
+                  {numero}
+                </span>
+              ) : null}
+              <h2 id={`${id}-titulo`} className={styles.tituloSeccion}>
+                {numero ? <span className={styles.soloLector}>{numero}. </span> : null}
+                {titulo}
+              </h2>
+            </div>
+            <p className={styles.ayudaSeccion}>No va en el PDF de esta cotización (Personalizar).</p>
+          </div>
+          {onIncluir ? (
+            <div className={styles.hojaAcciones}>
+              <button type="button" className={styles.secondaryBtn} onClick={onIncluir}>
+                Incluir
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
   return (
     <section id={id} data-seccion={id} className={styles.hoja} aria-labelledby={`${id}-titulo`}>
       <div className={styles.hojaCabeza}>
