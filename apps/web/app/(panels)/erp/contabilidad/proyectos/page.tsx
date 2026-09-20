@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
@@ -286,21 +286,11 @@ function BarraCategoria({ categoria }: { categoria: CostCategory }) {
       </div>
       <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
         {FUENTE_LABEL[categoria.fuente] ?? categoria.fuente} · {categoria.conteo} movimiento(s) ·
-        pagado{" "}
-        {categoria.pagado.toLocaleString("es-MX", {
-          style: "currency",
-          currency: "MXN",
-          maximumFractionDigits: 0,
-        })}
+        pagado <Money value={categoria.pagado} bold={false} />
         {categoria.pendiente > 0 && (
           <>
             {" "}
-            · pendiente{" "}
-            {categoria.pendiente.toLocaleString("es-MX", {
-              style: "currency",
-              currency: "MXN",
-              maximumFractionDigits: 0,
-            })}
+            · pendiente <Money value={categoria.pendiente} bold={false} />
           </>
         )}
       </div>
@@ -312,15 +302,11 @@ function BarraCategoria({ categoria }: { categoria: CostCategory }) {
 function cifra(
   label: string,
   value: number,
-  hint?: string,
+  hint?: ReactNode,
   tone: Metric["tone"] = "default",
 ): Metric {
   return { label, value: <Money value={value} />, hint, tone };
 }
-
-/** Pesos redondeados, para las pistas de la tira. */
-const pesos = (n: number) =>
-  n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 
 /** Etiqueta arriba, dato abajo. Sin negritas gritando dentro del párrafo. */
 function Dato({ label, value }: { label: string; value: React.ReactNode }) {
@@ -428,7 +414,7 @@ export default function ContabilidadProyectosPage() {
               )}
               {r.presupuesto != null && (
                 <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                  · presupuesto {pesos(r.presupuesto)}
+                  · presupuesto <Money value={r.presupuesto} bold={false} />
                 </span>
               )}
             </span>
@@ -621,12 +607,16 @@ export default function ContabilidadProyectosPage() {
                 cifra(
                   "Ingresos facturados",
                   detalle.resumen.ingresos,
-                  `por cobrar ${pesos(detalle.resumen.porCobrar)}`,
+                  <>
+                    por cobrar <Money value={detalle.resumen.porCobrar} bold={false} />
+                  </>,
                 ),
                 cifra(
                   "Costo total",
                   detalle.resumen.costoTotal,
-                  `pendiente de pagar ${pesos(detalle.resumen.costoPendiente)}`,
+                  <>
+                    pendiente de pagar <Money value={detalle.resumen.costoPendiente} bold={false} />
+                  </>,
                 ),
                 cifra(
                   "Margen",
@@ -705,8 +695,8 @@ export default function ContabilidadProyectosPage() {
               >
                 <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
                   Este proyecto no tiene tope autorizado, así que no hay «disponible» que calcular.
-                  Ya se comprometieron {pesos(detalle.presupuesto.comprometido)} y salieron de caja{" "}
-                  {pesos(detalle.presupuesto.pagado)}.
+                  Ya se comprometieron <Money value={detalle.presupuesto.comprometido} bold={false} />{" "}
+                  y salieron de caja <Money value={detalle.presupuesto.pagado} bold={false} />.
                 </p>
               </Section>
             ) : (
