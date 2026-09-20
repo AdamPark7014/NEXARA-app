@@ -370,11 +370,11 @@ const PDFViewer = dynamic(() => import("@/components/PDFViewer"), {
  */
 export function VisorPdf({
   url,
-  alto = "620px",
+  alto = "700px",
 }: {
   url: string;
-  /** Alturas del visor; 700px para preview de evidencia más alta. */
-  alto?: "400px" | "500px" | "620px" | "700px";
+  /** Alturas del visor; 700px default para preview de evidencia legible. */
+  alto?: "400px" | "500px" | "620px" | "700px" | "800px";
 }) {
   const ruta = resolveAssetUrl(url);
   const [pdf, setPdf] = useState<{ datos: Uint8Array | null; error: boolean }>({ datos: null, error: false });

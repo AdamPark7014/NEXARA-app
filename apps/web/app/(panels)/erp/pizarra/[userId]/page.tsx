@@ -430,7 +430,7 @@ export default function PizarraPersonaPage() {
                             Hoja de servicio
                           </IconLabel>
                         </div>
-                        <VisorPdf url={ev.serviceSheetPdfUrl} alto="400px" />
+                        <VisorPdf url={ev.serviceSheetPdfUrl} alto="500px" />
                       </div>
                     ) : null}
                     <Link href={`/erp/actividades/${h.id}`} style={{ fontWeight: 700, color: "var(--primary)" }}>
