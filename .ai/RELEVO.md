@@ -2,8 +2,8 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** fix(accounting): blindar periodo cerrado en escrituras
+- **Rama:** feat/gate-filter-scale (worktree `nexara-gate-filter-scale`)
+- **HEAD:** (pendiente commit FilterScale)
 
 ## Puente — no cambiar
 
@@ -11,36 +11,23 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-Blindaje de periodo fiscal cerrado en escrituras financieras críticas:
+FilterScale en listados/escalas de contabilidad que seguían con MetricStrip ad-hoc:
 
-- `assertDateNotInClosedPeriod` ahora se llama desde:
-  - `registerPayment` → `paymentDate`
-  - `reconcileTransaction` → `transactionDate`
-  - `cancelInvoice` → `issueDate` + hoy
-  - `createInvoice` → `issueDate`
-  - `updateInvoiceDraft` → `dto.issueDate` o `invoice.issueDate`
-  - `deleteInvoice` → `issueDate`
-  - `importBankTransactions` → cada `transactionDate`
-- Ya cubierto antes: `reverseJournalEntry`; crear/postear pólizas vía `resolveOpenFiscalPeriodId`.
-- Suite nueva: `apps/api/src/accounting/closed-period-writes.spec.ts` — **8/8 PASS**.
+- `CarteraView` CalendarioCxP: escala «Qué sale de caja» → `FilterScale` ligada a `aging`
+- `ContabilidadInvoicesView`: calendario CxP → `FilterScale` que filtra la lista
+- `proveedores/page.tsx` detalle «Antigüedad del saldo» → `FilterScale` que filtra facturas
 
-## A medias / pendiente real
+Worktree: `C:\dev\apps\_worktrees\nexara-gate-filter-scale` desde `origin/mejora/calidad-y-web`.
 
-- **Deploy bloqueado:** `~/.ssh/config` tiene `hetzner-nexara` con
-  `HostName REEMPLAZA_CON_IP_HETZNER`. Falta IP/llave. En servidor:
-  `./deploy/update.sh --force-all`
-- **AuditLog no guarda el estado anterior** salvo en el cierre de periodo.
-- Bonos/descuentos no existen en pre-nómina (no inventados).
-- Sin smoke de navegador contra datos reales.
-- UI de cierres (`proteccion.noBloqueado`) puede actualizarse a reflejar el
-  blindaje API; no se tocó web en este turno.
+## A medias
+
+- EXEC-PACKET del hub sigue stale (Actividades 13-09); no es este gate
+- IIFE en CalendarioCxP se puede bajar a variables locales (cosmético)
 
 ## Siguiente
 
-1. Adam da IP/llave Hetzner o corre deploy.
-2. Smoke contadora contra datos reales.
-3. Opcional: alinear copy de UI cierres con el blindaje API.
-4. AuditLog `previousData` en updates.
+1. Merge `feat/gate-filter-scale` → `mejora/calidad-y-web` cuando pase review
+2. Smoke CxP + expediente proveedor porPagar
 
 ## No tocar
 
