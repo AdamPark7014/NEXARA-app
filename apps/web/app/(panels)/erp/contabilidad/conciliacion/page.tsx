@@ -9,9 +9,11 @@ import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
+import styles from "./conciliacion.module.css";
 
 /**
  * Conciliación bancaria — pantalla dividida.
@@ -126,12 +128,28 @@ function fechaCorta(iso?: string | null) {
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" });
 }
 
-type Tono = "warning" | "danger";
+const pesos = (n: number) =>
+  n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
 
-const TONO_CONTADOR: Record<Tono, string> = {
-  warning: "var(--state-warning-text, #b45309)",
-  danger: "var(--state-danger-text, #b91c1c)",
-};
+/**
+ * La diferencia entre el movimiento y el candidato, en palabras.
+ *
+ * El API la manda en cada candidato (`diferenciaMonto`, `diferenciaDias`) y no
+ * se pintaba en ningún sitio: la pantalla decía «los montos no son idénticos»
+ * sin decir por cuánto, que es justo lo que hay que mirar para saber si es una
+ * comisión bancaria o un pago equivocado.
+ */
+function textoDiferenciaMonto(diferencia: number) {
+  const d = Math.abs(Number(diferencia) || 0);
+  if (d < 0.005) return "Coincide al centavo";
+  return `${pesos(d)} de diferencia`;
+}
+
+function textoDiferenciaDias(dias: number) {
+  const d = Math.abs(Math.round(Number(dias) || 0));
+  if (d === 0) return "mismo día";
+  return d === 1 ? "1 día de separación" : `${d} días de separación`;
+}
 
 function scoreColor(score: number, alto: number) {
   if (score >= alto) return "var(--state-success-text, #15803d)";
@@ -153,7 +171,18 @@ export default function ConciliacionPage() {
   const [loading, setLoading] = useState(true);
   const [aplicando, setAplicando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Lo que falló al conciliar, para contarlo junto al botón y no en un toast que se va. */
+  const [errorAplicar, setErrorAplicar] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const cargaRef = useRef(0);
+  /**
+   * Cerrojo síncrono del envío. `aplicando` deshabilita el botón, pero entre el
+   * clic y el repintado cabe un segundo clic —y sobre todo un segundo Enter,
+   * que se repite solo si se deja pulsado—. Conciliar dos veces el mismo
+   * movimiento no es un parpadeo: es un apunte duplicado.
+   */
+  const enVueloRef = useRef(false);
+  const listaRef = useRef<HTMLDivElement>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -204,6 +233,8 @@ export default function ConciliacionPage() {
 
   useEffect(() => {
     setCandidatoIdx(0);
+    setErrorAplicar(null);
+    setAviso(null);
   }, [seleccionado?.id]);
 
   const candidatos = seleccionado?.candidatos ?? [];
@@ -215,14 +246,29 @@ export default function ConciliacionPage() {
       const actual = visibles.findIndex((m) => m.id === (seleccionado?.id ?? -1));
       const next = Math.min(Math.max((actual < 0 ? 0 : actual) + delta, 0), visibles.length - 1);
       setMovimientoId(visibles[next].id);
+      // La lista tiene su propio scroll: sin esto, bajar con el teclado movía
+      // la selección fuera de la vista y parecía que no pasaba nada.
+      const fila = listaRef.current?.querySelectorAll("tbody tr")[next];
+      fila?.scrollIntoView({ block: "nearest" });
     },
     [visibles, seleccionado],
   );
 
   const conciliar = useCallback(
     async (mov: Movimiento, cand: Candidato) => {
-      if (!token || aplicando) return;
+      if (enVueloRef.current) return;
+      if (!token) {
+        setErrorAplicar("No hay sesión activa. Vuelve a entrar para poder conciliar.");
+        return;
+      }
+      if (mov.estado === "CONCILIADO") {
+        setAviso("Este movimiento ya está conciliado. Elige otro de la lista.");
+        return;
+      }
+      enVueloRef.current = true;
       setAplicando(true);
+      setErrorAplicar(null);
+      setAviso(null);
       try {
         await erpFetch("accounting/workspace/conciliacion/aplicar", token, {
           method: "POST",
@@ -236,12 +282,17 @@ export default function ConciliacionPage() {
         toast.success(`Movimiento conciliado con ${cand.folio}`);
         await cargar();
       } catch (e) {
-        toast.error(formatApiError(e));
+        // Junto al botón, no en un toast: aquí se decide si el dinero queda
+        // aplicado, y el motivo tiene que seguir en pantalla al releerlo.
+        setErrorAplicar(
+          `No se pudo conciliar con ${cand.folio}. ${formatApiError(e)}`,
+        );
       } finally {
+        enVueloRef.current = false;
         setAplicando(false);
       }
     },
-    [token, aplicando, cargar],
+    [token, cargar],
   );
 
   // Navegación de teclado: j/k o flechas para moverse, [ ] para cambiar de
@@ -270,8 +321,14 @@ export default function ConciliacionPage() {
           setCandidatoIdx((i) => Math.max(i - 1, 0));
         }
       } else if (e.key === "Enter") {
-        if (seleccionado && candidato && seleccionado.estado !== "CONCILIADO") {
-          e.preventDefault();
+        if (!seleccionado) return;
+        e.preventDefault();
+        // Enter siempre contesta algo: conciliar, o por qué no se puede.
+        if (seleccionado.estado === "CONCILIADO") {
+          setAviso("Este movimiento ya está conciliado. Elige otro de la lista.");
+        } else if (!candidato) {
+          setAviso("Este movimiento no tiene candidatos: no hay nada con qué conciliarlo.");
+        } else {
           void conciliar(seleccionado, candidato);
         }
       }
@@ -340,26 +397,64 @@ export default function ConciliacionPage() {
     },
   ];
 
-  const contadores: Array<{ key: Filtro; label: string; valor: number; tono?: Tono }> = [
-    { key: "TODOS", label: "Todos", valor: resumen?.total ?? 0 },
-    { key: "SUGERENCIA_ALTA", label: "Sugerencia alta", valor: resumen?.sugerenciaAlta ?? 0 },
+  /**
+   * Los contadores son la misma pieza que la escala de antigüedad de la
+   * cartera: se había escrito dos veces. Ahora los dos sitios usan
+   * `FilterScale`, para que la tercera vez no salga distinta.
+   */
+  const total = resumen?.total ?? 0;
+  const parte = (n: number) => (total > 0 ? n / total : undefined);
+  const contadores: Array<ScaleItem & { key: Filtro }> = [
+    {
+      key: "TODOS",
+      label: "Todos",
+      value: total,
+      hint: resumen ? `${resumen.sugeridos} con sugerencia` : undefined,
+    },
+    {
+      key: "SUGERENCIA_ALTA",
+      label: "Sugerencia alta",
+      value: resumen?.sugerenciaAlta ?? 0,
+      hint: `puntaje ${scoreAlto} o más`,
+      share: parte(resumen?.sugerenciaAlta ?? 0),
+    },
     {
       key: "SUGERENCIA_MULTIPLE",
       label: "Varias opciones",
-      valor: resumen?.sugerenciaMultiple ?? 0,
-      tono: "warning",
+      value: resumen?.sugerenciaMultiple ?? 0,
+      hint: "hay que elegir",
+      tone: (resumen?.sugerenciaMultiple ?? 0) > 0 ? "warning" : "mute",
+      share: parte(resumen?.sugerenciaMultiple ?? 0),
     },
     {
       key: "DISCREPANCIA",
       label: "Discrepancias",
-      valor: resumen?.discrepancias ?? 0,
-      tono: "danger",
+      value: resumen?.discrepancias ?? 0,
+      hint: "el monto no cuadra",
+      tone: (resumen?.discrepancias ?? 0) > 0 ? "danger" : "mute",
+      share: parte(resumen?.discrepancias ?? 0),
     },
-    { key: "PENDIENTE", label: "Pendientes", valor: resumen?.pendientes ?? 0 },
-    { key: "CONCILIADO", label: "Conciliados", valor: resumen?.conciliados ?? 0 },
+    {
+      key: "PENDIENTE",
+      label: "Pendientes",
+      value: resumen?.pendientes ?? 0,
+      hint: "sin candidato",
+      share: parte(resumen?.pendientes ?? 0),
+    },
+    {
+      key: "CONCILIADO",
+      label: "Conciliados",
+      value: resumen?.conciliados ?? 0,
+      hint: "ya aplicados",
+      tone: (resumen?.conciliados ?? 0) > 0 ? "success" : "mute",
+      share: parte(resumen?.conciliados ?? 0),
+    },
   ];
 
   const sinCuentas = !loading && !error && (data?.cuentas.length ?? 0) === 0;
+  const rango = data?.rango;
+  const cuentaActiva = (data?.cuentas ?? []).find((c) => c.id === data?.cuenta?.id) ?? null;
+  const parametros = data?.parametros;
 
   return (
     <>
@@ -426,81 +521,42 @@ export default function ConciliacionPage() {
         </Section>
       ) : (
         <>
-          <div
-            role="group"
-            aria-label="Filtrar por estado"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(126px, 1fr))",
-              border: "1px solid var(--nx-panel-hairline, var(--border))",
-              borderRadius: 10,
-              overflow: "hidden",
-              background: "var(--surface)",
-              marginBottom: 14,
+          <FilterScale
+            ariaLabel="Filtrar por estado"
+            items={contadores}
+            active={filtro}
+            onSelect={(clave) => {
+              setFiltro((clave || "TODOS") as Filtro);
+              setMovimientoId(null);
             }}
-          >
-            {contadores.map((c, i) => {
-              const activo = filtro === c.key;
-              const color =
-                c.valor > 0 && c.tono ? TONO_CONTADOR[c.tono] : "var(--text-primary)";
-              return (
-                <button
-                  key={c.key}
-                  type="button"
-                  onClick={() => {
-                    setFiltro(c.key);
-                    setMovimientoId(null);
-                  }}
-                  aria-pressed={activo}
-                  style={{
-                    display: "grid",
-                    gap: 2,
-                    padding: "10px 14px",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    font: "inherit",
-                    border: "none",
-                    borderRight:
-                      i < contadores.length - 1
-                        ? "1px solid var(--nx-panel-hairline, var(--border))"
-                        : undefined,
-                    boxShadow: activo ? "inset 0 -2px 0 var(--primary)" : undefined,
-                    background: activo
-                      ? "color-mix(in srgb, var(--primary) 7%, var(--surface))"
-                      : "transparent",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{c.label}</span>
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      fontSize: 20,
-                      lineHeight: 1.15,
-                      fontVariantNumeric: "tabular-nums",
-                      color,
-                    }}
-                  >
-                    {c.valor}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          />
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1.15fr) minmax(320px, 0.85fr)",
-              gap: 14,
-              alignItems: "start",
-            }}
-          >
+          {/* Qué periodo se está mirando: el API resuelve el rango cuando las
+              fechas van vacías, y hasta ahora no lo decía en ningún sitio. */}
+          {(rango?.from || rango?.to) && (
+            <p
+              style={{
+                margin: "-6px 0 12px",
+                fontSize: 12,
+                color: "var(--text-tertiary)",
+              }}
+            >
+              Movimientos del {fechaCorta(rango?.from)} al {fechaCorta(rango?.to)}
+              {parametros
+                ? ` · empareja con ±${pesos(parametros.toleranciaMonto)} o ±${parametros.toleranciaPorcentaje}% dentro de ${parametros.ventanaDias} días`
+                : ""}
+              .
+            </p>
+          )}
+
+          <div className={styles.split}>
             <Section
               title="Movimientos del banco"
               subtitle={
                 data?.cuenta
-                  ? `${data.cuenta.nombre} · ${data.cuenta.banco} · ${data.cuenta.moneda}`
+                  ? `${data.cuenta.nombre} · ${data.cuenta.banco} · ${data.cuenta.moneda}${
+                      cuentaActiva ? ` · saldo ${pesos(cuentaActiva.saldo)}` : ""
+                    }`
                   : undefined
               }
               dense
@@ -508,262 +564,377 @@ export default function ConciliacionPage() {
             >
               {loading ? (
                 <p style={{ padding: 16, fontSize: 13, color: "var(--text-tertiary)" }}>
-                  Cargando movimientos y buscando coincidencias…
+                  {token
+                    ? "Cargando movimientos y buscando coincidencias…"
+                    : "Esperando la sesión para pedir los movimientos…"}
                 </p>
               ) : (
-                <DataTable
-                  columns={columnas}
-                  rows={visibles}
-                  rowKey={(r) => r.id}
-                  density="compact"
-                  onRowClick={(r) => setMovimientoId(r.id)}
-                  emptyTitle={filtro === "TODOS" ? "Sin movimientos" : "Nada en este filtro"}
-                  emptyDescription={
-                    filtro === "TODOS"
-                      ? "No hay movimientos en el rango elegido. Cambia las fechas o importa el estado de cuenta desde Bancos."
-                      : "Ningún movimiento está en ese estado ahora mismo. Prueba con otro contador de arriba."
-                  }
-                />
-              )}
-            </Section>
-
-            <Section title="Coincidencia en NEXARA" subtitle={<AyudaTeclado />} dense>
-              {!seleccionado ? (
-                <EmptyState
-                  variant="compact"
-                  title="Elige un movimiento"
-                  description="Selecciona un movimiento del banco para ver con qué factura o pago coincide."
-                />
-              ) : (
-                <div style={{ display: "grid", gap: 12 }}>
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: 3,
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--nx-panel-hairline, var(--border))",
-                    }}
-                  >
-                    <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                      Movimiento del banco
-                    </span>
-                    <strong style={{ fontSize: 14, lineHeight: 1.3 }}>
-                      {seleccionado.descripcion || "Sin descripción"}
-                    </strong>
-                    <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                      {fechaCorta(seleccionado.fecha)} ·{" "}
-                      <Money
-                        value={
-                          seleccionado.esCargo
-                            ? -Math.abs(seleccionado.monto)
-                            : Math.abs(seleccionado.monto)
-                        }
-                        bold={false}
-                      />
-                      {seleccionado.referencia ? ` · ref. ${seleccionado.referencia}` : ""}
-                    </span>
-                  </div>
-
-                  {seleccionado.estado === "CONCILIADO" ? (
-                    <InlineAlert
-                      variant="success"
-                      style={{ marginBottom: 0 }}
-                      message={`Conciliado${
-                        seleccionado.conciliacion?.conciliadoPor
-                          ? ` por ${seleccionado.conciliacion.conciliadoPor.nombre}`
-                          : ""
-                      }${
-                        seleccionado.conciliacion?.conciliadoEn
-                          ? ` el ${fechaCorta(seleccionado.conciliacion.conciliadoEn)}`
-                          : ""
-                      }${seleccionado.conciliacion?.notas ? ` · ${seleccionado.conciliacion.notas}` : ""}`}
-                    />
-                  ) : candidatos.length === 0 ? (
-                    <EmptyState
-                      variant="compact"
-                      title="Sin coincidencias"
-                      description={`No hay factura ni pago con un monto parecido (±$${
-                        data?.parametros.toleranciaMonto ?? 0
-                      }) dentro de ${data?.parametros.ventanaDias ?? 0} días. Revisa si falta capturar el documento en NEXARA.`}
-                    />
-                  ) : (
-                    <>
-                      {seleccionado.estado === "DISCREPANCIA" && (
-                        <InlineAlert
-                          variant="warning"
-                          style={{ marginBottom: 0 }}
-                          message="Los montos no son idénticos. Revisa comisiones o retenciones antes de conciliar."
-                        />
-                      )}
-                      {candidatos.length > 1 && (
-                        <div style={{ display: "grid", gap: 5 }}>
-                          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                            Candidato {Math.min(candidatoIdx, candidatos.length - 1) + 1} de{" "}
-                            {candidatos.length} · ordenados por puntaje
-                          </span>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {candidatos.map((c, i) => {
-                              const activo = i === candidatoIdx;
-                              return (
-                                <button
-                                  key={`${c.tipo}-${c.id}`}
-                                  type="button"
-                                  onClick={() => setCandidatoIdx(i)}
-                                  aria-pressed={activo}
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "baseline",
-                                    gap: 6,
-                                    fontSize: 11.5,
-                                    padding: "4px 9px",
-                                    borderRadius: 6,
-                                    cursor: "pointer",
-                                    background: activo
-                                      ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
-                                      : "transparent",
-                                    border: `1px solid ${
-                                      activo
-                                        ? "color-mix(in srgb, var(--primary) 40%, var(--border))"
-                                        : "var(--border)"
-                                    }`,
-                                    color: "var(--text-primary)",
-                                    fontWeight: activo ? 700 : 500,
-                                  }}
-                                >
-                                  {c.folio}
-                                  <span
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: 600,
-                                      fontVariantNumeric: "tabular-nums",
-                                      color: scoreColor(c.score, scoreAlto),
-                                    }}
-                                  >
-                                    {c.score}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {candidato && (
-                        <div
-                          style={{
-                            border: "1px solid var(--border)",
-                            borderRadius: 10,
-                            padding: 12,
-                            display: "grid",
-                            gap: 10,
-                            background: "var(--surface)",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "flex-start",
-                              gap: 10,
-                            }}
-                          >
-                            <div style={{ display: "grid", gap: 2 }}>
-                              <strong style={{ fontSize: 14 }}>
-                                {candidato.tipo === "INVOICE" ? "Factura" : "Pago"} {candidato.folio}
-                              </strong>
-                              <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                                {candidato.contraparte || "Sin contraparte"}
-                              </span>
-                              {candidato.proyecto && (
-                                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                                  Proyecto: {candidato.proyecto}
-                                </span>
-                              )}
-                              <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                                {fechaCorta(candidato.fecha)}
-                                {candidato.vencimiento
-                                  ? ` · vence ${fechaCorta(candidato.vencimiento)}`
-                                  : ""}
-                              </span>
-                            </div>
-                            <div style={{ textAlign: "right", display: "grid", gap: 4 }}>
-                              <Money value={candidato.monto} />
-                              <Puntaje score={candidato.score} alto={scoreAlto} />
-                            </div>
-                          </div>
-
-                          <div style={{ display: "grid", gap: 5 }}>
-                            <span
-                              style={{
-                                fontSize: 10.5,
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.06em",
-                                color: "var(--text-tertiary)",
-                              }}
-                            >
-                              Por qué coinciden
-                            </span>
-                            <ul
-                              style={{
-                                margin: 0,
-                                padding: 0,
-                                listStyle: "none",
-                                display: "grid",
-                                gap: 4,
-                                fontSize: 12.5,
-                                lineHeight: 1.4,
-                                color: "var(--text-secondary)",
-                              }}
-                            >
-                              {candidato.razones.map((r) => (
-                                <li
-                                  key={r}
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "10px minmax(0, 1fr)",
-                                    gap: 8,
-                                    alignItems: "baseline",
-                                  }}
-                                >
-                                  <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>
-                                    ·
-                                  </span>
-                                  <span>{r}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            fullWidth
-                            loading={aplicando}
-                            disabled={aplicando}
-                            onClick={() => void conciliar(seleccionado, candidato)}
-                          >
-                            Conciliar con {candidato.folio}
-                          </Button>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text-tertiary)",
-                              textAlign: "center",
-                            }}
-                          >
-                            o pulsa Enter
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  )}
+                <div ref={listaRef}>
+                  <DataTable
+                    columns={columnas}
+                    rows={visibles}
+                    rowKey={(r) => r.id}
+                    density="compact"
+                    onRowClick={(r) => setMovimientoId(r.id)}
+                    emptyTitle={filtro === "TODOS" ? "Sin movimientos" : "Nada en este filtro"}
+                    emptyDescription={
+                      filtro === "TODOS"
+                        ? "No hay movimientos en el rango elegido. Cambia las fechas o importa el estado de cuenta desde Bancos."
+                        : "Ningún movimiento está en ese estado ahora mismo. Prueba con otro contador de arriba."
+                    }
+                  />
                 </div>
               )}
             </Section>
+
+            <div className={styles.match}>
+              <Section title="Coincidencia en NEXARA" subtitle={<AyudaTeclado />} dense>
+                {!seleccionado ? (
+                  <EmptyState
+                    variant="compact"
+                    title="Elige un movimiento"
+                    description="Selecciona un movimiento del banco para ver con qué factura o pago coincide."
+                  />
+                ) : (
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 3,
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--nx-panel-hairline, var(--border))",
+                      }}
+                    >
+                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                        Movimiento del banco · {seleccionado.esCargo ? "cargo" : "abono"}
+                      </span>
+                      <strong style={{ fontSize: 14, lineHeight: 1.3 }}>
+                        {seleccionado.descripcion || "Sin descripción"}
+                      </strong>
+                      <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                        {fechaCorta(seleccionado.fecha)} ·{" "}
+                        <Money
+                          value={
+                            seleccionado.esCargo
+                              ? -Math.abs(seleccionado.monto)
+                              : Math.abs(seleccionado.monto)
+                          }
+                          bold={false}
+                        />
+                        {seleccionado.referencia ? ` · ref. ${seleccionado.referencia}` : ""}
+                      </span>
+                      {/* Concepto, RFC y clave de rastreo venían del API y no se
+                          pintaban en ningún sitio; son lo que permite reconocer
+                          un cargo cuando la descripción del banco no dice nada. */}
+                      {(seleccionado.concepto ||
+                        seleccionado.contraparte ||
+                        seleccionado.contraparteRfc ||
+                        seleccionado.speiTrackingKey) && (
+                        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>
+                          {[
+                            seleccionado.concepto,
+                            seleccionado.contraparte,
+                            seleccionado.contraparteRfc,
+                            seleccionado.speiTrackingKey
+                              ? `clave ${seleccionado.speiTrackingKey}`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* La respuesta del último intento, donde se pulsó. */}
+                    {errorAplicar && (
+                      <InlineAlert
+                        variant="danger"
+                        style={{ marginBottom: 0 }}
+                        message={errorAplicar}
+                        onDismiss={() => setErrorAplicar(null)}
+                        action={
+                          <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+                            Recargar
+                          </Button>
+                        }
+                      />
+                    )}
+                    {aviso && (
+                      <InlineAlert
+                        variant="info"
+                        style={{ marginBottom: 0 }}
+                        message={aviso}
+                        onDismiss={() => setAviso(null)}
+                      />
+                    )}
+
+                    {seleccionado.estado === "CONCILIADO" ? (
+                      <InlineAlert
+                        variant="success"
+                        style={{ marginBottom: 0 }}
+                        message={`Conciliado${
+                          seleccionado.conciliacion
+                            ? ` por ${pesos(seleccionado.conciliacion.montoConciliado)}`
+                            : ""
+                        }${
+                          seleccionado.conciliacion?.conciliadoPor
+                            ? ` · ${seleccionado.conciliacion.conciliadoPor.nombre}`
+                            : ""
+                        }${
+                          seleccionado.conciliacion?.conciliadoEn
+                            ? ` · ${fechaCorta(seleccionado.conciliacion.conciliadoEn)}`
+                            : ""
+                        }${seleccionado.conciliacion?.notas ? ` · ${seleccionado.conciliacion.notas}` : ""}`}
+                      />
+                    ) : candidatos.length === 0 ? (
+                      <EmptyState
+                        variant="compact"
+                        title="Sin coincidencias"
+                        description={`No hay factura ni pago con un monto parecido (±${pesos(
+                          parametros?.toleranciaMonto ?? 0,
+                        )} o ±${parametros?.toleranciaPorcentaje ?? 0}%) dentro de ${
+                          parametros?.ventanaDias ?? 0
+                        } días. Revisa si falta capturar el documento en NEXARA.`}
+                      />
+                    ) : (
+                      <>
+                        {seleccionado.estado === "DISCREPANCIA" && candidato && (
+                          <InlineAlert
+                            variant="warning"
+                            style={{ marginBottom: 0 }}
+                            message={`Los montos no son idénticos: ${textoDiferenciaMonto(
+                              candidato.diferenciaMonto,
+                            )} contra ${candidato.folio}. Revisa comisiones o retenciones antes de conciliar.`}
+                          />
+                        )}
+                        {candidatos.length > 1 && (
+                          <div style={{ display: "grid", gap: 5 }}>
+                            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                              Candidato {Math.min(candidatoIdx, candidatos.length - 1) + 1} de{" "}
+                              {candidatos.length} · ordenados por puntaje
+                            </span>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {candidatos.map((c, i) => {
+                                const activo = i === candidatoIdx;
+                                return (
+                                  <button
+                                    key={`${c.tipo}-${c.id}`}
+                                    type="button"
+                                    onClick={() => setCandidatoIdx(i)}
+                                    aria-pressed={activo}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "baseline",
+                                      gap: 6,
+                                      fontSize: 11.5,
+                                      padding: "4px 9px",
+                                      borderRadius: 6,
+                                      cursor: "pointer",
+                                      background: activo
+                                        ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
+                                        : "transparent",
+                                      border: `1px solid ${
+                                        activo
+                                          ? "color-mix(in srgb, var(--primary) 40%, var(--border))"
+                                          : "var(--border)"
+                                      }`,
+                                      color: "var(--text-primary)",
+                                      fontWeight: activo ? 700 : 500,
+                                    }}
+                                  >
+                                    {c.folio}
+                                    <span
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: 600,
+                                        fontVariantNumeric: "tabular-nums",
+                                        color: scoreColor(c.score, scoreAlto),
+                                      }}
+                                    >
+                                      {c.score}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {candidato && (
+                          <div
+                            style={{
+                              border: "1px solid var(--border)",
+                              borderRadius: 10,
+                              padding: 12,
+                              display: "grid",
+                              gap: 10,
+                              background: "var(--surface)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "flex-start",
+                                gap: 10,
+                              }}
+                            >
+                              <div style={{ display: "grid", gap: 2 }}>
+                                <strong style={{ fontSize: 14 }}>
+                                  {candidato.tipo === "INVOICE" ? "Factura" : "Pago"} {candidato.folio}
+                                </strong>
+                                <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                                  {candidato.contraparte || "Sin contraparte"}
+                                  {candidato.contraparteRfc ? ` · ${candidato.contraparteRfc}` : ""}
+                                </span>
+                                {candidato.proyecto && (
+                                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                                    Proyecto: {candidato.proyecto}
+                                  </span>
+                                )}
+                                {candidato.tipo === "PAYMENT" && candidato.factura && (
+                                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                                    Aplica a la factura {candidato.factura}
+                                  </span>
+                                )}
+                                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                                  {fechaCorta(candidato.fecha)}
+                                  {candidato.vencimiento
+                                    ? ` · vence ${fechaCorta(candidato.vencimiento)}`
+                                    : ""}
+                                </span>
+                              </div>
+                              <div style={{ textAlign: "right", display: "grid", gap: 4 }}>
+                                <Money value={candidato.monto} />
+                                <Puntaje score={candidato.score} alto={scoreAlto} />
+                              </div>
+                            </div>
+
+                            {/* En qué se separan el movimiento y el candidato. El
+                                API lo manda por candidato y no se pintaba: sin
+                                esto, «no son idénticos» no dice por cuánto. */}
+                            <div
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: "4px 12px",
+                                fontSize: 12,
+                                color:
+                                  Math.abs(candidato.diferenciaMonto) >= 0.005
+                                    ? "var(--state-warning-text, #b45309)"
+                                    : "var(--text-secondary)",
+                              }}
+                            >
+                              <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                                {textoDiferenciaMonto(candidato.diferenciaMonto)}
+                              </span>
+                              <span
+                                style={{
+                                  fontVariantNumeric: "tabular-nums",
+                                  color: "var(--text-secondary)",
+                                }}
+                              >
+                                {textoDiferenciaDias(candidato.diferenciaDias)}
+                              </span>
+                              <span style={{ color: "var(--text-tertiary)" }}>
+                                {candidato.sentido === "IN" ? "entra dinero" : "sale dinero"}
+                              </span>
+                            </div>
+
+                            <div style={{ display: "grid", gap: 5 }}>
+                              <span
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.06em",
+                                  color: "var(--text-tertiary)",
+                                }}
+                              >
+                                Por qué coinciden
+                              </span>
+                              <ul
+                                style={{
+                                  margin: 0,
+                                  padding: 0,
+                                  listStyle: "none",
+                                  display: "grid",
+                                  gap: 4,
+                                  fontSize: 12.5,
+                                  lineHeight: 1.4,
+                                  color: "var(--text-secondary)",
+                                }}
+                              >
+                                {candidato.razones.length === 0 ? (
+                                  <li style={{ color: "var(--text-tertiary)" }}>
+                                    El emparejador no devolvió motivos para esta coincidencia.
+                                  </li>
+                                ) : (
+                                  candidato.razones.map((r) => (
+                                    <li
+                                      key={r}
+                                      style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "10px minmax(0, 1fr)",
+                                        gap: 8,
+                                        alignItems: "baseline",
+                                      }}
+                                    >
+                                      <span
+                                        aria-hidden="true"
+                                        style={{ color: "var(--text-tertiary)" }}
+                                      >
+                                        ·
+                                      </span>
+                                      <span>{r}</span>
+                                    </li>
+                                  ))
+                                )}
+                              </ul>
+                            </div>
+
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              fullWidth
+                              loading={aplicando}
+                              disabled={aplicando}
+                              onClick={() => void conciliar(seleccionado, candidato)}
+                            >
+                              {aplicando
+                                ? "Conciliando…"
+                                : `Conciliar con ${candidato.folio}`}
+                            </Button>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-tertiary)",
+                                textAlign: "center",
+                              }}
+                            >
+                              {aplicando ? "Aplicando el movimiento, no cierres la pantalla." : "o pulsa Enter"}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </Section>
+            </div>
           </div>
+
+          {/* Al moverse con el teclado, la selección cambia en una tabla que
+              no tiene foco: sin esto, un lector de pantalla no se entera. */}
+          <p aria-live="polite" className={styles.srOnly}>
+            {seleccionado
+              ? `Movimiento seleccionado: ${seleccionado.descripcion || "sin descripción"}, ${
+                  ESTADO_LABEL[seleccionado.estado]
+                }, ${candidatos.length} candidato${candidatos.length === 1 ? "" : "s"}.`
+              : "Ningún movimiento seleccionado."}
+          </p>
         </>
       )}
     </>

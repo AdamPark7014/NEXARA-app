@@ -218,10 +218,36 @@ const TONO_ESTATUS: Record<string, StatusTone> = {
   default: "neutral",
 };
 
+/**
+ * Los estatus llegan con la clave del modelo. «PARTIALLY_PAID» en la columna
+ * de estatus no es un estado legible: es una constante de código asomándose.
+ * Lo que no esté en esta tabla se muestra tal cual llegó, para no inventar
+ * traducciones ni romperse cuando el API añada un estatus nuevo.
+ */
+const ESTATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  PENDING: "Pendiente",
+  SENT: "Enviada",
+  PAID: "Pagada",
+  PARTIALLY_PAID: "Pago parcial",
+  OVERDUE: "Vencida",
+  CANCELLED: "Cancelada",
+  POSTED: "Contabilizada",
+  APPROVED: "Aprobada",
+  REJECTED: "Rechazada",
+  RECEIVED: "Recibida",
+  ORDERED: "Ordenada",
+  CLOSED: "Cerrada",
+  OPEN: "Abierta",
+};
+
+const estatusTexto = (estatus: string) =>
+  ESTATUS_LABEL[(estatus || "").toUpperCase()] ?? estatus ?? "—";
+
 function EstatusDot({ estatus, tono }: { estatus: string; tono?: StatusTone }) {
   return (
     <StatusDot
-      label={estatus}
+      label={estatusTexto(estatus)}
       tone={tono ?? TONO_ESTATUS[financeStatusVariant(estatus)] ?? "neutral"}
     />
   );
@@ -344,14 +370,24 @@ export default function ProveedoresPage() {
         label: "Vencido",
         align: "right",
         numeric: true,
-        render: (r) =>
-          r.vencido > 0 ? (
-            <span style={{ color: "var(--danger)" }}>
-              <Money value={r.vencido} />
-            </span>
-          ) : (
-            <span style={{ color: "var(--text-tertiary)" }}>—</span>
-          ),
+        render: (r) => (
+          <span style={{ display: "grid", gap: 1 }}>
+            {r.vencido > 0 ? (
+              <span style={{ color: "var(--danger)" }}>
+                <Money value={r.vencido} />
+              </span>
+            ) : (
+              <span style={{ color: "var(--text-tertiary)" }}>—</span>
+            )}
+            {/* «Por vencer» venía en cada renglón y no se enseñaba: sin él,
+                vencido a cero parece que no hay nada que pagar. */}
+            {r.porVencer > 0 && (
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                por vencer {pesos(r.porVencer)}
+              </span>
+            )}
+          </span>
+        ),
       },
       {
         key: "totalAnio",
@@ -381,8 +417,19 @@ export default function ProveedoresPage() {
         key: "ultimaCompra",
         label: "Última compra",
         render: (r) => (
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-            {fecha(r.ultimaCompra)}
+          <span style={{ display: "grid", gap: 1 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+              {fecha(r.ultimaCompra)}
+            </span>
+            {/* Órdenes de compra y su última fecha: el API las manda en la
+                lista y solo se veían al abrir el expediente. */}
+            {r.ordenesCompra > 0 && (
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                {r.ordenesCompra} {r.ordenesCompra === 1 ? "orden" : "órdenes"} ·{" "}
+                {pesos(r.montoOrdenes)}
+                {r.ultimaOrden ? ` · últ. ${fecha(r.ultimaOrden)}` : ""}
+              </span>
+            )}
           </span>
         ),
       },
@@ -430,7 +477,17 @@ export default function ProveedoresPage() {
         }
       />
 
-      {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
+      {error && (
+        <InlineAlert
+          message={`No se pudieron cargar los proveedores. ${error}`}
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()}>
+              Reintentar
+            </Button>
+          }
+        />
+      )}
 
       {totales && !loading && (
         <div style={{ marginBottom: 14 }}>
@@ -475,7 +532,9 @@ export default function ProveedoresPage() {
       </div>
 
       {loading ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando proveedores…</p>
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+          {token ? "Cargando proveedores…" : "Esperando la sesión para pedir los proveedores…"}
+        </p>
       ) : rows.length === 0 ? (
         <EmptyState
           title={q || soloActivos ? "Ningún proveedor coincide" : "Todavía no hay proveedores"}
@@ -502,9 +561,20 @@ export default function ProveedoresPage() {
         maxWidth={1040}
       >
         {detalleLoading ? (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando expediente…</p>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+            Cargando expediente…
+          </p>
         ) : detalleError ? (
-          <InlineAlert message={detalleError} />
+          <InlineAlert
+            message={`No se pudo abrir el expediente. ${detalleError}`}
+            action={
+              abierto ? (
+                <Button size="sm" variant="secondary" onClick={() => void abrir(abierto)}>
+                  Reintentar
+                </Button>
+              ) : undefined
+            }
+          />
         ) : !detalle ? null : (
           <>
             <div style={{ marginBottom: 14 }}>
@@ -685,6 +755,20 @@ export default function ProveedoresPage() {
                           numeric: true,
                           render: (e) => <strong>{e.global}</strong>,
                         },
+                        {
+                          // La nota de la evaluación llegaba y no se veía: es
+                          // lo único que explica por qué la calificación.
+                          key: "notas",
+                          label: "Nota",
+                          render: (e) =>
+                            e.notas ? (
+                              <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                                {e.notas}
+                              </span>
+                            ) : (
+                              <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                            ),
+                        },
                       ]}
                     />
                   </Section>
@@ -727,7 +811,30 @@ export default function ProveedoresPage() {
                     label: "Total",
                     align: "right",
                     numeric: true,
-                    render: (f) => <Money value={f.total} />,
+                    render: (f) => (
+                      <span style={{ display: "grid", gap: 1 }}>
+                        <Money value={f.total} />
+                        {f.moneda && f.moneda !== "MXN" && (
+                          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                            {f.moneda}
+                          </span>
+                        )}
+                      </span>
+                    ),
+                  },
+                  {
+                    // Lo pagado venía en cada factura y no se mostraba: sin
+                    // ello, total y saldo no explican qué se abonó.
+                    key: "pagado",
+                    label: "Pagado",
+                    align: "right",
+                    numeric: true,
+                    render: (f) =>
+                      f.pagado > 0 ? (
+                        <Money value={f.pagado} bold={false} />
+                      ) : (
+                        <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                      ),
                   },
                   {
                     key: "saldo",
@@ -741,7 +848,7 @@ export default function ProveedoresPage() {
                     label: "Estatus",
                     render: (f) => (
                       <EstatusDot
-                        estatus={f.cancelada ? "Cancelada" : f.estatus}
+                        estatus={f.cancelada ? "CANCELLED" : f.estatus}
                         tono={f.cancelada ? "danger" : undefined}
                       />
                     ),
@@ -789,9 +896,7 @@ export default function ProveedoresPage() {
                   {
                     key: "estatus",
                     label: "Estatus",
-                    render: (o) => (
-                      <EstatusDot estatus={o.estatus} />
-                    ),
+                    render: (o) => <EstatusDot estatus={o.estatus} />,
                   },
                 ]}
               />
@@ -916,7 +1021,7 @@ export default function ProveedoresPage() {
                 emptyDescription="Ninguna factura de este proveedor está ligada a una actividad de proyecto."
                 columns={[
                   { key: "titulo", label: "Proyecto" },
-                  { key: "estatus", label: "Estatus" },
+                  { key: "estatus", label: "Estatus", render: (p) => <EstatusDot estatus={p.estatus} /> },
                   { key: "facturas", label: "Facturas", align: "right", numeric: true },
                   {
                     key: "monto",
@@ -966,7 +1071,7 @@ export default function ProveedoresPage() {
                     render: (h) =>
                       h.monto ? <Money value={h.monto} /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>,
                   },
-                  { key: "estatus", label: "Estatus" },
+                  { key: "estatus", label: "Estatus", render: (h) => <EstatusDot estatus={h.estatus} /> },
                 ]}
               />
             )}
