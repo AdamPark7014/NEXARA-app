@@ -9,8 +9,12 @@ import { isNeverQueuePath } from "@nexara/offline-shared";
 // v2: la v1 guardaba las respuestas con la misma etiqueta para todas las cuentas (todas mandaban el
 // token genérico de la cookie), así que una pestaña podía leer lo que había pedido otra con otro
 // usuario. Al cambiar el nombre, esa caché envenenada se descarta y además se borra abajo.
-const DB_NAME = "nexara-api-get-cache-v2";
-const DB_NAME_VIEJA = "nexara-api-get-cache-v1";
+// v3: la v2 seguía sin la empresa en la etiqueta, así que un usuario con acceso
+// a dos empresas podía leer offline la copia de la otra. Al cambiar el nombre,
+// esas entradas se descartan en vez de quedarse esperando a que la etiqueta
+// vuelva a coincidir (pasaba al quedarse sin empresa activa).
+const DB_NAME = "nexara-api-get-cache-v3";
+const DB_NAMES_VIEJAS = ["nexara-api-get-cache-v2", "nexara-api-get-cache-v1"];
 const STORE = "entries";
 const DB_VERSION = 1;
 const MAX_ENTRIES = 450;
@@ -58,11 +62,22 @@ function normalizeGetUrl(href: string): string {
 }
 
 /**
- * Etiqueta con la que se guarda cada respuesta: token **y** usuario. Con el token solo, dos cuentas
- * abiertas en el mismo navegador compartían caché si el token no era propio de la sesión.
+ * Etiqueta con la que se guarda cada respuesta: token, usuario **y empresa activa**.
+ *
+ * Con el token solo, dos cuentas abiertas en el mismo navegador compartían caché si el token no
+ * era propio de la sesión. Y faltaba la empresa: va en la cabecera `X-Company-Id`, no en la URL,
+ * así que una contadora con acceso a dos empresas guardaba el libro de la empresa A y, al cambiar
+ * a la B y quedarse sin red, leía los datos de A creyendo que eran de B.
  */
-export function authCacheTag(token: string | undefined, userId?: number | string | null): string {
-  const sufijo = userId != null && String(userId).trim() ? `:${String(userId).trim()}` : "";
+export function authCacheTag(
+  token: string | undefined,
+  userId?: number | string | null,
+  companyId?: number | string | null,
+): string {
+  const usuario = userId != null && String(userId).trim() ? `:${String(userId).trim()}` : "";
+  const empresa =
+    companyId != null && String(companyId).trim() ? `@${String(companyId).trim()}` : "";
+  const sufijo = `${usuario}${empresa}`;
   if (!token) return `anon${sufijo}`;
   let h = 2166136261;
   for (let i = 0; i < token.length; i++) {
@@ -75,7 +90,7 @@ export function authCacheTag(token: string | undefined, userId?: number | string
 /** Borra toda la caché local de respuestas (al cerrar sesión, y la versión vieja al arrancar). */
 export async function borrarCacheApi(): Promise<void> {
   if (typeof indexedDB === "undefined") return;
-  for (const nombre of [DB_NAME, DB_NAME_VIEJA]) {
+  for (const nombre of [DB_NAME, ...DB_NAMES_VIEJAS]) {
     try {
       await new Promise<void>((resolve) => {
         const req = indexedDB.deleteDatabase(nombre);
@@ -89,13 +104,15 @@ export async function borrarCacheApi(): Promise<void> {
   }
 }
 
-/** Se llama una vez al cargar: tira la caché de la versión con etiqueta compartida. */
+/** Se llama una vez al cargar: tira las cachés de versiones con etiqueta compartida. */
 export function descartarCacheVieja(): void {
   if (typeof indexedDB === "undefined") return;
-  try {
-    indexedDB.deleteDatabase(DB_NAME_VIEJA);
-  } catch {
-    /* ignore */
+  for (const nombre of DB_NAMES_VIEJAS) {
+    try {
+      indexedDB.deleteDatabase(nombre);
+    } catch {
+      /* ignore */
+    }
   }
 }
 

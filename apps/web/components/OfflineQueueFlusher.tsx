@@ -6,6 +6,7 @@ import { flushOfflineQueue, getOfflineQueueLength, purgarColaOffline } from "@/l
 import { authCacheTag, revalidateHotApiCache } from "@/lib/offline-api-cache";
 import { getNativeFetch } from "@/lib/native-fetch";
 import { isCapacitorNative } from "@/lib/capacitor-env";
+import { getActiveCompanyId } from "@/lib/tenant";
 
 function portalSessionBearer(): string | undefined {
   try {
@@ -46,8 +47,14 @@ export default function OfflineQueueFlusher() {
     const run = () => {
       void flushOfflineQueue(resolveAuth).then(() => {
         if (!resolveAuth()) return;
-        // La etiqueta de ESTA sesión: sin ella se refrescarían entradas de otra cuenta.
-        void revalidateHotApiCache(getNativeFetch(), resolveAuth, 72, authCacheTag(user?.token, user?.id));
+        // La etiqueta de ESTA sesión y ESTA empresa: sin ella se refrescarían
+        // entradas de otra cuenta o de la otra empresa del mismo usuario.
+        void revalidateHotApiCache(
+          getNativeFetch(),
+          resolveAuth,
+          72,
+          authCacheTag(user?.token, user?.id, getActiveCompanyId()),
+        );
       });
     };
 

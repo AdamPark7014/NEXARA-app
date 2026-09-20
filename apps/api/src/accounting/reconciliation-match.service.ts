@@ -370,7 +370,15 @@ export function classifyMovement(
   const [best, second] = candidates;
   if (!best.exactAmount) return 'DISCREPANCIA';
   const dominant = !second || best.score - second.score >= config.dominanceMargin;
-  if (best.score >= config.highConfidenceScore && dominant) return 'SUGERENCIA_ALTA';
+  // El sentido del dinero es regla de negocio, no un matiz del score: un cargo
+  // no salda una cuenta por cobrar. La penalización de −18 no alcanzaba cuando
+  // coincidían monto, día, clave SPEI y referencia (55+25+25+12−18 = 99): el
+  // candidato invertido salía en verde y se aplicaba de un clic. Sigue siendo
+  // candidato visible, pero nunca "alta confianza".
+  const sentidoCoincide = movement.isDebit === (best.candidate.direction === 'OUT');
+  if (best.score >= config.highConfidenceScore && dominant && sentidoCoincide) {
+    return 'SUGERENCIA_ALTA';
+  }
   return 'SUGERENCIA_MULTIPLE';
 }
 

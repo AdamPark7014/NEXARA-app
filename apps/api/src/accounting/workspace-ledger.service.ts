@@ -266,6 +266,23 @@ type Bucket = {
 
 const emptyBlock = (): LedgerTotalsBlock => ({ ingresos: 0, egresos: 0, neto: 0, conteo: 0 });
 
+/**
+ * Orden global de la mezcla de fuentes.
+ *
+ * Cada fuente pide a Prisma su top-K con `orderBy: [<fecha> desc, id desc]`.
+ * El desempate de la mezcla TIENE que ser el mismo o el recorte de cada fuente
+ * deja de casar con la página: desempatando por el id textual ascendente
+ * (`"invoices:100" < "invoices:99"`) la página 1 y la 2 salían idénticas y las
+ * filas de en medio no aparecían nunca. Se desempata por el id numérico del
+ * documento, descendente, y la tabla sólo rompe el empate entre fuentes
+ * distintas para que el orden sea total y estable.
+ */
+export function compararFilasLibro(a: LedgerRow, b: LedgerRow): number {
+  if (a.fecha !== b.fecha) return b.fecha.localeCompare(a.fecha);
+  if (a.origen.id !== b.origen.id) return b.origen.id - a.origen.id;
+  return a.origen.tabla.localeCompare(b.origen.tabla);
+}
+
 @Injectable()
 export class AccountingWorkspaceLedgerService {
   constructor(private readonly prisma: PrismaService) {}
@@ -382,9 +399,7 @@ export class AccountingWorkspaceLedgerService {
 
     const totals = this.reduceTotals(active, totalGroups);
 
-    const merged = rowGroups
-      .flat()
-      .sort((a, b) => (a.fecha === b.fecha ? a.id.localeCompare(b.id) : b.fecha.localeCompare(a.fecha)));
+    const merged = rowGroups.flat().sort(compararFilasLibro);
 
     const items = merged.slice(offset, offset + f.pageSize);
 
@@ -423,9 +438,7 @@ export class AccountingWorkspaceLedgerService {
     const buckets = (await this.buildBuckets(tenantId, f)).filter((b) => b.enabled);
     const rowGroups = await Promise.all(buckets.map((b) => b.fetch(MAX_EXPORT_ROWS)));
 
-    const merged = rowGroups
-      .flat()
-      .sort((a, b) => (a.fecha === b.fecha ? a.id.localeCompare(b.id) : b.fecha.localeCompare(a.fecha)));
+    const merged = rowGroups.flat().sort(compararFilasLibro);
 
     const truncated = merged.length > MAX_EXPORT_ROWS;
     const rows = truncated ? merged.slice(0, MAX_EXPORT_ROWS) : merged;
@@ -1319,10 +1332,19 @@ const CSV_HEADERS = [
   'Origen ID',
 ];
 
-/** Escapa una celda CSV (comillas, comas y saltos de línea). */
+/**
+ * Excel evalúa como fórmula toda celda que empiece por `=`, `+`, `-`, `@` o
+ * tabulador. El concepto de un gasto o las notas de un pago los escribe
+ * cualquier usuario del ERP, y la contadora abre este CSV en Excel: se
+ * antepone un apóstrofo para que quede como texto.
+ */
+const CSV_INICIO_FORMULA = /^[=+\-@\t\r]/;
+
+/** Escapa una celda CSV (comillas, comas, saltos de línea y fórmulas). */
 export function csvCell(value: unknown): string {
   if (value == null) return '';
-  const s = String(value);
+  let s = String(value);
+  if (CSV_INICIO_FORMULA.test(s)) s = `'${s}`;
   if (/[",\r\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }

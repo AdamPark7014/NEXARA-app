@@ -9,6 +9,7 @@ import {
   storeApiGetCache,
 } from "./offline-api-cache";
 import { setNativeFetch } from "./native-fetch";
+import { getActiveCompanyId } from "./tenant";
 import { isNeverQueuePath } from "@nexara/offline-shared";
 import { isCapacitorNative } from "./capacitor-env";
 
@@ -121,7 +122,9 @@ function getPanelUserId(): number | string | undefined {
 async function getWithApiCache(abs: string, nativeExec: () => Promise<Response>): Promise<Response> {
   if (!shouldCacheApiGet(abs)) return nativeExec();
   const token = getPanelAuthToken();
-  const tag = authCacheTag(token, getPanelUserId());
+  // La empresa activa viaja en `X-Company-Id`, no en la URL: sin ella en la
+  // etiqueta, cambiar de empresa y quedarse sin red servía la copia de la otra.
+  const tag = authCacheTag(token, getPanelUserId(), getActiveCompanyId());
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
   if (offline) {
     const hit = await readApiGetCache(abs, tag);
