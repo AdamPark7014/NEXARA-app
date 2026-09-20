@@ -172,6 +172,26 @@ export default function ReportesPage() {
     ...(acepta("asOf") ? [{ label: "Al corte", value: asOf, onChange: setAsOf }] : []),
   ];
 
+  /**
+   * El catálogo marca qué filtros son obligatorios (`requerido`) y la pantalla
+   * no lo usaba: se lanzaba el reporte sin ellos y el resultado vacío no decía
+   * que faltaba elegir algo. Aquí solo se avisa; no se bloquea nada.
+   */
+  const faltantes = (reporte?.filtros ?? [])
+    .filter((f) => f.requerido && f.tipo === "seleccion" && !seleccion[f.clave])
+    .map((f) => f.etiqueta);
+
+  /** El periodo que el API dice haber calculado, que no siempre es el pedido. */
+  const periodoCalculado = (() => {
+    const p = resultado?.periodo;
+    if (!p) return null;
+    if (p.asOf) return `Cifras al corte del ${p.asOf}.`;
+    if (p.from && p.to) return `Cifras del ${p.from} al ${p.to}.`;
+    if (p.from) return `Cifras desde el ${p.from}.`;
+    if (p.to) return `Cifras hasta el ${p.to}.`;
+    return null;
+  })();
+
   return (
     <>
       <PageHeader
@@ -193,10 +213,26 @@ export default function ReportesPage() {
         }
       />
 
-      {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
+      {error && (
+        <InlineAlert
+          message={error}
+          onDismiss={() => setError(null)}
+          action={
+            reporte ? (
+              <Button size="sm" variant="secondary" onClick={() => void ejecutar()}>
+                Reintentar
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
 
       {cargandoCatalogo ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando el catálogo de reportes…</p>
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+          {token
+            ? "Cargando el catálogo de reportes…"
+            : "Esperando la sesión para pedir el catálogo…"}
+        </p>
       ) : catalogo.length === 0 ? (
         <EmptyState
           title="Sin reportes disponibles"
@@ -263,14 +299,34 @@ export default function ReportesPage() {
             />
           </div>
 
-          {resultado?.comparativo && (
+          {faltantes.length > 0 && (
+            <InlineAlert
+              variant="warning"
+              message={`Este reporte pide ${
+                faltantes.length === 1 ? "un filtro" : "filtros"
+              } que todavía no eliges: ${faltantes.join(", ")}. Sin ${
+                faltantes.length === 1 ? "él" : "ellos"
+              } el resultado puede venir vacío o incompleto.`}
+            />
+          )}
+
+          {(periodoCalculado || resultado?.comparativo) && (
             <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
-              Comparando contra {resultado.comparativo.periodo.from} → {resultado.comparativo.periodo.to}.
+              {periodoCalculado}
+              {resultado?.comparativo && (
+                <>
+                  {" "}
+                  Comparando la columna «{resultado.comparativo.columnaComparada}» contra{" "}
+                  {resultado.comparativo.periodo.from} → {resultado.comparativo.periodo.to}.
+                </>
+              )}
             </p>
           )}
 
           {cargando ? (
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculando el reporte…</p>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+              Calculando el reporte…
+            </p>
           ) : !resultado ? (
             error ? null : (
               <EmptyState title="Sin resultado" description="Ajusta el periodo y vuelve a intentar." />

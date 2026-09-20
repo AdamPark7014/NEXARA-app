@@ -1,0 +1,49 @@
+/**
+ * Conciliación — la pantalla dividida y su punto de ruptura.
+ *
+ * Dos columnas solo mientras las dos caben. Por debajo de 1100px la de la
+ * derecha bajaba a 320px y el movimiento del banco quedaba partido en cuatro
+ * renglones; a esa anchura se apilan, primero la coincidencia (que es donde se
+ * decide) y debajo la lista del banco.
+ */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  gap: 14px;
+  align-items: start;
+}
+
+/* El panel de la coincidencia se queda a la vista mientras se recorre la
+   lista con el teclado: si hay que buscarlo con el scroll, la navegación por
+   teclado deja de servir para lo que se hizo. */
+@media (min-width: 1101px) {
+  .match {
+    position: sticky;
+    top: 12px;
+  }
+}
+
+/* Solo para el anuncio de la selección al navegar con el teclado. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 1100px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Apilados, la decisión va primero y la lista debajo. */
+  .match {
+    order: -1;
+  }
+}

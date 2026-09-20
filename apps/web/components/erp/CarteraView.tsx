@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
 import {
   FinanceField,
   FinanceFormGrid,
@@ -210,6 +211,41 @@ function hoyIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const pesos = (n: number, decimales = 0) =>
+  n.toLocaleString("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: decimales,
+  });
+
+/**
+ * Los CFDI vienen del SAT con su clave; enseñar «PPD» a la contadora está bien,
+ * enseñarle «ACCOUNTS_PAYABLE» no. Si la clave no está en la tabla se muestra
+ * tal cual llegó: preferimos un dato crudo a inventar una traducción.
+ */
+const METODO_CFDI: Record<string, string> = {
+  PUE: "PUE · pago en una sola exhibición",
+  PPD: "PPD · pago en parcialidades o diferido",
+};
+
+/**
+ * Un renglón «etiqueta: valor» para el detalle. Cuando el API no manda el dato
+ * se escribe «—»: ni se esconde el renglón ni se rellena con una suposición.
+ */
+function Linea({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode }) {
+  // `valor || "—"` convertiría un 0 legítimo en un guion; aquí solo se
+  // sustituye lo que de verdad falta.
+  const vacio = valor === null || valor === undefined || valor === "";
+  return (
+    <div style={{ display: "flex", gap: 8, justifyContent: "space-between", fontSize: 12.5 }}>
+      <span style={{ color: "var(--text-tertiary)" }}>{etiqueta}</span>
+      <span style={{ textAlign: "right", minWidth: 0 }}>
+        {vacio ? <span style={{ color: "var(--text-tertiary)" }}>—</span> : valor}
+      </span>
+    </div>
+  );
+}
+
 export default function CarteraView({
   kind,
   title,
@@ -251,6 +287,18 @@ export default function CarteraView({
 
   const [formPago, setFormPago] = useState(false);
   const [guardandoPago, setGuardandoPago] = useState(false);
+  /** Lo que contestó el servidor al último intento, dentro del formulario. */
+  const [errorPago, setErrorPago] = useState<string | null>(null);
+  /** Se pulsó «Guardar» al menos una vez: a partir de ahí el campo vacío también se señala. */
+  const [intentado, setIntentado] = useState(false);
+  const [descargando, setDescargando] = useState<string | null>(null);
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
+  /**
+   * Cerrojo síncrono: `guardandoPago` deshabilita el botón, pero un doble clic
+   * rápido entra dos veces antes del repintado. Registrar el mismo cobro dos
+   * veces descuadra el saldo de la factura, así que el cerrojo es un ref.
+   */
+  const pagoEnVueloRef = useRef(false);
   const [pago, setPago] = useState({
     amount: "",
     paymentDate: hoyIso(),
@@ -258,6 +306,21 @@ export default function CarteraView({
     reference: "",
     notes: "",
   });
+  const [esAngosto, setEsAngosto] = useState(false);
+
+  /**
+   * Debajo de 1100px la tabla tiene nueve columnas y ninguna se lee: el
+   * contrato dice que la columna que no cabe se colapsa bajo el concepto, no
+   * que la tabla se desplace de lado.
+   */
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 1100px)");
+    const sincronizar = () => setEsAngosto(mq.matches);
+    sincronizar();
+    mq.addEventListener("change", sincronizar);
+    return () => mq.removeEventListener("change", sincronizar);
+  }, []);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -331,6 +394,8 @@ export default function CarteraView({
    */
   const descargarXml = useCallback(
     async (url: string, nombre: string) => {
+      setDescargando(url);
+      setErrorDescarga(null);
       try {
         const res = await fetch(buildApiUrl(url), {
           credentials: "include",
@@ -347,21 +412,50 @@ export default function CarteraView({
         a.remove();
         URL.revokeObjectURL(href);
       } catch (e) {
-        toast.error(formatApiError(e));
+        // Junto a los documentos, no en un toast: el botón sigue ahí y hay que
+        // saber si el archivo no bajó y por qué.
+        setErrorDescarga(`No se pudo descargar ${nombre}. ${formatApiError(e)}`);
+      } finally {
+        setDescargando(null);
       }
     },
     [token],
   );
 
-  const chips = useMemo(() => {
+  /**
+   * La escala de antigüedad, con los tramos que manda el API.
+   *
+   * Se pintan **todos** los que vienen, incluido el que está en cero: antes se
+   * ocultaban los vacíos y la escala cambiaba de forma según el día, así que
+   * «vencido, hoy, 7, 30» dejaba de leerse como una escala y no se distinguía
+   * «este tramo está limpio» de «este tramo no se está mirando». Un tramo que
+   * el API no manda no aparece: no se inventa ninguno, y las etiquetas son las
+   * suyas (`agingEtiquetas`), no una lista escrita aquí.
+   */
+  const tramos: ScaleItem[] = useMemo(() => {
     if (!data) return [];
-    return ORDEN_AGING.filter((b) => data.aging[b]?.documentos > 0).map((b) => ({
-      bucket: b,
-      etiqueta: data.agingEtiquetas[b],
-      monto: data.aging[b].monto,
-      documentos: data.aging[b].documentos,
-      tono: b === "vencido" ? "bad" : b === "hoy" ? "warn" : "mute",
-    }));
+    const presentes = ORDEN_AGING.filter((b) => data.aging[b] != null);
+    const base =
+      data.totales.pendiente > 0
+        ? data.totales.pendiente
+        : presentes.reduce((s, b) => s + Math.abs(data.aging[b].monto), 0);
+    if (presentes.every((b) => data.aging[b].documentos === 0)) return [];
+    return presentes.map((b) => {
+      const tramo = data.aging[b];
+      const vacio = tramo.documentos === 0;
+      return {
+        key: b,
+        label: data.agingEtiquetas[b] ?? b,
+        value: <Money value={tramo.monto} compact bold={false} />,
+        hint: vacio
+          ? "sin facturas"
+          : `${tramo.documentos} ${tramo.documentos === 1 ? "factura" : "facturas"}`,
+        // El color solo entra donde hay algo que hacer; un tramo en cero nunca
+        // se pinta de rojo aunque sea el de vencido.
+        tone: vacio ? "mute" : b === "vencido" ? "danger" : b === "hoy" ? "warning" : "mute",
+        share: base > 0 ? Math.abs(tramo.monto) / base : undefined,
+      };
+    });
   }, [data]);
 
   const hayFiltros =
@@ -378,17 +472,21 @@ export default function CarteraView({
   }
 
   async function registrarPago() {
-    if (!detalle) return;
+    if (pagoEnVueloRef.current) return;
+    setIntentado(true);
+    if (!detalle) {
+      setErrorPago("La factura ya no está abierta. Ciérrala y vuelve a entrar.");
+      return;
+    }
     const monto = Number(pago.amount);
-    if (!Number.isFinite(monto) || monto <= 0) {
-      toast.error("Escribe un monto mayor a cero");
-      return;
-    }
-    if (monto > detalle.saldo.pendiente + 0.01) {
-      toast.error("El monto supera el saldo pendiente");
-      return;
-    }
+    // El motivo se queda bajo el campo (`errorMonto`), no en un toast que se
+    // va: el formulario sigue abierto y hay que poder releer qué falta.
+    if (!Number.isFinite(monto) || monto <= 0) return;
+    if (monto > detalle.saldo.pendiente + 0.01) return;
+    if (!pago.paymentDate) return;
+    pagoEnVueloRef.current = true;
     setGuardandoPago(true);
+    setErrorPago(null);
     try {
       await erpFetch(`accounting/invoices/${detalle.factura.id}/payments`, token, {
         method: "POST",
@@ -400,8 +498,11 @@ export default function CarteraView({
           notes: pago.notes.trim() || undefined,
         }),
       });
-      toast.success(esCobrar ? "Cobro registrado" : "Pago registrado");
+      toast.success(
+        `${esCobrar ? "Cobro" : "Pago"} de ${pesos(monto, 2)} registrado en ${detalle.factura.folio}`,
+      );
       setFormPago(false);
+      setIntentado(false);
       setPago({ amount: "", paymentDate: hoyIso(), method: "SPEI", reference: "", notes: "" });
       const refrescado = await erpFetch<Detalle>(
         `accounting/workspace/${kind}/${detalle.factura.id}`,
@@ -411,8 +512,13 @@ export default function CarteraView({
       await cargar();
       if (!esCobrar) await cargarCalendario();
     } catch (e) {
-      toast.error(formatApiError(e));
+      // El formulario NO se cierra: si se cerrara, el capturista no sabría si
+      // el dinero quedó aplicado y volvería a capturarlo.
+      setErrorPago(
+        `No se pudo registrar el ${esCobrar ? "cobro" : "pago"}. ${formatApiError(e)}`,
+      );
     } finally {
+      pagoEnVueloRef.current = false;
       setGuardandoPago(false);
     }
   }
@@ -427,39 +533,60 @@ export default function CarteraView({
           <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
             {r.folio}
             {r.contraparte.rfc ? ` · ${r.contraparte.rfc}` : ""}
+            {r.moneda && r.moneda !== "MXN" ? ` · ${r.moneda}` : ""}
           </div>
+          {/* Angosto: lo que se quitó de columnas baja aquí, bajo el concepto,
+              en vez de empujar la tabla a un scroll horizontal. */}
+          {esAngosto && (
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+              {[
+                r.proyecto ? r.proyecto.nombre : "Sin proyecto",
+                `emitida ${fechaCorta(r.emision)}`,
+                `vence ${fechaCorta(r.vencimiento)}`,
+                r.pagado > 0 ? `pagado ${pesos(r.pagado)}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+          )}
         </div>
       ),
     },
-    {
-      key: "proyecto",
-      label: "Proyecto",
-      render: (r) =>
-        r.proyecto ? (
-          <span style={{ fontSize: 12 }}>{r.proyecto.nombre}</span>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin proyecto</span>
-        ),
-    },
-    {
-      key: "emision",
-      label: "Emisión",
-      render: (r) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{fechaCorta(r.emision)}</span>,
-    },
-    {
-      key: "vencimiento",
-      label: "Vence",
-      render: (r) => (
-        <span
-          style={{
-            fontVariantNumeric: "tabular-nums",
-            color: (r.diasVencido ?? -1) > 0 ? "var(--danger)" : undefined,
-          }}
-        >
-          {fechaCorta(r.vencimiento)}
-        </span>
-      ),
-    },
+    ...(esAngosto
+      ? []
+      : ([
+          {
+            key: "proyecto",
+            label: "Proyecto",
+            render: (r: Fila) =>
+              r.proyecto ? (
+                <span style={{ fontSize: 12 }}>{r.proyecto.nombre}</span>
+              ) : (
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin proyecto</span>
+              ),
+          },
+          {
+            key: "emision",
+            label: "Emisión",
+            render: (r: Fila) => (
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>{fechaCorta(r.emision)}</span>
+            ),
+          },
+          {
+            key: "vencimiento",
+            label: "Vence",
+            render: (r: Fila) => (
+              <span
+                style={{
+                  fontVariantNumeric: "tabular-nums",
+                  color: (r.diasVencido ?? -1) > 0 ? "var(--danger)" : undefined,
+                }}
+              >
+                {fechaCorta(r.vencimiento)}
+              </span>
+            ),
+          },
+        ] as Column<Fila>[])),
     {
       key: "dias",
       label: "Vencida",
@@ -475,18 +602,22 @@ export default function CarteraView({
       numeric: true,
       render: (r) => <Money value={r.monto} bold={false} />,
     },
-    {
-      key: "pagado",
-      label: "Pagado",
-      align: "right",
-      numeric: true,
-      render: (r) =>
-        r.pagado > 0 ? (
-          <Money value={r.pagado} bold={false} />
-        ) : (
-          <span style={{ color: "var(--text-tertiary)" }}>—</span>
-        ),
-    },
+    ...(esAngosto
+      ? []
+      : ([
+          {
+            key: "pagado",
+            label: "Pagado",
+            align: "right",
+            numeric: true,
+            render: (r: Fila) =>
+              r.pagado > 0 ? (
+                <Money value={r.pagado} bold={false} />
+              ) : (
+                <span style={{ color: "var(--text-tertiary)" }}>—</span>
+              ),
+          },
+        ] as Column<Fila>[])),
     {
       key: "pendiente",
       label: "Pendiente",
@@ -511,17 +642,26 @@ export default function CarteraView({
   const puedePagar = !!detalle && saldoAbierto > 0.009 && !detalle.factura.cancelada;
 
   /**
-   * El mismo criterio que ya aplica `registrarPago`, pero bajo el campo
-   * mientras se captura. No bloquea el guardado: solo adelanta la respuesta
-   * que hoy llega en un toast después de intentar.
+   * El mismo criterio que aplica `registrarPago`, bajo el campo. Mientras no
+   * se ha intentado guardar, el campo vacío se queda callado —no se regaña a
+   * nadie por no haber escrito todavía—; en cuanto se pulsa Guardar, el vacío
+   * también responde, porque antes ese caso no decía nada en el formulario.
    */
   const errorMonto = (() => {
-    if (!detalle || pago.amount.trim() === "") return null;
+    if (!detalle) return null;
+    if (pago.amount.trim() === "") {
+      return intentado ? "Escribe cuánto se está pagando." : null;
+    }
     const monto = Number(pago.amount);
     if (!Number.isFinite(monto) || monto <= 0) return "Escribe un monto mayor a cero.";
-    if (monto > detalle.saldo.pendiente + 0.01) return "El monto supera el saldo pendiente.";
+    if (monto > detalle.saldo.pendiente + 0.01) {
+      return `El monto supera el saldo pendiente (${pesos(detalle.saldo.pendiente, 2)}).`;
+    }
     return null;
   })();
+
+  const errorFecha =
+    intentado && !pago.paymentDate ? "Elige el día en que se movió el dinero." : null;
 
   const totales = data?.totales;
   const vencido = totales?.vencido ?? 0;
@@ -582,13 +722,36 @@ export default function CarteraView({
         <MetricStrip ariaLabel="Resumen de la cartera" metrics={metricas} />
       </div>
 
-      {/* Antigüedad — una escala que se lee de izquierda a derecha y filtra */}
-      <EscalaAntiguedad
-        tramos={chips}
-        activo={aging}
-        total={data?.totales.pendiente ?? 0}
-        onElegir={(b) => setAging(b)}
-      />
+      {/* Antigüedad — la escala compartida: se lee de izquierda a derecha y filtra */}
+      {tramos.length > 0 && (
+        <div>
+          <FilterScale
+            ariaLabel="Antigüedad de saldos"
+            items={tramos}
+            active={aging}
+            onSelect={(clave) => setAging(clave as AgingBucket | "")}
+            minCellWidth={128}
+          />
+          {aging !== "" && (
+            <button
+              type="button"
+              onClick={() => setAging("")}
+              style={{
+                margin: "-8px 0 14px",
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: "var(--primary)",
+                cursor: "pointer",
+              }}
+            >
+              Ver toda la cartera
+            </button>
+          )}
+        </div>
+      )}
 
       {!esCobrar && (
         <CalendarioCxP
@@ -664,12 +827,14 @@ export default function CarteraView({
       {data?.meta.truncado && (
         <InlineAlert
           variant="warning"
-          message="Hay más documentos de los que caben en un barrido. Acota el periodo para que los totales sean exactos."
+          message={`Se muestran ${data.rows.length} de ${data.meta.total} documentos: hay más de los que caben en un barrido. Acota el periodo para que los totales sean exactos.`}
         />
       )}
 
       {cargando ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando la cartera…</p>
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+          {token ? "Cargando la cartera…" : "Esperando la sesión para pedir la cartera…"}
+        </p>
       ) : !data || data.rows.length === 0 ? (
         <EmptyState
           title={hayFiltros ? "Sin resultados con estos filtros" : emptyTitle}
@@ -719,7 +884,15 @@ export default function CarteraView({
               Cerrar
             </Button>
             {puedePagar && (
-              <Button variant="primary" onClick={() => setFormPago(true)}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  // El formulario abre limpio: sin el error del intento anterior.
+                  setIntentado(false);
+                  setErrorPago(null);
+                  setFormPago(true);
+                }}
+              >
                 {esCobrar ? "Registrar cobro" : "Registrar pago"}
               </Button>
             )}
@@ -727,16 +900,31 @@ export default function CarteraView({
         }
       >
         {cargandoDetalle && (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Abriendo la factura…</p>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+            Abriendo la factura…
+          </p>
         )}
         {errorDetalle && (
-          <InlineAlert variant="danger" message={`No se pudo abrir el detalle. ${errorDetalle}`} />
+          <InlineAlert
+            variant="danger"
+            message={`No se pudo abrir el detalle. ${errorDetalle}`}
+            action={
+              abierta ? (
+                <Button size="sm" variant="secondary" onClick={() => void abrirDetalle(abierta)}>
+                  Reintentar
+                </Button>
+              ) : undefined
+            }
+          />
         )}
         {detalle && (
           <DetalleFactura
             detalle={detalle}
             etiquetaContraparte={etiquetaContraparte}
             onDescargarXml={descargarXml}
+            descargando={descargando}
+            errorDescarga={errorDescarga}
+            onCerrarErrorDescarga={() => setErrorDescarga(null)}
           />
         )}
       </Modal>
@@ -744,22 +932,46 @@ export default function CarteraView({
       {/* Registro de pago */}
       <Modal
         open={formPago}
-        onClose={() => setFormPago(false)}
+        onClose={() => {
+          setFormPago(false);
+          setErrorPago(null);
+          setIntentado(false);
+        }}
+        dirty={pago.amount.trim() !== "" || pago.reference.trim() !== "" || pago.notes.trim() !== ""}
         title={esCobrar ? "Registrar cobro" : "Registrar pago"}
         maxWidth={460}
         footer={
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", width: "100%" }}>
-            <Button variant="ghost" onClick={() => setFormPago(false)} disabled={guardandoPago}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setFormPago(false);
+                setErrorPago(null);
+                setIntentado(false);
+              }}
+              disabled={guardandoPago}
+            >
               Cancelar
             </Button>
+            {/* El botón NO se deshabilita por campos incompletos: un botón que
+                no reacciona tampoco explica qué falta. Al pulsarlo, el campo
+                que falla lo dice debajo. */}
             <Button variant="primary" loading={guardandoPago} onClick={() => void registrarPago()}>
-              Guardar
+              {guardandoPago ? "Guardando…" : "Guardar"}
             </Button>
           </div>
         }
       >
         {detalle && (
           <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
+            {errorPago && (
+              <InlineAlert
+                variant="danger"
+                message={errorPago}
+                style={{ marginBottom: 0 }}
+                onDismiss={() => setErrorPago(null)}
+              />
+            )}
             <div
               style={{
                 display: "flex",
@@ -791,6 +1003,7 @@ export default function CarteraView({
                   value={pago.amount}
                   onChange={(e) => setPago((p) => ({ ...p, amount: e.target.value }))}
                   placeholder={detalle.saldo.pendiente.toFixed(2)}
+                  aria-invalid={errorMonto ? true : undefined}
                   style={financeInputStyle}
                 />
                 <button
@@ -813,11 +1026,16 @@ export default function CarteraView({
                 </button>
               </FinanceField>
 
-              <FinanceField label="Fecha" hint="El día en que el dinero se movió, no el de captura.">
+              <FinanceField
+                label="Fecha"
+                hint="El día en que el dinero se movió, no el de captura."
+                error={errorFecha}
+              >
                 <input
                   type="date"
                   value={pago.paymentDate}
                   onChange={(e) => setPago((p) => ({ ...p, paymentDate: e.target.value }))}
+                  aria-invalid={errorFecha ? true : undefined}
                   style={financeInputStyle}
                 />
               </FinanceField>
@@ -911,140 +1129,6 @@ function DiasVencido({ dias }: { dias: number | null }) {
   );
 }
 
-type Tramo = {
-  bucket: AgingBucket;
-  etiqueta: string;
-  monto: number;
-  documentos: number;
-  tono: string;
-};
-
-const TONO_TRAMO: Record<string, string> = {
-  bad: "var(--state-danger-text, #b91c1c)",
-  warn: "var(--state-warning-text, #b45309)",
-  mute: "var(--text-secondary)",
-};
-
-/**
- * Antigüedad como escala, no como cinco botones sueltos.
- *
- * Las celdas van pegadas y en orden —vencido, hoy, 7, 30, +30— con una regla
- * bajo cada una cuyo ancho es su parte del saldo: así se ve de un vistazo
- * hacia qué lado carga la cartera. Cada celda filtra la tabla al hacer clic.
- */
-function EscalaAntiguedad({
-  tramos,
-  activo,
-  total,
-  onElegir,
-}: {
-  tramos: Tramo[];
-  activo: AgingBucket | "";
-  total: number;
-  onElegir: (bucket: AgingBucket | "") => void;
-}) {
-  if (tramos.length === 0) return null;
-  const base = total > 0 ? total : tramos.reduce((s, t) => s + Math.abs(t.monto), 0);
-
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <div
-        role="group"
-        aria-label="Antigüedad de saldos"
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(auto-fit, minmax(128px, 1fr))`,
-          border: "1px solid var(--nx-panel-hairline, var(--border))",
-          borderRadius: 10,
-          overflow: "hidden",
-          background: "var(--surface)",
-        }}
-      >
-        {tramos.map((t, i) => {
-          const esActivo = activo === t.bucket;
-          const color = TONO_TRAMO[t.tono] ?? "var(--text-secondary)";
-          const parte = base > 0 ? Math.min(100, (Math.abs(t.monto) / base) * 100) : 0;
-          return (
-            <button
-              key={t.bucket}
-              type="button"
-              aria-pressed={esActivo}
-              onClick={() => onElegir(esActivo ? "" : t.bucket)}
-              style={{
-                position: "relative",
-                display: "grid",
-                gap: 2,
-                padding: "9px 12px 11px",
-                textAlign: "left",
-                cursor: "pointer",
-                font: "inherit",
-                color: "var(--text-primary)",
-                border: "none",
-                borderRight:
-                  i < tramos.length - 1
-                    ? "1px solid var(--nx-panel-hairline, var(--border))"
-                    : undefined,
-                background: esActivo
-                  ? "color-mix(in srgb, var(--primary) 7%, var(--surface))"
-                  : "transparent",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: esActivo ? 700 : 500,
-                  color: t.tono === "mute" ? "var(--text-tertiary)" : color,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {t.etiqueta}
-              </span>
-              <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-                <Money value={t.monto} compact bold={false} />
-              </span>
-              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                {t.documentos} {t.documentos === 1 ? "factura" : "facturas"}
-              </span>
-              <span
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  bottom: 0,
-                  height: 2,
-                  width: `${parte}%`,
-                  background: t.tono === "mute" ? "var(--text-tertiary)" : color,
-                  opacity: t.tono === "mute" ? 0.35 : 0.7,
-                }}
-              />
-            </button>
-          );
-        })}
-      </div>
-      {activo !== "" && (
-        <button
-          type="button"
-          onClick={() => onElegir("")}
-          style={{
-            marginTop: 6,
-            background: "none",
-            border: "none",
-            padding: 0,
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: "var(--primary)",
-            cursor: "pointer",
-          }}
-        >
-          Ver toda la cartera
-        </button>
-      )}
-    </div>
-  );
-}
-
 function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
   return (
     <div>
@@ -1080,7 +1164,7 @@ function CalendarioCxP({
   if (!calendario) {
     return (
       <Section title="Calendario de vencimientos" dense>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
           Armando el calendario…
         </p>
       </Section>
@@ -1094,7 +1178,9 @@ function CalendarioCxP({
   return (
     <Section
       title="Calendario de vencimientos"
-      subtitle={`Qué sale de caja hasta el ${fechaLarga(calendario.hasta)}.`}
+      subtitle={`Qué sale de caja del ${fechaLarga(calendario.desde)} al ${fechaLarga(
+        calendario.hasta,
+      )} · ${calendario.ventanaDias} días.`}
       dense
       actions={
         <div style={{ display: "flex", gap: 6 }}>
@@ -1141,6 +1227,41 @@ function CalendarioCxP({
               ]}
             />
           </div>
+
+          {/* Lo vencido no es una cifra suelta: el API manda a quién se le
+              debe y cuántos documentos son, y no se pintaba en ningún lado. */}
+          {calendario.vencido.documentos > 0 && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: "9px 12px",
+                borderRadius: 8,
+                border: "1px solid var(--state-danger-border, var(--danger))",
+                background: "var(--state-danger-bg, #fef2f2)",
+                fontSize: 12.5,
+                color: "var(--state-danger-text, #b91c1c)",
+                lineHeight: 1.5,
+              }}
+            >
+              <strong>
+                {calendario.vencido.documentos}{" "}
+                {calendario.vencido.documentos === 1 ? "factura vencida" : "facturas vencidas"}
+              </strong>{" "}
+              por {pesos(calendario.vencido.monto)}.
+              {calendario.vencido.contrapartes.length > 0 && (
+                <span style={{ color: "var(--text-secondary)" }}>
+                  {" "}
+                  {calendario.vencido.contrapartes
+                    .slice(0, 3)
+                    .map((c) => `${c.nombre} (${pesos(c.monto)})`)
+                    .join(" · ")}
+                  {calendario.vencido.contrapartes.length > 3
+                    ? ` y ${calendario.vencido.contrapartes.length - 3} más`
+                    : ""}
+                </span>
+              )}
+            </div>
+          )}
 
           {calendario.semanas.length > 0 && (
             <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
@@ -1192,6 +1313,12 @@ function CalendarioCxP({
             </ul>
           )}
 
+          {calendario.semanas.length > 9 && (
+            <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              Se muestran las primeras 9 de {calendario.semanas.length} semanas de la ventana.
+            </p>
+          )}
+
           {(resumen.fueraDeVentana > 0 || resumen.sinFecha > 0) && (
             <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)" }}>
               {resumen.fueraDeVentana > 0 && (
@@ -1218,10 +1345,16 @@ function DetalleFactura({
   detalle,
   etiquetaContraparte,
   onDescargarXml,
+  descargando,
+  errorDescarga,
+  onCerrarErrorDescarga,
 }: {
   detalle: Detalle;
   etiquetaContraparte: string;
   onDescargarXml: (url: string, nombre: string) => void | Promise<void>;
+  descargando: string | null;
+  errorDescarga: string | null;
+  onCerrarErrorDescarga: () => void;
 }) {
   const { factura, contraparte, proyecto, pagos, saldo, documentos, historial, conceptos } = detalle;
   return (
@@ -1300,6 +1433,40 @@ function DetalleFactura({
         </div>
       )}
 
+      {/* Los datos fiscales del CFDI llegaban en el detalle y no se pintaban:
+          sin UUID, forma y método de pago no se puede casar con el SAT. */}
+      <Bloque titulo="Datos del comprobante">
+        <div style={{ display: "grid", gap: 5 }}>
+          <Linea
+            etiqueta="UUID fiscal"
+            valor={
+              factura.uuid ? (
+                <span style={{ fontFamily: "var(--nx-font-mono, monospace)", fontSize: 11.5 }}>
+                  {factura.uuid}
+                </span>
+              ) : (
+                <span style={{ color: "var(--text-tertiary)" }}>Sin timbrar</span>
+              )
+            }
+          />
+          <Linea etiqueta="Moneda" valor={factura.moneda} />
+          <Linea etiqueta="Subtotal" valor={<Money value={factura.subtotal} bold={false} />} />
+          <Linea etiqueta="Impuestos" valor={<Money value={factura.impuestos} bold={false} />} />
+          <Linea etiqueta="Forma de pago" valor={factura.formaPago} />
+          <Linea
+            etiqueta="Método de pago"
+            valor={
+              factura.metodoPago
+                ? (METODO_CFDI[factura.metodoPago] ?? factura.metodoPago)
+                : null
+            }
+          />
+          <Linea etiqueta="Uso del CFDI" valor={factura.usoCfdi} />
+          {factura.match && <Linea etiqueta="Conciliación" valor={factura.match} />}
+          {factura.notas && <Linea etiqueta="Notas" valor={factura.notas} />}
+        </div>
+      </Bloque>
+
       <Bloque titulo={`Pagos aplicados (${pagos.length})`}>
         {pagos.length === 0 ? (
           <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
@@ -1324,6 +1491,19 @@ function DetalleFactura({
                   <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
                     {[p.metodo, p.referencia, p.banco, p.registradoPor].filter(Boolean).join(" · ")}
                   </div>
+                  {/* Clave de rastreo, complemento y nota: venían en cada pago
+                      y no se enseñaban en ningún sitio. */}
+                  {(p.claveRastreo || p.complementoUuid || p.notas) && (
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+                      {[
+                        p.claveRastreo ? `clave ${p.claveRastreo}` : null,
+                        p.complementoUuid ? `complemento ${p.complementoUuid.slice(0, 8)}…` : null,
+                        p.notas,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                  )}
                 </div>
                 <Money value={p.monto} />
               </li>
@@ -1341,7 +1521,12 @@ function DetalleFactura({
                 style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10 }}
               >
                 <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  {c.cantidad} × {c.descripcion}
+                  {c.cantidad}
+                  {c.unidad ? ` ${c.unidad}` : ""} × {c.descripcion}
+                  <span style={{ color: "var(--text-tertiary)" }}>
+                    {" "}
+                    · {pesos(c.precioUnitario, 2)} c/u
+                  </span>
                 </span>
                 <Money value={c.total} bold={false} />
               </li>
@@ -1356,12 +1541,20 @@ function DetalleFactura({
       )}
 
       <Bloque titulo="Documentos">
+        {errorDescarga && (
+          <InlineAlert
+            variant="danger"
+            message={errorDescarga}
+            onDismiss={onCerrarErrorDescarga}
+            style={{ marginBottom: 8 }}
+          />
+        )}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {documentos.map((d) => {
             if (!d.disponible || !d.url) {
               return (
                 <span key={d.tipo} style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
-                  {d.tipo.toUpperCase()}: {d.nota}
+                  {d.tipo.toUpperCase()}: {d.nota ?? "no disponible"}
                 </span>
               );
             }
@@ -1379,22 +1572,27 @@ function DetalleFactura({
                 </a>
               );
             }
+            const bajando = descargando === d.url;
             return (
               <button
                 key={d.tipo}
                 type="button"
                 onClick={() => void onDescargarXml(d.url as string, d.nombre)}
+                disabled={bajando}
+                aria-busy={bajando || undefined}
                 style={{
                   background: "none",
                   border: "none",
                   padding: 0,
                   fontSize: 12.5,
                   fontWeight: 600,
-                  color: "var(--primary)",
-                  cursor: "pointer",
+                  color: bajando ? "var(--text-tertiary)" : "var(--primary)",
+                  cursor: bajando ? "progress" : "pointer",
                 }}
               >
-                Descargar {d.tipo.toUpperCase()} →
+                {bajando
+                  ? `Descargando ${d.tipo.toUpperCase()}…`
+                  : `Descargar ${d.tipo.toUpperCase()} →`}
               </button>
             );
           })}
