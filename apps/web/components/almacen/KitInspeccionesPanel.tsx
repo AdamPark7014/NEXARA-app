@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { type Column } from "@/components/ui/DataTable";
+import StatusDot from "@/components/ui/StatusDot";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { FinanceField, FinanceFormGrid } from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -30,6 +33,9 @@ const ESTADOS: ReadonlyArray<{ valor: EstadoInspeccion; etiqueta: string }> = [
 
 const CADENCIAS = [0, 30, 60, 90, 180] as const;
 
+/** El error de las notas lo referencia el propio textarea. */
+const NOTAS_ERROR_ID = "revision-kit-notas-error";
+
 const inp: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
@@ -44,21 +50,23 @@ const inp: React.CSSProperties = {
 };
 
 function tagEstado(estado: EstadoInspeccion) {
-  if (estado === "DANADO") return <Tag variant="danger" dot size="sm">Dañado</Tag>;
-  if (estado === "OBSERVADO") return <Tag variant="warning" dot size="sm">Observado</Tag>;
-  return <Tag variant="positive" dot size="sm">En orden</Tag>;
+  if (estado === "DANADO") return <StatusDot tone="danger" label="Dañado" />;
+  if (estado === "OBSERVADO") return <StatusDot tone="warning" label="Con observaciones" />;
+  return <StatusDot tone="success" label="En orden" />;
 }
 
 function tagProgramacion(k: KitPorInspeccionar) {
   if (k.vencida) {
     return (
-      <Tag variant="danger" dot size="sm">
-        {k.diasDeAtraso === 0 ? "Hoy" : `${k.diasDeAtraso} d de atraso`}
-      </Tag>
+      <StatusDot
+        tone="danger"
+        label={k.diasDeAtraso === 0 ? "Toca hoy" : `${k.diasDeAtraso} d de atraso`}
+      />
     );
   }
-  if (k.porVencer) return <Tag variant="warning" dot size="sm">En {k.diasParaLaProxima} d</Tag>;
-  return <Tag variant="neutral" size="sm">En {k.diasParaLaProxima ?? "—"} d</Tag>;
+  if (k.porVencer) return <StatusDot tone="warning" label={`En ${k.diasParaLaProxima} d`} />;
+  if (k.diasParaLaProxima == null) return <StatusDot label="Sin programar" />;
+  return <StatusDot label={`En ${k.diasParaLaProxima} d`} />;
 }
 
 /** «Revisar kit»: lo que toca revisar hoy, y el registro de cada revisión. */
@@ -74,6 +82,7 @@ export default function KitInspeccionesPanel() {
   const [revisando, setRevisando] = useState<KitPorInspeccionar | null>(null);
   const [estado, setEstado] = useState<EstadoInspeccion>("OK");
   const [notas, setNotas] = useState("");
+  const [errorNotas, setErrorNotas] = useState<string | null>(null);
   const [fotos, setFotos] = useState<File[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [historial, setHistorial] = useState<InspeccionKit[]>([]);
@@ -100,6 +109,7 @@ export default function KitInspeccionesPanel() {
     setRevisando(kit);
     setEstado("OK");
     setNotas("");
+    setErrorNotas(null);
     setFotos([]);
     setHistorial([]);
     if (!token) return;
@@ -113,9 +123,12 @@ export default function KitInspeccionesPanel() {
   const guardarRevision = async () => {
     if (!token || !revisando) return;
     if (estado !== "OK" && !notas.trim()) {
+      // El error vive bajo su campo, no solo en un toast que se va solo.
+      setErrorNotas("Escribe qué observaste antes de guardar.");
       toast.error("Escribe qué observaste");
       return;
     }
+    setErrorNotas(null);
     setGuardando(true);
     try {
       await registrarInspeccionKit(token, revisando.id, {
@@ -159,16 +172,16 @@ export default function KitInspeccionesPanel() {
       ),
     },
     { key: "quien", label: "Asignado a", width: 160, accessor: (k) => k.user?.nombre ?? "—" },
-    { key: "cuando", label: "Revisión", width: 120, render: (k) => tagProgramacion(k) },
+    { key: "cuando", label: "Toca revisar", width: 130, render: (k) => tagProgramacion(k) },
     {
       key: "cadencia",
-      label: "Cada",
-      width: 110,
+      label: "Cada cuánto",
+      width: 118,
       render: (k) => (
         <select
           value={String(k.inspeccionCadaDias ?? 0)}
           onChange={(e) => void cambiarCadencia(k, Number(e.target.value))}
-          aria-label={`Ritmo de revisión de ${k.inventoryItem?.toolName ?? "el kit"}`}
+          aria-label={`Cada cuánto se revisa ${k.inventoryItem?.toolName ?? "el kit"}`}
           style={{ ...inp, minHeight: 32, padding: "4px 8px", fontSize: 12.5 }}
         >
           {CADENCIAS.map((d) => (
@@ -181,8 +194,8 @@ export default function KitInspeccionesPanel() {
     },
     {
       key: "ultima",
-      label: "Última",
-      width: 150,
+      label: "Última revisión",
+      width: 160,
       render: (k) =>
         k.ultimaInspeccion ? (
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
@@ -210,10 +223,17 @@ export default function KitInspeccionesPanel() {
     },
   ];
 
+  const atrasados = kits.filter((k) => k.vencida).length;
+
   return (
     <>
       <Section
-        title={cargando ? "Cargando…" : `${kits.length} kits por revisar`}
+        title="Kits por revisar"
+        subtitle={
+          kits.length > 0
+            ? `${kits.length} kit${kits.length === 1 ? "" : "s"}${atrasados > 0 ? `, ${atrasados} con la revisión atrasada` : ""}`
+            : undefined
+        }
         actions={
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12.5 }}>
@@ -230,21 +250,36 @@ export default function KitInspeccionesPanel() {
         flush
       >
         {error && (
-          <div role="alert" style={{ margin: 16, fontSize: 12.5 }}>
-            {error}{" "}
-            <Button size="sm" variant="ghost" onClick={() => void cargar()}>
-              Reintentar
-            </Button>
+          <div style={{ marginBottom: 12 }}>
+            <InlineAlert
+              variant="danger"
+              message={error}
+              action={
+                <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+                  Reintentar
+                </Button>
+              }
+            />
           </div>
         )}
-        <DataTable
-          columns={columnas}
-          rows={kits}
-          rowKey={(k) => k.id}
-          density="compact"
-          emptyTitle="Nada por revisar"
-          emptyDescription="Programa un ritmo de revisión en los kits asignados."
-        />
+        {cargando && kits.length === 0 ? (
+          <p role="status" style={{ margin: 0, padding: "24px 0", fontSize: 12.5, color: "var(--text-tertiary)" }}>
+            Cargando…
+          </p>
+        ) : (
+          <DataTable
+            columns={columnas}
+            rows={kits}
+            rowKey={(k) => k.id}
+            density="compact"
+            emptyTitle={porVencer ? "Ningún kit pide revisión" : "Nada vencido"}
+            emptyDescription={
+              porVencer
+                ? "Ni hoy ni la próxima semana. Si un kit asignado nunca aparece aquí, ponle un ritmo de revisión en la columna «Cada cuánto»."
+                : "No hay revisiones vencidas. Marca «Incluir la próxima semana» para ver lo que viene."
+            }
+          />
+        )}
       </Section>
 
       {revisando && (
@@ -253,57 +288,70 @@ export default function KitInspeccionesPanel() {
           onClose={() => setRevisando(null)}
           title={`Revisar ${revisando.inventoryItem?.toolName ?? "kit"}`}
         >
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
               {revisando.user?.nombre} · {revisando.inventoryItem?.serialNumber}
             </div>
 
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
-                Estado
-              </span>
-              <select
-                value={estado}
-                onChange={(e) => setEstado(e.target.value as EstadoInspeccion)}
-                style={inp}
+            <FinanceFormGrid>
+              <FinanceField label="Cómo quedó el kit">
+                <select
+                  value={estado}
+                  onChange={(e) => setEstado(e.target.value as EstadoInspeccion)}
+                  style={inp}
+                >
+                  {ESTADOS.map((e) => (
+                    <option key={e.valor} value={e.valor}>
+                      {e.etiqueta}
+                    </option>
+                  ))}
+                </select>
+              </FinanceField>
+
+              <FinanceField
+                label="Fotos"
+                optional
+                hint={fotos.length > 0 ? `${fotos.length} elegidas, máximo 8` : "Hasta 8 imágenes"}
               >
-                {ESTADOS.map((e) => (
-                  <option key={e.valor} value={e.valor}>
-                    {e.etiqueta}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => setFotos(Array.from(e.target.files ?? []).slice(0, 8))}
+                  style={{ ...inp, padding: "7px 10px", minHeight: 36, fontSize: 12.5 }}
+                />
+              </FinanceField>
 
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
-                Notas {estado !== "OK" ? "*" : ""}
-              </span>
-              <textarea
-                value={notas}
-                onChange={(e) => setNotas(e.target.value)}
-                rows={3}
-                placeholder="Qué se revisó, qué falta, qué está dañado…"
-                style={{ ...inp, minHeight: 78, resize: "vertical" }}
-              />
-            </label>
-
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
-                Fotos {fotos.length > 0 ? `(${fotos.length})` : ""}
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => setFotos(Array.from(e.target.files ?? []).slice(0, 8))}
-                style={{ ...inp, padding: "7px 10px", minHeight: 36, fontSize: 12.5 }}
-              />
-            </label>
+              <FinanceField
+                label="Qué observaste"
+                fullWidth
+                optional={estado === "OK"}
+                error={errorNotas}
+                describedById={NOTAS_ERROR_ID}
+                hint={
+                  estado === "OK"
+                    ? "Si todo está bien, puedes dejarlo vacío."
+                    : "Obligatorio cuando el kit no queda en orden."
+                }
+              >
+                <textarea
+                  value={notas}
+                  onChange={(e) => {
+                    setNotas(e.target.value);
+                    if (errorNotas) setErrorNotas(null);
+                  }}
+                  rows={3}
+                  aria-invalid={errorNotas ? true : undefined}
+                  aria-describedby={errorNotas ? NOTAS_ERROR_ID : undefined}
+                  placeholder="Qué falta, qué está dañado, qué hay que reponer…"
+                  style={{ ...inp, minHeight: 78, resize: "vertical" }}
+                />
+              </FinanceField>
+            </FinanceFormGrid>
 
             {historial.length > 0 && (
               <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+                <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
                   Revisiones anteriores
                 </span>
                 <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
@@ -329,7 +377,15 @@ export default function KitInspeccionesPanel() {
               </div>
             )}
 
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                justifyContent: "flex-end",
+                paddingTop: 12,
+                borderTop: "1px solid var(--nx-panel-hairline, var(--border))",
+              }}
+            >
               <Button variant="ghost" onClick={() => setRevisando(null)}>
                 Cancelar
               </Button>

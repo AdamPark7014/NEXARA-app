@@ -95,7 +95,7 @@ export default function AlmacenPage() {
       {tab === "reabastecimiento" && <ReabastecimientoPanel />}
 
       {tab === "herramientas" && (
-        <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gap: 16 }}>
           {gestionaHerramientas && (
             <>
               <RecoleccionAlmacenPanel />
@@ -110,19 +110,9 @@ export default function AlmacenPage() {
 
       {tab === "kits" &&
         (gestionaHerramientas ? (
-          <div style={{ display: "grid", gap: 10 }}>
-            <div
-              style={{
-                padding: "8px 12px",
-                borderRadius: 10,
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                fontSize: 12.5,
-                color: "var(--text-secondary)",
-              }}
-            >
-              Revisiones y kits por persona. Fotos del inventario: pestaña Herramientas.
-            </div>
+          // Sin banner de ayuda: los títulos de cada bloque ya dicen qué es cada
+          // cosa, y el recuadro solo añadía un rectángulo más a la pantalla.
+          <div style={{ display: "grid", gap: 16 }}>
             <KitInspeccionesPanel />
             <ToolUserKitPanel />
           </div>

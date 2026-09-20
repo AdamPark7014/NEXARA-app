@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
+import PanelTabs from "@/components/ui/PanelTabs";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { isCoreMount } from "@/lib/recursos-core";
@@ -69,22 +71,47 @@ export default function ToolsPage() {
     }
   }, [highlightId, canManage, canRequest, searchParams]);
 
-  const tabBtn = (active: boolean): React.CSSProperties => ({
-    padding: "10px 16px",
-    minHeight: 40,
-    borderRadius: 8,
-    border: "none",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: active ? 700 : 500,
-    background: active ? "var(--primary)" : "var(--surface-2)",
-    color: active ? "#fff" : "var(--text-secondary)",
-  });
-
   const showManagePane = canManage && (!canRequest || pane === "manage");
   const showLoanPane = canRequest && (!canManage || pane === "loan");
-  const manageTabActive = (t: ManagerTab) => showManagePane && managerTab === t;
-  const loanTabActive = (t: LoanTab) => showLoanPane && loanTab === t;
+
+  /**
+   * Antes eran pastillas rellenas de color de marca, todas encendidas a la vez:
+   * cinco botones primarios donde no hay ninguna acción. Ahora son pestañas de
+   * verdad (`role="tablist"`, una sola activa) y la única tinta de la pantalla
+   * vuelve a ser el botón con el que se da de alta o se presta algo.
+   */
+  type ToolsTab = `manage:${ManagerTab}` | `loan:${LoanTab}`;
+
+  const tabs: { key: ToolsTab; label: string }[] = [
+    ...(canManage
+      ? ([
+          { key: "manage:approvals", label: "Por aprobar" },
+          { key: "manage:inventory", label: "Inventario" },
+          { key: "manage:kits", label: "Kits por persona" },
+          { key: "manage:requests", label: "Préstamos" },
+          { key: "manage:renewals", label: "Renovaciones" },
+        ] as const)
+      : []),
+    ...(canRequest
+      ? ([
+          { key: "loan:mykit", label: "Mi kit" },
+          { key: "loan:myrequests", label: "Pedir prestado" },
+        ] as const)
+      : []),
+  ];
+
+  const tabActiva: ToolsTab = showLoanPane ? `loan:${loanTab}` : `manage:${managerTab}`;
+
+  const cambiarTab = (key: ToolsTab) => {
+    const [panel, sub] = key.split(":");
+    if (panel === "manage") {
+      setPane("manage");
+      setManagerTab(sub as ManagerTab);
+    } else {
+      setPane("loan");
+      setLoanTab(sub as LoanTab);
+    }
+  };
 
   return (
     <>
@@ -92,77 +119,32 @@ export default function ToolsPage() {
         eyebrow={enCore ? "Core · Recursos" : "OPS · Campo"}
         title={cfg.title}
         subtitle={cfg.subtitle}
+        density="ops"
       />
 
       {highlightId && (
-        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
-          Destacando solicitud/herramienta <strong>#{highlightId}</strong> desde notificación.
+        <div style={{ marginBottom: 12 }}>
+          <InlineAlert
+            variant="info"
+            message={`Vienes de un aviso sobre la solicitud #${highlightId}: está resaltada en la lista.`}
+          />
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-        {canManage && (
-          <>
-            <button type="button" style={tabBtn(manageTabActive("approvals"))} onClick={() => { setPane("manage"); setManagerTab("approvals"); }}>
-              Cola de aprobación
-            </button>
-            <button type="button" style={tabBtn(manageTabActive("inventory"))} onClick={() => { setPane("manage"); setManagerTab("inventory"); }}>
-              Inventario y fotos
-            </button>
-            <button type="button" style={tabBtn(manageTabActive("kits"))} onClick={() => { setPane("manage"); setManagerTab("kits"); }}>
-              Kits por persona
-            </button>
-            <button type="button" style={tabBtn(manageTabActive("requests"))} onClick={() => { setPane("manage"); setManagerTab("requests"); }}>
-              Todos los préstamos
-            </button>
-            <button type="button" style={tabBtn(manageTabActive("renewals"))} onClick={() => { setPane("manage"); setManagerTab("renewals"); }}>
-              Renovaciones
-            </button>
-          </>
-        )}
-        {canRequest && (
-          <>
-            <button type="button" style={tabBtn(loanTabActive("mykit"))} onClick={() => { setPane("loan"); setLoanTab("mykit"); }}>
-              Mi kit
-            </button>
-            <button type="button" style={tabBtn(loanTabActive("myrequests"))} onClick={() => { setPane("loan"); setLoanTab("myrequests"); }}>
-              Solicitar préstamo
-            </button>
-          </>
-        )}
-        {!canManage && !canRequest && (
-          <button type="button" style={tabBtn(true)} disabled>
-            Mi kit
-          </button>
-        )}
-      </div>
+      {tabs.length > 0 ? (
+        <PanelTabs
+          ariaLabel="Secciones de herramientas"
+          value={tabActiva}
+          onChange={cambiarTab}
+          tabs={tabs}
+        />
+      ) : null}
 
       {showManagePane && managerTab === "approvals" && (
-        <div style={{ display: "grid", gap: 12 }}>
-          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-            Aprueba o rechaza préstamos pendientes. Solo Christian e Iván tienen esta cola.
-          </p>
-          <ToolRequestsTable highlightId={highlightId} />
-        </div>
+        <ToolRequestsTable highlightId={highlightId} />
       )}
       {showManagePane && managerTab === "inventory" && <ToolInventoryPanel />}
-      {showManagePane && managerTab === "kits" && (
-        <div style={{ display: "grid", gap: 12 }}>
-          <div
-            style={{
-              padding: "12px 14px",
-              borderRadius: 12,
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              fontSize: 13,
-              color: "var(--text-secondary)",
-            }}
-          >
-            Kits permanentes por ingeniero: asignación, cadencia de revisión y eventos de daño.
-          </div>
-          <ToolUserKitPanel />
-        </div>
-      )}
+      {showManagePane && managerTab === "kits" && <ToolUserKitPanel />}
       {showManagePane && managerTab === "requests" && <ToolRequestsTable highlightId={highlightId} />}
       {showManagePane && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
 

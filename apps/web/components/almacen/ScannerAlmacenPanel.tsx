@@ -8,6 +8,11 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { createStockMovement, listWarehouses } from "@/lib/stock-api";
+import Section from "@/components/ui/Section";
+import Button from "@/components/ui/Button";
+import InlineAlert from "@/components/ui/InlineAlert";
+import EmptyState from "@/components/ui/EmptyState";
+import { FinanceField, FinanceFormGrid } from "@/components/finance/FinanceModuleShell";
 
 type Match =
   | {
@@ -24,6 +29,10 @@ type Match =
 
 type OpType = "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT" | "RETURN";
 
+/**
+ * Lo que queda escrito en la nota del movimiento. No se toca: cambiarlo
+ * dejaría el historial con dos formas de nombrar la misma operación.
+ */
 const OP_LABELS: Record<OpType, string> = {
   RECEIPT: "Entrada (recepción)",
   DISPATCH: "Salida (despacho)",
@@ -33,10 +42,36 @@ const OP_LABELS: Record<OpType, string> = {
   RETURN: "Devolución",
 };
 
+/** Lo que lee el operador. Sin paréntesis ni sinónimos: qué le pasa al stock. */
+const OP_UI: Record<OpType, string> = {
+  RECEIPT: "Entra material",
+  DISPATCH: "Sale material",
+  TRANSFER: "Se mueve de almacén",
+  ADJUSTMENT: "Ajuste: sobra",
+  ADJUSTMENT_OUT: "Ajuste: falta",
+  RETURN: "Devuelven material",
+};
+
 /** Gap máximo entre teclas para tratarlas como ráfaga HID. */
 const SCAN_CHAR_MS = 45;
 /** Longitud mínima del código para aceptar Enter como escaneo. */
 const MIN_SCAN_LEN = 3;
+
+/** El error va atado al campo del código: sin esto se anuncia suelto. */
+const ERROR_ID = "escaner-almacen-error";
+
+const campo: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  minHeight: 36,
+  padding: "7px 10px",
+  borderRadius: 8,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  color: "inherit",
+  font: "inherit",
+  fontSize: 14,
+};
 
 export default function ScannerAlmacenPanel() {
   const { user } = useUser();
@@ -181,7 +216,7 @@ export default function ScannerAlmacenPanel() {
       if (needsTo) payload.toWarehouseId = Number(toWarehouseId);
 
       await createStockMovement(token, payload);
-      setOkMsg(`${OP_LABELS[opType]} · ${hit.product.name}`);
+      setOkMsg(`${OP_UI[opType]}: ${hit.product.name}`);
       setHit(null);
       setQty("1");
     } catch (e) {
@@ -199,29 +234,17 @@ export default function ScannerAlmacenPanel() {
     (opType === "TRANSFER" && fromWarehouseId !== "" && fromWarehouseId === toWarehouseId);
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gap: 8,
-        padding: 10,
-        borderRadius: 12,
-        border: "1px solid var(--border)",
-        background: "var(--surface)",
-      }}
+    <Section
+      title="Escanear"
+      subtitle="Dispara el lector sobre el código. El producto aparece abajo y ahí decides qué pasó con él."
     >
-      <div>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>Escáner de almacén</div>
-        <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>
-          Cuña USB: ráfaga + Enter busca el producto. Luego elige operación, almacén y cantidad.
-        </div>
-      </div>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           if (busyRef.current) return;
           void buscarCodigo(code);
         }}
-        style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
+        style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}
       >
         <input
           ref={inputRef}
@@ -229,136 +252,140 @@ export default function ScannerAlmacenPanel() {
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={onScanKeyDown}
           placeholder="Código de barras…"
+          aria-label="Código de barras"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? ERROR_ID : undefined}
           autoComplete="off"
           autoFocus
           disabled={loading || saving}
-          style={{
-            flex: 1,
-            minWidth: 180,
-            minHeight: 40,
-            fontSize: 15,
-            padding: "8px 10px",
-            borderRadius: 8,
-            border: "2px solid var(--primary)",
-            background: "var(--surface)",
-            color: "var(--foreground)",
-          }}
+          style={{ ...campo, flex: "1 1 220px", maxWidth: 360 }}
         />
-        <button
-          type="submit"
-          disabled={loading || saving || !code.trim()}
-          style={{
-            minHeight: 40,
-            padding: "0 14px",
-            borderRadius: 8,
-            border: "none",
-            background: "var(--primary)",
-            color: "#fff",
-            fontWeight: 700,
-            cursor: "pointer",
-            opacity: loading || saving ? 0.6 : 1,
-          }}
-        >
-          {loading ? "Buscando…" : "Buscar"}
-        </button>
+        <Button type="submit" variant="primary" loading={loading} disabled={!code.trim() || saving}>
+          Buscar
+        </Button>
       </form>
-      {error && <div style={{ color: "var(--danger)", fontSize: 12.5 }}>{error}</div>}
-      {okMsg && <div style={{ color: "var(--success)", fontSize: 12.5 }}>{okMsg}</div>}
-      {hit && (
-        <div
-          style={{
-            padding: 10,
-            borderRadius: 10,
-            background: "color-mix(in srgb, var(--success) 12%, var(--surface))",
-            border: "1px solid color-mix(in srgb, var(--success) 35%, var(--border))",
-            display: "grid",
-            gap: 8,
-          }}
-        >
-          <div>
-            <strong>{hit.product.name}</strong>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-              SKU {hit.product.sku} · código {hit.codigoBarras}
-            </div>
-            {hit.match === "empaque" && (
-              <div style={{ fontSize: 12.5 }}>
-                Empaque: {hit.packaging.nombre} ({hit.packaging.piezasPorUnidad} pzas)
-              </div>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <select
-              value={opType}
-              onChange={(e) => setOpType(e.target.value as OpType)}
-              aria-label="Tipo de operación"
-              style={{ minHeight: 36, borderRadius: 8, padding: "0 8px", fontSize: 13 }}
-            >
-              {(Object.keys(OP_LABELS) as OpType[]).map((k) => (
-                <option key={k} value={k}>
-                  {OP_LABELS[k]}
-                </option>
-              ))}
-            </select>
-            {needsFrom && (
-              <select
-                value={fromWarehouseId}
-                onChange={(e) => setFromWarehouseId(e.target.value ? Number(e.target.value) : "")}
-                aria-label="Almacén origen"
-                style={{ minHeight: 36, borderRadius: 8, padding: "0 8px", fontSize: 13 }}
-              >
-                <option value="">Origen…</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {needsTo && (
-              <select
-                value={toWarehouseId}
-                onChange={(e) => setToWarehouseId(e.target.value ? Number(e.target.value) : "")}
-                aria-label="Almacén destino"
-                style={{ minHeight: 36, borderRadius: 8, padding: "0 8px", fontSize: 13 }}
-              >
-                <option value="">Destino…</option>
-                {warehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            <input
-              type="number"
-              min={0.001}
-              step="any"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              aria-label="Cantidad"
-              style={{ width: 88, minHeight: 36, borderRadius: 8, padding: "0 8px", fontSize: 15 }}
-            />
-            <button
-              type="button"
-              onClick={() => void confirmarMovimiento()}
-              disabled={confirmDisabled}
-              style={{
-                minHeight: 36,
-                padding: "0 12px",
-                borderRadius: 8,
-                border: "none",
-                background: "var(--success)",
-                color: "#fff",
-                fontWeight: 700,
-                cursor: "pointer",
-                opacity: confirmDisabled ? 0.6 : 1,
-              }}
-            >
-              {saving ? "Guardando…" : "Confirmar"}
-            </button>
-          </div>
+
+      {error && (
+        <div id={ERROR_ID} style={{ marginTop: 10 }}>
+          <InlineAlert variant="danger" message={error} onDismiss={() => setError(null)} />
         </div>
       )}
-    </div>
+      {okMsg && (
+        <div style={{ marginTop: 10 }}>
+          <InlineAlert variant="success" message={okMsg} onDismiss={() => setOkMsg(null)} />
+        </div>
+      )}
+
+      {hit ? (
+        // El hallazgo no va en una caja verde: el producto ya es el protagonista
+        // y el color se reserva para lo que pide acción o salió mal.
+        <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
+          <div style={{ display: "grid", gap: 2 }}>
+            <strong style={{ fontSize: 15 }}>{hit.product.name}</strong>
+            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              Clave {hit.product.sku} · código {hit.codigoBarras}
+              {hit.match === "empaque"
+                ? ` · ${hit.packaging.nombre} de ${hit.packaging.piezasPorUnidad} piezas`
+                : ""}
+            </span>
+          </div>
+
+          <FinanceFormGrid>
+            <FinanceField label="Qué pasó">
+              <select
+                value={opType}
+                onChange={(e) => setOpType(e.target.value as OpType)}
+                style={campo}
+              >
+                {(Object.keys(OP_UI) as OpType[]).map((k) => (
+                  <option key={k} value={k}>
+                    {OP_UI[k]}
+                  </option>
+                ))}
+              </select>
+            </FinanceField>
+
+            {needsFrom && (
+              <FinanceField label="Sale de">
+                <select
+                  value={fromWarehouseId}
+                  onChange={(e) => setFromWarehouseId(e.target.value ? Number(e.target.value) : "")}
+                  style={campo}
+                >
+                  <option value="">Elige almacén…</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </FinanceField>
+            )}
+
+            {needsTo && (
+              <FinanceField label="Entra a">
+                <select
+                  value={toWarehouseId}
+                  onChange={(e) => setToWarehouseId(e.target.value ? Number(e.target.value) : "")}
+                  style={campo}
+                >
+                  <option value="">Elige almacén…</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </FinanceField>
+            )}
+
+            <FinanceField
+              label="Cantidad"
+              hint={hit.match === "empaque" ? hit.packaging.nombre : undefined}
+            >
+              <input
+                type="number"
+                min={0.001}
+                step="any"
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                style={{ ...campo, fontVariantNumeric: "tabular-nums" }}
+              />
+            </FinanceField>
+          </FinanceFormGrid>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 8,
+              paddingTop: 12,
+              borderTop: "1px solid var(--nx-panel-hairline, var(--border))",
+            }}
+          >
+            <Button variant="ghost" onClick={() => setHit(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void confirmarMovimiento()}
+              disabled={confirmDisabled}
+              loading={saving}
+            >
+              Registrar movimiento
+            </Button>
+          </div>
+        </div>
+      ) : okMsg ? null : (
+        // Tras registrar un movimiento manda el aviso de «listo», no este hueco.
+        <div style={{ marginTop: 8 }}>
+          <EmptyState
+            variant="compact"
+            title="Nada escaneado todavía"
+            description="Dispara el lector sobre el código de barras, o tecléalo y pulsa Buscar."
+          />
+        </div>
+      )}
+    </Section>
   );
 }

@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { type Column } from "@/components/ui/DataTable";
+import StatusDot from "@/components/ui/StatusDot";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -16,7 +19,7 @@ import { cantidadLegible, pluralEmpaque } from "@/lib/empaque";
 import InfoBreve from "./InfoBreve";
 
 const INFO =
-  "El mínimo sale del consumo real de los últimos 90 días por el lead time del proveedor más los días de seguridad. La cantidad sugerida ya viene subida al empaque y a la compra mínima. Solo aplica a material marcado como circulante.";
+  "El mínimo sale del consumo real de los últimos 90 días por los días que tarda el proveedor en entregar, más los días de seguridad. La cantidad sugerida ya viene subida al empaque y a la compra mínima. Solo aplica a material marcado como circulante.";
 
 function fechaCorta(iso: string | null): string {
   if (!iso) return "—";
@@ -28,6 +31,15 @@ function toneCobertura(dias: number | null): "danger" | "warning" | "neutral" {
   if (dias <= 2) return "danger";
   if (dias <= 7) return "warning";
   return "neutral";
+}
+
+/** Los días de cobertura no se comunican solo con color: la palabra lo dice. */
+function cobertura(dias: number | null): { tono: "danger" | "warning" | "neutral"; texto: string } {
+  const tono = toneCobertura(dias);
+  if (dias == null) return { tono, texto: "Sin dato" };
+  if (tono === "danger") return { tono, texto: `Se acaba en ${cantidadLegible(dias)} d` };
+  if (tono === "warning") return { tono, texto: `${cantidadLegible(dias)} d, poco` };
+  return { tono, texto: `${cantidadLegible(dias)} d` };
 }
 
 /**
@@ -83,6 +95,33 @@ export default function ReabastecimientoPanel() {
     () => filas.map((f) => f.calculadoAt).filter(Boolean).sort().at(-1) ?? null,
     [filas],
   );
+  const seAcaba = useMemo(
+    () => filas.filter((f) => f.diasDeCobertura != null && f.diasDeCobertura <= 2).length,
+    [filas],
+  );
+  const aprietan = useMemo(
+    () =>
+      filas.filter(
+        (f) => f.diasDeCobertura != null && f.diasDeCobertura > 2 && f.diasDeCobertura <= 7,
+      ).length,
+    [filas],
+  );
+
+  const cifras: Metric[] = [
+    { label: "por comprar", value: porComprar, hint: "llegaron a su mínimo" },
+    {
+      label: "se acaban ya",
+      value: seAcaba,
+      hint: "2 días o menos",
+      tone: seAcaba > 0 ? "danger" : "default",
+    },
+    {
+      label: "aprietan",
+      value: aprietan,
+      hint: "menos de una semana",
+      tone: aprietan > 0 ? "warning" : "default",
+    },
+  ];
 
   const columnas: Column<RenglonReabastecimiento>[] = [
     {
@@ -122,17 +161,12 @@ export default function ReabastecimientoPanel() {
     },
     {
       key: "cobertura",
-      label: "Cobertura",
-      numeric: true,
-      width: 96,
-      render: (r) =>
-        r.diasDeCobertura == null ? (
-          <span style={{ color: "var(--text-tertiary)" }}>—</span>
-        ) : (
-          <Tag variant={toneCobertura(r.diasDeCobertura)} dot size="sm">
-            {cantidadLegible(r.diasDeCobertura)} d
-          </Tag>
-        ),
+      label: "Alcanza para",
+      width: 140,
+      render: (r) => {
+        const { tono, texto } = cobertura(r.diasDeCobertura);
+        return <StatusDot tone={tono} label={texto} />;
+      },
     },
     {
       key: "consumo",
@@ -174,10 +208,14 @@ export default function ReabastecimientoPanel() {
     },
     {
       key: "lead",
-      label: "Lead",
+      label: "Tarda",
       numeric: true,
-      width: 70,
-      render: (r) => <span style={{ color: "var(--text-secondary)" }}>{r.leadTimeDias} d</span>,
+      width: 76,
+      render: (r) => (
+        <span style={{ color: "var(--text-secondary)" }} title="Días que tarda el proveedor">
+          {r.leadTimeDias} d
+        </span>
+      ),
     },
     {
       key: "calculado",
@@ -193,7 +231,7 @@ export default function ReabastecimientoPanel() {
 
   return (
     <Section
-      title={cargando ? "Cargando…" : `${porComprar} por comprar`}
+      title="Qué comprar"
       actions={
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <label style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 12.5 }}>
@@ -215,35 +253,43 @@ export default function ReabastecimientoPanel() {
       }
       flush
     >
-      {error && (
-        <div
-          role="alert"
-          style={{
-            margin: 16,
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid color-mix(in srgb, var(--danger) 40%, var(--border))",
-            fontSize: 12.5,
-          }}
-        >
-          {error}{" "}
-          <Button size="sm" variant="ghost" onClick={() => void cargar()}>
-            Reintentar
-          </Button>
+      {!cargando && filas.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <MetricStrip ariaLabel="Resumen de reabastecimiento" metrics={cifras} />
         </div>
       )}
+
+      {error && (
+        <div style={{ marginBottom: 12 }}>
+          <InlineAlert
+            variant="danger"
+            message={error}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+                Reintentar
+              </Button>
+            }
+          />
+        </div>
+      )}
+      {cargando && filas.length === 0 ? (
+        <p role="status" style={{ margin: 0, padding: "24px 0", fontSize: 12.5, color: "var(--text-tertiary)" }}>
+          Cargando…
+        </p>
+      ) : (
       <DataTable
         columns={columnas}
         rows={filas}
         rowKey={(r) => r.stockLevelId}
         density="compact"
-        emptyTitle={todos ? "Sin material circulante" : "Nada por comprar"}
+        emptyTitle={todos ? "Aún no hay material circulante" : "Nada por comprar ahora"}
         emptyDescription={
           todos
-            ? "Marca los productos de consumo como circulantes para que entren aquí."
-            : "Ningún material circulante llegó a su mínimo."
+            ? "El reabastecimiento solo mira el material marcado como circulante. Marca así los productos de consumo en su ficha y volverán a salir aquí."
+            : "Ningún material circulante llegó a su mínimo. Marca «Ver todo el circulante» para revisar mínimos y máximos antes de que aprieten."
         }
       />
+      )}
     </Section>
   );
 }
