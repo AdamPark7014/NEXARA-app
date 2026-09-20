@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
@@ -201,13 +201,13 @@ function Dato({ label, value }: { label: string; value: React.ReactNode }) {
 function cifra(
   label: string,
   value: number,
-  hint?: string,
+  hint?: ReactNode,
   tone: Metric["tone"] = "default",
 ): Metric {
   return { label, value: <Money value={value} />, hint, tone };
 }
 
-/** Pesos redondeados, para las pistas de la tira. */
+/** Pesos en texto plano — solo para `title`/atributos string. */
 const pesos = (n: number) =>
   n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 
@@ -361,7 +361,7 @@ export default function ProveedoresPage() {
                 vencido a cero parece que no hay nada que pagar. */}
             {r.porVencer > 0 && (
               <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                por vencer {pesos(r.porVencer)}
+                por vencer <Money value={r.porVencer} bold={false} />
               </span>
             )}
           </span>
@@ -404,7 +404,7 @@ export default function ProveedoresPage() {
             {r.ordenesCompra > 0 && (
               <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
                 {r.ordenesCompra} {r.ordenesCompra === 1 ? "orden" : "órdenes"} ·{" "}
-                {pesos(r.montoOrdenes)}
+                <Money value={r.montoOrdenes} bold={false} />
                 {r.ultimaOrden ? ` · últ. ${fecha(r.ultimaOrden)}` : ""}
               </span>
             )}
@@ -570,7 +570,9 @@ export default function ProveedoresPage() {
                   cifra(
                     "Vencido",
                     detalle.resumen.vencido,
-                    `por vencer ${pesos(detalle.resumen.porVencer)}`,
+                    <>
+                      por vencer <Money value={detalle.resumen.porVencer} bold={false} />
+                    </>,
                     detalle.resumen.vencido > 0 ? "danger" : "default",
                   ),
                   cifra(

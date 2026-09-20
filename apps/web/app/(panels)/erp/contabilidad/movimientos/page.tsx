@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
@@ -468,11 +468,19 @@ export default function MovimientosPage() {
             <DetailRow
               label="Importe"
               value={
-                detail.tipo === "INGRESO"
-                  ? `Ingreso $${detail.ingreso.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`
-                  : detail.tipo === "EGRESO"
-                    ? `Egreso $${detail.egreso.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`
-                    : `$${detail.monto.toLocaleString("es-MX", { minimumFractionDigits: 2 })} (no suma al neto)`
+                detail.tipo === "INGRESO" ? (
+                  <>
+                    Ingreso <Money value={detail.ingreso} bold={false} />
+                  </>
+                ) : detail.tipo === "EGRESO" ? (
+                  <>
+                    Egreso <Money value={detail.egreso} bold={false} />
+                  </>
+                ) : (
+                  <>
+                    <Money value={detail.monto} bold={false} /> (no suma al neto)
+                  </>
+                )
               }
             />
           </dl>
@@ -482,7 +490,7 @@ export default function MovimientosPage() {
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <>
       <dt style={{ color: "var(--text-tertiary)", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.06em" }}>
