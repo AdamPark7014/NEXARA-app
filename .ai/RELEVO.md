@@ -2,8 +2,8 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** PRODUCTION GATE Contabilidad — flota micro + merges (periodo cerrado, a11y, labels, etc.)
+- **Rama:** feat/gate-accounting-close-link → base `mejora/calidad-y-web`
+- **HEAD:** Gate cierre periodo en Contabilidad general → redirige a `/erp/contabilidad/cierres` (sin PATCH directo)
 
 ## Puente — no cambiar
 
@@ -11,7 +11,11 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-### PRODUCTION GATE Contabilidad / Finanzas
+### Gate cierre periodo (accounting page)
+
+- Botón **Cerrar** en periodos fiscales (`/erp/accounting`): ya no hace PATCH silencioso; confirma y navega a `/erp/contabilidad/cierres`.
+
+### PRODUCTION GATE Contabilidad / Finanzas (turno anterior)
 
 Flota grande de micro-agentes (explore + writers en worktrees `nexara-gate-*`), merges selectivos.
 
