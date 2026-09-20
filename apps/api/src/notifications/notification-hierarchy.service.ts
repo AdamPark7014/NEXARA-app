@@ -1698,6 +1698,119 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * Herramienta aprobada: el código para recogerla en almacén.
+   *
+   * Va al solicitante (es su llave) y a quien aprobó (para que sepa que la credencial
+   * salió y hasta cuándo vale). El código viaja en el mensaje a propósito: si no se ve
+   * en la notificación, el técnico tiene que abrir la web estando ya en el mostrador.
+   */
+  async notifyToolPickupReady(params: {
+    requesterId: number;
+    approverId: number;
+    toolRequestId: number;
+    toolName: string;
+    pickupCode: string;
+    pickupExpiresAt: Date;
+  }) {
+    try {
+      const vence = params.pickupExpiresAt.toLocaleString('es-MX', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      });
+      await this.notificationsService.createNotification({
+        userId: params.requesterId,
+        type: 'TOOL_APPROVED',
+        category: 'tools',
+        title: 'Pasa por tu herramienta',
+        message: `Código de recolección ${params.pickupCode} para "${params.toolName}". Vence el ${vence}.`,
+        relatedEntityId: params.toolRequestId,
+        entityType: 'ToolRequest',
+        relatedUrl: appUrls.erpHerramientas(params.toolRequestId, 'requests'),
+        priority: 'high',
+      });
+
+      if (params.approverId && params.approverId !== params.requesterId) {
+        await this.notificationsService.createNotification({
+          userId: params.approverId,
+          type: 'USER_ACTION_CONFIRMED',
+          category: 'confirmations',
+          title: 'Herramienta aprobada',
+          message: `"${params.toolName}": código ${params.pickupCode}, vence el ${vence}.`,
+          relatedEntityId: params.toolRequestId,
+          entityType: 'ToolRequest',
+          relatedUrl: appUrls.erpHerramientas(params.toolRequestId, 'requests'),
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyToolPickupReady', error);
+    }
+  }
+
+  /**
+   * Revisión de kit vencida. Al dueño del kit y a sus superiores: el kit es suyo, pero
+   * quien tiene que ir a revisarlo es el supervisor.
+   */
+  async notifyKitInspectionDue(params: {
+    userId: number;
+    assignmentId: number;
+    toolName: string;
+    diasDeAtraso: number;
+  }) {
+    try {
+      const supervisores = await this.getSupervisors(params.userId);
+      const destinatarios = new Set<number>([params.userId, ...supervisores.map((s) => s.id)]);
+      const atraso =
+        params.diasDeAtraso === 0
+          ? 'hoy'
+          : `con ${params.diasDeAtraso} ${params.diasDeAtraso === 1 ? 'día' : 'días'} de atraso`;
+
+      for (const userId of destinatarios) {
+        await this.notificationsService.createNotification({
+          userId,
+          type: 'TOOL_EXPIRATION_WARNING',
+          category: 'tools',
+          title: 'Revisión de kit pendiente',
+          message: `Toca revisar "${params.toolName}" ${atraso}.`,
+          relatedEntityId: params.assignmentId,
+          entityType: 'ToolKitAssignment',
+          relatedUrl: appUrls.erpHerramientas(params.assignmentId, 'kits'),
+          priority: params.diasDeAtraso > 7 ? 'high' : 'normal',
+          // El cron corre a diario; un aviso al día por kit es suficiente.
+          dedupeSeconds: 20 * 3600,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyKitInspectionDue', error);
+    }
+  }
+
+  /** Kit revisado y marcado mal: quien lo trae tiene que saber qué se le anotó. */
+  async notifyKitInspectionFlagged(params: {
+    userId: number;
+    assignmentId: number;
+    toolName: string;
+    estado: string;
+    notas: string;
+  }) {
+    try {
+      const titulo = params.estado === 'DANADO' ? 'Kit dañado' : 'Kit con observaciones';
+      await this.notificationsService.createNotification({
+        userId: params.userId,
+        type: 'TOOL_EXPIRATION_WARNING',
+        category: 'tools',
+        title: titulo,
+        message: `"${params.toolName}": ${params.notas.slice(0, 200)}`,
+        relatedEntityId: params.assignmentId,
+        entityType: 'ToolKitAssignment',
+        relatedUrl: appUrls.erpHerramientas(params.assignmentId, 'kits'),
+        priority: 'high',
+      });
+    } catch (error) {
+      this.logger.error('notifyKitInspectionFlagged', error);
+    }
+  }
+
+  /**
    * Notificar multa
    */
   async notifyFineCreated(
