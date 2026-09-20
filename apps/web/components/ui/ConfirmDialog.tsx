@@ -30,12 +30,18 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
   const msgId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  /**
+   * Cerrojo síncrono: `busy` deshabilita el botón, pero un doble clic rápido
+   * entra dos veces antes del repintado (p. ej. Marcar pagado).
+   */
+  const busyRef = useRef(false);
   const [busy, setBusy] = useState(false);
 
   const isDanger = state?.danger ?? danger;
 
   useEffect(() => {
     if (!state) {
+      busyRef.current = false;
       setBusy(false);
       return;
     }
@@ -43,7 +49,7 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
     confirmBtnRef.current?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) {
+      if (e.key === "Escape" && !busyRef.current) {
         e.preventDefault();
         onClose();
         return;
@@ -69,16 +75,18 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
       document.removeEventListener("keydown", onKey);
       prev?.focus?.();
     };
-  }, [state, busy, onClose]);
+  }, [state, onClose]);
 
   if (!state) return null;
 
   const handleConfirm = async () => {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       await Promise.resolve(state.fn());
     } finally {
+      busyRef.current = false;
       setBusy(false);
       onClose();
     }
@@ -89,7 +97,7 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
       <div
         role="presentation"
         onClick={() => {
-          if (!busy) onClose();
+          if (!busyRef.current) onClose();
         }}
         style={{
           position: "fixed",
@@ -158,6 +166,7 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
             variant={isDanger ? "danger" : "primary"}
             onClick={() => void handleConfirm()}
             disabled={busy}
+            loading={busy}
           >
             {busy ? "Procesando…" : state.confirmLabel ?? (isDanger ? "Eliminar" : "Confirmar")}
           </Button>
