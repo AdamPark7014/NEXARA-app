@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import { Alert, Card, CardHead, EmptyState, InfoPopover, PageHead, Segmented, SkeletonRows, Stat, StatRow } from "@/components/base";
+import { Alert, Badge, Button, Card, CardHead, EmptyState, InfoPopover, PageHead, Segmented, SkeletonRows, Stat, StatRow } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import RankingPersonas, { LeyendaJornada } from "@/components/kpis/RankingPersonas";
@@ -10,6 +10,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
 import { KPIS_PATH, fetchKpisEquipo, formatPctKpi, rangoDesdeUrl, type KpiPersonaFila, type KpisEquipoResponse } from "@/lib/kpis-equipo";
 import { horasEnPalabras, ordenaRanking, tonoProductividad, type OrdenRanking } from "@/lib/kpis-lectura";
+import { descargarPreNominaExcel } from "@/lib/asistencia-confiable-api";
 
 const ORDENES: ReadonlyArray<{ id: OrdenRanking; label: string }> = [
   { id: "productividad", label: "Productividad" },
@@ -30,6 +31,28 @@ export default function KpisEquipoPage() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orden, setOrden] = useState<OrdenRanking>("productividad");
+  const [bajando, setBajando] = useState(false);
+  const [errorNomina, setErrorNomina] = useState<string | null>(null);
+
+  /**
+   * Pre-nómina del periodo en Excel.
+   *
+   * Es el paso entre «el jefe mira los indicadores» y «alguien captura los pagos»: las
+   * mismas horas de esta pantalla, netas de comida, con el tiempo extra aprobado aparte
+   * del calculado y una columna de qué revisar antes de pagar.
+   */
+  const bajarPreNomina = async () => {
+    if (!token || !rango.desde || !rango.hasta) return;
+    setBajando(true);
+    setErrorNomina(null);
+    try {
+      await descargarPreNominaExcel(token, { desde: rango.desde, hasta: rango.hasta });
+    } catch (e) {
+      setErrorNomina(formatApiError(e, "No se pudo generar la pre-nómina"));
+    } finally {
+      setBajando(false);
+    }
+  };
 
   useEffect(() => {
     const inicial = rangoDesdeUrl(window.location.search);
@@ -97,6 +120,11 @@ export default function KpisEquipoPage() {
               }}
             />
             {data ? (
+              <Button variant="secondary" disabled={bajando} onClick={() => void bajarPreNomina()}>
+                {bajando ? "Generando…" : "Pre-nómina (Excel)"}
+              </Button>
+            ) : null}
+            {data ? (
               <InfoPopover label="¿Cómo se calcula?" title="Cómo se calcula">
                 {notas.length ? (
                   <>
@@ -119,6 +147,19 @@ export default function KpisEquipoPage() {
       {error ? (
         <Alert tone="danger" role="alert">
           {error}
+        </Alert>
+      ) : null}
+
+      {errorNomina ? (
+        <Alert tone="danger" role="alert">
+          {errorNomina}
+        </Alert>
+      ) : null}
+
+      {t && t.diasExtraPendientes > 0 ? (
+        <Alert tone="warning">
+          {t.diasExtraPendientes} día(s) con tiempo extra sin aprobar ({horasEnPalabras(t.minutosExtraPendientes)}).
+          Solo lo aprobado llega a la pre-nómina: entra a la persona para decidirlo.
         </Alert>
       ) : null}
 
@@ -146,6 +187,17 @@ export default function KpisEquipoPage() {
             value={t.retardos}
             hint={t.retardos ? `${horasEnPalabras(t.minutosTarde)} tarde` : "Todos a tiempo"}
             tone={t.retardos >= 3 ? "warning" : "default"}
+          />
+          <Stat
+            label="Extra aprobado"
+            value={horasEnPalabras(t.minutosExtraAprobados)}
+            hint={
+              t.minutosExtraPendientes
+                ? `${horasEnPalabras(t.minutosExtraPendientes)} sin aprobar`
+                : "Todo decidido"
+            }
+            title="Lo único que la pre-nómina puede pagar como tiempo extra"
+            tone={t.minutosExtraPendientes ? "warning" : "default"}
           />
           <Stat
             label="Uniforme"
