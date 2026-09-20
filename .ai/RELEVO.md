@@ -2,8 +2,9 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** fix(accounting): blindar periodo cerrado en escrituras
+- **Rama:** gate/toast-cxc
+- **HEAD:** ui(cartera): toast.error en registrar cobro/pago CxC/CxP
+- **Worktree:** C:\dev\apps\_worktrees\nexara-gate-toast-cxc
 
 ## Puente — no cambiar
 
@@ -11,36 +12,25 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-Blindaje de periodo fiscal cerrado en escrituras financieras críticas:
+Gate toast CxC — `CarteraView.registrarPago`:
 
-- `assertDateNotInClosedPeriod` ahora se llama desde:
-  - `registerPayment` → `paymentDate`
-  - `reconcileTransaction` → `transactionDate`
-  - `cancelInvoice` → `issueDate` + hoy
-  - `createInvoice` → `issueDate`
-  - `updateInvoiceDraft` → `dto.issueDate` o `invoice.issueDate`
-  - `deleteInvoice` → `issueDate`
-  - `importBankTransactions` → cada `transactionDate`
-- Ya cubierto antes: `reverseJournalEntry`; crear/postear pólizas vía `resolveOpenFiscalPeriodId`.
-- Suite nueva: `apps/api/src/accounting/closed-period-writes.spec.ts` — **8/8 PASS**.
+- Éxito ya tenía `toast.success` (cobro/pago + monto + folio).
+- Error de API y factura cerrada: además del `InlineAlert` (`setErrorPago`), ahora
+  `toast.error` con el mismo mensaje. El formulario sigue abierto tras fallo.
+- Validación de monto/fecha sigue bajo campo (`errorMonto`), sin toast fugaz.
+
+Archivo: `apps/web/components/erp/CarteraView.tsx` (CxC y CxP comparten el motor).
 
 ## A medias / pendiente real
 
-- **Deploy bloqueado:** `~/.ssh/config` tiene `hetzner-nexara` con
-  `HostName REEMPLAZA_CON_IP_HETZNER`. Falta IP/llave. En servidor:
-  `./deploy/update.sh --force-all`
-- **AuditLog no guarda el estado anterior** salvo en el cierre de periodo.
-- Bonos/descuentos no existen en pre-nómina (no inventados).
-- Sin smoke de navegador contra datos reales.
-- UI de cierres (`proteccion.noBloqueado`) puede actualizarse a reflejar el
-  blindaje API; no se tocó web en este turno.
+- Merge de `gate/toast-cxc` → `mejora/calidad-y-web` (rama creada detrás ~12 commits).
+- Deploy Hetzner bloqueado (`HostName REEMPLAZA_CON_IP_HETZNER`).
+- Smoke navegador con datos reales.
 
 ## Siguiente
 
-1. Adam da IP/llave Hetzner o corre deploy.
-2. Smoke contadora contra datos reales.
-3. Opcional: alinear copy de UI cierres con el blindaje API.
-4. AuditLog `previousData` en updates.
+1. Integrar este commit en la rama de calidad.
+2. Adam: IP/llave Hetzner o deploy.
 
 ## No tocar
 

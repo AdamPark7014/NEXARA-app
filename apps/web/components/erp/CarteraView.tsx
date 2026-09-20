@@ -475,7 +475,9 @@ export default function CarteraView({
     if (pagoEnVueloRef.current) return;
     setIntentado(true);
     if (!detalle) {
-      setErrorPago("La factura ya no está abierta. Ciérrala y vuelve a entrar.");
+      const msg = "La factura ya no está abierta. Ciérrala y vuelve a entrar.";
+      setErrorPago(msg);
+      toast.error(msg);
       return;
     }
     const monto = Number(pago.amount);
@@ -514,9 +516,9 @@ export default function CarteraView({
     } catch (e) {
       // El formulario NO se cierra: si se cerrara, el capturista no sabría si
       // el dinero quedó aplicado y volvería a capturarlo.
-      setErrorPago(
-        `No se pudo registrar el ${esCobrar ? "cobro" : "pago"}. ${formatApiError(e)}`,
-      );
+      const msg = `No se pudo registrar el ${esCobrar ? "cobro" : "pago"}. ${formatApiError(e)}`;
+      setErrorPago(msg);
+      toast.error(msg);
     } finally {
       pagoEnVueloRef.current = false;
       setGuardandoPago(false);
