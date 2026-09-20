@@ -168,3 +168,21 @@ Se dejan intactas, sin borrar.
 `~/.ssh/config` tiene `hetzner-nexara` con `HostName REEMPLAZA_CON_IP_HETZNER`.
 Sin la dirección real ni la llave, el deploy no sale de esta máquina.
 Requiere a Adam.
+
+## Resultado de la ola contadora
+
+7/7 ramas integradas en `mejora/calidad-y-web`. 17 commits, 50 archivos,
++17,618 / −690.
+
+**Verificación:** `tsc --noEmit` limpio en API y web. Web 965/965 en 79 archivos.
+
+**Lo que ninguna de las siete misiones pedía y salió de auditar:** seis fallos
+de producción (pólizas automáticas que nunca se contabilizaban, fuga entre
+empresas por `reference`, fuga entre usuarios en la caché offline, XML/PDF de
+factura siempre 404, Proyectos agrupando por un campo inexistente, y la prueba
+del panel contable que nunca corrió). Detalle en `.ai/RELEVO.md`.
+
+**Lo que sigue abierto y no se disimuló:** el periodo cerrado no está blindado
+en 7 rutas de escritura (`registerPayment` es la peor: mueve saldo bancario),
+`AuditLog` no guarda estado anterior fuera del cierre, y 3 suites de API siguen
+rojas desde la ola anterior.
