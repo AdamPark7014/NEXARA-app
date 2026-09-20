@@ -69,7 +69,7 @@ const PANEL_ORDER: MobilePanelOption[] = [
     icon: "💼",
     name: "Contabilidad",
     description: "Pagos, viáticos, horas y control financiero.",
-    entryPath: "/erp/accounting",
+    entryPath: "/erp/contabilidad",
   },
   {
     key: "web",

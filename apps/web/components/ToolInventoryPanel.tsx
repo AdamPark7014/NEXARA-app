@@ -4,7 +4,7 @@ import { resolveAssetUrl } from "@/lib/evidence-display";
 import React, { useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
-import KpiCard from './ui/KpiCard';
+import MetricStrip, { type Metric } from '@/components/ui/MetricStrip';
 import styles from './ToolInventoryPanel.module.css';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 
@@ -370,37 +370,22 @@ const ToolInventoryPanel: React.FC = () => {
     retired: items.filter((i) => i.status === 'RETIRED').length,
   };
 
+  const inventoryMetrics: Metric[] = [
+    { label: 'Total', value: counts.total },
+    { label: 'Disponibles', value: counts.available, tone: 'success' },
+    { label: 'Asignadas', value: counts.assigned },
+    {
+      label: 'En reparación',
+      value: counts.inRepair,
+      tone: counts.inRepair > 0 ? 'warning' : 'default',
+    },
+    { label: 'Retiradas', value: counts.retired },
+  ];
+
   return (
     <div className={styles.wrapper}>
       {!loading && items.length > 0 && (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
-            <KpiCard label="Total" value={counts.total} icon="🧰" />
-            <KpiCard label="Disponibles" value={counts.available} icon="✅" variant="positive" />
-            <KpiCard label="Asignadas" value={counts.assigned} icon="👤" variant="accent" />
-            <KpiCard label="En reparación" value={counts.inRepair} icon="🔧" variant={counts.inRepair > 0 ? "warning" : "default"} />
-            <KpiCard label="Retiradas" value={counts.retired} icon="🗑️" />
-          </div>
-          <div style={{ marginTop: 6, marginBottom: 0, padding: "8px 12px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Por estado</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {([
-                { label: "Disponibles", count: counts.available, color: "var(--success)" },
-                { label: "Asignadas", count: counts.assigned, color: "var(--primary)" },
-                { label: "En reparación", count: counts.inRepair, color: "var(--warning)" },
-                { label: "Retiradas", count: counts.retired, color: "var(--danger)" },
-              ] as { label: string; count: number; color: string }[]).filter(r => r.count > 0).map(r => (
-                <div key={r.label} style={{ display: "grid", gridTemplateColumns: "100px 1fr 32px", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
-                  <div style={{ height: 5, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(r.count / counts.total) * 100}%`, background: r.color, borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
+        <MetricStrip ariaLabel="Resumen de inventario" metrics={inventoryMetrics} />
       )}
 
       <form className={`card ${styles.formCard}`} onSubmit={createItem}>
@@ -409,8 +394,23 @@ const ToolInventoryPanel: React.FC = () => {
           <input className="input" placeholder="Herramienta" value={toolName} onChange={(e) => setToolName(e.target.value)} />
           <input className="input" placeholder="Modelo" value={model} onChange={(e) => setModel(e.target.value)} />
           <input className="input" placeholder="Serie" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} />
-          <input className="input" placeholder="URL panorámica" value={panoramicPhotoUrl} onChange={(e) => setPanoramicPhotoUrl(e.target.value)} />
-          <input className="input" placeholder="URL serie" value={serialPhotoUrl} onChange={(e) => setSerialPhotoUrl(e.target.value)} />
+          <details className={styles.urlDetails}>
+            <summary className={styles.urlSummary}>Pegar URL (opcional)</summary>
+            <div className={`${styles.fieldsGrid} ${styles.urlFields}`}>
+              <input
+                className="input"
+                placeholder="URL panorámica"
+                value={panoramicPhotoUrl}
+                onChange={(e) => setPanoramicPhotoUrl(e.target.value)}
+              />
+              <input
+                className="input"
+                placeholder="URL serie"
+                value={serialPhotoUrl}
+                onChange={(e) => setSerialPhotoUrl(e.target.value)}
+              />
+            </div>
+          </details>
           {!isMobile && (
             <div className={styles.formActionsInline}>
               <button className="button-primary" type="submit">Agregar</button>
@@ -555,8 +555,23 @@ const ToolInventoryPanel: React.FC = () => {
             <input className="input" value={replacementModel} onChange={(e) => setReplacementModel(e.target.value)} placeholder="Nuevo modelo" />
             <input className="input" value={replacementSerialNumber} onChange={(e) => setReplacementSerialNumber(e.target.value)} placeholder="Nueva serie" />
             <input className="input" value={replacementRetiredReason} onChange={(e) => setReplacementRetiredReason(e.target.value)} placeholder="Motivo de retiro" />
-            <input className="input" value={replacementPanoramicPhotoUrl} onChange={(e) => setReplacementPanoramicPhotoUrl(e.target.value)} placeholder="URL panorámica" />
-            <input className="input" value={replacementSerialPhotoUrl} onChange={(e) => setReplacementSerialPhotoUrl(e.target.value)} placeholder="URL serie" />
+            <details className={styles.urlDetails}>
+              <summary className={styles.urlSummary}>Pegar URL (opcional)</summary>
+              <div className={`${styles.fieldsGrid} ${styles.urlFields}`}>
+                <input
+                  className="input"
+                  value={replacementPanoramicPhotoUrl}
+                  onChange={(e) => setReplacementPanoramicPhotoUrl(e.target.value)}
+                  placeholder="URL panorámica"
+                />
+                <input
+                  className="input"
+                  value={replacementSerialPhotoUrl}
+                  onChange={(e) => setReplacementSerialPhotoUrl(e.target.value)}
+                  placeholder="URL serie"
+                />
+              </div>
+            </details>
 
             <div
               onDragOver={(e) => {

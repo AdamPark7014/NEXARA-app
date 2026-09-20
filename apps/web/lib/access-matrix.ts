@@ -82,7 +82,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
     tagline: "Facturación, pólizas y bancos",
     accent: "#059669",
     icon: "💰",
-    entryPath: "/erp/accounting",
+    entryPath: "/erp/contabilidad",
   },
   [PANELS.HR]: {
     id: PANELS.HR,
