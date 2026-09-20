@@ -8,9 +8,12 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
+import MetricStrip from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import { FinanceField, financeInputStyle } from "@/components/finance/FinanceModuleShell";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { useUser } from "@/components/UserContext";
-import { erpFetch, erpInputStyle, formatApiError } from "@/lib/erp-api";
+import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 
 type Period = {
@@ -52,24 +55,30 @@ type Checklist = {
 
 const MIN_JUSTIFICACION = 20;
 
-const MARCA: Record<EstadoItem, { icono: string; color: string; fondo: string; texto: string }> = {
-  ok: {
-    icono: "✓",
-    color: "var(--success, #15803d)",
-    fondo: "color-mix(in srgb, var(--success, #22c55e) 10%, transparent)",
-    texto: "Listo",
-  },
+/**
+ * Lo que decide si el periodo puede cerrarse.
+ *
+ * Antes los tres estados llevaban un disco de color con un símbolo en blanco y
+ * el renglón entero teñido: con diez puntos, la lista era un semáforo y el
+ * bloqueante no se distinguía del aviso. Ahora lo resuelto se queda plano y
+ * gris, y solo lo que impide cerrar lleva una regla roja al margen.
+ */
+const MARCA: Record<
+  EstadoItem,
+  { tono: StatusTone; color: string | null; texto: string; peso: number }
+> = {
+  ok: { tono: "neutral", color: null, texto: "Listo", peso: 2 },
   advertencia: {
-    icono: "!",
-    color: "var(--warning, #b45309)",
-    fondo: "color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent)",
+    tono: "warning",
+    color: "var(--state-warning-text, #b45309)",
     texto: "Revisar",
+    peso: 1,
   },
   bloqueante: {
-    icono: "×",
-    color: "var(--danger)",
-    fondo: "color-mix(in srgb, var(--danger) 10%, transparent)",
+    tono: "danger",
+    color: "var(--state-danger-text, #b91c1c)",
     texto: "Bloquea el cierre",
+    peso: 0,
   },
 };
 
@@ -185,15 +194,11 @@ export default function CierresPage() {
       key: "status",
       label: "Estado",
       render: (r) => (
-        <span
-          style={{
-            fontSize: 12.5,
-            fontWeight: 600,
-            color: r.isClosed ? "var(--text-tertiary)" : "var(--success, #15803d)",
-          }}
-        >
-          {r.isClosed ? `Cerrado ${fecha(r.closedAt)}` : "Abierto"}
-        </span>
+        <StatusDot
+          label={r.isClosed ? `Cerrado ${fecha(r.closedAt)}` : "Abierto"}
+          tone={r.isClosed ? "success" : "neutral"}
+          title={r.isClosed ? "Solo dirección puede reabrirlo" : "Admite pólizas"}
+        />
       ),
     },
     {
@@ -273,7 +278,7 @@ export default function CierresPage() {
                 {bloqueado && (
                   <Button
                     size="sm"
-                    variant="danger"
+                    variant="secondary"
                     disabled={closing}
                     onClick={() => setForceOpen(true)}
                   >
@@ -310,82 +315,108 @@ export default function CierresPage() {
                 />
               )}
 
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-                {checklist.items.map((i) => {
-                  const marca = MARCA[i.estado];
-                  return (
-                    <li
-                      key={i.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 12,
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: `1px solid ${
-                          i.estado === "ok" ? "var(--border)" : `color-mix(in srgb, ${marca.color} 40%, var(--border))`
-                        }`,
-                        background: i.estado === "ok" ? "transparent" : marca.fondo,
-                      }}
-                    >
-                      <span
-                        aria-hidden
+              <div style={{ margin: "0 0 12px" }}>
+                <MetricStrip
+                  ariaLabel="Estado de la verificación"
+                  metrics={[
+                    {
+                      label: "Bloquean el cierre",
+                      value: String(checklist.bloqueantes),
+                      tone: checklist.bloqueantes > 0 ? "danger" : "default",
+                      hint:
+                        checklist.bloqueantes > 0
+                          ? "hay que resolverlos o justificar"
+                          : "nada lo impide",
+                    },
+                    {
+                      label: "Para revisar",
+                      value: String(checklist.advertencias),
+                      tone: checklist.advertencias > 0 ? "warning" : "default",
+                      hint: "no impiden cerrar",
+                    },
+                    {
+                      label: "Resueltos",
+                      value: String(checklist.items.filter((i) => i.estado === "ok").length),
+                      hint: `de ${checklist.items.length} puntos`,
+                    },
+                  ]}
+                />
+              </div>
+
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 2 }}>
+                {[...checklist.items]
+                  .sort((a, b) => MARCA[a.estado].peso - MARCA[b.estado].peso)
+                  .map((i) => {
+                    const marca = MARCA[i.estado];
+                    const pide = i.estado !== "ok";
+                    return (
+                      <li
+                        key={i.id}
                         style={{
-                          width: 22,
-                          height: 22,
-                          flexShrink: 0,
-                          borderRadius: "50%",
                           display: "grid",
-                          placeItems: "center",
-                          fontSize: 13,
-                          fontWeight: 800,
-                          color: "#fff",
-                          background: marca.color,
+                          gridTemplateColumns: "minmax(0, 1fr) auto",
+                          gap: 12,
+                          alignItems: "baseline",
+                          padding: "10px 12px 10px 14px",
+                          borderLeft: `2px solid ${marca.color ?? "transparent"}`,
+                          borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
+                          background: "transparent",
                         }}
                       >
-                        {marca.icono}
-                      </span>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 10,
-                            alignItems: "baseline",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <span style={{ fontSize: 13.5, fontWeight: 600 }}>{i.etiqueta}</span>
-                          <span style={{ fontSize: 11.5, fontWeight: 700, color: marca.color }}>
-                            {marca.texto}
-                          </span>
-                          {i.conteo > 0 && (
-                            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                              {i.conteo} pendiente{i.conteo === 1 ? "" : "s"}
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 10,
+                              alignItems: "baseline",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: pide ? 600 : 500,
+                                color: pide ? "var(--text-primary)" : "var(--text-secondary)",
+                              }}
+                            >
+                              {i.etiqueta}
                             </span>
+                            {i.conteo > 0 && (
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  fontVariantNumeric: "tabular-nums",
+                                  color: marca.color ?? "var(--text-secondary)",
+                                }}
+                              >
+                                {i.conteo} pendiente{i.conteo === 1 ? "" : "s"}
+                              </span>
+                            )}
+                          </div>
+                          <p
+                            style={{
+                              margin: "3px 0 0",
+                              fontSize: 12,
+                              color: "var(--text-tertiary)",
+                              lineHeight: 1.45,
+                            }}
+                          >
+                            {i.descripcion}
+                          </p>
+                          {i.conteo > 0 && i.href && (
+                            <a
+                              href={i.href}
+                              style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}
+                            >
+                              Ir a resolverlo →
+                            </a>
                           )}
                         </div>
-                        <p
-                          style={{
-                            margin: "4px 0 0",
-                            fontSize: 12.5,
-                            color: "var(--text-secondary)",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {i.descripcion}
-                        </p>
-                        {i.conteo > 0 && i.href && (
-                          <a
-                            href={i.href}
-                            style={{ fontSize: 12.5, color: "var(--primary)", fontWeight: 600 }}
-                          >
-                            Ir a resolverlo →
-                          </a>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
+                        <StatusDot label={marca.texto} tone={marca.tono} />
+                      </li>
+                    );
+                  })}
               </ul>
 
               <div
@@ -470,23 +501,24 @@ export default function CierresPage() {
               ))}
           </ul>
         )}
-        <label
-          htmlFor="justificacion-cierre"
-          style={{ display: "block", fontSize: 12.5, fontWeight: 600, marginBottom: 4 }}
+        <FinanceField
+          label="Justificación"
+          hint={`Mínimo ${MIN_JUSTIFICACION} caracteres · llevas ${justificacion.trim().length}.`}
+          error={
+            justificacion.trim().length > 0 && justificacion.trim().length < MIN_JUSTIFICACION
+              ? `Faltan ${MIN_JUSTIFICACION - justificacion.trim().length} caracteres para poder cerrar.`
+              : null
+          }
         >
-          Justificación
-        </label>
-        <textarea
-          id="justificacion-cierre"
-          value={justificacion}
-          onChange={(e) => setJustificacion(e.target.value)}
-          rows={4}
-          placeholder="Ej. Cierre autorizado por dirección: las pólizas pendientes se reponen en el siguiente periodo."
-          style={{ ...erpInputStyle, minHeight: 90, resize: "vertical" }}
-        />
-        <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--text-tertiary)" }}>
-          Mínimo {MIN_JUSTIFICACION} caracteres ({justificacion.trim().length}).
-        </p>
+          <textarea
+            id="justificacion-cierre"
+            value={justificacion}
+            onChange={(e) => setJustificacion(e.target.value)}
+            rows={4}
+            placeholder="Ej. Cierre autorizado por dirección: las pólizas pendientes se reponen en el siguiente periodo."
+            style={{ ...financeInputStyle, minHeight: 90, resize: "vertical" }}
+          />
+        </FinanceField>
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} danger={false} />

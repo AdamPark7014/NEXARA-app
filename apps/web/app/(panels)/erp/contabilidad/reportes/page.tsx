@@ -220,15 +220,22 @@ export default function ReportesPage() {
                     aria-pressed={activo}
                     title={r.descripcion}
                     style={{
-                      padding: "8px 12px",
+                      height: 32,
+                      padding: "0 12px",
                       borderRadius: 8,
                       cursor: "pointer",
-                      fontSize: 12.5,
-                      fontWeight: activo ? 700 : 500,
+                      fontSize: 13,
+                      fontWeight: activo ? 600 : 500,
                       textAlign: "left",
                       color: activo ? "var(--text-primary)" : "var(--text-secondary)",
-                      background: activo ? "var(--surface-2)" : "transparent",
-                      border: `1px solid ${activo ? "var(--border-strong, var(--border))" : "var(--border)"}`,
+                      background: activo
+                        ? "color-mix(in srgb, var(--primary) 8%, var(--surface))"
+                        : "transparent",
+                      border: `1px solid ${
+                        activo
+                          ? "color-mix(in srgb, var(--primary) 40%, var(--border))"
+                          : "var(--nx-panel-hairline, var(--border))"
+                      }`,
                     }}
                   >
                     {r.nombre}

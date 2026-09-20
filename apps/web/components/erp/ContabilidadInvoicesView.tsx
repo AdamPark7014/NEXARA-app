@@ -6,6 +6,13 @@ import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import {
+  FinanceField,
+  financeInputStyle,
+} from "@/components/finance/FinanceModuleShell";
 import FilterToolbar from "@/components/FilterToolbar";
 import Modal from "@/components/ui/Modal";
 import { useUser } from "@/components/UserContext";
@@ -66,6 +73,14 @@ function statusLabel(row: InvoiceRow): { text: string; tone: "ok" | "warn" | "ba
   return { text: "Pendiente", tone: "mute" };
 }
 
+/** El tono del estado, en el vocabulario de `StatusDot`: punto y palabra. */
+const TONO_ESTADO: Record<"ok" | "warn" | "bad" | "mute", StatusTone> = {
+  ok: "success",
+  warn: "warning",
+  bad: "danger",
+  mute: "neutral",
+};
+
 type Mode = "cxc" | "cxp" | "all";
 
 export default function ContabilidadInvoicesView({
@@ -85,6 +100,13 @@ export default function ContabilidadInvoicesView({
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<InvoiceRow | null>(null);
   const [paying, setPaying] = useState(false);
+  /**
+   * El registro de pago vivía en un `window.prompt`: una caja gris del
+   * navegador, sin saldo a la vista ni forma de corregir el dato. Ahora es un
+   * formulario, con el mismo envío y la misma validación de antes.
+   */
+  const [payOpen, setPayOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
 
   const typeParam =
     mode === "cxc" ? "ACCOUNTS_RECEIVABLE" : mode === "cxp" ? "ACCOUNTS_PAYABLE" : "";
@@ -145,15 +167,17 @@ export default function ContabilidadInvoicesView({
     return buckets;
   }, [filtered, mode]);
 
+  function abrirPago(row: InvoiceRow) {
+    const pend = pendingOf(row);
+    if (pend <= 0) return;
+    setPayAmount(pend.toFixed(2));
+    setPayOpen(true);
+  }
+
   async function registerPayment(row: InvoiceRow) {
     const pend = pendingOf(row);
     if (pend <= 0) return;
-    const amountStr = window.prompt(
-      `Monto a registrar (saldo ${pend.toFixed(2)})`,
-      String(pend.toFixed(2)),
-    );
-    if (!amountStr) return;
-    const amount = Number(amountStr);
+    const amount = Number(payAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
       toast.error("Indica un monto válido");
       return;
@@ -169,6 +193,8 @@ export default function ContabilidadInvoicesView({
         }),
       });
       toast.success("Pago registrado");
+      setPayOpen(false);
+      setPayAmount("");
       setSelected(null);
       await load();
     } catch (e) {
@@ -179,6 +205,32 @@ export default function ContabilidadInvoicesView({
   }
 
   const partyLabel = mode === "cxp" ? "Proveedor" : mode === "cxc" ? "Cliente" : "Contraparte";
+
+  /** El mismo criterio que aplica `registerPayment`, mostrado bajo el campo. */
+  const errorMonto = (() => {
+    if (!payOpen || payAmount.trim() === "") return null;
+    const monto = Number(payAmount);
+    if (!Number.isFinite(monto) || monto <= 0) return "Indica un monto mayor a cero.";
+    return null;
+  })();
+
+  /** Las mismas tres cifras del calendario, ahora en una tira legible. */
+  const metricasCalendario: Metric[] = calendar
+    ? [
+        {
+          label: "Vencido",
+          value: <Money value={calendar.overdue} />,
+          tone: calendar.overdue > 0 ? "danger" : "default",
+          hint: calendar.overdue > 0 ? "ya debió salir" : "nada atrasado",
+        },
+        { label: "Hoy", value: <Money value={calendar.today} />, hint: "sale hoy" },
+        {
+          label: "Próximos 7 días",
+          value: <Money value={calendar.d7} />,
+          hint: "esta semana",
+        },
+      ]
+    : [];
 
   const columns: Column<InvoiceRow>[] = [
     {
@@ -196,9 +248,29 @@ export default function ContabilidadInvoicesView({
       label: "Vence",
       render: (r) => {
         const od = daysOverdue(r.dueDate);
+        const vencida = od != null && od > 0;
         return (
-          <span style={{ color: od != null && od > 0 ? "var(--danger)" : undefined }}>
-            {r.dueDate ? new Date(r.dueDate).toLocaleDateString("es-MX") : "—"}
+          <span style={{ display: "grid", gap: 1 }}>
+            <span
+              style={{
+                fontVariantNumeric: "tabular-nums",
+                color: vencida ? "var(--state-danger-text, #b91c1c)" : undefined,
+                fontWeight: vencida ? 600 : undefined,
+              }}
+            >
+              {r.dueDate ? new Date(r.dueDate).toLocaleDateString("es-MX") : "—"}
+            </span>
+            {vencida && (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--state-danger-text, #b91c1c)",
+                }}
+              >
+                {od} {od === 1 ? "día vencida" : "días vencida"}
+              </span>
+            )}
           </span>
         );
       },
@@ -215,15 +287,7 @@ export default function ContabilidadInvoicesView({
       label: "Estado",
       render: (r) => {
         const s = statusLabel(r);
-        const color =
-          s.tone === "bad"
-            ? "var(--danger)"
-            : s.tone === "warn"
-              ? "var(--warning)"
-              : s.tone === "ok"
-                ? "var(--success)"
-                : "var(--text-secondary)";
-        return <span style={{ fontSize: 12.5, fontWeight: 600, color }}>{s.text}</span>;
+        return <StatusDot label={s.text} tone={TONO_ESTADO[s.tone]} />;
       },
     },
   ];
@@ -284,23 +348,9 @@ export default function ContabilidadInvoicesView({
       />
 
       {calendar && (calendar.overdue > 0 || calendar.today > 0 || calendar.d7 > 0) && (
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)" }}>
-          {calendar.overdue > 0 && (
-            <span style={{ color: "var(--danger)", fontWeight: 600, marginRight: 12 }}>
-              Vencido <Money value={calendar.overdue} />
-            </span>
-          )}
-          {calendar.today > 0 && (
-            <span style={{ marginRight: 12 }}>
-              Hoy <strong><Money value={calendar.today} /></strong>
-            </span>
-          )}
-          {calendar.d7 > 0 && (
-            <span>
-              Próx. 7 días <strong><Money value={calendar.d7} /></strong>
-            </span>
-          )}
-        </p>
+        <div style={{ marginBottom: 12 }}>
+          <MetricStrip ariaLabel="Qué sale de caja" metrics={metricasCalendario} />
+        </div>
       )}
 
       <div style={{ marginBottom: 12 }}>
@@ -315,12 +365,14 @@ export default function ContabilidadInvoicesView({
       </div>
 
       {error && (
-        <div role="alert" style={{ marginBottom: 12, fontSize: 13, color: "var(--danger)" }}>
-          No se pudo cargar la lista.{" "}
-          <button type="button" onClick={() => void load()} style={{ fontWeight: 700, textDecoration: "underline", background: "none", border: "none", color: "inherit", cursor: "pointer" }}>
-            Reintentar
-          </button>
-        </div>
+        <>
+          <InlineAlert variant="danger" message={`No se pudo cargar la lista. ${error}`} />
+          <div style={{ margin: "-4px 0 12px" }}>
+            <Button size="sm" variant="secondary" onClick={() => void load()}>
+              Reintentar
+            </Button>
+          </div>
+        </>
       )}
 
       {loading ? (
@@ -352,59 +404,145 @@ export default function ContabilidadInvoicesView({
         onClose={() => setSelected(null)}
         title={selected?.invoiceNumber || "Factura"}
         footer={
-          selected && pendingOf(selected) > 0.01 ? (
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", width: "100%" }}>
+            <Button variant="ghost" onClick={() => setSelected(null)}>
+              Cerrar
+            </Button>
+            {selected && pendingOf(selected) > 0.01 && (
+              <Button variant="primary" onClick={() => selected && abrirPago(selected)}>
+                Registrar pago
+              </Button>
+            )}
+          </div>
+        }
+      >
+        {selected && (
+          <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
+            <MetricStrip
+              ariaLabel="Saldo de la factura"
+              metrics={[
+                {
+                  label: "Total",
+                  value: <Money value={Number(selected.totalAmount || 0)} />,
+                  hint: "facturado",
+                },
+                {
+                  label: "Saldo",
+                  value: <Money value={pendingOf(selected)} />,
+                  tone: pendingOf(selected) > 0.01 ? "warning" : "success",
+                  hint: pendingOf(selected) > 0.01 ? "pendiente de cobro" : "liquidada",
+                },
+              ]}
+            />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <Dato etiqueta={partyLabel}>
+                {selected.receptorName || selected.emisorName || "—"}
+              </Dato>
+              <Dato etiqueta="Emisión">
+                {selected.issueDate
+                  ? new Date(selected.issueDate).toLocaleDateString("es-MX")
+                  : "—"}
+              </Dato>
+              <Dato etiqueta="Vence">
+                {selected.dueDate ? new Date(selected.dueDate).toLocaleDateString("es-MX") : "—"}
+              </Dato>
+              <Dato etiqueta="Estado">
+                <StatusDot
+                  label={statusLabel(selected).text}
+                  tone={TONO_ESTADO[statusLabel(selected).tone]}
+                />
+              </Dato>
+            </div>
+
+            <div style={{ fontSize: 12.5 }}>
+              {selected.cfdiXml || selected.cfdiUuid ? (
+                <StatusDot label="CFDI con XML" tone="neutral" />
+              ) : (
+                <StatusDot
+                  label="Sin XML — completar cuando exista"
+                  tone="warning"
+                  title="La factura no tiene el CFDI timbrado adjunto"
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Registro de pago — antes era un window.prompt del navegador */}
+      <Modal
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+        title="Registrar pago"
+        maxWidth={440}
+        footer={
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", width: "100%" }}>
+            <Button variant="ghost" onClick={() => setPayOpen(false)} disabled={paying}>
+              Cancelar
+            </Button>
             <Button
               variant="primary"
               loading={paying}
               onClick={() => selected && void registerPayment(selected)}
             >
-              Registrar pago
+              Guardar
             </Button>
-          ) : (
-            <Button variant="ghost" onClick={() => setSelected(null)}>
-              Cerrar
-            </Button>
-          )
+          </div>
         }
       >
         {selected && (
-          <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
-            <div>
-              <div style={{ color: "var(--text-tertiary)", fontSize: 11, marginBottom: 2 }}>{partyLabel}</div>
-              <div style={{ fontWeight: 600 }}>{selected.receptorName || selected.emisorName || "—"}</div>
+          <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "var(--surface-2)",
+                border: "1px solid var(--nx-panel-hairline, var(--border))",
+              }}
+            >
+              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                Saldo pendiente de <strong>{selected.invoiceNumber}</strong>
+              </span>
+              <Money value={pendingOf(selected)} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div>
-                <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Emisión</div>
-                <div>{selected.issueDate ? new Date(selected.issueDate).toLocaleDateString("es-MX") : "—"}</div>
-              </div>
-              <div>
-                <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Vence</div>
-                <div>{selected.dueDate ? new Date(selected.dueDate).toLocaleDateString("es-MX") : "—"}</div>
-              </div>
-              <div>
-                <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Total</div>
-                <div style={{ fontWeight: 600 }}><Money value={Number(selected.totalAmount || 0)} /></div>
-              </div>
-              <div>
-                <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Saldo</div>
-                <div style={{ fontWeight: 700 }}><Money value={pendingOf(selected)} /></div>
-              </div>
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-              CFDI:{" "}
-              {selected.cfdiXml || selected.cfdiUuid ? (
-                <span style={{ color: "var(--success)", fontWeight: 600 }}>Con XML</span>
-              ) : (
-                <span style={{ color: "var(--warning)", fontWeight: 600 }}>Sin XML — completar cuando exista</span>
-              )}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-              Estado: {statusLabel(selected).text}
-            </div>
+            <FinanceField
+              label="Monto"
+              hint="Pesos, con IVA incluido. Se registra con la fecha de hoy y forma de pago SPEI."
+              error={errorMonto}
+            >
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                placeholder={pendingOf(selected).toFixed(2)}
+                style={financeInputStyle}
+              />
+            </FinanceField>
           </div>
         )}
       </Modal>
     </>
+  );
+}
+
+function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>{etiqueta}</div>
+      <div style={{ fontSize: 13, fontWeight: 600 }}>{children}</div>
+    </div>
   );
 }
