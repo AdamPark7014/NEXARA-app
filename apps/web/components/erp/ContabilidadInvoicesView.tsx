@@ -8,6 +8,7 @@ import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import {
   FinanceField,
@@ -98,6 +99,7 @@ export default function ContabilidadInvoicesView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [aging, setAging] = useState<"" | "vencido" | "hoy" | "d7">("");
   const [selected, setSelected] = useState<InvoiceRow | null>(null);
   const [paying, setPaying] = useState(false);
   /**
@@ -134,7 +136,7 @@ export default function ContabilidadInvoicesView({
     void load();
   }, [load]);
 
-  const filtered = useMemo(() => {
+  const baseRows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let rows = items;
     if (mode !== "all") {
@@ -150,12 +152,13 @@ export default function ContabilidadInvoicesView({
     );
   }, [items, q, mode]);
 
+  /** Antigüedad sin el filtro activo: la escala no debe colapsar al filtrar. */
   const calendar = useMemo(() => {
     if (mode !== "cxp") return null;
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const buckets = { today: 0, d7: 0, overdue: 0 };
-    for (const r of filtered) {
+    for (const r of baseRows) {
       const due = r.dueDate ? new Date(r.dueDate) : null;
       const pend = pendingOf(r);
       if (!due) continue;
@@ -165,7 +168,21 @@ export default function ContabilidadInvoicesView({
       else if (diff <= 7) buckets.d7 += pend;
     }
     return buckets;
-  }, [filtered, mode]);
+  }, [baseRows, mode]);
+
+  const filtered = useMemo(() => {
+    if (!aging) return baseRows;
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return baseRows.filter((r) => {
+      const due = r.dueDate ? new Date(r.dueDate) : null;
+      if (!due) return false;
+      const diff = Math.floor((due.getTime() - start.getTime()) / 86_400_000);
+      if (aging === "vencido") return diff < 0;
+      if (aging === "hoy") return diff === 0;
+      return diff > 0 && diff <= 7;
+    });
+  }, [baseRows, aging]);
 
   function abrirPago(row: InvoiceRow) {
     const pend = pendingOf(row);
@@ -214,22 +231,36 @@ export default function ContabilidadInvoicesView({
     return null;
   })();
 
-  /** Las mismas tres cifras del calendario, ahora en una tira legible. */
-  const metricasCalendario: Metric[] = calendar
-    ? [
-        {
-          label: "Vencido",
-          value: <Money value={calendar.overdue} />,
-          tone: calendar.overdue > 0 ? "danger" : "default",
-          hint: calendar.overdue > 0 ? "ya debió salir" : "nada atrasado",
-        },
-        { label: "Hoy", value: <Money value={calendar.today} />, hint: "sale hoy" },
-        {
-          label: "Próximos 7 días",
-          value: <Money value={calendar.d7} />,
-          hint: "esta semana",
-        },
-      ]
+  const escalaCalendario: ScaleItem[] = calendar
+    ? (() => {
+        const base = calendar.overdue + calendar.today + calendar.d7;
+        return [
+          {
+            key: "vencido",
+            label: "Vencido",
+            value: <Money value={calendar.overdue} />,
+            tone: calendar.overdue > 0 ? "danger" : "mute",
+            hint: calendar.overdue > 0 ? "ya debió salir" : "nada atrasado",
+            share: base > 0 ? calendar.overdue / base : 0,
+          },
+          {
+            key: "hoy",
+            label: "Hoy",
+            value: <Money value={calendar.today} />,
+            tone: calendar.today > 0 ? "warning" : "mute",
+            hint: "sale hoy",
+            share: base > 0 ? calendar.today / base : 0,
+          },
+          {
+            key: "d7",
+            label: "Próximos 7 días",
+            value: <Money value={calendar.d7} />,
+            tone: "mute",
+            hint: "esta semana",
+            share: base > 0 ? calendar.d7 / base : 0,
+          },
+        ];
+      })()
     : [];
 
   const columns: Column<InvoiceRow>[] = [
@@ -349,7 +380,13 @@ export default function ContabilidadInvoicesView({
 
       {calendar && (calendar.overdue > 0 || calendar.today > 0 || calendar.d7 > 0) && (
         <div style={{ marginBottom: 12 }}>
-          <MetricStrip ariaLabel="Qué sale de caja" metrics={metricasCalendario} />
+          <FilterScale
+            ariaLabel="Qué sale de caja"
+            items={escalaCalendario}
+            active={aging}
+            onSelect={(clave) => setAging((clave || "") as "" | "vencido" | "hoy" | "d7")}
+            minCellWidth={128}
+          />
         </div>
       )}
 
