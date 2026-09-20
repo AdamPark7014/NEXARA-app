@@ -14,7 +14,7 @@ import ToolRenewalsTable from "@/components/ToolRenewalsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
 
 type ManagerTab = "inventory" | "kits" | "requests" | "renewals" | "approvals";
-type EngineerTab = "mykit" | "myrequests";
+type LoanTab = "mykit" | "myrequests";
 
 function parseManagerTab(value: string | null): ManagerTab {
   if (value === "kits" || value === "requests" || value === "renewals" || value === "inventory" || value === "approvals") {
@@ -29,7 +29,9 @@ export default function ToolsPage() {
   // También se monta en Core (`/erp/almacen/herramientas`).
   const enCore = isCoreMount(usePathname());
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "tools"), [user]);
-  const isManager = cfg.viewMode !== "execute";
+  // Email helpers (vía section-views): manage ≠ OPS_MANAGER; request ≠ campo genérico.
+  const canManage = cfg.viewMode === "manage" || cfg.viewMode === "manage_execute" || cfg.canApprove;
+  const canRequest = cfg.canCreate;
   const highlightId = searchParams.get("highlight");
 
   const [managerTab, setManagerTab] = useState<ManagerTab>(() => {
@@ -37,20 +39,35 @@ export default function ToolsPage() {
     if (searchParams.get("tab")) return tab;
     return highlightId ? "approvals" : "inventory";
   });
-  const [engineerTab, setEngineerTab] = useState<EngineerTab>(() =>
-    highlightId ? "myrequests" : "mykit",
+  const [loanTab, setLoanTab] = useState<LoanTab>(() =>
+    highlightId && !canManage ? "myrequests" : "mykit",
+  );
+  // Christian/Iván + loan-creator: una familia de tabs a la vez.
+  const [pane, setPane] = useState<"manage" | "loan">(() =>
+    canManage ? "manage" : "loan",
   );
 
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab === "renewals" || tab === "requests" || tab === "kits" || tab === "inventory" || tab === "approvals") {
       setManagerTab(tab);
+      setPane("manage");
+      return;
+    }
+    if (tab === "mykit" || tab === "myrequests") {
+      setLoanTab(tab);
+      setPane("loan");
       return;
     }
     if (!highlightId) return;
-    if (isManager) setManagerTab("approvals");
-    else setEngineerTab("myrequests");
-  }, [highlightId, isManager, searchParams]);
+    if (canManage) {
+      setManagerTab("approvals");
+      setPane("manage");
+    } else if (canRequest) {
+      setLoanTab("myrequests");
+      setPane("loan");
+    }
+  }, [highlightId, canManage, canRequest, searchParams]);
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
     padding: "10px 16px",
@@ -63,6 +80,11 @@ export default function ToolsPage() {
     background: active ? "var(--primary)" : "var(--surface-2)",
     color: active ? "#fff" : "var(--text-secondary)",
   });
+
+  const showManagePane = canManage && (!canRequest || pane === "manage");
+  const showLoanPane = canRequest && (!canManage || pane === "loan");
+  const manageTabActive = (t: ManagerTab) => showManagePane && managerTab === t;
+  const loanTabActive = (t: LoanTab) => showLoanPane && loanTab === t;
 
   return (
     <>
@@ -79,37 +101,43 @@ export default function ToolsPage() {
       )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-        {isManager ? (
+        {canManage && (
           <>
-            <button type="button" style={tabBtn(managerTab === "approvals")} onClick={() => setManagerTab("approvals")}>
+            <button type="button" style={tabBtn(manageTabActive("approvals"))} onClick={() => { setPane("manage"); setManagerTab("approvals"); }}>
               Cola de aprobación
             </button>
-            <button type="button" style={tabBtn(managerTab === "inventory")} onClick={() => setManagerTab("inventory")}>
+            <button type="button" style={tabBtn(manageTabActive("inventory"))} onClick={() => { setPane("manage"); setManagerTab("inventory"); }}>
               Inventario y fotos
             </button>
-            <button type="button" style={tabBtn(managerTab === "kits")} onClick={() => setManagerTab("kits")}>
+            <button type="button" style={tabBtn(manageTabActive("kits"))} onClick={() => { setPane("manage"); setManagerTab("kits"); }}>
               Kits por persona
             </button>
-            <button type="button" style={tabBtn(managerTab === "requests")} onClick={() => setManagerTab("requests")}>
+            <button type="button" style={tabBtn(manageTabActive("requests"))} onClick={() => { setPane("manage"); setManagerTab("requests"); }}>
               Todos los préstamos
             </button>
-            <button type="button" style={tabBtn(managerTab === "renewals")} onClick={() => setManagerTab("renewals")}>
+            <button type="button" style={tabBtn(manageTabActive("renewals"))} onClick={() => { setPane("manage"); setManagerTab("renewals"); }}>
               Renovaciones
             </button>
           </>
-        ) : (
+        )}
+        {canRequest && (
           <>
-            <button type="button" style={tabBtn(engineerTab === "mykit")} onClick={() => setEngineerTab("mykit")}>
+            <button type="button" style={tabBtn(loanTabActive("mykit"))} onClick={() => { setPane("loan"); setLoanTab("mykit"); }}>
               Mi kit
             </button>
-            <button type="button" style={tabBtn(engineerTab === "myrequests")} onClick={() => setEngineerTab("myrequests")}>
-              Mis solicitudes
+            <button type="button" style={tabBtn(loanTabActive("myrequests"))} onClick={() => { setPane("loan"); setLoanTab("myrequests"); }}>
+              Solicitar préstamo
             </button>
           </>
         )}
+        {!canManage && !canRequest && (
+          <button type="button" style={tabBtn(true)} disabled>
+            Mi kit
+          </button>
+        )}
       </div>
 
-      {isManager && managerTab === "approvals" && (
+      {showManagePane && managerTab === "approvals" && (
         <div style={{ display: "grid", gap: 12 }}>
           <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
             Aprueba o rechaza préstamos pendientes. Solo Christian e Iván tienen esta cola.
@@ -117,8 +145,8 @@ export default function ToolsPage() {
           <ToolRequestsTable highlightId={highlightId} />
         </div>
       )}
-      {isManager && managerTab === "inventory" && <ToolInventoryPanel />}
-      {isManager && managerTab === "kits" && (
+      {showManagePane && managerTab === "inventory" && <ToolInventoryPanel />}
+      {showManagePane && managerTab === "kits" && (
         <div style={{ display: "grid", gap: 12 }}>
           <div
             style={{
@@ -135,10 +163,12 @@ export default function ToolsPage() {
           <ToolUserKitPanel />
         </div>
       )}
-      {isManager && managerTab === "requests" && <ToolRequestsTable highlightId={highlightId} />}
-      {isManager && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
-      {!isManager && engineerTab === "mykit" && <ToolMyKitPanel />}
-      {!isManager && engineerTab === "myrequests" && <ToolRequestForm />}
+      {showManagePane && managerTab === "requests" && <ToolRequestsTable highlightId={highlightId} />}
+      {showManagePane && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
+
+      {showLoanPane && loanTab === "mykit" && <ToolMyKitPanel />}
+      {showLoanPane && loanTab === "myrequests" && <ToolRequestForm />}
+      {!canManage && !canRequest && <ToolMyKitPanel />}
     </>
   );
 }

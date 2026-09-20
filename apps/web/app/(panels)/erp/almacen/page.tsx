@@ -48,7 +48,11 @@ export default function AlmacenPage() {
   const searchParams = useSearchParams();
   const cfg = useMemo(() => getErpInventorySectionConfig(user, "warehouse"), [user]);
   const herramientasCfg = useMemo(() => getOpsTeamSectionConfig(user, "tools"), [user]);
-  const gestionaHerramientas = herramientasCfg.viewMode !== "execute";
+  const gestionaHerramientas =
+    herramientasCfg.viewMode === "manage"
+    || herramientasCfg.viewMode === "manage_execute"
+    || herramientasCfg.canApprove;
+  const puedePedirHerramientas = herramientasCfg.canCreate;
 
   const highlightId = searchParams.get("highlight");
   const [tab, setTab] = useState<Pestana>(
@@ -90,16 +94,19 @@ export default function AlmacenPage() {
 
       {tab === "reabastecimiento" && <ReabastecimientoPanel />}
 
-      {tab === "herramientas" &&
-        (gestionaHerramientas ? (
-          <div style={{ display: "grid", gap: 10 }}>
-            <RecoleccionAlmacenPanel />
-            <ToolInventoryPanel />
-            <ToolRequestsTable highlightId={highlightId} />
-          </div>
-        ) : (
-          <ToolRequestForm />
-        ))}
+      {tab === "herramientas" && (
+        <div style={{ display: "grid", gap: 10 }}>
+          {gestionaHerramientas && (
+            <>
+              <RecoleccionAlmacenPanel />
+              <ToolInventoryPanel />
+              <ToolRequestsTable highlightId={highlightId} />
+            </>
+          )}
+          {puedePedirHerramientas && <ToolRequestForm />}
+          {!gestionaHerramientas && !puedePedirHerramientas && <ToolMyKitPanel />}
+        </div>
+      )}
 
       {tab === "kits" &&
         (gestionaHerramientas ? (

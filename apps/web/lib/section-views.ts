@@ -10,6 +10,8 @@ import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac/roles';
 import { resolveV2RoleKey, type UserAccessInput } from '@/lib/rbac/role-mapping';
 import { isAdvancedOnlyModuleId, isNavAdvanced } from '@/lib/nav-mode';
 import { canSeeClientesModule } from '@/lib/client-sectors';
+import { PERMISSIONS } from '@/lib/permissions';
+import { canCreateToolLoan, canManageTools } from '@/lib/tools-access';
 
 export type SectionViewMode = 'manage' | 'execute' | 'manage_execute';
 
@@ -1636,10 +1638,42 @@ export function getOpsTeamSectionConfig(
     };
   }
 
-  // Tools inventory ≠ OT assignment: warehouse/admin must manage even if
-  // activities viewMode is execute (e.g. ADMINISTRATIVO stocks kits).
+  // Tools: gate por email (espejo API), NO por OPS_MANAGERS/WAREHOUSE.
+  // David pide; Christian/Iván aprueban. TOOLS_MANAGE JWT = señal secundaria.
   if (module === 'tools') {
-    if (v2 && (isFieldRole(v2) || isSupportRole(v2))) {
+    const manageUi =
+      canManageTools(user?.email)
+      || Boolean(user?.isSuperAdmin)
+      || Boolean(user?.permissions?.includes(PERMISSIONS.TOOLS_MANAGE));
+    const createLoan = canCreateToolLoan(user?.email);
+
+    if (manageUi && createLoan) {
+      return {
+        viewMode: 'manage_execute',
+        defaultScope: 'team',
+        canCreate: true,
+        canEdit: true,
+        canDelete: false,
+        canAssign: true,
+        canApprove: true,
+        title: copy.title,
+        subtitle: copy.subtitle,
+      };
+    }
+    if (manageUi) {
+      return {
+        viewMode: 'manage',
+        defaultScope: 'team',
+        canCreate: false,
+        canEdit: true,
+        canDelete: false,
+        canAssign: true,
+        canApprove: true,
+        title: copy.title,
+        subtitle: copy.subtitle,
+      };
+    }
+    if (createLoan) {
       return {
         viewMode: 'execute',
         defaultScope: 'self',
@@ -1652,37 +1686,16 @@ export function getOpsTeamSectionConfig(
         subtitle: 'Solicita y rastrea tu kit.',
       };
     }
-    if (
-      !v2
-      || user?.isSuperAdmin
-      || (v2
-        && (WAREHOUSE_ROLES.has(v2)
-          || OPS_MANAGERS.has(v2)
-          || EXECUTIVE.has(v2)
-          || v2 === ROLES.ADMINISTRATIVO))
-    ) {
-      return {
-        viewMode: 'manage',
-        defaultScope: 'team',
-        canCreate: true,
-        canEdit: true,
-        canDelete: !v2 || tier(v2) >= 70,
-        canAssign: true,
-        canApprove: true,
-        title: copy.title,
-        subtitle: copy.subtitle,
-      };
-    }
     return {
       viewMode: 'execute',
       defaultScope: 'self',
-      canCreate: true,
-      canEdit: true,
+      canCreate: false,
+      canEdit: false,
       canDelete: false,
       canAssign: false,
       canApprove: false,
       title: 'Herramientas',
-      subtitle: 'Solicita y rastrea tu kit.',
+      subtitle: 'Consulta tu kit asignado.',
     };
   }
 
