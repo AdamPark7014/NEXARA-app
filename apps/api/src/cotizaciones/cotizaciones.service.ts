@@ -665,6 +665,38 @@ export class CotizacionesService {
       assertCompanyAccess(salesClient, tenantId, 'Cliente comercial');
     }
 
+    // Al EDITAR también hay que dejarla ligada a un cliente del padrón, igual
+    // que al crear. Sin esto, cambiar el nombre a mano la desligaba en
+    // silencio: el editor muestra «Cliente nuevo · se da de alta en el CRM al
+    // guardar», y al guardar una edición eso no pasaba. La promesa era falsa y
+    // así aparecieron cotizaciones con clientes que no existen en ningún lado.
+    let salesClientIdResuelto: number | null | undefined =
+      dto.salesClientId !== undefined ? (dto.salesClientId ? Number(dto.salesClientId) : null) : undefined;
+
+    const nombreNuevo = dto.clientName?.trim();
+    const quedaSinCliente =
+      salesClientIdResuelto === null ||
+      (salesClientIdResuelto === undefined && existing.salesClientId == null);
+
+    if (quedaSinCliente && nombreNuevo) {
+      const existentePorNombre = await this.db.salesClient.findFirst({
+        where: { companyId: tenantId, name: nombreNuevo },
+      });
+      const cliente =
+        existentePorNombre ??
+        (await this.db.salesClient.create({
+          data: {
+            name: nombreNuevo,
+            legalName: dto.clientCompany?.trim() || nombreNuevo,
+            billingEmail: dto.clientEmail?.trim(),
+            billingPhone: dto.clientPhone?.trim(),
+            fiscalAddress: dto.clientAddress?.trim(),
+            companyId: tenantId,
+          },
+        }));
+      salesClientIdResuelto = cliente.id;
+    }
+
     const updateData: Record<string, any> = {
       // El folio lo emite el servidor; solo se deja reescribir donde nunca lo emitió (CRM legacy).
       quoteNumber: existing.folioNomenclatura ? undefined : dto.quoteNumber?.trim(),
@@ -679,7 +711,7 @@ export class CotizacionesService {
         : undefined,
       issueDate: this.parseDate(dto.issueDate),
       validUntil: this.parseDate(dto.validUntil),
-      salesClientId: dto.salesClientId !== undefined ? (dto.salesClientId ? Number(dto.salesClientId) : null) : undefined,
+      salesClientId: salesClientIdResuelto,
       opportunityId: dto.opportunityId !== undefined ? (dto.opportunityId ? Number(dto.opportunityId) : null) : undefined,
       clientName: dto.clientName?.trim(),
       clientCompany: dto.clientCompany?.trim(),
