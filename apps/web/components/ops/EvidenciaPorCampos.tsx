@@ -122,10 +122,11 @@ function Hueco({
   onAbrir: () => void;
 }) {
   const etiqueta = `${MOMENTO_LABEL[momento]}${pedido ? "" : " (ya no se pide)"}`;
-  const alto = 112;
+  /** Hero por momento: alto suficiente para revisión en escritorio y móvil. */
+  const alto = 320;
   return (
-    <figure style={{ margin: 0, display: "grid", gap: 4, minWidth: 0 }}>
-      <figcaption style={{ fontSize: 12, fontWeight: 750, color: pedido ? "inherit" : "var(--text-tertiary)" }}>
+    <figure style={{ margin: 0, display: "grid", gap: 6, minWidth: 0 }}>
+      <figcaption style={{ fontSize: 13, fontWeight: 750, color: pedido ? "inherit" : "var(--text-tertiary)" }}>
         {etiqueta}
       </figcaption>
       {foto ? (
@@ -136,11 +137,12 @@ function Hueco({
           style={{
             padding: 0,
             border: "1px solid var(--border)",
-            borderRadius: 12,
+            borderRadius: 14,
             overflow: "hidden",
             background: "color-mix(in srgb, var(--text-secondary) 8%, var(--surface))",
             cursor: "zoom-in",
             height: alto,
+            minHeight: 280,
             display: "block",
             width: "100%",
           }}
@@ -156,11 +158,12 @@ function Hueco({
         <div
           style={{
             height: alto,
+            minHeight: 280,
             display: "grid",
             placeContent: "center",
             justifyItems: "center",
             gap: 4,
-            borderRadius: 12,
+            borderRadius: 14,
             border: `1px dashed color-mix(in srgb, ${NARANJA} 45%, var(--border))`,
             background: `color-mix(in srgb, ${NARANJA} 6%, var(--surface))`,
             color: NARANJA,
@@ -471,8 +474,8 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
               margin: 0,
               padding: 0,
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))",
-              gap: 12,
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 360px), 1fr))",
+              gap: 14,
             }}
           >
             {lista.map((campo) => {
@@ -513,8 +516,8 @@ export default function EvidenciaPorCampos({ activityId, anNumber, titulo, canMa
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: `repeat(${Math.max(1, momentosVisibles.length)}, minmax(0, 1fr))`,
-                      gap: 8,
+                      gridTemplateColumns: "1fr",
+                      gap: 12,
                     }}
                   >
                     {momentosVisibles.map((m) => {

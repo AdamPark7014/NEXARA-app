@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { Tag } from "@/components/ui/DataTable";
 import { formatDateTime } from "@/components/detail/DetailFrame";
@@ -14,6 +15,7 @@ import type { ActivityDetail } from "@/lib/ops-activities-api";
 import { activityDisplayLabel, activityDisplayVariant } from "@/lib/activity-status";
 import { IconLabel } from "@/components/ui/IconBadge";
 import DescargarEvidenciaZip from "@/components/ops/DescargarEvidenciaZip";
+import { FotoProtegida, Visor, type Foto } from "@/components/ops/EquipoEvidencias";
 import CheckIcon from "@mui/icons-material/Check";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
@@ -25,31 +27,86 @@ type Props = {
   showHeader?: boolean;
 };
 
-function PhotoThumb({ url, label }: { url: string; label: string }) {
-  const src = resolveAssetUrl(url);
-  if (!src) return null;
+const FOTO_ALTO = 300;
+
+function PhotoHero({
+  url,
+  label,
+  onOpen,
+}: {
+  url: string;
+  label: string;
+  onOpen: () => void;
+}) {
   return (
-    <a
-      href={src}
-      target="_blank"
-      rel="noreferrer"
-      style={{
-        display: "block",
-        borderRadius: 10,
-        border: "1px solid var(--border)",
-        overflow: "hidden",
-        textDecoration: "none",
-        color: "inherit",
-      }}
-    >
-      <img src={src} alt={label} style={{ width: "100%", height: 120, objectFit: "cover", display: "block" }} />
-      <div style={{ padding: "6px 8px", fontSize: 11, fontWeight: 600, background: "var(--surface-2)" }}>{label}</div>
-    </a>
+    <figure style={{ margin: 0, display: "grid", gap: 6, minWidth: 0 }}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Ver en grande: ${label}`}
+        style={{
+          display: "block",
+          width: "100%",
+          padding: 0,
+          borderRadius: 12,
+          border: "1px solid var(--border)",
+          overflow: "hidden",
+          background: "color-mix(in srgb, var(--text-secondary) 8%, var(--surface))",
+          cursor: "zoom-in",
+          height: FOTO_ALTO,
+          minHeight: 280,
+        }}
+      >
+        <FotoProtegida
+          url={url}
+          alt={label}
+          alto={FOTO_ALTO}
+          style={{ width: "100%", height: FOTO_ALTO, objectFit: "cover", display: "block" }}
+        />
+      </button>
+      <figcaption style={{ fontSize: 12.5, fontWeight: 650, color: "var(--text-secondary)" }}>{label}</figcaption>
+    </figure>
   );
 }
 
 export default function ActivityEvidenceReviewPanel({ activity, showHeader = true }: Props) {
   const ev = activity.activityEvidence as ActivityEvidenceDetail | null | undefined;
+  const [visor, setVisor] = useState<{ fotos: Foto[]; index: number } | null>(null);
+  const cerrarVisor = useCallback(() => setVisor(null), []);
+  const moverVisor = useCallback((i: number) => setVisor((v) => (v ? { ...v, index: i } : v)), []);
+
+  const galeria = useMemo(() => {
+    if (!ev) return [] as Foto[];
+    const num = (v: number | string | null | undefined): number | null => {
+      if (v == null || v === "") return null;
+      const n = typeof v === "string" ? Number(v) : v;
+      return Number.isFinite(n) ? n : null;
+    };
+    const fotos: Foto[] = [];
+    if (ev.entryPhotoUrl) {
+      fotos.push({
+        url: ev.entryPhotoUrl,
+        titulo: "Foto entrada",
+        at: ev.entryPhotoUploadedAt ?? null,
+        lat: num(ev.entryLatitude),
+        lng: num(ev.entryLongitude),
+      });
+    }
+    for (const [idx, photo] of (ev.evidencePhotos ?? []).entries()) {
+      fotos.push({ url: photo, titulo: `Evidencia ${idx + 1}` });
+    }
+    if (ev.exitPhotoUrl) {
+      fotos.push({
+        url: ev.exitPhotoUrl,
+        titulo: "Foto salida",
+        at: ev.exitPhotoUploadedAt ?? null,
+        lat: num(ev.exitLatitude),
+        lng: num(ev.exitLongitude),
+      });
+    }
+    return fotos;
+  }, [ev]);
+
   if (!ev) return null;
 
   const steps = evidenceStepStatuses(ev);
@@ -57,6 +114,17 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
   const entryMap = mapsUrl(ev.entryLatitude, ev.entryLongitude);
   const exitMap = mapsUrl(ev.exitLatitude, ev.exitLongitude);
   const branch = [activity.branchName, activity.branchCity, activity.branchState].filter(Boolean).join(" · ");
+
+  const abrirFoto = (index: number) => {
+    if (index >= 0 && galeria[index]) setVisor({ fotos: galeria, index });
+  };
+
+  let fotoIdx = 0;
+  const entryIdx = ev.entryPhotoUrl ? fotoIdx++ : -1;
+  const evidenceStart = fotoIdx;
+  const evidenceCount = ev.evidencePhotos?.length ?? 0;
+  fotoIdx += evidenceCount;
+  const exitIdx = ev.exitPhotoUrl ? fotoIdx : -1;
 
   return (
     <div style={{ display: "grid", gap: 16, marginBottom: showHeader ? 20 : 0 }}>
@@ -168,12 +236,16 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
               <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
                 {entryMap && (
                   <Link href={entryMap} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>
-                    <IconLabel icon={PlaceOutlinedIcon} gap={4}>GPS entrada</IconLabel>
+                    <IconLabel icon={PlaceOutlinedIcon} gap={4}>
+                      GPS entrada
+                    </IconLabel>
                   </Link>
                 )}
                 {exitMap && (
                   <Link href={exitMap} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>
-                    <IconLabel icon={PlaceOutlinedIcon} gap={4}>GPS salida</IconLabel>
+                    <IconLabel icon={PlaceOutlinedIcon} gap={4}>
+                      GPS salida
+                    </IconLabel>
                   </Link>
                 )}
               </div>
@@ -184,12 +256,21 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
 
       <div style={{ padding: 16, borderRadius: 12, border: "1px solid var(--border)" }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Archivos capturados</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-          {ev.entryPhotoUrl && <PhotoThumb url={ev.entryPhotoUrl} label="Foto entrada" />}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {ev.entryPhotoUrl && entryIdx >= 0 ? (
+            <PhotoHero url={ev.entryPhotoUrl} label="Foto entrada" onOpen={() => abrirFoto(entryIdx)} />
+          ) : null}
           {(ev.evidencePhotos ?? []).map((photo, idx) => (
-            <PhotoThumb key={`${photo}-${idx}`} url={photo} label={`Evidencia ${idx + 1}`} />
+            <PhotoHero
+              key={`${photo}-${idx}`}
+              url={photo}
+              label={`Evidencia ${idx + 1}`}
+              onOpen={() => abrirFoto(evidenceStart + idx)}
+            />
           ))}
-          {ev.exitPhotoUrl && <PhotoThumb url={ev.exitPhotoUrl} label="Foto salida" />}
+          {ev.exitPhotoUrl && exitIdx >= 0 ? (
+            <PhotoHero url={ev.exitPhotoUrl} label="Foto salida" onOpen={() => abrirFoto(exitIdx)} />
+          ) : null}
         </div>
 
         {ev.serviceSheetPdfUrl && (
@@ -228,10 +309,11 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
                   <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>{field.label}</div>
                   <div style={{ fontWeight: 600, marginTop: 2 }}>{field.value}</div>
                   {field.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={resolveAssetUrl(field.imageUrl)}
                       alt={field.label}
-                      style={{ marginTop: 6, width: "100%", maxHeight: 80, objectFit: "cover", borderRadius: 6 }}
+                      style={{ marginTop: 6, width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6 }}
                     />
                   )}
                 </div>
@@ -251,6 +333,8 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
           </p>
         )}
       </div>
+
+      {visor ? <Visor fotos={visor.fotos} index={visor.index} onClose={cerrarVisor} onIndex={moverVisor} /> : null}
     </div>
   );
 }
