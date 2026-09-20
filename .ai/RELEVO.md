@@ -2,26 +2,28 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** `7322717c` (en Hetzner; web+api healthy)
-- **Migraciones:** ya aplicadas `2026092001*`
+- **Rama:** feat/hard-rbac
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-hard-rbac`
+- **HEAD:** (este commit)
 
-## Puente — no cambiar
+## Hecho este turno
 
-NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
+- **sec(tools):** approve/reject/deliver + renovaciones exigen `assertCanManageTools(email)` (solo Christian `gerencia@` / Iván `administracion.ventas@`).
+- Quitado bypass `CONSOLE_ADMIN` en gates de manage/approve (David `operaciones@` no aprueba aunque tenga consola).
+- Auth `applyToolsManageByEmail` verificado (strip + add por email).
+- Specs: `tools-access`, `tools-manage-rbac`, `tools-approve-rbac`, `solicitud-con-ot` verdes.
 
-## Hecho este turno (optimización densidad · 4 agentes)
+## Nota seguridad
 
-1. **Shell** (`58241797`): menos padding PageHeader / Section / PanelTabs / KpiCard.
-2. **Organigrama** (`8725d527`): KPIs + depto en franja; nodos ~204px.
-3. **Almacén** (`ea1b5ddd`): sin doble chrome embedded; herramientas densas; fotos 140px.
-4. **section-views** (`2e2a6b10`): copy Core corto; tools manage para admin/warehouse.
+- `RbacGuard` puede seguir dejando pasar `isSuperAdmin` (p.ej. `developer@`) a endpoints con `@RBAC`; el **service** bloquea approve/reject/deliver/renewals por email.
+- No se rompió superadmin global del guard; solo tool approve paths.
 
 ## Siguiente
 
-- QA visual en prod tras deploy.
-- Rotar Maps key / contraseñas: lado Adam.
+- Merge `feat/hard-rbac` cuando Adam diga.
+- QA: Iván aprueba préstamo + renovación; David no.
 
 ## No tocar
 
-Puente NAS.
+- Puente NAS Synology.
+- `C:\dev\apps\NEXARA-app` (main) — trabajo solo en este worktree.
