@@ -178,7 +178,10 @@ final class ShiftGpsTracker: NSObject, ObservableObject, CLLocationManagerDelega
                     lat: coordinate.latitude,
                     lng: coordinate.longitude,
                     speedKmh: location.speed >= 0 ? location.speed * 3.6 : nil,
-                    actividadId: actividadId
+                    actividadId: actividadId,
+                    // El punto viaja marcado si lo produjo software. No se descarta: un
+                    // hueco en el recorrido no se puede leer, un punto marcado sí.
+                    mockLocation: location.isSimulatedLocation
                 )
                 self.lastSent = Date()
                 self.lastSentAt = self.lastSent

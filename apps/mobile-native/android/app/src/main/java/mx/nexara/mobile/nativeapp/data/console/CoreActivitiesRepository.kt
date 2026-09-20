@@ -250,6 +250,7 @@ class CoreActivitiesRepository(context: Context) {
         lat: Double,
         lng: Double,
         justificacionOrden: String? = null,
+        mockLocation: Boolean? = null,
     ): EvidenceFlowDto = api.entryPhoto(
         activityId,
         ActivityEvidencePhotoStepRequest(
@@ -257,6 +258,7 @@ class CoreActivitiesRepository(context: Context) {
             latitude = lat,
             longitude = lng,
             justificacionOrden = justificacionOrden?.trim()?.takeIf { it.isNotEmpty() },
+            mockLocation = mockLocation,
         ),
     )
 
@@ -304,8 +306,22 @@ class CoreActivitiesRepository(context: Context) {
     suspend fun serviceSheetData(activityId: Long, form: Map<String, String>): EvidenceFlowDto =
         api.serviceSheetData(activityId, form)
 
-    suspend fun exitPhoto(activityId: Long, photoUrl: String, lat: Double, lng: Double): EvidenceFlowDto =
-        api.exitPhoto(activityId, ActivityEvidencePhotoStepRequest(photoUrl, lat, lng))
+    suspend fun exitPhoto(
+        activityId: Long,
+        photoUrl: String,
+        lat: Double,
+        lng: Double,
+        mockLocation: Boolean? = null,
+    ): EvidenceFlowDto =
+        api.exitPhoto(
+            activityId,
+            ActivityEvidencePhotoStepRequest(
+                photoUrl = photoUrl,
+                latitude = lat,
+                longitude = lng,
+                mockLocation = mockLocation,
+            ),
+        )
 
     suspend fun resubmit(activityId: Long, step: String, data: Any): EvidenceFlowDto =
         api.resubmit(activityId, EvidenceResubmitRequest(step = step, data = data))

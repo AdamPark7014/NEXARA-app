@@ -30,6 +30,11 @@ export type TotalesKpi = {
   minutosInactivos: number;
   productividadPct: number | null;
   minutosExtra: number | null;
+  /** Lo que un jefe ya aprobó: lo único que la pre-nómina puede pagar como extra. */
+  minutosExtraAprobados: number;
+  /** Tiempo extra calculado que nadie ha aprobado ni rechazado todavía. */
+  minutosExtraPendientes: number;
+  diasExtraPendientes: number;
   jornadasAbiertas: number;
   jornadasSinSalida: number;
   cierresAutomaticos: number;
@@ -69,6 +74,10 @@ export type DiaKpi = {
   minutosInactivos: number;
   productividadPct: number | null;
   minutosExtra: number | null;
+  /** Qué decidió el jefe sobre el extra de ese día. null = nadie lo ha visto. */
+  extraEstado: "PENDIENTE" | "APROBADO" | "RECHAZADO" | null;
+  minutosExtraAprobados: number;
+  extraNota: string | null;
   actividadesFueraDeJornada: number;
   tramos?: { jornada: TramoIso[]; comida: TramoIso[]; productivo: TramoIso[]; inactivo: TramoIso[] };
   actividades?: ActividadDelDia[];
@@ -80,8 +89,12 @@ export type KpiPersonaFila = {
     clave: string | null;
     etiqueta: string;
     entrada: string | null;
+    salida: string | null;
     graciaMin: number;
     jornadaOrdinariaMin: number | null;
+    dias: number[];
+    /** Alguien le escribió un horario propio; si no, es el de su plantilla. */
+    personalizado: boolean;
   };
   totales: TotalesKpi;
   semaforo: SemaforoKpi;

@@ -121,11 +121,15 @@ export type HorarioKpi = {
   clave: string | null;
   /** Hora de entrada esperada `HH:MM`; null = sin horario (no hay retardo ni extra). */
   entrada: string | null;
+  /** Hora de salida esperada `HH:MM`. Informativa: la jornada la miden las checadas. */
+  salida: string | null;
   graciaMin: number;
   /** Jornada ordinaria por día laborable, en minutos netos; null = sin horario. */
   jornadaOrdinariaMin: number | null;
   /** Días laborables (0 = domingo … 6 = sábado). */
   diasLaborables: readonly number[];
+  /** Alguien le escribió un horario propio; si no, es el de su plantilla. */
+  personalizado: boolean;
 };
 
 /** Horario a partir de la plantilla que ya decide retardos en avisos y RH. */
@@ -134,9 +138,70 @@ export function horarioDePlantilla(clave?: string | null): HorarioKpi {
   return {
     clave: clave ?? null,
     entrada,
+    salida: null,
     graciaMin: RETARDO_GRACE_MINUTES,
     jornadaOrdinariaMin: entrada ? JORNADA_ORDINARIA_MIN : null,
     diasLaborables: entrada ? DIAS_LABORABLES : [],
+    personalizado: false,
+  };
+}
+
+/** Lo que alguien escribió en el editor de horarios. Todo opcional. */
+export type HorarioPropio = {
+  horaEntrada?: string | null;
+  horaSalida?: string | null;
+  dias?: readonly number[] | null;
+  graciaMin?: number | null;
+  jornadaOrdinariaMin?: number | null;
+};
+
+/** `HH:MM` válido, o null. */
+export function horaValida(valor?: string | null): string | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec((valor ?? '').trim());
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
+/**
+ * Horario de una persona: su plantilla, con lo que alguien le haya escrito encima.
+ *
+ * Cada campo se decide por separado a propósito. Cambiarle la hora de entrada a alguien no
+ * debería obligar a decidir de paso su jornada ni sus días, así que lo que no se escribe
+ * sigue siendo el de la plantilla. Mientras la tabla esté vacía —que es como nace— esto
+ * devuelve exactamente lo mismo que `horarioDePlantilla`, y no cambia ni un cálculo.
+ *
+ * Un horario propio sí puede dar retardo y tiempo extra a quien su plantilla no se los
+ * daba (dirección 24/7, visitante): para eso está el editor. Poner la hora de entrada es
+ * justamente decir «a esta persona sí se le mide».
+ */
+export function horarioDePersona(clave?: string | null, propio?: HorarioPropio | null): HorarioKpi {
+  const base = horarioDePlantilla(clave);
+  if (!propio) return base;
+
+  const entrada = horaValida(propio.horaEntrada) ?? base.entrada;
+  const salida = horaValida(propio.horaSalida) ?? base.salida;
+  const dias = (propio.dias ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  const gracia =
+    typeof propio.graciaMin === 'number' && Number.isFinite(propio.graciaMin) && propio.graciaMin >= 0
+      ? Math.round(propio.graciaMin)
+      : base.graciaMin;
+  const jornada =
+    typeof propio.jornadaOrdinariaMin === 'number' &&
+    Number.isFinite(propio.jornadaOrdinariaMin) &&
+    propio.jornadaOrdinariaMin > 0
+      ? Math.round(propio.jornadaOrdinariaMin)
+      : null;
+
+  // Sin hora de entrada no hay a qué llegar tarde ni de qué pasarse: se respeta.
+  const diasLaborables = entrada ? (dias.length ? [...new Set(dias)].sort() : base.diasLaborables.length ? base.diasLaborables : DIAS_LABORABLES) : [];
+
+  return {
+    clave: base.clave,
+    entrada,
+    salida,
+    graciaMin: gracia,
+    jornadaOrdinariaMin: entrada ? (jornada ?? base.jornadaOrdinariaMin ?? JORNADA_ORDINARIA_MIN) : null,
+    diasLaborables,
+    personalizado: true,
   };
 }
 
@@ -402,6 +467,16 @@ export type DiaKpi = {
   minutosInactivos: number;
   productividadPct: number | null;
   minutosExtra: number | null;
+  /**
+   * Qué decidió el jefe sobre el tiempo extra de ese día. null = nadie lo ha visto.
+   * A nómina solo llegan los APROBADO (`minutosExtraAprobados`).
+   */
+  extraEstado: EstadoExtra | null;
+  /** Minutos que el jefe aprobó ese día. Pueden no coincidir con `minutosExtra`: el jefe
+   * aprueba una cantidad, y una corrección posterior de la hora no la cambia sola. */
+  minutosExtraAprobados: number;
+  /** Nota que dejó al aprobar o rechazar. */
+  extraNota: string | null;
   /** Actividades que empezaron ese día sin tocar ninguna jornada (trabajo sin checar). */
   actividadesFueraDeJornada: number;
   /** Solo en el detalle: para dibujar la línea de tiempo. */
@@ -436,10 +511,28 @@ export type TotalesKpi = {
   productividadPct: number | null;
   /** null = sin horario (24/7, visitante): no se puede hablar de extra. */
   minutosExtra: number | null;
+  /** Lo que un jefe ya aprobó. Es lo único que nómina puede pagar. */
+  minutosExtraAprobados: number;
+  /** Tiempo extra calculado que nadie ha aprobado ni rechazado todavía. */
+  minutosExtraPendientes: number;
+  /** Días con tiempo extra esperando decisión. */
+  diasExtraPendientes: number;
   jornadasAbiertas: number;
   jornadasSinSalida: number;
   cierresAutomaticos: number;
   actividadesFueraDeJornada: number;
+};
+
+/** Qué decidió el jefe sobre el tiempo extra de un día. */
+export type EstadoExtra = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+
+/** Una decisión de horas extra, ya leída de la base. */
+export type AprobacionExtra = {
+  /** `AAAA-MM-DD`. */
+  fecha: string;
+  minutos: number;
+  estado: EstadoExtra;
+  nota?: string | null;
 };
 
 export type EntradaKpiPersona = {
@@ -453,6 +546,8 @@ export type EntradaKpiPersona = {
   actividades: ActividadKpi[];
   /** Días (`AAAA-MM-DD`) con falta justificada. */
   justificadas?: string[];
+  /** Lo que el jefe ya decidió sobre el tiempo extra, por día. */
+  aprobacionesExtra?: AprobacionExtra[];
   /** Antes de su ingreso no hay faltas. */
   fechaIngreso?: Date | null;
   /** Incluir tramos y actividades por día (detalle de una persona). */
@@ -477,6 +572,7 @@ export function calculaKpisPersona(e: EntradaKpiPersona): { dias: DiaKpi[]; tota
   const hoy = workDateKey(e.ahora, tz);
   const justificadas = new Set(e.justificadas ?? []);
   const ingreso = e.fechaIngreso ? workDateKey(e.fechaIngreso, tz) : null;
+  const extraPorDia = new Map((e.aprobacionesExtra ?? []).map((a) => [a.fecha, a]));
 
   const jornadas = armaJornadas(e.checadas, e.ahora, tz);
   const tramosJornadaTodos = jornadas.map((j) => ({ inicio: j.entrada.getTime(), fin: j.fin.getTime() }));
@@ -541,6 +637,9 @@ export function calculaKpisPersona(e: EntradaKpiPersona): { dias: DiaKpi[]; tota
         minutosInactivos: 0,
         productividadPct: null,
         minutosExtra: null,
+        extraEstado: null,
+        minutosExtraAprobados: 0,
+        extraNota: null,
         actividadesFueraDeJornada: fuera,
         ...(e.detalle ? { tramos: { jornada: [], comida: [], productivo: [], inactivo: [] }, actividades: [] } : {}),
       });
@@ -566,6 +665,9 @@ export function calculaKpisPersona(e: EntradaKpiPersona): { dias: DiaKpi[]; tota
           ? Math.max(0, minutosLaborados - e.horario.jornadaOrdinariaMin)
           : minutosLaborados;
 
+    // Solo se paga lo que un jefe aprobó. Sin fila, el extra está pendiente de mirar.
+    const decision = extraPorDia.get(fecha) ?? null;
+
     const dia: DiaKpi = {
       fecha,
       laborable,
@@ -587,6 +689,9 @@ export function calculaKpisPersona(e: EntradaKpiPersona): { dias: DiaKpi[]; tota
       minutosInactivos,
       productividadPct: pct(minutosProductivos, minutosLaborados),
       minutosExtra,
+      extraEstado: decision?.estado ?? null,
+      minutosExtraAprobados: decision?.estado === 'APROBADO' ? Math.max(0, decision.minutos) : 0,
+      extraNota: decision?.nota ?? null,
       actividadesFueraDeJornada: fuera,
     };
 
@@ -627,6 +732,9 @@ function sumaTotales(dias: DiaKpi[], jornadas: JornadaKpi[], horario: HorarioKpi
   const noOk = jornadas.filter((j) => j.uniformeOk === false).length;
   const minutosLaborados = conJornada.reduce((s, d) => s + d.minutosLaborados, 0);
   const minutosProductivos = conJornada.reduce((s, d) => s + d.minutosProductivos, 0);
+  // Un día sin decisión, o rechazado, no aporta minutos pagables. Pendiente es solo lo
+  // que nadie ha mirado: lo rechazado ya se miró y la respuesta fue que no.
+  const pendientes = conJornada.filter((d) => (d.minutosExtra ?? 0) > 0 && d.extraEstado == null);
   return {
     diasConJornada: conJornada.length,
     diasSinChecada: dias.filter((d) => d.sinChecada).length,
@@ -648,6 +756,9 @@ function sumaTotales(dias: DiaKpi[], jornadas: JornadaKpi[], horario: HorarioKpi
       horario.jornadaOrdinariaMin == null
         ? null
         : conJornada.reduce((s, d) => s + (d.minutosExtra ?? 0), 0),
+    minutosExtraAprobados: conJornada.reduce((s, d) => s + d.minutosExtraAprobados, 0),
+    minutosExtraPendientes: pendientes.reduce((s, d) => s + (d.minutosExtra ?? 0), 0),
+    diasExtraPendientes: pendientes.length,
     jornadasAbiertas: jornadas.filter((j) => j.abierta).length,
     jornadasSinSalida: jornadas.filter((j) => j.sinSalida).length,
     cierresAutomaticos: jornadas.filter((j) => j.cierreAutomatico).length,
@@ -681,6 +792,9 @@ export function sumaEquipo(lista: TotalesKpi[]): TotalesKpi {
     minutosInactivos: s((t) => t.minutosInactivos),
     productividadPct: pct(productivos, laborados),
     minutosExtra: conExtra.length ? conExtra.reduce((acc, t) => acc + (t.minutosExtra ?? 0), 0) : null,
+    minutosExtraAprobados: s((t) => t.minutosExtraAprobados),
+    minutosExtraPendientes: s((t) => t.minutosExtraPendientes),
+    diasExtraPendientes: s((t) => t.diasExtraPendientes),
     jornadasAbiertas: s((t) => t.jornadasAbiertas),
     jornadasSinSalida: s((t) => t.jornadasSinSalida),
     cierresAutomaticos: s((t) => t.cierresAutomaticos),
@@ -767,8 +881,9 @@ export function supuestosKpi(): string[] {
     'Horas productivas: tiempo en actividades («Iniciar» o foto de entrada → foto de salida o fin) dentro de las horas laboradas. Dos actividades a la vez no cuentan doble y lo hecho fuera de la jornada no suma.',
     'Una actividad abierta cuenta hasta ahora solo si empezó hoy; si empezó otro día se corta al final de ese día. Las de un periodo de varios días cuentan en cada jornada de su periodo, hasta su último día.',
     'Inactividad: horas laboradas menos horas productivas.',
-    `Retardo: entrada después de su hora (oficina 09:00, contratista 08:00) más ${RETARDO_GRACE_MINUTES} min de gracia, de lunes a viernes. Los minutos tarde se cuentan desde su hora de entrada. Dirección (24/7) no tiene retardos.`,
+    `Retardo: entrada después de su hora (oficina 09:00, contratista 08:00) más ${RETARDO_GRACE_MINUTES} min de gracia, de lunes a viernes. Los minutos tarde se cuentan desde su hora de entrada. Dirección (24/7) no tiene retardos. A quien se le haya escrito un horario propio, se le mide con ese.`,
     `Tiempo extra: lo laborado arriba de ${JORNADA_ORDINARIA_MIN / 60} h en día laborable, o todo lo laborado en sábado o domingo. Sin horario no se calcula.`,
+    'El tiempo extra calculado no se paga solo: un jefe lo aprueba día por día, y a la pre-nómina solo llega lo aprobado.',
     'Uniforme: el jefe marca ✓ o ✗ en la entrada de cada persona (Asistencias). El % es sobre las entradas revisadas.',
     `Semáforo: el peor de productividad (verde ≥ ${u.productividadVerde} %, amarillo ≥ ${u.productividadAmarillo} %), retardos (amarillo desde ${u.retardosAmarillo}, rojo desde ${u.retardosRojo}), uniforme (verde ≥ ${u.uniformeVerde} %, amarillo ≥ ${u.uniformeAmarillo} %) y días sin checada (amarillo ${u.faltasAmarillo}, rojo desde ${u.faltasRojo}).`,
   ];

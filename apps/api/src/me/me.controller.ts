@@ -27,6 +27,7 @@ import {
 import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
 import { PeerRequestsService } from './peer-requests.service.js';
+import { HorasExtraService } from './horas-extra.service.js';
 import { ActivityToolsService } from '../activities/tools/activity-tools.service.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { COLUMNAS_KPIS_DIAS, COLUMNAS_KPIS_PERSONAS } from '../common/excel/reportes.js';
@@ -52,6 +53,7 @@ export class MeController {
     private readonly excel: ExcelExportService,
     private readonly activityTools: ActivityToolsService,
     private readonly peerRequests: PeerRequestsService,
+    private readonly horasExtra: HorasExtraService,
   ) {}
 
   /** Mis actividades: cola personal (todos menos el CEO). */
@@ -572,6 +574,74 @@ export class MeController {
       email: user.email ?? null,
       isSuperAdmin: Boolean(user.isSuperAdmin),
     };
+  }
+
+  /**
+   * El jefe aprueba o rechaza el tiempo extra de un día: `{ userId, fecha, minutos, estado, nota }`.
+   * Calculado no es autorizado: a la pre-nómina solo llegan los APROBADO.
+   */
+  @Post('kpis/horas-extra')
+  decidirHorasExtra(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { userId?: number; fecha?: string; minutos?: number; estado?: string; nota?: string },
+  ) {
+    this.exigirEmpleado(user);
+    return this.horasExtra.decidir(this.viewer(user), companyId, body);
+  }
+
+  /** Decisiones de horas extra ya tomadas en el rango (`?desde&hasta&userId`). */
+  @Get('kpis/horas-extra')
+  listarHorasExtra(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+    @Query('userId') userId?: string,
+  ) {
+    this.exigirEmpleado(user);
+    const solo = Number(userId);
+    return this.horasExtra.listar(
+      this.viewer(user),
+      companyId,
+      this.horasExtra.resolveDias(desde, hasta),
+      Number.isInteger(solo) && solo > 0 ? solo : null,
+    );
+  }
+
+  /** Horarios propios ya escritos, de la gente que este jefe alcanza. */
+  @Get('kpis/horarios')
+  listarHorarios(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    this.exigirEmpleado(user);
+    return this.horasExtra.listarHorarios(this.viewer(user), companyId);
+  }
+
+  /**
+   * Escribe el horario propio de una persona. Todo vacío borra la fila y la persona
+   * vuelve a su plantilla (oficina 09:00, campo 08:00, 15 min de gracia, L–V, 8 h).
+   */
+  @Post('kpis/horarios')
+  guardarHorario(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body()
+    body: {
+      userId?: number;
+      horaEntrada?: string | null;
+      horaSalida?: string | null;
+      dias?: number[] | null;
+      graciaMin?: number | null;
+      jornadaOrdinariaMin?: number | null;
+    },
+  ) {
+    this.exigirEmpleado(user);
+    return this.horasExtra.guardarHorario(this.viewer(user), companyId, body);
+  }
+
+  private exigirEmpleado(user: any) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
   }
 
   @Get('board/:userId')

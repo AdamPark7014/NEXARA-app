@@ -404,6 +404,9 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                         accuracyM = coords?.accuracyM,
                         // Se manda aunque sea true: el servidor la rechaza y avisa a sus jefes.
                         mockLocation = coords?.mock == true,
+                        // De cuándo es la medición: el servidor no acepta una posición
+                        // guardada de hace media hora como si fuera de ahora.
+                        fixAgeMs = coords?.fixAgeMs,
                         photoBase64 = photoBase64,
                     )
                 }
@@ -435,14 +438,17 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 val mensaje = e.toUserMessage("Error al registrar")
                 val code = (e as? retrofit2.HttpException)?.code()
-                val mock = AttendanceCheckIn.esUbicacionSimulada(code, mensaje)
+                // Ubicación simulada, posición vieja, viaje imposible o intento desde fuera
+                // de la app: son cuatro rechazos distintos, pero para quien está parado en
+                // la puerta todos significan «no se registró». Van al mismo diálogo.
+                val rechazada = AttendanceCheckIn.esRechazoDelServidor(code, mensaje)
                 _state.update {
                     it.copy(
                         checkInLoading = false,
-                        // El 422 de ubicación simulada se ve en un diálogo, no en una línea gris.
-                        checkInMessage = if (mock) null else mensaje,
-                        checkInError = !mock,
-                        checkInBloqueo = if (mock) {
+                        // Un rechazo del servidor se ve en un diálogo, no en una línea gris.
+                        checkInMessage = if (rechazada) null else mensaje,
+                        checkInError = !rechazada,
+                        checkInBloqueo = if (rechazada) {
                             mensaje.takeIf { m -> m.isNotBlank() } ?: AttendanceCheckIn.MOCK_MENSAJE
                         } else {
                             null
@@ -593,17 +599,20 @@ fun ConsoleAttendanceScreen(
     }
 
     state.checkInBloqueo?.let { mensaje ->
-        UbicacionSimuladaDialog(mensaje = mensaje, onDismiss = vm::clearBloqueo)
+        ChecadaRechazadaDialog(mensaje = mensaje, onDismiss = vm::clearBloqueo)
     }
 }
 
 /**
- * 422 del servidor: la checada no se registró porque el teléfono traía GPS
- * falso. Se dice completo y en un diálogo — es lo único que importa en ese
- * momento — con lo que hay que hacer para poder checar.
+ * 422 del servidor: la checada no se registró.
+ *
+ * Puede ser GPS falso, una posición guardada de hace rato, una distancia imposible desde
+ * la checada anterior, o un intento desde fuera de la app. Se dice completo y en un
+ * diálogo —es lo único que importa en ese momento— con lo que hay que hacer para checar,
+ * que no es lo mismo en los cuatro casos.
  */
 @Composable
-private fun UbicacionSimuladaDialog(mensaje: String, onDismiss: () -> Unit) {
+private fun ChecadaRechazadaDialog(mensaje: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -621,7 +630,7 @@ private fun UbicacionSimuladaDialog(mensaje: String, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(mensaje, fontSize = 14.sp, color = NxColors.Slate, fontWeight = FontWeight.SemiBold)
-                Text(AttendanceCheckIn.MOCK_AYUDA, fontSize = 13.sp, color = NxColors.Muted)
+                Text(AttendanceCheckIn.ayudaDelRechazo(mensaje), fontSize = 13.sp, color = NxColors.Muted)
             }
         },
         confirmButton = {

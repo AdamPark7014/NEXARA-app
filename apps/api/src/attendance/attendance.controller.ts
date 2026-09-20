@@ -58,6 +58,57 @@ export class AttendanceController {
     return this.justifications.remove(this.actor(req), id, companyId);
   }
 
+  /**
+   * Intentos de checada que el servidor rechazó: quién, cuándo, desde dónde y por qué.
+   * Filtros `?from&to&userId&motivo`. Cada quien ve a los suyos.
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ATTENDANCE_VIEW,
+      PERMISSIONS.ATTENDANCE_MANAGE,
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.HR_MANAGE,
+    ],
+  })
+  @Get('rechazos')
+  rechazos(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('userId') userId?: string,
+    @Query('motivo') motivo?: string,
+  ) {
+    return this.attendanceService.listarRechazos(
+      this.actor(req),
+      { from, to, userId, motivo },
+      companyId,
+    );
+  }
+
+  /**
+   * Un jefe registra la checada de alguien de su equipo: `{ userId, type, timestamp?, motivo }`.
+   * Es la salida de emergencia de «solo se checa desde la app» — teléfono roto, sin batería,
+   * olvidado en casa. Queda quién la puso y por qué, y nace en REVISAR.
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ATTENDANCE_MANAGE,
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.HR_MANAGE,
+    ],
+  })
+  @Post('registro-asistido')
+  registroAsistido(
+    @Req() req: any,
+    @Body() body: { userId?: number; type?: string; timestamp?: string; motivo?: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.attendanceService.registrarPorJefe(this.actor(req), body, companyId);
+  }
+
   private actor(req: any) {
     const u = req?.user ?? {};
     return {

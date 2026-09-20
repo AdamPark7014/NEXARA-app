@@ -1,3 +1,4 @@
+import { PETICION_APP } from './peticion-de-app.testing.js';
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AttendanceService } from './attendance.service.js';
@@ -55,7 +56,7 @@ describe('entrada duplicada', () => {
     const { service } = build({
       attendance: { findFirst: jest.fn().mockResolvedValue({ id: 9 }) },
     });
-    await expect(service.register(entrada as any, 3, undefined, 7)).rejects.toThrow(
+    await expect(service.register(entrada as any, 3, PETICION_APP, 7)).rejects.toThrow(
       'Ya existe una entrada registrada para hoy',
     );
   });
@@ -68,7 +69,7 @@ describe('entrada duplicada', () => {
         create: jest.fn().mockRejectedValue(P2002),
       },
     });
-    await expect(service.register(entrada as any, 3, undefined, 7)).rejects.toThrow(
+    await expect(service.register(entrada as any, 3, PETICION_APP, 7)).rejects.toThrow(
       BadRequestException,
     );
   });
@@ -80,7 +81,7 @@ describe('entrada duplicada', () => {
         create: jest.fn().mockRejectedValue(P2002),
       },
     });
-    await expect(service.register(entrada as any, 3, undefined, 7)).rejects.toThrow(
+    await expect(service.register(entrada as any, 3, PETICION_APP, 7)).rejects.toThrow(
       'Ya existe una entrada registrada para hoy',
     );
   });
@@ -89,7 +90,7 @@ describe('entrada duplicada', () => {
     // Sin `workDate` no se puede exigir la regla en la base: convertir zonas no
     // es inmutable en Postgres y `timestamp::date` no se puede indexar asi.
     const { service, prisma } = build();
-    await service.register(entrada as any, 3, undefined, 7);
+    await service.register(entrada as any, 3, PETICION_APP, 7);
 
     const data = prisma.attendance.create.mock.calls[0][0].data;
     expect(data.workDate).toBeInstanceOf(Date);
@@ -105,12 +106,12 @@ describe('entrada duplicada', () => {
         create: jest.fn().mockRejectedValue(caida),
       },
     });
-    await expect(service.register(entrada as any, 3, undefined, 7)).rejects.toThrow('base caída');
+    await expect(service.register(entrada as any, 3, PETICION_APP, 7)).rejects.toThrow('base caída');
   });
 
   it('sin usuario autenticado no registra nada', async () => {
     const { service, prisma } = build();
-    await expect(service.register(entrada as any, 0, undefined, 7)).rejects.toThrow(
+    await expect(service.register(entrada as any, 0, PETICION_APP, 7)).rejects.toThrow(
       BadRequestException,
     );
     expect(prisma.attendance.create).not.toHaveBeenCalled();
@@ -143,7 +144,7 @@ describe('entrada duplicada', () => {
       .fn()
       .mockResolvedValue({ id: 5, isOpen: true, date: diaDeHoy });
 
-    await expect(service.register(entrada as any, 3, undefined, 7)).rejects.toThrow(
+    await expect(service.register(entrada as any, 3, PETICION_APP, 7)).rejects.toThrow(
       /jornada abierta/,
     );
   });
@@ -166,7 +167,7 @@ describe('entrada duplicada', () => {
       },
     });
 
-    await expect(service.register(entrada as any, 3, undefined, 7)).resolves.toMatchObject({
+    await expect(service.register(entrada as any, 3, PETICION_APP, 7)).resolves.toMatchObject({
       message: expect.stringContaining('Entrada'),
     });
     // La salida inventada queda marcada como cierre automático y a revisión.

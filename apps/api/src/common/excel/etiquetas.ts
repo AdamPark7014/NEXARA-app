@@ -176,6 +176,21 @@ export const ETIQUETA_SEMAFORO: Record<string, string> = {
   sin_datos: 'Sin datos',
 };
 
+/** Qué decidió el jefe sobre el tiempo extra de un día (`OvertimeApprovalEstado`). */
+export const ETIQUETA_ESTADO_EXTRA: Record<string, string> = {
+  PENDIENTE: 'Por aprobar',
+  APROBADO: 'Aprobado',
+  RECHAZADO: 'Rechazado',
+};
+
+/** Por qué el servidor no aceptó una checada (`AttendanceRejection.motivo`). */
+export const ETIQUETA_MOTIVO_CHECADA_RECHAZADA: Record<string, string> = {
+  MOCK_LOCATION: 'Ubicación simulada',
+  ORIGEN_WEB: 'Intento desde el navegador',
+  VIAJE_IMPOSIBLE: 'Viaje imposible entre checadas',
+  UBICACION_VIEJA: 'Ubicación guardada, no del momento',
+};
+
 // ─────────────────────────────────── CRM y contabilidad (packs de «Exportar»)
 
 /** `sales-api.ts` · `LEAD_STATUS_LABELS`. */
