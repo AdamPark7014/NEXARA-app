@@ -2,7 +2,7 @@ import {
   calculatePrenominaAmount,
   OT_MULTIPLIER,
   roundMoney,
-} from './prenomina-amount.js';
+} from './prenomina-amount';
 
 describe('calculatePrenominaAmount', () => {
   it('null sueldo → suggestedAmount null', () => {

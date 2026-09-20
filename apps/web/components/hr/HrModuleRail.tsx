@@ -11,6 +11,7 @@ const HR_LINKS = [
   { id: "org", label: "Organigrama", href: "/erp/hr/orgchart" },
   { id: "kpis", label: "KPIs", href: "/erp/hr/kpis" },
   { id: "multas", label: "Incidencias", href: "/erp/hr/fines" },
+  { id: "prenomina", label: "Pre-nómina", href: "/erp/hr/prenomina" },
 ] as const;
 
 function isHrPlantillaPath(pathname: string): boolean {
