@@ -21,6 +21,8 @@ import { AccountingWorkspaceReportsController } from './workspace-reports.contro
 import { AccountingWorkspaceReportsService } from './workspace-reports.service.js';
 import { WorkspaceArApController } from './workspace-ar-ap.controller.js';
 import { WorkspaceArApService } from './workspace-ar-ap.service.js';
+import { VendorProjectFinanceService } from './vendor-project-finance.service.js';
+import { VendorProjectFinanceController } from './vendor-project-finance.controller.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule, AuditModule],
@@ -36,6 +38,7 @@ import { WorkspaceArApService } from './workspace-ar-ap.service.js';
     PeriodCloseController,
     AccountingWorkspaceReportsController,
     WorkspaceArApController,
+    VendorProjectFinanceController,
   ],
   providers: [
     AccountingService,
@@ -44,7 +47,8 @@ import { WorkspaceArApService } from './workspace-ar-ap.service.js';
     PeriodCloseService,
     AccountingWorkspaceReportsService,
     WorkspaceArApService,
+    VendorProjectFinanceService,
   ],
-  exports: [AccountingService],
+  exports: [AccountingService, VendorProjectFinanceService],
 })
 export class AccountingModule {}

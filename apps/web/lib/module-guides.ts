@@ -432,6 +432,18 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `users IAM`,
   },
+  'erp-contabilidad': {
+    id: 'erp-contabilidad',
+    summary: `Workspace de la contadora: facturas, cuentas por pagar y cobrar, proveedores y proyectos.`,
+    audience: `Contabilidad, facturación y dirección.`,
+    how: `Hub /erp/contabilidad. Proveedores sale del catálogo de Supplier con saldo y vencido; Proyectos muestra ingresos, costo por categoría y margen, con desglose hasta el documento.`,
+    steps: [
+      `Abre el tablero para ver el pendiente del periodo`,
+      `En Proveedores abre uno para su expediente 360°`,
+      `En Proyectos abre uno y haz clic en una categoría para ver sus transacciones`,
+    ],
+    connects: `facturación, compras, gastos, viáticos, almacén y proyectos`,
+  },
   'exports': {
     id: 'exports',
     summary: `Exportaciones masivas Excel/PDF autorizadas.`,
