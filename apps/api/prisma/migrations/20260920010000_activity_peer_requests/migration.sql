@@ -1,6 +1,10 @@
 -- Solicitudes de equipo entre pares (Ola C). Aditivo: no toca Activity ni el rechazo 403 de OT del jefe.
 
-CREATE TYPE "ActivityPeerRequestStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED');
+DO $$ BEGIN
+  CREATE TYPE "ActivityPeerRequestStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "activity_peer_requests" (
   "id" SERIAL NOT NULL,
@@ -42,7 +46,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'activity_peer_requests_companyId_fkey') THEN
     ALTER TABLE "activity_peer_requests"
       ADD CONSTRAINT "activity_peer_requests_companyId_fkey"
-      FOREIGN KEY ("companyId") REFERENCES "CompanyProfile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+      FOREIGN KEY ("companyId") REFERENCES "company_profile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
   END IF;
 END
 $$;
