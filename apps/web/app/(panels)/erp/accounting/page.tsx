@@ -818,17 +818,14 @@ export default function AccountingPage() {
   };
 
   const closePeriod = (period: FiscalPeriod) => {
+    const dest = "/erp/contabilidad/cierres";
     setConfirmState({
-      message: `¿Cerrar el periodo "${period.name}"? Ya no se podrán contabilizar pólizas dentro de este rango.`,
-      confirmLabel: "Cerrar periodo",
-      fn: async () => {
-        try {
-          const updated = await apiFetch(`accounting/accounts/fiscal-periods/${period.id}/close`, token, { method: "PATCH" });
-          setPeriods(prev => prev.map(p => p.id === period.id ? { ...p, ...updated } : p));
-          toast.success(`Periodo "${period.name}" cerrado.`);
-        } catch (e) {
-          toast.error(formatApiError(e, "No se pudo cerrar el periodo"));
-        }
+      title: "Cierre con lista de verificación",
+      message: `El periodo "${period.name}" se cierra desde Cierres de periodo, con checklist antes de bloquear pólizas. Ruta: ${dest}`,
+      confirmLabel: "Ir a cierres",
+      danger: false,
+      fn: () => {
+        window.location.assign(dest);
       },
     });
   };
