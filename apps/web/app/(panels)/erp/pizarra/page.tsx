@@ -1,20 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ReplayIcon from "@mui/icons-material/Replay";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import OutboxOutlinedIcon from "@mui/icons-material/OutboxOutlined";
+import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { Alert, Avatar, Badge, Button, EmptyState, PageHead, Skeleton, Stat, StatRow, Tabs, TONE_COLOR, type Tone } from "@/components/base";
+import { Alert, Badge, Button, EmptyState, PageHead, Skeleton, Stat, StatRow, Tabs, TONE_COLOR, type Tone } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
 import AsignadasPorMiView from "@/components/pizarra/AsignadasPorMiView";
 import SolicitudesEquipoView from "@/components/pizarra/SolicitudesEquipoView";
-import { PrioridadChip, RangoSelector, SemaforoDot } from "@/components/pizarra/PizarraKpi";
+import PersonaPhotoCard from "@/components/pizarra/PersonaPhotoCard";
+import FlujoKpiStrip from "@/components/pizarra/FlujoKpiStrip";
+import { RangoSelector, SemaforoDot } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import {
   STATUS_LABELS,
@@ -96,99 +98,82 @@ function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean })
   const open = user.openActivities ?? [];
   const fin = user.lastFinished;
   const k = user.kpis;
+  const principal = open[0] ?? null;
   return (
-    <Link href={`/erp/pizarra/${user.id}`} className={`${p.tarjeta} ${isSelf ? p.tarjetaYo : ""}`}>
-      <div className={p.cabeza}>
-        <span className={p.avatar}>
-          <Avatar url={user.avatarUrl} name={user.nombre} size={36} />
-          <span className={p.punto} style={{ background: TONE_COLOR[tono] }} title={STATUS_LABELS[user.status]} />
-        </span>
-        <span style={{ minWidth: 0, flex: 1 }}>
-          <span className={p.nombre}>
-            <span>{user.nombre}</span>
-            {isSelf ? <Badge tone="brand">Tú</Badge> : null}
+    <PersonaPhotoCard
+      href={`/erp/pizarra/${user.id}`}
+      nombre={user.nombre}
+      puesto={user.puesto || "Sin puesto"}
+      avatarUrl={user.avatarUrl}
+      photoSize={200}
+      title={principal?.titulo ?? act?.titulo ?? (fin ? `Última: ${fin.titulo}` : "Sin actividades hoy")}
+      subtitle={estadoTexto(user, Date.now())}
+      prioridad={principal?.prioridad}
+      semaforo={principal?.semaforo}
+      meta={
+        <div style={{ display: "grid", gap: 8 }}>
+          {isSelf ? <Badge tone="brand">Tú</Badge> : null}
+          <span style={{ fontSize: 12.5, color: TEXTO_TONO[tono] }}>
+            {user.status === "libre" && fin ? terminoTexto(fin) : STATUS_LABELS[user.status]}
           </span>
-          <span className={p.puesto} style={{ display: "block" }}>
-            {user.puesto || "Sin puesto"}
-          </span>
-        </span>
-      </div>
-
-      <div className={p.estado} style={{ color: TEXTO_TONO[tono] }}>
-        <span>{estadoTexto(user, Date.now())}</span>
-        {user.status === "libre" && fin ? <span className={p.estadoSub}>{terminoTexto(fin)}</span> : null}
-      </div>
-
-      {user.enCorreccion || user.enEsperaAprobacion ? (
-        <div className={p.chips}>
-          {user.enCorreccion ? (
-            <Badge tone="warning">
-              <ReplayIcon aria-hidden="true" />
-              Corrigiendo evidencia
-            </Badge>
+          {user.enCorreccion || user.enEsperaAprobacion ? (
+            <div className={p.chips}>
+              {user.enCorreccion ? (
+                <Badge tone="warning">
+                  <ReplayIcon aria-hidden="true" />
+                  Corrigiendo evidencia
+                </Badge>
+              ) : null}
+              {user.enEsperaAprobacion ? (
+                <Badge tone="violet">
+                  <HourglassTopIcon aria-hidden="true" />
+                  {user.enEsperaAprobacion > 1
+                    ? `${user.enEsperaAprobacion} en espera de aprobación`
+                    : "En espera de aprobación"}
+                </Badge>
+              ) : null}
+            </div>
           ) : null}
-          {user.enEsperaAprobacion ? (
-            <Badge tone="violet">
-              <HourglassTopIcon aria-hidden="true" />
-              {user.enEsperaAprobacion > 1 ? `${user.enEsperaAprobacion} en espera de aprobación` : "En espera de aprobación"}
-            </Badge>
+          {k ? (
+            <dl className={p.kpis}>
+              <div className={p.kpi} title={`${k.aTiempo} de ${k.cerradas} cerradas dentro de su fecha máxima`}>
+                <dt>A tiempo</dt>
+                <dd>{formatPct(k.aTiempoPct)}</dd>
+              </div>
+              <div className={p.kpi} title={`Plan ${formatMinutes(k.minutosPlan)} contra real ${formatMinutes(k.minutosReales)}`}>
+                <dt>Eficiencia</dt>
+                <dd>{formatPct(k.eficienciaPct)}</dd>
+              </div>
+              <div
+                className={p.kpi}
+                title={`${formatMinutes(k.minutosEnActividad)} en actividad de ${formatMinutes(k.minutosAsistidos)} asistidos`}
+              >
+                <dt>Productividad</dt>
+                <dd>{formatPct(k.productividadPct)}</dd>
+              </div>
+            </dl>
+          ) : null}
+          {open.length > 1 ? (
+            <ul className={p.acts}>
+              {open.slice(1, 3).map((a) => (
+                <li key={a.id} className={p.act} title={`${a.anNumber} · ${a.titulo}`}>
+                  <span className={p.actLinea}>
+                    <SemaforoDot semaforo={a.semaforo} size={7} />
+                    <span className={p.actTitulo}>{a.titulo}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {k ? (
+            <span className={p.cerradas}>
+              {k.cerradas}/{k.asignadas} cerradas
+              {k.rechazadas > 0 ? ` · ${k.rechazadas} rechazada${k.rechazadas > 1 ? "s" : ""}` : ""}
+            </span>
           ) : null}
         </div>
-      ) : null}
-
-      {k ? (
-        <dl className={p.kpis}>
-          <div className={p.kpi} title={`${k.aTiempo} de ${k.cerradas} cerradas dentro de su fecha máxima`}>
-            <dt>A tiempo</dt>
-            <dd>{formatPct(k.aTiempoPct)}</dd>
-          </div>
-          <div className={p.kpi} title={`Plan ${formatMinutes(k.minutosPlan)} contra real ${formatMinutes(k.minutosReales)}`}>
-            <dt>Eficiencia</dt>
-            <dd>{formatPct(k.eficienciaPct)}</dd>
-          </div>
-          <div
-            className={p.kpi}
-            title={`${formatMinutes(k.minutosEnActividad)} en actividad de ${formatMinutes(k.minutosAsistidos)} asistidos`}
-          >
-            <dt>Productividad</dt>
-            <dd>{formatPct(k.productividadPct)}</dd>
-          </div>
-        </dl>
-      ) : null}
-
-      {open.length > 0 ? (
-        <ul className={p.acts}>
-          {open.slice(0, 3).map((a) => (
-            <li key={a.id} className={p.act} title={`${a.anNumber} · ${a.titulo}`}>
-              <span className={p.actLinea}>
-                <SemaforoDot semaforo={a.semaforo} size={7} />
-                <span className={p.actTitulo}>
-                  {a.titulo}
-                  {a.assignmentCharge === "despacho" ? " · Despacho" : a.assignmentCharge === "ejecucion" ? " · Ejecución" : ""}
-                </span>
-                {a.prioridad === "ALTA" ? <PrioridadChip prioridad={a.prioridad} /> : null}
-              </span>
-              {a.periodo ? (
-                <span className={`${p.actPeriodo} ${a.periodo.estado === "vencida" ? p.actPeriodoVencido : ""}`}>
-                  {a.periodo.etiqueta}
-                </span>
-              ) : null}
-              <span className={`${p.progreso} ${a.progressPct >= 100 ? p.progresoCompleto : ""}`} aria-label={`Avance ${a.progressPct} %`}>
-                <span style={{ width: `${Math.min(100, Math.max(0, a.progressPct))}%` }} />
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <span className={p.nada}>{act ? act.titulo : fin ? `Última: ${fin.titulo}` : "Sin actividades hoy"}</span>
-      )}
-
-      {k ? (
-        <span className={p.cerradas}>
-          {k.cerradas}/{k.asignadas} cerradas{k.rechazadas > 0 ? ` · ${k.rechazadas} rechazada${k.rechazadas > 1 ? "s" : ""}` : ""}
-        </span>
-      ) : null}
-    </Link>
+      }
+    />
   );
 }
 
@@ -216,7 +201,7 @@ const PESTANAS = [
   { id: "mias" as const, label: "Mis actividades", icon: TaskAltIcon },
   { id: "equipo" as const, label: "Mi equipo", icon: GroupsOutlinedIcon },
   { id: "asignadas" as const, label: "Asignadas por mí", icon: OutboxOutlinedIcon },
-  { id: "solicitudes" as const, label: "Solicitudes de equipo", icon: HourglassTopIcon },
+  { id: "solicitudes" as const, label: "Solicitudes de equipo", icon: HandshakeOutlinedIcon },
 ];
 
 export default function PizarraPage() {
@@ -338,7 +323,7 @@ export default function PizarraPage() {
             />
           }
         />
-        <SolicitudesEquipoView />
+        <SolicitudesEquipoView token={token} />
       </div>
     );
   }
@@ -360,6 +345,10 @@ export default function PizarraPage() {
         <MisActividadesView />
       </div>
     );
+  }
+
+  if (sinEquipo) {
+    return <MisActividadesView />;
   }
 
   const estados = (Object.keys(STATUS_LABELS) as BoardUserStatus[])
@@ -393,7 +382,7 @@ export default function PizarraPage() {
       {verMias ? (
         <MisActividadesView />
       ) : verSolicitudes ? (
-        <SolicitudesEquipoView />
+        <SolicitudesEquipoView token={token} />
       ) : (
         <>
           <div className={p.filtros}>
@@ -406,6 +395,8 @@ export default function PizarraPage() {
               }}
             />
           </div>
+
+          {data?.workflow ? <FlujoKpiStrip workflow={data.workflow} /> : null}
 
           {verAsignadas ? (
             <AsignadasPorMiView token={token} rango={preset === "hoy" ? {} : rango} />

@@ -124,6 +124,10 @@ export default function PDFViewer({
         <Worker workerUrl="/pdf.worker.min.js">
           <Viewer
             fileUrl={pdfData || pdfUrl}
+            // pdf.js escala el canvas con devicePixelRatio (tope 2) para nitidez en pantallas densas.
+            defaultScale={
+              typeof window !== "undefined" ? Math.min(Math.max(window.devicePixelRatio || 1, 1), 2) * 0.85 : 1
+            }
             renderError={(error) => (
               <div className={styles.error}>
                 No se pudo previsualizar el PDF: {error.message || "error de visor"}

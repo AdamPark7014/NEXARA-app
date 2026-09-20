@@ -30,6 +30,13 @@ import {
   type Prioridad,
   type Semaforo,
 } from './pizarra-kpi.js';
+import {
+  accumulateWorkflow,
+  emptyWorkflowPipeline,
+  finalizeWorkflow,
+  withPeerRejects,
+  type WorkflowPipelineCounts,
+} from './workflow-kpis.js';
 
 export type BoardActivityBucket = 'daily' | 'projects' | 'services';
 /**
@@ -128,7 +135,7 @@ export type TeamBoardResponse = {
   hasta: string;
   users: TeamBoardUser[];
   /** Pipeline de flujo (Ola C); ausente en clientes viejos. */
-  workflow?: import('./workflow-kpis.js').WorkflowPipelineCounts;
+  workflow?: WorkflowPipelineCounts;
 };
 
 export type TeamBoardHistoryItem = {
@@ -275,10 +282,6 @@ export class TeamBoardService {
       hasta: workDateKey(rangoFinal.hasta),
     };
     if (userIds.length === 0) {
-      const {
-        emptyWorkflowPipeline,
-        finalizeWorkflow,
-      } = await import('./workflow-kpis.js');
       return { ...base, users: [], workflow: finalizeWorkflow(emptyWorkflowPipeline()) };
     }
     const users = await this.buildCards(
@@ -304,7 +307,7 @@ export class TeamBoardService {
     scope: 'company' | 'subtree';
     desde: string;
     hasta: string;
-    workflow: import('./workflow-kpis.js').WorkflowPipelineCounts;
+    workflow: WorkflowPipelineCounts;
   }> {
     const { companyWide, scoped, now } = await this.resolveScope(viewer, companyId);
     const rangoFinal = rango ?? this.resolveRange(null, null, now);
@@ -323,13 +326,7 @@ export class TeamBoardService {
     companyId: number | null,
     rango: BoardRange,
     now: Date,
-  ): Promise<import('./workflow-kpis.js').WorkflowPipelineCounts> {
-    const {
-      emptyWorkflowPipeline,
-      accumulateWorkflow,
-      finalizeWorkflow,
-      withPeerRejects,
-    } = await import('./workflow-kpis.js');
+  ): Promise<WorkflowPipelineCounts> {
     const counts = emptyWorkflowPipeline();
     if (userIds.length === 0) return finalizeWorkflow(counts);
 

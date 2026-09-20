@@ -27,7 +27,12 @@ import {
   puntoReal,
   type PuntoGeo,
 } from '@/lib/activity-geofence';
+import dynamic from 'next/dynamic';
 
+const VisorPdf = dynamic(
+  () => import('@/components/ops/EquipoEvidencias').then((m) => m.VisorPdf),
+  { ssr: false, loading: () => <p style={{ fontSize: 13, color: '#6b7280' }}>Cargando vista previa PDF…</p> },
+);
 type EvidenceBootstrap = {
   status?: string;
   reviewStatus?: string;
@@ -2177,14 +2182,8 @@ const ActivityEvidenceFlow = () => {
           {flowData.serviceSheetPdfUrl && (
             <div className={styles.pdfPreviewCard}>
               <div>✅ PDF cargado correctamente</div>
-              <object
-                data={getAssetUrl(flowData.serviceSheetPdfUrl)}
-                type="application/pdf"
-                width="100%"
-                height="280"
-              >
-                <embed src={getAssetUrl(flowData.serviceSheetPdfUrl)} type="application/pdf" />
-              </object>
+              {/* Mismo VisorPdf/pdf.js que EquipoEvidencias (CSP bloquea object/embed). Altura mayor. */}
+              <VisorPdf url={flowData.serviceSheetPdfUrl} alto="700px" />
             </div>
           )}
         </div>
