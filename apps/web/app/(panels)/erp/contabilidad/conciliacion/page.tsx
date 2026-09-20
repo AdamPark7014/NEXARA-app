@@ -575,6 +575,7 @@ export default function ConciliacionPage() {
                     rows={visibles}
                     rowKey={(r) => r.id}
                     density="compact"
+                    ariaLabel="Conciliación bancaria"
                     onRowClick={(r) => setMovimientoId(r.id)}
                     emptyTitle={filtro === "TODOS" ? "Sin movimientos" : "Nada en este filtro"}
                     emptyDescription={

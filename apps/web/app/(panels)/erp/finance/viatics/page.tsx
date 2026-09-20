@@ -1186,6 +1186,7 @@ export default function ViaticosPage() {
               rows={filtered}
               rowKey={(v) => v.id}
               density="compact"
+              ariaLabel="Solicitudes de viáticos"
               emptyTitle="Sin viáticos"
               emptyDescription={
                 filter || filterEstatus

@@ -314,6 +314,7 @@ export default function PrenominaPanel({
             columns={teamColumns}
             rows={rows}
             rowKey={(r) => r.userId}
+            ariaLabel="Pre-nómina por persona"
             emptyTitle={loading ? "Cargando…" : "Sin filas todavía"}
             emptyDescription="Elige periodo y pulsa Calcular periodo"
           />
@@ -329,6 +330,7 @@ export default function PrenominaPanel({
             columns={otColumns}
             rows={otRows}
             rowKey={(r) => r.id}
+            ariaLabel="Horas extra de pre-nómina"
             emptyTitle="Sin candidatos de extra"
             emptyDescription="No hay horas extra en el periodo"
           />

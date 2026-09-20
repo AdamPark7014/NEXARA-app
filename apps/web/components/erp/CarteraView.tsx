@@ -857,6 +857,7 @@ export default function CarteraView({
           rows={data.rows}
           rowKey={(r) => r.id}
           density="compact"
+          ariaLabel="Cartera por cobrar y pagar"
           onRowClick={(r) => void abrirDetalle(r)}
         />
       )}

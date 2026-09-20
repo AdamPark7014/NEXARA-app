@@ -346,6 +346,7 @@ export default function ReportesPage() {
                     rows={resultado.filas}
                     rowKey={(f) => f.clave}
                     density="compact"
+                    ariaLabel="Resultado del reporte"
                     onRowClick={resultado.drilldown ? abrirDetalle : undefined}
                   />
                   <FilaTotales columnas={resultado.columnas} totales={resultado.totales} />
