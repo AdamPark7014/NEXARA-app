@@ -48,6 +48,7 @@ import { BranchAuthModule } from './branch-auth/branch-auth.module';
 import { BranchPortalModule } from './branch-portal/branch-portal.module';
 import { VentasModule } from './ventas/ventas.module';
 import { ActivityEvidenceModule } from './activities/evidence/activity-evidence.module';
+import { ActivityToolsModule } from './activities/tools/activity-tools.module';
 import { FinesModule } from './fines/fines.module.js';
 import { ToolRequestsModule } from './tool-requests/tool-requests.module.js';
 import { LunchBreaksModule } from './attendance/lunch/lunch-breaks.module.js';
@@ -150,6 +151,7 @@ import { CelebrationsModule } from './celebrations/celebrations.module.js';
     BranchPortalModule,
     VentasModule,
     ActivityEvidenceModule,
+    ActivityToolsModule,
     FinesModule,
     ToolRequestsModule,
     LunchBreaksModule,
