@@ -141,7 +141,6 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
             lineHeight: 1.55,
             color: "var(--text-primary)",
             fontWeight: 500,
-            // Conserva saltos y espacios del mensaje; wrap + maxHeight evitan romper el layout del diálogo.
             whiteSpace: "pre-wrap",
             overflowWrap: "break-word",
             maxHeight: "calc(100vh - 200px)",

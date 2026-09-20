@@ -160,8 +160,8 @@ describe("EvidenciaPorCampos", () => {
 
   it("sin permiso de gestión no ofrece editar", async () => {
     useUser.mockReturnValue({ user: { token: "jwt", permissions: ["evidences.view"] }, token: "jwt" });
-    render(<EvidenciaPorCampos activityId={5} />);
-    await screen.findByText("1 de 3 fotos");
+    render(<EvidenciaPorCampos activityId={5} anNumber="AN-0005" titulo="Cámaras" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Quitar Cámara 1" }));
     expect(screen.queryByRole("button", { name: "Quitar Cámara 1" })).not.toBeInTheDocument();
   });
 
@@ -176,6 +176,7 @@ describe("EvidenciaPorCampos", () => {
     expect((zip[1].headers as Record<string, string>).Authorization).toBe("Bearer jwt");
     const downloadArgs = triggerBlobDownload.mock.calls[0];
     expect(downloadArgs.length).toBe(3);
+    expect(downloadArgs[0]).toBeInstanceOf(Blob);
     expect(downloadArgs[1]).toBe("AN-0005 Cámaras.zip");
     expect(downloadArgs[2]).toEqual({
       mimeType: "application/zip",
