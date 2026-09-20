@@ -25,10 +25,15 @@ import { CreateEmployeePaymentDto } from './dto/create-employee-payment.dto.js';
 import { UpdateEmployeePaymentDto } from './dto/update-employee-payment.dto.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { ExcelExportService } from '../common/excel-export.service.js';
+import { COLUMNAS_PRE_NOMINA } from '../common/excel/reportes.js';
 
 @Controller('employee-payments')
 export class EmployeePaymentsController {
-  constructor(private readonly service: EmployeePaymentsService) {}
+  constructor(
+    private readonly service: EmployeePaymentsService,
+    private readonly excel: ExcelExportService,
+  ) {}
 
   private validateFiles(files?: any[]) {
     if (!files?.length) return;
@@ -45,13 +50,87 @@ export class EmployeePaymentsController {
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Get('calculate-from-attendance')
   calculateFromAttendance(
+    @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Query('userId') userId: string,
     @Query('from') from: string,
     @Query('to') to: string,
   ) {
     if (!userId) throw new BadRequestException('userId requerido');
-    return this.service.calculateFromAttendance(+userId, from, to, companyId);
+    return this.service.calculateFromAttendance(this.viewer(user), +userId, from, to, companyId);
+  }
+
+  /**
+   * Pre-nómina del periodo: una fila por persona con horas netas, productividad y el
+   * tiempo extra aprobado (lo único pagable), más lo que ya esté capturado.
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
+  @Get('pre-nomina')
+  preNomina(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('desde') desde: string,
+    @Query('hasta') hasta: string,
+  ) {
+    return this.service.preNomina(this.viewer(user), this.rango(desde, hasta), companyId);
+  }
+
+  /** La misma pre-nómina en Excel, con el tema corporativo y los totales con fórmulas. */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
+  @Get('pre-nomina/export.xlsx')
+  async preNominaExcel(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+    @Query('desde') desde: string,
+    @Query('hasta') hasta: string,
+  ) {
+    const rango = this.rango(desde, hasta);
+    const datos = await this.service.preNomina(this.viewer(user), rango, companyId);
+    const r = datos.resumen;
+    const buffer = await this.excel.exportarReporte({
+      titulo: 'Pre-nómina',
+      subtitulo: `Del ${rango.desde} al ${rango.hasta}`,
+      hoja: 'Pre-nómina',
+      columnas: COLUMNAS_PRE_NOMINA,
+      filas: datos.filas,
+      generadoPor: user?.nombre ?? null,
+      generadoEn: new Date(datos.generadoAt),
+      filtros: [
+        { etiqueta: 'Desde', valor: rango.desde },
+        { etiqueta: 'Hasta', valor: rango.hasta },
+        { etiqueta: 'Alcance', valor: datos.scope === 'company' ? 'Toda la empresa' : 'Mi organigrama' },
+      ],
+      notas: [
+        `${r.personas} persona(s) · ${r.conAvisos} con algo que revisar antes de pagar.`,
+        'Las horas son netas de comida y salen de los mismos registros que los indicadores.',
+        'El tiempo extra solo se paga si un jefe lo aprobó: «Extra sin aprobar» no está incluido en ningún total pagable.',
+        ...datos.supuestos,
+      ],
+    });
+    res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.header('Content-Disposition', `attachment; filename="pre-nomina-${rango.desde}-${rango.hasta}.xlsx"`);
+    return res.send(buffer);
+  }
+
+  private viewer(user: any) {
+    return {
+      id: Number(user?.id),
+      roleKey: user?.roleKey ?? null,
+      email: user?.email ?? null,
+      isSuperAdmin: Boolean(user?.isSuperAdmin),
+    };
+  }
+
+  private rango(desde?: string, hasta?: string) {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    if (!desde || !iso.test(desde) || !hasta || !iso.test(hasta)) {
+      throw new BadRequestException('desde y hasta son obligatorios en formato AAAA-MM-DD');
+    }
+    if (desde > hasta) throw new BadRequestException('La fecha "desde" no puede ser posterior a "hasta"');
+    return { desde, hasta };
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
