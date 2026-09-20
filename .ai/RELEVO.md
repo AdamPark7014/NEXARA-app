@@ -2,9 +2,9 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** `2a2529a6` (Hetzner healthy; script org corrido)
-- **Migraciones:** ya aplicadas `2026092001*`
+- **Rama:** feat/opt-opt-shell
+- **HEAD:** (este commit)
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-opt-shell` — NO tocar `C:\dev\apps\NEXARA-app`
 
 ## Puente — no cambiar
 
@@ -12,15 +12,18 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-1. **Organigrama:** Christian (`gerencia@`) vuelve a salir como DG raíz; Claudia (`claudia.bernal@`) excluida del chart (tester).
-2. Seed demo: puesto Claudia → «Tester de plataforma».
-3. Script `fix-org-puestos-jefes.js` actualizado y corrido en prod (1 cambio: puesto Claudia).
+1. **UI shell density:** padding más compacto en `PageHeader`, `Section`, `PanelTabs`, `KpiCard` (solo spacing; tipografía/colores intactos).
+2. Commit: `opt(ui-shell): reducir padding PageHeader Section PanelTabs`.
+
+## A medias
+
+Nada en este worktree.
 
 ## Siguiente
 
-- QA: recargar `/erp/organigrama` — raíz = Christian; sin bloque huérfanos por Christian excluido.
-- Rotar Maps key / contraseñas: lado Adam.
+- QA visual en un módulo ERP/OPS con `density="ops"` y Section densa vs default.
+- Merge de `feat/opt-opt-shell` cuando el resto de olas de opt estén listas.
 
 ## No tocar
 
-Puente NAS.
+Puente NAS · `C:\dev\apps\NEXARA-app` desde este worktree.

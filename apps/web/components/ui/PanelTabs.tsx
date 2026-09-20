@@ -34,7 +34,7 @@ export default function PanelTabs<T extends string>({
         display: "flex",
         gap: 2,
         flexWrap: "wrap",
-        marginBottom: 18,
+        marginBottom: 14,
         borderBottom: "1px solid var(--nx-panel-hairline)",
         paddingBottom: 0,
       }}
@@ -52,7 +52,7 @@ export default function PanelTabs<T extends string>({
             style={{
               appearance: "none",
               fontFamily: "inherit",
-              padding: "9px 14px",
+              padding: "7px 12px",
               marginBottom: -1,
               fontSize: 12.5,
               fontWeight: active ? 700 : 550,

@@ -39,7 +39,7 @@ export default function PageHeader({
     <header
       style={{
         position: "relative",
-        marginBottom: isHero ? 28 : isOps ? 16 : 24,
+        marginBottom: isHero ? 28 : isOps ? 12 : 20,
         padding: isHero ? "24px 26px" : "0",
         background: isHero ? "var(--nx-panel-surface-overlay)" : "transparent",
         border: isHero ? "1px solid var(--nx-panel-hairline)" : "none",
@@ -71,7 +71,7 @@ export default function PageHeader({
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "space-between",
-          gap: 20,
+          gap: isOps ? 14 : 16,
           flexWrap: "wrap",
         }}
       >
@@ -87,7 +87,7 @@ export default function PageHeader({
                 textTransform: "uppercase",
                 letterSpacing: "var(--nx-panel-eyebrow-letter, 0.12em)",
                 color: "var(--text-tertiary)",
-                marginBottom: isOps ? 6 : 10,
+                marginBottom: isOps ? 4 : 8,
               }}
             >
               <span
@@ -121,7 +121,7 @@ export default function PageHeader({
           {subtitle && (
             <p
               style={{
-                marginTop: isOps ? 6 : 10,
+                marginTop: isOps ? 4 : 8,
                 marginBottom: 0,
                 fontSize: isOps ? "0.8125rem" : "0.95rem",
                 color: "var(--text-secondary)",
@@ -135,7 +135,7 @@ export default function PageHeader({
           {meta && (
             <div
               style={{
-                marginTop: isOps ? 10 : 14,
+                marginTop: isOps ? 8 : 12,
                 display: "flex",
                 flexWrap: "wrap",
                 gap: 8,
