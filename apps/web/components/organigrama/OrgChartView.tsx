@@ -7,7 +7,15 @@
  * Reasignar jefe (✎) solo con `canEditOrg`; la API exige USERS_MANAGE / CONSOLE_ADMIN.
  * El subtítulo del nodo es `puesto`, no el nombre del rol RBAC.
  */
-import { useEffect, useState, useCallback, useMemo } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
@@ -40,6 +48,17 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 }
 
 const LINE = "color-mix(in srgb, var(--primary) 55%, var(--border))";
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 1.5;
+const ZOOM_STEP = 0.1;
+
+function norm(s: string) {
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
 function Avatar({ url, name }: { url?: string | null; name: string }) {
   const src = url ? resolveAssetUrl(url) : "";
@@ -87,9 +106,20 @@ interface NodeCardProps {
   onRefresh: () => void;
   canEditOrg: boolean;
   isRoot?: boolean;
+  dimmed?: boolean;
+  highlighted?: boolean;
 }
 
-function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: NodeCardProps) {
+function NodeCard({
+  node,
+  allUsers,
+  token,
+  onRefresh,
+  canEditOrg,
+  isRoot,
+  dimmed,
+  highlighted,
+}: NodeCardProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -133,14 +163,21 @@ function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: Node
         background: isRoot
           ? "color-mix(in srgb, var(--primary) 10%, transparent)"
           : "var(--surface)",
-        border: "1px solid var(--border)",
+        border: highlighted
+          ? "2px solid var(--primary)"
+          : "1px solid var(--border)",
         borderRadius: 12,
         display: "flex",
         flexDirection: "column",
         gap: 6,
         minWidth: 200,
         width: 204,
-        boxShadow: "0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)",
+        boxShadow: highlighted
+          ? "0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent)"
+          : "0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)",
+        opacity: dimmed ? 0.28 : 1,
+        pointerEvents: dimmed ? "none" : "auto",
+        transition: "opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
       }}
     >
       {canEditOrg && (
@@ -179,6 +216,7 @@ function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: Node
               fontSize: 12.5,
               lineHeight: 1.3,
               wordBreak: "break-word",
+              color: highlighted ? "var(--primary)" : undefined,
             }}
           >
             {node.nombre}
@@ -292,6 +330,8 @@ interface TreeBranchProps {
   onRefresh: () => void;
   canEditOrg: boolean;
   isRoot?: boolean;
+  matchIds: Set<number> | null;
+  hasActiveFilter: boolean;
 }
 
 /** Rama del flowchart: nodo + conectores SVG/CSS + hijos en fila. */
@@ -302,9 +342,14 @@ function TreeBranch({
   onRefresh,
   canEditOrg,
   isRoot = false,
+  matchIds,
+  hasActiveFilter,
 }: TreeBranchProps) {
   const kids = node.children ?? [];
   const hasKids = kids.length > 0;
+  const isMatch = !hasActiveFilter || (matchIds?.has(node.id) ?? true);
+  const highlighted = hasActiveFilter && (matchIds?.has(node.id) ?? false);
+  const dimmed = hasActiveFilter && !isMatch;
 
   return (
     <div
@@ -322,6 +367,8 @@ function TreeBranch({
         onRefresh={onRefresh}
         canEditOrg={canEditOrg}
         isRoot={isRoot}
+        dimmed={dimmed}
+        highlighted={highlighted}
       />
 
       {hasKids && (
@@ -377,6 +424,8 @@ function TreeBranch({
                     token={token}
                     onRefresh={onRefresh}
                     canEditOrg={canEditOrg}
+                    matchIds={matchIds}
+                    hasActiveFilter={hasActiveFilter}
                   />
                 </div>
               ))}
@@ -399,6 +448,35 @@ export type OrgChartViewProps = {
 const TITULO = "Organigrama";
 const SUBTITULO = "Jerarquía corporativa y líneas de reporte.";
 
+const zoomBtnStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 700,
+  minWidth: 36,
+  minHeight: 36,
+  padding: "0 10px",
+  borderRadius: 8,
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  cursor: "pointer",
+  lineHeight: 1,
+};
+
+const chipStyle = (active: boolean): CSSProperties => ({
+  fontSize: 12,
+  fontWeight: active ? 700 : 500,
+  padding: "6px 12px",
+  borderRadius: 999,
+  border: active ? "1.5px solid var(--primary)" : "1px solid var(--border)",
+  background: active
+    ? "color-mix(in srgb, var(--primary) 14%, var(--surface))"
+    : "var(--surface)",
+  color: active ? "var(--primary)" : "var(--text-secondary)",
+  cursor: "pointer",
+  minHeight: 32,
+  lineHeight: 1.2,
+});
+
 export default function OrgChartView({
   canEditOrg,
   eyebrow,
@@ -410,6 +488,12 @@ export default function OrgChartView({
   const [roots, setRoots] = useState<OrgChartNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDept, setSelectedDept] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
+  const [panning, setPanning] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -437,6 +521,78 @@ export default function OrgChartView({
   const trueRoots = useMemo(() => roots.filter((r) => r.managerId == null), [roots]);
   const danglingRoots = useMemo(() => roots.filter((r) => r.managerId != null), [roots]);
 
+  const byDept = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const u of allUsers) {
+      const dept = u.department?.nombre ?? "Sin área";
+      map[dept] = (map[dept] ?? 0) + 1;
+    }
+    return map;
+  }, [allUsers]);
+
+  const deptEntries = useMemo(
+    () => Object.entries(byDept).sort((a, b) => b[1] - a[1]),
+    [byDept],
+  );
+
+  const q = norm(searchQuery);
+  const hasSearch = q.length > 0;
+  const hasDept = selectedDept != null;
+  const hasActiveFilter = hasSearch || hasDept;
+
+  const matchIds = useMemo(() => {
+    if (!hasActiveFilter) return null;
+    const ids = new Set<number>();
+    for (const u of allUsers) {
+      const deptName = u.department?.nombre ?? "Sin área";
+      if (hasDept && deptName !== selectedDept) continue;
+      if (hasSearch) {
+        const hay = `${norm(u.nombre)} ${norm(orgNodeSubtitle(u) ?? "")}`;
+        if (!hay.includes(q)) continue;
+      }
+      ids.add(u.id);
+    }
+    return ids;
+  }, [allUsers, hasActiveFilter, hasDept, hasSearch, q, selectedDept]);
+
+  const bumpZoom = (delta: number) => {
+    setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + delta) * 10) / 10)));
+  };
+
+  const onCanvasPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const t = e.target as HTMLElement;
+    if (t.closest("button, a, input, select, textarea, label")) return;
+    const el = canvasRef.current;
+    if (!el) return;
+    dragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      sl: el.scrollLeft,
+      st: el.scrollTop,
+    };
+    setPanning(true);
+    el.setPointerCapture(e.pointerId);
+  };
+
+  const onCanvasPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    const el = canvasRef.current;
+    if (!drag || !el) return;
+    el.scrollLeft = drag.sl - (e.clientX - drag.x);
+    el.scrollTop = drag.st - (e.clientY - drag.y);
+  };
+
+  const onCanvasPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    dragRef.current = null;
+    setPanning(false);
+    try {
+      canvasRef.current?.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -452,12 +608,6 @@ export default function OrgChartView({
       {showHrRail && <HrModuleRail />}
 
       {!loading && allUsers.length > 0 && (() => {
-        const byDept: Record<string, number> = {};
-        for (const u of allUsers) {
-          const dept = u.department?.nombre ?? "Sin área";
-          byDept[dept] = (byDept[dept] ?? 0) + 1;
-        }
-        const deptEntries = Object.entries(byDept).sort((a, b) => b[1] - a[1]);
         const total = allUsers.length;
         const colors = [
           "var(--primary)",
@@ -606,62 +756,176 @@ export default function OrgChartView({
             No hay usuarios en la base de datos aún.
           </div>
         ) : (
-          <div
-            style={{
-              overflowX: "auto",
-              padding: "16px 12px 24px",
-              background:
-                "radial-gradient(ellipse at top, color-mix(in srgb, var(--primary) 6%, transparent), transparent 55%)",
-              borderRadius: 12,
-            }}
-          >
+          <>
+            {/* Toolbar: search + zoom + dept chips */}
             <div
               style={{
                 display: "flex",
-                flexWrap: "wrap",
-                justifyContent: "center",
-                gap: 24,
-                minWidth: "min-content",
+                flexDirection: "column",
+                gap: 8,
+                marginBottom: 10,
               }}
             >
-              {trueRoots.map((root) => (
-                <TreeBranch
-                  key={root.id}
-                  node={root}
-                  allUsers={allUsers}
-                  token={token}
-                  onRefresh={load}
-                  canEditOrg={canEditOrg}
-                  isRoot
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar persona o puesto…"
+                  aria-label="Buscar persona o puesto"
+                  style={{
+                    flex: "1 1 200px",
+                    minWidth: 160,
+                    maxWidth: 360,
+                    fontSize: 16,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                    background: "var(--surface)",
+                    color: "var(--foreground)",
+                    minHeight: 36,
+                  }}
                 />
-              ))}
-            </div>
+                <div
+                  role="group"
+                  aria-label="Zoom"
+                  style={{ display: "inline-flex", gap: 4, alignItems: "center" }}
+                >
+                  <button
+                    type="button"
+                    style={zoomBtnStyle}
+                    onClick={() => bumpZoom(-ZOOM_STEP)}
+                    disabled={zoom <= ZOOM_MIN}
+                    title="Alejar"
+                    aria-label="Alejar"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...zoomBtnStyle, minWidth: 52, fontWeight: 600, fontSize: 12 }}
+                    onClick={() => setZoom(1)}
+                    title="Restablecer zoom"
+                    aria-label="Zoom 100%"
+                  >
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button
+                    type="button"
+                    style={zoomBtnStyle}
+                    onClick={() => bumpZoom(ZOOM_STEP)}
+                    disabled={zoom >= ZOOM_MAX}
+                    title="Acercar"
+                    aria-label="Acercar"
+                  >
+                    +
+                  </button>
+                </div>
+                {hasActiveFilter && (
+                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                    {matchIds?.size ?? 0} coincidencia{(matchIds?.size ?? 0) === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
 
-            {danglingRoots.length > 0 && (
-              <div style={{ marginTop: 16 }}>
+              {deptEntries.length > 0 && (
                 <div
                   style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: "var(--warning)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginBottom: 8,
-                    textAlign: "center",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    alignItems: "center",
                   }}
                 >
-                  Sin línea de reporte válida ({danglingRoots.length})
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "var(--text-tertiary)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      marginRight: 2,
+                    }}
+                  >
+                    Área
+                  </span>
+                  <button
+                    type="button"
+                    style={chipStyle(selectedDept === null)}
+                    onClick={() => setSelectedDept(null)}
+                  >
+                    Todas
+                  </button>
+                  {deptEntries.map(([dept, count]) => (
+                    <button
+                      key={dept}
+                      type="button"
+                      style={chipStyle(selectedDept === dept)}
+                      onClick={() =>
+                        setSelectedDept((cur) => (cur === dept ? null : dept))
+                      }
+                    >
+                      {dept}
+                      <span
+                        style={{
+                          marginLeft: 6,
+                          opacity: 0.7,
+                          fontWeight: 600,
+                          fontSize: 11,
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  ))}
                 </div>
+              )}
+            </div>
+
+            <div
+              ref={canvasRef}
+              onPointerDown={onCanvasPointerDown}
+              onPointerMove={onCanvasPointerMove}
+              onPointerUp={onCanvasPointerUp}
+              onPointerCancel={onCanvasPointerUp}
+              style={{
+                overflow: "auto",
+                maxHeight: "min(70vh, 720px)",
+                padding: "16px 12px 24px",
+                background:
+                  "radial-gradient(ellipse at top, color-mix(in srgb, var(--primary) 6%, transparent), transparent 55%)",
+                borderRadius: 12,
+                cursor: panning ? "grabbing" : "grab",
+                userSelect: panning ? "none" : undefined,
+                border: "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: "top center",
+                  display: "inline-block",
+                  minWidth: "100%",
+                  verticalAlign: "top",
+                }}
+              >
                 <div
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
                     justifyContent: "center",
-                    gap: 12,
+                    gap: 24,
                     minWidth: "min-content",
                   }}
                 >
-                  {danglingRoots.map((root) => (
+                  {trueRoots.map((root) => (
                     <TreeBranch
                       key={root.id}
                       node={root}
@@ -670,12 +934,55 @@ export default function OrgChartView({
                       onRefresh={load}
                       canEditOrg={canEditOrg}
                       isRoot
+                      matchIds={matchIds}
+                      hasActiveFilter={hasActiveFilter}
                     />
                   ))}
                 </div>
+
+                {danglingRoots.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "var(--warning)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        marginBottom: 8,
+                        textAlign: "center",
+                      }}
+                    >
+                      Sin línea de reporte válida ({danglingRoots.length})
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                        gap: 12,
+                        minWidth: "min-content",
+                      }}
+                    >
+                      {danglingRoots.map((root) => (
+                        <TreeBranch
+                          key={root.id}
+                          node={root}
+                          allUsers={allUsers}
+                          token={token}
+                          onRefresh={load}
+                          canEditOrg={canEditOrg}
+                          isRoot
+                          matchIds={matchIds}
+                          hasActiveFilter={hasActiveFilter}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          </>
         )}
       </Section>
     </>

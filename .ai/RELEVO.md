@@ -2,26 +2,32 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** `7322717c` (en Hetzner; web+api healthy)
-- **Migraciones:** ya aplicadas `2026092001*`
+- **Rama:** feat/hard-org-ux
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-hard-org-ux`
+- **HEAD:** (este commit)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Hecho este turno (optimización densidad · 4 agentes)
+## Hecho este turno
 
-1. **Shell** (`58241797`): menos padding PageHeader / Section / PanelTabs / KpiCard.
-2. **Organigrama** (`8725d527`): KPIs + depto en franja; nodos ~204px.
-3. **Almacén** (`ea1b5ddd`): sin doble chrome embedded; herramientas densas; fotos 140px.
-4. **section-views** (`2e2a6b10`): copy Core corto; tools manage para admin/warehouse.
+1. **OrgChartView UX** (`apps/web/components/organigrama/OrgChartView.tsx`):
+   - Búsqueda por nombre/puesto (normaliza acentos): matches con borde/glow primary; no-matches atenuados (`opacity 0.28`).
+   - Chips de filtro por área (datos `byDept` existentes) + chip «Todas».
+   - Zoom − / % / + (0.5–1.5) vía `transform: scale` en el canvas; pan con overflow scroll + drag en fondo (ignora botones/inputs).
+   - KPI strip denso + barra por depto intactos.
+   - `trueRoots` / `danglingRoots` (Christian-as-root / huérfanos) sin cambios de API.
+
+## A medias
+
+- Nada en este worktree.
 
 ## Siguiente
 
-- QA visual en prod tras deploy.
-- Rotar Maps key / contraseñas: lado Adam.
+- QA visual: buscar, filtrar área, zoom/pan en `/erp/organigrama`.
+- Merge `feat/hard-org-ux` → rama de integración cuando Adam lo pida.
 
 ## No tocar
 
-Puente NAS.
+Puente NAS · API orgchart · props `OrgChartViewProps`.
