@@ -1,8 +1,11 @@
-// `apps/api` corre con jest (ver `jest.config.js`), no con vitest: el `import from 'vitest'`
-// que traía este archivo hacía fallar la suite entera antes de ejecutar un solo caso, así que
-// este contrato de autorización llevaba tiempo sin verificarse. Aquí se usan los globals de jest.
+// El runner de apps/api es jest (`jest.config.js`), no vitest: el `import from 'vitest'`
+// que traía este archivo hacía fallar la suite entera antes de ejecutar un solo caso, así
+// que este contrato de autorización llevaba tiempo sin verificarse. describe/it/expect son
+// globales de jest, y los imports son estáticos porque jest corre en CommonJS: el `import()`
+// dinámico exigiría --experimental-vm-modules.
 import 'reflect-metadata';
 import { PERMISSIONS } from '../common/permissions.js';
+import { AccountingService } from './accounting.service.js';
 import { AccountingWorkspaceController } from './workspace.controller.js';
 
 /**
@@ -46,17 +49,11 @@ describe('autorización del panel de contabilidad', () => {
 });
 
 describe('contrato de getWorkspaceDashboard', () => {
-  it('el método existe en AccountingService', async () => {
-    const mod = await import('./accounting.service.js');
-    expect(typeof mod.AccountingService.prototype.getWorkspaceDashboard).toBe(
-      'function',
-    );
+  it('el método existe en AccountingService', () => {
+    expect(typeof AccountingService.prototype.getWorkspaceDashboard).toBe('function');
   });
 
-  it('acepta empresa y rango de fechas', async () => {
-    const mod = await import('./accounting.service.js');
-    expect(
-      mod.AccountingService.prototype.getWorkspaceDashboard.length,
-    ).toBeGreaterThanOrEqual(3);
+  it('acepta empresa y rango de fechas', () => {
+    expect(AccountingService.prototype.getWorkspaceDashboard.length).toBeGreaterThanOrEqual(3);
   });
 });
