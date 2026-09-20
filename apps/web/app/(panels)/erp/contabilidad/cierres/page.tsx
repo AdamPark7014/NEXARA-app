@@ -493,7 +493,7 @@ export default function CierresPage() {
                               href={i.href}
                               style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}
                             >
-                              Ir a resolverlo →
+                              Ir a resolverlo
                             </Link>
                           )}
                         </div>

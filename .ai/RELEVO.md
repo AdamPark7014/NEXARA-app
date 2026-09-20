@@ -3,7 +3,7 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
 - **Rama:** feat/gate-emoji-strip
-- **HEAD:** gate emoji-strip — verificación en contabilidad
+- **HEAD:** (pendiente de commit de cierre)
 
 ## Puente — no cambiar
 
@@ -11,26 +11,23 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-Gate `feat/gate-emoji-strip` en worktree `C:\dev\apps\_worktrees\nexara-gate-emoji-strip`:
+Gate `feat/gate-emoji-strip` en worktree `nexara-gate-emoji-strip`:
 
-- Escaneo PCRE2 / Python de `apps/web/app/(panels)/erp/contabilidad/**` y `ContabilidadSidebar.tsx`.
-- **Cero emoji decorativos** (U+1F300–U+1FAFF, misc U+2600–U+27BF, dingbats ornamentales).
-- `ContabilidadSidebar` solo texto + `CrossPanelLink`; sin lucide ni emoji.
-- Lucide no aparece en estas páginas; no se tocó nada.
-- Se conservan tipográficos de UI (`—` `·` `…` `→` `↑` `↓` `±` `«»`), que no son emoji.
+- Escaneo de `erp/contabilidad` + `components/finance`: **sin pictogramas emoji** (EmptyState ya usa SVG del design system; sidebar sin iconos decorativos).
+- Adornos tipográficos de CTA quitados: flechas `→` en enlaces de cierres, pre-nómina, facturas y `QuietLink`.
+- El chevron `›` del listado «requiere atención» del hub pasó a `ChevronRight` de lucide-react (icono funcional del design system).
+- Separadores de rango de fechas `desde → hasta` se dejaron: no son emoji decorativo.
 
-No hubo diff de código: el módulo ya cumple el gate.
+Archivos: `contabilidad/page.tsx`, `cierres/page.tsx`, `pre-nomina/page.tsx`, `ContabilidadInvoicesView.tsx`.
 
-## A medias / pendiente
+## A medias
 
-- Deploy Hetzner (IP/llave) y smoke de la contadora.
-- Blindar periodo cerrado en rutas de escritura listadas en el relevo previo.
-- Otros gates paralelos (cartera, MetricStrip, etc.) siguen en sus worktrees.
+- Nada de este gate. El EXEC-PACKET del repo sigue siendo el de Core UX (13-09) y **no aplica** a este worktree.
 
 ## Siguiente
 
-1. Integrar esta rama al merge de gates si Adam quiere el commit de verificación.
-2. Si aparece emoji en un PR nuevo de UI, re-correr el mismo escaneo.
+- Integrar `feat/gate-emoji-strip` a la rama de calidad cuando Adam lo pida.
+- Resto de puertas de calidad (status labels, a11y, etc.) en sus worktrees.
 
 ## No tocar
 
