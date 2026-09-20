@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
-import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import FileDropzone from "@/components/ui/FileDropzone";
+import InlineAlert from "@/components/ui/InlineAlert";
+import ListExportActions from "@/components/ui/ListExportActions";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
 import {
@@ -72,11 +75,65 @@ const emptyForm = {
   status: "Borrador" as PaymentStatus,
 };
 
+/* ── Estilos locales del contrato de diseño (.ai/DISENO-FINANZAS.md) ──────── */
+
+/** Regla 4: acciones de pantalla a 32px / 13px. El único primario es «Registrar pago». */
+const toolbarButtonStyle: CSSProperties = { height: 32, fontSize: 13 };
+/** Regla 2: las acciones de fila no deben engordar el renglón. */
+const rowButtonStyle: CSSProperties = { height: 28, fontSize: 12, padding: "0 9px" };
+/** Regla 2: el contexto secundario va en 11px gris bajo el nombre. */
+const rowMetaStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: 6,
+  marginTop: 2,
+  fontSize: 11,
+  color: "var(--text-tertiary)",
+  lineHeight: 1.35,
+};
+const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text, #b91c1c)" };
+const breakdownPanelStyle: CSSProperties = {
+  padding: 14,
+  border: "1px solid var(--nx-panel-hairline, var(--border))",
+  borderRadius: 10,
+  background: "var(--surface-2, var(--surface))",
+};
+const breakdownTitleStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  marginBottom: 10,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  color: "var(--text-tertiary)",
+};
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Regla 3: neutral para el flujo normal; color solo cuando el renglón pide
+ * acción (un borrador esperando aprobación) o algo salió mal.
+ */
+function statusTone(status?: string): StatusTone {
+  if (status === "Pagado") return "success";
+  if (status === "Anulado") return "danger";
+  if (status === "Borrador") return "warning";
+  return "neutral";
+}
+
 function assetUrl(path?: string | null) {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
   const base = getApiAssetOrigin().replace(/\/+$/, "");
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function formatDay(value?: string) {
+  if (!value) return "—";
+  return new Date(`${value}T12:00:00`).toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 function mapPaymentRow(raw: Record<string, unknown>): Payment {
@@ -95,6 +152,13 @@ function mapPaymentRow(raw: Record<string, unknown>): Payment {
     user: raw.user as Payment["user"],
   };
 }
+
+type FormErrors = {
+  userId?: string;
+  periodFrom?: string;
+  periodTo?: string;
+  amount?: string;
+};
 
 export default function EmployeePaymentsPage() {
   const { user } = useUser();
@@ -115,6 +179,7 @@ export default function EmployeePaymentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -193,17 +258,53 @@ export default function EmployeePaymentsPage() {
     return result;
   }, [items, searchQ, filterUser, filterStatus]);
 
-  const totalPagado = visibleItems
-    .filter((p) => p.status === "Pagado")
-    .reduce((s, p) => s + p.amount, 0);
-  const borradores = visibleItems.filter((p) => p.status === "Borrador").length;
-  const empleados = new Set(visibleItems.map((p) => p.userId)).size;
+  /**
+   * Regla 1: lo que la persona viene a saber — qué falta por aprobar, cuánto se
+   * pagó, a cuánta gente, y qué registros quedan sin comprobante para el cierre.
+   */
+  const metrics = useMemo<Metric[]>(() => {
+    const sum = (rows: Payment[]) => rows.reduce((s, p) => s + p.amount, 0);
+    const borradores = visibleItems.filter((p) => p.status === "Borrador");
+    const pagados = visibleItems.filter((p) => p.status === "Pagado");
+    const empleados = new Set(visibleItems.map((p) => p.userId)).size;
+    const sinComprobante = visibleItems.filter(
+      (p) => (p.evidenceUrls?.length ?? 0) === 0 && p.status !== "Anulado",
+    );
+
+    return [
+      {
+        label: "Por aprobar",
+        value: <Money value={sum(borradores)} />,
+        hint: plural(borradores.length, "borrador esperando", "borradores esperando"),
+        tone: borradores.length > 0 ? "warning" : "default",
+        onClick: () => setFilterStatus((prev) => (prev === "Borrador" ? "" : "Borrador")),
+      },
+      {
+        label: "Pagado",
+        value: <Money value={sum(pagados)} />,
+        hint: plural(pagados.length, "pago liquidado", "pagos liquidados"),
+        onClick: () => setFilterStatus((prev) => (prev === "Pagado" ? "" : "Pagado")),
+      },
+      {
+        label: "Empleados",
+        value: empleados,
+        hint: "con registros en la vista",
+      },
+      {
+        label: "Sin comprobante",
+        value: sinComprobante.length,
+        hint: sinComprobante.length > 0 ? "bloquean el cierre" : "todo comprobado",
+        tone: sinComprobante.length > 0 ? "danger" : "default",
+      },
+    ];
+  }, [visibleItems]);
 
   const openNew = () => {
     setEditing(null);
     setForm({ ...emptyForm });
     setEvidenceFiles([]);
     setSaveErr(null);
+    setFormErrors({});
     setShowForm(true);
   };
 
@@ -221,6 +322,7 @@ export default function EmployeePaymentsPage() {
     });
     setEvidenceFiles([]);
     setSaveErr(null);
+    setFormErrors({});
     setShowForm(true);
   };
 
@@ -246,7 +348,16 @@ export default function EmployeePaymentsPage() {
   };
 
   const submit = async () => {
-    if (!token || !form.userId || !form.periodFrom || !form.periodTo || !form.amount) return;
+    if (!token) return;
+    // Regla 5: la validación se contesta bajo el campo, no en un aviso suelto.
+    const errors: FormErrors = {};
+    if (!form.userId) errors.userId = "Elige a quién se le paga.";
+    if (!form.periodFrom) errors.periodFrom = "Indica el primer día del periodo.";
+    if (!form.periodTo) errors.periodTo = "Indica el último día del periodo.";
+    if (!form.amount) errors.amount = "Captura el monto; tiene que ser mayor que cero.";
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
     setSaveErr(null);
     try {
@@ -354,104 +465,91 @@ export default function EmployeePaymentsPage() {
     }
   };
 
-  const statusVariant = (s?: string): "warning" | "positive" | "danger" | "neutral" => {
-    if (s === "Pagado") return "positive";
-    if (s === "Anulado") return "danger";
-    return "warning";
-  };
-
   const columns: Column<Payment>[] = [
     {
       key: "user",
       label: "Empleado",
-      render: (p) => (
-        <Link
-          href={`/erp/hr/${p.userId}`}
-          style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}
-        >
-          {p.user?.nombre ?? `#${p.userId}`}
-        </Link>
-      ),
-      width: 160,
-    },
-    {
-      key: "concepto",
-      label: "Concepto",
-      render: (p) => (
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 13 }}>{p.concepto || p.note || "—"}</div>
-          {p.concepto && p.note ? (
-            <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.note}</div>
-          ) : null}
-        </div>
-      ),
+      render: (p) => {
+        const urls = p.evidenceUrls ?? [];
+        const detalle = [p.concepto, p.note].filter(Boolean).join(" · ");
+        return (
+          <div style={{ minWidth: 0 }}>
+            <Link
+              href={`/erp/hr/${p.userId}`}
+              style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)", textDecoration: "none" }}
+            >
+              {p.user?.nombre ?? `#${p.userId}`}
+            </Link>
+            <div style={rowMetaStyle}>
+              {detalle ? <span>{detalle}</span> : null}
+              {urls.length > 0 ? (
+                <>
+                  {urls.slice(0, 3).map((u, i) => {
+                    const href = assetUrl(u);
+                    return href ? (
+                      <a
+                        key={`${u}-${i}`}
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "var(--primary)", textDecoration: "none" }}
+                      >
+                        · Comprobante {i + 1}
+                      </a>
+                    ) : null;
+                  })}
+                  {urls.length > 3 ? <span>· +{urls.length - 3} más</span> : null}
+                </>
+              ) : (
+                <span style={rowMetaWarnStyle}>· Sin comprobante</span>
+              )}
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: "periodFrom",
       label: "Periodo",
       render: (p) => (
-        <span style={{ fontSize: 12 }}>
-          {p.periodFrom ? new Date(`${p.periodFrom}T12:00:00`).toLocaleDateString("es-MX") : "—"}
-          {" – "}
-          {p.periodTo ? new Date(`${p.periodTo}T12:00:00`).toLocaleDateString("es-MX") : "—"}
+        <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+          {formatDay(p.periodFrom)} – {formatDay(p.periodTo)}
         </span>
       ),
-      width: 180,
+      width: 150,
     },
     {
       key: "amount",
       label: "Monto",
-      align: "right" as const,
+      align: "right",
+      numeric: true,
       render: (p) => <Money value={p.amount} />,
-      width: 110,
-    },
-    {
-      key: "evidenceUrls",
-      label: "Evidencia",
-      render: (p) => {
-        const urls = p.evidenceUrls ?? [];
-        if (!urls.length) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {urls.slice(0, 3).map((u, i) => {
-              const href = assetUrl(u);
-              return href ? (
-                <a key={`${u}-${i}`} href={href} target="_blank" rel="noreferrer" style={{ fontSize: 11.5, color: "var(--primary)" }}>
-                  Archivo {i + 1}
-                </a>
-              ) : null;
-            })}
-            {urls.length > 3 ? (
-              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>+{urls.length - 3} más</span>
-            ) : null}
-          </div>
-        );
-      },
-      width: 100,
+      width: 120,
     },
     {
       key: "status",
       label: "Estado",
-      render: (p) => <Tag variant={statusVariant(p.status)}>{p.status ?? "—"}</Tag>,
-      width: 100,
+      render: (p) => <StatusDot label={p.status ?? "—"} tone={statusTone(p.status)} />,
+      width: 110,
     },
     {
       key: "id",
       label: "",
+      align: "right",
       render: (p) => (
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {cfg.canEdit && p.status !== "Anulado" && (
-            <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
+            <Button size="sm" variant="ghost" style={rowButtonStyle} onClick={() => openEdit(p)}>
               Editar
             </Button>
           )}
           {cfg.canEdit && p.status === "Borrador" && (
-            <Button size="sm" variant="secondary" onClick={() => runMarkPagado(p)}>
+            <Button size="sm" variant="secondary" style={rowButtonStyle} onClick={() => runMarkPagado(p)}>
               Aprobar borrador
             </Button>
           )}
           {cfg.canDelete && p.status !== "Anulado" && (
-            <Button size="sm" variant="danger" onClick={() => remove(p)}>
+            <Button size="sm" variant="ghost" style={rowButtonStyle} onClick={() => remove(p)}>
               Anular
             </Button>
           )}
@@ -469,23 +567,20 @@ export default function EmployeePaymentsPage() {
         subtitle={cfg.subtitle}
         actions={
           <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>
+            <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void load()}>
               Actualizar
             </Button>
             {cfg.canCreate && (
-              <Button variant="primary" iconLeft="+" onClick={openNew}>
+              <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
                 Registrar pago
               </Button>
             )}
           </>
         }
         kpis={
-          <>
-            <KpiCard label="Total pagado" value={<Money value={totalPagado} compact />} variant="positive" />
-            <KpiCard label="Borradores" value={borradores} variant={borradores > 0 ? "warning" : "default"} />
-            <KpiCard label="Empleados" value={empleados} />
-            <KpiCard label="Registros" value={visibleItems.length} />
-          </>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <MetricStrip metrics={metrics} ariaLabel="Resumen de pagos a empleados" />
+          </div>
         }
         tabs={[
           { id: "lista", label: "Lista" },
@@ -497,68 +592,66 @@ export default function EmployeePaymentsPage() {
         {tab === "analytics" ? (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "end" }}>
-              <FinanceField label="Desde">
+              <FinanceField label="Desde" hint="Deja vacío para incluir todo el histórico." optional>
                 <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={financeInputStyle} />
               </FinanceField>
-              <FinanceField label="Hasta">
+              <FinanceField label="Hasta" optional>
                 <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={financeInputStyle} />
               </FinanceField>
-              <Button size="sm" variant="secondary" onClick={() => void loadAnalytics()}>
+              <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
                 Aplicar
               </Button>
-              <Button size="sm" variant="primary" onClick={() => void downloadPdf()}>
+              <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void downloadPdf()}>
                 Descargar PDF
               </Button>
             </div>
             {analyticsLoading && (
-              <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>Calculando…</div>
+              <div style={{ padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
+                Calculando…
+              </div>
             )}
             {!analyticsLoading && analytics && (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
-                  <KpiCard label="Total pagado" value={<Money value={analytics.totalPagado} compact />} variant="positive" />
-                  <KpiCard label="Borradores" value={<Money value={analytics.totalBorrador} compact />} variant="warning" />
-                  <KpiCard label="Empleados" value={analytics.employees} />
-                  <KpiCard label="Registros" value={analytics.count} />
-                </div>
-                <div
-                  style={{
-                    padding: 14,
-                    border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    background: "var(--surface-2, var(--surface))",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      marginBottom: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      color: "var(--text-tertiary)",
-                    }}
-                  >
-                    Por empleado
-                  </div>
+                <MetricStrip
+                  ariaLabel="Resumen del periodo"
+                  metrics={[
+                    { label: "Pagado", value: <Money value={analytics.totalPagado} />, hint: "liquidado en el periodo" },
+                    {
+                      label: "Por aprobar",
+                      value: <Money value={analytics.totalBorrador} />,
+                      hint: "en borradores",
+                      tone: analytics.totalBorrador > 0 ? "warning" : "default",
+                    },
+                    { label: "Empleados", value: analytics.employees, hint: "con pagos en el periodo" },
+                    { label: "Registros", value: analytics.count, hint: "en el periodo" },
+                  ]}
+                />
+                <div style={breakdownPanelStyle}>
+                  <div style={breakdownTitleStyle}>Por empleado</div>
                   {!analytics.byEmployee.length && (
                     <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
                   )}
-                  {analytics.byEmployee.slice(0, 12).map((r) => (
+                  {analytics.byEmployee.slice(0, 12).map((r, i) => (
                     <div
                       key={r.name}
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr auto auto",
+                        alignItems: "baseline",
                         gap: 12,
                         padding: "6px 0",
-                        borderBottom: "1px solid var(--border)",
-                        fontSize: 13,
+                        borderBottom:
+                          i === Math.min(analytics.byEmployee.length, 12) - 1
+                            ? "none"
+                            : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
+                        fontSize: 12.5,
                       }}
                     >
                       <span>{r.name}</span>
-                      <span style={{ color: "var(--text-tertiary)" }}>{r.count} reg.</span>
-                      <Money value={r.total} />
+                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.count} reg.</span>
+                      <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                        <Money value={r.total} />
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -596,63 +689,63 @@ export default function EmployeePaymentsPage() {
               }}
               resultCount={loading ? null : visibleItems.length}
               rightActions={
-                visibleItems.length > 0 ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconLeft="⬇"
-                    onClick={() =>
-                      exportToExcel(
-                        visibleItems,
-                        [
-                          {
-                            key: "user",
-                            label: "Empleado",
-                            format: (v) => (v as Payment["user"])?.nombre ?? "—",
-                          },
-                          { key: "concepto", label: "Concepto" },
-                          { key: "periodFrom", label: "Desde" },
-                          { key: "periodTo", label: "Hasta" },
-                          { key: "amount", label: "Monto ($)" },
-                          { key: "status", label: "Estado" },
-                          { key: "note", label: "Nota" },
-                        ],
-                        "pagos-empleados",
-                      )
-                    }
-                  >
-                    Excel
-                  </Button>
-                ) : undefined
+                <ListExportActions
+                  onExcel={
+                    visibleItems.length > 0
+                      ? () =>
+                          exportToExcel(
+                            visibleItems,
+                            [
+                              {
+                                key: "user",
+                                label: "Empleado",
+                                format: (v) => (v as Payment["user"])?.nombre ?? "—",
+                              },
+                              { key: "concepto", label: "Concepto" },
+                              { key: "periodFrom", label: "Desde" },
+                              { key: "periodTo", label: "Hasta" },
+                              { key: "amount", label: "Monto ($)" },
+                              { key: "status", label: "Estado" },
+                              { key: "note", label: "Nota" },
+                            ],
+                            "pagos-empleados",
+                          )
+                      : undefined
+                  }
+                />
               }
             />
             {error && (
-              <div
-                role="alert"
-                style={{
-                  padding: "10px 14px",
-                  marginBottom: 12,
-                  background: "var(--state-warning-bg)",
-                  border: "1px solid var(--state-warning-border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-              >
-                {error}{" "}
-                <Button size="sm" variant="ghost" onClick={() => void load()}>
+              <div style={{ marginBottom: 12 }}>
+                <InlineAlert message={error} variant="danger" style={{ marginBottom: 8 }} />
+                <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
                   Reintentar
                 </Button>
               </div>
             )}
             {loading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+              <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
+                Cargando pagos…
+              </div>
             ) : !error ? (
               <DataTable
                 columns={columns}
                 rows={visibleItems}
                 rowKey={(p) => p.id}
+                density="compact"
                 emptyTitle="Sin pagos registrados"
-                emptyDescription="Registra el primer pago a empleados."
+                emptyDescription={
+                  searchQ || filterUser || filterStatus
+                    ? "Ningún pago coincide con los filtros aplicados."
+                    : "Registra el primer pago a empleados."
+                }
+                emptyAction={
+                  cfg.canCreate && !searchQ && !filterUser && !filterStatus ? (
+                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={openNew}>
+                      Registrar pago
+                    </Button>
+                  ) : undefined
+                }
               />
             ) : null}
           </>
@@ -663,40 +756,41 @@ export default function EmployeePaymentsPage() {
         open={showForm}
         onClose={() => setShowForm(false)}
         title={editing ? "Editar pago" : "Registrar pago"}
-        maxWidth={520}
+        maxWidth={560}
         footer={
           <>
             <Button
               variant="ghost"
+              style={toolbarButtonStyle}
               onClick={() => {
                 setShowForm(false);
                 setSaveErr(null);
+                setFormErrors({});
                 setEditing(null);
                 setEvidenceFiles([]);
               }}
             >
               Cancelar
             </Button>
-            <Button
-              variant="primary"
-              onClick={() => void submit()}
-              disabled={saving || !form.userId || !form.amount || !form.periodFrom || !form.periodTo}
-            >
-              {saving ? "Guardando…" : editing ? "Guardar cambios" : "Registrar"}
+            <Button variant="primary" style={toolbarButtonStyle} onClick={() => void submit()} disabled={saving}>
+              {saving ? "Guardando…" : editing ? "Guardar cambios" : "Registrar pago"}
             </Button>
           </>
         }
       >
         <FinanceFormGrid>
           {editing ? (
-            <FinanceField label="Empleado" fullWidth>
+            <FinanceField label="Empleado" fullWidth hint="El empleado no cambia; registra otro pago si te equivocaste.">
               <input value={editing.user?.nombre ?? `#${editing.userId}`} disabled style={{ ...financeInputStyle, opacity: 0.7 }} />
             </FinanceField>
           ) : (
-            <FinanceField label="Empleado" fullWidth>
+            <FinanceField label="Empleado" fullWidth error={formErrors.userId}>
               <select
                 value={form.userId}
-                onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, userId: e.target.value }));
+                  setFormErrors((prev) => ({ ...prev, userId: undefined }));
+                }}
                 style={financeInputStyle}
               >
                 <option value="">— Seleccionar —</option>
@@ -706,10 +800,14 @@ export default function EmployeePaymentsPage() {
                   </option>
                 ))}
               </select>
-              {usersErr && <p style={{ fontSize: 12, color: "var(--danger)", margin: "4px 0 0" }}>{usersErr}</p>}
             </FinanceField>
           )}
-          <FinanceField label="Concepto" fullWidth>
+          {usersErr && !editing && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <InlineAlert message={usersErr} variant="warning" style={{ marginBottom: 0 }} />
+            </div>
+          )}
+          <FinanceField label="Concepto" fullWidth optional hint="Así se identifica el pago en el reporte y en el PDF.">
             <input
               value={form.concepto}
               onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))}
@@ -717,32 +815,45 @@ export default function EmployeePaymentsPage() {
               style={financeInputStyle}
             />
           </FinanceField>
-          <FinanceField label="Periodo desde">
+          <FinanceField label="Periodo desde" hint="Primer día que cubre el pago." error={formErrors.periodFrom}>
             <input
               type="date"
               value={form.periodFrom}
-              onChange={(e) => setForm((f) => ({ ...f, periodFrom: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, periodFrom: e.target.value }));
+                setFormErrors((prev) => ({ ...prev, periodFrom: undefined }));
+              }}
               style={financeInputStyle}
             />
           </FinanceField>
-          <FinanceField label="Periodo hasta">
+          <FinanceField label="Periodo hasta" hint="Último día que cubre el pago." error={formErrors.periodTo}>
             <input
               type="date"
               value={form.periodTo}
-              onChange={(e) => setForm((f) => ({ ...f, periodTo: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, periodTo: e.target.value }));
+                setFormErrors((prev) => ({ ...prev, periodTo: undefined }));
+              }}
               style={financeInputStyle}
             />
           </FinanceField>
-          <FinanceField label="Monto ($)">
+          <FinanceField label="Monto" hint="Pesos: el neto que se deposita." error={formErrors.amount}>
             <input
               type="number"
               min={0}
               value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: Number(e.target.value) }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, amount: Number(e.target.value) }));
+                setFormErrors((prev) => ({ ...prev, amount: undefined }));
+              }}
               style={financeInputStyle}
             />
           </FinanceField>
-          <FinanceField label="Horas trabajadas (asistencia)">
+          <FinanceField
+            label="Horas trabajadas"
+            optional
+            hint="«Calcular» las trae de los registros de asistencia del periodo."
+          >
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 type="number"
@@ -756,6 +867,7 @@ export default function EmployeePaymentsPage() {
                 type="button"
                 variant="secondary"
                 size="sm"
+                style={toolbarButtonStyle}
                 onClick={() => void calcularDesdeAsistencia()}
                 disabled={calculatingAttendance || !form.userId || !form.periodFrom || !form.periodTo}
               >
@@ -764,7 +876,7 @@ export default function EmployeePaymentsPage() {
             </div>
           </FinanceField>
           {!editing && (
-            <FinanceField label="Estado">
+            <FinanceField label="Estado" hint="Un borrador se revisa antes de aprobarlo y marcarlo pagado.">
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as PaymentStatus }))}
@@ -775,11 +887,11 @@ export default function EmployeePaymentsPage() {
               </select>
             </FinanceField>
           )}
-          <FinanceField label="Nota" fullWidth>
+          <FinanceField label="Nota" fullWidth optional hint="Referencia interna; se queda en el ERP.">
             <input
               value={form.note}
               onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-              placeholder="Referencia interna (opcional)"
+              placeholder="Ej. transferencia BBVA 1234"
               style={financeInputStyle}
             />
           </FinanceField>
@@ -790,13 +902,29 @@ export default function EmployeePaymentsPage() {
                 if (f) setEvidenceFiles((prev) => [...prev, f]);
               }}
               label={editing ? "Agregar comprobantes" : "Comprobantes"}
-              hint={editing ? "Opcional · se anexan a los existentes" : "Opcional · PDF o imagen · puedes agregar varios"}
+              hint={
+                editing
+                  ? "Opcional · se anexan a los existentes"
+                  : "Opcional · PDF o imagen · puedes agregar varios"
+              }
             />
             {evidenceFiles.length > 0 && (
-              <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 12, color: "var(--text-secondary)" }}>
+              <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 4 }}>
                 {evidenceFiles.map((f, i) => (
-                  <li key={`${f.name}-${i}`} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span>{f.name}</span>
+                  <li
+                    key={`${f.name}-${i}`}
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      fontSize: 12,
+                      color: "var(--text-secondary)",
+                      padding: "4px 0",
+                      borderBottom: "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
+                    }}
+                  >
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</span>
                     <button
                       type="button"
                       onClick={() => setEvidenceFiles((prev) => prev.filter((_, idx) => idx !== i))}
@@ -804,7 +932,7 @@ export default function EmployeePaymentsPage() {
                         background: "none",
                         border: "none",
                         cursor: "pointer",
-                        color: "var(--danger)",
+                        color: "var(--text-tertiary)",
                         fontSize: 11,
                         padding: 0,
                       }}
@@ -816,7 +944,7 @@ export default function EmployeePaymentsPage() {
               </ul>
             )}
             {editing?.evidenceUrls && editing.evidenceUrls.length > 0 && (
-              <div style={{ marginTop: 8, fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-tertiary)" }}>
                 Existentes:{" "}
                 {editing.evidenceUrls.map((u, i) => {
                   const href = assetUrl(u);
@@ -830,19 +958,8 @@ export default function EmployeePaymentsPage() {
             )}
           </div>
           {saveErr && (
-            <div
-              role="alert"
-              style={{
-                gridColumn: "1 / -1",
-                padding: "8px 12px",
-                background: "var(--state-danger-bg, #fef2f2)",
-                border: "1px solid var(--danger)",
-                borderRadius: 8,
-                fontSize: 12,
-                color: "var(--danger)",
-              }}
-            >
-              {saveErr}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <InlineAlert message={saveErr} variant="danger" style={{ marginBottom: 0 }} />
             </div>
           )}
         </FinanceFormGrid>
