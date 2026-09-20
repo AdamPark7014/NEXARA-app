@@ -725,6 +725,68 @@ data class CelebracionesHoyDto(
     val celebraciones: List<CelebracionDto>? = null,
 )
 
+// ── Checklist de herramientas (GET me/activities/:id/herramientas) ─────────
+
+/**
+ * Producto del catálogo que respalda un renglón (material de consumo).
+ * Espejo de `RequisitoConCheck.producto` en
+ * apps/api/src/activities/tools/herramientas-checklist.helpers.ts.
+ */
+data class HerramientaProductoDto(
+    val id: Long? = null,
+    val sku: String? = null,
+    val nombre: String? = null,
+)
+
+/** Herramienta concreta del inventario (por número de serie). */
+data class HerramientaInventarioDto(
+    val id: Long? = null,
+    val nombre: String? = null,
+    val serie: String? = null,
+)
+
+/** Último palomeo de un renglón; `null` = nadie lo ha revisado. */
+data class HerramientaCheckDto(
+    val ok: Boolean? = null,
+    val nota: String? = null,
+    val fotoUrl: String? = null,
+    val at: String? = null,
+    val por: MyActivityRefDto? = null,
+)
+
+/** Un renglón del checklist: qué hay que llevar y si ya se palomeó. */
+data class HerramientaRequisitoDto(
+    val id: Long? = null,
+    val descripcion: String? = null,
+    val cantidad: Double? = null,
+    val productId: Long? = null,
+    val producto: HerramientaProductoDto? = null,
+    val toolId: Long? = null,
+    val herramienta: HerramientaInventarioDto? = null,
+    val check: HerramientaCheckDto? = null,
+)
+
+/**
+ * Estado completo del checklist de una OT. Lo devuelven tanto el GET como el
+ * POST de palomeo, así que la pantalla no vuelve a pedir la lista.
+ */
+data class HerramientasChecklistDto(
+    val activityId: Long? = null,
+    val requisitos: List<HerramientaRequisitoDto>? = null,
+    val total: Int? = null,
+    val listos: Int? = null,
+    val pendientes: List<String>? = null,
+    val completo: Boolean? = null,
+)
+
+/** `POST me/activities/:id/herramientas/:requirementId/check`. */
+data class PalomearHerramientaRequest(
+    /** true = «lo traigo y sirve»; false = «falta o está dañado». */
+    val ok: Boolean,
+    val nota: String? = null,
+    val fotoUrl: String? = null,
+)
+
 interface CoreActivitiesApi {
     @GET("me/activities")
     suspend fun myActivities(): MyActivitiesResponseDto
@@ -765,6 +827,21 @@ interface CoreActivitiesApi {
      */
     @POST("me/activities/{id}/iniciar")
     suspend fun iniciarActividad(@Path("id") activityId: Long): ResponseBody
+
+    /**
+     * Checklist de herramientas de una OT mía. Solo de quien la tiene asignada:
+     * a los demás el API contesta 403.
+     */
+    @GET("me/activities/{id}/herramientas")
+    suspend fun herramientasChecklist(@Path("id") activityId: Long): HerramientasChecklistDto
+
+    /** Palomear un renglón: «lo traigo» (ok=true) o «falta» (ok=false). */
+    @POST("me/activities/{id}/herramientas/{requirementId}/check")
+    suspend fun palomearHerramienta(
+        @Path("id") activityId: Long,
+        @Path("requirementId") requirementId: Long,
+        @Body body: PalomearHerramientaRequest,
+    ): HerramientasChecklistDto
 
     @POST("me/activities/{id}/despacho")
     suspend fun dispatch(
