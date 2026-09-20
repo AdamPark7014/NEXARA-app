@@ -91,7 +91,13 @@ export default function FilterScale({
               cursor: "pointer",
               font: "inherit",
               color: "var(--text-primary)",
-              border: "none",
+              // Solo propiedades largas, igual que en MetricStrip: mezclar el
+              // atajo `border` con `borderRight` deja el resultado a merced del
+              // orden de claves. Aquí hoy sale bien, pero es un patrón frágil
+              // que el siguiente en copiarlo hereda roto.
+              borderTop: "none",
+              borderBottom: "none",
+              borderLeft: "none",
               // `border: none` se lleva por delante el anillo del navegador.
               outlineOffset: -2,
               borderRight:

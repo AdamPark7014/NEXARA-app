@@ -101,8 +101,16 @@ export default function MetricStrip({
         const interactiveStyle = {
           ...cellStyle,
           background: "transparent",
-          border: "none",
-          borderRight: cellStyle.borderRight,
+          // Solo propiedades largas. Mezclar el atajo `border` con `borderRight`
+          // en el mismo objeto deja el resultado a merced del orden de claves:
+          // una clave repetida conserva su posición original pero el valor
+          // último, así que el atajo acababa aplicándose DESPUÉS y las celdas
+          // con `onClick` se quedaban con el borde por defecto del navegador
+          // —pastillas dentro de la tira—. Medido en el DOM, no deducido.
+          borderTop: "none",
+          borderBottom: "none",
+          borderLeft: "none",
+          borderRight: cellStyle.borderRight ?? "none",
           cursor: "pointer",
           font: "inherit",
           display: "block",
