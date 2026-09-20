@@ -127,6 +127,8 @@ export type TeamBoardResponse = {
   desde: string;
   hasta: string;
   users: TeamBoardUser[];
+  /** Pipeline de flujo (Ola C); ausente en clientes viejos. */
+  workflow?: import('./workflow-kpis.js').WorkflowPipelineCounts;
 };
 
 export type TeamBoardHistoryItem = {
@@ -272,7 +274,13 @@ export class TeamBoardService {
       desde: workDateKey(rangoFinal.desde),
       hasta: workDateKey(rangoFinal.hasta),
     };
-    if (userIds.length === 0) return { ...base, users: [] };
+    if (userIds.length === 0) {
+      const {
+        emptyWorkflowPipeline,
+        finalizeWorkflow,
+      } = await import('./workflow-kpis.js');
+      return { ...base, users: [], workflow: finalizeWorkflow(emptyWorkflowPipeline()) };
+    }
     const users = await this.buildCards(
       scoped,
       userIds,
@@ -281,7 +289,117 @@ export class TeamBoardService {
       tiposVisibles(viewer),
       rangoFinal,
     );
-    return { ...base, users };
+    const workflow = await this.buildWorkflowPipeline(userIds, companyId, rangoFinal, now);
+    return { ...base, users, workflow };
+  }
+
+  /**
+   * Pipeline de flujo del equipo en el rango (asignada→iniciada→evidencia→cerrada + peer rejects + SLA).
+   */
+  async getWorkflow(
+    viewer: Viewer,
+    companyId: number | null,
+    rango?: BoardRange,
+  ): Promise<{
+    scope: 'company' | 'subtree';
+    desde: string;
+    hasta: string;
+    workflow: import('./workflow-kpis.js').WorkflowPipelineCounts;
+  }> {
+    const { companyWide, scoped, now } = await this.resolveScope(viewer, companyId);
+    const rangoFinal = rango ?? this.resolveRange(null, null, now);
+    const userIds = scoped.map((u) => u.id);
+    const workflow = await this.buildWorkflowPipeline(userIds, companyId, rangoFinal, now);
+    return {
+      scope: companyWide ? 'company' : 'subtree',
+      desde: workDateKey(rangoFinal.desde),
+      hasta: workDateKey(rangoFinal.hasta),
+      workflow,
+    };
+  }
+
+  private async buildWorkflowPipeline(
+    userIds: number[],
+    companyId: number | null,
+    rango: BoardRange,
+    now: Date,
+  ): Promise<import('./workflow-kpis.js').WorkflowPipelineCounts> {
+    const {
+      emptyWorkflowPipeline,
+      accumulateWorkflow,
+      finalizeWorkflow,
+      withPeerRejects,
+    } = await import('./workflow-kpis.js');
+    const counts = emptyWorkflowPipeline();
+    if (userIds.length === 0) return finalizeWorkflow(counts);
+
+    const rows = await this.prisma.activityAssignee.findMany({
+      where: {
+        userId: { in: userIds },
+        retiradoAt: null,
+        ...(companyId != null ? { companyId } : {}),
+        activity: { deletedAt: null, cancelledAt: null },
+      },
+      select: {
+        userId: true,
+        inicioRealAt: true,
+        activity: {
+          select: {
+            estatus: true,
+            fechaFinalizacion: true,
+            fechaMaxima: true,
+            periodoFin: true,
+            fechaAsignacion: true,
+            cancelledAt: true,
+            activityEvidences: {
+              select: { userId: true, status: true },
+            },
+          },
+        },
+      },
+      take: 2000,
+    });
+
+    for (const row of rows) {
+      const a = row.activity;
+      if (!a) continue;
+      const enRangoAct =
+        enRango(
+          [a.fechaAsignacion, row.inicioRealAt, a.fechaFinalizacion, a.fechaMaxima],
+          rango.desde,
+          rango.hasta,
+        ) ||
+        enRango([a.periodoFin], rango.desde, rango.hasta);
+      if (!enRangoAct) continue;
+      const ev = a.activityEvidences.find((e) => e.userId === row.userId)?.status ?? null;
+      accumulateWorkflow(
+        counts,
+        {
+          estatus: a.estatus,
+          inicioRealAt: row.inicioRealAt,
+          fechaFinalizacion: a.fechaFinalizacion,
+          fechaMaxima: a.fechaMaxima,
+          periodoFin: a.periodoFin,
+          evidenceStatus: ev,
+          cancelada: Boolean(a.cancelledAt),
+        },
+        now,
+      );
+    }
+
+    let peerRejected = 0;
+    if (companyId != null) {
+      peerRejected = await this.prisma.activityPeerRequest.count({
+        where: {
+          companyId,
+          status: 'REJECTED',
+          toUserId: { in: userIds },
+          updatedAt: { gte: rango.desde, lte: rango.hasta },
+        },
+      });
+    }
+
+    return finalizeWorkflow(withPeerRejects(counts, peerRejected));
   }
 
   async getBoardUser(

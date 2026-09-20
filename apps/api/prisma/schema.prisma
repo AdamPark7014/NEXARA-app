@@ -852,6 +852,8 @@ model User {
   companyMemberships        UserCompany[]
   participacionesActividad  ActivityAssignee[]         @relation("ActivityAssignedUser")
   asignacionesDespachadas   ActivityAssignee[]         @relation("ActivityAssignedBy")
+  peerRequestsSent          ActivityPeerRequest[]      @relation("PeerRequestFrom")
+  peerRequestsReceived      ActivityPeerRequest[]      @relation("PeerRequestTo")
   reprogramacionesHechas    ActivityScheduleChange[]   @relation("ActivityScheduleChangedBy")
   evidenceReviewsHechas     ActivityEvidenceReview[]   @relation("EvidenceReviewAuthor")
   evidenceReviewsRecibidas  ActivityEvidenceReview[]   @relation("EvidenceReviewSubject")
@@ -1203,6 +1205,8 @@ model Activity {
   toolRequirements        ActivityToolRequirement[] @relation("ActivityToolRequirements")
   /// Préstamos de herramienta pedidos para esta OT.
   toolRequests            ToolRequest[]             @relation("ActivityToolRequests")
+  /// Solicitudes entre pares que, al aceptarse, crearon esta actividad.
+  peerRequestsOriginated  ActivityPeerRequest[]
   @@unique([companyId, anNumber])
   @@index([cotizacionId])
   @@index([projectId])
@@ -1210,6 +1214,38 @@ model Activity {
   @@index([clientId])
   @@index([companyId])
   @@index([acsEnteredAt])
+}
+
+/// Solicitud de ayuda entre pares (mismo rango u org superior). No es el rechazo
+/// de una OT asignada por el jefe — eso sigue en 403.
+enum ActivityPeerRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model ActivityPeerRequest {
+  id           Int                       @id @default(autoincrement())
+  fromUserId   Int
+  toUserId     Int
+  title        String                    @db.VarChar(200)
+  description  String?
+  status       ActivityPeerRequestStatus @default(PENDING)
+  rejectReason String?                   @db.VarChar(500)
+  activityId   Int?
+  companyId    Int
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  fromUser     User                      @relation("PeerRequestFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser       User                      @relation("PeerRequestTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  activity     Activity?                 @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  company      CompanyProfile            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, status])
+  @@index([fromUserId, status])
+  @@index([toUserId, status])
+  @@index([activityId])
+  @@map("activity_peer_requests")
 }
 
 enum ActivityWorkType {
@@ -5848,6 +5884,7 @@ model CompanyProfile {
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
   attendanceRejections        AttendanceRejection[]
   overtimeApprovals           OvertimeApproval[]
+  activityPeerRequests        ActivityPeerRequest[]
   productPackagings           ProductPackaging[]
   activityToolRequirements    ActivityToolRequirement[]
   activityToolChecks          ActivityToolCheck[]
