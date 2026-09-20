@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import PersonaPhotoCard from "@/components/pizarra/PersonaPhotoCard";
 import { formatApiError } from "@/lib/erp-api";
-import { Chip, PrioridadChip, SemaforoDot } from "@/components/pizarra/PizarraKpi";
 import {
   fetchAsignadasPorMi,
   formatMinutes,
@@ -18,7 +18,7 @@ function fecha(iso: string | null | undefined): string {
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
 }
 
-/** Contrato C: lo que repartió quien mira, con persona, estado y semáforo. */
+/** Contrato C: lo que repartió quien mira, con foto grande unificada. */
 export default function AsignadasPorMiView({
   token,
   rango,
@@ -68,67 +68,30 @@ export default function AsignadasPorMiView({
   }
 
   return (
-    <div style={{ display: "grid", gap: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
       {items.map((a) => (
-        <div
+        <PersonaPhotoCard
           key={`${a.id}-${a.persona.id}`}
-          style={{
-            display: "grid",
-            gap: 6,
-            padding: "12px 14px",
-            borderRadius: 14,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <SemaforoDot semaforo={a.semaforo} />
-            <Link
-              href={`/erp/actividades/${a.id}`}
-              style={{
-                fontWeight: 750,
-                fontSize: 14,
-                color: "inherit",
-                textDecoration: "none",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {a.anNumber} · {a.titulo}
-            </Link>
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
-            <PrioridadChip prioridad={a.prioridad} />
-            {/* Ya no se acepta ni se rechaza: lo que importa es si ya la inició. */}
-            {a.inicioRealAt ? (
-              <Chip color="#16a34a">Iniciada</Chip>
-            ) : a.aceptacion === "RECHAZADA" ? (
-              <Chip color="#dc2626" title={a.motivoRechazo ?? undefined}>
-                Rechazada
-              </Chip>
-            ) : null}
-            {a.excedida ? <Chip color="#dc2626">Excedió el plan</Chip> : null}
-            {a.retirado ? <Chip color="#64748b">Retirado</Chip> : null}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-            <Link
-              href={`/erp/pizarra/${a.persona.id}`}
-              style={{ fontWeight: 700, color: "var(--primary)", textDecoration: "none" }}
-            >
-              {a.persona.nombre}
-            </Link>
-            {` · ${a.estatus} · asignada ${fecha(a.fechaAsignacion)}`}
-            {a.periodo ? ` · ${a.periodo.etiqueta}` : a.fechaMaxima ? ` · vence ${fecha(a.fechaMaxima)}` : ""}
-            {a.minutosPlan != null
-              ? ` · plan ${formatMinutes(a.minutosPlan)}${
-                  a.minutosReales != null ? ` / real ${formatMinutes(a.minutosReales)}` : ""
-                }`
-              : a.minutosReales != null
-                ? ` · real ${formatMinutes(a.minutosReales)}`
-                : ""}
-          </div>
-        </div>
+          href={`/erp/actividades/${a.id}`}
+          nombre={a.persona.nombre}
+          puesto={a.persona.puesto}
+          avatarUrl={a.persona.avatarUrl}
+          photoSize={200}
+          title={`${a.anNumber} · ${a.titulo}`}
+          subtitle={`${a.estatus} · Asignada ${fecha(a.fechaAsignacion)}`}
+          prioridad={a.prioridad}
+          semaforo={a.semaforo}
+          meta={
+            <div style={{ fontSize: 12, color: "var(--text-secondary)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span>Plan {formatMinutes(a.minutosPlan)}</span>
+              <span>Real {formatMinutes(a.minutosReales)}</span>
+              {a.excedida ? <span style={{ color: "var(--danger)" }}>Excedida</span> : null}
+              <Link href={`/erp/pizarra/${a.persona.id}`} style={{ color: "inherit" }}>
+                Ver ficha
+              </Link>
+            </div>
+          }
+        />
       ))}
     </div>
   );

@@ -13,6 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
 import AsignadasPorMiView from "@/components/pizarra/AsignadasPorMiView";
+import SolicitudesEquipoView from "@/components/pizarra/SolicitudesEquipoView";
 import { PrioridadChip, RangoSelector, SemaforoDot } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import {
@@ -28,8 +29,8 @@ import {
 } from "@/lib/team-board-api";
 import p from "./pizarra.module.css";
 
-/** Actividades tiene tres vistas: lo mío, mi equipo y lo que repartí (se recuerda la última). */
-type Vista = "mias" | "equipo" | "asignadas";
+/** Actividades: lo mío, mi equipo, lo que repartí y solicitudes entre pares. */
+type Vista = "mias" | "equipo" | "asignadas" | "solicitudes";
 const VISTA_KEY = "nx-actividades-vista";
 
 /** Estado de la persona → tono de la base (el mismo en el punto, el texto y la cifra de arriba). */
@@ -215,6 +216,7 @@ const PESTANAS = [
   { id: "mias" as const, label: "Mis actividades", icon: TaskAltIcon },
   { id: "equipo" as const, label: "Mi equipo", icon: GroupsOutlinedIcon },
   { id: "asignadas" as const, label: "Asignadas por mí", icon: OutboxOutlinedIcon },
+  { id: "solicitudes" as const, label: "Solicitudes de equipo", icon: HourglassTopIcon },
 ];
 
 export default function PizarraPage() {
@@ -231,7 +233,8 @@ export default function PizarraPage() {
     try {
       const q = new URLSearchParams(window.location.search).get("vista");
       const guardada = window.localStorage.getItem(VISTA_KEY);
-      const valida = (v: string | null): v is Vista => v === "mias" || v === "equipo" || v === "asignadas";
+      const valida = (v: string | null): v is Vista =>
+        v === "mias" || v === "equipo" || v === "asignadas" || v === "solicitudes";
       setVista(valida(q) ? q : valida(guardada) ? guardada : "mias");
     } catch {
       /* sin storage: queda «mias» */
@@ -292,11 +295,16 @@ export default function PizarraPage() {
   const sinEquipo = !isCeo && !tieneEquipo && (data != null || Boolean(error));
   // Christian solo asigna: ve el tablero y lo que repartió. Encargados con subordinados,
   // además lo suyo.
-  const pestanas: Vista[] = isCeo ? ["equipo", "asignadas"] : tieneEquipo ? ["mias", "equipo", "asignadas"] : [];
+  const pestanas: Vista[] = isCeo
+    ? ["equipo", "asignadas", "solicitudes"]
+    : tieneEquipo
+      ? ["mias", "equipo", "asignadas", "solicitudes"]
+      : ["mias", "solicitudes"];
   const conPestanas = pestanas.length > 0;
   const vistaActiva: Vista = conPestanas && pestanas.includes(vista) ? vista : pestanas[0] ?? "equipo";
   const verMias = vistaActiva === "mias";
   const verAsignadas = vistaActiva === "asignadas";
+  const verSolicitudes = vistaActiva === "solicitudes";
 
   const cambiarVista = (v: Vista) => {
     setVista(v);
@@ -316,8 +324,42 @@ export default function PizarraPage() {
     );
   }
 
-  if (sinEquipo) {
-    return <MisActividadesView />;
+  if (sinEquipo && vistaActiva === "solicitudes") {
+    return (
+      <div className={p.pagina}>
+        <PageHead
+          title="Actividades"
+          tabs={
+            <Tabs
+              ariaLabel="Vista de actividades"
+              items={PESTANAS.filter((t) => t.id === "mias" || t.id === "solicitudes")}
+              value={vistaActiva}
+              onChange={cambiarVista}
+            />
+          }
+        />
+        <SolicitudesEquipoView />
+      </div>
+    );
+  }
+
+  if (sinEquipo && vistaActiva === "mias") {
+    return (
+      <div className={p.pagina}>
+        <PageHead
+          title="Actividades"
+          tabs={
+            <Tabs
+              ariaLabel="Vista de actividades"
+              items={PESTANAS.filter((t) => t.id === "mias" || t.id === "solicitudes")}
+              value={vistaActiva}
+              onChange={cambiarVista}
+            />
+          }
+        />
+        <MisActividadesView />
+      </div>
+    );
   }
 
   const estados = (Object.keys(STATUS_LABELS) as BoardUserStatus[])
@@ -350,6 +392,8 @@ export default function PizarraPage() {
 
       {verMias ? (
         <MisActividadesView />
+      ) : verSolicitudes ? (
+        <SolicitudesEquipoView />
       ) : (
         <>
           <div className={p.filtros}>
