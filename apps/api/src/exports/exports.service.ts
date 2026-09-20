@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
-type ExportEntity =
+export type ExportEntity =
   | 'clients'
   | 'leads'
   | 'opportunities'
@@ -12,7 +12,8 @@ type ExportEntity =
   | 'projects'
   | 'users'
   | 'kb-articles'
-  | 'crm-activities';
+  | 'crm-activities'
+  | 'cotizaciones';
 
 /** Campo de fecha por entidad (Activity no tiene createdAt). */
 const DATE_FIELD: Partial<Record<ExportEntity, string>> = {
@@ -26,6 +27,7 @@ const DATE_FIELD: Partial<Record<ExportEntity, string>> = {
   users: 'fechaCreacion',
   'kb-articles': 'createdAt',
   'crm-activities': 'createdAt',
+  cotizaciones: 'issueDate',
 };
 
 function buildDateWhere(entity: ExportEntity, filters?: { from?: string; to?: string }) {
@@ -293,6 +295,47 @@ export class ExportsService {
           dueDate: a.dueDate?.toISOString(),
           completedAt: a.completedAt?.toISOString(),
           createdAt: a.createdAt?.toISOString(),
+        }));
+        break;
+      case 'cotizaciones':
+        rows = (
+          await this.prisma.cotizacion.findMany({
+            where: { ...where, deletedAt: null },
+            select: {
+              quoteNumber: true,
+              folioEnviado: true,
+              revision: true,
+              projectName: true,
+              clientName: true,
+              clientCompany: true,
+              status: true,
+              segmento: true,
+              currency: true,
+              issueDate: true,
+              validUntil: true,
+              subtotal: true,
+              discountTotal: true,
+              taxTotal: true,
+              total: true,
+              preparedBy: true,
+              sentAt: true,
+              signedByName: true,
+              signedAt: true,
+            },
+            orderBy: { issueDate: 'desc' },
+          })
+        ).map((c) => ({
+          ...c,
+          // El folio enviado lleva la cadena de quién intervino; es el que la gente cita.
+          folio: c.folioEnviado || c.quoteNumber,
+          subtotal: Number(c.subtotal || 0),
+          discountTotal: Number(c.discountTotal || 0),
+          taxTotal: Number(c.taxTotal || 0),
+          total: Number(c.total || 0),
+          issueDate: c.issueDate?.toISOString(),
+          validUntil: c.validUntil?.toISOString(),
+          sentAt: c.sentAt?.toISOString(),
+          signedAt: c.signedAt?.toISOString(),
         }));
         break;
       default:
