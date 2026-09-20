@@ -10,6 +10,7 @@ const FINANCE_LINKS = [
   { id: "viatics", label: "Viáticos", href: "/erp/finance/viatics" },
   { id: "expenses", label: "Gastos", href: "/erp/finance/expenses" },
   { id: "payments", label: "Pagos a personal", href: "/erp/finance/employee-payments" },
+  { id: "prenomina", label: "Pre-nómina", href: "/erp/finance/prenomina" },
 ] as const;
 
 export default function FinanceModuleRail() {

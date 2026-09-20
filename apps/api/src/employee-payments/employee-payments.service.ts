@@ -14,6 +14,7 @@ import {
   requireCompanyId,
   resolveRequiredCompanyId,
 } from '../common/tenant/tenant-scope.js';
+import { calculatePrenominaAmount } from './prenomina-amount.js';
 
 const STATUS = {
   BORRADOR: 'Borrador',
@@ -64,6 +65,32 @@ export class EmployeePaymentsService {
     const totalMinutes = days.reduce((sum, d) => sum + d.totalMinutes, 0);
     const openDays = days.filter((d) => d.isOpen).map((d) => d.date);
 
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { sueldoSemanal: true },
+    });
+    const overtime = await (this.prisma as any).overtimeApproval.findMany({
+      where: {
+        userId,
+        estado: 'APROBADO',
+        fecha: { gte: fromDate, lte: toDate },
+        ...companyWhere(tenantId),
+      },
+      select: { minutos: true },
+    });
+    // Solo minutos APROBADO cuentan hacia el preview de nómina.
+    const approvedOvertimeMinutes = (overtime as Array<{ minutos: number }>).reduce(
+      (s, r) => s + (r.minutos || 0),
+      0,
+    );
+
+    const sueldoSemanal = profile?.sueldoSemanal != null ? Number(profile.sueldoSemanal) : null;
+    const suggested = calculatePrenominaAmount({
+      sueldoSemanal,
+      minutosLaborados: totalMinutes,
+      minutosExtraAprobados: approvedOvertimeMinutes,
+    });
+
     return {
       userId,
       from: fromDate.toISOString().slice(0, 10),
@@ -72,8 +99,95 @@ export class EmployeePaymentsService {
       totalMinutes,
       totalHours: Math.round((totalMinutes / 60) * 100) / 100,
       openDays: openDays.map((d) => d.toISOString().slice(0, 10)),
-      byDay: days.map((d) => ({ date: d.date.toISOString().slice(0, 10), minutes: d.totalMinutes, isOpen: d.isOpen })),
+      byDay: days.map((d) => ({
+        date: d.date.toISOString().slice(0, 10),
+        minutes: d.totalMinutes,
+        isOpen: d.isOpen,
+      })),
+      approvedOvertimeMinutes,
+      suggestedAmount: suggested.suggestedAmount,
+      suggestedBreakdown: suggested,
+      sueldoSemanal,
     };
+  }
+
+  /**
+   * Vista de pre-nómina por periodo: minutos, extras APROBADOS y monto sugerido
+   * por persona activa de la empresa.
+   */
+  async previewPeriod(from: string, to: string, companyId?: number | null, userIds?: number[]) {
+    const tenantId = requireCompanyId(companyId);
+    const fromDate = this.toDate(from);
+    const toDate = this.toDate(to);
+    if (!fromDate || !toDate || fromDate > toDate) {
+      throw new BadRequestException('Rango de fechas inválido');
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        companyMemberships: { some: { companyId: tenantId } },
+        ...(userIds?.length ? { id: { in: userIds } } : {}),
+      },
+      select: { id: true, nombre: true, email: true, puesto: true },
+      orderBy: { nombre: 'asc' },
+    });
+
+    const rows = [];
+    for (const u of users) {
+      const calc = await this.calculateFromAttendance(u.id, from, to, tenantId);
+      rows.push({
+        ...calc,
+        nombre: u.nombre,
+        email: u.email,
+        puesto: u.puesto,
+      });
+    }
+
+    return {
+      from: fromDate.toISOString().slice(0, 10),
+      to: toDate.toISOString().slice(0, 10),
+      count: rows.length,
+      rows,
+    };
+  }
+
+  /** Crea un batch de EmployeePayment en estado Borrador a partir del preview. */
+  async createBorradorBatch(
+    currentUser: { id: number },
+    from: string,
+    to: string,
+    companyId?: number | null,
+    userIds?: number[],
+  ) {
+    const preview = await this.previewPeriod(from, to, companyId, userIds);
+    const created: any[] = [];
+    const skipped: Array<{ userId: number; reason: string }> = [];
+
+    for (const row of preview.rows) {
+      if (row.suggestedAmount == null || row.suggestedAmount <= 0) {
+        skipped.push({ userId: row.userId, reason: 'sin monto sugerido' });
+        continue;
+      }
+      const payment = await this.create(
+        currentUser,
+        {
+          userId: row.userId,
+          periodFrom: preview.from,
+          periodTo: preview.to,
+          amount: row.suggestedAmount,
+          totalMinutes: row.totalMinutes,
+          concepto: `Pre-nómina ${preview.from} → ${preview.to}`,
+          note: `Extras aprobados: ${row.approvedOvertimeMinutes} min`,
+          status: STATUS.BORRADOR,
+        } as any,
+        [],
+        companyId,
+      );
+      created.push(payment);
+    }
+
+    return { from: preview.from, to: preview.to, created: created.length, skipped, payments: created };
   }
 
   private canViewAll(user: { isSuperAdmin?: boolean; permissions?: string[] }) {

@@ -885,6 +885,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/hr/**', scope: 'write' },
     { path: '/erp/finance/employee-payments/**', scope: 'write' },
+    { path: '/erp/finance/prenomina/**', scope: 'write' },
+    { path: '/erp/finance/prenomina', methods: ['GET'], scope: 'write' },
     // `resolveViaticsSidebarHome` manda a RH al home de viáticos en finanzas ERP.
     { path: '/erp/finance/viatics/**', scope: 'read' },
     // Autoriza permisos, vacaciones e incidencias del personal.
@@ -900,6 +902,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/ops/recruiting/**', scope: 'write' },
     { path: '/api/hr/**', scope: 'write' },
     { path: '/api/employee-payments/**', scope: 'write' },
+    { path: '/api/overtime-approvals/**', scope: 'write' },
+    { path: '/api/attendance-rejections/**', methods: ['GET'], scope: 'read' },
     { path: '/api/attendance/**', scope: 'write' },
     { path: '/api/cvs/**', scope: 'write' },
     { path: '/api/fines/**', scope: 'write' },
@@ -943,6 +947,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     { path: '/api/expenses/**', scope: 'write' },
     { path: '/api/employee-payments/**', methods: ['GET', 'POST'], scope: 'write' },
+    { path: '/api/overtime-approvals/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     ...CLIENT_ADMIN_WRITE_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
   ],
