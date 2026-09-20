@@ -2,6 +2,7 @@
  * Utilidades compartidas para formularios ERP — fetch, listas y mensajes de error.
  */
 import { buildApiUrl } from "@/lib/api-base";
+import { withTenantHeaders } from "@/lib/tenant";
 
 export function formatApiError(err: unknown, fallback = "Error desconocido"): string {
   if (err instanceof Error) {
@@ -32,21 +33,31 @@ export async function erpFetch<T = unknown>(
   token: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    ...(init.headers as Record<string, string> | undefined),
+  };
+
+  // Sin `X-Company-Id` el servidor resuelve la empresa desde la membresía del
+  // usuario, así que no hay fuga de datos — pero el cambio de empresa deja de
+  // surtir efecto en silencio: quien tiene dos empresas sigue viendo la primera.
+  const withTenant = withTenantHeaders(headers);
+
   const res = await fetch(buildApiUrl(path), {
     ...init,
     // Cookie HttpOnly `nexara_token` (Bearer suele ser sentinel `session-cookie`).
     credentials: "include",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> | undefined),
-    },
+    headers: withTenant,
   });
+
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || `HTTP ${res.status}`);
   }
+
   if (res.status === 204) return null as T;
+
   const text = await res.text();
   return (text ? JSON.parse(text) : null) as T;
 }
