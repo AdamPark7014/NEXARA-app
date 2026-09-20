@@ -77,7 +77,9 @@ export default function PrenominaPanel({
     if (!token) return;
     setLoading(true);
     try {
-      await upsertOvertimeCandidates(token, from, to).catch(() => null);
+      await upsertOvertimeCandidates(token, from, to).catch((e) => {
+        toast.error(formatApiError(e, "No se pudo sincronizar horas extra"));
+      });
       const [preview, ots] = await Promise.all([
         fetchPrenominaPreview(token, from, to),
         fetchOvertimeApprovals(token, { from, to }),
@@ -257,7 +259,23 @@ export default function PrenominaPanel({
                 setCreating(true);
                 try {
                   const res = await createPrenominaBatch(token, from, to, [...selected]);
-                  toast.success(`Borradores creados: ${res?.created ?? 0}`);
+                  const created = Number(res?.created ?? 0);
+                  const skipped = Array.isArray(res?.skipped)
+                    ? res.skipped.length
+                    : Number(res?.skipped ?? 0);
+                  if (created > 0) {
+                    toast.success(`Borradores creados: ${created}`);
+                  }
+                  if (skipped > 0) {
+                    const msg =
+                      skipped === 1
+                        ? "1 omitido sin monto sugerido"
+                        : `${skipped} omitidos sin monto sugerido`;
+                    if (created === 0) toast.error(msg);
+                    else toast.warning(msg);
+                  } else if (created === 0) {
+                    toast.error("No se creó ningún borrador");
+                  }
                 } catch (e) {
                   toast.error(formatApiError(e, "No se pudo crear el lote"));
                 } finally {
