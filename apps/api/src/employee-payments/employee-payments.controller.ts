@@ -55,6 +55,44 @@ export class EmployeePaymentsController {
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONTABILIDAD_MANAGE,
+      PERMISSIONS.CONTABILIDAD_VIEW,
+      PERMISSIONS.HR_VIEW,
+      PERMISSIONS.HR_MANAGE,
+    ],
+  })
+  @Get('preview-period')
+  previewPeriod(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('userIds') userIds?: string,
+  ) {
+    if (!from || !to) throw new BadRequestException('from y to requeridos');
+    const ids = userIds
+      ? userIds
+          .split(',')
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isFinite(n) && n > 0)
+      : undefined;
+    return this.service.previewPeriod(from, to, companyId, ids);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.CONTABILIDAD_MANAGE, PERMISSIONS.HR_MANAGE] })
+  @Post('prenomina/batch')
+  createPrenominaBatch(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { from?: string; to?: string; userIds?: number[] },
+  ) {
+    if (!body?.from || !body?.to) throw new BadRequestException('from y to requeridos');
+    return this.service.createBorradorBatch(user, body.from, body.to, companyId, body.userIds);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get('analytics')
   analytics(
