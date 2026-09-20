@@ -1,1 +1,263 @@
-.wrapper {  display: grid;  gap: 16px;}.formCard,.listCard {  display: grid;  gap: 10px;}.title {  color: var(--primary);  margin-bottom: 0;}.fieldsGrid {  display: grid;  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));  gap: 8px;}.fieldsGridMobile {  grid-template-columns: 1fr;}.dropzone {  border: 1px dashed var(--muted);  border-radius: 10px;  padding: 10px;  display: grid;  gap: 8px;  align-content: start;  background: var(--surface-light);  transition: all 0.2s ease;  cursor: pointer;}.dropzoneActive {  border-color: var(--primary);  background: var(--surface);  box-shadow: 0 0 0 1px var(--primary);}.dropzoneLabel,.fileName,.checkboxLabel {  font-size: 12px;  color: var(--text-secondary);}.dropzoneHint {  font-size: 12px;  color: var(--text-secondary);}.hiddenInput {  display: none;}.selectImageBtn {  justify-self: start;  padding: 6px 10px;  font-size: 12px;}.previewImage {  width: 100%;  height: 110px;  object-fit: cover;  border-radius: 8px;  border: 1px solid var(--muted);}.formActions,.topBar {  display: flex;  gap: 8px;  flex-wrap: wrap;}.searchInput {  flex: 1;  min-width: 220px;}.searchInputMobile {  min-width: 0;  width: 100%;}.checkboxLabel {  display: flex;  align-items: center;  gap: 6px;  font-size: 13px;}.errorText {  color: var(--danger);}.centerLoading {  text-align: center;  padding: 16px;}.centerEmpty {  text-align: center;  color: var(--text-secondary);  padding: 20px;}.tableWrap {  overflow-x: auto;}.table {  width: 100%;  border-collapse: collapse;  font-size: 13px;}.tableHeadRow,.tableRow {  border-bottom: 1px solid var(--muted);}.thLeft,.td {  text-align: left;  padding: 10px;}.thCenter,.tdCenter {  text-align: center;  padding: 10px;}.gallery {  display: grid;  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));  gap: 14px;}.galleryCard {  border: 1px solid var(--border);  border-radius: 14px;  overflow: hidden;  background: var(--surface);  display: grid;}.photoRow {  display: grid;  grid-template-columns: 1fr 1fr;  gap: 2px;  background: var(--surface-2);}.photoLink {  display: block;  min-height: 160px;}.galleryPhoto {  width: 100%;  height: 180px;  object-fit: cover;  display: block;}.galleryBody {  padding: 12px 14px 14px;  display: grid;  gap: 6px;}.galleryTitle {  font-weight: 700;  font-size: 15px;}.galleryMeta {  font-size: 12.5px;  color: var(--text-secondary);}.galleryActions {  display: flex;  flex-wrap: wrap;  gap: 6px;  margin-top: 6px;}
+.wrapper {
+  display: grid;
+  gap: 12px;
+}
+
+.formCard,
+.listCard {
+  display: grid;
+  gap: 10px;
+}
+
+.title {
+  color: var(--primary);
+  margin-bottom: 0;
+}
+
+.fieldsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.fieldsGridMobile {
+  grid-template-columns: 1fr;
+}
+
+.dropzone {
+  border: 1px dashed var(--muted);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  background: var(--surface-light);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.dropzoneActive {
+  border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.dropzoneLabel,
+.fileName,
+.checkboxLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dropzoneHint {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.selectImageBtn {
+  justify-self: start;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.previewImage {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--muted);
+}
+
+.formActions,
+.topBar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.topBar {
+  justify-content: space-between;
+}
+
+.searchInput {
+  flex: 1 1 240px;
+  min-width: 0;
+  max-width: 480px;
+}
+
+.searchInputMobile {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.errorText {
+  color: var(--danger);
+}
+
+.centerLoading {
+  text-align: center;
+  padding: 16px;
+}
+
+.centerEmpty {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 20px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tableHeadRow,
+.tableRow {
+  border-bottom: 1px solid var(--muted);
+}
+
+.thLeft,
+.td {
+  text-align: left;
+  padding: 10px;
+}
+
+.thCenter,
+.tdCenter {
+  text-align: center;
+  padding: 10px;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.galleryCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  display: grid;
+}
+
+.photoRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: var(--surface-2);
+}
+
+.photoLink {
+  display: block;
+  min-height: 160px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.galleryPhoto {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.photoPlaceholder {
+  width: 100%;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--border));
+}
+
+.galleryBody {
+  padding: 12px 14px 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.galleryTitle {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.galleryMeta {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.statusAvailable {
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+}
+
+.statusAssigned {
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  color: var(--primary);
+}
+
+.statusRepair {
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+}
+
+.statusRetired {
+  background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
+  color: var(--text-secondary);
+}
+
+.galleryActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.actionBtn {
+  width: 100%;
+  min-height: 34px;
+  justify-content: center;
+  font-size: 12px;
+  padding: 6px 8px;
+}

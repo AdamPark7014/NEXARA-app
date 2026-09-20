@@ -1456,16 +1456,35 @@ export function VistaAlmacen({
           title="Movimientos de inventario"
           subtitle="Historial auditado: quién, cuándo, por qué, de/hacia qué almacén, saldo antes/después y documento (OC, venta, traspaso, ajuste)."
           actions={
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <select value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)} style={{ ...inp, width: 200 }}>
+            cfg.canCreate ? (
+              <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowMovementForm(true)}>
+                Registrar movimiento
+              </Button>
+            ) : undefined
+          }
+        >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "center",
+              marginBottom: 14,
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "color-mix(in srgb, var(--surface-2) 55%, var(--surface))",
+            }}
+          >
+              <select value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)} style={{ ...inp, width: 200, maxWidth: "100%" }}>
                 <option value="">Todos los productos</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
               </select>
-              <select value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)} style={{ ...inp, width: 160 }}>
+              <select value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)} style={{ ...inp, width: 160, maxWidth: "100%" }}>
                 <option value="">Todos los almacenes</option>
                 {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
-              <select value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)} style={{ ...inp, width: 140 }}>
+              <select value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)} style={{ ...inp, width: 140, maxWidth: "100%" }}>
                 <option value="">Todos los tipos</option>
                 {Object.entries(MOVEMENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
@@ -1526,12 +1545,7 @@ export function VistaAlmacen({
               >
                 {exportingPdf ? "PDF…" : "PDF kardex"}
               </Button>
-              {cfg.canCreate && (
-                <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowMovementForm(true)}>Registrar movimiento</Button>
-              )}
-            </div>
-          }
-        >
+          </div>
           {movementId && (
             <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
               Resaltando movimiento <strong>#{movementId}</strong>.{" "}

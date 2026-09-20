@@ -5,6 +5,8 @@ import {
   orgNodeSubtitle,
   maxOrgDepth,
   countWithManager,
+  countWithoutManager,
+  countOrphanRoots,
 } from './orgchart-layout';
 
 function node(
@@ -77,5 +79,16 @@ describe('orgchart-layout', () => {
 
   it('cuenta nodos con manager', () => {
     expect(countWithManager(tree)).toBe(3);
+  });
+
+  it('cuenta nodos sin manager por managerId, no por raíces del bosque', () => {
+    expect(countWithoutManager(tree)).toBe(1);
+    const forest = [
+      ...tree,
+      node({ id: 9, nombre: 'Huérfano', managerId: 999, children: [] }),
+    ];
+    expect(countWithoutManager(forest)).toBe(1);
+    expect(countOrphanRoots(forest)).toBe(1);
+    expect(countWithManager(forest)).toBe(4);
   });
 });
