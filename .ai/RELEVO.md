@@ -2,28 +2,29 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** feat/hard-org-mgrs
-- **Worktree:** `C:\dev\apps\_worktrees\nexara-hard-org-mgrs`
+- **Rama:** mejora/calidad-y-web
+- **HEAD:** merge hard-org-mgrs + hard-org-ux + hard-warehouse
+- **Migraciones:** ya aplicadas `2026092001*`
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Hecho este turno
+## Hecho (hardening merge parcial)
 
-1. **fix-org-puestos-jefes.js**: JA/David/Luis/Daniela ahora llevan `managerEmail: CHRISTIAN` (`gerencia@nexara.com.mx`), igual que Josué.
-2. Header del script documenta que esos cuatro (+ Josué) reportan a Christian.
-3. Lógica idempotente + Claudia tester sin cambios. **getOrgchart API no tocada.**
+1. Script org: JA/David/Luis/Daniela → Christian (`b6c91011`).
+2. Orgchart: búsqueda, filtro área, zoom/pan (`91eb9d82`).
+3. Almacén scanner: multi-op + debounce HID + RETURN (`04ca8f97`).
 
-## A medias
+## A medias (worktrees aún escribiendo)
 
-- Script aún no corrido en prod/DB (solo código).
+hard-rbac · hard-pdf · hard-act-photos · hard-act-flow · hard-tools-ui · hard-prenomina
 
 ## Siguiente
 
-- Correr en API: `node scripts/fix-org-puestos-jefes.js` (o docker exec) y verificar organigrama.
-- Resto del hardening hard-org-mgrs según packet/auditoría.
+- Merge olas restantes → deploy → correr `fix-org-puestos-jefes.js` en prod.
+- Plan Workspace Contadora pendiente de confirmación.
 
 ## No tocar
 
-Puente NAS · getOrgchart API en este fix.
+Puente NAS.
