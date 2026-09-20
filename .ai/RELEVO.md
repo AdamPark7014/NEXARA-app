@@ -2,26 +2,22 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** `7322717c` (en Hetzner; web+api healthy)
-- **Migraciones:** ya aplicadas `2026092001*`
+- **Rama:** feat/hard-prenomina
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-hard-prenomina`
 
-## Puente — no cambiar
+## Hecho este turno
 
-NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
-
-## Hecho este turno (optimización densidad · 4 agentes)
-
-1. **Shell** (`58241797`): menos padding PageHeader / Section / PanelTabs / KpiCard.
-2. **Organigrama** (`8725d527`): KPIs + depto en franja; nodos ~204px.
-3. **Almacén** (`ea1b5ddd`): sin doble chrome embedded; herramientas densas; fotos 140px.
-4. **section-views** (`2e2a6b10`): copy Core corto; tools manage para admin/warehouse.
+1. **Paridad HR/Finance prenomina:** panel compartido `PrenominaPanel` (OT approve/reject + selección candidatos + batch). HR y Finance son wrappers con rail y permisos `HR_MANAGE` / `CONTABILIDAD_MANAGE`.
+2. **Gate borrador ligero:** sin nuevo status Prisma (solo Borrador|Pagado|Anulado). En pagos a empleados: confirm «Aprobar borrador» + stamp en `note` vía `prenomina-draft-gate.ts`. Sin CFDI.
+3. **OT×2** intacto en `prenomina-amount.ts`.
 
 ## Siguiente
 
-- QA visual en prod tras deploy.
-- Rotar Maps key / contraseñas: lado Adam.
+- Merge a `mejora/calidad-y-web` cuando el swarm de hardening esté listo.
+- QA: RH aprueba OT desde `/erp/hr/prenomina`; Finance igual; marcar pagado pide confirm + nota.
 
 ## No tocar
 
-Puente NAS.
+- Fórmula OT en `prenomina-amount.ts`
+- Puente NAS Synology
+- CFDI / timbrado
