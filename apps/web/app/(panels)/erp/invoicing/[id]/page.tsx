@@ -16,6 +16,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
+import { formatApiError } from "@/lib/erp-api";
 import {
   FinanceField,
   FinanceFormGrid,
@@ -139,6 +140,8 @@ export default function InvoiceDetailPage() {
   const [paying, setPaying] = useState(false);
   const [payErr, setPayErr] = useState<string | null>(null);
   const [stamping, setStamping] = useState(false);
+  /** Timbrar/complemento: el ConfirmDialog cierra y el toast solo no basta. */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [satStatus, setSatStatus] = useState<{ estado?: string; esCancelable?: string } | null>(null);
   const [checkingSat, setCheckingSat] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
@@ -149,7 +152,12 @@ export default function InvoiceDetailPage() {
   const [matching, setMatching] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token || !id) return;
+    if (!token) {
+      setLoading(false);
+      setError("Esperando sesión. Vuelve a entrar si esto no se resuelve.");
+      return;
+    }
+    if (!id) return;
     setLoading(true);
     setError(null);
     try {
@@ -216,7 +224,9 @@ export default function InvoiceDetailPage() {
       }
       void load();
     } catch (e) {
-      setPayErr(e instanceof Error ? e.message : "Error al registrar pago");
+      const msg = formatApiError(e, "Error al registrar pago");
+      setPayErr(msg);
+      toast.error(msg);
     } finally { setPaying(false); }
   };
 
@@ -229,12 +239,15 @@ export default function InvoiceDetailPage() {
       danger: false,
       fn: async () => {
         setStamping(true);
+        setActionError(null);
         try {
           await apiFetch(`accounting/invoices/${id}/stamp`, token, { method: "POST" });
           toast.success("Factura timbrada ante el PAC");
           void load();
         } catch (e) {
-          toast.error(e instanceof Error ? e.message : "Error al timbrar");
+          const msg = formatApiError(e, "Error al timbrar");
+          setActionError(msg);
+          toast.error(msg);
         } finally {
           setStamping(false);
         }
@@ -289,12 +302,15 @@ export default function InvoiceDetailPage() {
 
   const stampComplement = async (paymentId: number) => {
     if (!token) return;
+    setActionError(null);
     try {
       const data = await apiFetch(`accounting/invoices/payments/${paymentId}/stamp-complement`, token, { method: "POST" });
       toast.success(`Complemento timbrado: ${data.cfdiPaymentUuid}`);
       void load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al timbrar complemento");
+      const msg = formatApiError(e, "Error al timbrar complemento");
+      setActionError(msg);
+      toast.error(msg);
     }
   };
 
@@ -477,6 +493,16 @@ export default function InvoiceDetailPage() {
               ) : null}
             </div>
           )}
+        </div>
+      )}
+
+      {actionError && (
+        <div style={{ marginBottom: 12 }}>
+          <InlineAlert
+            variant="danger"
+            message={actionError}
+            onDismiss={() => setActionError(null)}
+          />
         </div>
       )}
 
