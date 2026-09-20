@@ -88,6 +88,19 @@ export const COTIZACIONES_CORE_URL_RULES: UrlRule[] = [
 ];
 
 /**
+ * Vista previa en vivo del PDF de una cotización (`POST /api/cotizaciones/:id/pdf/vista-previa`).
+ *
+ * Es un POST, pero solo lee: arma el PDF del borrador en memoria y no guarda nada. Va donde ya se
+ * permite descargar el PDF (`GET /api/cotizaciones/**`) aunque el puesto no pueda escribir; quien
+ * escribe ya la tiene por `COTIZACIONES_CORE_URL_RULES`.
+ */
+export const VISTA_PREVIA_COTIZACION_URL_RULE: UrlRule = {
+  path: '/api/cotizaciones/:id/pdf/vista-previa',
+  methods: ['POST'],
+  scope: 'read',
+};
+
+/**
  * Proyectos en Core (`/erp/proyectos`): mismo público que las cotizaciones de Core.
  *
  * Las páginas van aquí para que `/me/navigation` no recorte el módulo del menú. La escritura en
@@ -809,6 +822,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/calendar', methods: ['GET'], scope: 'read' },
     { path: '/api/chat/**', scope: 'write' },
     { path: '/api/cotizaciones/**', methods: ['GET'], scope: 'read' },
+    VISTA_PREVIA_COTIZACION_URL_RULE,
     { path: '/api/catalog/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/erp/notifications-center', scope: 'read' },
     { path: '/erp/my-profile', scope: 'write' },
@@ -846,6 +860,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/calendar', methods: ['GET'], scope: 'read' },
     { path: '/api/chat/**', scope: 'write' },
     { path: '/api/cotizaciones/**', methods: ['GET'], scope: 'read' },
+    VISTA_PREVIA_COTIZACION_URL_RULE,
     { path: '/api/catalog/**', methods: ['GET'], scope: 'read' },
     { path: '/erp/notifications-center', scope: 'read' },
     { path: '/erp/my-profile', scope: 'write' },
@@ -923,6 +938,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/crm/quotes/**', methods: ['GET'], scope: 'read' },
     { path: '/crm/projects/**', methods: ['GET'], scope: 'read' },
     { path: '/api/cotizaciones/**', methods: ['GET'], scope: 'read' },
+    VISTA_PREVIA_COTIZACION_URL_RULE,
     { path: '/api/accounting/**', scope: 'write' },
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     { path: '/api/expenses/**', scope: 'write' },
