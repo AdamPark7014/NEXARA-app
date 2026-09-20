@@ -12,6 +12,7 @@ import VehicleRequestForm from "@/components/VehicleRequestForm";
 import VehicleCheckoutForm from "@/components/VehicleCheckoutForm";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { enviarChecklist, type ChecklistPayload } from "@/lib/vehiculos-api";
 import { getVehiclesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { isCoreMount } from "@/lib/recursos-core";
@@ -81,24 +82,19 @@ export default function MyVehiclesPage() {
     setActionErr(null);
   };
 
-  const submitCheckout = async (payload: {
-    files: Record<string, File | null>;
-    odometroKm: number;
-    combustiblePct: number;
-  }) => {
+  // El multipart lo arma `enviarChecklist`: los nombres de los huecos, la hora
+  // de cada foto y el nivel de gasolina tienen que ser exactamente los que
+  // exige `revisarChecklist` en la API, y esa traducción vive en un solo sitio.
+  const submitCheckout = async (payload: ChecklistPayload) => {
     if (!token || !checkoutTarget || !checkoutMode) return;
     setCheckoutSaving(true);
     setActionErr(null);
     try {
-      const form = new FormData();
-      form.append("odometroKm", String(payload.odometroKm));
-      form.append("combustiblePct", String(payload.combustiblePct));
-      for (const [key, file] of Object.entries(payload.files)) {
-        if (file) form.append(key, file);
-      }
-      const path = checkoutMode === "salida" ? `vehicles/${checkoutTarget.id}/start-use` : `vehicles/${checkoutTarget.id}/end-use`;
-      const res = await fetch(buildApiUrl(path), { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form });
-      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      const path =
+        checkoutMode === "salida"
+          ? `vehicles/${checkoutTarget.id}/start-use`
+          : `vehicles/${checkoutTarget.id}/end-use`;
+      await enviarChecklist(token, path, payload);
       setCheckoutTarget(null);
       setCheckoutMode(null);
       void load();

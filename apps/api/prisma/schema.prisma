@@ -1639,6 +1639,11 @@ model VehiclePosition {
   vehicleAsset VehicleAsset   @relation(fields: [vehicleAssetId], references: [id], onDelete: Cascade)
   company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  /// Un rastreador no puede estar en dos sitios en el mismo instante: esta es
+  /// la llave natural del punto y lo que hace idempotente la ingesta. Si el
+  /// proveedor reentrega un lote (la cola de HCT lo hace cuando no se acusa el
+  /// `batchId`), `createMany({ skipDuplicates: true })` lo descarta aquí.
+  @@unique([vehicleAssetId, at])
   @@index([vehicleAssetId, at])
   @@index([companyId])
   @@map("vehicle_positions")

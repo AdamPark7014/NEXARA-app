@@ -12,6 +12,13 @@ import {
 } from '../common/rbac/hierarchical-approval.js';
 import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import {
+  mensajeErrores,
+  revisarChecklist,
+  type ChecklistNormalizado,
+  type EntradaChecklist,
+  type FotoChecklist,
+} from './checklist-entrega.js';
 
 @Injectable()
 export class VehiclesService {
@@ -302,75 +309,139 @@ export class VehiclesService {
     });
   }
 
-  private buildPhotoPayload(files: Record<string, string>, odometroKm: number, combustiblePct: number) {
+  /**
+   * El check list de entrega/recepción, idéntico en las cuatro rutas que abren
+   * o cierran una asignación. Si falta una foto, el kilometraje o la gasolina,
+   * el 400 dice todo lo que falta de una vez.
+   */
+  private revisarOFallar(entrada: EntradaChecklist): ChecklistNormalizado {
+    const revision = revisarChecklist(entrada);
+    if (!revision.ok) throw new BadRequestException(mensajeErrores(revision.errores));
+    return revision.datos;
+  }
+
+  /** Lo que se guarda en `fotosSalida` / `fotosDevolucion`. */
+  private payloadFotos(datos: ChecklistNormalizado) {
     return {
-      internas: ['interna-0', 'interna-1', 'interna-2', 'interna-3'].map((k) => files[k]).filter(Boolean),
-      externas: ['externa-0', 'externa-1', 'externa-2', 'externa-3'].map((k) => files[k]).filter(Boolean),
-      odometroFoto: files['odometro'] ?? null,
-      odometroKm,
-      combustiblePct,
-      capturedAt: new Date().toISOString(),
+      fotos: datos.fotos,
+      fotoTableroUrl: datos.fotoTableroUrl,
+      odometroKm: datos.odometroKm,
+      combustiblePct: datos.combustiblePct,
+      registradoEn: new Date().toISOString(),
     };
   }
 
-  async startUse(
-    id: number,
-    userId: number,
-    files: Record<string, string>,
-    odometroKm: number,
-    combustiblePct: number,
-    companyId?: number | null,
-  ) {
+  /** `fotosMeta` guarda el cuándo y el dónde de cada foto, de los dos momentos. */
+  private mezclarMeta(
+    previo: unknown,
+    momento: 'salida' | 'devolucion',
+    fotos: ChecklistNormalizado['fotos'],
+  ): any {
+    const base =
+      previo && typeof previo === 'object' && !Array.isArray(previo)
+        ? (previo as Record<string, unknown>)
+        : {};
+    return { ...base, [momento]: fotos };
+  }
+
+  async startUse(id: number, userId: number, entrada: EntradaChecklist, companyId?: number | null) {
     const record = await this.findOne(id, companyId);
     if (record.estatusAprobacion !== 'Aprobado') throw new BadRequestException('La solicitud debe estar aprobada');
     if (record.solicitanteId !== userId) throw new ForbiddenException('Solo el solicitante puede registrar la salida');
     if (record.fotosSalida) throw new BadRequestException('Ya registraste la salida del vehículo');
 
-    const fotosSalida = this.buildPhotoPayload(files, odometroKm, combustiblePct);
-    if (fotosSalida.internas.length < 4 || fotosSalida.externas.length < 4 || !fotosSalida.odometroFoto) {
-      throw new BadRequestException('Debes subir 4 fotos internas, 4 externas y foto del odómetro');
-    }
+    const datos = this.revisarOFallar(entrada);
 
     return this.prisma['vehicleControl'].update({
       where: { id },
       data: {
-        fotosSalida,
-        odometroInicio: odometroKm,
-        combustibleInicioPct: combustiblePct,
+        fotosSalida: this.payloadFotos(datos),
+        fotosMeta: this.mezclarMeta(record.fotosMeta, 'salida', datos.fotos),
+        fotoTableroSalidaUrl: datos.fotoTableroUrl,
+        odometroInicio: datos.odometroKm,
+        combustibleInicioPct: datos.combustiblePct,
         entregaEstatus: 'En uso',
         fechaInicio: record.fechaInicioAprobada ?? new Date(),
       },
     });
   }
 
-  async endUse(
-    id: number,
-    userId: number,
-    files: Record<string, string>,
-    odometroKm: number,
-    combustiblePct: number,
-    companyId?: number | null,
-  ) {
+  async endUse(id: number, userId: number, entrada: EntradaChecklist, companyId?: number | null) {
     const record = await this.findOne(id, companyId);
     if (record.solicitanteId !== userId) throw new ForbiddenException('Solo el solicitante puede registrar la devolución');
     if (!record.fotosSalida) throw new BadRequestException('Primero registra la salida del vehículo');
 
-    const fotosDevolucion = this.buildPhotoPayload(files, odometroKm, combustiblePct);
-    if (fotosDevolucion.internas.length < 4 || fotosDevolucion.externas.length < 4 || !fotosDevolucion.odometroFoto) {
-      throw new BadRequestException('Debes subir 4 fotos internas, 4 externas y foto del odómetro');
-    }
-    if (record.odometroInicio != null && odometroKm < record.odometroInicio) {
-      throw new BadRequestException('El kilometraje final no puede ser menor al inicial');
-    }
+    const datos = this.revisarOFallar({ ...entrada, odometroInicio: record.odometroInicio });
 
     return this.prisma['vehicleControl'].update({
       where: { id },
       data: {
-        fotosDevolucion,
-        odometroFin: odometroKm,
-        combustibleFinPct: combustiblePct,
+        fotosDevolucion: this.payloadFotos(datos),
+        fotosMeta: this.mezclarMeta(record.fotosMeta, 'devolucion', datos.fotos),
+        fotoTableroDevolucionUrl: datos.fotoTableroUrl,
+        odometroFin: datos.odometroKm,
+        combustibleFinPct: datos.combustiblePct,
         entregaEstatus: 'Devuelto',
         fechaFin: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Salida directa desde el inventario, sin solicitud previa. Hasta ahora esta
+   * ruta aceptaba de 0 a 10 fotos sueltas y ni kilometraje ni gasolina: era la
+   * puerta de atrás del check list. Ahora pide exactamente lo mismo.
+   */
+  async checkoutAsset(id: number, userId: number, entrada: EntradaChecklist, companyId?: number | null) {
+    const asset = await this.getAsset(id, companyId);
+    if (!asset) throw new BadRequestException('Vehículo no encontrado');
+    if (asset.estatus === 'Asignado') throw new BadRequestException('El vehículo ya está asignado');
+    if (asset.activo === false) throw new BadRequestException('El vehículo está dado de baja');
+
+    const datos = this.revisarOFallar(entrada);
+
+    return this.prisma['vehicleAsset'].update({
+      where: { id },
+      data: {
+        estatus: 'Asignado',
+        assignedToId: userId,
+        assignedAt: new Date(),
+        salidaFotos: this.payloadFotos(datos),
+        devolucionFotos: undefined,
+        tiempoUsoMinutos: null,
+      },
+    });
+  }
+
+  /** Devolución directa al inventario. Mismas reglas, y el km final no retrocede. */
+  async returnAsset(
+    id: number,
+    actor: { id: number; isSuperAdmin?: boolean; puedeInventario?: boolean },
+    entrada: EntradaChecklist,
+    companyId?: number | null,
+  ) {
+    const asset = await this.getAsset(id, companyId);
+    if (!asset) throw new BadRequestException('Vehículo no encontrado');
+    if (!actor.isSuperAdmin && !actor.puedeInventario && asset.assignedToId !== actor.id) {
+      throw new ForbiddenException('Solo el asignatario puede devolver el vehículo');
+    }
+    if (asset.estatus !== 'Asignado') throw new BadRequestException('El vehículo no está asignado');
+
+    const salida = asset.salidaFotos as { odometroKm?: number } | null;
+    const datos = this.revisarOFallar({ ...entrada, odometroInicio: salida?.odometroKm ?? null });
+
+    const minutosUso = asset.assignedAt
+      ? Math.round((Date.now() - new Date(asset.assignedAt).getTime()) / 60000)
+      : null;
+
+    return this.prisma['vehicleAsset'].update({
+      where: { id },
+      data: {
+        estatus: 'Disponible',
+        assignedToId: null,
+        assignedAt: null,
+        devolucionFotos: this.payloadFotos(datos),
+        tiempoUsoMinutos: minutosUso,
       },
     });
   }
@@ -464,6 +535,221 @@ export class VehiclesService {
       }
     }
     return { notified: expiring.length };
+  }
+
+  // ─── Pantallas de Core: flotilla, ficha e «mis vehículos» ─────────────────
+
+  private fotosDe(payload: unknown): FotoChecklist[] {
+    if (!payload || typeof payload !== 'object') return [];
+    const fotos = (payload as { fotos?: unknown }).fotos;
+    if (!Array.isArray(fotos)) return [];
+    return fotos.filter(
+      (f): f is FotoChecklist => Boolean(f) && typeof f === 'object' && typeof (f as FotoChecklist).url === 'string',
+    );
+  }
+
+  private numeroDe(payload: unknown, campo: string): number | null {
+    if (!payload || typeof payload !== 'object') return null;
+    const valor = (payload as Record<string, unknown>)[campo];
+    return typeof valor === 'number' && Number.isFinite(valor) ? valor : null;
+  }
+
+  /** La asignación viva de un vehículo: la solicitud en uso manda sobre el inventario. */
+  private controlEnUso(controles: any[]): any | null {
+    return (
+      controles.find((c) => c.entregaEstatus === 'En uso' && c.estatusAprobacion === 'Aprobado') ?? null
+    );
+  }
+
+  private filaFlotilla(asset: any) {
+    const controles: any[] = asset.controles ?? [];
+    const enUso = this.controlEnUso(controles);
+    const ultimoCerrado = controles.find((c) => c.odometroFin != null);
+
+    const conductor = enUso?.solicitante
+      ? { id: enUso.solicitante.id, nombre: enUso.solicitante.nombre }
+      : asset.assignedTo
+        ? { id: asset.assignedTo.id, nombre: asset.assignedTo.nombre }
+        : null;
+
+    const asignado = asset.estatus === 'Asignado' || Boolean(enUso);
+
+    return {
+      id: asset.id,
+      nombre: asset.nombre,
+      placas: asset.placas ?? null,
+      estatus: asset.estatus,
+      activo: asset.activo !== false,
+      disponible: asset.activo !== false && !asignado && asset.estatus === 'Disponible',
+      conductor,
+      desde: (enUso?.fechaInicio ?? asset.assignedAt ?? null) as Date | null,
+      proximaDevolucion: (enUso?.fechaFinAprobada ?? enUso?.fechaFinSolicitada ?? null) as Date | null,
+      odometroUltimo:
+        ultimoCerrado?.odometroFin ??
+        enUso?.odometroInicio ??
+        this.numeroDe(asset.devolucionFotos, 'odometroKm') ??
+        this.numeroDe(asset.salidaFotos, 'odometroKm') ??
+        null,
+      combustibleUltimoPct:
+        ultimoCerrado?.combustibleFinPct ??
+        enUso?.combustibleInicioPct ??
+        this.numeroDe(asset.devolucionFotos, 'combustiblePct') ??
+        this.numeroDe(asset.salidaFotos, 'combustiblePct') ??
+        null,
+      gpsProveedor: asset.gpsProveedor ?? null,
+      tieneRastreador: Boolean(asset.gpsProveedor && asset.gpsDispositivoId),
+    };
+  }
+
+  private incluirParaFlotilla() {
+    return {
+      assignedTo: { select: { id: true, nombre: true } },
+      controles: {
+        orderBy: { fechaSolicitud: 'desc' as const },
+        take: 25,
+        include: {
+          solicitante: { select: { id: true, nombre: true } },
+          actividad: { select: { id: true, anNumber: true } },
+        },
+      },
+    };
+  }
+
+  /** Lista de la flotilla: quién trae cada unidad y cuándo la regresa. */
+  async listarFlotilla(companyId?: number | null) {
+    const assets = await this.prisma['vehicleAsset'].findMany({
+      where: companyWhere(companyId ?? null),
+      orderBy: [{ activo: 'desc' }, { nombre: 'asc' }],
+      include: this.incluirParaFlotilla(),
+    });
+    return { vehiculos: assets.map((a: any) => this.filaFlotilla(a)) };
+  }
+
+  /** Ficha de un vehículo con el historial de asignaciones y sus fotos. */
+  async detalleFlotilla(id: number, companyId?: number | null) {
+    const asset = await this.prisma['vehicleAsset'].findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      include: this.incluirParaFlotilla(),
+    });
+    assertCompanyAccess(asset, companyId, 'Vehículo');
+
+    const historial = (asset!.controles ?? []).map((c: any) => ({
+      id: c.id,
+      origen: 'solicitud' as const,
+      conductor: c.solicitante ? { id: c.solicitante.id, nombre: c.solicitante.nombre } : null,
+      actividad: c.actividad?.anNumber ?? null,
+      inicio: c.fechaInicio ?? c.fechaInicioAprobada ?? null,
+      fin: c.fechaFin ?? c.fechaFinAprobada ?? null,
+      odometroInicio: c.odometroInicio ?? null,
+      odometroFin: c.odometroFin ?? null,
+      kmRecorridos:
+        c.odometroInicio != null && c.odometroFin != null ? c.odometroFin - c.odometroInicio : null,
+      combustibleInicioPct: c.combustibleInicioPct ?? null,
+      combustibleFinPct: c.combustibleFinPct ?? null,
+      fotosSalida: this.fotosDe(c.fotosSalida),
+      fotosDevolucion: this.fotosDe(c.fotosDevolucion),
+      estatus: c.entregaEstatus ?? c.estatusAprobacion,
+    }));
+
+    // Una salida directa de inventario no deja VehicleControl: se muestra aparte
+    // para que la ficha no mienta sobre quién trae el coche.
+    if (asset!.salidaFotos) {
+      historial.unshift({
+        id: -asset!.id,
+        origen: 'inventario' as any,
+        conductor: asset!.assignedTo
+          ? { id: asset!.assignedTo.id, nombre: asset!.assignedTo.nombre }
+          : null,
+        actividad: null,
+        inicio: asset!.assignedAt ?? null,
+        fin: asset!.devolucionFotos ? (asset!.updatedAt ?? null) : null,
+        odometroInicio: this.numeroDe(asset!.salidaFotos, 'odometroKm'),
+        odometroFin: this.numeroDe(asset!.devolucionFotos, 'odometroKm'),
+        kmRecorridos: (() => {
+          const ini = this.numeroDe(asset!.salidaFotos, 'odometroKm');
+          const fin = this.numeroDe(asset!.devolucionFotos, 'odometroKm');
+          return ini != null && fin != null ? fin - ini : null;
+        })(),
+        combustibleInicioPct: this.numeroDe(asset!.salidaFotos, 'combustiblePct'),
+        combustibleFinPct: this.numeroDe(asset!.devolucionFotos, 'combustiblePct'),
+        fotosSalida: this.fotosDe(asset!.salidaFotos),
+        fotosDevolucion: this.fotosDe(asset!.devolucionFotos),
+        estatus: asset!.devolucionFotos ? 'Devuelto' : 'En uso',
+      });
+    }
+
+    return { vehiculo: this.filaFlotilla(asset), historial };
+  }
+
+  /** Lo que ve una persona en «Mis vehículos» y en la app: una sola llamada. */
+  async misVehiculos(userId: number, companyId?: number | null) {
+    const where = companyWhere(companyId ?? null);
+
+    const [controles, assets] = await Promise.all([
+      this.prisma['vehicleControl'].findMany({
+        where: { solicitanteId: userId, ...where },
+        orderBy: { fechaSolicitud: 'desc' },
+        take: 30,
+        include: { vehiculo: { select: { id: true, nombre: true, placas: true } } },
+      }),
+      this.prisma['vehicleAsset'].findMany({
+        where,
+        orderBy: [{ activo: 'desc' }, { nombre: 'asc' }],
+        include: this.incluirParaFlotilla(),
+      }),
+    ]);
+
+    const flotilla = assets.map((a: any) => this.filaFlotilla(a));
+
+    // Una asignación viva es: una solicitud aprobada sin devolver, o un vehículo
+    // del inventario que salió a nombre de esta persona.
+    const control = controles.find(
+      (c: any) => c.estatusAprobacion === 'Aprobado' && c.entregaEstatus !== 'Devuelto',
+    );
+    const assetPropio = assets.find((a: any) => a.assignedToId === userId && a.estatus === 'Asignado');
+
+    let activa: Record<string, unknown> | null = null;
+    if (control) {
+      activa = {
+        id: control.id,
+        origen: 'solicitud',
+        vehiculo: control.vehiculo
+          ? { id: control.vehiculo.id, nombre: control.vehiculo.nombre, placas: control.vehiculo.placas ?? null }
+          : { id: 0, nombre: control.nombreVehiculo ?? 'Vehículo', placas: control.placasVehiculo ?? null },
+        inicio: control.fechaInicio ?? control.fechaInicioAprobada ?? null,
+        fin: control.fechaFin ?? control.fechaFinAprobada ?? null,
+        odometroInicio: control.odometroInicio ?? null,
+        combustibleInicioPct: control.combustibleInicioPct ?? null,
+        requiereSalida: !control.fotosSalida,
+        requiereDevolucion: Boolean(control.fotosSalida) && !control.fotosDevolucion,
+      };
+    } else if (assetPropio) {
+      activa = {
+        id: assetPropio.id,
+        origen: 'inventario',
+        vehiculo: { id: assetPropio.id, nombre: assetPropio.nombre, placas: assetPropio.placas ?? null },
+        inicio: assetPropio.assignedAt ?? null,
+        fin: null,
+        odometroInicio: this.numeroDe(assetPropio.salidaFotos, 'odometroKm'),
+        combustibleInicioPct: this.numeroDe(assetPropio.salidaFotos, 'combustiblePct'),
+        requiereSalida: false,
+        requiereDevolucion: true,
+      };
+    }
+
+    return {
+      activa,
+      solicitudes: controles.map((c: any) => ({
+        id: c.id,
+        nombreVehiculo: c.vehiculo?.nombre ?? c.nombreVehiculo ?? null,
+        placasVehiculo: c.vehiculo?.placas ?? c.placasVehiculo ?? null,
+        estatusAprobacion: c.estatusAprobacion,
+        entregaEstatus: c.entregaEstatus,
+        fechaInicioSolicitada: c.fechaInicioSolicitada ?? null,
+        fechaFinSolicitada: c.fechaFinSolicitada ?? null,
+      })),
+      disponibles: flotilla.filter((v) => v.disponible),
+    };
   }
 
   async remove(id: number, companyId?: number | null) {

@@ -30,6 +30,35 @@ import { ExcelExportService } from '../common/excel-export.service.js';
 import { COLUMNAS_VEHICULOS } from '../common/excel/reportes.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import {
+  SLOTS_CHECKLIST,
+  leerMetaDelBody,
+  type EntradaChecklist,
+} from './checklist-entrega.js';
+
+/** Un campo de archivo por foto del check list: las mismas siete en las cuatro rutas. */
+const CAMPOS_CHECKLIST = SLOTS_CHECKLIST.map((slot) => ({ name: slot, maxCount: 1 }));
+
+/**
+ * Traduce el multipart al contrato del check list. Vive aquí, una sola vez,
+ * para que salida/devolución de solicitud y salida/devolución de inventario no
+ * puedan divergir otra vez.
+ */
+function entradaChecklist(uploaded: Record<string, any[]> | undefined, body: any): EntradaChecklist {
+  const fotos: Record<string, string> = {};
+  for (const [campo, archivos] of Object.entries(uploaded ?? {})) {
+    const nombre = archivos?.[0]?.filename;
+    if (nombre) fotos[campo] = `/uploads/vehicles/${nombre}`;
+  }
+  return {
+    fotos,
+    meta: leerMetaDelBody(body),
+    odometroKm: body?.odometroKm,
+    // `combustiblePct` es el nombre viejo; se sigue aceptando para no romper
+    // una app móvil que todavía no se haya actualizado.
+    combustible: body?.combustible ?? body?.combustiblePct,
+  };
+}
 
 @Controller('vehicles')
 export class VehiclesController {
@@ -119,13 +148,7 @@ export class VehiclesController {
   @Post(':id/start-use')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
-  @UseInterceptors(FileFieldsInterceptor([
-    { name: 'interna-0', maxCount: 1 }, { name: 'interna-1', maxCount: 1 },
-    { name: 'interna-2', maxCount: 1 }, { name: 'interna-3', maxCount: 1 },
-    { name: 'externa-0', maxCount: 1 }, { name: 'externa-1', maxCount: 1 },
-    { name: 'externa-2', maxCount: 1 }, { name: 'externa-3', maxCount: 1 },
-    { name: 'odometro', maxCount: 1 },
-  ], { dest: getUploadSubdir(__dirname, 'vehicles') }))
+  @UseInterceptors(FileFieldsInterceptor(CAMPOS_CHECKLIST, { dest: getUploadSubdir(__dirname, 'vehicles') }))
   async startUse(
     @CurrentUser() user: any,
     @Param('id') id: string,
@@ -133,30 +156,13 @@ export class VehiclesController {
     @UploadedFiles() uploaded: Record<string, any[]>,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    const fileMap: Record<string, string> = {};
-    for (const [key, arr] of Object.entries(uploaded ?? {})) {
-      if (arr?.[0]?.filename) fileMap[key] = `/uploads/vehicles/${arr[0].filename}`;
-    }
-    return this.vehiclesService.startUse(
-      +id,
-      user.id,
-      fileMap,
-      Number(body.odometroKm),
-      Number(body.combustiblePct),
-      companyId,
-    );
+    return this.vehiclesService.startUse(+id, user.id, entradaChecklist(uploaded, body), companyId);
   }
 
   @Post(':id/end-use')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
-  @UseInterceptors(FileFieldsInterceptor([
-    { name: 'interna-0', maxCount: 1 }, { name: 'interna-1', maxCount: 1 },
-    { name: 'interna-2', maxCount: 1 }, { name: 'interna-3', maxCount: 1 },
-    { name: 'externa-0', maxCount: 1 }, { name: 'externa-1', maxCount: 1 },
-    { name: 'externa-2', maxCount: 1 }, { name: 'externa-3', maxCount: 1 },
-    { name: 'odometro', maxCount: 1 },
-  ], { dest: getUploadSubdir(__dirname, 'vehicles') }))
+  @UseInterceptors(FileFieldsInterceptor(CAMPOS_CHECKLIST, { dest: getUploadSubdir(__dirname, 'vehicles') }))
   async endUse(
     @CurrentUser() user: any,
     @Param('id') id: string,
@@ -164,18 +170,30 @@ export class VehiclesController {
     @UploadedFiles() uploaded: Record<string, any[]>,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    const fileMap: Record<string, string> = {};
-    for (const [key, arr] of Object.entries(uploaded ?? {})) {
-      if (arr?.[0]?.filename) fileMap[key] = `/uploads/vehicles/${arr[0].filename}`;
-    }
-    return this.vehiclesService.endUse(
-      +id,
-      user.id,
-      fileMap,
-      Number(body.odometroKm),
-      Number(body.combustiblePct),
-      companyId,
-    );
+    return this.vehiclesService.endUse(+id, user.id, entradaChecklist(uploaded, body), companyId);
+  }
+
+  // ─── Pantallas de Core ──────────────────────────────────────────────────────
+
+  @Get('flotilla')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
+  listarFlotilla(@CurrentCompanyId() companyId: number | null) {
+    return this.vehiclesService.listarFlotilla(companyId);
+  }
+
+  @Get('mis-vehiculos')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST] })
+  misVehiculos(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.vehiclesService.misVehiculos(user.id, companyId);
+  }
+
+  @Get('flotilla/:id')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
+  detalleFlotilla(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.vehiclesService.detalleFlotilla(+id, companyId);
   }
 
   @Post('notify-expiring')
@@ -356,60 +374,43 @@ export class VehiclesController {
     return this.vehiclesService.removeAsset(+id, companyId);
   }
 
-  // ── Checkout: engineer takes "before" photos and marks vehicle as taken ──────
+  // ── Salida directa desde inventario: mismo check list que una solicitud ─────
   @Post('inventory/:id/checkout')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
-  @UseInterceptors(FilesInterceptor('photos', 10, { dest: getUploadSubdir(__dirname, 'vehicles') }))
+  @UseInterceptors(FileFieldsInterceptor(CAMPOS_CHECKLIST, { dest: getUploadSubdir(__dirname, 'vehicles') }))
   async checkoutVehicle(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @UploadedFiles() files: any[],
+    @Body() body: any,
+    @UploadedFiles() uploaded: Record<string, any[]>,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    const asset = await this.vehiclesService.getAsset(+id, companyId);
-    if (!asset) throw new BadRequestException('Vehículo no encontrado');
-    if (asset.estatus === 'Asignado') {
-      throw new BadRequestException('El vehículo ya está asignado');
-    }
-    const photoUrls = (files ?? []).map(f => `/uploads/vehicles/${f.filename}`);
-    return this.vehiclesService.updateAsset(+id, {
-      estatus: 'Asignado',
-      assignedToId: user.id,
-      assignedAt: new Date(),
-      salidaFotos: photoUrls,
-      devolucionFotos: null,
-      tiempoUsoMinutos: null,
-    }, companyId);
+    return this.vehiclesService.checkoutAsset(+id, user.id, entradaChecklist(uploaded, body), companyId);
   }
 
-  // ── Return: engineer takes "after" photos, system logs time used ─────────────
+  // ── Devolución directa al inventario: mismo check list ──────────────────────
   @Post('inventory/:id/return')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
-  @UseInterceptors(FilesInterceptor('photos', 10, { dest: getUploadSubdir(__dirname, 'vehicles') }))
+  @UseInterceptors(FileFieldsInterceptor(CAMPOS_CHECKLIST, { dest: getUploadSubdir(__dirname, 'vehicles') }))
   async returnVehicle(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @UploadedFiles() files: any[],
+    @Body() body: any,
+    @UploadedFiles() uploaded: Record<string, any[]>,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    const asset = await this.vehiclesService.getAsset(+id, companyId);
-    if (!asset) throw new BadRequestException('Vehículo no encontrado');
-    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.VEHICLES_INVENTORY) && asset.assignedToId !== user.id) {
-      throw new ForbiddenException('Solo el asignatario puede devolver el vehículo');
-    }
-    const photoUrls = (files ?? []).map(f => `/uploads/vehicles/${f.filename}`);
-    const minutosUso = asset.assignedAt
-      ? Math.round((Date.now() - new Date(asset.assignedAt).getTime()) / 60000)
-      : null;
-    return this.vehiclesService.updateAsset(+id, {
-      estatus: 'Disponible',
-      assignedToId: null,
-      assignedAt: null,
-      devolucionFotos: photoUrls,
-      tiempoUsoMinutos: minutosUso,
-    }, companyId);
+    return this.vehiclesService.returnAsset(
+      +id,
+      {
+        id: user.id,
+        isSuperAdmin: user.isSuperAdmin,
+        puedeInventario: user.permissions?.includes(PERMISSIONS.VEHICLES_INVENTORY),
+      },
+      entradaChecklist(uploaded, body),
+      companyId,
+    );
   }
 
   // Exportar vehículos (CSV o JSON)

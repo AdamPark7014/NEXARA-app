@@ -59,6 +59,7 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ModulePlaceholderScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
+import mx.nexara.mobile.nativeapp.ui.console.vehiculos.VehiculosScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
@@ -94,6 +95,18 @@ internal object ConsoleRoutes {
     const val ModulePlaceholder = "console/more/{key}"
 
     fun modulePlaceholder(key: String): String = "console/more/$key"
+
+    /** Vehículos: ya tiene pantalla nativa (solicitar, salida y regreso con fotos). */
+    const val Vehiculos = "console/vehiculos"
+
+    /**
+     * A dónde lleva un módulo de «Más»: su pantalla nativa si ya existe, si no
+     * la ficha «Disponible pronto» con el enlace a la web.
+     */
+    fun forExtra(module: CoreExtraModule): String = when (module) {
+        CoreExtraModule.VEHICULOS -> Vehiculos
+        else -> modulePlaceholder(module.key)
+    }
 
     const val Notifications = "console/notifications"
     const val OfflineQueue = "console/offline-queue"
@@ -222,7 +235,7 @@ fun ConsoleNavHost(
         // Módulo de «Más» (aún sin pantalla propia): su ficha, si el rol lo tiene.
         val extra = CoreExtraModule.fromKey(link.key)
         if (extra != null) {
-            val ruta = if (extra in extras) ConsoleRoutes.modulePlaceholder(extra.key) else startRoute
+            val ruta = if (extra in extras) ConsoleRoutes.forExtra(extra) else startRoute
             navController.navigate(ruta) { launchSingleTop = true }
             return@LaunchedEffect
         }
@@ -255,6 +268,7 @@ fun ConsoleNavHost(
         ConsoleRoutes.NewClient -> "Nuevo cliente"
         ConsoleRoutes.MyProfile -> "Mi perfil"
         ConsoleRoutes.More, ConsoleRoutes.ModulePlaceholder -> "Más"
+        ConsoleRoutes.Vehiculos -> "Vehículos"
         ConsoleRoutes.Notifications -> "Notificaciones"
         ConsoleRoutes.OfflineQueue -> "Cola offline"
         ConsoleRoutes.ActivityDetail -> "Detalle de actividad"
@@ -463,11 +477,14 @@ fun ConsoleNavHost(
                 MoreHubScreen(
                     modules = extras,
                     onOpen = { module ->
-                        navController.navigate(ConsoleRoutes.modulePlaceholder(module.key)) {
+                        navController.navigate(ConsoleRoutes.forExtra(module)) {
                             launchSingleTop = true
                         }
                     },
                 )
+            }
+            nxComposable(ConsoleRoutes.Vehiculos, style = NxNavAnimStyle.Push) {
+                VehiculosScreen()
             }
             nxComposable(ConsoleRoutes.ModulePlaceholder, style = NxNavAnimStyle.Push) { entry ->
                 val module = CoreExtraModule.fromKey(entry.arguments?.getString("key"))
