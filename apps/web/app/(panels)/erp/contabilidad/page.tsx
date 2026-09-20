@@ -284,22 +284,22 @@ export default function ContabilidadDashboardPage() {
     () => [
       {
         id: "cuentas",
-        titulo: "Carga el catálogo de cuentas",
-        porque: "Sin cuentas contables no se puede registrar una póliza ni sacar la balanza. El catálogo base evita ~80 altas a mano.",
+        titulo: "Listar las cuentas del negocio",
+        porque: "Es la lista de bolsillos (banco, clientes, gastos…). Sin eso no se anota nada.",
         destino: DESTINOS.catalogoCuentas,
         estado: arranque?.cuentas ?? "desconocido",
       },
       {
         id: "periodo",
-        titulo: "Abre el periodo fiscal",
-        porque: "Es el mes que vas a cuadrar; sin uno abierto, Cierres no tiene qué revisar.",
+        titulo: "Abrir el mes en curso",
+        porque: "Define de qué fechas estamos hablando al cobrar y pagar.",
         destino: DESTINOS.periodoFiscal,
         estado: arranque?.periodo ?? "desconocido",
       },
       {
         id: "banco",
-        titulo: "Da de alta la cuenta bancaria",
-        porque: "De ahí salen el disponible de arriba y la conciliación del estado de cuenta.",
+        titulo: "Registrar la cuenta bancaria",
+        porque: "Para ver cuánto hay disponible y cuadrar el estado de cuenta.",
         destino: DESTINOS.cuentaBancaria,
         estado: arranque?.banco ?? "desconocido",
       },
@@ -325,10 +325,10 @@ export default function ContabilidadDashboardPage() {
     ? (primerPasoPendiente?.destino.href ?? "/erp/contabilidad/polizas?tab=cuentas")
     : (attention.find((a) => a.href)?.href ?? "/erp/contabilidad/cuentas-por-cobrar");
   const primaryLabel = modoArranque
-    ? (primerPasoPendiente?.destino.etiqueta ?? "Configurar contabilidad")
+    ? (primerPasoPendiente?.destino.etiqueta ?? "Empezar")
     : attention.some((a) => a.href)
-      ? "Revisar pendientes"
-      : "Ver por cobrar";
+      ? "Resolver lo pendiente"
+      : "Ver a quién cobrar";
 
   /**
    * El periodo que contestó el servidor, no el que se pidió: la API normaliza
@@ -357,101 +357,52 @@ export default function ContabilidadDashboardPage() {
     const cargando: ReactNode | null = loading ? "…" : data ? null : "—";
     const cobrosVencidos = data?.agingReceivable.overdue ?? 0;
     const pagosVencidos = data?.agingPayable.overdue ?? 0;
-    const tonoAlertas: Metric["tone"] = attention.some((a) => a.tone === "danger")
-      ? "danger"
-      : attention.length > 0
-        ? "warning"
-        : "default";
 
     return [
-      // `href`, no `onClick`: navegar con un manejador rompe ctrl+clic y «abrir
-      // en pestaña nueva», que es justo lo que se hace para comparar dos cosas.
       {
-        label: "Disponible",
+        label: "En el banco",
         value: cargando ?? <Money value={data?.cashBalance ?? 0} />,
-        hint: "En bancos y caja",
+        hint: "Lo que hay disponible hoy",
         href: "/erp/contabilidad/conciliacion",
       },
       {
-        label: "Por cobrar",
+        label: "Me deben",
         value: cargando ?? <Money value={data?.accountsReceivablePending ?? 0} />,
         hint: !data
           ? "Sin dato"
           : cobrosVencidos > 0
-            ? `${formatMoney(cobrosVencidos)} ya vencidos`
-            : "Nada vencido",
+            ? `${formatMoney(cobrosVencidos)} ya se atrasaron`
+            : "Nadie atrasado",
         tone: cobrosVencidos > 0 ? "warning" : "default",
         href: "/erp/contabilidad/cuentas-por-cobrar",
       },
       {
-        label: "Por pagar",
+        label: "Debo pagar",
         value: cargando ?? <Money value={data?.accountsPayablePending ?? 0} />,
         hint: !data
           ? "Sin dato"
           : pagosVencidos > 0
-            ? `${formatMoney(pagosVencidos)} ya vencidos`
-            : "Nada vencido",
+            ? `${formatMoney(pagosVencidos)} ya se atrasaron`
+            : "Nada atrasado",
         tone: pagosVencidos > 0 ? "danger" : "default",
         href: "/erp/contabilidad/cuentas-por-pagar",
       },
-      {
-        label: "Flujo neto",
-        value: cargando ?? <Money value={data?.netCashflow ?? 0} />,
-        hint: "Ingresos menos egresos del periodo",
-      },
-      {
-        label: "Requiere atención",
-        value: cargando ?? attention.length,
-        hint: !data
-          ? "Sin respuesta del servidor"
-          : attention.length === 0
-            ? "Nada pendiente"
-            : "Con su enlace, aquí abajo",
-        tone: tonoAlertas,
-      },
     ];
-  }, [loading, data, attention]);
-
-  const agingRows = useMemo(
-    () => [
-      {
-        id: "cobros",
-        label: "Cobros",
-        href: "/erp/contabilidad/cuentas-por-cobrar",
-        vencido: data?.agingReceivable.overdue ?? 0,
-        hoy: data?.agingReceivable.dueToday ?? 0,
-        next7: data?.agingReceivable.next7 ?? 0,
-        next30: data?.agingReceivable.next30 ?? 0,
-        tieneHoy: true,
-      },
-      {
-        id: "pagos",
-        label: "Pagos",
-        href: "/erp/contabilidad/cuentas-por-pagar",
-        vencido: data?.agingPayable.overdue ?? 0,
-        hoy: 0,
-        next7: data?.agingPayable.next7 ?? 0,
-        next30: data?.agingPayable.next30 ?? 0,
-        // La API no desglosa el «hoy» de cuentas por pagar; no se inventa.
-        tieneHoy: false,
-      },
-    ],
-    [data],
-  );
+  }, [loading, data]);
 
   return (
     <>
       <PageHeader
-        eyebrow="Contabilidad"
-        title="Resumen"
+        eyebrow="Dinero"
+        title="¿Qué hay que hacer hoy?"
         subtitle={
           sinSesion
-            ? "Sin sesión activa."
+            ? "Entra con tu cuenta para ver cobros, pagos y banco."
             : loading
-              ? "Cargando el periodo…"
+              ? "Cargando…"
               : modoArranque
-                ? "Qué falta para que esta pantalla tenga cifras."
-                : `Qué está pasando en ${monthLabel}.`
+                ? "Todavía falta preparar lo básico. Empieza por el primer paso."
+                : `Resumen de ${monthLabel} — toca una cifra para entrar.`
         }
         density="ops"
         actions={
@@ -463,7 +414,7 @@ export default function ContabilidadDashboardPage() {
               aria-expanded={showPeriod}
               aria-controls={periodoId}
             >
-              Periodo
+              Cambiar fechas
             </Button>
             <Link href={primaryHref} className="nx-contab-cta">
               {primaryLabel}
@@ -550,7 +501,7 @@ export default function ContabilidadDashboardPage() {
       {sinCifras ? (
         <section aria-labelledby="arranque-title" style={{ marginBottom: 18 }}>
           <BlockTitle id="arranque-title">
-            {modoArranque ? "Puesta en marcha" : "Sin movimiento todavía"}
+            {modoArranque ? "Para empezar (3 pasos)" : "Aún no hay movimiento"}
           </BlockTitle>
 
           {arranque === null ? (
@@ -568,9 +519,8 @@ export default function ContabilidadDashboardPage() {
                   maxWidth: 640,
                 }}
               >
-                No hay nada que contar en {monthLabel}: ni saldo en bancos, ni facturas, ni cartera
-                abierta. Antes de que el resumen tenga cifras hay que dejar lista la contabilidad.
-                Estos son los pasos, en orden.
+                En {monthLabel} todavía no hay dinero registrado. Antes de ver cifras hay que
+                dejar listo lo básico — en este orden:
               </p>
               <PuestaEnMarcha pasos={pasos} />
               <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)" }}>
@@ -603,7 +553,7 @@ export default function ContabilidadDashboardPage() {
         <>
           {/* Nivel 1 — la tira: el estado del dinero en una sola línea. */}
           <div style={{ marginBottom: 18 }}>
-            <MetricStrip metrics={metrics} ariaLabel="Estado del periodo" />
+            <MetricStrip metrics={metrics} ariaLabel="En el banco, me deben y debo pagar" />
           </div>
 
           <div
@@ -618,7 +568,7 @@ export default function ContabilidadDashboardPage() {
         <div style={{ display: "grid", gap: 18, minWidth: 0 }}>
           {/* Nivel 2 — excepciones: cada una con el enlace a donde se resuelve. */}
           <section aria-labelledby="att-title">
-            <BlockTitle id="att-title">Requiere atención</BlockTitle>
+            <BlockTitle id="att-title">Lo que no puede esperar</BlockTitle>
             {sinSesion ? (
               <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
                 No se pudo revisar: no hay sesión.
@@ -639,7 +589,7 @@ export default function ContabilidadDashboardPage() {
                   background: "var(--surface)",
                 }}
               >
-                Nada urgente en este periodo. Puedes seguir con cobros, pagos o conciliación.
+                Nada urgente. Puedes cobrar, pagar o cuadrar el banco cuando quieras.
               </p>
             ) : (
               <ul
@@ -718,111 +668,83 @@ export default function ContabilidadDashboardPage() {
             )}
           </section>
 
-          {/* Nivel 3 — qué vence: columnas comparables, no otra rejilla de tarjetas. */}
-          <section aria-labelledby="aging-title">
-            <BlockTitle id="aging-title">Qué vence</BlockTitle>
+          {/* Tres puertas claras — no una tabla de vencimientos tipo Excel. */}
+          <section aria-labelledby="hacer-title">
+            <BlockTitle id="hacer-title">Atajos del día</BlockTitle>
             <div
               style={{
-                border: "1px solid var(--nx-panel-hairline, var(--border))",
-                borderRadius: 10,
-                overflowX: "auto",
-                background: "var(--surface)",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 10,
               }}
             >
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: 13,
-                  minWidth: 440,
-                }}
-              >
-                <caption
+              {(
+                [
+                  {
+                    href: "/erp/contabilidad/cuentas-por-cobrar",
+                    title: "Cobrar",
+                    detail: loading
+                      ? "…"
+                      : data
+                        ? data.agingReceivable.overdue > 0
+                          ? `${formatMoney(data.agingReceivable.overdue)} atrasados`
+                          : "Clientes al corriente"
+                        : "—",
+                  },
+                  {
+                    href: "/erp/contabilidad/cuentas-por-pagar",
+                    title: "Pagar",
+                    detail: loading
+                      ? "…"
+                      : data
+                        ? data.agingPayable.overdue > 0
+                          ? `${formatMoney(data.agingPayable.overdue)} atrasados`
+                          : "Proveedores al corriente"
+                        : "—",
+                  },
+                  {
+                    href: "/erp/contabilidad/conciliacion",
+                    title: "Cuadrar banco",
+                    detail: "Que el estado de cuenta coincida",
+                  },
+                ] as const
+              ).map((card) => (
+                <Link
+                  key={card.href}
+                  href={card.href}
+                  className="nx-contab-task"
                   style={{
-                    captionSide: "bottom",
-                    textAlign: "left",
-                    padding: "8px 14px 10px",
-                    fontSize: 11,
-                    color: "var(--text-tertiary)",
+                    display: "block",
+                    padding: "14px 16px",
+                    borderRadius: 10,
+                    border: "1px solid var(--nx-panel-hairline, var(--border))",
+                    background: "var(--surface)",
+                    textDecoration: "none",
+                    color: "inherit",
                   }}
                 >
-                  Saldo pendiente por fecha de vencimiento. Los pagos no traen desglose de «hoy».
-                </caption>
-                <thead>
-                  <tr>
-                    {["Vencimientos", "Vencido", "Hoy", "Próx. 7 días", "Próx. 30 días"].map(
-                      (h, i) => (
-                        <th
-                          key={h}
-                          scope="col"
-                          style={{
-                            textAlign: i === 0 ? "left" : "right",
-                            padding: "8px 14px",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "var(--text-tertiary)",
-                            borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {h}
-                        </th>
-                      ),
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {agingRows.map((row, i) => (
-                    <tr key={row.id}>
-                      <th
-                        scope="row"
-                        style={{
-                          textAlign: "left",
-                          padding: "10px 14px",
-                          fontSize: 13,
-                          fontWeight: 500,
-                          whiteSpace: "nowrap",
-                          borderTop:
-                            i === 0
-                              ? undefined
-                              : "1px solid var(--nx-panel-hairline, var(--border))",
-                        }}
-                      >
-                        <Link
-                          href={row.href}
-                          style={{ color: "var(--text-primary)", textDecoration: "none" }}
-                        >
-                          {row.label}
-                        </Link>
-                      </th>
-                      <AgingCell
-                        value={loading ? null : data ? row.vencido : undefined}
-                        alert={!loading && row.vencido > 0}
-                        first={i === 0}
-                      />
-                      <AgingCell
-                        value={loading ? null : data && row.tieneHoy ? row.hoy : undefined}
-                        first={i === 0}
-                      />
-                      <AgingCell
-                        value={loading ? null : data ? row.next7 : undefined}
-                        first={i === 0}
-                      />
-                      <AgingCell
-                        value={loading ? null : data ? row.next30 : undefined}
-                        first={i === 0}
-                      />
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                    {card.title}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 12.5,
+                      color: "var(--text-secondary)",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {card.detail}
+                  </div>
+                </Link>
+              ))}
             </div>
           </section>
         </div>
 
         {/* Secundario — contexto del mes */}
         <section aria-labelledby="ctx-title" style={{ minWidth: 0 }}>
-          <BlockTitle id="ctx-title">Este mes</BlockTitle>
+          <BlockTitle id="ctx-title">Del mes, en corto</BlockTitle>
           <dl
             style={{
               margin: 0,
@@ -834,29 +756,27 @@ export default function ContabilidadDashboardPage() {
             }}
           >
             <CtxRow
-              label="Ingresos"
+              label="Entró"
               value={ctx(<Money value={data?.income ?? 0} bold={false} />)}
               first
             />
-            <CtxRow label="Egresos" value={ctx(<Money value={data?.expense ?? 0} bold={false} />)} />
-            <CtxRow label="Flujo neto" value={ctx(<Money value={data?.netCashflow ?? 0} />)} />
+            <CtxRow label="Salió" value={ctx(<Money value={data?.expense ?? 0} bold={false} />)} />
+            <CtxRow label="Quedó" value={ctx(<Money value={data?.netCashflow ?? 0} />)} />
             <CtxRow
               label="Facturas"
               value={ctx(
-                `${data?.invoicesPeriod.total ?? 0} (${data?.invoicesPeriod.issued ?? 0} emit. · ${data?.invoicesPeriod.received ?? 0} rec.)`,
+                `${data?.invoicesPeriod.total ?? 0} (${data?.invoicesPeriod.issued ?? 0} hechas · ${data?.invoicesPeriod.received ?? 0} recibidas)`,
               )}
             />
-            {/* El renglón se queda aunque el borrador esté en cero: si aparece
-                y desaparece solo, deja de poderse consultar «¿cómo va?». */}
             <CtxRow
-              label="Pre-nómina borrador"
+              label="Nómina en borrador"
               value={ctx(<Money value={data?.prenominaDraftTotal ?? 0} bold={false} />)}
               href="/erp/contabilidad/pre-nomina"
             />
           </dl>
               <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-                <QuietLink href="/erp/contabilidad/cierres">Cerrar periodo</QuietLink>
-                <QuietLink href="/erp/contabilidad/reportes">Reportes</QuietLink>
+                <QuietLink href="/erp/contabilidad/cierres">Cerrar el mes</QuietLink>
+                <QuietLink href="/erp/contabilidad/reportes">Ver informes</QuietLink>
               </div>
             </section>
           </div>
@@ -895,6 +815,14 @@ export default function ContabilidadDashboardPage() {
         .nx-contab-cta:focus-visible {
           outline: none;
           box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+        }
+        .nx-contab-task:hover {
+          border-color: color-mix(in srgb, var(--primary) 35%, var(--border)) !important;
+          background: color-mix(in srgb, var(--primary) 4%, var(--surface)) !important;
+        }
+        .nx-contab-task:focus-visible {
+          outline: 2px solid var(--primary);
+          outline-offset: 2px;
         }
       `}</style>
     </>
@@ -953,54 +881,20 @@ function CampoFecha({
   );
 }
 
-/** Encabezado de bloque: discreto, para que las cifras manden. */
+/** Encabezado de bloque: frase corta, sin gritar. */
 function BlockTitle({ id, children }: { id: string; children: ReactNode }) {
   return (
     <h2
       id={id}
       style={{
-        margin: "0 0 8px",
-        fontSize: 11,
+        margin: "0 0 10px",
+        fontSize: 14,
         fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--text-tertiary)",
+        color: "var(--text-primary)",
       }}
     >
       {children}
     </h2>
-  );
-}
-
-/** Celda de vencimientos. `null` = cargando; `undefined` = la API no lo desglosa. */
-function AgingCell({
-  value,
-  alert,
-  first,
-}: {
-  value: number | null | undefined;
-  alert?: boolean;
-  first?: boolean;
-}) {
-  return (
-    <td
-      style={{
-        textAlign: "right",
-        padding: "10px 14px",
-        fontVariantNumeric: "tabular-nums",
-        whiteSpace: "nowrap",
-        borderTop: first ? undefined : "1px solid var(--nx-panel-hairline, var(--border))",
-        color: alert ? "var(--state-danger-text, #b91c1c)" : "var(--text-secondary)",
-      }}
-    >
-      {value === null ? (
-        "…"
-      ) : value === undefined || value === 0 ? (
-        <span style={{ color: "var(--text-tertiary)" }}>—</span>
-      ) : (
-        <Money value={value} bold={false} />
-      )}
-    </td>
   );
 }
 
