@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
-import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import FileDropzone from "@/components/ui/FileDropzone";
+import InlineAlert from "@/components/ui/InlineAlert";
+import ListExportActions from "@/components/ui/ListExportActions";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
 import {
@@ -59,11 +62,66 @@ const emptyForm = {
   fecha: new Date().toISOString().slice(0, 10),
 };
 
+/* ── Estilos locales del contrato de diseño (.ai/DISENO-FINANZAS.md) ──────── */
+
+/** Regla 4: acciones de pantalla a 32px / 13px. El único primario es «Registrar gasto». */
+const toolbarButtonStyle: CSSProperties = { height: 32, fontSize: 13 };
+/** Regla 2: las acciones de fila no deben engordar el renglón. */
+const rowButtonStyle: CSSProperties = { height: 28, fontSize: 12, padding: "0 9px" };
+/** Regla 2: el contexto secundario va en 11px gris bajo el concepto. */
+const rowMetaStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: 6,
+  marginTop: 2,
+  fontSize: 11,
+  color: "var(--text-tertiary)",
+  lineHeight: 1.35,
+};
+const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text, #b91c1c)" };
+const breakdownPanelStyle: CSSProperties = {
+  padding: 14,
+  border: "1px solid var(--nx-panel-hairline, var(--border))",
+  borderRadius: 10,
+  background: "var(--surface-2, var(--surface))",
+};
+const breakdownTitleStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  marginBottom: 10,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  color: "var(--text-tertiary)",
+};
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Regla 3: tono neutral para el flujo normal; el color solo entra cuando el
+ * renglón pide acción («Pendiente») o algo salió mal («Rechazado»).
+ */
+function estadoTone(estado?: string): StatusTone {
+  if (estado === "Pagado") return "success";
+  if (estado === "Rechazado") return "danger";
+  if (estado === "Pendiente") return "warning";
+  return "neutral";
+}
+
 function assetUrl(path?: string | null) {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
   const base = getApiAssetOrigin().replace(/\/+$/, "");
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function formatFecha(fecha?: string) {
+  if (!fecha) return "—";
+  return new Date(`${fecha}T12:00:00`).toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function mapExpenseRow(raw: Record<string, unknown>): Expense {
@@ -81,6 +139,8 @@ function mapExpenseRow(raw: Record<string, unknown>): Expense {
     creadoPor: (raw.usuario ?? raw.creadoPor ?? raw.createdBy) as Expense["creadoPor"],
   };
 }
+
+type FormErrors = { concepto?: string; monto?: string; evidencia?: string };
 
 export default function ExpensesPage() {
   const { user } = useUser();
@@ -104,6 +164,7 @@ export default function ExpensesPage() {
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   const [rejectTarget, setRejectTarget] = useState<Expense | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -173,17 +234,56 @@ export default function ExpensesPage() {
     return result;
   }, [items, user, cfg.defaultScope, searchQ, filterCat, filterEstado, highlightId]);
 
-  const pendientes = visibleItems.filter((e) => e.estado === "Pendiente").length;
-  const aprobados = visibleItems.filter((e) => e.estado === "Aprobado").length;
-  const pagadoMonto = visibleItems
-    .filter((e) => e.estado === "Pagado")
-    .reduce((s, e) => s + (e.monto ?? 0), 0);
+  /**
+   * Regla 1: la tira responde a lo que la persona viene a saber — cuánto falta
+   * por autorizar, cuánto está autorizado esperando pago, cuánto ya se pagó y
+   * qué bloquea el cierre contable.
+   */
+  const metrics = useMemo<Metric[]>(() => {
+    const sum = (rows: Expense[]) => rows.reduce((s, e) => s + (e.monto ?? 0), 0);
+    const porAutorizar = visibleItems.filter((e) => e.estado === "Pendiente");
+    const autorizados = visibleItems.filter((e) => e.estado === "Aprobado");
+    const pagados = visibleItems.filter((e) => e.estado === "Pagado");
+    const sinComprobante = visibleItems.filter(
+      (e) => !e.ticketEvidenciaUrl && e.estado !== "Rechazado",
+    );
+    const toggleEstado = (estado: string) => setFilterEstado((prev) => (prev === estado ? "" : estado));
+
+    return [
+      {
+        label: "Por autorizar",
+        value: <Money value={sum(porAutorizar)} />,
+        hint: plural(porAutorizar.length, "gasto esperando", "gastos esperando"),
+        tone: porAutorizar.length > 0 ? "warning" : "default",
+        onClick: () => toggleEstado("Pendiente"),
+      },
+      {
+        label: "Autorizado sin pagar",
+        value: <Money value={sum(autorizados)} />,
+        hint: plural(autorizados.length, "gasto listo para pago", "gastos listos para pago"),
+        onClick: () => toggleEstado("Aprobado"),
+      },
+      {
+        label: "Pagado",
+        value: <Money value={sum(pagados)} />,
+        hint: plural(pagados.length, "gasto liquidado", "gastos liquidados"),
+        onClick: () => toggleEstado("Pagado"),
+      },
+      {
+        label: "Sin comprobante",
+        value: sinComprobante.length,
+        hint: sinComprobante.length > 0 ? "bloquean el cierre" : "todo comprobado",
+        tone: sinComprobante.length > 0 ? "danger" : "default",
+      },
+    ];
+  }, [visibleItems]);
 
   const openNew = () => {
     setEditing(null);
     setForm({ ...emptyForm });
     setEvidenceFile(null);
     setSaveErr(null);
+    setFormErrors({});
     setShowForm(true);
   };
 
@@ -198,15 +298,20 @@ export default function ExpensesPage() {
     });
     setEvidenceFile(null);
     setSaveErr(null);
+    setFormErrors({});
     setShowForm(true);
   };
 
   const save = async () => {
-    if (!token || !form.concepto.trim() || !form.monto) return;
-    if (!editing && !evidenceFile) {
-      setSaveErr("Adjunta el comprobante del gasto.");
-      return;
-    }
+    if (!token) return;
+    // Regla 5: la validación se contesta bajo el campo, no en un aviso suelto.
+    const errors: FormErrors = {};
+    if (!form.concepto.trim()) errors.concepto = "Escribe de qué es el gasto.";
+    if (!form.monto) errors.monto = "Captura el monto; tiene que ser mayor que cero.";
+    if (!editing && !evidenceFile) errors.evidencia = "Adjunta el comprobante del gasto.";
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
     setSaveErr(null);
     try {
@@ -318,118 +423,115 @@ export default function ExpensesPage() {
     }
   };
 
-  const estadoVariant = (s?: string): "accent" | "warning" | "neutral" | "danger" | "positive" => {
-    if (s === "Pagado") return "positive";
-    if (s === "Aprobado") return "accent";
-    if (s === "Rechazado") return "danger";
-    return "warning";
-  };
-
   const columns: Column<Expense>[] = [
     {
       key: "concepto",
       label: "Concepto",
-      render: (e) => (
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{e.concepto ?? "—"}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            {e.categoria ?? "Sin categoría"}
-            {e.esRecurrente ? " · Recurrente" : ""}
+      render: (e) => {
+        const href = assetUrl(e.ticketEvidenciaUrl);
+        const meta: string[] = [e.categoria ?? "Sin categoría"];
+        if (e.creadoPor?.nombre) meta.push(e.creadoPor.nombre);
+        if (e.esRecurrente) meta.push("Recurrente");
+        return (
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>
+              {e.concepto ?? "—"}
+            </div>
+            <div style={rowMetaStyle}>
+              <span>{meta.join(" · ")}</span>
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "var(--primary)", textDecoration: "none" }}
+                >
+                  · Ver comprobante
+                </a>
+              ) : (
+                <span style={rowMetaWarnStyle}>· Sin comprobante</span>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "monto",
       label: "Monto",
+      align: "right",
+      numeric: true,
       render: (e) => <Money value={e.monto ?? 0} />,
-      width: 110,
+      width: 120,
     },
     {
       key: "fecha",
       label: "Fecha",
       render: (e) => (
-        <span style={{ fontSize: 12 }}>
-          {e.fecha
-            ? new Date(`${e.fecha}T12:00:00`).toLocaleDateString("es-MX", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
-            : "—"}
+        <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+          {formatFecha(e.fecha)}
         </span>
       ),
       width: 110,
     },
     {
-      key: "creadoPor",
-      label: "Creado por",
-      accessor: (e) => e.creadoPor?.nombre ?? "—",
-      width: 130,
-    },
-    {
-      key: "ticketEvidenciaUrl",
-      label: "Comprobante",
-      render: (e) => {
-        const href = assetUrl(e.ticketEvidenciaUrl);
-        return href ? (
-          <a href={href} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--primary)" }}>
-            Ver
-          </a>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>
-        );
-      },
-      width: 90,
-    },
-    {
       key: "estado",
       label: "Estado",
-      render: (e) => <Tag variant={estadoVariant(e.estado)}>{e.estado ?? "—"}</Tag>,
+      render: (e) => <StatusDot label={e.estado ?? "—"} tone={estadoTone(e.estado)} />,
       width: 110,
     },
     {
       key: "id",
       label: "",
+      align: "right",
       render: (e) => (
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {cfg.canEdit && e.estado === "Pendiente" && (
-            <Button size="sm" variant="ghost" onClick={() => openEdit(e)}>
+            <Button size="sm" variant="ghost" style={rowButtonStyle} onClick={() => openEdit(e)}>
               Editar
             </Button>
           )}
           {cfg.canApprove && e.estado === "Pendiente" && (
             <>
-              <Button size="sm" variant="secondary" onClick={() => runApprove(e)}>
+              <Button size="sm" variant="secondary" style={rowButtonStyle} onClick={() => runApprove(e)}>
                 Autorizar
               </Button>
-              <Button size="sm" variant="danger" onClick={() => { setRejectTarget(e); setRejectNote(""); }}>
+              <Button
+                size="sm"
+                variant="ghost"
+                style={rowButtonStyle}
+                onClick={() => {
+                  setRejectTarget(e);
+                  setRejectNote("");
+                }}
+              >
                 Rechazar
               </Button>
             </>
           )}
           {cfg.canApprove && e.estado === "Aprobado" && (
-            <Button size="sm" variant="ghost" onClick={() => runMarkPagado(e)}>
+            <Button size="sm" variant="secondary" style={rowButtonStyle} onClick={() => runMarkPagado(e)}>
               Marcar pagado
             </Button>
           )}
           {cfg.canDelete && (
-            <Button size="sm" variant="ghost" onClick={() => remove(e)}>
+            <Button size="sm" variant="ghost" style={rowButtonStyle} onClick={() => remove(e)}>
               Eliminar
             </Button>
           )}
         </div>
       ),
-      width: 280,
+      width: 260,
     },
   ];
 
   return (
     <>
       {highlightId && (
-        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
-          Mostrando gasto <strong>#{highlightId}</strong> desde enlace directo.
-        </div>
+        <InlineAlert
+          variant="info"
+          message={`Mostrando el gasto #${highlightId} desde un enlace directo.`}
+        />
       )}
       <FinanceModuleShell
         eyebrow="ERP · Finanzas"
@@ -437,23 +539,20 @@ export default function ExpensesPage() {
         subtitle={cfg.subtitle}
         actions={
           <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>
+            <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void load()}>
               Actualizar
             </Button>
             {cfg.canCreate && (
-              <Button variant="primary" iconLeft="+" onClick={openNew}>
-                Nuevo gasto
+              <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
+                Registrar gasto
               </Button>
             )}
           </>
         }
         kpis={
-          <>
-            <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} />
-            <KpiCard label="Aprobados" value={aprobados} variant="accent" />
-            <KpiCard label="Pagado" value={<Money value={pagadoMonto} compact />} variant="positive" />
-            <KpiCard label="Total registros" value={visibleItems.length} />
-          </>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <MetricStrip metrics={metrics} ariaLabel="Resumen de gastos" />
+          </div>
         }
         tabs={[
           { id: "lista", label: "Lista" },
@@ -465,75 +564,72 @@ export default function ExpensesPage() {
         {tab === "analytics" ? (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "end" }}>
-              <FinanceField label="Desde">
+              <FinanceField label="Desde" hint="Deja vacío para incluir todo el histórico." optional>
                 <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={financeInputStyle} />
               </FinanceField>
-              <FinanceField label="Hasta">
+              <FinanceField label="Hasta" optional>
                 <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={financeInputStyle} />
               </FinanceField>
-              <Button size="sm" variant="secondary" onClick={() => void loadAnalytics()}>
+              <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
                 Aplicar
               </Button>
-              <Button size="sm" variant="primary" onClick={() => void downloadPdf()}>
+              <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void downloadPdf()}>
                 Descargar PDF
               </Button>
             </div>
             {analyticsLoading && (
-              <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>Calculando…</div>
+              <div style={{ padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
+                Calculando…
+              </div>
             )}
             {!analyticsLoading && analytics && (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
-                  <KpiCard label="Registros" value={analytics.count} />
-                  <KpiCard label="Pendientes" value={analytics.pendientes} variant="warning" />
-                  <KpiCard label="Aprobado" value={<Money value={analytics.totalAprobado} compact />} variant="positive" />
-                  <KpiCard label="Pagado" value={<Money value={analytics.totalPagado} compact />} />
-                </div>
+                <MetricStrip
+                  ariaLabel="Resumen del periodo"
+                  metrics={[
+                    { label: "Registros", value: analytics.count, hint: "en el periodo" },
+                    {
+                      label: "Por autorizar",
+                      value: analytics.pendientes,
+                      hint: plural(analytics.pendientes, "gasto esperando", "gastos esperando"),
+                      tone: analytics.pendientes > 0 ? "warning" : "default",
+                    },
+                    { label: "Autorizado", value: <Money value={analytics.totalAprobado} />, hint: "sin pagar aún" },
+                    { label: "Pagado", value: <Money value={analytics.totalPagado} />, hint: "liquidado en el periodo" },
+                  ]}
+                />
                 {(
                   [
                     ["Por categoría", analytics.byCategory],
                     ["Por persona", analytics.byPerson],
                   ] as const
                 ).map(([title, rows]) => (
-                  <div
-                    key={title}
-                    style={{
-                      padding: 14,
-                      border: "1px solid var(--border)",
-                      borderRadius: 10,
-                      background: "var(--surface-2, var(--surface))",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        marginBottom: 10,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                        color: "var(--text-tertiary)",
-                      }}
-                    >
-                      {title}
-                    </div>
+                  <div key={title} style={breakdownPanelStyle}>
+                    <div style={breakdownTitleStyle}>{title}</div>
                     {!rows.length && (
                       <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
                     )}
-                    {rows.slice(0, 12).map((r) => (
+                    {rows.slice(0, 12).map((r, i) => (
                       <div
                         key={r.name}
                         style={{
                           display: "grid",
                           gridTemplateColumns: "1fr auto auto",
+                          alignItems: "baseline",
                           gap: 12,
                           padding: "6px 0",
-                          borderBottom: "1px solid var(--border)",
-                          fontSize: 13,
+                          borderBottom:
+                            i === Math.min(rows.length, 12) - 1
+                              ? "none"
+                              : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
+                          fontSize: 12.5,
                         }}
                       >
                         <span>{r.name}</span>
-                        <span style={{ color: "var(--text-tertiary)" }}>{r.count} reg.</span>
-                        <Money value={r.total} />
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.count} reg.</span>
+                        <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                          <Money value={r.total} />
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -568,57 +664,57 @@ export default function ExpensesPage() {
               }}
               resultCount={loading ? null : visibleItems.length}
               rightActions={
-                visibleItems.length > 0 ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconLeft="⬇"
-                    onClick={() =>
-                      exportToExcel(
-                        visibleItems,
-                        [
-                          { key: "concepto", label: "Concepto" },
-                          { key: "monto", label: "Monto", format: (v) => `${Number(v).toFixed(2)}` },
-                          { key: "categoria", label: "Categoría" },
-                          { key: "estado", label: "Estado" },
-                          { key: "fecha", label: "Fecha" },
-                        ],
-                        "gastos",
-                      )
-                    }
-                  >
-                    Excel
-                  </Button>
-                ) : undefined
+                <ListExportActions
+                  onExcel={
+                    visibleItems.length > 0
+                      ? () =>
+                          exportToExcel(
+                            visibleItems,
+                            [
+                              { key: "concepto", label: "Concepto" },
+                              { key: "monto", label: "Monto", format: (v) => `${Number(v).toFixed(2)}` },
+                              { key: "categoria", label: "Categoría" },
+                              { key: "estado", label: "Estado" },
+                              { key: "fecha", label: "Fecha" },
+                            ],
+                            "gastos",
+                          )
+                      : undefined
+                  }
+                />
               }
             />
             {error && (
-              <div
-                role="alert"
-                style={{
-                  padding: "10px 14px",
-                  marginBottom: 12,
-                  background: "var(--state-warning-bg)",
-                  border: "1px solid var(--state-warning-border)",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-              >
-                {error}{" "}
-                <Button size="sm" variant="ghost" onClick={() => void load()}>
+              <div style={{ marginBottom: 12 }}>
+                <InlineAlert message={error} variant="danger" style={{ marginBottom: 8 }} />
+                <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
                   Reintentar
                 </Button>
               </div>
             )}
             {loading ? (
-              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+              <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
+                Cargando gastos…
+              </div>
             ) : !error ? (
               <DataTable
                 columns={columns}
                 rows={visibleItems}
                 rowKey={(e) => e.id}
+                density="compact"
                 emptyTitle="Sin gastos"
-                emptyDescription="Registra el primer gasto administrativo."
+                emptyDescription={
+                  searchQ || filterCat || filterEstado
+                    ? "Ningún gasto coincide con los filtros aplicados."
+                    : "Registra el primer gasto administrativo."
+                }
+                emptyAction={
+                  cfg.canCreate && !searchQ && !filterCat && !filterEstado ? (
+                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={openNew}>
+                      Registrar gasto
+                    </Button>
+                  ) : undefined
+                }
               />
             ) : null}
           </>
@@ -628,32 +724,36 @@ export default function ExpensesPage() {
       <Modal
         open={showForm}
         onClose={() => setShowForm(false)}
-        title={editing ? "Editar gasto" : "Nuevo gasto"}
+        title={editing ? "Editar gasto" : "Registrar gasto"}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>
+            <Button variant="ghost" style={toolbarButtonStyle} onClick={() => setShowForm(false)}>
               Cancelar
             </Button>
-            <Button
-              variant="primary"
-              onClick={() => void save()}
-              disabled={saving || !form.concepto.trim() || !form.monto || (!editing && !evidenceFile)}
-            >
-              {saving ? "Guardando…" : editing ? "Guardar" : "Crear gasto"}
+            <Button variant="primary" style={toolbarButtonStyle} onClick={() => void save()} disabled={saving}>
+              {saving ? "Guardando…" : editing ? "Guardar" : "Registrar gasto"}
             </Button>
           </>
         }
       >
         <FinanceFormGrid>
-          <FinanceField label="Concepto" fullWidth>
+          <FinanceField
+            label="Concepto"
+            fullWidth
+            hint="Así aparece en el reporte y en el PDF de cierre."
+            error={formErrors.concepto}
+          >
             <input
               value={form.concepto}
-              onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, concepto: e.target.value }));
+                setFormErrors((prev) => ({ ...prev, concepto: undefined }));
+              }}
               placeholder="Renta oficinas, internet, SaaS…"
               style={financeInputStyle}
             />
           </FinanceField>
-          <FinanceField label="Categoría">
+          <FinanceField label="Categoría" hint="Define en qué rubro suma dentro del reporte.">
             <select
               value={form.categoria}
               onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))}
@@ -666,16 +766,19 @@ export default function ExpensesPage() {
               ))}
             </select>
           </FinanceField>
-          <FinanceField label="Monto ($)">
+          <FinanceField label="Monto" hint="Pesos, con IVA incluido." error={formErrors.monto}>
             <input
               type="number"
               min={0}
               value={form.monto}
-              onChange={(e) => setForm((f) => ({ ...f, monto: Number(e.target.value) }))}
+              onChange={(e) => {
+                setForm((f) => ({ ...f, monto: Number(e.target.value) }));
+                setFormErrors((prev) => ({ ...prev, monto: undefined }));
+              }}
               style={financeInputStyle}
             />
           </FinanceField>
-          <FinanceField label="Fecha">
+          <FinanceField label="Fecha" hint="El día en que se realizó el gasto, no el de captura.">
             <input
               type="date"
               value={form.fecha}
@@ -683,27 +786,41 @@ export default function ExpensesPage() {
               style={financeInputStyle}
             />
           </FinanceField>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 22 }}>
-            <input
-              type="checkbox"
-              id="recurrente"
-              checked={form.esRecurrente}
-              onChange={(e) => setForm((f) => ({ ...f, esRecurrente: e.target.checked }))}
-            />
-            <label htmlFor="recurrente" style={{ fontSize: 13, fontWeight: 500 }}>
-              Gasto recurrente mensual
-            </label>
+          <div style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                id="recurrente"
+                checked={form.esRecurrente}
+                onChange={(e) => setForm((f) => ({ ...f, esRecurrente: e.target.checked }))}
+                style={{ width: 15, height: 15, accentColor: "var(--primary)" }}
+              />
+              <label htmlFor="recurrente" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+                Gasto recurrente mensual
+              </label>
+            </div>
+            <span style={{ fontSize: 11, color: "var(--text-tertiary)", paddingLeft: 23, lineHeight: 1.4 }}>
+              Se repite cada mes; sirve para proyectar el gasto fijo.
+            </span>
           </div>
           <div style={{ gridColumn: "1 / -1" }}>
             <FileDropzone
               file={evidenceFile}
-              onFile={setEvidenceFile}
+              onFile={(f) => {
+                setEvidenceFile(f);
+                setFormErrors((prev) => ({ ...prev, evidencia: undefined }));
+              }}
               label="Comprobante"
               required={!editing}
-              hint={editing ? "Opcional · reemplaza el archivo actual" : "Obligatorio · PDF o imagen"}
+              hint={editing ? "Opcional · reemplaza el archivo actual" : "PDF o imagen del ticket o la factura"}
             />
+            {formErrors.evidencia && (
+              <div style={{ fontSize: 11, color: "var(--state-danger-text, #b91c1c)", marginTop: 6 }}>
+                {formErrors.evidencia}
+              </div>
+            )}
             {editing?.ticketEvidenciaUrl && !evidenceFile && (
-              <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6 }}>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6 }}>
                 Actual:{" "}
                 <a href={assetUrl(editing.ticketEvidenciaUrl) ?? "#"} target="_blank" rel="noreferrer">
                   ver comprobante
@@ -712,19 +829,8 @@ export default function ExpensesPage() {
             )}
           </div>
           {saveErr && (
-            <div
-              role="alert"
-              style={{
-                gridColumn: "1 / -1",
-                padding: "8px 12px",
-                background: "var(--state-danger-bg, #fef2f2)",
-                border: "1px solid var(--danger)",
-                borderRadius: 8,
-                fontSize: 12,
-                color: "var(--danger)",
-              }}
-            >
-              {saveErr}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <InlineAlert message={saveErr} variant="danger" style={{ marginBottom: 0 }} />
             </div>
           )}
         </FinanceFormGrid>
@@ -736,27 +842,49 @@ export default function ExpensesPage() {
         title="Rechazar gasto"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setRejectTarget(null)}>
+            <Button variant="ghost" style={toolbarButtonStyle} onClick={() => setRejectTarget(null)}>
               Cancelar
             </Button>
-            <Button variant="danger" onClick={() => void submitReject()} disabled={saving}>
+            <Button variant="danger" style={toolbarButtonStyle} onClick={() => void submitReject()} disabled={saving}>
               {saving ? "Guardando…" : "Rechazar"}
             </Button>
           </>
         }
       >
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 0 }}>
-          {rejectTarget?.concepto} · <Money value={rejectTarget?.monto ?? 0} />
-        </p>
-        <FinanceField label="Nota (opcional)">
-          <textarea
-            value={rejectNote}
-            onChange={(e) => setRejectNote(e.target.value)}
-            rows={3}
-            placeholder="Motivo del rechazo"
-            style={{ ...financeInputStyle, resize: "vertical" }}
-          />
-        </FinanceField>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            gap: 12,
+            paddingBottom: 12,
+            marginBottom: 12,
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 600 }}>
+            {rejectTarget?.concepto}
+          </span>
+          <span style={{ fontSize: 15, fontVariantNumeric: "tabular-nums" }}>
+            <Money value={rejectTarget?.monto ?? 0} />
+          </span>
+        </div>
+        <FinanceFormGrid>
+          <FinanceField
+            label="Nota para quien lo solicitó"
+            fullWidth
+            optional
+            hint="Si explicas el motivo, se corrige a la primera."
+          >
+            <textarea
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              rows={3}
+              placeholder="Motivo del rechazo"
+              style={{ ...financeInputStyle, resize: "vertical" }}
+            />
+          </FinanceField>
+        </FinanceFormGrid>
       </Modal>
 
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
