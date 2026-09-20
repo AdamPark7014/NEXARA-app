@@ -36,7 +36,12 @@ describe('ActivitiesController', () => {
         ActivitiesService,
         {
           provide: PrismaService,
-          useValue: { activity: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() } },
+          // El alcance de un encargado de consola se resuelve consultando los
+          // usuarios activos de la empresa: sin `user` el simulacro revienta.
+          useValue: {
+            activity: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
+            user: { findMany: jest.fn().mockResolvedValue([]) },
+          },
         },
         {
           provide: NotificationHierarchyService,
@@ -77,16 +82,19 @@ describe('ActivitiesController', () => {
     expect(spy).toHaveBeenCalledWith(query, COMPANY_ID);
   });
 
-  it('scopes an ops manager to the console activity user set', async () => {
+  it('a un encargado lo acota a su equipo, y con la empresa activa', async () => {
+    // El alcance ya no sale de `findUsersForConsoleActivityScope`, que consultaba
+    // sin empresa: ahora pasa por `findAllScoped`, que resuelve el subárbol del
+    // encargado dentro de su empresa. Se prueba el contrato nuevo, no el retirado.
     const expected = [activity(2, 'Actividad Supervisor')];
-    const spy = jest.spyOn(service, 'findByAllowedUsers').mockResolvedValueOnce(expected as any);
+    const spy = jest.spyOn(service, 'findAllScoped').mockResolvedValueOnce(expected as any);
 
-    const user = { permissions: [PERMISSIONS.CONSOLE_ADMIN], departmentId: 2 };
-    const result = await controller.findAll(user as any, COMPANY_ID, {} as any);
+    const user = { id: 9, permissions: [PERMISSIONS.CONSOLE_ADMIN], departmentId: 2 };
+    const query = {} as any;
+    const result = await controller.findAll(user as any, COMPANY_ID, query);
 
     expect(result).toEqual(expected);
-    expect(usersService.findUsersForConsoleActivityScope).toHaveBeenCalled();
-    expect(spy).toHaveBeenCalledWith([3, 4], COMPANY_ID);
+    expect(spy).toHaveBeenCalledWith(user, COMPANY_ID, query);
   });
 
   it('falls back to own activities for regular staff', async () => {
