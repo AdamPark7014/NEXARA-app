@@ -195,7 +195,13 @@ export default function ActivityViaticsPage() {
     color: "var(--foreground)", fontSize: 13,
   };
 
-  const totalMonto = viatics.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
+  // Lo que carga ESTA actividad: su parte si el viático se repartió, el total
+  // si no. Sumar el viático entero inflaba el costo de la actividad cuando el
+  // viaje cubría dos servicios.
+  const montoAqui = (v: ViaticoRow) =>
+    Number(v.montoEnEstaActividad ?? v.montoSolicitado) || 0;
+  const totalMonto = viatics.reduce((s, v) => s + montoAqui(v), 0);
+  const hayRepartidos = viatics.some((v) => (v.repartos?.length ?? 0) > 0);
 
   const aprobados = viatics.filter((v) => {
     const s = (v.estatus ?? "").toLowerCase();
@@ -216,7 +222,7 @@ export default function ActivityViaticsPage() {
     <>
       {viatics.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-          <KpiCard label="Total viáticos" value={<Money value={totalMonto} compact />} variant="accent" icon={<PaymentsOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
+          <KpiCard label={hayRepartidos ? "Carga de esta OT" : "Total viáticos"} value={<Money value={totalMonto} compact />} variant="accent" icon={<PaymentsOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
           <KpiCard label="Registros" value={viatics.length} icon={<ReceiptLongOutlinedIcon fontSize="inherit" aria-hidden="true" />} />
           <KpiCard label="Aprobados" value={aprobados} variant={aprobados > 0 ? "positive" : "default"} icon={<TaskAltIcon fontSize="inherit" aria-hidden="true" />} />
           <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} />
@@ -271,7 +277,13 @@ export default function ActivityViaticsPage() {
                   </Tag>
                 </div>
                 <div style={{ fontSize: 13 }}>
-                  <Money value={Number(v.montoSolicitado)} />
+                  <Money value={montoAqui(v)} />
+                  {(v.repartos?.length ?? 0) > 0 && (
+                    <span style={{ color: "var(--text-secondary)", marginLeft: 8 }}>
+                      · parte de un viático de <Money value={Number(v.montoSolicitado)} /> repartido entre{" "}
+                      {v.repartos!.length} actividades
+                    </span>
+                  )}
                   {v.motivo && <span style={{ color: "var(--text-secondary)", marginLeft: 8 }}>· {v.motivo}</span>}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>

@@ -1,5 +1,16 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { ViaticoParteDto } from './viatico-reparto.dto.js';
 
 /**
  * Asignación de viático a un beneficiario, sin evidencia previa.
@@ -48,4 +59,12 @@ export class AssignViaticoDto {
   @IsString()
   @MaxLength(1000)
   concepto?: string;
+
+  /** Reparto del anticipo entre varias actividades (opcional). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ViaticoParteDto)
+  partes?: ViaticoParteDto[];
 }

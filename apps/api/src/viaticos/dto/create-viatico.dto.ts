@@ -1,5 +1,16 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { ViaticoParteDto } from './viatico-reparto.dto.js';
 
 /**
  * Alta de viático.
@@ -66,4 +77,19 @@ export class CreateViaticoDto {
   @IsString()
   @MaxLength(500)
   comprobante?: string;
+
+  /**
+   * Reparto del gasto entre varias actividades. Opcional: sin él, el viático
+   * sigue siendo de la actividad de `actividadId`, como siempre.
+   *
+   * Solo llega por JSON. En `multipart` —cuando se adjunta el ticket— una
+   * lista anidada no sobrevive al `FormData`, así que el reparto se guarda
+   * después con `PUT /viatics/:id/reparto`.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ViaticoParteDto)
+  partes?: ViaticoParteDto[];
 }

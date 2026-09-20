@@ -11,7 +11,12 @@ export type TrailEntry = {
   role: string;
   userId: number;
   userName?: string;
-  action: 'approve' | 'reject';
+  /**
+   * `comprobar` no avanza el flujo: es la entrega de tickets contra un anticipo
+   * de viáticos, anotada en la misma cadena para que la historia del documento
+   * se lea entera en un solo sitio. Solo `approve` hace avanzar el paso.
+   */
+  action: 'approve' | 'reject' | 'comprobar';
   at: string;
   note?: string;
 };

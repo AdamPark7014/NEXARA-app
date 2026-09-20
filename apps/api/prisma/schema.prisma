@@ -805,6 +805,7 @@ model User {
   vehicleControls           VehicleControl[]           @relation("SolicitanteVehiculo")
   Viatico                   Viatico[]
   viaticosAsignados         Viatico[]                  @relation("ViaticoAsignadoPor")
+  viaticosComprobados       Viatico[]                  @relation("ViaticoComprobadoPor")
   attendances               Attendance[]
   attendanceDays            AttendanceDay[]
   faltasJustificadas        AttendanceJustification[]  @relation("AttendanceJustificationUser")
@@ -1166,6 +1167,8 @@ model Activity {
   locations               LocationTracking[]
   vehicleControls         VehicleControl[]
   Viatico                 Viatico[]
+  /// Partes de viáticos repartidos que carga esta actividad.
+  viaticoRepartos         ViaticoReparto[]
   inventorySnapshot       InventorySnapshot?
   /// Equipo asignado. `responsableId` sigue siendo el líder.
   assignees               ActivityAssignee[]
@@ -1770,20 +1773,56 @@ model Viatico {
   journalEntryId     Int?
   companyId          Int
   fechaSolicitud     DateTime       @default(now())
+  /// Lo que realmente se autorizó entregar. Nulo = todavía no hay resolución;
+  /// al aprobar se sella con el monto solicitado si nadie recorta la cifra.
+  montoAprobado      Decimal?       @db.Decimal(10, 2)
+  /// Suma de los tickets entregados contra el anticipo. Nulo = sin comprobar.
+  montoComprobado    Decimal?       @db.Decimal(10, 2)
+  fechaComprobacion  DateTime?
+  comprobadoPorId    Int?
   deletedAt          DateTime?
   Activity           Activity?      @relation(fields: [actividadId], references: [id])
   User               User           @relation(fields: [usuarioId], references: [id])
   asignadoPor        User?          @relation("ViaticoAsignadoPor", fields: [asignadoPorId], references: [id])
+  comprobadoPor      User?          @relation("ViaticoComprobadoPor", fields: [comprobadoPorId], references: [id])
   project            SalesProject?  @relation(fields: [projectId], references: [id])
   vehicle            VehicleAsset?  @relation(fields: [vehicleId], references: [id])
   journalEntry       JournalEntry?  @relation(fields: [journalEntryId], references: [id])
   company            CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  /// Reparto del costo entre varias actividades. Vacío = el viático es de una
+  /// sola actividad y sigue valiendo `actividadId`.
+  repartos           ViaticoReparto[]
 
   @@index([projectId, fechaSolicitud])
   @@index([categoria, fechaSolicitud])
   @@index([companyId])
   @@index([origen, fechaSolicitud])
   @@map("viaticos")
+}
+
+/// Una parte del costo de un viático imputada a una actividad concreta.
+///
+/// Un mismo viaje cubre varias actividades de clientes distintos: sin esto, el
+/// costo entero cae sobre una sola y el P&L por proyecto miente. La suma de las
+/// partes tiene que cuadrar con el total del viático — se valida en el servidor.
+model ViaticoReparto {
+  id          Int            @id @default(autoincrement())
+  viaticoId   Int
+  actividadId Int
+  monto       Decimal        @db.Decimal(10, 2)
+  nota        String?        @db.VarChar(255)
+  companyId   Int
+  createdAt   DateTime       @default(now())
+  viatico     Viatico        @relation(fields: [viaticoId], references: [id], onDelete: Cascade)
+  actividad   Activity       @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  /// Una sola fila por actividad: si no, el reparto se fragmenta y deja de
+  /// poder leerse "esta actividad carga X".
+  @@unique([viaticoId, actividadId])
+  @@index([actividadId])
+  @@index([companyId])
+  @@map("viatico_repartos")
 }
 
 enum OrderStatus {
@@ -5797,6 +5836,7 @@ model CompanyProfile {
   journalEntries             JournalEntry[]
   expenses                   Expense[]
   viaticos                   Viatico[]
+  viaticoRepartos            ViaticoReparto[]
   employeePayments           EmployeePayment[]
   purchaseOrders             PurchaseOrder[]
   apiKeys                    CompanyApiKey[]
