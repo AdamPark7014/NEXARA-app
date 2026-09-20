@@ -70,7 +70,6 @@ function visibleModules(role: RoleKey, advanced = true): string[] {
  */
 const EXPECTED_MODULES: Record<RoleKey, string[]> = {
   super_admin: [
-    'accounting',
     'approvals',
     'architecture',
     'asistencias',
@@ -178,7 +177,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
 
   ],
   ceo: [
-    'accounting',
     'approvals',
     'architecture',
     'asistencias',
@@ -415,7 +413,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'warehouse',
   ],
   dir_admin: [
-    'accounting',
     'approvals',
     'architecture',
     'asistencias',
@@ -477,7 +474,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
 
   ],
   coord_admin: [
-    'accounting',
     'approvals',
     'attendance',
     'banking',
@@ -813,7 +809,6 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'viatics-admin',
   ],
   contabilidad: [
-    'accounting',
     'approvals',
     'attendance',
     'banking',
@@ -891,8 +886,10 @@ describe('modulos visibles por rol', () => {
     // dentro de Actividades y Mantenimiento; el ejecutivo sustituye al dashboard.
     // Tareas/Proyectos/Servicios y «Mis actividades» se consolidaron en la Pizarra;
     // Clientes de Core se concede por persona (sectores por correo), no por rol.
+    // `accounting` (pólizas) ya no es entrada de menú: vive en /erp/contabilidad/polizas.
     const shown = new Set(EXPECTED_MODULES.super_admin);
     expect(ALL_MODULES.filter((m) => !shown.has(m.id)).map((m) => m.id).sort()).toEqual([
+      'accounting',
       'activities-daily',
       'activities-projects',
       'activities-services',
@@ -1099,7 +1096,7 @@ describe('cada puesto llega a su objeto de trabajo', () => {
 
   it('contabilidad autoriza gastos y abre la cotizacion que factura', () => {
     expect(visibleModules(ROLES.CONTABILIDAD)).toEqual(
-      expect.arrayContaining(['approvals', 'accounting', 'invoicing', 'crm-quotes']),
+      expect.arrayContaining(['approvals', 'erp-contabilidad', 'invoicing', 'crm-quotes']),
     );
     expect(canOpenPage(ROLES.CONTABILIDAD, '/crm/quotes/7')).toBe(true);
   });

@@ -1216,9 +1216,8 @@ export default function AccountingPage() {
       />
 
       <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)" }}>
-        Escritorio Contadora:{" "}
         <Link href="/erp/contabilidad" style={{ fontWeight: 600 }}>
-          CxC, CxP, cierres y conciliación →
+          Escritorio Contadora →
         </Link>
       </p>
 

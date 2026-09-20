@@ -93,7 +93,7 @@ const ALL_SHORTCUTS: Record<string, { href: string; title: string; desc: string 
     { href: "/erp/calendar", title: "Calendario", desc: "Eventos corporativos y agenda" },
   ],
   contabilidad: [
-    { href: "/erp/accounting", title: "Pólizas contables", desc: "Libro diario y ajustes" },
+    { href: "/erp/contabilidad/polizas", title: "Pólizas contables", desc: "Libro diario y ajustes" },
     { href: "/erp/invoicing", title: "Facturación CFDI", desc: "Ingresos y egresos timbrados" },
     { href: "/erp/banking", title: "Cuentas bancarias", desc: "Conciliación y movimientos" },
     { href: "/erp/finance/viatics", title: "Viáticos", desc: "Solicitudes y reembolsos" },

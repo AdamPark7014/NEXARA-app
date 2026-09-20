@@ -181,8 +181,8 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/erp\/employee-payments(\/?.*)$/, '/erp/finance/employee-payments'],
   [/^\/erp\/contact-messages(\/?.*)$/, '/studio/contacts'],
   [/^\/erp\/accounting\/reports(\/?.*)$/, '/erp/contabilidad/reportes'],
-  // Escritorio Contadora: la ruta vieja de pólizas redirige al hub limpio.
-  [/^\/erp\/accounting\/?$/, '/erp/contabilidad'],
+  // Escritorio Contadora: la ruta vieja de pólizas vive bajo el hub.
+  [/^\/erp\/accounting\/?$/, '/erp/contabilidad/polizas'],
   [/^\/erp\/procurement\/dashboard(\/?.*)$/, '/erp/procurement'],
   [/^\/ops\/work-projects(\/?.*)$/, '/ops/projects'],
   [/^\/ops\/assets\/depreciation(\/?.*)$/, '/ops/assets'],
@@ -226,6 +226,11 @@ export function remapLegacySlugs(pathname: string): string {
   if (pathname === '/erp/proyectos' || pathname.startsWith('/erp/proyectos/')) {
     return pathname;
   }
+  // Escritorio Contadora (`/erp/contabilidad/*`): sin atajo el alias contabilidad→accounting
+  // mandaba al módulo legacy de pólizas en `/erp/accounting`.
+  if (pathname === '/erp/contabilidad' || pathname.startsWith('/erp/contabilidad/')) {
+    return pathname;
+  }
   // Mis actividades Core: no traducir "mis-actividades"→"my-activities" (eso es OPS).
   if (pathname === '/erp/mis-actividades' || pathname.startsWith('/erp/mis-actividades/')) {
     return pathname;
@@ -234,11 +239,6 @@ export function remapLegacySlugs(pathname: string): string {
   // `herramientas`→`tools`, `vehiculos`→`vehicles` y el remapeo de `organigrama` los sacaban
   // de su página (308 a rutas de OPS/RH que en Core rebotan).
   if (/^\/erp\/(almacen|vehiculos|organigrama)(\/|$)/.test(pathname)) {
-    return pathname;
-  }
-
-  // Contabilidad hub: no traducir "contabilidad"→"accounting" (ruta vieja de pólizas).
-  if (pathname === '/erp/contabilidad' || pathname.startsWith('/erp/contabilidad/')) {
     return pathname;
   }
 
