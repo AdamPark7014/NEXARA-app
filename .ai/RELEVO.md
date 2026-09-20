@@ -1,96 +1,35 @@
 # RELEVO
 
-- **Último turno:** claude-code
-- **Fecha:** 2026-09-19
-- **Rama:** `feat/ws0-base-modulos` (base de los cuatro frentes, desde `mejora/calidad-y-web` en `56d51e40`)
-- **HEAD:** este commit — **sin desplegar**; Hetzner (prueba) sigue en e6f885ff
-- **Migración nueva sin aplicar:** `20260918150000_modulos_ws0`
+- **Último turno:** cursor
+- **Fecha:** 2026-09-20
+- **Rama:** mejora/calidad-y-web
+- **HEAD:** `be4e6824` (push a origin; deploy Hetzner en curso / verificar)
+- **Migraciones nuevas:** `20260920010000_tool_labels_barcode`, `20260920010000_activity_peer_requests` (+ WS0 `20260918150000_modulos_ws0` si aún no en servidor)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno (claude-code, 18-09) — requisitos «Tareas/Dashboard» y cotizaciones
+## Hecho este turno (backlog paralelo)
 
-Requisitos de Adam: tabla «Tareas/Dashboard» (evidencia, aceptación, periodo, KPIs) +
-`Downloads/Primera cotizacion  (1).pdf` (referencia del PDF) + `Downloads/gantt_seguimiento_proyectos (1).xlsx`
-(hoja «Desarrollo») + `Downloads/V1_Nomenglaturas_Nexara.xlsx`. Entrega de avances: viernes 18-09.
+1. **Organigrama:** diagrama de flujo (`OrgChartView` + layout), API con `puesto`, seed/script `fix-org-puestos-jefes.js` (JA soporte, David instalación, Luis servicios, Daniela H. comercial; Josué → Christian).
+2. **Herramientas:** `TOOLS_MANAGE` solo Christian + Iván; préstamos solo JA + David; etiquetas (`codigoInterno`/`barcode` + PDF/ZPL); escáner HID en `/erp/almacen?tab=scanner`; timeline de préstamo / UI punch.
+3. **Actividades:** pestaña «Solicitudes de equipo» (`ActivityPeerRequest` + `me/activity-requests`); cards con foto grande; workflow KPIs helpers.
+4. **Pre-nómina:** `calculatePrenominaAmount` + `preview-period` / `prenomina/batch`; pantallas `/erp/hr/prenomina` y `/erp/finance/prenomina`; módulo `OvertimeModule` para aprobar extras.
 
-### Integrado y desplegado
+## A medias / verificar
 
-1. **PDF de propuesta** (`2235edec`): rehecho en vectores (Adam NO quiere la portada con captura del video
-   público), con todos los campos de su referencia: portada (cliente/proyecto/folio/fecha/versión, índice 01–04),
-   01 objetivo (intro + beneficios + cierre), 02 alcance (título + intro + subsecciones con viñetas), 03 planos a
-   página completa, 04 cotización (datos empresa, cliente, N°, emisión, validez, tabla, subtotal/IVA/total,
-   términos con etiqueta, firma). Sin filas de subtotal por grupo (como la referencia). «Página n de N».
-   Correo: usa el perfil de empresa (en el servidor dice `contacto@`; la referencia `gerencia@`).
-2. **Logo en todos los PDFs de producción** (`6a1ffeb0`): `loadPdfAsset` busca junto al build.
-3. **Solo «Iniciar actividad»** (`ebf98b4d`): `POST me/activities/:id/iniciar` sella `inicioRealAt`;
-   `aceptar` es alias; `rechazar` → 403 para el asignado. Web/Android/iOS sin «No puedo tomarla».
-4. **Periodos** (`9ac41ade`, migración `20260918120000_actividades_periodo` APLICADA): `periodoInicio/Fin`,
-   «Día N de M», SLA/semáforo contra fin de periodo, asistencia acepta la sucursal todo el periodo,
-   `GET/POST /proyectos/:id/programacion|programar-actividades`, rango «Del/Al» en asignar.
-5. Antes en el turno: `/api/proyectos` + `/erp/proyectos`, evidencia por campos (web + apps alineadas al
-   contrato), fix `RefObject` del build web, fix tenencia al crear proyecto. Otra sesión dejó la web en verde
-   (`62b3bb93`, 744/744 vitest) — detalle en su commit.
+- Deploy Hetzner con `--with-migrate --force-all` tras push `be4e6824`.
+- Correr `node apps/api/scripts/fix-org-puestos-jefes.js` en el servidor (puestos/jefes en DB real).
+- PDF evidencia embebido (unificar pdf.js) quedó parcial si el agente no tocó `ActivityEvidenceFlow`.
+- Contraseñas Excel / facturación Google Maps: siguen en lado de Adam.
 
-6. **KPIs** (`d9677c98`, migración `20260918130000_asistencia_uniforme` APLICADA): `GET /api/me/kpis/equipo`
-   (+ `/:userId`), `PATCH /api/attendance/:id/uniforme`; web `/erp/asistencias/indicadores` (+ detalle por
-   persona) y ✓/✗ de uniforme junto a la foto de entrada. Supuestos por confirmar con Adam: oficina 09:00 /
-   campo 08:00 con 15 min, extra > 8 h netas entre semana o todo sáb/dom, comida sin regreso = 60 min.
-7. **Editor de cotizaciones** (`e6f885ff`): tipo documento en el orden del PDF (portada, 01–04), autoguardado,
-   vista previa real, «Enviar por correo», folio explicado en lista y detalle, «Asignar folio»
-   (`POST /cotizaciones/:id/refoliar`), `propuesta-payload.ts` arma el payload del PDF. Filas del PDF sin IVA
-   (antes no cuadraban con el subtotal) y en el orden del editor.
+## Siguiente
 
-### Decisiones pendientes de Adam
+- Validar en producción: organigrama, pedir herramienta (David/JA), aprobar (Iván), solicitudes de equipo, pre-nómina.
+- Aplicar migraciones WS0 si el migrate no las corrió todas.
+- Rotar Maps key si aún quedó en historial de chat.
 
-- **Estilo visual**: dijo que la UI de los módulos y el PDF siguen sin convencerle. Se le mostraron 3
-  direcciones de PDF (A corporativo sobrio / B tecnológico oscuro / C editorial) y 3 de pantallas
-  (1 minimalista / 2 panel ejecutivo / 3 documento con vista previa) y se le pidió una referencia real.
-  Plan: guía visual → muestra aprobada → aplicar a todos los módulos. Para revisar pantallas hace falta
-  que él inicie sesión en el panel lateral.
-- `scripts/refoliar-borradores.js` (dry-run por defecto, `CONFIRMAR=SI`) — gasta un número del contador
-  del autor por borrador; no correr sin su sí.
-- Partidas del editor: hacerlas más compactas (tipo hoja de cálculo).
-
-### Pendiente / conocido
-
-- **Puestos sin Core** (pregunta para Adam): `dir_operaciones`, `coord_admin`, `coord_ventas`, `vendedor`,
-  `disenador`, `rh`, `contabilidad` no abren `/erp/pizarra` ni `/erp/asistencias` con Core-only.
-- **Google Maps**: sin cuenta de facturación activa; clave web sin restricción de aplicación; Android usa otra
-  clave (`local.properties`); no borrar la vieja. Memoria `nexara-google-maps-claves`.
-- `activities.controller.spec.ts` («scopes an ops manager…») falla desde antes: su prisma falso no trae `user`.
-- Proyectos API: al cambiar responsable queda el anterior como RESPONSABLE; PLANNED→ACTIVE no pone
-  `actualStartDate`; borrar documento no borra el archivo.
-- El flujo de evidencia del navegador no sabe de campos (solo apps). iOS: cambios de hoy sin compilar.
-- Revisión visual en web pendiente: Adam debe iniciar sesión él (no se escriben contraseñas).
-
-## Este turno (claude-code, 18-09) — base WS0: módulos de Core para los cuatro frentes
-
-Rama `feat/ws0-base-modulos` (desde `mejora/calidad-y-web` en `56d51e40`). Es **la base compartida**
-de los cuatro frentes (A asistencia/nómina, B actividades/organigrama/checklist, C almacén y
-herramientas, D vehículos): solo registro de módulos y esquema; las pantallas las llenan ellos.
-
-- **Core** gana cuatro módulos en `/erp`: `erp-almacen` (`/erp/almacen`, monta el inventario de
-  `/erp/warehouse`), `erp-herramientas` (`/erp/almacen/herramientas`, monta `/ops/tools`),
-  `erp-vehiculos` (`/erp/vehiculos`, `/erp/vehiculos/:id`, `/erp/vehiculos/mis-vehiculos`, y
-  `/erp/vehiculos/gps` como «Próximamente» solo para Dirección General) y `erp-organigrama`
-  (`/erp/organigrama`, lectura para todo el personal; editar sigue siendo de RH y dirección).
-- Las rutas viejas (`/ops/vehicles*`, `/ops/my-vehicles`, `/ops/tools*`, `/erp/warehouse`,
-  `/erp/hr/orgchart`) redirigen a las nuevas conservando id y query, y los avisos del API ya salen
-  con las rutas de Core (`app-urls.ts`).
-- Permisos: todo el personal interno pide herramienta y vehículo (`TOOLS_REQUEST`/`VEHICLES_REQUEST`);
-  aprobar sigue igual. Almacén: operan almacén y administración, consultan dirección y coordinadores.
-- Apps: entrada **«Más»** (Android e iOS) con los módulos de Core que el rol tiene según
-  `/me/navigation`; cada uno abre «Disponible pronto en la app — ábrelo en la web».
-- Migración **aditiva** `20260918150000_modulos_ws0` (NO aplicada en ningún servidor): origen de la
-  checada e intentos rechazados, `mockLocation` en GPS, herramienta ligada a la OT con código de
-  recogida, parámetros de reabastecimiento y empaques, checklist de herramienta de la OT,
-  inspecciones de kit, posiciones y fotos de tablero de vehículos, y aprobación de horas extra.
-- Verde: `tsc` web y API, 810 vitest, jest de rbac/navegación/tenant, Android compila y pasa
-  `CoreMenu` / `DeepLinkParser` / `AppUrlsParity`. iOS **sin compilar** (no hay Mac aquí).
-
-### No tocar
+## No tocar
 
 Puente NAS.
