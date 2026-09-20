@@ -169,9 +169,13 @@ function NodeCard({
         borderRadius: 12,
         display: "flex",
         flexDirection: "column",
-        gap: 6,
-        minWidth: 200,
-        width: 204,
+        gap: 5,
+        // Tarjeta mas angosta: con 16 personas, a 204px el arbol medía 3,650px
+        // y para caber en pantalla habia que encogerlo al 40 %, donde el nombre
+        // ya no se lee. Quitando ancho a la tarjeta, cabe al ~50 %: se gana
+        // legibilidad sin quitar informacion.
+        minWidth: 164,
+        width: 168,
         boxShadow: highlighted
           ? "0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent)"
           : "0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)",
@@ -493,6 +497,13 @@ export default function OrgChartView({
   const [zoom, setZoom] = useState(1);
   /** Ancho natural del arbol, para poder ajustarlo al hueco disponible. */
   const contentRef = useRef<HTMLDivElement>(null);
+  /**
+   * Tamaño real del arbol sin escalar. Hace falta guardarlo porque `scale()`
+   * encoge el DIBUJO pero no la CAJA: sin esto el arbol se veia pequeño y
+   * arrinconado dentro de un hueco enorme, y la barra de desplazamiento seguia
+   * ahi aunque ya cupiera entero.
+   */
+  const [tamanoNatural, setTamanoNatural] = useState<{ w: number; h: number } | null>(null);
   /** Mientras nadie toque el zoom a mano, el arbol se reajusta solo al cambiar el ancho. */
   const zoomManual = useRef(false);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -576,7 +587,9 @@ export default function OrgChartView({
     const contenido = contentRef.current;
     if (!caja || !contenido) return;
     const anchoNatural = contenido.scrollWidth;
+    const altoNatural = contenido.scrollHeight;
     if (anchoNatural <= 0) return;
+    setTamanoNatural({ w: anchoNatural, h: altoNatural });
     const disponible = caja.clientWidth - 24; // el relleno lateral del lienzo
     const factor = Math.min(1, disponible / anchoNatural);
     setZoom(Math.max(ZOOM_MIN, Math.round(factor * 100) / 100));
@@ -955,20 +968,31 @@ export default function OrgChartView({
             >
               <div
                 style={{
-                  transform: `scale(${zoom})`,
-                  transformOrigin: "top center",
-                  display: "inline-block",
-                  minWidth: "100%",
-                  verticalAlign: "top",
+                  // La caja ocupa el tamaño YA ESCALADO, para que el hueco
+                  // sobrante desaparezca y la barra de desplazamiento solo
+                  // aparezca cuando de verdad no cabe.
+                  width: tamanoNatural ? tamanoNatural.w * zoom : "100%",
+                  height: tamanoNatural ? tamanoNatural.h * zoom : undefined,
+                  margin: "0 auto",
+                  position: "relative",
                 }}
               >
                 <div
                   ref={contentRef}
                   style={{
+                    transform: `scale(${zoom})`,
+                    transformOrigin: "top left",
+                    position: tamanoNatural ? "absolute" : "relative",
+                    top: 0,
+                    left: 0,
+                    // Sin esto se muerde la cola: al estar posicionado, su ancho
+                    // lo marcaria el padre, y el ancho del padre sale de medirlo
+                    // a el. `max-content` lo ata a su propio contenido.
+                    width: tamanoNatural ? "max-content" : undefined,
                     display: "flex",
                     flexWrap: "wrap",
                     justifyContent: "center",
-                    gap: 24,
+                    gap: 16,
                     minWidth: "min-content",
                   }}
                 >
