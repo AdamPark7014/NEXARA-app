@@ -644,9 +644,8 @@ export default function EditorCotizacion({
           {!id ? (
             <div className={`${styles.aviso} ${styles.avisoInfo}`}>
               <p>
-                Se guarda solo en cuanto escribas el cliente. En ese momento se emite el folio con tu nomenclatura
-                (NEX-tu clave-consecutivo) y aparece la vista previa del PDF.
-                {activityId ? ` Queda ligada a la actividad #${activityId}: su evidencia entra como anexo.` : ""}
+                Se guarda sola al escribir el cliente; ahí se emite el folio.
+                {activityId ? ` Queda ligada a la actividad #${activityId}.` : ""}
               </p>
             </div>
           ) : null}

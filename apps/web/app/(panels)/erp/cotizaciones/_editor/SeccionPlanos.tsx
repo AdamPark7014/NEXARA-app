@@ -173,7 +173,7 @@ export default function SeccionPlanos({
       id="planos"
       numero="03"
       titulo="Planos"
-      ayuda="Plano CAD, sembrado o fotos: cada imagen sale a página completa, en este orden."
+      ayuda="Plano CAD, sembrado de cámaras o fotos del levantamiento: cada imagen sale a página completa, en este orden. Acepta PNG, JPG o PDF hasta 20 MB; si la cotización está ligada a la actividad comercial, su evidencia entra sola."
     >
       <label
         className={`${styles.zona} ${encima ? styles.zonaActiva : ""} ${puede ? "" : styles.zonaDeshabilitada}`}
@@ -197,14 +197,12 @@ export default function SeccionPlanos({
             if (archivos.length) void subir(archivos);
           }}
         />
-        <strong>{subiendo ? `Subiendo «${subiendo}»…` : "Arrastra aquí el plano o haz clic para elegirlo"}</strong>
-        <span className={styles.pista}>
-          {!cotizacionId
-            ? "Se habilita en cuanto el borrador se guarda (al escribir el cliente)."
-            : !editable
-              ? "La cotización ya salió: crea una revisión para cambiar sus planos."
-              : "Imagen (PNG, JPG) o PDF, hasta 20 MB."}
-        </span>
+        <strong>{subiendo ? `Subiendo «${subiendo}»…` : "Arrastra un plano o haz clic"}</strong>
+        {!cotizacionId || !editable ? (
+          <span className={styles.pista}>
+            {!cotizacionId ? "Se habilita al guardarse el borrador." : "Ya salió: crea una revisión para cambiarlos."}
+          </span>
+        ) : null}
       </label>
 
       {propios.length || heredados.length ? (
@@ -213,10 +211,7 @@ export default function SeccionPlanos({
           {heredados.map((p, i) => tarjeta(p, i, false))}
         </ol>
       ) : (
-        <p className={`${styles.pista} ${styles.bloque}`}>
-          Sin planos todavía. Si ligas la cotización a la actividad comercial del levantamiento, sus fotos
-          entran aquí solas.
-        </p>
+        <p className={`${styles.pista} ${styles.bloque}`}>Sin planos todavía.</p>
       )}
     </Hoja>
   );

@@ -11,7 +11,7 @@ import {
   type CondicionesSugeridas,
   type OpcionesCotizacion,
 } from "@/lib/cotizacion-personalizacion";
-import { Segmentado, TextoAuto } from "./campos";
+import { Ayuda, Segmentado, TextoAuto } from "./campos";
 import styles from "./editor.module.css";
 
 type Cambiar = (cambio: (doc: DocumentoCotizacion) => DocumentoCotizacion) => void;
@@ -34,7 +34,11 @@ function Interruptor({
 }) {
   const id = useId();
   return (
-    <label className={`${styles.interruptor} ${bloqueado ? styles.interruptorBloqueado : ""}`} htmlFor={id}>
+    <label
+      className={`${styles.interruptor} ${bloqueado ? styles.interruptorBloqueado : ""}`}
+      htmlFor={id}
+      title={ayuda}
+    >
       <input
         id={id}
         type="checkbox"
@@ -44,19 +48,19 @@ function Interruptor({
         disabled={bloqueado || deshabilitado}
         onChange={(e) => onCambio?.(e.target.checked)}
       />
-      <span className={styles.interruptorTextos}>
-        <span className={styles.interruptorEtiqueta}>{etiqueta}</span>
-        {ayuda ? <span className={styles.pista}>{ayuda}</span> : null}
-      </span>
+      <span className={styles.interruptorEtiqueta}>{etiqueta}</span>
     </label>
   );
 }
 
-function Grupo({ titulo, children, accion }: { titulo: string; children: ReactNode; accion?: ReactNode }) {
+function Grupo({ titulo, children, accion, ayuda }: { titulo: string; children: ReactNode; accion?: ReactNode; ayuda?: ReactNode }) {
   return (
     <fieldset className={styles.grupoOpciones}>
       <legend className={styles.grupoOpcionesTitulo}>
-        <span>{titulo}</span>
+        <span className={styles.etiquetaConAyuda}>
+          <span>{titulo}</span>
+          {ayuda ? <Ayuda titulo={titulo.toLowerCase()}>{ayuda}</Ayuda> : null}
+        </span>
         {accion}
       </legend>
       {children}
@@ -109,7 +113,7 @@ export default function PanelPersonalizar({
               Personalizar
             </h2>
           </div>
-          <p className={styles.ayudaSeccion}>{resumenOpciones(o, doc.moneda)}</p>
+          {!abierto ? <p className={styles.ayudaSeccion}>{resumenOpciones(o, doc.moneda)}</p> : null}
         </div>
         <div className={styles.hojaAcciones}>
           <button
@@ -126,7 +130,7 @@ export default function PanelPersonalizar({
 
       {abierto ? (
         <div id="personalizar-cuerpo" className={styles.opcionesCuerpo}>
-          <Grupo titulo="Secciones incluidas">
+          <Grupo titulo="Secciones incluidas" ayuda="Lo que se apaga no se imprime; en el editor queda su cabecera con «Incluir». La portada y la cotización van siempre.">
             <div className={styles.rejillaInterruptores}>
               <Interruptor activo bloqueado etiqueta="Portada" ayuda="Siempre va" />
               {SECCIONES_OPCIONALES.map((s) => (
@@ -143,7 +147,7 @@ export default function PanelPersonalizar({
             </div>
           </Grupo>
 
-          <Grupo titulo="Columnas de la tabla">
+          <Grupo titulo="Columnas de la tabla" ayuda="Marca y modelo, imagen del producto y descuento se agregan a la tabla del PDF. Con el precio unitario apagado, el cliente solo ve el total de cada renglón (a precio alzado).">
             <div className={styles.rejillaInterruptores}>
               {COLUMNAS_OPCIONALES.map((c) => (
                 <Interruptor
@@ -158,7 +162,7 @@ export default function PanelPersonalizar({
             </div>
           </Grupo>
 
-          <Grupo titulo="Carta de presentación">
+          <Grupo titulo="Carta de presentación" ayuda="Se imprime como primera hoja después de la portada, dirigida a quien recibe la propuesta.">
             <Interruptor
               activo={Boolean(o.carta)}
               etiqueta="Incluir carta"
@@ -191,7 +195,7 @@ export default function PanelPersonalizar({
                       className={styles.input}
                       value={o.carta.cargo ?? ""}
                       disabled={!editable}
-                      placeholder="Gerente de compras"
+                      placeholder="Cargo"
                       onChange={(e) =>
                         setOpciones((x) => ({ ...x, carta: { ...(x.carta ?? { dirigidaA: "", mensaje: "" }), cargo: e.target.value } }))
                       }
@@ -206,7 +210,7 @@ export default function PanelPersonalizar({
                     id="carta-mensaje"
                     value={o.carta.mensaje}
                     disabled={!editable}
-                    placeholder="Por medio de la presente, le hacemos llegar nuestra propuesta para…"
+                    placeholder="Por medio de la presente le hacemos llegar nuestra propuesta…"
                     onValor={(v) => setOpciones((x) => ({ ...x, carta: { ...(x.carta ?? { dirigidaA: "" }), mensaje: v } }))}
                   />
                 </div>
@@ -216,6 +220,7 @@ export default function PanelPersonalizar({
 
           <Grupo
             titulo="Condiciones comerciales"
+            ayuda="Alimentan los términos del PDF: la forma de pago completa el renglón del anticipo, y el tiempo de entrega y la garantía salen como renglones propios. Lo que dejes vacío no se imprime."
             accion={
               editable && sugeridas ? (
                 <button
@@ -242,7 +247,6 @@ export default function PanelPersonalizar({
               ) : null
             }
           >
-            <p className={styles.pista}>Salen en los términos del PDF. Vacío = ese renglón no se imprime.</p>
             <div className={styles.campos3}>
               <div className={styles.campo}>
                 <label className={styles.etiqueta} htmlFor="cond-pago">
@@ -320,7 +324,7 @@ export default function PanelPersonalizar({
             </div>
           </Grupo>
 
-          <Grupo titulo="Moneda">
+          <Grupo titulo="Moneda" ayuda="Cambia la moneda de toda la cotización. En dólares conviene dejar escrito el tipo de cambio que aplica al pagar.">
             <Segmentado
               etiqueta="Moneda"
               opciones={[
@@ -341,14 +345,14 @@ export default function PanelPersonalizar({
                   className={styles.input}
                   value={o.tipoCambioNota}
                   disabled={!editable}
-                  placeholder="Pagadero en moneda nacional al tipo de cambio publicado en el DOF el día de pago."
+                  placeholder="Tipo de cambio DOF del día de pago"
                   onChange={(e) => setOpciones((x) => ({ ...x, tipoCambioNota: e.target.value }))}
                 />
               </div>
             ) : null}
           </Grupo>
 
-          <Grupo titulo="Firmas">
+          <Grupo titulo="Firmas" ayuda="«Elaboró» es quien hizo la cotización (déjalo vacío para usar su nombre y su puesto). «Autorizó» es opcional y sugiere a quienes intervinieron.">
             <datalist id={listaPersonas}>
               {personas.map((p) => (
                 <option key={`${p.userId ?? p.nombre}`} value={p.nombre}>
@@ -367,7 +371,7 @@ export default function PanelPersonalizar({
                   list={listaPersonas}
                   value={o.elaboro?.nombre ?? ""}
                   disabled={!editable}
-                  placeholder={autor?.nombre || "Quien la elaboró"}
+                  placeholder={autor?.nombre || "Nombre"}
                   onChange={(e) =>
                     setOpciones((x) => ({ ...x, elaboro: e.target.value ? { ...(x.elaboro ?? {}), nombre: e.target.value } : null }))
                   }
@@ -390,7 +394,7 @@ export default function PanelPersonalizar({
             <Interruptor
               activo={Boolean(o.autorizo)}
               etiqueta="Agregar «Autorizó»"
-              ayuda="Una segunda firma, p. ej. dirección"
+              ayuda="Una segunda firma, por ejemplo dirección"
               deshabilitado={!editable}
               onCambio={(v) => setOpciones((x) => ({ ...x, autorizo: v ? x.autorizo ?? { nombre: "" } : null }))}
             />
@@ -406,7 +410,7 @@ export default function PanelPersonalizar({
                     list={listaPersonas}
                     value={o.autorizo.nombre}
                     disabled={!editable}
-                    placeholder="Nombre de quien autoriza"
+                    placeholder="Nombre"
                     onChange={(e) => {
                       const nombre = e.target.value;
                       const persona = personas.find((p) => p.nombre === nombre);
@@ -430,7 +434,7 @@ export default function PanelPersonalizar({
                     className={styles.input}
                     value={o.autorizo.cargo ?? ""}
                     disabled={!editable}
-                    placeholder="Dirección general"
+                    placeholder="Cargo"
                     onChange={(e) => setOpciones((x) => ({ ...x, autorizo: x.autorizo ? { ...x.autorizo, cargo: e.target.value } : null }))}
                   />
                 </div>
@@ -438,16 +442,12 @@ export default function PanelPersonalizar({
             ) : null}
           </Grupo>
 
-          <Grupo titulo="Plantilla">
-            <p className={styles.pista}>
-              Guarda los textos, secciones, columnas y términos de esta cotización para empezar otras desde aquí. Nada del
-              cliente ni del folio.
-            </p>
+          <Grupo titulo="Plantilla" ayuda="Guarda los textos, las secciones, las columnas y los términos de esta cotización para empezar otras desde aquí. No guarda cliente ni folio; con «Con partidas» también guarda los precios.">
             <div className={styles.filaPlantilla}>
               <input
                 className={styles.input}
                 aria-label="Nombre de la plantilla"
-                placeholder="Nombre de la plantilla, p. ej. CCTV obra 16 cámaras"
+                placeholder="Nombre de la plantilla"
                 value={nombrePlantilla}
                 onChange={(e) => setNombrePlantilla(e.target.value)}
               />
@@ -472,7 +472,7 @@ export default function PanelPersonalizar({
                 {guardando ? "Guardando…" : "Guardar como plantilla"}
               </button>
             </div>
-            {!puedeGuardarPlantilla ? <p className={styles.pista}>Se habilita en cuanto el borrador se guarda.</p> : null}
+            {!puedeGuardarPlantilla ? <p className={styles.pista}>Se habilita al guardarse el borrador.</p> : null}
           </Grupo>
         </div>
       ) : null}

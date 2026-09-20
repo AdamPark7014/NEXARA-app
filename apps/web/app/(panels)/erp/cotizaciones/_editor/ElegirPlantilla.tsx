@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SEGMENTO_LABEL, archivarPlantilla, listarPlantillasGuardadas, type PlantillaGuardadaResumen } from "@/lib/cotizaciones-api";
+import { Ayuda } from "./campos";
 import styles from "./editor.module.css";
 
 /**
@@ -43,8 +44,11 @@ export default function ElegirPlantilla({
             <h2 id="plantillas-titulo" className={styles.tituloSeccion}>
               Empezar desde una plantilla
             </h2>
+            <Ayuda titulo="las plantillas">
+              Traen los textos, las secciones, las columnas y los términos guardados; el cliente y las fechas los pones
+              tú. Si la plantilla se guardó «con partidas», también llegan sus precios.
+            </Ayuda>
           </div>
-          <p className={styles.ayudaSeccion}>Trae textos, secciones, columnas y términos; el cliente lo pones tú.</p>
         </div>
       </div>
       <ul className={styles.listaPlantillas}>
