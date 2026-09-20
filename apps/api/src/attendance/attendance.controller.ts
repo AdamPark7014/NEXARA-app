@@ -9,6 +9,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
+import { COLUMNAS_ASISTENCIA_HIBRIDA } from '../common/excel/reportes.js';
 
 @Controller('attendance')
 export class AttendanceController {
@@ -266,26 +267,26 @@ export class AttendanceController {
       siteId: siteId ? parseInt(siteId, 10) : null,
       selfOnly: !canManage,
     });
-    const rows = (data.items || []).map((item: any) => ({
-      fecha: data.date,
-      persona: item.user?.nombre || item.acs?.personName || item.acs?.personId || '',
-      codigo:
-        item.user?.employeeNumber ||
-        item.user?.companyEmployeeNumber ||
-        item.acs?.personId ||
-        '',
-      departamento: item.user?.department || '',
-      vinculo: item.linkStatus,
-      erpEntrada: item.erp?.checkIn || '',
-      erpSalida: item.erp?.checkOut || '',
-      erpMinutos: item.erp?.totalMinutes ?? '',
-      acsEntrada: item.acs?.firstAt || '',
-      acsSalida: item.acs?.lastAt || '',
-      acsMinutos: item.acs?.minutes ?? '',
-      puerta: item.acs?.firstDoor || '',
-      alertas: Array.isArray(item.flags) ? item.flags.join('; ') : '',
-    }));
-    const buffer = await this.excelExport.exportToExcel(rows, 'asistencia-hibrida');
+    // Las columnas leen el item tal cual (`excel/reportes.ts`); solo se le añade el día.
+    const rows = (data.items || []).map((item: any) => ({ ...item, fecha: data.date }));
+    const resumen = data.summary ?? {};
+    const buffer = await this.excelExport.exportarReporte({
+      titulo: 'Asistencia híbrida · checador ERP ↔ accesos ACS',
+      subtitulo: `Día ${day}`,
+      hoja: 'Asistencia',
+      columnas: COLUMNAS_ASISTENCIA_HIBRIDA,
+      filas: rows,
+      generadoPor: req.user?.nombre ?? null,
+      filtros: [
+        { etiqueta: 'Fecha', valor: day },
+        { etiqueta: 'Sitio', valor: siteId ? `#${siteId}` : 'Todos' },
+        { etiqueta: 'Alcance', valor: canManage ? 'Toda la empresa' : 'Solo mi registro' },
+      ],
+      notas: [
+        `Vinculados: ${resumen.linked ?? 0} · Solo ERP: ${resumen.erpOnly ?? 0} · Solo ACS: ${resumen.acsOnly ?? 0} · Con alertas: ${resumen.withFlags ?? 0}`,
+        'Las jornadas se miden en la zona horaria de la empresa; las duraciones están en formato [h]:mm.',
+      ],
+    });
     res!.header(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

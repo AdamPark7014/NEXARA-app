@@ -25,6 +25,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
+import { COLUMNAS_EVIDENCIAS } from '../common/excel/reportes.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { UpdateEvidenceDto } from './dto/update-evidence.dto.js';
 
@@ -98,15 +99,23 @@ export class EvidencesController {
     @CurrentCompanyId() companyId: number | null,
     @Res() res: Response,
   ) {
+    if (format !== 'xlsx') {
+      throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON estan deshabilitados.');
+    }
     const result = await this.evidencesService.findForHierarchy(user, undefined, companyId);
     const data: any[] = Array.isArray(result) ? result : (result as any).data;
-    if (format === 'xlsx') {
-      const buffer = await this.excelExport.exportToExcel(data, 'evidences');
-      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.attachment('evidencias.xlsx');
-      return res.send(Buffer.from(buffer));
-    }
-    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON estan deshabilitados.');
+    const buffer = await this.excelExport.exportarReporte({
+      titulo: 'Evidencias de actividades',
+      subtitulo: 'Evidencias visibles según tu jerarquía',
+      hoja: 'Evidencias',
+      columnas: COLUMNAS_EVIDENCIAS,
+      filas: data ?? [],
+      generadoPor: user?.nombre ?? null,
+      hojaInformacion: true,
+    });
+    res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.attachment('evidencias.xlsx');
+    return res.send(buffer);
   }
 
   @Post('import')
