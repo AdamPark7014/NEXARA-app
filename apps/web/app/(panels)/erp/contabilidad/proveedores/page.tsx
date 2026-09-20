@@ -7,6 +7,7 @@ import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import Modal from "@/components/ui/Modal";
 import PanelTabs from "@/components/ui/PanelTabs";
@@ -254,6 +255,7 @@ export default function ProveedoresPage() {
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [detalleError, setDetalleError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("fiscal");
+  const [agingKey, setAgingKey] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -284,6 +286,7 @@ export default function ProveedoresPage() {
     async (row: VendorRow) => {
       setAbierto(row);
       setTab("fiscal");
+      setAgingKey("");
       setDetalle(null);
       setDetalleError(null);
       setDetalleLoading(true);
@@ -531,7 +534,10 @@ export default function ProveedoresPage() {
 
       <Modal
         open={abierto != null}
-        onClose={() => setAbierto(null)}
+        onClose={() => {
+          setAbierto(null);
+          setAgingKey("");
+        }}
         title={abierto?.nombre ?? "Proveedor"}
         maxWidth={1040}
       >
@@ -884,21 +890,42 @@ export default function ProveedoresPage() {
                   subtitle="Cuánto lleva esperando cada peso que se le debe."
                   dense
                 >
-                  <MetricStrip
-                    ariaLabel="Antigüedad del saldo"
-                    metrics={detalle.cuentasPorPagar.antiguedad.map((b) => ({
+                  {(() => {
+                    const bands = detalle.cuentasPorPagar.antiguedad;
+                    const base = bands.reduce((s, b) => s + Math.abs(b.monto), 0);
+                    const items: ScaleItem[] = bands.map((b) => ({
+                      key: b.key,
                       label: b.label,
                       value: <Money value={b.monto} />,
                       hint: `${b.conteo} factura(s)`,
                       tone:
                         b.monto > 0 && b.key !== "porVencer"
                           ? ("danger" as const)
-                          : ("default" as const),
-                    }))}
-                  />
+                          : ("mute" as const),
+                      share: base > 0 ? Math.abs(b.monto) / base : 0,
+                    }));
+                    return (
+                      <FilterScale
+                        ariaLabel="Antigüedad del saldo"
+                        items={items}
+                        active={agingKey}
+                        onSelect={(clave) => setAgingKey(clave || "")}
+                        minCellWidth={120}
+                      />
+                    );
+                  })()}
                 </Section>
                 <DataTable
-                  rows={detalle.cuentasPorPagar.facturas}
+                  rows={detalle.cuentasPorPagar.facturas.filter((f) => {
+                    if (!agingKey) return true;
+                    const d = f.diasVencido;
+                    if (agingKey === "porVencer") return d <= 0;
+                    if (agingKey === "d1_30") return d > 0 && d <= 30;
+                    if (agingKey === "d31_60") return d > 30 && d <= 60;
+                    if (agingKey === "d61_90") return d > 60 && d <= 90;
+                    if (agingKey === "d90") return d > 90;
+                    return true;
+                  })}
                   rowKey={(f) => f.id}
                   density="compact"
                   stickyHeader={false}
