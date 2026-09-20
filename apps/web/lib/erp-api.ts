@@ -2,6 +2,7 @@
  * Utilidades compartidas para formularios ERP — fetch, listas y mensajes de error.
  */
 import { buildApiUrl } from "@/lib/api-base";
+import { withTenantHeaders } from "@/lib/tenant";
 
 export function formatApiError(err: unknown, fallback = "Error desconocido"): string {
   if (err instanceof Error) {
@@ -36,11 +37,11 @@ export async function erpFetch<T = unknown>(
     ...init,
     // Cookie HttpOnly `nexara_token` (Bearer suele ser sentinel `session-cookie`).
     credentials: "include",
-    headers: {
+    headers: withTenantHeaders({
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...(init.headers as Record<string, string> | undefined),
-    },
+    }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

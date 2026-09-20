@@ -2,8 +2,8 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** PRODUCTION GATE Contabilidad — flota micro + merges (periodo cerrado, a11y, labels, etc.)
+- **Rama:** feat/gate-erpFetch-spec → mejora/calidad-y-web
+- **HEAD:** gate erpFetch — spec + withTenantHeaders en erpFetch
 
 ## Puente — no cambiar
 
