@@ -50,8 +50,12 @@ export class PacService {
   /** Bloquea timbrado con mock en producción. */
   assertProductionReady(): void {
     if (this.isProduction && this.adapter.provider === 'mock') {
+      // El texto de este error llega a la pantalla de quien intenta timbrar, así
+      // que dice qué pasó y qué hacer, sin nombrar variables de entorno: eso es
+      // asunto de quien configura, y vive en la pantalla de configuración.
       throw new Error(
-        'Timbrado bloqueado: PAC en modo mock en producción. Configura PAC_PROVIDER real y credenciales.',
+        'No se puede timbrar: el servicio de timbrado todavía no está conectado. ' +
+          'Pídele a administración que lo configure.',
       );
     }
   }

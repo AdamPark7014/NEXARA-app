@@ -54,7 +54,6 @@ describe("menú del hub contable", () => {
       "facturas",
       "proveedores",
       "prenomina",
-      "pagos",
       "proyectos",
       "presupuestos",
       "reportes",
@@ -69,8 +68,13 @@ describe("menú del hub contable", () => {
   });
 
   it("RH solo ve nómina, no la contabilidad", () => {
+    // "Pagos al personal" salió de esta barra: apuntaba a /erp/finance/employee-payments,
+    // que es un módulo propio y ya está en el menú izquierdo. Tener la misma entrada
+    // en los dos sitios es lo que hacía que esta barra se leyera como un duplicado
+    // del menú. No se pierde acceso, cambia de dónde se llega.
     const ids = idsVisibles(RH);
-    expect(ids).toEqual(expect.arrayContaining(["prenomina", "pagos"]));
+    expect(ids).toEqual(expect.arrayContaining(["prenomina"]));
+    expect(ids).not.toContain("pagos");
     for (const id of ["home", "movimientos", "cxc", "cxp", "conciliacion", "facturas", "cierres"]) {
       expect(ids).not.toContain(id);
     }

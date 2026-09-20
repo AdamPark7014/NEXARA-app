@@ -117,12 +117,6 @@ export const GRUPOS_CONTABILIDAD: NavGroup[] = [
         href: "/erp/contabilidad/pre-nomina",
         permissions: VER_NOMINA,
       },
-      {
-        id: "pagos",
-        label: "Pagos al personal",
-        href: "/erp/finance/employee-payments",
-        permissions: VER_NOMINA,
-      },
     ],
   },
   {
@@ -194,82 +188,66 @@ function isActive(pathname: string, item: NavItem) {
 }
 
 /**
- * Subnavegación del hub Contadora.
+ * Barra de secciones del escritorio de contabilidad.
  *
- * Agrupada por tarea (no por tabla BD). Los grupos fluyen y envuelven: en móvil
- * se apilan en vez de irse a scroll horizontal, que obligaba a arrastrar el
- * menú para encontrar una sección. El grupo que contiene la página abierta
- * levanta su encabezado, y el enlace activo es lo único con acento: así se ve
- * dónde estás sin pintar la barra entera.
+ * Antes eran siete grupos con su título —CONTABILIDAD, FINANZAS, DOCUMENTOS,
+ * NÓMINA, OPERACIÓN, ANÁLISIS, CONTROL— desparramados en dos filas. Para
+ * navegar DENTRO de un solo módulo, eso es un directorio, no una barra: pesaba
+ * más que el contenido y repetía la estructura que ya da el menú izquierdo.
+ *
+ * Ahora es una sola fila en el orden en que se trabaja: mirar, cobrar, pagar,
+ * cuadrar, documentar, cerrar. El orden ES la agrupación; no hacen falta
+ * títulos para decir que «Por cobrar» y «Por pagar» van juntos, están juntos.
+ * Los grupos siguen existiendo como dato porque el filtro por permisos se
+ * apoya en ellos.
  */
 export default function ContabilidadSidebar() {
   const pathname = usePathname() ?? "";
   const { user } = useUser();
-  const groups = filtrarGruposContabilidad(user);
+  const items = filtrarGruposContabilidad(user).flatMap((g) => g.items);
 
-  if (groups.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
     <nav
-      aria-label="Módulos de contabilidad"
+      aria-label="Secciones de contabilidad"
       style={{
         display: "flex",
         flexWrap: "wrap",
-        gap: "14px 26px",
-        alignItems: "flex-start",
-        paddingBottom: 12,
+        gap: 2,
+        alignItems: "center",
+        paddingBottom: 10,
         borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
         marginBottom: 4,
       }}
     >
-      {groups.map((group) => {
-        const grupoActivo = group.items.some((item) => isActive(pathname, item));
+      {items.map((item) => {
+        const active = isActive(pathname, item);
         return (
-          <div key={group.id} style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "0.09em",
-                textTransform: "uppercase",
-                color: grupoActivo ? "var(--text-secondary)" : "var(--text-tertiary)",
-                marginBottom: 5,
-              }}
-            >
-              {group.label}
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-              {group.items.map((item) => {
-                const active = isActive(pathname, item);
-                return (
-                  <CrossPanelLink
-                    key={item.id}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className="nx-contab-nav-link"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      height: 26,
-                      padding: "0 9px",
-                      borderRadius: 6,
-                      fontSize: 12.5,
-                      fontWeight: active ? 600 : 400,
-                      lineHeight: 1,
-                      whiteSpace: "nowrap",
-                      textDecoration: "none",
-                      color: active ? "var(--primary)" : "var(--text-secondary)",
-                      background: active
-                        ? "color-mix(in srgb, var(--primary) 9%, transparent)"
-                        : "transparent",
-                    }}
-                  >
-                    {item.label}
-                  </CrossPanelLink>
-                );
-              })}
-            </div>
-          </div>
+          <CrossPanelLink
+            key={item.id}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className="nx-contab-nav-link"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              height: 28,
+              padding: "0 10px",
+              borderRadius: 6,
+              fontSize: 12.5,
+              fontWeight: active ? 600 : 400,
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+              textDecoration: "none",
+              color: active ? "var(--primary)" : "var(--text-secondary)",
+              background: active
+                ? "color-mix(in srgb, var(--primary) 9%, transparent)"
+                : "transparent",
+            }}
+          >
+            {item.label}
+          </CrossPanelLink>
         );
       })}
 
@@ -282,7 +260,7 @@ export default function ContabilidadSidebar() {
           background: color-mix(in srgb, var(--primary) 14%, transparent);
           color: var(--primary);
         }
-        /* Sin esto, tabular por el menú no dejaba ver dónde estaba el foco:
+        /* Sin esto, tabular por la barra no dejaba ver dónde estaba el foco:
            el enlace activo se distingue por color y peso, pero el foco no. */
         .nx-contab-nav-link:focus-visible {
           outline: 2px solid var(--primary);

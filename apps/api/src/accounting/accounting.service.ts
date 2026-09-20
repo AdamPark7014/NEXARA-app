@@ -2871,9 +2871,13 @@ export class AccountingService {
     const efirma = this.satService.isEfirmaConfigured();
     const productionWarning =
       env === 'production' && (provider === 'mock' || (this.pacService.fallbackToMock && !configured))
-        ? 'PAC en modo mock o sin credenciales en producción. Configura PAC_PROVIDER y credenciales reales.'
+        // Este texto se pinta tal cual en la pantalla de facturación, así que
+        // habla de lo que pasa —no se puede timbrar— y no de variables de
+        // entorno ni de nombres de proveedores. El detalle técnico vive en la
+        // pantalla de configuración, que es donde se resuelve.
+        ? 'Todavía no se pueden timbrar facturas: falta conectar el servicio de timbrado.'
         : env === 'production' && !csd.configured && provider !== 'facturama'
-          ? 'CSD del emisor no configurado. Requerido para sellado local (Finkok/SW XML). Facturama sella con CSD en su bóveda.'
+          ? 'Falta el certificado de sello digital. Sin él las facturas no se pueden sellar.'
           : null;
     return {
       provider,
