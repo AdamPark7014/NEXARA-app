@@ -944,12 +944,14 @@ export function VistaAlmacen({
   }).length, [lots]);
 
   const acciones = (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: embedded ? 6 : 8, flexWrap: "wrap" }}>
       <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
       {cfg.canCreate && (
         <>
           <Button variant="secondary" size="sm" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
-          <Button variant="primary" size="sm" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
+          <Button variant="primary" size="sm" onClick={() => setShowMovementForm(true)}>
+            {embedded ? "Entrada" : "Entrada de stock"}
+          </Button>
         </>
       )}
     </div>
@@ -957,9 +959,7 @@ export function VistaAlmacen({
 
   return (
     <>
-      {embedded ? (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>{acciones}</div>
-      ) : (
+      {!embedded && (
         <PageHeader
           eyebrow="ERP · Almacén"
           title="Inventario y stock"
@@ -986,13 +986,37 @@ export function VistaAlmacen({
         }
       />}
 
+      {/* Embedded: acciones van en la misma fila que las sub-pestañas (sin barra extra bajo PageHeader). */}
       {vistasVisibles.length > 1 && (
-        <PanelTabs
-          ariaLabel="Vistas de almacén"
-          value={tab}
-          onChange={setTab}
-          tabs={vistasVisibles.map((t) => ({ key: t.key, label: t.label }))}
-        />
+        embedded ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              marginBottom: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+              <PanelTabs
+                ariaLabel="Vistas de almacén"
+                value={tab}
+                onChange={setTab}
+                tabs={vistasVisibles.map((t) => ({ key: t.key, label: t.label }))}
+              />
+            </div>
+            {acciones}
+          </div>
+        ) : (
+          <PanelTabs
+            ariaLabel="Vistas de almacén"
+            value={tab}
+            onChange={setTab}
+            tabs={vistasVisibles.map((t) => ({ key: t.key, label: t.label }))}
+          />
+        )
       )}
 
       {/* ── Nuevo almacén (disponible desde cualquier pestaña) ── */}
@@ -1454,12 +1478,19 @@ export function VistaAlmacen({
       {tab === "movimientos" && (
         <Section
           title="Movimientos de inventario"
-          subtitle="Historial auditado: quién, cuándo, por qué, de/hacia qué almacén, saldo antes/después y documento (OC, venta, traspaso, ajuste)."
+          subtitle="Quién, cuándo, de/hacia qué almacén y saldo."
           actions={
-            cfg.canCreate ? (
-              <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowMovementForm(true)}>
-                Registrar movimiento
-              </Button>
+            embedded || cfg.canCreate ? (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {embedded && (
+                  <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
+                )}
+                {cfg.canCreate ? (
+                  <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowMovementForm(true)}>
+                    Registrar
+                  </Button>
+                ) : null}
+              </div>
             ) : undefined
           }
         >
@@ -1467,11 +1498,11 @@ export function VistaAlmacen({
             style={{
               display: "flex",
               flexWrap: "wrap",
-              gap: 8,
+              gap: 6,
               alignItems: "center",
-              marginBottom: 14,
-              padding: "10px 12px",
-              borderRadius: 12,
+              marginBottom: 8,
+              padding: "6px 10px",
+              borderRadius: 10,
               border: "1px solid var(--border)",
               background: "color-mix(in srgb, var(--surface-2) 55%, var(--surface))",
             }}

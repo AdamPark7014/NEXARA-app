@@ -17,7 +17,7 @@ import {
 import InfoBreve from "./InfoBreve";
 
 const INFO =
-  "Al aprobar una solicitud, el técnico recibe un código de 6 caracteres que vale 48 horas. El almacén lo teclea aquí para entregar; queda registrado quién recogió y a qué hora.";
+  "Código de 6 caracteres (48 h). Teclea aquí para entregar; queda quién y cuándo.";
 
 const inp: React.CSSProperties = {
   width: "100%",
@@ -166,10 +166,10 @@ export default function RecoleccionAlmacenPanel() {
   ];
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 10 }}>
       <Section
         title="Entregar con código"
-        actions={<InfoBreve etiqueta="Cómo funciona el código de recolección" texto={INFO} />}
+        actions={<InfoBreve etiqueta="Código de recolección" texto={INFO} />}
       >
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
           <input
@@ -261,7 +261,7 @@ export default function RecoleccionAlmacenPanel() {
           rowKey={(p) => p.id}
           density="compact"
           emptyTitle="Nada por entregar"
-          emptyDescription="Las solicitudes aprobadas aparecen aquí con su código."
+          emptyDescription="Las aprobadas aparecen aquí con su código."
         />
       </Section>
     </div>
