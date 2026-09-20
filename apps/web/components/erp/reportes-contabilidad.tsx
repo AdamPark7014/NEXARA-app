@@ -5,6 +5,7 @@ import Modal from "@/components/ui/Modal";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
+import MetricStrip from "@/components/ui/MetricStrip";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 
@@ -229,36 +230,21 @@ export function FilaTotales({
   );
 }
 
-/** Tarjetas de cifras clave del reporte. */
+/**
+ * Cifras clave del reporte, en la tira compartida de finanzas. Eran tarjetas
+ * sueltas con borde propio: ocupaban el doble de alto para decir lo mismo.
+ */
 export function Resumen({ items }: { items: Array<{ etiqueta: string; valor: number; tipo: TipoColumna }> }) {
   if (!items.length) return null;
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-        gap: 10,
-        marginBottom: 12,
-      }}
-    >
-      {items.map((k) => (
-        <div
-          key={k.etiqueta}
-          style={{
-            padding: "10px 14px",
-            borderRadius: "var(--nx-panel-radius)",
-            border: "1px solid var(--nx-panel-hairline)",
-            background: "var(--surface)",
-          }}
-        >
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)" }}>
-            {k.etiqueta}
-          </div>
-          <div style={{ marginTop: 4, fontSize: 18 }}>
-            <Celda valor={k.valor} tipo={k.tipo} />
-          </div>
-        </div>
-      ))}
+    <div style={{ marginBottom: 12 }}>
+      <MetricStrip
+        ariaLabel="Cifras del reporte"
+        metrics={items.map((k) => ({
+          label: k.etiqueta,
+          value: <Celda valor={k.valor} tipo={k.tipo} />,
+        }))}
+      />
     </div>
   );
 }
