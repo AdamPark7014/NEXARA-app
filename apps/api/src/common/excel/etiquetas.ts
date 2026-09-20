@@ -215,6 +215,15 @@ export const ETIQUETA_TIPO_FACTURA: Record<string, string> = {
   ACCOUNTS_PAYABLE: 'Por pagar',
 };
 
+/** `accounting/page.tsx` · `ACCOUNT_TYPE_LABEL` — naturaleza en balanza de comprobación. */
+export const ETIQUETA_TIPO_CUENTA: Record<string, string> = {
+  ASSET: 'Activo',
+  LIABILITY: 'Pasivo',
+  EQUITY: 'Capital',
+  REVENUE: 'Ingreso',
+  EXPENSE: 'Gasto',
+};
+
 /** `tenders-api.ts` · `TENDER_TYPE_LABEL` y `TENDER_STATUS_LABEL`. */
 export const ETIQUETA_TIPO_LICITACION: Record<string, string> = {
   PUBLIC_GOV: 'Gobierno',

@@ -2,6 +2,12 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccountingService } from './accounting.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import {
+  ETIQUETA_CATEGORIA_VIATICO,
+  ETIQUETA_ESTATUS_VIATICO,
+  ETIQUETA_PAGO,
+  ETIQUETA_TIPO_CUENTA,
+} from '../common/excel/etiquetas.js';
 
 /**
  * NEXARA · Motor de reportes del hub Contadora (`/erp/contabilidad/reportes`).
@@ -257,6 +263,29 @@ const isoDay = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
+/** Traduce enums crudos a la misma etiqueta en español que ya usa la UI. */
+function etiquetaDe(valor: string | null | undefined, mapa: Record<string, string>): string {
+  if (valor == null || String(valor).trim() === '') return '';
+  const clave = String(valor);
+  return mapa[clave] ?? mapa[clave.toUpperCase()] ?? clave;
+}
+
+function etiquetaCategoriaGasto(valor: string | null | undefined): string {
+  if (valor == null || String(valor).trim() === '') return 'Sin categoría';
+  return etiquetaDe(valor, ETIQUETA_CATEGORIA_VIATICO) || 'Sin categoría';
+}
+
+function etiquetaEstatusGasto(valor: string | null | undefined): string {
+  if (valor == null || String(valor).trim() === '') return '—';
+  return (
+    ETIQUETA_ESTATUS_VIATICO[valor] ??
+    ETIQUETA_PAGO[valor] ??
+    ETIQUETA_ESTATUS_VIATICO[String(valor).toUpperCase()] ??
+    ETIQUETA_PAGO[String(valor).toUpperCase()] ??
+    String(valor)
+  );
+}
+
 @Injectable()
 export class AccountingWorkspaceReportsService {
   constructor(
@@ -307,7 +336,7 @@ export class AccountingWorkspaceReportsService {
         .map((c) => c.categoria)
         .filter((c): c is string => typeof c === 'string' && c.trim() !== '')
         .sort((a, b) => a.localeCompare(b, 'es'))
-        .map((c) => ({ valor: c, etiqueta: c })),
+        .map((c) => ({ valor: c, etiqueta: etiquetaCategoriaGasto(c) })),
       projectId: proyectos.map((p) => ({ valor: String(p.id), etiqueta: p.title })),
     };
 
@@ -492,7 +521,7 @@ export class AccountingWorkspaceReportsService {
       clave: `cuenta:${r.code}`,
       codigo: r.code,
       nombre: r.name,
-      tipo: r.type,
+      tipo: etiquetaDe(r.type, ETIQUETA_TIPO_CUENTA) || r.type,
       debe: round2(r.debit),
       haber: round2(r.credit),
       saldo: round2(r.debit - r.credit),
@@ -676,7 +705,7 @@ export class AccountingWorkspaceReportsService {
     const filas: FilaReporte[] = rows
       .map((r) => ({
         clave: `categoria:${r.categoria ?? ''}`,
-        categoria: r.categoria || 'Sin categoría',
+        categoria: etiquetaCategoriaGasto(r.categoria),
         numero: r._count._all,
         importe: round2(num(r._sum.montoSolicitado)),
       }))
@@ -1095,9 +1124,9 @@ export class AccountingWorkspaceReportsService {
       clave: `gasto:${r.id}`,
       fecha: isoDay(new Date(r.fechaGasto ?? r.fechaSolicitud)),
       concepto: r.concepto || r.razonGasto || '—',
-      categoria: r.categoria || 'Sin categoría',
+      categoria: etiquetaCategoriaGasto(r.categoria),
       actividad: r.actividad ? `${r.actividad.anNumber} · ${r.actividad.titulo}` : '—',
-      estatus: r.estatusPago,
+      estatus: etiquetaEstatusGasto(r.estatusPago),
       importe: round2(num(r.montoSolicitado)),
     }));
 
@@ -1106,7 +1135,7 @@ export class AccountingWorkspaceReportsService {
       clave,
       etiqueta:
         sel.categoria !== null
-          ? sel.categoria || 'Sin categoría'
+          ? etiquetaCategoriaGasto(sel.categoria)
           : sel.projectId === 'sin'
             ? 'Sin proyecto'
             : `Proyecto #${sel.projectId}`,
