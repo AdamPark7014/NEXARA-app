@@ -199,6 +199,28 @@ describe('lista de verificación', () => {
   });
 });
 
+// ── (a2) Copy de protección alineado con closed-period writes ────────
+
+describe('proteccion del cierre', () => {
+  it('tras blindar escrituras (closed-period writes), noBloqueado queda vacío', async () => {
+    const { service } = build();
+    const lista = await service.getChecklist(3, EMPRESA);
+
+    // Las rutas de pago/factura/banco/conciliación ya las bloquea
+    // assertDateNotInClosedPeriod; la lista no debe seguir diciendo que no.
+    expect(lista.proteccion.noBloqueado).toEqual([]);
+    expect(lista.proteccion.bloqueado).toEqual(
+      expect.arrayContaining([
+        'Registrar el pago de una factura con fecha dentro del periodo',
+        'Conciliar movimientos bancarios del periodo',
+        'Cancelar ante el SAT una factura timbrada del periodo',
+        'Importar movimientos bancarios con fecha del periodo',
+        'Emitir, editar o eliminar un borrador de factura con fecha del periodo',
+      ]),
+    );
+  });
+});
+
 // ── (b) El cierre se rechaza con bloqueantes; pasa con justificación ─
 
 describe('cierre del periodo', () => {
