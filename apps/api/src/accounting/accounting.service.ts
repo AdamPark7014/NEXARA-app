@@ -1234,8 +1234,8 @@ export class AccountingService {
       });
     }
 
-    if (invoice.matchStatus === 'WAIVED') {
-      return this.getInvoice(invoiceId);
+    if (invoice!.matchStatus === 'WAIVED') {
+      return this.getInvoice(invoiceId, companyId);
     }
 
     const PRICE_TOL = 0.02;
