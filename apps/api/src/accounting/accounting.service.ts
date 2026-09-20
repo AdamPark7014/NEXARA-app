@@ -1666,6 +1666,7 @@ export class AccountingService {
     }>;
   }, userId: number) {
     const companyId = await this.resolveCompanyId(dto.companyId);
+    await this.assertDateNotInClosedPeriod(new Date(dto.issueDate), companyId);
     // `clientId` y `supplierId` llegan del cuerpo de la petición y se escribían
     // sin mirar de quién eran: una factura de esta empresa podía apuntar al
     // cliente de otra.
@@ -2105,6 +2106,10 @@ export class AccountingService {
       include: { items: true },
     });
     assertCompanyAccess(invoice, companyId, 'Factura');
+    await this.assertDateNotInClosedPeriod(
+      dto.issueDate ? new Date(dto.issueDate) : invoice.issueDate,
+      companyId,
+    );
     if (invoice.status !== 'DRAFT' || invoice.cfdiUuid) {
       throw new BadRequestException('Solo borradores sin timbrar pueden editarse');
     }
@@ -2278,6 +2283,7 @@ export class AccountingService {
     });
 
     assertCompanyAccess(invoice, companyId, 'Factura');
+    await this.assertDateNotInClosedPeriod(invoice.issueDate, companyId);
     if (invoice.deletedAt) {
       throw new NotFoundException('Factura no encontrada');
     }
@@ -2316,6 +2322,7 @@ export class AccountingService {
     stampComplement?: boolean;
   }, userId: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
+    await this.assertDateNotInClosedPeriod(new Date(dto.paymentDate), tenantId);
 
     if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
       throw new BadRequestException('El monto del pago debe ser mayor a cero');
@@ -2623,6 +2630,9 @@ export class AccountingService {
     });
     assertCompanyAccess(account, tenantId, 'Cuenta bancaria');
     const accountCompanyId = requireCompanyId(account.companyId);
+    for (const t of transactions) {
+      await this.assertDateNotInClosedPeriod(new Date(t.transactionDate), tenantId);
+    }
     return this.prisma.bankTransaction.createMany({
       data: transactions.map((t) => ({
         bankAccountId,
@@ -2688,6 +2698,7 @@ export class AccountingService {
     if (!tx) throw new NotFoundException('Transacción no encontrada');
     assertCompanyAccess(tx, tenantId, 'Transacción bancaria');
     assertCompanyAccess(tx.bankAccount, tenantId, 'Cuenta bancaria');
+    await this.assertDateNotInClosedPeriod(tx.transactionDate, tenantId);
     if (tx.reconciliation) {
       throw new BadRequestException('Esta transacción ya está conciliada');
     }
@@ -2805,6 +2816,8 @@ export class AccountingService {
       where: { id, ...companyWhere(companyId ?? null) },
     });
     assertCompanyAccess(invoice, companyId, 'Factura');
+    await this.assertDateNotInClosedPeriod(invoice.issueDate, companyId);
+    await this.assertDateNotInClosedPeriod(new Date(), companyId);
     if (invoice.isCancelled) throw new BadRequestException('La factura ya está cancelada');
     if (!invoice.cfdiUuid) throw new BadRequestException('La factura no tiene UUID CFDI para cancelar');
     if (!invoice.emisorRfc) throw new BadRequestException('La factura no tiene RFC del emisor');
