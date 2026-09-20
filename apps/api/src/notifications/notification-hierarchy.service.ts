@@ -1658,7 +1658,7 @@ export class NotificationHierarchyService {
           message: `${requesterName} solicitó: "${toolName}"`,
           relatedEntityId: toolRequestId,
           entityType: 'ToolRequest',
-          relatedUrl: appUrls.opsTools(toolRequestId, 'requests'),
+          relatedUrl: appUrls.erpHerramientas(toolRequestId, 'requests'),
           priority: 'high',
         });
       }
@@ -1689,7 +1689,7 @@ export class NotificationHierarchyService {
         message,
         relatedEntityId: toolRequestId,
         entityType: 'ToolRequest',
-        relatedUrl: appUrls.opsTools(toolRequestId, 'requests'),
+        relatedUrl: appUrls.erpHerramientas(toolRequestId, 'requests'),
         priority: status === 'rejected' ? 'high' : 'normal',
       });
     } catch (error) {
@@ -1804,7 +1804,7 @@ export class NotificationHierarchyService {
           message: `${requesterName} solicitó renovar: "${toolName}"`,
           relatedEntityId: renewalId,
           entityType: 'ToolRenewal',
-          relatedUrl: appUrls.opsTools(renewalId, 'renewals'),
+          relatedUrl: appUrls.erpHerramientas(renewalId, 'renewals'),
           priority: 'high',
         });
       }
@@ -1837,7 +1837,7 @@ export class NotificationHierarchyService {
         message,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
-        relatedUrl: `/ops/my-vehicles?highlight=${vehicleRequestId}`,
+        relatedUrl: appUrls.erpMisVehiculos(vehicleRequestId),
         priority: 'high',
       });
 
@@ -1851,7 +1851,7 @@ export class NotificationHierarchyService {
           message,
           relatedEntityId: vehicleRequestId,
           entityType: 'VehicleControl',
-          relatedUrl: appUrls.opsVehicles(vehicleRequestId, 'requests'),
+          relatedUrl: appUrls.erpVehiculos(vehicleRequestId, 'requests'),
           priority: 'high',
         });
       }
@@ -1881,7 +1881,7 @@ export class NotificationHierarchyService {
           message: `${requesterName} solicitó: "${vehicleName}"`,
           relatedEntityId: vehicleRequestId,
           entityType: 'VehicleControl',
-          relatedUrl: appUrls.opsVehicles(vehicleRequestId, 'requests'),
+          relatedUrl: appUrls.erpVehiculos(vehicleRequestId, 'requests'),
           priority: 'high',
         });
       }
@@ -1907,7 +1907,7 @@ export class NotificationHierarchyService {
         message: `Tu solicitud para "${vehicleName}" ha sido aprobada`,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
-        relatedUrl: appUrls.opsVehicles(vehicleRequestId, 'requests'),
+        relatedUrl: appUrls.erpVehiculos(vehicleRequestId, 'requests'),
         priority: 'high',
       });
     } catch (error) {
@@ -1932,7 +1932,7 @@ export class NotificationHierarchyService {
         message: `Tu solicitud para "${vehicleName}" ha sido rechazada`,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
-        relatedUrl: appUrls.opsVehicles(vehicleRequestId, 'requests'),
+        relatedUrl: appUrls.erpVehiculos(vehicleRequestId, 'requests'),
         priority: 'high',
       });
     } catch (error) {
@@ -2462,7 +2462,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: movementId,
           entityType: 'StockMovement',
-          relatedUrl: `/erp/warehouse?movementId=${movementId}`,
+          relatedUrl: appUrls.erpAlmacen({ movementId }),
         });
       }
       await this.notificationsService.createNotification({
@@ -2473,7 +2473,7 @@ export class NotificationHierarchyService {
         message: `${movementNumber} guardado.`,
         relatedEntityId: movementId,
         entityType: 'StockMovement',
-        relatedUrl: `/erp/warehouse?movementId=${movementId}`,
+        relatedUrl: appUrls.erpAlmacen({ movementId }),
       });
     } catch (error) {
       this.logger.error('notifyStockMovementPosted', error);

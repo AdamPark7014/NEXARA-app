@@ -1,9 +1,10 @@
 # RELEVO
 
 - **Último turno:** claude-code
-- **Fecha:** 2026-09-18
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** e6f885ff (+ este commit de relevo) — desplegado en Hetzner (prueba) hasta e6f885ff
+- **Fecha:** 2026-09-19
+- **Rama:** `feat/ws0-base-modulos` (base de los cuatro frentes, desde `mejora/calidad-y-web` en `56d51e40`)
+- **HEAD:** este commit — **sin desplegar**; Hetzner (prueba) sigue en e6f885ff
+- **Migración nueva sin aplicar:** `20260918150000_modulos_ws0`
 
 ## Puente — no cambiar
 
@@ -64,6 +65,31 @@ Requisitos de Adam: tabla «Tareas/Dashboard» (evidencia, aceptación, periodo,
   `actualStartDate`; borrar documento no borra el archivo.
 - El flujo de evidencia del navegador no sabe de campos (solo apps). iOS: cambios de hoy sin compilar.
 - Revisión visual en web pendiente: Adam debe iniciar sesión él (no se escriben contraseñas).
+
+## Este turno (claude-code, 18-09) — base WS0: módulos de Core para los cuatro frentes
+
+Rama `feat/ws0-base-modulos` (desde `mejora/calidad-y-web` en `56d51e40`). Es **la base compartida**
+de los cuatro frentes (A asistencia/nómina, B actividades/organigrama/checklist, C almacén y
+herramientas, D vehículos): solo registro de módulos y esquema; las pantallas las llenan ellos.
+
+- **Core** gana cuatro módulos en `/erp`: `erp-almacen` (`/erp/almacen`, monta el inventario de
+  `/erp/warehouse`), `erp-herramientas` (`/erp/almacen/herramientas`, monta `/ops/tools`),
+  `erp-vehiculos` (`/erp/vehiculos`, `/erp/vehiculos/:id`, `/erp/vehiculos/mis-vehiculos`, y
+  `/erp/vehiculos/gps` como «Próximamente» solo para Dirección General) y `erp-organigrama`
+  (`/erp/organigrama`, lectura para todo el personal; editar sigue siendo de RH y dirección).
+- Las rutas viejas (`/ops/vehicles*`, `/ops/my-vehicles`, `/ops/tools*`, `/erp/warehouse`,
+  `/erp/hr/orgchart`) redirigen a las nuevas conservando id y query, y los avisos del API ya salen
+  con las rutas de Core (`app-urls.ts`).
+- Permisos: todo el personal interno pide herramienta y vehículo (`TOOLS_REQUEST`/`VEHICLES_REQUEST`);
+  aprobar sigue igual. Almacén: operan almacén y administración, consultan dirección y coordinadores.
+- Apps: entrada **«Más»** (Android e iOS) con los módulos de Core que el rol tiene según
+  `/me/navigation`; cada uno abre «Disponible pronto en la app — ábrelo en la web».
+- Migración **aditiva** `20260918150000_modulos_ws0` (NO aplicada en ningún servidor): origen de la
+  checada e intentos rechazados, `mockLocation` en GPS, herramienta ligada a la OT con código de
+  recogida, parámetros de reabastecimiento y empaques, checklist de herramienta de la OT,
+  inspecciones de kit, posiciones y fotos de tablero de vehículos, y aprobación de horas extra.
+- Verde: `tsc` web y API, 810 vitest, jest de rbac/navegación/tenant, Android compila y pasa
+  `CoreMenu` / `DeepLinkParser` / `AppUrlsParity`. iOS **sin compilar** (no hay Mac aquí).
 
 ### No tocar
 

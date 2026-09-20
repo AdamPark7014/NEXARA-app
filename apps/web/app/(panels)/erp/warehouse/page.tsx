@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -12,6 +12,7 @@ import PanelTabs from "@/components/ui/PanelTabs";
 import ContextRail from "@/components/ui/ContextRail";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
+import { ALMACEN_PATH, HERRAMIENTAS_PATH } from "@/lib/recursos-core";
 import {
   listStockLevels,
   mapStockLevelToRow,
@@ -84,6 +85,10 @@ export default function WarehousePage() {
   const cfg = useMemo(() => getErpInventorySectionConfig(user, "warehouse"), [user]);
   const token = user?.token ?? "";
   const searchParams = useSearchParams();
+  // Montada en Core (`/erp/almacen`) o en su ruta vieja (`/erp/warehouse`): los enlaces siguen a la página.
+  const pathname = usePathname() ?? "";
+  const enCore = pathname === ALMACEN_PATH || pathname.startsWith(`${ALMACEN_PATH}/`);
+  const almacenBase = enCore ? ALMACEN_PATH : "/erp/warehouse";
   const productFilter = searchParams.get("productId");
   const movementId = searchParams.get("movementId");
 
@@ -888,11 +893,19 @@ export default function WarehousePage() {
 
       <ContextRail
         ariaLabel="Catálogos de inventario"
-        items={[
-          { id: "stock", label: "Stock de productos", active: true },
-          { id: "catalog", label: "Catálogo CRM", href: "/crm/products" },
-          { id: "tools", label: "Herramientas OPS", href: "/ops/tools?tab=inventory" },
-        ]}
+        items={
+          enCore
+            ? [
+                // En Core no hay CRM: el catálogo se consulta desde Cotizaciones.
+                { id: "stock", label: "Stock de productos", active: true },
+                { id: "tools", label: "Herramientas", href: `${HERRAMIENTAS_PATH}?tab=inventory` },
+              ]
+            : [
+                { id: "stock", label: "Stock de productos", active: true },
+                { id: "catalog", label: "Catálogo CRM", href: "/crm/products" },
+                { id: "tools", label: "Herramientas OPS", href: "/ops/tools?tab=inventory" },
+              ]
+        }
       />
 
       <PanelTabs
@@ -1245,7 +1258,7 @@ export default function WarehousePage() {
         {productFilter && (
           <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
             Filtrando producto <strong>#{productFilter}</strong>.{" "}
-            <Link href="/erp/warehouse" style={{ color: "var(--primary)" }}>Ver todo el inventario</Link>
+            <Link href={almacenBase} style={{ color: "var(--primary)" }}>Ver todo el inventario</Link>
           </p>
         )}
         {movementId && (
@@ -1363,7 +1376,7 @@ export default function WarehousePage() {
           {movementId && (
             <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
               Resaltando movimiento <strong>#{movementId}</strong>.{" "}
-              <Link href="/erp/warehouse?tab=movimientos" style={{ color: "var(--primary)" }}>Quitar filtro</Link>
+              <Link href={`${almacenBase}?tab=movimientos`} style={{ color: "var(--primary)" }}>Quitar filtro</Link>
             </p>
           )}
           {movementsLoading ? (

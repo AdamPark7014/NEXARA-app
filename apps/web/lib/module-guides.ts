@@ -511,6 +511,53 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `erp-clients, erp-cotizaciones, pizarra`,
   },
+  'erp-almacen': {
+    id: 'erp-almacen',
+    summary: `Almacén de Core: existencias por almacén, entradas y salidas, lotes, valuación y conteos.`,
+    audience: `Almacén y administración (operan); dirección y coordinadores de campo (consultan).`,
+    how: `Es el mismo inventario que antes vivía en /erp/warehouse, ahora dentro de Core. Quién puede registrar movimientos lo decide el rol; los coordinadores lo usan para revisar si hay material antes de programar la OT.`,
+    steps: [
+      `Abre Almacén y revisa existencias por producto`,
+      `Registra entradas y salidas con su referencia`,
+      `Revisa los productos bajo mínimo antes de pedir compra`,
+    ],
+    connects: `erp-herramientas, procurement, pizarra`,
+  },
+  'erp-herramientas': {
+    id: 'erp-herramientas',
+    summary: `Herramientas: pide una herramienta, revisa tu kit y el estado de tus préstamos.`,
+    audience: `Todo el personal pide; almacén y coordinadores aprueban, entregan y reciben.`,
+    how: `La solicitud la aprueba quien administra herramientas; al entregarla queda a tu nombre hasta que la devuelves. Los kits por persona y las renovaciones se ven en la misma página.`,
+    steps: [
+      `Pide la herramienta con el motivo y las fechas`,
+      `Recógela en almacén cuando la aprueben`,
+      `Devuélvela o pide renovación antes de la fecha`,
+    ],
+    connects: `erp-almacen, pizarra`,
+  },
+  'erp-vehiculos': {
+    id: 'erp-vehiculos',
+    summary: `Vehículos: pide un vehículo, entrégalo y recíbelo con fotos, kilometraje y tanque.`,
+    audience: `Todo el personal pide; administración y coordinadores autorizan y llevan la flotilla.`,
+    how: `Quien gestiona la flotilla ve el inventario y las solicitudes por autorizar; los demás ven sus vehículos. El GPS de las unidades es solo para Dirección General.`,
+    steps: [
+      `Pide el vehículo para tu actividad`,
+      `Al recogerlo, toma las fotos de salida`,
+      `Al devolverlo, fotos, kilometraje y nivel de tanque`,
+    ],
+    connects: `pizarra, erp-almacen`,
+  },
+  'erp-organigrama': {
+    id: 'erp-organigrama',
+    summary: `Organigrama: quién reporta a quién en NEXARA.`,
+    audience: `Todo el personal (lectura). RH y dirección cambian jefes.`,
+    how: `Se arma con el jefe directo de cada persona. De ahí salen también quién aprueba tus actividades, tu comida y tus solicitudes.`,
+    steps: [
+      `Busca a la persona en el árbol`,
+      `Si su jefe está mal, avisa a RH`,
+    ],
+    connects: `asistencias, pizarra`,
+  },
   'crm-dashboard': {
     id: 'crm-dashboard',
     summary: `Home comercial: pipeline, actividad del equipo e insights (LTV, forecast).`,

@@ -338,6 +338,15 @@ export function shouldShowModuleInSidebar(
       return HR_ONLY.has(v2) || HR_MANAGERS.has(v2) || EXECUTIVE.has(v2);
     case 'warehouse':
       return WAREHOUSE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO;
+    // Core · Recursos. El Almacén lo operan almacén y administración; los coordinadores de
+    // campo (OPS_MANAGERS) lo consultan para planear la OT.
+    case 'erp-almacen':
+      return WAREHOUSE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO || OPS_MANAGERS.has(v2);
+    // Todo el personal pide herramienta y vehículo, y ve el organigrama.
+    case 'erp-herramientas':
+    case 'erp-vehiculos':
+    case 'erp-organigrama':
+      return v2 !== ROLES.CLIENTE;
     case 'procurement':
       return WAREHOUSE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO;
     // CRM — gerente vs vendedor vs diseño

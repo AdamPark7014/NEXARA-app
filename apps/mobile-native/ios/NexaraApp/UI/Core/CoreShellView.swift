@@ -6,6 +6,10 @@ private enum CoreShellOverlay: Identifiable {
     case activity(id: Int, tab: String?)
     case person(userId: Int)
     case comidas
+    /// Hub «Más»: los módulos de Core que no son pestaña.
+    case more
+    /// Un módulo del hub directo (deep link o push).
+    case extra(CoreExtraModule)
 
     var id: String {
         switch self {
@@ -13,6 +17,8 @@ private enum CoreShellOverlay: Identifiable {
         case .activity(let id, let tab): return "activity-\(id)-\(tab ?? "")"
         case .person(let userId): return "person-\(userId)"
         case .comidas: return "comidas"
+        case .more: return "more"
+        case .extra(let module): return "extra-\(module.rawValue)"
         }
     }
 }
@@ -34,6 +40,8 @@ struct CoreShellView: View {
     @State private var clientesNonce = 0
 
     private var modules: [CoreModule] { CoreNavigation.modules(for: session.currentUser) }
+    /// Módulos del hub «Más» (ver `CoreNavigation.extraModules`).
+    private var extraModules: [CoreExtraModule] { CoreNavigation.extraModules(for: session.currentUser) }
     private var myId: Int? { session.currentUser.flatMap { Int($0.id) } }
 
     var body: some View {
@@ -68,11 +76,17 @@ struct CoreShellView: View {
                 .id(chatNonce)
         case .actividades:
             NavigationStack {
-                ActividadesHomeView().toolbar { bellItem }
+                ActividadesHomeView().toolbar {
+                    bellItem
+                    moreItem
+                }
             }
         case .asistencias:
             NavigationStack {
-                AttendanceView().toolbar { bellItem }
+                AttendanceView().toolbar {
+                    bellItem
+                    moreItem
+                }
             }
         case .clientes:
             NavigationStack {
@@ -80,12 +94,30 @@ struct CoreShellView: View {
                     initialClientId: clientesLinkId,
                     initialSectorSlug: clientesSectorSlug
                 )
-                .toolbar { bellItem }
+                .toolbar {
+                    bellItem
+                    moreItem
+                }
                 .id(clientesNonce)
             }
         case .perfil:
             NavigationStack {
-                MyProfileView().toolbar { bellItem }
+                MyProfileView().toolbar {
+                    bellItem
+                    moreItem
+                }
+            }
+        }
+    }
+
+    /// «Más»: Cotizaciones, Almacén, Vehículos… Solo si el rol ve alguno.
+    private var moreItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            if !extraModules.isEmpty {
+                Button { present(.more) } label: {
+                    Label("Más", systemImage: "square.grid.2x2")
+                }
+                .accessibilityLabel("Más módulos")
             }
         }
     }
@@ -131,6 +163,14 @@ struct CoreShellView: View {
             NavigationStack {
                 ComidasView().toolbar { closeItem }
             }
+        case .more:
+            NavigationStack {
+                CoreMoreHubView(modules: extraModules).toolbar { closeItem }
+            }
+        case .extra(let module):
+            NavigationStack {
+                CoreModulePlaceholderView(module: module).toolbar { closeItem }
+            }
         }
     }
 
@@ -175,6 +215,16 @@ struct CoreShellView: View {
     }
 
     private func open(_ link: CoreLink) {
+        // Módulo del hub «Más»: se abre encima de la pestaña actual; si su rol
+        // no lo ve, a casa (misma regla que abajo).
+        if let extra = link.extra {
+            if extraModules.contains(extra) {
+                present(.extra(extra))
+            } else {
+                selected = .actividades
+            }
+            return
+        }
         // Módulo que su rol no ve: a casa, como `coreSurfaceRedirect`.
         guard modules.contains(link.module) else {
             selected = .actividades
