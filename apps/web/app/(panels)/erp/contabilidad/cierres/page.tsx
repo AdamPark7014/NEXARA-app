@@ -6,7 +6,6 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
 import MetricStrip from "@/components/ui/MetricStrip";
@@ -16,6 +15,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
+import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 
 type Period = {
   id: number;
@@ -297,9 +297,12 @@ export default function CierresPage() {
             {token ? "Cargando periodos…" : "Esperando la sesión para pedir los periodos…"}
           </p>
         ) : rows.length === 0 ? (
-          <EmptyState
-            title="Sin periodos"
-            description="Crea un periodo fiscal desde Contabilidad general."
+          /* Sin configurar: no falta movimiento, falta el periodo en sí. */
+          <VacioConPrimerPaso
+            variant="default"
+            title="Todavía no hay periodos fiscales"
+            description="Un periodo fiscal es el mes o el ejercicio que se cuadra y se cierra; sin ninguno no hay nada que verificar ni que bloquear. Créalo en Contabilidad general y vuelve aquí a revisarlo."
+            destino={DESTINOS.periodoFiscal}
           />
         ) : (
           <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} density="compact" ariaLabel="Periodos de cierre" />

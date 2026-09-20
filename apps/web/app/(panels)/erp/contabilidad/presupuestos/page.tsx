@@ -21,6 +21,7 @@ import {
   pedirJson,
   queryString,
 } from "@/components/erp/reportes-contabilidad";
+import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 
 type LineaComparativo = {
   clave: string;
@@ -271,11 +272,33 @@ export default function PresupuestosPage() {
         </p>
       ) : !data ? (
         error ? null : <EmptyState title="Sin datos" description="Ajusta el periodo y vuelve a intentar." />
-      ) : data.lineas.length === 0 ? (
-        <EmptyState
-          title="Sin presupuestos en este periodo"
-          description="No hay presupuestos que caigan dentro del rango elegido. Créalos desde Contabilidad general o amplía el periodo."
+      ) : data.centros.length === 0 ? (
+        /* Sin configurar: no es que falte el presupuesto, falta contra qué
+           medirlo. `centros` son TODOS los centros de costo de la empresa, no
+           los del rango, así que vacío aquí significa vacío de verdad. */
+        <VacioConPrimerPaso
+          title="Todavía no hay centros de costo"
+          description="Un presupuesto se mide contra un centro de costo y no hay ninguno dado de alta. Créalo en Contabilidad general, pestaña Presupuestos, y luego captura el presupuesto del año."
+          destino={DESTINOS.presupuesto}
         />
+      ) : data.lineas.length === 0 ? (
+        centroId ? (
+          <EmptyState
+            title="Ningún presupuesto en este filtro"
+            description="El centro de costo elegido no tiene presupuesto dentro del rango. Quítale el filtro o amplía el periodo."
+            action={
+              <Button size="sm" variant="secondary" onClick={() => setCentroId("")}>
+                Ver todos los centros
+              </Button>
+            }
+          />
+        ) : (
+          <VacioConPrimerPaso
+            title="Sin presupuestos en este periodo"
+            description={`Los centros de costo ya existen, pero ninguno tiene presupuesto entre el ${data.periodo.from} y el ${data.periodo.to}. Captura el del año y aquí verás, mes a mes, cuánto llevas gastado contra lo planeado.`}
+            destino={DESTINOS.presupuesto}
+          />
+        )
       ) : (
         <>
           {/* El periodo que el API dice haber comparado: cuando acota el rango
