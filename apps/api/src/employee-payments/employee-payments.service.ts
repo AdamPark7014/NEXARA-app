@@ -401,6 +401,9 @@ export class EmployeePaymentsService {
         date: existing.paidAt || existing.periodTo,
         description: `Pago a empleado #${id}: ${existing.concepto || existing.note || 'Pago'}`,
         userId: actorId,
+        // Sin la empresa, la póliza automática fallaba con 403 al contabilizarse
+        // y "marcar pagado" reventaba entero.
+        companyId: tenantId,
       });
       journalEntryId = entry.id;
       contabilidadRef = entry.entryNumber;

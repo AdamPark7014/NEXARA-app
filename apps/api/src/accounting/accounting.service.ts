@@ -798,7 +798,13 @@ export class AccountingService {
     userId: number,
     companyId?: number | null,
   ) {
-    const existing = await this.prisma.journalEntry.findFirst({ where: { reference } });
+    // `reference` es único POR EMPRESA (@@unique([companyId, reference])): buscarlo
+    // sin filtro de empresa devolvía la póliza de otra empresa cuando dos usan el
+    // mismo consecutivo (EXP-PAY-5 existe legítimamente en ambas).
+    const tenantId = await this.resolveCompanyId(companyId);
+    const existing = await this.prisma.journalEntry.findFirst({
+      where: { reference, ...companyWhere(tenantId) },
+    });
     if (existing) return existing;
 
     try {
@@ -807,7 +813,7 @@ export class AccountingService {
           date,
           description,
           reference,
-          companyId,
+          companyId: tenantId,
           lines: lines.map((line) => ({
             debitAccountId: line.debitAccountId,
             creditAccountId: line.creditAccountId,
@@ -819,11 +825,16 @@ export class AccountingService {
         userId,
       );
 
-      return this.postJournalEntry(entry.id, userId);
+      // Sin `tenantId`, postJournalEntry hacía requireCompanyId(undefined) y lanzaba
+      // 403 SIEMPRE: toda póliza automática nacía en DRAFT y nunca se contabilizaba,
+      // y "marcar pagado" reventaba para gastos, viáticos y pagos a empleados.
+      return this.postJournalEntry(entry.id, userId, tenantId);
     } catch (err) {
       // Carrera: otro request creó el mismo reference (unique)
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        const raced = await this.prisma.journalEntry.findFirst({ where: { reference } });
+        const raced = await this.prisma.journalEntry.findFirst({
+          where: { reference, ...companyWhere(tenantId) },
+        });
         if (raced) return raced;
       }
       throw err;
@@ -841,6 +852,7 @@ export class AccountingService {
     date?: Date | string | null;
     description: string;
     userId: number;
+    companyId?: number | null;
   }) {
     const amount = Number(input.amount);
     if (!amount || amount <= 0) {
@@ -854,8 +866,8 @@ export class AccountingService {
     const reference = `${prefix}-${input.entityId}`;
 
     const [expenseAccount, bank] = await Promise.all([
-      this.getAccountByCode(expenseAccountCode),
-      this.getAccountByCode('102.01'),
+      this.getAccountByCode(expenseAccountCode, input.companyId),
+      this.getAccountByCode('102.01', input.companyId),
     ]);
 
     const rawDate = input.date ? new Date(input.date) : new Date();
@@ -884,6 +896,7 @@ export class AccountingService {
         },
       ],
       input.userId,
+      input.companyId,
     );
 
     return entry;
@@ -899,14 +912,15 @@ export class AccountingService {
     date?: Date | string | null;
     description: string;
     userId: number;
+    companyId?: number | null;
   }) {
     const amount = Number(input.amount);
     if (!amount || amount <= 0) return null;
 
     const reference = `SM-COGS-${input.stockMovementId}`;
     const [cogs, inventory] = await Promise.all([
-      this.getAccountByCode('501.01'),
-      this.getAccountByCode('115.01'),
+      this.getAccountByCode('501.01', input.companyId),
+      this.getAccountByCode('115.01', input.companyId),
     ]);
 
     const rawDate = input.date ? new Date(input.date) : new Date();
@@ -935,6 +949,7 @@ export class AccountingService {
         },
       ],
       input.userId,
+      input.companyId,
     );
   }
 
@@ -948,9 +963,8 @@ export class AccountingService {
     companyId?: number | null;
   }) {
     const reference = `GR-ACCRUAL-${input.goodsReceiptId}`;
-    const existing = await this.prisma.journalEntry.findFirst({ where: { reference } });
-    if (existing) return existing;
-
+    // La búsqueda por `reference` se hace DESPUÉS de resolver la empresa: sin ese
+    // filtro devolvía la póliza de otra empresa con el mismo consecutivo.
     const receipt = await this.prisma.goodsReceipt.findFirst({
       where: {
         id: input.goodsReceiptId,
@@ -972,6 +986,11 @@ export class AccountingService {
     if (!receipt) throw new BadRequestException('Recepción no encontrada');
     const tenantId = requireCompanyId(input.companyId ?? receipt.companyId);
     assertCompanyAccess(receipt, tenantId, 'Recepción');
+
+    const existing = await this.prisma.journalEntry.findFirst({
+      where: { reference, ...companyWhere(tenantId) },
+    });
+    if (existing) return existing;
 
     let inventoryBase = 0;
     let expenseBase = 0;
@@ -1008,10 +1027,10 @@ export class AccountingService {
     }
 
     const [inventory, expense, taxAccount, payable] = await Promise.all([
-      this.getAccountByCode('115.01'),
-      this.getAccountByCode('601.01'),
-      this.getAccountByCode('209.01'),
-      this.getAccountByCode('201.01'),
+      this.getAccountByCode('115.01', tenantId),
+      this.getAccountByCode('601.01', tenantId),
+      this.getAccountByCode('209.01', tenantId),
+      this.getAccountByCode('201.01', tenantId),
     ]);
 
     const date = new Date(receipt.receiptDate).toISOString().slice(0, 10);
@@ -1315,6 +1334,7 @@ export class AccountingService {
       issueDate: Date;
     },
     userId: number,
+    companyId?: number | null,
   ) {
     if (invoice.type !== 'ACCOUNTS_RECEIVABLE') return null;
 
@@ -1324,9 +1344,9 @@ export class AccountingService {
     if (total <= 0) return null;
 
     const [cxc, revenue, iva] = await Promise.all([
-      this.getAccountByCode('105.01'),
-      this.getAccountByCode('401.01'),
-      this.getAccountByCode('208.01'),
+      this.getAccountByCode('105.01', companyId),
+      this.getAccountByCode('401.01', companyId),
+      this.getAccountByCode('208.01', companyId),
     ]);
 
     const date = new Date(invoice.issueDate).toISOString().slice(0, 10);
@@ -1342,6 +1362,7 @@ export class AccountingService {
         { debitAccountId: iva.id, creditAccountId: cxc.id, debit: 0, credit: tax, label: 'IVA trasladado' },
       ],
       userId,
+      companyId,
     );
   }
 
@@ -1349,6 +1370,7 @@ export class AccountingService {
     payment: { id: number; amount: Prisma.Decimal | number; paymentDate: Date },
     invoice: { id: number; invoiceNumber: string; type: string },
     userId: number,
+    companyId?: number | null,
   ) {
     const amount = Number(payment.amount);
     if (amount <= 0) return null;
@@ -1359,8 +1381,8 @@ export class AccountingService {
     // Cobro cliente: Debe bancos · Haber CXC
     if (invoice.type === 'ACCOUNTS_RECEIVABLE') {
       const [bank, cxc] = await Promise.all([
-        this.getAccountByCode('102.01'),
-        this.getAccountByCode('105.01'),
+        this.getAccountByCode('102.01', companyId),
+        this.getAccountByCode('105.01', companyId),
       ]);
       return this.createAndPostAutoJournal(
         ref,
@@ -1371,14 +1393,15 @@ export class AccountingService {
           { debitAccountId: cxc.id, creditAccountId: bank.id, debit: 0, credit: amount, label: 'Aplicación CXC' },
         ],
         userId,
+        companyId,
       );
     }
 
     // Pago proveedor: Debe CXP · Haber bancos
     if (invoice.type === 'ACCOUNTS_PAYABLE') {
       const [bank, cxp] = await Promise.all([
-        this.getAccountByCode('102.01'),
-        this.getAccountByCode('201.01'),
+        this.getAccountByCode('102.01', companyId),
+        this.getAccountByCode('201.01', companyId),
       ]);
       return this.createAndPostAutoJournal(
         ref,
@@ -1389,6 +1412,7 @@ export class AccountingService {
           { debitAccountId: bank.id, creditAccountId: cxp.id, debit: 0, credit: amount, label: 'Salida bancaria' },
         ],
         userId,
+        companyId,
       );
     }
 
@@ -1990,7 +2014,7 @@ export class AccountingService {
     // queda una factura timbrada sin asiento contable y los libros no cuadran
     // sin que nadie lo sepa. Se registra con los datos necesarios para
     // regenerarla a mano.
-    void this.autoJournalForStampedInvoice(updated, userId).catch((error) => {
+    void this.autoJournalForStampedInvoice(updated, userId, updated.companyId).catch((error) => {
       this.logger.error(
         `Factura timbrada SIN póliza contable — requiere asiento manual. ` +
           `facturaId=${updated.id} folio=${updated.invoiceNumber} uuid=${updated.cfdiUuid ?? 'n/d'} ` +
@@ -2439,7 +2463,7 @@ export class AccountingService {
 
     let journalEntryId: number | null = null;
     try {
-      const journal = await this.autoJournalForPayment(payment, invoice, userId);
+      const journal = await this.autoJournalForPayment(payment, invoice, userId, invoice.companyId);
       journalEntryId = journal?.id ?? null;
     } catch (error) {
       // El pago ya está guardado, así que fallar aquí no puede tumbar la
