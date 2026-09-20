@@ -16,6 +16,7 @@
 
 import type { PanelId } from '@/lib/access-matrix';
 import { PANEL_META } from '@/lib/access-matrix';
+import { CORE_SURFACE_ONLY, coreSurfaceRedirect } from '@/lib/core-surface';
 
 export const HANDOFF_PARAM = '_nxt';
 
@@ -233,10 +234,17 @@ export function buildCrossPanelUrl(
 ): string {
   const panelId = resolvePanelId(panelIdOrSubdomain);
   const targetSub = resolveCanonicalSubdomain(panelId);
-  const internalPath = normalizeInternalPanelPath(panelId, entryPath);
+  let internalPath = normalizeInternalPanelPath(panelId, entryPath);
+
+  // Core-only: sales/ops/studio ya no sirven paneles — redirigen a la pizarra.
+  // Remapeamos a /erp/... en el mismo host y nunca saltamos de subdominio.
+  if (CORE_SURFACE_ONLY) {
+    const remapped = coreSurfaceRedirect(internalPath);
+    if (remapped) internalPath = remapped;
+    return internalPath;
+  }
 
   if (typeof window === 'undefined') {
- 
     return internalPath;
   }
 

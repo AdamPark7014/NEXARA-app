@@ -107,6 +107,12 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     expect(coreSurfaceRedirect('/erp/warehouse')).toBe('/erp/almacen');
     expect(coreSurfaceRedirect('/erp/warehouse/stock')).toBe('/erp/almacen');
     expect(coreSurfaceRedirect('/erp/hr/orgchart')).toBe('/erp/organigrama');
+    // CRM ola1 en Core: sin mapa caía en la pizarra.
+    expect(coreSurfaceRedirect('/crm/quotes')).toBe('/erp/cotizaciones');
+    expect(coreSurfaceRedirect('/crm/quotes/17')).toBe('/erp/cotizaciones/17');
+    expect(coreSurfaceRedirect('/crm/clients')).toBe('/erp/clientes');
+    expect(coreSurfaceRedirect('/crm/clients/3')).toBe('/erp/clientes/3');
+    expect(coreSurfaceRedirect('/crm/projects/42')).toBe('/erp/proyectos/42');
     // Lo que ya vive en su ruta de Core no se toca, y el resto de /erp/hr tampoco.
     expect(coreSurfaceRedirect('/erp/almacen')).toBeNull();
     expect(coreSurfaceRedirect('/erp/vehiculos/mis-vehiculos')).toBeNull();

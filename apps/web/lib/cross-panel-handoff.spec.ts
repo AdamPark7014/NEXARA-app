@@ -89,4 +89,14 @@ describe("buildCrossPanelUrl dentro del mismo subdominio", () => {
       }
     });
   });
+
+  it("enlaces a CRM/OPS no saltan a sales/ops: remapean a /erp en core", () => {
+    enCore(() => {
+      expect(buildCrossPanelUrl("crm", "/crm/quotes", null)).toBe("/erp/cotizaciones");
+      expect(buildCrossPanelUrl("crm", "/crm/quotes/12", null)).toBe("/erp/cotizaciones/12");
+      expect(buildCrossPanelUrl("crm", "/crm/clients/3", null)).toBe("/erp/clientes/3");
+      expect(buildCrossPanelUrl("ops", "/ops/projects/9", null)).toBe("/erp/proyectos/9");
+      expect(buildCrossPanelUrl("ops", "/ops/tools", null)).toBe("/erp/almacen/herramientas");
+    });
+  });
 });

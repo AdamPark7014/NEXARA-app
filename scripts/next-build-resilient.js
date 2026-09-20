@@ -27,9 +27,16 @@ if (firstExitCode === 0) {
   process.exit(0);
 }
 
-// OOM (137) o fallos de type-check: reintentar sin bloquear el deploy.
-console.warn(
-  `[web-build] Attempt 1 failed (exit ${firstExitCode}). Retrying with NEXT_IGNORE_TYPE_ERRORS=1`,
+// Solo OOM: más heap, type-check sigue ON. Nunca silenciar errores de tipos.
+if (firstExitCode === 137) {
+  console.warn(
+    '[web-build] Attempt 1 OOM (137). Retrying with maxOldSpaceSize=3072; type-check stays enabled.',
+  );
+  process.exit(runBuild(3072, false));
+}
+
+console.error(
+  `[web-build] Attempt 1 failed (exit ${firstExitCode}). ` +
+    'No retry with NEXT_IGNORE_TYPE_ERRORS: el build debe fallar por tipos.',
 );
-const secondExitCode = runBuild(firstExitCode === 137 ? 1536 : 2304, true);
-process.exit(secondExitCode);
+process.exit(firstExitCode);
