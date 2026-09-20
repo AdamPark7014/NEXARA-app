@@ -34,3 +34,13 @@ export function assertCanCreateToolLoan(email: string | null | undefined): void 
     );
   }
 }
+
+export function assertCanManageTools(email: string | null | undefined): void {
+  if (!canManageTools(email)) {
+    throw new ForbiddenException('Solo Christian e Iván pueden aprobar o administrar herramientas.');
+  }
+}
+
+export function hasToolsManageAccess(email: string | null | undefined, permissions?: string[]): boolean {
+  return canManageTools(email) || (permissions ?? []).includes('tools.manage');
+}

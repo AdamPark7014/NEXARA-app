@@ -58,7 +58,7 @@ const solicitudBase = {
 describe('crear solicitud contra una OT', () => {
   it('guarda la OT cuando el técnico está asignado a ella', async () => {
     const { service, prisma } = build();
-    await service.create({ ...solicitudBase, activityId: 10 }, EMPRESA);
+    await service.create({ ...solicitudBase, activityId: 10 }, EMPRESA, 'jose.ramirez@nexara.com.mx');
 
     expect(prisma.activityAssignee.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -70,15 +70,15 @@ describe('crear solicitud contra una OT', () => {
 
   it('para una OT que no es suya, no', async () => {
     const { service, prisma } = build({ asignado: null });
-    await expect(service.create({ ...solicitudBase, activityId: 10 }, EMPRESA)).rejects.toThrow(
-      /actividad que tengas asignada/,
-    );
+    await expect(
+      service.create({ ...solicitudBase, activityId: 10 }, EMPRESA, 'jose.ramirez@nexara.com.mx'),
+    ).rejects.toThrow(/actividad que tengas asignada/);
     expect(prisma.toolRequest.create).not.toHaveBeenCalled();
   });
 
   it('sin OT sigue siendo un préstamo suelto válido', async () => {
     const { service, prisma } = build();
-    await service.create(solicitudBase, EMPRESA);
+    await service.create(solicitudBase, EMPRESA, 'jose.ramirez@nexara.com.mx');
     expect(prisma.activityAssignee.findFirst).not.toHaveBeenCalled();
     expect(prisma.toolRequest.create.mock.calls[0][0].data.activityId).toBeNull();
   });
@@ -86,7 +86,7 @@ describe('crear solicitud contra una OT', () => {
   it('una OT que no es un número se rechaza antes de tocar la base', async () => {
     const { service, prisma } = build();
     await expect(
-      service.create({ ...solicitudBase, activityId: -1 }, EMPRESA),
+      service.create({ ...solicitudBase, activityId: -1 }, EMPRESA, 'jose.ramirez@nexara.com.mx'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.activityAssignee.findFirst).not.toHaveBeenCalled();
   });
@@ -107,7 +107,7 @@ describe('aprobar genera la credencial de recolección', () => {
     const { service, prisma } = build();
     conSolicitud(service);
     const antes = Date.now();
-    await service.approve(5, 9, EMPRESA);
+    await service.approve(5, 9, EMPRESA, 'gerencia@nexara.com.mx');
 
     const data = prisma.toolRequest.update.mock.calls[0][0].data;
     expect(data.status).toBe('APPROVED');
@@ -120,7 +120,7 @@ describe('aprobar genera la credencial de recolección', () => {
   it('avisa al solicitante y a quien aprobó', async () => {
     const { service, notificationHierarchy } = build();
     conSolicitud(service);
-    await service.approve(5, 9, EMPRESA);
+    await service.approve(5, 9, EMPRESA, 'gerencia@nexara.com.mx');
 
     expect(notificationHierarchy.notifyToolReview).toHaveBeenCalledWith(
       TECNICO,
@@ -161,7 +161,11 @@ describe('entregar contra el código', () => {
 
   it('con el código correcto entrega y sella quién recogió', async () => {
     const { service, tx } = servicioConEntrega(aprobada);
-    await service.deliver(5, EMPRESA, { pickupCode: 'ac3f7k', recogidaPorId: TECNICO });
+    await service.deliver(5, EMPRESA, {
+      pickupCode: 'ac3f7k',
+      recogidaPorId: TECNICO,
+      managerEmail: 'gerencia@nexara.com.mx',
+    });
 
     const data = tx.toolRequest.update.mock.calls[0][0].data;
     expect(data.status).toBe('IN_USE');
@@ -171,7 +175,9 @@ describe('entregar contra el código', () => {
 
   it('sin código no entrega nada', async () => {
     const { service, tx } = servicioConEntrega(aprobada);
-    await expect(service.deliver(5, EMPRESA, {})).rejects.toThrow(/no coincide/i);
+    await expect(service.deliver(5, EMPRESA, { managerEmail: 'gerencia@nexara.com.mx' })).rejects.toThrow(
+      /no coincide/i,
+    );
     expect(tx.toolRequest.update).not.toHaveBeenCalled();
   });
 
@@ -180,12 +186,17 @@ describe('entregar contra el código', () => {
       ...aprobada,
       pickupExpiresAt: new Date(Date.now() - 3600_000),
     });
-    await expect(service.deliver(5, EMPRESA, { pickupCode: 'AC3F7K' })).rejects.toThrow(/venció/);
+    await expect(
+      service.deliver(5, EMPRESA, {
+        pickupCode: 'AC3F7K',
+        managerEmail: 'gerencia@nexara.com.mx',
+      }),
+    ).rejects.toThrow(/venció/);
   });
 
   it('una solicitud vieja sin código se entrega como siempre', async () => {
     const { service, tx } = servicioConEntrega({ ...aprobada, pickupCode: null });
-    await service.deliver(5, EMPRESA);
+    await service.deliver(5, EMPRESA, { managerEmail: 'gerencia@nexara.com.mx' });
     expect(tx.toolRequest.update).toHaveBeenCalled();
     // A falta de quien la recoja, queda el solicitante.
     expect(tx.toolRequest.update.mock.calls[0][0].data.pickedUpById).toBe(TECNICO);
