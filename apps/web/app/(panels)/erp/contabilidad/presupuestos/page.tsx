@@ -296,6 +296,7 @@ export default function PresupuestosPage() {
                 rowKey={(r) => r.costCenterId}
                 density="compact"
                 stickyHeader={false}
+                ariaLabel="Presupuesto por centro de costo"
                 onRowClick={(r) => abrirDetalle({ ...r, year: new Date(data.periodo.to).getFullYear(), month: null })}
               />
             </Section>
@@ -307,6 +308,7 @@ export default function PresupuestosPage() {
               rows={data.lineas}
               rowKey={(r) => r.clave}
               density="compact"
+              ariaLabel="Líneas de presupuesto"
               onRowClick={abrirDetalle}
             />
           </div>
