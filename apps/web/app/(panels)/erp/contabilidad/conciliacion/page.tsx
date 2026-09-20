@@ -171,7 +171,7 @@ export default function ConciliacionPage() {
   const [loading, setLoading] = useState(true);
   const [aplicando, setAplicando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Lo que falló al conciliar, para contarlo junto al botón y no en un toast que se va. */
+  /** Lo que falló al conciliar: InlineAlert junto al botón (además del toast). */
   const [errorAplicar, setErrorAplicar] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const cargaRef = useRef(0);
@@ -258,7 +258,9 @@ export default function ConciliacionPage() {
     async (mov: Movimiento, cand: Candidato) => {
       if (enVueloRef.current) return;
       if (!token) {
-        setErrorAplicar("No hay sesión activa. Vuelve a entrar para poder conciliar.");
+        const msg = "No hay sesión activa. Vuelve a entrar para poder conciliar.";
+        setErrorAplicar(msg);
+        toast.error(msg);
         return;
       }
       if (mov.estado === "CONCILIADO") {
@@ -282,11 +284,11 @@ export default function ConciliacionPage() {
         toast.success(`Movimiento conciliado con ${cand.folio}`);
         await cargar();
       } catch (e) {
-        // Junto al botón, no en un toast: aquí se decide si el dinero queda
-        // aplicado, y el motivo tiene que seguir en pantalla al releerlo.
-        setErrorAplicar(
-          `No se pudo conciliar con ${cand.folio}. ${formatApiError(e)}`,
-        );
+        // Toast inmediato + InlineAlert junto al botón (el motivo debe quedar
+        // visible al releer la pantalla).
+        const msg = `No se pudo conciliar con ${cand.folio}. ${formatApiError(e)}`;
+        setErrorAplicar(msg);
+        toast.error(msg);
       } finally {
         enVueloRef.current = false;
         setAplicando(false);
