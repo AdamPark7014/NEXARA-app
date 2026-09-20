@@ -421,7 +421,7 @@ export default function ContabilidadInvoicesView({
           action={
             mode === "all" ? (
               <Link href="/erp/invoicing" style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
-                Ir a facturación →
+                Ir a facturación
               </Link>
             ) : undefined
           }

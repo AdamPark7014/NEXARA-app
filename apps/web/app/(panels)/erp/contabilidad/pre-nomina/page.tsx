@@ -257,7 +257,7 @@ export default function ContabilidadPrenominaPage() {
             href={MODULO_COMPLETO}
             style={{ fontSize: 12, fontWeight: 600, textDecoration: "none" }}
           >
-            Abrir módulo completo →
+            Abrir módulo completo
           </Link>
         }
       />
@@ -366,7 +366,7 @@ export default function ContabilidadPrenominaPage() {
                 href={MODULO_COMPLETO}
                 style={{ fontSize: 12, fontWeight: 600, textDecoration: "none" }}
               >
-                Operar la pre-nómina →
+                Operar la pre-nómina
               </Link>
             }
           >
