@@ -57,6 +57,20 @@ const ENTITIES: ExportCard[] = [
     xlsxPath: (from, to) => `exports/projects?from=${from}&to=${to}&format=xlsx`,
   },
   {
+    key: "cotizaciones",
+    label: "Cotizaciones",
+    icon: "📄",
+    desc: "Folios, cliente, segmento, importes y firma",
+    xlsxPath: (from, to) => `exports/cotizaciones?from=${from}&to=${to}&format=xlsx`,
+  },
+  {
+    key: "kpis-equipo",
+    label: "KPIs del equipo",
+    icon: "📊",
+    desc: "Retardos, uniforme, horas laboradas contra productivas y tiempo extra (máximo 93 días)",
+    xlsxPath: (from, to) => `me/kpis/equipo/export.xlsx?desde=${from}&hasta=${to}`,
+  },
+  {
     key: "crm-activities",
     label: "Actividades CRM",
     icon: "📞",

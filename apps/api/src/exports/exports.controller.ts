@@ -3,22 +3,30 @@ import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { ExportsService } from './exports.service.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
+import { REPORTES_POR_ENTIDAD } from '../common/excel/reportes.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
-const ALLOWED = new Set([
-  'clients',
-  'leads',
-  'opportunities',
-  'tenders',
-  'invoices',
-  'activities',
-  'projects',
-  'users',
-  'kb-articles',
-  'crm-activities',
-]);
+/** Las entidades exportables son exactamente las que tienen columnas declaradas. */
+const ALLOWED = new Set(Object.keys(REPORTES_POR_ENTIDAD));
+
+const fechaCorta = (iso?: string) => {
+  if (!iso) return null;
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return y && m && d ? `${d}/${m}/${y}` : iso;
+};
+
+/** «Del 01/09/2026 al 30/09/2026», o lo que haya, o el histórico completo. */
+function periodo(from?: string, to?: string): string {
+  const desde = fechaCorta(from);
+  const hasta = fechaCorta(to);
+  if (desde && hasta) return `Del ${desde} al ${hasta}`;
+  if (desde) return `Desde ${desde}`;
+  if (hasta) return `Hasta ${hasta}`;
+  return 'Histórico completo';
+}
 
 @Controller('exports')
 @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -41,6 +49,7 @@ export class ExportsController {
     @Query('from') from: string | undefined,
     @Query('to') to: string | undefined,
     @Query('format') format: string | undefined,
+    @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
     @Res() res: Response,
   ) {
@@ -52,8 +61,20 @@ export class ExportsController {
       throw new BadRequestException('Solo se permite format=xlsx. CSV está deshabilitado.');
     }
 
+    const definicion = REPORTES_POR_ENTIDAD[entity];
     const result = await this.service.exportEntity(entity as any, { from, to }, companyId);
-    const buffer = await this.excelExport.exportToExcel(result.rows, entity);
+    const buffer = await this.excelExport.exportarReporte({
+      titulo: definicion.titulo,
+      subtitulo: periodo(from, to),
+      hoja: definicion.hoja,
+      columnas: definicion.columnas,
+      filas: result.rows,
+      generadoPor: user?.nombre ?? null,
+      filtros: [
+        { etiqueta: 'Desde', valor: fechaCorta(from) ?? 'Sin límite' },
+        { etiqueta: 'Hasta', valor: fechaCorta(to) ?? 'Sin límite' },
+      ],
+    });
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
