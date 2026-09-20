@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
@@ -17,6 +17,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { financeStatusLabel } from "@/lib/finance-status-labels";
 import {
+  METODO_LABELS,
   NATURALEZA_HINT,
   NATURALEZA_LABELS,
   TIPO_LABELS,
@@ -35,7 +36,21 @@ import {
 
 const PAGE_SIZE = 50;
 
+/**
+ * La API rechaza con 400 cualquier página cuyo final pase del movimiento 2000
+ * (`MAX_MERGE_SCAN`): fusiona seis tablas en memoria y más allá de eso no puede
+ * garantizar el orden. Se topa aquí para que el botón no lleve a un error.
+ */
+const MAX_SCAN = 2000;
+const MAX_PAGE = Math.floor(MAX_SCAN / PAGE_SIZE);
+
+/** Tope de renglones del CSV en la API (`MAX_EXPORT_ROWS`). */
+const MAX_EXPORT_ROWS = 5000;
+
 type BankAccountOption = { id: number; name: string; bankName?: string | null };
+
+/** Opciones del filtro de método: el mismo catálogo cerrado que valida la API. */
+const METODO_OPTIONS = Object.entries(METODO_LABELS).map(([value, label]) => ({ value, label }));
 
 /**
  * El estado del renglón como punto y palabra. La API manda la cadena libre, así
@@ -53,7 +68,7 @@ function tonoEstado(estado: string | null | undefined): StatusTone {
 }
 
 export default function MovimientosPage() {
-  const { user } = useUser();
+  const { user, isContextReady } = useUser();
   const token = user?.token ?? "";
 
   const [filters, setFilters] = useState<LedgerFilters>(() => emptyFilters());
@@ -63,7 +78,18 @@ export default function MovimientosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportAviso, setExportAviso] = useState<{
+    tono: "success" | "warning" | "danger";
+    texto: string;
+  } | null>(null);
   const [detail, setDetail] = useState<LedgerRow | null>(null);
+  const [angosto, setAngosto] = useState(false);
+
+  // La última consulta pedida es la que se pinta. Teclear en el buscador lanza
+  // una petición por letra y sin esto la respuesta lenta de «fac» podía llegar
+  // después de la de «factura» y dejar en la tabla un resultado que ya no se
+  // corresponde con lo que dicen los filtros.
+  const peticion = useRef(0);
 
   const setFilter = useCallback((key: keyof LedgerFilters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -72,6 +98,7 @@ export default function MovimientosPage() {
 
   const load = useCallback(async () => {
     if (!token) return;
+    const turno = ++peticion.current;
     setLoading(true);
     setError(null);
     try {
@@ -80,18 +107,40 @@ export default function MovimientosPage() {
         `accounting/workspace/movimientos${qs ? `?${qs}` : ""}`,
         token,
       );
+      if (turno !== peticion.current) return;
       setData(res);
     } catch (e) {
-      setError(formatApiError(e, "No se pudo cargar el libro de movimientos"));
+      if (turno !== peticion.current) return;
+      setError(
+        `${formatApiError(e, "No se pudo cargar el libro de movimientos")} Reintenta con «Actualizar»; si persiste, acorta el rango de fechas.`,
+      );
       setData(null);
     } finally {
-      setLoading(false);
+      if (turno === peticion.current) setLoading(false);
     }
   }, [token, filters, page]);
 
   useEffect(() => {
+    if (!isContextReady) return;
+    // Sin sesión el esqueleto se quedaba girando para siempre sin decir por qué.
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [isContextReady, token, load]);
+
+  // Con doce columnas, por debajo de 1200px la tabla solo cabía a base de
+  // scroll horizontal. Lo secundario baja bajo el concepto en vez de perderse.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1200px)");
+    const sync = () => setAngosto(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const sinSesion = isContextReady && !token;
 
   // Las cuentas alimentan el filtro; si no hay permiso de banca, el filtro
   // simplemente no aparece y el resto de la página sigue funcionando.
@@ -116,9 +165,16 @@ export default function MovimientosPage() {
   const rows = data?.items ?? [];
   const filtrado = hasActiveFilters(filters);
 
+  /**
+   * Exportar dejaba de decir qué había pasado: ni al terminar ni —peor— cuando
+   * la API recorta. El CSV se topa en {@link MAX_EXPORT_ROWS} renglones y lo
+   * avisa en `X-Ledger-Truncated`; una contadora que cuadra el mes con un
+   * archivo recortado y sin avisar cuadra mal.
+   */
   const exportCsv = useCallback(async () => {
-    if (!token) return;
+    if (!token || exporting) return;
     setExporting(true);
+    setExportAviso(null);
     try {
       const qs = buildLedgerQuery(filters);
       const res = await fetch(
@@ -126,19 +182,37 @@ export default function MovimientosPage() {
         { credentials: "include", headers: { Authorization: `Bearer ${token}` } },
       );
       if (!res.ok) throw new Error(await res.text().catch(() => "No se pudo generar el CSV"));
+      const renglones = Number(res.headers.get("X-Ledger-Rows"));
+      const recortado = res.headers.get("X-Ledger-Truncated") === "true";
+      const nombre = `movimientos-${filters.from}-a-${filters.to}.csv`;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `movimientos-${filters.from}-a-${filters.to}.csv`;
+      a.download = nombre;
       a.click();
       URL.revokeObjectURL(url);
+      const cuantos = Number.isFinite(renglones) && renglones > 0 ? `${renglones} ` : "";
+      setExportAviso(
+        recortado
+          ? {
+              tono: "warning",
+              texto: `Se descargó ${nombre}, pero está recortado: el CSV llega hasta ${MAX_EXPORT_ROWS.toLocaleString("es-MX")} movimientos y el filtro trae más. Parte el periodo en tramos más cortos y exporta cada uno.`,
+            }
+          : {
+              tono: "success",
+              texto: `Se descargó ${nombre} con ${cuantos}movimientos, los mismos que muestran los filtros de arriba.`,
+            },
+      );
     } catch (e) {
-      setError(formatApiError(e, "No se pudo exportar el libro"));
+      setExportAviso({
+        tono: "danger",
+        texto: `No se pudo exportar el libro. ${formatApiError(e, "El servidor no devolvió el archivo")} Vuelve a intentarlo; si sigue fallando, reduce el rango de fechas.`,
+      });
     } finally {
       setExporting(false);
     }
-  }, [token, filters]);
+  }, [token, filters, exporting]);
 
   const columns: Column<LedgerRow>[] = useMemo(
     () => [
@@ -163,31 +237,64 @@ export default function MovimientosPage() {
       {
         key: "concepto",
         label: "Concepto",
-        render: (r) => (
-          <div style={{ minWidth: 200 }}>
-            <div style={{ fontWeight: 600 }}>{r.concepto}</div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-              {describeOrigen(r)}
-              {r.naturaleza === "DEVENGADO" ? " · devengado" : ""}
+        render: (r) => {
+          // En pantalla angosta, el contexto que identifica el renglón baja
+          // aquí en 11px; el resto no se pierde, vive en el detalle del
+          // renglón, que se abre con un clic o con Enter.
+          const meta = [
+            describeOrigen(r),
+            r.naturaleza === "DEVENGADO" ? "devengado" : null,
+            ...(angosto
+              ? [
+                  r.contraparte?.nombre ?? null,
+                  r.cuenta?.nombre ?? null,
+                  r.referencia ? `Ref. ${r.referencia}` : null,
+                ]
+              : []),
+          ].filter(Boolean);
+          return (
+            <div style={{ minWidth: angosto ? 160 : 200 }}>
+              <div style={{ fontWeight: 600 }}>{r.concepto}</div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.35 }}>
+                {meta.join(" · ")}
+              </div>
             </div>
-          </div>
-        ),
+          );
+        },
       },
-      { key: "categoria", label: "Categoría", render: (r) => r.categoria || "—" },
-      { key: "cuenta", label: "Cuenta", render: (r) => r.cuenta?.nombre ?? "—" },
-      {
-        key: "contraparte",
-        label: "Contraparte",
-        render: (r) => r.contraparte?.nombre ?? "—",
-      },
-      { key: "proyecto", label: "Proyecto", render: (r) => r.proyecto?.nombre ?? "—" },
-      {
-        key: "referencia",
-        label: "Referencia",
-        render: (r) => (
-          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.referencia ?? "—"}</span>
-        ),
-      },
+      ...(angosto
+        ? []
+        : [
+            {
+              key: "categoria",
+              label: "Categoría",
+              render: (r: LedgerRow) => r.categoria || "—",
+            },
+            {
+              key: "cuenta",
+              label: "Cuenta",
+              render: (r: LedgerRow) => r.cuenta?.nombre ?? "—",
+            },
+            {
+              key: "contraparte",
+              label: "Contraparte",
+              render: (r: LedgerRow) => r.contraparte?.nombre ?? "—",
+            },
+            {
+              key: "proyecto",
+              label: "Proyecto",
+              render: (r: LedgerRow) => r.proyecto?.nombre ?? "—",
+            },
+            {
+              key: "referencia",
+              label: "Referencia",
+              render: (r: LedgerRow) => (
+                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                  {r.referencia ?? "—"}
+                </span>
+              ),
+            },
+          ]),
       {
         key: "ingreso",
         label: "Ingreso",
@@ -224,12 +331,24 @@ export default function MovimientosPage() {
             <span style={{ color: "var(--text-tertiary)" }}>—</span>
           ),
       },
-      { key: "registradoPor", label: "Registró", render: (r) => r.registradoPor ?? "—" },
+      ...(angosto
+        ? []
+        : [
+            {
+              key: "registradoPor",
+              label: "Registró",
+              render: (r: LedgerRow) => r.registradoPor ?? "—",
+            },
+          ]),
     ],
-    [],
+    [angosto],
   );
 
   const totalPages = data?.totalPages ?? 1;
+  // El servidor rechaza pasar del movimiento 2000; navegar más allá solo
+  // produciría un 400, así que la última página alcanzable se dice aquí.
+  const ultimaPagina = Math.min(totalPages, MAX_PAGE);
+  const topeAlcanzado = totalPages > MAX_PAGE;
 
   /**
    * La tira de totales. Las pistas NO son decorado: «Ingresos» suma efectivo y
@@ -238,8 +357,17 @@ export default function MovimientosPage() {
    * —para eso está «Efectivo»—. Si algún día se recorta la tira, la pista se
    * queda.
    */
-  const totalesStrip: Metric[] = useMemo(
-    () => [
+  const totalesStrip: Metric[] = useMemo(() => {
+    // Cifras cortas: la pista vive en 11px dentro de una celda de 150px y la
+    // tira va fija arriba; escrita entera ocupaba tres renglones por celda.
+    const dinero = (n: number) => {
+      const abs = Math.abs(n);
+      const signo = n < 0 ? "−" : "";
+      if (abs >= 1_000_000) return `${signo}$${(abs / 1_000_000).toFixed(1)}M`;
+      if (abs >= 1_000) return `${signo}$${Math.round(abs / 1000)}k`;
+      return `${signo}$${Math.round(abs).toLocaleString("es-MX")}`;
+    };
+    return [
       {
         label: "Ingresos",
         value: <Money value={totals.ingresos} />,
@@ -255,24 +383,27 @@ export default function MovimientosPage() {
         value: <Money value={totals.neto} />,
         hint: "Ingresos menos egresos",
       },
+      // Efectivo y devengado traían el desglose completo desde la API y solo se
+      // pintaba el neto: de qué está hecho cada neto se lee en la pista.
       {
         label: "Efectivo",
         value: <Money value={totals.efectivo.neto} />,
-        hint: "Ya pasó por banco o caja",
+        hint: `${totals.efectivo.conteo} mov · ${dinero(totals.efectivo.ingresos)} entró, ${dinero(totals.efectivo.egresos)} salió`,
       },
       {
         label: "Devengado",
         value: <Money value={totals.devengado.neto} />,
-        hint: "Registrado, aún sin liquidar",
+        hint: `${totals.devengado.conteo} mov · ${dinero(totals.devengado.ingresos)} por cobrar, ${dinero(totals.devengado.egresos)} por pagar`,
       },
       {
         label: "Movimientos",
         value: totals.conteo.toLocaleString("es-MX"),
-        hint: `${totals.transferencias.conteo} traspaso(s) · ${totals.ajustes.conteo} ajuste(s)`,
+        // Traspasos y ajustes no suman al neto, pero su importe sí explica
+        // huecos al cuadrar; llegaba en la respuesta y no se veía.
+        hint: `${totals.transferencias.conteo} traspasos (${dinero(totals.transferencias.monto)}) · ${totals.ajustes.conteo} ajustes (${dinero(totals.ajustes.monto)}), no suman al neto`,
       },
-    ],
-    [totals],
-  );
+    ];
+  }, [totals]);
 
   return (
     <>
@@ -283,15 +414,46 @@ export default function MovimientosPage() {
         density="ops"
         actions={
           <>
-            <Button size="sm" variant="ghost" onClick={() => void exportCsv()} disabled={exporting || loading}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void exportCsv()}
+              disabled={exporting || loading || sinSesion}
+            >
               {exporting ? "Generando…" : "Exportar CSV"}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
-              Actualizar
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void load()}
+              disabled={loading || sinSesion}
+            >
+              {loading ? "Actualizando…" : "Actualizar"}
             </Button>
           </>
         }
       />
+
+      {/* El resultado de exportar, pegado a la acción que lo produjo. */}
+      {exportAviso && (
+        <InlineAlert
+          variant={exportAviso.tono}
+          message={exportAviso.texto}
+          onDismiss={() => setExportAviso(null)}
+        />
+      )}
+
+      {sinSesion && (
+        <InlineAlert
+          variant="warning"
+          message="No hay sesión activa, así que el libro no se puede consultar. Vuelve a entrar con tu cuenta para ver los movimientos."
+          action={
+            <Link href="/login" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+              Ir a entrar
+            </Link>
+          }
+        />
+      )}
 
       {/* Totales pegados arriba: es lo que la contadora cuadra. */}
       <div
@@ -340,6 +502,13 @@ export default function MovimientosPage() {
                   },
                 ]
               : []),
+            {
+              label: "Método",
+              value: filters.metodoPago,
+              onChange: (v: string) => setFilter("metodoPago", v),
+              options: METODO_OPTIONS,
+              allLabel: "Todos los métodos",
+            },
           ]}
           onClear={() => {
             setFilters(emptyFilters());
@@ -349,9 +518,20 @@ export default function MovimientosPage() {
         />
       </div>
 
-      {error && <InlineAlert message={error} variant="danger" onDismiss={() => setError(null)} />}
+      {error && (
+        <InlineAlert
+          message={error}
+          variant="danger"
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
+              {loading ? "Reintentando…" : "Reintentar"}
+            </Button>
+          }
+        />
+      )}
 
-      {loading ? (
+      {sinSesion ? null : loading ? (
         <SkeletonList rows={8} tableLike />
       ) : rows.length === 0 ? (
         <EmptyState
@@ -398,20 +578,33 @@ export default function MovimientosPage() {
               color: "var(--text-secondary)",
             }}
           >
-            <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            {/* `loading` también bloquea: dos clics seguidos en «Siguiente»
+                disparaban dos consultas y se saltaban una página. */}
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
               Anterior
             </Button>
             <span>
-              Página {data?.page ?? page} de {totalPages}
+              Página {data?.page ?? page} de {ultimaPagina}
             </span>
             <Button
               size="sm"
               variant="ghost"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= ultimaPagina || loading}
+              onClick={() => setPage((p) => Math.min(ultimaPagina, p + 1))}
             >
               Siguiente
             </Button>
+            {topeAlcanzado && (
+              <span style={{ fontSize: 11, color: "var(--state-warning-text, #b45309)" }}>
+                Hasta aquí llega la paginación ({MAX_SCAN.toLocaleString("es-MX")} movimientos).
+                Filtra o acorta el periodo para ver el resto.
+              </span>
+            )}
             <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-tertiary)" }}>
               {NATURALEZA_HINT}
             </span>
@@ -490,13 +683,18 @@ export default function MovimientosPage() {
   );
 }
 
+/** `—` cuando el campo viene vacío: una celda en blanco no dice si falta el
+ *  dato o si falló el render. */
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  const vacio = !value || (typeof value === "string" && !value.trim());
   return (
     <>
       <dt style={{ color: "var(--text-tertiary)", fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.06em" }}>
         {label}
       </dt>
-      <dd style={{ margin: 0, color: "var(--text-primary)" }}>{value}</dd>
+      <dd style={{ margin: 0, color: vacio ? "var(--text-tertiary)" : "var(--text-primary)" }}>
+        {vacio ? "—" : value}
+      </dd>
     </>
   );
 }

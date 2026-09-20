@@ -175,8 +175,12 @@ export class InvoicesController {
   @Post(':id/match/evaluate')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  evaluateMatch(@Param('id') id: string, @CurrentUser() user: { id: number }) {
-    return this.service.evaluateThreeWayMatch(+id, user.id);
+  evaluateMatch(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.evaluateThreeWayMatch(+id, user.id, companyId);
   }
 
   @Post(':id/match/waive')

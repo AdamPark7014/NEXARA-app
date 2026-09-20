@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { AccountingService } from './accounting.service.js';
+import { PeriodCloseService } from './period-close.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -17,7 +18,10 @@ import {
 @Controller('accounting/accounts')
 @UseGuards(UrlAccessGuard)
 export class AccountsController {
-  constructor(private readonly service: AccountingService) {}
+  constructor(
+    private readonly service: AccountingService,
+    private readonly periodClose: PeriodCloseService,
+  ) {}
 
   @Post()
   @UseGuards(RbacGuard)
@@ -108,7 +112,8 @@ export class AccountsController {
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.closeFiscalPeriod(+id, user.id, companyId);
+    // Ya no cierra en silencio: misma checklist/auditoría que workspace/cierres.
+    return this.periodClose.closePeriod(+id, user.id, {}, companyId);
   }
 
   @Patch('fiscal-periods/:id/reopen')
