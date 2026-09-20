@@ -121,6 +121,29 @@ const ESTADO_TONO: Record<Estado, StatusTone> = {
   PENDIENTE: "neutral",
 };
 
+/** Enums crudos del banco/API (`BankReconciliationStatus` / match) → español. */
+const RECON_STATUS_LABEL: Record<string, string> = {
+  MATCHED: "Conciliado",
+  PENDING: "Pendiente",
+  UNMATCHED: "Sin conciliar",
+  IGNORED: "Ignorado",
+  PARTIAL: "Parcial",
+  VARIANCE: "Discrepancia",
+};
+
+function estadoTexto(estado: string | null | undefined): string {
+  if (!estado) return "—";
+  const key = String(estado).trim().toUpperCase();
+  return (
+    ESTADO_LABEL[key as Estado] ??
+    RECON_STATUS_LABEL[key] ??
+    key
+      .split("_")
+      .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+      .join(" ")
+  );
+}
+
 function fechaCorta(iso?: string | null) {
   if (!iso) return "—";
   const d = new Date(`${String(iso).slice(0, 10)}T12:00:00`);
@@ -387,7 +410,7 @@ export default function ConciliacionPage() {
       width: 150,
       render: (r) => (
         <StatusDot
-          label={ESTADO_LABEL[r.estado]}
+          label={estadoTexto(r.estado)}
           tone={ESTADO_TONO[r.estado]}
           title={
             r.candidatos.length > 0
@@ -933,7 +956,7 @@ export default function ConciliacionPage() {
           <p aria-live="polite" className={styles.srOnly}>
             {seleccionado
               ? `Movimiento seleccionado: ${seleccionado.descripcion || "sin descripción"}, ${
-                  ESTADO_LABEL[seleccionado.estado]
+                  estadoTexto(seleccionado.estado)
                 }, ${candidatos.length} candidato${candidatos.length === 1 ? "" : "s"}.`
               : "Ningún movimiento seleccionado."}
           </p>
