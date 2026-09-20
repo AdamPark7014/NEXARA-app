@@ -138,10 +138,20 @@ export function Avatar({ url, name, size = 32 }: { url?: string | null; name: st
 }
 
 /**
- * Botón chico que abre una ventanita con texto de ayuda («¿Cómo se calcula?»).
- * Se cierra con Escape o al tocar fuera.
+ * Icono ⓘ que abre una ventanita con la explicación. La página no lleva el texto:
+ * vive aquí. Se cierra con Escape o al tocar fuera. `conTexto` muestra la etiqueta.
  */
-export function InfoPopover({ label, title, children }: { label: string; title?: string; children: ReactNode }) {
+export function InfoPopover({
+  label,
+  title,
+  conTexto = false,
+  children,
+}: {
+  label: string;
+  title?: string;
+  conTexto?: boolean;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -164,13 +174,15 @@ export function InfoPopover({ label, title, children }: { label: string; title?:
     <div className={s.pop} ref={ref}>
       <button
         type="button"
-        className={`${b.btn} ${b.btnGhost}`}
+        className={`${b.btn} ${b.btnGhost}${conTexto ? "" : ` ${b.btnIcon}`}`}
         aria-expanded={open}
+        aria-label={conTexto ? undefined : label}
+        title={conTexto ? undefined : label}
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}
       >
         <InfoOutlinedIcon aria-hidden="true" />
-        {label}
+        {conTexto ? label : null}
       </button>
       {open ? (
         <div id={id} role="dialog" aria-label={title ?? label} className={s.popPanel}>

@@ -139,36 +139,36 @@ export default function KpisPersonaPage() {
                   {resumenEnPalabras(t, { conHorario: data.horario.entrada != null })}
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 10, fontSize: 12, color: "var(--ui-fg-3)" }}>
-                  <span>{t.diasConJornada} día(s) con jornada</span>
-                  <span>Sin actividad: {horasEnPalabras(t.minutosInactivos)}</span>
-                  {t.minutosExtra ? <span>Tiempo extra: {horasEnPalabras(t.minutosExtra)}</span> : null}
-                  {data.motivos.length ? <span>Qué mirar: {data.motivos.join(" · ")}</span> : null}
+                  <span>{t.diasConJornada} días con jornada</span>
+                  <span title="Horas en jornada sin ninguna actividad abierta">Sin actividad {horasEnPalabras(t.minutosInactivos)}</span>
+                  {t.minutosExtra ? <span title="Arriba de 8 h netas entre semana, o todo lo del fin de semana">Extra {horasEnPalabras(t.minutosExtra)}</span> : null}
                 </div>
               </div>
             </div>
           </Card>
 
           <Card>
-            <CardHead
-              title="Día por día"
-              subtitle="Lo más reciente arriba. Pasa el cursor por un bloque para ver la actividad."
-              actions={<LeyendaJornada conComida />}
-            />
+            <CardHead title="Día por día" actions={<LeyendaJornada conComida />} />
             {data.dias.length ? (
               <DiasEnLinea dias={data.dias} />
             ) : (
-              <EmptyState
-                icon={<EventBusyOutlinedIcon />}
-                title="Sin jornadas en estas fechas"
-                description="No hay checadas ni actividades registradas en el rango."
-              />
+              <EmptyState icon={<EventBusyOutlinedIcon />} title="Sin jornadas en estas fechas" />
             )}
           </Card>
 
           <Card>
             <CardHead
-              title="Actividades del rango"
-              subtitle="Duración real (de «Iniciar» o foto de entrada a la salida) y cuánto de eso cuenta como productivo."
+              title="Actividades"
+              actions={
+                <InfoPopover label="Cómo se cuentan las actividades" title="Cómo se cuentan">
+                  <p style={{ margin: 0 }}>
+                    <strong style={{ color: "var(--ui-fg)" }}>Duración</strong> es el tiempo real: de «Iniciar» (o la foto
+                    de entrada) al fin. <strong style={{ color: "var(--ui-fg)" }}>Cuenta</strong> es la parte que cayó
+                    dentro de sus horas laboradas; lo que pasa en la comida o fuera de la jornada no suma. Una actividad
+                    empezada sin checar entrada no cuenta.
+                  </p>
+                </InfoPopover>
+              }
             />
             {actividades.length || diasFuera.length ? (
               <div className={tabla.tabla} role="table" aria-label="Actividades del rango">
@@ -176,9 +176,13 @@ export default function KpisPersonaPage() {
                   <span role="columnheader">Día</span>
                   <span role="columnheader">Actividad</span>
                   <span role="columnheader">Horario</span>
-                  <span role="columnheader" className={tabla.num}>Duración</span>
-                  <span role="columnheader" className={tabla.num}>Cuenta</span>
-                  <span role="columnheader">Por qué</span>
+                  <span role="columnheader" className={tabla.num} title="Del inicio real al fin real">
+                    Duración
+                  </span>
+                  <span role="columnheader" className={tabla.num} title="Lo que cayó dentro de sus horas laboradas">
+                    Cuenta
+                  </span>
+                  <span role="columnheader" />
                 </div>
                 {actividades.map((a) => {
                   const completa = a.minutosEnJornada >= a.minutosReales - 1;
@@ -200,9 +204,7 @@ export default function KpisPersonaPage() {
                       </span>
                       <span role="cell" className={tabla.num}>{horasEnPalabras(a.minutosReales)}</span>
                       <span role="cell" className={`${tabla.num} ${tabla.fuerte}`}>{horasEnPalabras(a.minutosEnJornada)}</span>
-                      <span role="cell">
-                        <Badge tone={completa ? "brand" : "warning"}>{porQueCuenta(a)}</Badge>
-                      </span>
+                      <span role="cell">{completa ? null : <Badge tone="warning">{porQueCuenta(a)}</Badge>}</span>
                     </div>
                   );
                 })}
@@ -216,16 +218,15 @@ export default function KpisPersonaPage() {
                     <span role="cell" className={tabla.num}>—</span>
                     <span role="cell" className={`${tabla.num} ${tabla.fuerte}`}>0 min</span>
                     <span role="cell">
-                      <Badge tone="danger">No cuenta: empezó sin estar checado</Badge>
+                      <Badge tone="danger" title="Empezó sin checar entrada, así que no suma productividad">
+                        No cuenta
+                      </Badge>
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState
-                title="Sin actividades con inicio en su jornada"
-                description="Una actividad cuenta desde que la inicia (o sube la foto de entrada) mientras está checado."
-              />
+              <EmptyState title="Sin actividades en estas fechas" />
             )}
           </Card>
 

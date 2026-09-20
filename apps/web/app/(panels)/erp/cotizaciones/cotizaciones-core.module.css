@@ -69,61 +69,6 @@
   color: var(--ui-fg-3);
 }
 
-/* ─── Cómo se lee el folio (plegable, neutro) ──────────────────────────── */
-
-.explica {
-  margin-bottom: var(--ui-s4);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface);
-}
-
-.explica summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px var(--ui-s4);
-  font-size: var(--ui-text-sm);
-  font-weight: 500;
-  color: var(--ui-fg-2);
-  cursor: pointer;
-  list-style: none;
-}
-
-.explica summary::-webkit-details-marker {
-  display: none;
-}
-
-.explica summary::before {
-  content: "›";
-  display: inline-block;
-  width: 10px;
-  color: var(--ui-fg-3);
-  transition: transform 120ms ease;
-}
-
-.explica[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.explica summary:hover {
-  color: var(--ui-fg);
-}
-
-.explicaCuerpo {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 0 var(--ui-s4) var(--ui-s4);
-}
-
-.explicaCuerpo p {
-  margin: 0;
-  font-size: var(--ui-text-xs);
-  line-height: 1.55;
-  color: var(--ui-fg-2);
-}
-
 /* ─── Lista (rejilla con los estilos de `tabla`) ───────────────────────── */
 
 .list {
