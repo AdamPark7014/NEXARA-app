@@ -236,6 +236,7 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     how: `Es la puerta de entrada, no un módulo de captura: cada sección lee del mismo API que ya opera su área (accounting, invoicing, banking, employee-payments). El menú solo muestra lo que tu puesto puede abrir de verdad; si una entrada no aparece es porque la API te respondería 403, no porque falte la pantalla. El cierre de periodo calcula una lista de verificación contra la base —facturas sin XML, banco sin conciliar, pólizas en borrador, pre-nómina abierta— y rechaza el cierre mientras haya puntos bloqueantes, salvo que escribas una justificación, que queda en la bitácora con el estado anterior del periodo.`,
     steps: [
       `Entra a /erp/contabilidad y atiende las alertas del resumen.`,
+      `En Proveedores abre uno para su expediente completo; en Proyectos, haz clic en una categoría de costo para ver sus transacciones.`,
       `Usa Por cobrar / Por pagar para el dinero pendiente, y Conciliación para cuadrar el banco.`,
       `En Cierres, elige el periodo y pulsa «Revisar cierre» para ver qué falta; si cierras con pendientes, explica por qué.`,
       `En Auditoría, abre cualquier evento para ver el antes y el después campo por campo.`,
@@ -431,18 +432,6 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
       `Exporta CSV si investigas un incidente`,
     ],
     connects: `users IAM`,
-  },
-  'erp-contabilidad': {
-    id: 'erp-contabilidad',
-    summary: `Workspace de la contadora: facturas, cuentas por pagar y cobrar, proveedores y proyectos.`,
-    audience: `Contabilidad, facturación y dirección.`,
-    how: `Hub /erp/contabilidad. Proveedores sale del catálogo de Supplier con saldo y vencido; Proyectos muestra ingresos, costo por categoría y margen, con desglose hasta el documento.`,
-    steps: [
-      `Abre el tablero para ver el pendiente del periodo`,
-      `En Proveedores abre uno para su expediente 360°`,
-      `En Proyectos abre uno y haz clic en una categoría para ver sus transacciones`,
-    ],
-    connects: `facturación, compras, gastos, viáticos, almacén y proyectos`,
   },
   'exports': {
     id: 'exports',

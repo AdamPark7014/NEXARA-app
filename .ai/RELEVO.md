@@ -2,56 +2,78 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-20
-- **Rama:** feat/cont-cxc (worktree `_worktrees/nexara-cont-cxc`, base `mejora/calidad-y-web` @ 07016b6c)
-- **HEAD base:** merge 6 hardening (pdf, rbac, tools-ui, act-photos, act-flow, prenomina)
+- **Rama:** mejora/calidad-y-web
+- **HEAD:** ola contadora — 7 ramas integradas sobre `07016b6c`
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Hecho en esta rama
+## Hecho este turno
 
-Cuentas por cobrar y por pagar dejan de ser la lista genérica de facturas.
+Workspace de la contadora, 7 worktrees en paralelo, todos integrados:
 
-1. API — archivos nuevos en `apps/api/src/accounting/`:
-   - `workspace-ar-ap.service.ts` — cartera con antigüedad, días vencido,
-     calendario de obligaciones y detalle con pagos aplicados. Todo `where`
-     pasa por `requireCompanyId` + `companyWhere`.
-   - `workspace-ar-ap.controller.ts` — `GET /accounting/workspace/cxc|cxp`,
-     `/cxp/calendario`, `/{cxc,cxp}/:id`, `/{cxc,cxp}/:id/xml`.
-   - `workspace-ar-ap.spec.ts` — 39 pruebas: aislamiento por empresa, tramos
-     de antigüedad con casos borde y contrato de autorización.
-   - `accounting.module.ts`: una línea de provider y una de controller.
-2. Web:
-   - `apps/web/components/erp/CarteraView.tsx` — tabla densa, chips de
-     antigüedad que filtran, detalle con pagos/documentos/historial, registro
-     de pago y calendario de vencimientos en CxP.
-   - `cuentas-por-cobrar/page.tsx` y `cuentas-por-pagar/page.tsx` reescritas.
-   - `ContabilidadInvoicesView.tsx` queda intacto: sigue sirviendo /facturas.
+| Rama | Qué entrega |
+|------|-------------|
+| feat/cont-ledger | Libro de movimientos: une pagos, gastos, gastos de obra, banco, nómina y facturas. Separa efectivo de devengado; traspaso entre cuentas propias no suma |
+| feat/cont-cxc | CxC/CxP con antigüedad, días vencido, detalle con pagos, registrar cobro/pago y calendario de vencimientos |
+| feat/cont-concilia | Motor de emparejamiento banco↔documento (puntaje + razones), pantalla dividida, conciliación con teclado |
+| feat/cont-cierre | Lista de verificación de cierre (7 puntos contra BD), bloqueo con justificación auditada, auditoría antes/después |
+| feat/cont-vendors | Proveedor 360° desde el modelo Supplier + P&L por proyecto con drill-down al documento |
+| feat/cont-reportes | Catálogo de 8 reportes servido por API, comparación con periodo anterior, drill-down y CSV; presupuesto vs real |
+| feat/cont-rbac | 403 por backend probado, menú por permisos reales, pre-nómina propia en el hub |
 
-Fechas: los vencimientos se comparan como día calendario (las columnas
-`@db.Date` llegan a medianoche UTC). Leerlas con `getDate()` corría un día
-los "días vencido" en un servidor en UTC-6.
+## Fallos de producción encontrados al auditar (no eran el encargo)
 
-## A medias / heredado
+1. **Ninguna póliza automática se contabilizaba.** `createAndPostAutoJournal`
+   llamaba `postJournalEntry` sin empresa → `requireCompanyId` lanzaba 403
+   siempre. Gastos, viáticos y pagos a empleados no tienen try/catch: "marcar
+   pagado" reventaba y dejaba la póliza en borrador. Corregido en toda la cadena.
+2. **Fuga entre empresas:** la póliza se buscaba por `reference` sin filtro de
+   empresa, y el índice es `@@unique([companyId, reference])`. Corregido en
+   `createAndPostAutoJournal` y `postPurchaseReceiptAccrual`.
+3. **Fuga entre usuarios, viva:** el revalidador de la caché sin conexión
+   refrescaba entradas de OTRA cuenta con el token de la sesión actual y las
+   guardaba bajo la etiqueta ajena; la cola offline reenviaba lo encolado por A
+   con la sesión de B. Corregido (la web ya no guarda caché ni cola: eso es del
+   teléfono). Es la continuación del incidente previo de datos cruzados.
+4. **XML y PDF de factura siempre 404:** `getInvoiceXml`/`getInvoicePdf` sin
+   empresa contra un `companyWhere` deny-all. Corregido.
+5. **Proyectos nunca funcionó:** agrupaba por `Invoice.projectId`, campo que no
+   existe. El camino real es `activityId → Activity.projectId` o
+   `salesProjectOrderId`. Corregido.
+6. **La prueba del panel contable nunca corrió:** importaba de vitest en un
+   proyecto jest. Reescrita leyendo el metadata `@RBAC` real del controlador.
 
-- `apps/web/lib/module-guides.ts` no tiene la entrada `erp-contabilidad` y
-  `ModuleId` la exige → `tsc -p apps/web` falla desde antes de esta rama. El
-  archivo es generado (`.ai/gen-module-guides.py`), y `.ai/module-guides.json`
-  tampoco trae el módulo: hay que regenerarlo, no escribirlo a mano.
-- Jest: `accounting/workspace-dashboard.spec.ts` importa de `vitest` y no
-  corre bajo jest. Fallan también `activities.controller.spec.ts`,
-  `entrega-herramienta.spec.ts` y `me/team-board-periodo.spec.ts` (heredado).
-- El cliente Prisma estaba desfasado (faltaba `ActivityPeerRequest`); se
-  regeneró con `npm run prisma:generate --workspace=apps/api`.
-- Deploy Hetzner sigue pendiente (SSH Permission denied desde este entorno).
+## A medias / pendiente real
+
+- **Deploy bloqueado, y no por el servidor:** `~/.ssh/config` tiene
+  `hetzner-nexara` con `HostName REEMPLAZA_CON_IP_HETZNER`. Falta la dirección
+  real y la llave. Comando a correr en el servidor:
+  `./deploy/update.sh --force-all`
+- **Periodo cerrado sin blindar del todo.** `assertDateNotInClosedPeriod` solo
+  se llama desde `reverseJournalEntry`; `resolveOpenFiscalPeriodId` cubre crear
+  y postear pólizas. Quedan sin validar: `registerPayment` (el más grave: mueve
+  saldo bancario dentro de un periodo cerrado), `reconcileTransaction`,
+  `cancelInvoice`, `createInvoice`, `updateInvoiceDraft`, `deleteInvoice`,
+  `importBankTransactions`. La UI de cierres ya lo dice en `proteccion.noBloqueado`
+  en vez de prometer lo que no cumple.
+- **AuditLog no guarda el estado anterior** salvo en el cierre de periodo. Para
+  antes/después de verdad hace falta que cada `update` lea la fila antes y la
+  pase como `previousData`.
+- **3 suites de API rojas desde la ola anterior**, ajenas a este trabajo:
+  `activities.controller`, `tool-requests/entrega-herramienta`,
+  `me/team-board-periodo`.
+- Bonos y descuentos no existen en el modelo de pre-nómina: no se inventaron.
+- Sin base local levantada no hubo smoke en navegador; todo está cubierto por
+  pruebas, no por uso real.
 
 ## Siguiente
 
-1. Revisar la cartera con datos reales: CxC y CxP, chips y calendario.
-2. Regenerar `module-guides` para desbloquear el typecheck de web.
-3. `./deploy/update.sh --force-all` en servidor + smoke contadora.
+1. Adam da la IP/llave del Hetzner, o corre `./deploy/update.sh --force-all`.
+2. Smoke de la contadora contra datos reales.
+3. Blindar el periodo cerrado en las 7 rutas de escritura listadas arriba.
 
 ## No tocar
 
-Puente NAS. `ContabilidadInvoicesView.tsx` (lo usa /facturas).
+Puente NAS.
