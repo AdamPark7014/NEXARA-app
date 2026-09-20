@@ -13,11 +13,11 @@ import ToolRequestsTable from "@/components/ToolRequestsTable";
 import ToolRenewalsTable from "@/components/ToolRenewalsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
 
-type ManagerTab = "inventory" | "kits" | "requests" | "renewals";
+type ManagerTab = "inventory" | "kits" | "requests" | "renewals" | "approvals";
 type EngineerTab = "mykit" | "myrequests";
 
 function parseManagerTab(value: string | null): ManagerTab {
-  if (value === "kits" || value === "requests" || value === "renewals" || value === "inventory") {
+  if (value === "kits" || value === "requests" || value === "renewals" || value === "inventory" || value === "approvals") {
     return value;
   }
   return "inventory";
@@ -35,7 +35,7 @@ export default function ToolsPage() {
   const [managerTab, setManagerTab] = useState<ManagerTab>(() => {
     const tab = parseManagerTab(searchParams.get("tab"));
     if (searchParams.get("tab")) return tab;
-    return highlightId ? "requests" : "inventory";
+    return highlightId ? "approvals" : "inventory";
   });
   const [engineerTab, setEngineerTab] = useState<EngineerTab>(() =>
     highlightId ? "myrequests" : "mykit",
@@ -43,17 +43,18 @@ export default function ToolsPage() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "renewals" || tab === "requests" || tab === "kits" || tab === "inventory") {
+    if (tab === "renewals" || tab === "requests" || tab === "kits" || tab === "inventory" || tab === "approvals") {
       setManagerTab(tab);
       return;
     }
     if (!highlightId) return;
-    if (isManager) setManagerTab("requests");
+    if (isManager) setManagerTab("approvals");
     else setEngineerTab("myrequests");
   }, [highlightId, isManager, searchParams]);
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
-    padding: "7px 16px",
+    padding: "10px 16px",
+    minHeight: 40,
     borderRadius: 8,
     border: "none",
     cursor: "pointer",
@@ -80,17 +81,20 @@ export default function ToolsPage() {
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         {isManager ? (
           <>
+            <button type="button" style={tabBtn(managerTab === "approvals")} onClick={() => setManagerTab("approvals")}>
+              Cola de aprobación
+            </button>
             <button type="button" style={tabBtn(managerTab === "inventory")} onClick={() => setManagerTab("inventory")}>
-              Inventario
+              Inventario y fotos
             </button>
             <button type="button" style={tabBtn(managerTab === "kits")} onClick={() => setManagerTab("kits")}>
-              Kits por ingeniero
+              Kits por persona
             </button>
             <button type="button" style={tabBtn(managerTab === "requests")} onClick={() => setManagerTab("requests")}>
-              Solicitudes
+              Todos los préstamos
             </button>
             <button type="button" style={tabBtn(managerTab === "renewals")} onClick={() => setManagerTab("renewals")}>
-              Renovaciones / vencimientos
+              Renovaciones
             </button>
           </>
         ) : (
@@ -105,8 +109,32 @@ export default function ToolsPage() {
         )}
       </div>
 
+      {isManager && managerTab === "approvals" && (
+        <div style={{ display: "grid", gap: 12 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+            Aprueba o rechaza préstamos pendientes. Solo Christian e Iván tienen esta cola.
+          </p>
+          <ToolRequestsTable highlightId={highlightId} />
+        </div>
+      )}
       {isManager && managerTab === "inventory" && <ToolInventoryPanel />}
-      {isManager && managerTab === "kits" && <ToolUserKitPanel />}
+      {isManager && managerTab === "kits" && (
+        <div style={{ display: "grid", gap: 12 }}>
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              fontSize: 13,
+              color: "var(--text-secondary)",
+            }}
+          >
+            Kits permanentes por ingeniero: asignación, cadencia de revisión y eventos de daño.
+          </div>
+          <ToolUserKitPanel />
+        </div>
+      )}
       {isManager && managerTab === "requests" && <ToolRequestsTable highlightId={highlightId} />}
       {isManager && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
       {!isManager && engineerTab === "mykit" && <ToolMyKitPanel />}
