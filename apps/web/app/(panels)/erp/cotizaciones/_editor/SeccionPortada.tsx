@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { listSalesClients, type SalesClient } from "@/lib/sales-api";
 import { SEGMENTOS, SEGMENTO_LABEL, type Segmento } from "@/lib/cotizaciones-api";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
-import { Hoja, Segmentado, TextoAuto } from "./campos";
+import { Ayuda, Hoja, Segmentado, TextoAuto } from "./campos";
 import styles from "./editor.module.css";
 
 const QUE_CAMBIA: Record<Segmento, string> = {
@@ -103,7 +103,7 @@ export function ClienteCombo({
         value={doc.clientName}
         autoComplete="off"
         autoFocus={autoFocus}
-        placeholder="Busca en tus clientes o escribe uno nuevo"
+        placeholder="Buscar o escribir cliente"
         role="combobox"
         aria-expanded={mostrar}
         aria-controls={listaId}
@@ -147,9 +147,9 @@ export function ClienteCombo({
         </ul>
       ) : null}
       {doc.clientName.trim() && !doc.salesClientId && clientes && !exacto ? (
-        <p className={styles.pista}>
-          Cliente nuevo: se da de alta en el CRM al guardar.
-        </p>
+        <span className={styles.pastilla} title="Se da de alta en el CRM al guardar">
+          Cliente nuevo
+        </span>
       ) : null}
     </div>
   );
@@ -172,7 +172,12 @@ export default function SeccionPortada({
   esNueva: boolean;
 }) {
   return (
-    <Hoja id="portada" numero="" titulo="Portada" ayuda="Lo primero que ve el cliente: proyecto, cliente, fecha y versión.">
+    <Hoja
+      id="portada"
+      numero=""
+      titulo="Portada"
+      ayuda="Lo primero que ve el cliente: el título del proyecto, para quién es, la fecha y la versión. El folio lo emite el servidor al guardar."
+    >
       <div className={styles.campos}>
         <div className={styles.campo}>
           <label htmlFor="cot-proyecto" className={styles.etiqueta}>
@@ -183,7 +188,7 @@ export default function SeccionPortada({
             variante="portada"
             value={doc.projectName}
             onValor={(v) => cambiar((d) => ({ ...d, projectName: v.replace(/\n/g, " ") }))}
-            placeholder="p. ej. Renovación, mantenimiento y ampliación del sistema de CCTV"
+            placeholder="Renovación del sistema de CCTV"
             disabled={!editable}
           />
         </div>
@@ -215,8 +220,9 @@ export default function SeccionPortada({
           </div>
         </div>
         <div className={styles.campo}>
-          <span className={styles.etiqueta} id="cot-segmento">
-            Segmento
+          <span className={styles.etiquetaConAyuda}>
+            <span className={styles.etiqueta}>Segmento</span>
+            <Ayuda titulo="el segmento">{QUE_CAMBIA[doc.segmento]}</Ayuda>
           </span>
           <Segmentado
             etiqueta="Segmento"
@@ -225,7 +231,6 @@ export default function SeccionPortada({
             onValor={(s) => cambiar((d) => ({ ...d, segmento: s }))}
             deshabilitado={!editable}
           />
-          <p className={styles.pista}>{QUE_CAMBIA[doc.segmento]}</p>
         </div>
       </div>
     </Hoja>

@@ -2249,10 +2249,16 @@ select.celda {
 .interruptorCaja {
   appearance: none;
   -webkit-appearance: none;
-  flex: none;
+  flex: 0 0 30px;
+  align-self: flex-start;
+  box-sizing: border-box;
   position: relative;
   width: 30px;
+  min-width: 30px;
+  max-width: 30px;
   height: 18px;
+  min-height: 18px;
+  max-height: 18px;
   margin: 1px 0 0;
   border-radius: 999px;
   background: var(--doc-borde-fuerte);
@@ -2401,4 +2407,70 @@ select.celda {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* ─── Ayuda en ⓘ: la explicación existe, pero no ocupa la pantalla ────── */
+
+.ayuda {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.ayudaBtn {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--doc-borde-fuerte);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--doc-suave);
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ayudaBtn:hover,
+.ayudaBtn[aria-expanded="true"] {
+  border-color: var(--doc-acento);
+  color: var(--doc-acento-texto);
+}
+
+.ayudaBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--doc-anillo);
+  border-color: var(--doc-acento);
+}
+
+.ayudaGlobo {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 6px);
+  left: -8px;
+  width: max-content;
+  max-width: min(24rem, 70vw);
+  padding: 10px 12px;
+  border-radius: var(--doc-radio-campo);
+  border: 1px solid var(--doc-borde);
+  background: var(--doc-superficie);
+  color: var(--doc-suave);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 12px 28px color-mix(in srgb, #0f1c2e 16%, transparent);
+}
+
+/* Etiqueta de campo o bloque con su ⓘ al lado. */
+.etiquetaConAyuda {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }

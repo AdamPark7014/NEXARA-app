@@ -7,6 +7,7 @@ import {
   useImperativeHandle,
   useLayoutEffect,
   useRef,
+  useState,
   type KeyboardEvent,
   type ReactNode,
   type TextareaHTMLAttributes,
@@ -205,9 +206,50 @@ export function ListaEditable({
 }
 
 /**
- * Una sección del documento. Todas con el mismo encabezado: número pequeño en verde, título y una
- * línea de ayuda; acciones secundarias a la derecha. `data-seccion` es lo que usa la vista previa
- * para saber dónde está el cursor.
+ * Ayuda en un ⓘ: la explicación existe, pero no ocupa la pantalla. Se abre al hacer clic y se
+ * cierra con Escape o al hacer clic fuera.
+ */
+export function Ayuda({ titulo, children }: { titulo: string; children: ReactNode }) {
+  const [abierta, setAbierta] = useState(false);
+  const caja = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!abierta) return;
+    const fuera = (e: MouseEvent) => {
+      if (!caja.current?.contains(e.target as Node)) setAbierta(false);
+    };
+    document.addEventListener("mousedown", fuera);
+    return () => document.removeEventListener("mousedown", fuera);
+  }, [abierta]);
+  return (
+    <span
+      className={styles.ayuda}
+      ref={caja}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setAbierta(false);
+      }}
+    >
+      <button
+        type="button"
+        className={styles.ayudaBtn}
+        aria-label={`Qué es ${titulo}`}
+        aria-expanded={abierta}
+        onClick={() => setAbierta((v) => !v)}
+      >
+        i
+      </button>
+      {abierta ? (
+        <span role="note" className={styles.ayudaGlobo}>
+          {children}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * Una sección del documento. Todas con el mismo encabezado: número pequeño en verde, título y —si
+ * hace falta— un ⓘ con la explicación; acciones secundarias a la derecha. `data-seccion` es lo que
+ * usa la vista previa para saber dónde está el cursor.
  */
 export function Hoja({
   id,
@@ -273,8 +315,8 @@ export function Hoja({
               {numero ? <span className={styles.soloLector}>{numero}. </span> : null}
               {titulo}
             </h2>
+            {ayuda ? <Ayuda titulo={titulo}>{ayuda}</Ayuda> : null}
           </div>
-          {ayuda ? <p className={styles.ayudaSeccion}>{ayuda}</p> : null}
         </div>
         {acciones ? <div className={styles.hojaAcciones}>{acciones}</div> : null}
       </div>

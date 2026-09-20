@@ -12,6 +12,7 @@ import {
   type CotizacionDetalle,
   type VersionCotizacion,
 } from "@/lib/cotizaciones-api";
+import { Ayuda } from "./campos";
 import Dialogo from "./Dialogo";
 import FolioExplicado from "./FolioExplicado";
 import styles from "./editor.module.css";
@@ -62,12 +63,14 @@ export default function Seguimiento({
     <section id="seguimiento" className={styles.seguimiento} aria-labelledby="seguimiento-titulo">
       <div className={styles.hojaCabeza}>
         <div className={styles.hojaTitulos}>
-          <h2 id="seguimiento-titulo" className={styles.tituloSeccion}>
-            Seguimiento
-          </h2>
-          <p className={styles.ayudaSeccion}>
-            Cómo se lee el folio, quién intervino y qué versiones salieron. Esto no va en el PDF.
-          </p>
+          <div className={styles.hojaLinea}>
+            <h2 id="seguimiento-titulo" className={styles.tituloSeccion}>
+              Seguimiento
+            </h2>
+            <Ayuda titulo="el seguimiento">
+              Cómo se lee el folio, quién intervino y qué versiones salieron. Esto no va en el PDF.
+            </Ayuda>
+          </div>
         </div>
         <div className={styles.hojaAcciones}>
           {estado !== "APROBADA" ? (

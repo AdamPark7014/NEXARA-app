@@ -68,7 +68,7 @@ export default function SeccionAlcance({
   const panel = verPlantillas ? (
     <div className={styles.panelPlantillas}>
       <div className={styles.panelPlantillasCabeza}>
-        <span>Subsecciones de la propuesta modelo · se agregan al final y las ajustas</span>
+        <span>Subsecciones del segmento</span>
         <button type="button" className={styles.ghostBtn} onClick={() => setVerPlantillas(false)}>
           Cerrar
         </button>
@@ -103,7 +103,7 @@ export default function SeccionAlcance({
       id="alcance"
       numero="02"
       titulo="Alcance del proyecto"
-      ayuda="Qué se hace, por subsección: título, párrafos y viñetas."
+      ayuda="Qué se hace, subsección por subsección: título, párrafos y viñetas. El PDF las numera; una subsección sin título sale como párrafo suelto. Sin subsecciones, el documento remite a la sección 04."
       acciones={
         editable ? (
           <button type="button" className={styles.secondaryBtn} onClick={() => setVerPlantillas((v) => !v)} aria-expanded={verPlantillas}>
@@ -208,7 +208,7 @@ export default function SeccionAlcance({
                 <TextoAuto
                   value={b.texto}
                   onValor={(v) => cambiarBloque(b.key, { texto: v })}
-                  placeholder="Párrafo: qué se hace y con qué alcance. Enter para otro párrafo."
+                  placeholder="Qué se hace y con qué alcance"
                   aria-label={`Párrafo de la subsección ${i + 1}`}
                   disabled={!editable}
                 />
@@ -242,9 +242,7 @@ export default function SeccionAlcance({
               </>
             }
           >
-            La propuesta modelo tiene doce: modernización del grabador, mantenimiento, diagnóstico, ampliación,
-            analíticos, puesta en marcha, almacenamiento, consideraciones, exclusiones y entrega. Agrega las que
-            apliquen y cambia las cifras por las de este proyecto.
+            Elige de las plantillas del segmento y ajusta las cifras.
           </Vacio>
         </div>
       ) : (

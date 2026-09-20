@@ -8,7 +8,7 @@ import {
   type PaqueteCotizacion,
 } from "@/lib/cotizaciones-api";
 import { sumarDias, totalesDePartidas, type DocumentoCotizacion, type PartidaEditor } from "@/lib/cotizacion-documento";
-import { Hoja, Segmentado, TextoAuto } from "./campos";
+import { Ayuda, Hoja, Segmentado, TextoAuto } from "./campos";
 import TablaPartidas from "./TablaPartidas";
 import styles from "./editor.module.css";
 
@@ -82,7 +82,7 @@ export default function SeccionCotizacion({
       id="cotizacion"
       numero="04"
       titulo="Cotización"
-      ayuda="La tabla del PDF: partidas, subtotal, IVA, total y términos."
+      ayuda="La hoja de cotización del PDF: datos del cliente, tabla de partidas con subtotal, IVA y total, términos y firma. El folio y la moneda salen de la portada y de Personalizar."
       acciones={
         editable ? (
           <button
@@ -127,7 +127,7 @@ export default function SeccionCotizacion({
         </div>
         <div className={styles.campo}>
           <label className={styles.etiqueta} htmlFor="cot-correo">
-            Correo (para enviarla)
+            Correo
           </label>
           <input
             id="cot-correo"
@@ -188,7 +188,13 @@ export default function SeccionCotizacion({
       {verPaquetes && editable ? (
         <div className={styles.panelPlantillas}>
           <div className={styles.panelPlantillasCabeza}>
-            <span>Un paquete agrega todas sus partidas y su subsección de alcance, con la cantidad que pongas.</span>
+            <span className={styles.etiquetaConAyuda}>
+              <span className={styles.etiqueta}>Paquetes</span>
+              <Ayuda titulo="los paquetes">
+                Un paquete agrega todas sus partidas y su subsección de alcance, con la cantidad que pongas; si lo
+                vuelves a aplicar, se recalcula.
+              </Ayuda>
+            </span>
             <button type="button" className={styles.ghostBtn} onClick={() => setVerPaquetes(false)}>
               Cerrar
             </button>
@@ -227,15 +233,24 @@ export default function SeccionCotizacion({
               </div>
             ))}
           </div>
-          {!detalle ? <p className={styles.pista}>Los paquetes se habilitan en cuanto el borrador se guarda.</p> : null}
+          {!detalle ? <p className={styles.pista}>Se habilitan al guardarse el borrador.</p> : null}
         </div>
       ) : null}
 
       <div className={styles.bloque}>
         <div className={styles.bloqueCabeza}>
-          <span className={styles.etiqueta}>Partidas</span>
-          {editable ? (
-            <span className={styles.pista}>Enter agrega una fila · Tab cambia de celda · ↑↓ cambian de fila</span>
+          <span className={styles.etiquetaConAyuda}>
+            <span className={styles.etiqueta}>Partidas</span>
+            {editable ? (
+              <Ayuda titulo="la tabla de partidas">
+                Enter agrega una fila · Tab cambia de celda · ↑↓ cambian de fila · Retroceso en una descripción vacía
+                quita la fila. La última fila busca en el catálogo mientras escribes; el menú ⋯ de cada renglón tiene
+                el grupo (equipos, materiales o mano de obra), subir, bajar y quitar.
+              </Ayuda>
+            ) : null}
+          </span>
+          {editable && !doc.partidas.length ? (
+            <span className={styles.pista}>Escribe la primera partida y presiona Enter</span>
           ) : null}
         </div>
         <TablaPartidas
@@ -251,14 +266,15 @@ export default function SeccionCotizacion({
 
       <div className={styles.bloque}>
         <div className={styles.bloqueCabeza}>
-          <span className={styles.etiqueta}>Términos y condiciones</span>
-          <span className={styles.pista}>
-            {!terminosIncluidos
-              ? "No van en el PDF de esta cotización (Personalizar)."
-              : detalle
-                ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Vienen del segmento; lo que reescribas se queda.`
+          <span className={styles.etiquetaConAyuda}>
+            <span className={styles.etiqueta}>Términos y condiciones</span>
+            <Ayuda titulo="los términos">
+              {detalle
+                ? `${MODALIDAD[detalle.terminos.modalidad] ?? ""} Cada término viene del segmento y de lo que cobras; si lo reescribes, se queda como lo escribiste («Restablecer» lo devuelve). El anticipo, la vigencia, el tiempo de entrega y la garantía se cambian en Personalizar.`
                 : "Se arman al guardar, según el segmento y lo que cobres."}
+            </Ayuda>
           </span>
+          {!terminosIncluidos ? <span className={styles.pista}>No van en el PDF (Personalizar)</span> : null}
           {!terminosIncluidos && editable && onIncluirTerminos ? (
             <button type="button" className={styles.secondaryBtn} onClick={onIncluirTerminos}>
               Incluir
@@ -314,7 +330,7 @@ export default function SeccionCotizacion({
                     value={valor}
                     disabled={!editable}
                     aria-label={tituloDe(clave)}
-                    placeholder={clave === "otras" ? "Otra condición (opcional): garantías, tiempos de entrega, moneda…" : ""}
+                    placeholder={clave === "otras" ? "Otra condición" : ""}
                     onValor={(v) =>
                       cambiar((d) => {
                         const terminos = { ...d.terminos };
@@ -330,13 +346,13 @@ export default function SeccionCotizacion({
             {doc.opciones.condiciones.tiempoEntrega.trim() ? (
               <li className={styles.termino}>
                 <span className={styles.terminoTitulo}>Tiempo de entrega</span>
-                <p className={styles.pista}>{doc.opciones.condiciones.tiempoEntrega} · se cambia en Personalizar</p>
+                <p className={styles.pista}>{doc.opciones.condiciones.tiempoEntrega}</p>
               </li>
             ) : null}
             {doc.opciones.condiciones.garantia.trim() ? (
               <li className={styles.termino}>
                 <span className={styles.terminoTitulo}>Garantía</span>
-                <p className={styles.pista}>{doc.opciones.condiciones.garantia} · se cambia en Personalizar</p>
+                <p className={styles.pista}>{doc.opciones.condiciones.garantia}</p>
               </li>
             ) : null}
             <li className={styles.termino}>

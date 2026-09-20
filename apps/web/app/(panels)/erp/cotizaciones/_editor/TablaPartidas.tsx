@@ -652,7 +652,7 @@ function FilaNueva({
           onChange={(e) => setNombre(e.target.value)}
           onKeyDown={alTeclear}
           onBlur={() => setTimeout(() => setOfertas([]), 150)}
-          placeholder={sinCatalogo ? "Nueva partida…" : "Nueva partida: escribe o busca en el catálogo"}
+          placeholder="Nueva partida"
           aria-label="Descripción de la nueva partida"
           role="combobox"
           aria-expanded={ofertas.length > 0}

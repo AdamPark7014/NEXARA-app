@@ -61,7 +61,7 @@ export default function SeccionObjetivo({
       id="objetivo"
       numero="01"
       titulo="Objetivo del proyecto"
-      ayuda="Qué gana el cliente. Lo que dejes vacío lo completa el PDF con la plantilla del segmento."
+      ayuda="Qué gana el cliente. El PDF lo imprime como introducción, «Entre los principales beneficios se encuentran:» con la lista, y cierre. Lo que dejes vacío lo completa con la plantilla del segmento y las cifras de tus partidas."
       acciones={
         editable ? (
           <button type="button" className={styles.secondaryBtn} onClick={pedirBorrador}>
@@ -99,8 +99,7 @@ export default function SeccionObjetivo({
               </>
             }
           >
-            El borrador toma la entrada y el cierre del segmento y arma los beneficios con las cantidades
-            de tus partidas («15 equipos nuevos…»), para que el texto y la tabla digan lo mismo.
+            Con el texto del segmento y las cifras de tus partidas.
           </Vacio>
         </div>
       ) : null}
@@ -121,7 +120,7 @@ export default function SeccionObjetivo({
       </div>
 
       <div className={styles.campo}>
-      <span className={styles.etiqueta}>Beneficios · «Entre los principales beneficios se encuentran:»</span>
+      <span className={styles.etiqueta}>Beneficios</span>
       <ListaEditable
         items={objetivo.beneficios}
         onCambio={(beneficios) => cambiar((d) => ({ ...d, objetivo: { ...d.objetivo, beneficios } }))}
@@ -133,7 +132,7 @@ export default function SeccionObjetivo({
       />
       {!beneficiosEscritos.length && sugerido?.beneficios.length ? (
         <div className={styles.sugerido}>
-          Si lo dejas vacío, el PDF pone estos (salen de tus partidas):
+          El PDF pondría:
           <ol>
             {sugerido.beneficios.map((b) => (
               <li key={b}>{b}</li>
