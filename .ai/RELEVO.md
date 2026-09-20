@@ -3,7 +3,7 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** (pendiente cerrar) — open points 1/2/4; **no** toca cotizaciones de prueba
+- **HEAD:** Contabilidad UX llana (no-contador)
 
 ## Puente — no cambiar
 
@@ -11,36 +11,31 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-Adam: cerrar todos los puntos abiertos excepto las 12 cotizaciones de prueba.
+Adam: Contabilidad se veía ineficiente, sucia, poco intuitiva; debía usarla cualquiera sin ser contador.
 
-### 1) Enlaces CRM/OPS → ya no van a subdominios muertos
-- `CORE_SURFACE_ONLY`: `buildCrossPanelUrl` remapea con `coreSurfaceRedirect` y **nunca** salta a sales/ops.
-- CRM ola1: `/crm/quotes|clients|projects` → `/erp/cotizaciones|clientes|proyectos` (con id).
-- Specs: handoff + legacy-path-remap en verde.
+### Menú
+- Etiquetas en tareas humanas: Me deben, Debo pagar, Cuadrar banco, Entradas y salidas…
+- Primario siempre visible; el resto en **Más opciones** (pólizas, auditoria, cierres…).
 
-### 2) Catálogo de cuentas base (~80)
-- `apps/api/src/accounting/base-chart-of-accounts.ts`
-- `POST /accounting/accounts/seed-base` (solo crea faltantes)
-- Botón «Cargar catálogo base» en pólizas/tab cuentas
-- Hub arranque: copy actualizado
-- `209.01` sigue siendo IVA acreditable (asientos auto); IVA por pagar = `216.01`
+### Hub `/erp/contabilidad`
+- Título: «¿Qué hay que hacer hoy?»
+- Solo 3 cifras: En el banco / Me deben / Debo pagar
+- Tabla de vencimientos → 3 atajos (Cobrar / Pagar / Cuadrar banco)
+- Copy de arranque y pasos en español llano
+- CTA: «Resolver lo pendiente» / «Ver a quién cobrar»
 
-### 4) Build no silencia tipos
-- `scripts/next-build-resilient.js`: reintento **solo OOM 137** con más heap; type-check ON. Fallo de tipos → exit del primer intento.
-
-### Excluido (pedido Adam)
-- Punto 3: no borrar las 12 cotizaciones de prueba en prod.
+Sin cambiar rutas ni permisos.
 
 ## A medias
 
-- Deploy de este turno (push + force-all) tras cerrar.
-- Módulos CRM fuera de ola1 (leads, pipeline…) siguen cayendo a pizarra en Core-only — no tienen home /erp aún.
+- Deploy de este UX a Hetzner.
+- Pantallas hijas (facturas, CxC…) aún pueden tener jerga interna — siguiente ola si Adam lo pide.
 
 ## Siguiente
 
-1. Deploy Hetzner.
-2. Smoke: link CRM/OPS desde Contabilidad/ERP; seed catálogo; build sin IGNORE_TYPE_ERRORS.
+1. Deploy + smoke hub Contabilidad.
+2. Si sigue «sucio»: limpiar CxC/CxP/facturas con el mismo criterio.
 
 ## No tocar
 
-Puente NAS · cotizaciones de prueba (punto 3).
+Puente NAS · cotizaciones de prueba.

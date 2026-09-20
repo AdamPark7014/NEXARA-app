@@ -55,37 +55,37 @@ export type Destino = {
 export const DESTINOS = {
   catalogoCuentas: {
     href: "/erp/contabilidad/polizas?tab=cuentas",
-    etiqueta: "Cargar catálogo base",
-    loHace: "quien lleva la contabilidad general",
+    etiqueta: "Cargar lista de cuentas",
+    loHace: "quien lleva el dinero",
   },
   periodoFiscal: {
     href: "/erp/contabilidad/polizas?tab=cuentas",
-    etiqueta: "Crear el periodo fiscal",
-    loHace: "quien lleva la contabilidad general",
+    etiqueta: "Abrir el mes",
+    loHace: "quien lleva el dinero",
   },
   poliza: {
     href: "/erp/contabilidad/polizas?tab=polizas",
-    etiqueta: "Registrar una póliza",
-    loHace: "quien lleva la contabilidad general",
+    etiqueta: "Registrar un asiento",
+    loHace: "quien lleva el dinero",
   },
   presupuesto: {
     href: "/erp/contabilidad/polizas?tab=presupuestos",
     etiqueta: "Crear un presupuesto",
-    loHace: "quien lleva la contabilidad general",
+    loHace: "quien lleva el dinero",
   },
   cuentaBancaria: {
     href: "/erp/banking",
-    etiqueta: "Dar de alta la cuenta",
+    etiqueta: "Agregar cuenta bancaria",
     loHace: "quien administra los bancos",
   },
   bancos: {
     href: "/erp/banking",
-    etiqueta: "Ir a Bancos",
+    etiqueta: "Ir a bancos",
     loHace: "quien administra los bancos",
   },
   factura: {
     href: "/erp/invoicing",
-    etiqueta: "Ir a facturación",
+    etiqueta: "Hacer una factura",
     loHace: "quien factura",
   },
   proveedor: {
