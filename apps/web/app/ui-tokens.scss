@@ -11,13 +11,28 @@
    - Bordes de 1 px, sin sombras pesadas. Radio 8 px (tarjetas 12 px).
    - Espaciado 4 / 8 / 12 / 16 / 24 / 32.
    El modo oscuro sigue siendo `body.dark` (ThemeContext).
+
+   Documentación de uso: `.ai/DISENO-TOKENS.md`
+   Este archivo se importa EL ÚLTIMO en `app/layout.tsx`, por lo que también
+   aloja la capa de compatibilidad del final (alias globales).
    ============================================================ */
 
 :root {
+  /* Pilas tipográficas de las que cuelga todo lo demás.
+     `--nx-font-app` / `--ds-font-mono` / `--nx-font-mono` se declaran aquí
+     porque `--ui-font*` los consume desde `:root` (html) y no vería una
+     definición puesta más abajo, en `body`. Los valores replican el
+     fallback que ya se estaba aplicando: no cambian nada visualmente. */
+  --nx-font-app: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ds-font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  --nx-font-mono: var(--ds-font-mono);
+
   --ui-font: var(--nx-font-app, "Inter"), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --ui-font-mono: var(--ds-font-mono, "JetBrains Mono"), ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
 
-  /* Tipografía */
+  /* ----------------------------------------------------------
+     Tipografía · tamaños crudos (escala heredada, se conserva)
+     ---------------------------------------------------------- */
   --ui-text-xs: 12px;
   --ui-text-sm: 13px;
   --ui-text-base: 14px;
@@ -25,61 +40,196 @@
   --ui-text-title: 20px;
   --ui-text-stat: 24px;
 
-  /* Neutros */
-  --ui-fg: #0f172a;
-  --ui-fg-2: #475569;
-  --ui-fg-3: #94a3b8;
-  --ui-border: #e2e8f0;
-  --ui-border-strong: #cbd5e1;
-  --ui-bg: #f8fafc;
-  --ui-surface: #ffffff;
-  --ui-surface-2: #f8fafc;
+  /* ----------------------------------------------------------
+     Tipografía · escala POR PAPEL (la que hay que usar)
+     Seis papeles, ni uno más. Cada papel = tamaño + interlineado +
+     peso + tracking. Los tamaños apuntan a la escala cruda de arriba,
+     así que esto NO cambia ningún píxel de lo que ya existe.
+     ---------------------------------------------------------- */
+
+  /* Título de página — el H1 de cada pantalla, uno por vista */
+  --ui-fs-page: var(--ui-text-title); /* 20px */
+  --ui-lh-page: 1.25;
+  --ui-fw-page: 650;
+  --ui-tracking-page: -0.015em;
+
+  /* Título de sección — encabezado de tarjeta, bloque o grupo */
+  --ui-fs-section: var(--ui-text-lg); /* 16px */
+  --ui-lh-section: 1.3;
+  --ui-fw-section: 600;
+  --ui-tracking-section: -0.008em;
+
+  /* Cuerpo — texto por defecto de la interfaz, celdas de tabla, párrafos */
+  --ui-fs-body: var(--ui-text-base); /* 14px */
+  --ui-lh-body: 1.5;
+  --ui-fw-body: 400;
+  --ui-tracking-body: normal;
+
+  /* Etiqueta — label de campo, botón, pestaña, encabezado de columna */
+  --ui-fs-label: var(--ui-text-sm); /* 13px */
+  --ui-lh-label: 1.35;
+  --ui-fw-label: 550;
+  --ui-tracking-label: normal;
+
+  /* Metadato — fecha, contador, texto de apoyo bajo un campo, badge */
+  --ui-fs-meta: var(--ui-text-xs); /* 12px */
+  --ui-lh-meta: 1.4;
+  --ui-fw-meta: 500;
+  --ui-tracking-meta: normal;
+
+  /* Leyenda — el escalón más bajo: pie de gráfica, nota legal, overline */
+  --ui-fs-caption: 11px;
+  --ui-lh-caption: 1.35;
+  --ui-fw-caption: 500;
+  --ui-tracking-caption: 0.02em;
+
+  /* Cifra — KPI / métrica destacada (no es un papel de texto, es un dato) */
+  --ui-fs-stat: var(--ui-text-stat); /* 24px */
+  --ui-lh-stat: 1.15;
+  --ui-fw-stat: 650;
+  --ui-tracking-stat: -0.02em;
+
+  /* Números tabulares para columnas de importes */
+  --ui-numeric: "tnum" on, "lnum" on;
+
+  /* ----------------------------------------------------------
+     Superficies · escala real de tres peldaños
+     surface-0 (fondo de página) < surface (tarjeta) < surface-3 (elevada)
+     `--ui-surface-2` es la superficie *hundida* (zebra, thead, wells).
+     ---------------------------------------------------------- */
+  --ui-bg: #f4f7fa; /* fondo de página */
+  --ui-surface: #ffffff; /* superficie 1 — tarjeta, panel, modal */
+  --ui-surface-2: #f8fafc; /* superficie hundida — thead, zebra, well */
+  --ui-surface-3: #ffffff; /* superficie elevada — popover, dropdown, tooltip */
   --ui-hover: #f1f5f9;
+  --ui-active: #e7edf4;
   --ui-track: #eef2f6;
 
-  /* Marca */
+  /* Alias de lectura (mismo valor, nombre por papel) */
+  --ui-surface-0: var(--ui-bg);
+  --ui-surface-1: var(--ui-surface);
+  --ui-surface-sunken: var(--ui-surface-2);
+  --ui-surface-raised: var(--ui-surface-3);
+  --ui-bg-2: var(--ui-surface-2);
+
+  /* ----------------------------------------------------------
+     Texto · cuatro niveles
+     ---------------------------------------------------------- */
+  --ui-fg: #0f172a; /* primario */
+  --ui-fg-2: #475569; /* secundario */
+  --ui-fg-3: #94a3b8; /* terciario / apagado */
+  --ui-fg-4: #b6c1cf; /* deshabilitado */
+  --ui-fg-disabled: var(--ui-fg-4);
+  --ui-fg-muted: var(--ui-fg-3);
+  --ui-fg-on-brand: #ffffff;
+
+  /* ----------------------------------------------------------
+     Bordes · tres pesos
+     ---------------------------------------------------------- */
+  --ui-border-subtle: #eef2f6; /* separadores internos, filas de tabla */
+  --ui-border: #e2e8f0; /* borde por defecto de tarjeta / control */
+  --ui-border-strong: #cbd5e1; /* hover, control enfocado, divisor mayor */
+
+  /* ----------------------------------------------------------
+     Marca
+     ---------------------------------------------------------- */
   --ui-brand: #1f9e84;
   --ui-brand-hover: #1a8972;
   --ui-brand-fg: #ffffff;
   --ui-brand-text: #147a65;
   --ui-brand-soft: #e8f6f2;
+  --ui-brand-bg: var(--ui-brand-soft);
+  --ui-brand-border: color-mix(in srgb, #1f9e84 30%, transparent);
   --ui-ring: 0 0 0 3px color-mix(in srgb, #1f9e84 26%, transparent);
+  --ui-ring-danger: 0 0 0 3px color-mix(in srgb, #dc2626 24%, transparent);
+  --ui-focus-ring: var(--ui-ring);
 
-  /* Estados: texto legible + fondo tenue */
+  /* ----------------------------------------------------------
+     Semánticos · cada estado trae relleno, fondo tenue, borde y
+     dos textos: `-text` (sobre fondo tenue) y `-fg` (sobre relleno).
+     ---------------------------------------------------------- */
   --ui-success: #16a34a;
   --ui-success-text: #15803d;
   --ui-success-bg: #f0fdf4;
+  --ui-success-border: color-mix(in srgb, #16a34a 30%, transparent);
+  --ui-success-fg: #ffffff;
+
   --ui-warning: #d97706;
   --ui-warning-text: #b45309;
   --ui-warning-bg: #fffbeb;
+  --ui-warning-border: color-mix(in srgb, #d97706 32%, transparent);
+  --ui-warning-fg: #241503;
+
   --ui-danger: #dc2626;
   --ui-danger-text: #b91c1c;
   --ui-danger-bg: #fef2f2;
+  --ui-danger-border: color-mix(in srgb, #dc2626 30%, transparent);
+  --ui-danger-fg: #ffffff;
+
   --ui-info: #0284c7;
   --ui-info-text: #0369a1;
   --ui-info-bg: #f0f9ff;
+  --ui-info-border: color-mix(in srgb, #0284c7 30%, transparent);
+  --ui-info-fg: #ffffff;
+
   --ui-violet: #7c3aed;
   --ui-violet-text: #6d28d9;
   --ui-violet-bg: #f5f3ff;
+  --ui-violet-border: color-mix(in srgb, #7c3aed 30%, transparent);
+  --ui-violet-fg: #ffffff;
+
+  --ui-neutral: #64748b;
   --ui-neutral-text: #475569;
   --ui-neutral-bg: #f1f5f9;
+  --ui-neutral-border: #e2e8f0;
+  --ui-neutral-fg: #ffffff;
 
-  /* Forma */
+  /* ----------------------------------------------------------
+     Forma
+     ---------------------------------------------------------- */
+  --ui-radius-sm: 6px;
   --ui-radius: 8px;
   --ui-radius-lg: 12px;
+  --ui-radius-xl: 16px;
   --ui-radius-pill: 999px;
-  --ui-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --ui-shadow-pop: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.1);
 
-  /* Espaciado */
+  /* ----------------------------------------------------------
+     Elevación · muy contenida. Nada por encima de `pop`.
+     Sin degradados y sin desenfoque: la profundidad es
+     superficie + borde, y la sombra solo la remata.
+     ---------------------------------------------------------- */
+  --ui-elev-0: none;
+  --ui-elev-1: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --ui-elev-2: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 10px rgba(15, 23, 42, 0.06);
+  --ui-elev-pop: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.1);
+  --ui-shadow-sm: var(--ui-elev-1);
+  --ui-shadow-pop: var(--ui-elev-pop);
+
+  /* ----------------------------------------------------------
+     Movimiento
+     ---------------------------------------------------------- */
+  --ui-duration-fast: 120ms; /* hover, foco, cambio de color */
+  --ui-duration-base: 180ms; /* despliegue, acordeón, tab */
+  --ui-duration-slow: 260ms; /* modal, drawer, entrada de página */
+  --ui-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ui-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ui-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ----------------------------------------------------------
+     Espaciado · 2 / 4 / 8 / 12 / 16 / 24 / 32 / 48
+     ---------------------------------------------------------- */
+  --ui-s0: 2px;
   --ui-s1: 4px;
   --ui-s2: 8px;
   --ui-s3: 12px;
   --ui-s4: 16px;
   --ui-s5: 24px;
   --ui-s6: 32px;
+  --ui-s7: 48px;
 
-  /* Medidas */
+  /* ----------------------------------------------------------
+     Medidas
+     ---------------------------------------------------------- */
   --ui-control-h: 32px;
   --ui-control-h-lg: 36px;
   --ui-row-h: 40px;
@@ -88,44 +238,84 @@
 }
 
 body.dark {
+  /* Superficies — el mismo orden: fondo < superficie < elevada */
+  --ui-bg: #0b1120;
+  --ui-surface: #0f172a;
+  --ui-surface-2: #111a2e; /* hundida */
+  --ui-surface-3: #16213a; /* elevada: un peldaño POR ENCIMA de surface */
+  --ui-hover: #172136;
+  --ui-active: #1d2942;
+  --ui-track: #1b2438;
+
+  /* Texto */
   --ui-fg: #e2e8f0;
   --ui-fg-2: #94a3b8;
   --ui-fg-3: #64748b;
+  --ui-fg-4: #4a5569;
+  --ui-fg-on-brand: #ffffff;
+
+  /* Bordes */
+  --ui-border-subtle: #16202f;
   --ui-border: #1e293b;
   --ui-border-strong: #334155;
-  --ui-bg: #0b1120;
-  --ui-surface: #0f172a;
-  --ui-surface-2: #111a2e;
-  --ui-hover: #172136;
-  --ui-track: #1b2438;
 
+  /* Marca */
   --ui-brand: #1f9e84;
   --ui-brand-hover: #25b193;
   --ui-brand-fg: #ffffff;
   --ui-brand-text: #3cc9a9;
   --ui-brand-soft: color-mix(in srgb, #1f9e84 16%, transparent);
+  --ui-brand-bg: var(--ui-brand-soft);
+  --ui-brand-border: color-mix(in srgb, #3cc9a9 34%, transparent);
   --ui-ring: 0 0 0 3px color-mix(in srgb, #3cc9a9 32%, transparent);
+  --ui-ring-danger: 0 0 0 3px color-mix(in srgb, #ef4444 34%, transparent);
 
+  /* Semánticos — en oscuro el relleno aclara, así que el texto que va
+     ENCIMA del relleno (`-fg`) se oscurece para seguir siendo legible. */
   --ui-success: #22c55e;
   --ui-success-text: #4ade80;
   --ui-success-bg: color-mix(in srgb, #22c55e 12%, transparent);
+  --ui-success-border: color-mix(in srgb, #22c55e 34%, transparent);
+  --ui-success-fg: #052e14;
+
   --ui-warning: #f59e0b;
   --ui-warning-text: #fbbf24;
   --ui-warning-bg: color-mix(in srgb, #f59e0b 12%, transparent);
+  --ui-warning-border: color-mix(in srgb, #f59e0b 34%, transparent);
+  --ui-warning-fg: #241503;
+
   --ui-danger: #ef4444;
   --ui-danger-text: #f87171;
   --ui-danger-bg: color-mix(in srgb, #ef4444 12%, transparent);
+  --ui-danger-border: color-mix(in srgb, #ef4444 34%, transparent);
+  --ui-danger-fg: #2a0707;
+
   --ui-info: #38bdf8;
   --ui-info-text: #7dd3fc;
   --ui-info-bg: color-mix(in srgb, #38bdf8 12%, transparent);
+  --ui-info-border: color-mix(in srgb, #38bdf8 34%, transparent);
+  --ui-info-fg: #04202e;
+
   --ui-violet: #a78bfa;
   --ui-violet-text: #c4b5fd;
   --ui-violet-bg: color-mix(in srgb, #a78bfa 14%, transparent);
+  --ui-violet-border: color-mix(in srgb, #a78bfa 34%, transparent);
+  --ui-violet-fg: #1b1132;
+
+  --ui-neutral: #94a3b8;
   --ui-neutral-text: #cbd5e1;
   --ui-neutral-bg: #1e293b;
+  --ui-neutral-border: #334155;
+  --ui-neutral-fg: #0f172a;
 
-  --ui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --ui-shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.45);
+  /* Elevación — en oscuro la sombra pesa más porque el contraste
+     de superficie es menor, pero sigue sin marcarse. */
+  --ui-elev-0: none;
+  --ui-elev-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ui-elev-2: 0 1px 2px rgba(0, 0, 0, 0.34), 0 6px 16px rgba(0, 0, 0, 0.38);
+  --ui-elev-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.45);
+  --ui-shadow-sm: var(--ui-elev-1);
+  --ui-shadow-pop: var(--ui-elev-pop);
 }
 
 /* ------------------------------------------------------------
@@ -149,4 +339,96 @@ body.dark {
 .nx-app-shell ::selection {
   background: color-mix(in srgb, var(--ui-brand) 22%, transparent);
   color: inherit;
+}
+
+/* ============================================================
+   CAPA DE COMPATIBILIDAD — alias de tokens huérfanos
+   ------------------------------------------------------------
+   La auditoría encontró nombres que el código consume pero que
+   nunca se declararon en ninguna hoja. Sin definición, `var(--x)`
+   sin fallback invalida la propiedad: el borde cae a `currentColor`
+   y el fondo a transparente. Eso es la mitad de lo «sucio» que se ve.
+
+   Aquí cada huérfano queda enganchado al token semántico que ya
+   existe, con el mismo valor que la mayoría de los fallbacks locales
+   tenía, así que no se rediseña nada: se termina de conectar.
+
+   Se declara en `body` y también en los dos ámbitos que reescriben
+   los semánticos (`.public-friendly`, `[data-nx-panel="web"]`) para
+   que el alias se resuelva contra el valor de ESE ámbito y no contra
+   el de `body`.
+   ============================================================ */
+body,
+.public-friendly,
+[data-nx-panel="web"] {
+  /* Superficies */
+  --bg: var(--background);
+  --bg-primary: var(--background);
+  --surface-alt: var(--surface-2);
+  --surface-elevated: var(--background-elevated);
+  --card-bg: var(--surface);
+
+  /* Texto */
+  --text: var(--text-primary);
+  --text-2: var(--text-secondary);
+  --text-3: var(--text-tertiary);
+  --muted-foreground: var(--text-tertiary);
+
+  /* Bordes */
+  --border-color: var(--border);
+
+  /* Semánticos */
+  --positive: var(--success);
+  --state-success: var(--success);
+  --state-error: var(--danger);
+  --panel-accent: var(--primary);
+
+  /* Elevación */
+  --elev-sm: var(--nx-panel-elev-1);
+  --elev-md: var(--nx-panel-elev-2);
+
+  /* Layout */
+  --page-padding-bottom: var(--page-padding-y);
+
+  /* Tipografía heredada de la plantilla de Next (create-next-app).
+     Se mantiene el nombre porque `app/page.module.css` lo usa; el valor
+     pasa a ser la pila real del producto. */
+  --font-geist-sans: var(--font-base);
+  --font-geist-mono: var(--ui-font-mono);
+
+  /* ----------------------------------------------------------
+     Sitio público · tokens que el CSS consumía sin que nadie los
+     declarara. `background`, `box-shadow` y `border-radius` con un
+     `var()` inválido se anulan (transparente, sin sombra, radio 0) y
+     `border-color` cae a `currentColor`: de ahí el hero sin fondo y
+     los bordes del color del texto. Se enganchan a los semánticos.
+     ---------------------------------------------------------- */
+  --public-border: var(--border);
+  --public-surface-strong: var(--surface);
+  --public-hero-bg: var(--background-elevated);
+  --public-shadow: var(--shadow);
+  --public-radius-xl: var(--nx-radius-xl);
+  --public-nav-pill: var(--surface-2);
+  --public-nav-pill-active: var(--primary-soft);
+  --public-nav-text: var(--text-secondary);
+}
+
+/* `--elev-1` / `--elev-2` viven en `:root` con sombras calculadas para
+   claro; en oscuro quedaban demasiado tenues sobre el ink. Modo oscuro
+   arreglado sin tocar su nombre ni su uso. */
+body.dark {
+  --elev-1: 0 10px 24px rgba(0, 0, 0, 0.42);
+  --elev-2: 0 18px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* `--nx-hairline` se declaraba con blanco al 8 %: invisible sobre fondo
+   claro. Ahora es consciente del modo. */
+body {
+  --nx-hairline: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  --nx-hairline-strong: 1px solid var(--border-strong);
+}
+
+body.dark {
+  --nx-hairline: 1px solid rgba(255, 255, 255, 0.08);
+  --nx-hairline-strong: 1px solid rgba(255, 255, 255, 0.14);
 }
