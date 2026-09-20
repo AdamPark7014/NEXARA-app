@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
@@ -107,12 +107,22 @@ export default function ContabilidadInvoicesView({
    */
   const [payOpen, setPayOpen] = useState(false);
   const [payAmount, setPayAmount] = useState("");
+  /** Error del servidor dentro del formulario — no solo toast que se va. */
+  const [payErr, setPayErr] = useState<string | null>(null);
+  /** Tras pulsar Guardar, el monto vacío también se señala bajo el campo. */
+  const [intentado, setIntentado] = useState(false);
+  /** Cerrojo síncrono: el botón deshabilitado no alcanza contra doble clic. */
+  const payingRef = useRef(false);
 
   const typeParam =
     mode === "cxc" ? "ACCOUNTS_RECEIVABLE" : mode === "cxp" ? "ACCOUNTS_PAYABLE" : "";
 
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      setError("Esperando sesión. Vuelve a entrar si esto no se resuelve.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -171,18 +181,25 @@ export default function ContabilidadInvoicesView({
     const pend = pendingOf(row);
     if (pend <= 0) return;
     setPayAmount(pend.toFixed(2));
+    setPayErr(null);
+    setIntentado(false);
     setPayOpen(true);
   }
 
   async function registerPayment(row: InvoiceRow) {
+    if (payingRef.current) return;
+    setIntentado(true);
     const pend = pendingOf(row);
-    if (pend <= 0) return;
-    const amount = Number(payAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Indica un monto válido");
+    if (pend <= 0) {
+      setPayErr("Esta factura ya no tiene saldo pendiente.");
       return;
     }
+    const amount = Number(payAmount);
+    // El motivo se queda bajo el campo (`errorMonto`), no en un toast que se va.
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    payingRef.current = true;
     setPaying(true);
+    setPayErr(null);
     try {
       await apiFetch(`accounting/invoices/${row.id}/payments`, token, {
         method: "POST",
@@ -195,11 +212,16 @@ export default function ContabilidadInvoicesView({
       toast.success("Pago registrado");
       setPayOpen(false);
       setPayAmount("");
+      setPayErr(null);
+      setIntentado(false);
       setSelected(null);
       await load();
     } catch (e) {
+      // El formulario NO se cierra: si se cerrara, nadie sabría si el dinero quedó aplicado.
+      setPayErr(`No se pudo registrar el pago. ${formatApiError(e)}`);
       toast.error(formatApiError(e));
     } finally {
+      payingRef.current = false;
       setPaying(false);
     }
   }
@@ -208,7 +230,10 @@ export default function ContabilidadInvoicesView({
 
   /** El mismo criterio que aplica `registerPayment`, mostrado bajo el campo. */
   const errorMonto = (() => {
-    if (!payOpen || payAmount.trim() === "") return null;
+    if (!payOpen) return null;
+    if (payAmount.trim() === "") {
+      return intentado ? "Escribe cuánto se está pagando." : null;
+    }
     const monto = Number(payAmount);
     if (!Number.isFinite(monto) || monto <= 0) return "Indica un monto mayor a cero.";
     return null;
@@ -479,12 +504,24 @@ export default function ContabilidadInvoicesView({
       {/* Registro de pago — antes era un window.prompt del navegador */}
       <Modal
         open={payOpen}
-        onClose={() => setPayOpen(false)}
+        onClose={() => {
+          setPayOpen(false);
+          setPayErr(null);
+          setIntentado(false);
+        }}
         title="Registrar pago"
         maxWidth={440}
         footer={
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", width: "100%" }}>
-            <Button variant="ghost" onClick={() => setPayOpen(false)} disabled={paying}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPayOpen(false);
+                setPayErr(null);
+                setIntentado(false);
+              }}
+              disabled={paying}
+            >
               Cancelar
             </Button>
             <Button
@@ -499,6 +536,14 @@ export default function ContabilidadInvoicesView({
       >
         {selected && (
           <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
+            {payErr && (
+              <InlineAlert
+                variant="danger"
+                message={payErr}
+                style={{ marginBottom: 0 }}
+                onDismiss={() => setPayErr(null)}
+              />
+            )}
             <div
               style={{
                 display: "flex",
