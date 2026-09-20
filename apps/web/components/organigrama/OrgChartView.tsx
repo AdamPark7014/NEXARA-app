@@ -48,7 +48,7 @@ function Avatar({ url, name }: { url?: string | null; name: string }) {
       <img
         src={src}
         alt={name}
-        style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+        style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
       />
     );
   }
@@ -62,15 +62,15 @@ function Avatar({ url, name }: { url?: string | null; name: string }) {
   return (
     <div
       style={{
-        width: 40,
-        height: 40,
+        width: 34,
+        height: 34,
         borderRadius: "50%",
         flexShrink: 0,
         background: "color-mix(in srgb, var(--primary) 20%, var(--surface))",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 700,
         color: "var(--primary)",
       }}
@@ -128,18 +128,18 @@ function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: Node
     <div
       style={{
         position: "relative",
-        padding: "12px 14px",
-        paddingRight: canEditOrg ? 36 : 14,
+        padding: "8px 10px",
+        paddingRight: canEditOrg ? 32 : 10,
         background: isRoot
           ? "color-mix(in srgb, var(--primary) 10%, transparent)"
           : "var(--surface)",
         border: "1px solid var(--border)",
-        borderRadius: 14,
+        borderRadius: 12,
         display: "flex",
         flexDirection: "column",
-        gap: 8,
-        minWidth: 220,
-        width: 240,
+        gap: 6,
+        minWidth: 200,
+        width: 204,
         boxShadow: "0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)",
       }}
     >
@@ -170,13 +170,13 @@ function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: Node
           ✎
         </button>
       )}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
         <Avatar url={node.avatarUrl} name={node.nombre} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 12.5,
               lineHeight: 1.3,
               wordBreak: "break-word",
             }}
@@ -186,10 +186,10 @@ function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: Node
           {puesto ? (
             <div
               style={{
-                fontSize: 11.5,
+                fontSize: 11,
                 color: "var(--text-secondary)",
-                marginTop: 3,
-                lineHeight: 1.35,
+                marginTop: 2,
+                lineHeight: 1.3,
                 wordBreak: "break-word",
               }}
             >
@@ -200,7 +200,9 @@ function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: Node
       </div>
       {node.department && (
         <div>
-          <Tag variant={isRoot ? "accent" : "neutral"}>{node.department.nombre}</Tag>
+          <Tag variant={isRoot ? "accent" : "neutral"} size="sm">
+            {node.department.nombre}
+          </Tag>
         </div>
       )}
 
@@ -327,7 +329,7 @@ function TreeBranch({
           {/* Drop from parent to horizontal bar */}
           <div
             aria-hidden
-            style={{ width: 2, height: 24, background: LINE, flexShrink: 0, borderRadius: 1 }}
+            style={{ width: 2, height: 18, background: LINE, flexShrink: 0, borderRadius: 1 }}
           />
 
           <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
@@ -353,7 +355,7 @@ function TreeBranch({
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "flex-start",
-                gap: 24,
+                gap: 16,
               }}
             >
               {kids.map((child) => (
@@ -367,7 +369,7 @@ function TreeBranch({
                 >
                   <div
                     aria-hidden
-                    style={{ width: 2, height: 24, background: LINE, flexShrink: 0, borderRadius: 1 }}
+                    style={{ width: 2, height: 18, background: LINE, flexShrink: 0, borderRadius: 1 }}
                   />
                   <TreeBranch
                     node={child}
@@ -449,39 +451,13 @@ export default function OrgChartView({
 
       {showHrRail && <HrModuleRail />}
 
-      {!loading && allUsers.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-            gap: 12,
-            marginBottom: 18,
-          }}
-        >
-          <KpiCard label="Total personas" value={allUsers.length} icon="👥" />
-          <KpiCard
-            label="Con manager"
-            value={withManager}
-            icon="🔗"
-            variant={withManager + withoutManager === allUsers.length ? "positive" : "warning"}
-          />
-          <KpiCard
-            label="Sin manager"
-            value={withoutManager}
-            icon="🏛️"
-            variant="accent"
-            hint={orphanRoots > 0 ? `${orphanRoots} con jefe inválido` : "Raíces del org"}
-          />
-          <KpiCard label="Niveles" value={levels} icon="📊" />
-        </div>
-      )}
-
-      {!loading && allUsers.length > 1 && (() => {
+      {!loading && allUsers.length > 0 && (() => {
         const byDept: Record<string, number> = {};
         for (const u of allUsers) {
           const dept = u.department?.nombre ?? "Sin área";
           byDept[dept] = (byDept[dept] ?? 0) + 1;
         }
+        const deptEntries = Object.entries(byDept).sort((a, b) => b[1] - a[1]);
         const total = allUsers.length;
         const colors = [
           "var(--primary)",
@@ -493,81 +469,114 @@ export default function OrgChartView({
           "var(--danger)",
         ];
         return (
-          <div
-            style={{
-              marginBottom: 18,
-              padding: "12px 16px",
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              borderRadius: 10,
-            }}
-          >
+          <div style={{ marginBottom: 10 }}>
             <div
               style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "var(--text-tertiary)",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 10,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
+                gap: 8,
+                marginBottom: allUsers.length > 1 ? 8 : 0,
               }}
             >
-              Por departamento
+              <KpiCard label="Total personas" value={allUsers.length} icon="👥" />
+              <KpiCard
+                label="Con manager"
+                value={withManager}
+                icon="🔗"
+                variant={withManager + withoutManager === allUsers.length ? "positive" : "warning"}
+              />
+              <KpiCard
+                label="Sin manager"
+                value={withoutManager}
+                icon="🏛️"
+                variant="accent"
+                hint={orphanRoots > 0 ? `${orphanRoots} con jefe inválido` : "Raíces del org"}
+              />
+              <KpiCard label="Niveles" value={levels} icon="📊" />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {Object.entries(byDept)
-                .sort((a, b) => b[1] - a[1])
-                .map(([dept, count], i) => (
-                  <div
-                    key={dept}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "minmax(110px, 160px) 1fr 36px",
-                      gap: 10,
-                      alignItems: "center",
-                    }}
-                  >
-                    <span
+
+            {allUsers.length > 1 && (
+              <div
+                style={{
+                  padding: "8px 12px",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "var(--text-tertiary)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 6,
+                  }}
+                >
+                  Por departamento
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    height: 10,
+                    borderRadius: 5,
+                    overflow: "hidden",
+                    background: "var(--surface)",
+                    marginBottom: 8,
+                  }}
+                  title="Distribución por departamento"
+                >
+                  {deptEntries.map(([dept, count], i) => (
+                    <div
+                      key={dept}
+                      title={`${dept}: ${count}`}
                       style={{
-                        fontSize: 12,
+                        width: `${(count / total) * 100}%`,
+                        background: colors[i % colors.length],
+                        minWidth: count > 0 ? 2 : 0,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "4px 10px",
+                    alignItems: "center",
+                  }}
+                >
+                  {deptEntries.map(([dept, count], i) => (
+                    <span
+                      key={dept}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        fontSize: 11,
                         color: "var(--text-secondary)",
                         fontWeight: 500,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        lineHeight: 1.2,
                       }}
                     >
-                      {dept}
-                    </span>
-                    <div
-                      style={{
-                        height: 6,
-                        borderRadius: 3,
-                        background: "var(--surface)",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
+                      <span
+                        aria-hidden
                         style={{
-                          height: "100%",
-                          width: `${(count / total) * 100}%`,
+                          width: 8,
+                          height: 8,
+                          borderRadius: 2,
                           background: colors[i % colors.length],
-                          borderRadius: 3,
+                          flexShrink: 0,
                         }}
                       />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 11.5,
-                        color: "var(--text-tertiary)",
-                        textAlign: "right",
-                      }}
-                    >
-                      {count}
+                      {dept}
+                      <span style={{ color: "var(--text-tertiary)", fontWeight: 600 }}>{count}</span>
                     </span>
-                  </div>
-                ))}
-            </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}
@@ -587,23 +596,23 @@ export default function OrgChartView({
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${allUsers.length} personas`}>
+      <Section title={loading ? "Cargando…" : `${allUsers.length} personas`} dense>
         {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
+          <div style={{ padding: 20, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
             Cargando organigrama…
           </div>
         ) : roots.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
+          <div style={{ padding: 20, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
             No hay usuarios en la base de datos aún.
           </div>
         ) : (
           <div
             style={{
               overflowX: "auto",
-              padding: "28px 16px 40px",
+              padding: "16px 12px 24px",
               background:
                 "radial-gradient(ellipse at top, color-mix(in srgb, var(--primary) 6%, transparent), transparent 55%)",
-              borderRadius: 16,
+              borderRadius: 12,
             }}
           >
             <div
@@ -611,7 +620,7 @@ export default function OrgChartView({
                 display: "flex",
                 flexWrap: "wrap",
                 justifyContent: "center",
-                gap: 36,
+                gap: 24,
                 minWidth: "min-content",
               }}
             >
@@ -629,15 +638,15 @@ export default function OrgChartView({
             </div>
 
             {danglingRoots.length > 0 && (
-              <div style={{ marginTop: 28 }}>
+              <div style={{ marginTop: 16 }}>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: 700,
                     color: "var(--warning)",
                     textTransform: "uppercase",
                     letterSpacing: "0.06em",
-                    marginBottom: 12,
+                    marginBottom: 8,
                     textAlign: "center",
                   }}
                 >
@@ -648,7 +657,7 @@ export default function OrgChartView({
                     display: "flex",
                     flexWrap: "wrap",
                     justifyContent: "center",
-                    gap: 20,
+                    gap: 12,
                     minWidth: "min-content",
                   }}
                 >
