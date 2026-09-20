@@ -26,6 +26,7 @@ import {
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
+import { ActivityToolsService } from '../activities/tools/activity-tools.service.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { COLUMNAS_KPIS_DIAS, COLUMNAS_KPIS_PERSONAS } from '../common/excel/reportes.js';
 import { ETIQUETA_SEMAFORO } from '../common/excel/etiquetas.js';
@@ -38,7 +39,6 @@ function rangoLegible({ desde, hasta }: { desde: string; hasta: string }): strin
   };
   return desde === hasta ? `Día ${bonita(desde)}` : `Del ${bonita(desde)} al ${bonita(hasta)}`;
 }
-import { ActivityToolsService } from '../activities/tools/activity-tools.service.js';
 
 @Controller('me')
 @UseGuards(AuthGuard('jwt'))
