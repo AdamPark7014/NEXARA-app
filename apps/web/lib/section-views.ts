@@ -331,7 +331,12 @@ export function shouldShowModuleInSidebar(
     case 'invoicing':
     case 'banking':
     case 'employee-payments':
+    case 'erp-contabilidad':
       return FINANCE_ROLES.has(v2) || v2 === ROLES.RH || v2 === ROLES.ADMINISTRATIVO;
+    case 'pizarra':
+      // Contadora aterriza en hub financiero; pizarra de campo no es su menú diario.
+      if (v2 === ROLES.CONTABILIDAD) return false;
+      return true;
     case 'hr':
     case 'fines':
     case 'kpis-hr':

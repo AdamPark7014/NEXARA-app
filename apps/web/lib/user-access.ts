@@ -19,6 +19,7 @@ import {
   CORE_SURFACE_ONLY,
   CORE_HOME_PATH,
   CORE_PANEL_ID,
+  CONTABILIDAD_HOME_PATH,
   isCoreOla1ModuleId,
 } from '@/lib/core-surface';
 import { sortSidebarGroups } from '@/lib/nav-mode';
@@ -144,7 +145,8 @@ export function buildUserSidebar(
     const seenPaths = new Set<string>();
 
     for (const module of Object.values(MODULES)) {
-      if (module.panel !== panel) continue;
+      const effectivePanel = module.routePanel ?? module.panel;
+      if (effectivePanel !== panel && module.panel !== panel) continue;
       if (CORE_SURFACE_ONLY && !isCoreOla1ModuleId(module.id)) continue;
       if (user.moduleAccess?.[module.id] === 'off') continue;
       if (!canUserAccessModule(user, module)) continue;
@@ -328,6 +330,10 @@ export function getUserHomePanel(user: UserAccessInput | null | undefined): Pane
 /** Ruta HOME post-login. */
 export function getUserHomePath(user: UserAccessInput | null | undefined): string {
   if (!user) return '/login';
+
+  const v2Early = resolveV2RoleKey(user);
+  if (v2Early === ROLES.CONTABILIDAD) return CONTABILIDAD_HOME_PATH;
+
   if (CORE_SURFACE_ONLY) return CORE_HOME_PATH;
   if (isTechnicalSuperAdmin(user)) return '/lab';
   if (resolveIsPlatformOwner(user)) return '/erp/executive';

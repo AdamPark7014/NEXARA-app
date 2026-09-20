@@ -99,6 +99,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
+    'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
@@ -174,6 +175,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'users',
     'viatics-admin',
     'warehouse',
+
   ],
   ceo: [
     'accounting',
@@ -205,6 +207,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
+    'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
@@ -280,6 +283,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'users',
     'viatics-admin',
     'warehouse',
+
   ],
   arquitecto: [
     'approvals',
@@ -440,6 +444,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
+    'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
@@ -469,6 +474,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'users',
     'viatics-admin',
     'warehouse',
+
   ],
   coord_admin: [
     'accounting',
@@ -491,6 +497,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-almacen',
+    'erp-contabilidad',
     'erp-cotizaciones',
     'erp-herramientas',
     'erp-organigrama',
@@ -515,6 +522,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'users',
     'viatics-admin',
     'warehouse',
+
   ],
   administrativo: [
     'approvals',
@@ -816,6 +824,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'employee-payments',
+    'erp-contabilidad',
     'erp-herramientas',
     'erp-organigrama',
     'erp-vehiculos',
@@ -828,6 +837,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'notifications-center',
     'reuniones',
     'viatics-admin',
+
   ],
   cliente: [
     'integra-access',
@@ -848,7 +858,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
 /** Suelo por puesto: por debajo de esto el rol no puede hacer su trabajo. */
 const MIN_MODULES: Partial<Record<RoleKey, number>> = {
   administrativo: 20,
-  contabilidad: 18,
+  contabilidad: 19,
   rh: 16,
   vendedor: 15,
   coord_ventas: 25,

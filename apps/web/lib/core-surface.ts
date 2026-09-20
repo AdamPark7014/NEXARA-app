@@ -18,8 +18,20 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'erp-herramientas',
   'erp-vehiculos',
   'erp-organigrama',
+  // Hub contadora: finanzas orquestadas bajo /erp/contabilidad.
+  'erp-contabilidad',
+  'accounting',
+  'invoicing',
+  'banking',
+  'employee-payments',
+  'exports',
+  'expenses-admin',
+  'viatics-admin',
 ];
 export const CORE_PANEL_ID = 'erp' as const;
+
+/** Home post-login para rol contabilidad (Core-only). */
+export const CONTABILIDAD_HOME_PATH = '/erp/contabilidad';
 
 export function isCoreOla1ModuleId(id: string): boolean {
   return CORE_OLA1_MODULE_IDS.includes(id);
