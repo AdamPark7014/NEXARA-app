@@ -106,8 +106,15 @@ como filtro; ningún controlador acepta la empresa desde el cuerpo o la query.
 - Las 3 suites que la ola anterior dejó rojas quedaron reparadas: dos eran
   simulacros incompletos; la de actividades fijaba el alcance SIN empresa, que
   ya se había retirado, así que verificaba el comportamiento inseguro.
-- `npm run build:server:lowmem`: **éxito, sin ignorar errores**. Las 13 páginas
-  de `/erp/contabilidad` y los 6 controladores nuevos compilan.
+- `npm run build:server`: **éxito con la revisión de tipos activada**, sin
+  reintentar ignorando errores. Las 13 páginas de `/erp/contabilidad` y los
+  6 controladores nuevos compilan.
+
+  **OJO para el próximo turno:** `build:server:lowmem` fija
+  `NEXT_IGNORE_TYPE_ERRORS=1` y `next.config` lo obedece
+  (`ignoreBuildErrors`). Esa variante **no** es una barrera de calidad: es la
+  que dejó pasar el despliegue sin revisión de tipos en la ola anterior. Para
+  la puerta de calidad usa `npm run build:server` a secas.
 
 ## Siguiente
 
