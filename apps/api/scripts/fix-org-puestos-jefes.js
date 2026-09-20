@@ -1,94 +1,82 @@
 /**
- * Idempotente: alinea puestos y jefes del organigrama (Adam 19-09-2026).
+ * One-shot idempotente: alinea puestos de encargados y el jefe de Josué (Obra)
+ * en la BD de producción / staging. No crea usuarios; solo actualiza.
  *
- * - Puestos: JA soporte, David instalación, Luis servicios, Daniela H. comercial
- * - Josué (encargado de obra) reporta a Christian; fuera del equipo de José Antonio
+ *   cd apps/api && node scripts/fix-org-puestos-jefes.js
+ *   # o en el contenedor:
+ *   docker exec -i -w /app/apps/api nexara-api node scripts/fix-org-puestos-jefes.js
  *
- * Uso: node apps/api/scripts/fix-org-puestos-jefes.js
- * (desde apps/api con DATABASE_URL cargado, o con dotenv del .env)
+ * Idempotente: si puesto/managerId ya coinciden, solo lo reporta.
  */
-const path = require('path');
-const fs = require('fs');
-
-function loadEnv() {
-  const candidates = [
-    path.join(__dirname, '../.env'),
-    path.join(__dirname, '../../../.env'),
-    path.join(__dirname, '../../../deploy/.env'),
-  ];
-  for (const file of candidates) {
-    if (!fs.existsSync(file)) continue;
-    for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-      const m = line.match(/^([^#=]+)=(.*)$/);
-      if (!m) continue;
-      const key = m[1].trim();
-      let val = m[2].trim().replace(/^["']|["']$/g, '');
-      if (!process.env[key]) process.env[key] = val;
-    }
-  }
-}
-
-loadEnv();
-
+'use strict';
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const PUESTOS = [
+const UPDATES = [
   { email: 'jose.ramirez@nexara.com.mx', puesto: 'Encargado de soporte' },
   { email: 'operaciones@nexara.com.mx', puesto: 'Encargado de instalación' },
   { email: 'direccion.operaciones@nexara.com.mx', puesto: 'Encargado de servicios' },
   { email: 'daniela.hernandez@nexara.com.mx', puesto: 'Encargada comercial' },
-  { email: 'infraestructura@nexara.com.mx', puesto: 'Encargado de Obra' },
+  {
+    email: 'infraestructura@nexara.com.mx',
+    puesto: 'Encargado de Obra',
+    managerEmail: 'gerencia@nexara.com.mx',
+  },
 ];
 
 async function main() {
-  const christian = await prisma.user.findFirst({
-    where: { email: 'gerencia@nexara.com.mx' },
-    select: { id: true, nombre: true },
-  });
-  if (!christian) throw new Error('No está gerencia@ (Christian)');
+  console.log('🔧 [fix-org-puestos-jefes] Alineando puestos / jefes…');
+  let changed = 0;
 
-  for (const row of PUESTOS) {
-    const u = await prisma.user.findFirst({ where: { email: row.email } });
-    if (!u) {
-      console.warn(`SKIP sin usuario: ${row.email}`);
+  for (const update of UPDATES) {
+    const user = await prisma.user.findUnique({
+      where: { email: update.email },
+      select: { id: true, email: true, puesto: true, managerId: true },
+    });
+    if (!user) {
+      console.log(`   ⚠️  ${update.email} no existe — omitido`);
       continue;
     }
-    const data = { puesto: row.puesto };
-    if (row.email === 'infraestructura@nexara.com.mx') {
-      data.managerId = christian.id;
-    }
-    await prisma.user.update({ where: { id: u.id }, data });
-    console.log(`OK ${row.email} → puesto=${row.puesto}${data.managerId ? ` manager=${christian.nombre}` : ''}`);
-  }
 
-  // Si alguien quedó colgando de José Antonio siendo encargado de obra, corregir.
-  const ja = await prisma.user.findFirst({ where: { email: 'jose.ramirez@nexara.com.mx' } });
-  if (ja) {
-    const wrong = await prisma.user.findMany({
-      where: {
-        managerId: ja.id,
-        OR: [
-          { email: 'infraestructura@nexara.com.mx' },
-          { puesto: { contains: 'Obra', mode: 'insensitive' } },
-        ],
-      },
-    });
-    for (const w of wrong) {
-      await prisma.user.update({
-        where: { id: w.id },
-        data: { managerId: christian.id },
+    const data = {};
+    if (user.puesto !== update.puesto) {
+      data.puesto = update.puesto;
+    }
+
+    if (update.managerEmail) {
+      const manager = await prisma.user.findUnique({
+        where: { email: update.managerEmail },
+        select: { id: true, email: true },
       });
-      console.log(`FIX jefe: ${w.email || w.nombre} → Christian (era José Antonio)`);
+      if (!manager) {
+        console.log(`   ⚠️  jefe ${update.managerEmail} no existe — omitido manager de ${update.email}`);
+      } else if (user.managerId !== manager.id) {
+        data.managerId = manager.id;
+      }
     }
+
+    if (Object.keys(data).length === 0) {
+      console.log(`   ✓  ${update.email} ya OK (${update.puesto})`);
+      continue;
+    }
+
+    await prisma.user.update({ where: { id: user.id }, data });
+    changed += 1;
+    console.log(
+      `   ✏️  ${update.email}` +
+        (data.puesto ? ` · puesto→${data.puesto}` : '') +
+        (data.managerId != null ? ` · manager→${update.managerEmail}` : ''),
+    );
   }
 
-  console.log('Listo.');
+  console.log(`✅ listo · cambios: ${changed}`);
 }
 
 main()
   .catch((e) => {
-    console.error(e);
-    process.exitCode = 1;
+    console.error('❌ fix-org-puestos-jefes falló:', e);
+    process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
