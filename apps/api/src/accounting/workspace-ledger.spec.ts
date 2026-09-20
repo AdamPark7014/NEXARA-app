@@ -482,3 +482,114 @@ describe('libro de movimientos · contrato de autorización', () => {
     expect(classGuards.map((g) => g?.name)).toContain('UrlAccessGuard');
   });
 });
+
+// ───────────────────────── mezcla y paginación de filas ─────────────────────────
+
+describe('libro de movimientos · mezcla de fuentes', () => {
+  /** Prisma con filas reales en pagos y facturas, para probar el merge. */
+  function buildConFilas() {
+    const { prisma } = buildPrisma();
+
+    prisma.payment.findMany = jest.fn(async () => [
+      {
+        id: 1,
+        amount: 100,
+        paymentDate: new Date('2026-09-10T00:00:00.000Z'),
+        method: 'SPEI',
+        reference: 'REF-1',
+        speiTrackingKey: null,
+        operationNumber: null,
+        notes: null,
+        bankAccountId: 1,
+        bankAccount: { id: 1, name: 'Operativa', bankName: 'Banorte' },
+        createdBy: { nombre: 'Elisa' },
+        invoice: {
+          id: 5,
+          invoiceNumber: 'A-5',
+          pdfUrl: null,
+          clientId: 2,
+          supplierId: null,
+          client: { id: 2, name: 'ACME' },
+          supplier: null,
+          receptorName: null,
+          emisorName: null,
+          activity: null,
+        },
+      },
+    ]) as any;
+
+    prisma.invoice.findMany = jest.fn(async () => [
+      {
+        id: 9,
+        invoiceNumber: 'A-9',
+        type: 'ACCOUNTS_RECEIVABLE',
+        status: 'SENT',
+        issueDate: new Date('2026-09-20T00:00:00.000Z'),
+        totalAmount: 500,
+        cfdiUuid: null,
+        pdfUrl: 'https://cdn/x.pdf',
+        notes: null,
+        isCancelled: false,
+        receptorName: null,
+        emisorName: null,
+        client: { id: 2, name: 'ACME' },
+        supplier: null,
+        createdBy: { nombre: 'Elisa' },
+        activity: null,
+      },
+    ]) as any;
+
+    return new AccountingWorkspaceLedgerService(prisma as any);
+  }
+
+  it('ordena por fecha descendente aunque las filas vengan de tablas distintas', async () => {
+    const service = buildConFilas();
+    const res = await service.listMovements(TENANT, { pageSize: 50 });
+
+    const fechas = res.items.map((r) => r.fecha);
+    expect(fechas).toEqual([...fechas].sort().reverse());
+    expect(res.items[0].fecha).toBe('2026-09-20');
+  });
+
+  it('cada fila trae su origen para poder abrir el documento', async () => {
+    const service = buildConFilas();
+    const res = await service.listMovements(TENANT, {});
+
+    const pago = res.items.find((r) => r.origen.tabla === 'payments');
+    expect(pago).toMatchObject({
+      id: 'payments:1',
+      tipo: 'INGRESO',
+      naturaleza: 'EFECTIVO',
+      ingreso: 100,
+      egreso: 0,
+      contraparte: { tipo: 'cliente', id: 2, nombre: 'ACME' },
+      cuenta: { id: 1, nombre: 'Operativa · Banorte' },
+      registradoPor: 'Elisa',
+    });
+
+    const factura = res.items.find((r) => r.origen.tabla === 'invoices');
+    expect(factura).toMatchObject({
+      id: 'invoices:9',
+      naturaleza: 'DEVENGADO',
+      estado: 'Enviada',
+      comprobanteUrl: 'https://cdn/x.pdf',
+    });
+  });
+
+  it('una fecha @db.Date no se corre un día por la zona horaria', async () => {
+    const service = buildConFilas();
+    const res = await service.listMovements(TENANT, {});
+    // Medianoche UTC del 10 de septiembre debe leerse 10, no 9.
+    expect(res.items.find((r) => r.id === 'payments:1')?.fecha).toBe('2026-09-10');
+  });
+
+  it('la página recorta la mezcla, pero el total sigue siendo el del filtro', async () => {
+    const service = buildConFilas();
+    const res = await service.listMovements(TENANT, { pageSize: 1 });
+
+    expect(res.items).toHaveLength(1);
+    expect(res.items[0].id).toBe('invoices:9'); // la más reciente
+    expect(res.total).toBe(23); // total del filtro, no de la página
+    expect(res.totalPages).toBe(23);
+  });
+});
