@@ -760,6 +760,8 @@ export default function CarteraView({
           ventana={ventana}
           onVentana={setVentana}
           onReintentar={() => void cargarCalendario()}
+          aging={aging}
+          onAging={setAging}
         />
       )}
 
@@ -1144,12 +1146,16 @@ function CalendarioCxP({
   ventana,
   onVentana,
   onReintentar,
+  aging,
+  onAging,
 }: {
   calendario: Calendario | null;
   error: string | null;
   ventana: number;
   onVentana: (v: number) => void;
   onReintentar: () => void;
+  aging: AgingBucket | "";
+  onAging: (v: AgingBucket | "") => void;
 }) {
   if (error) {
     return (
@@ -1204,28 +1210,53 @@ function CalendarioCxP({
       ) : (
         <>
           <div style={{ marginBottom: 12 }}>
-            <MetricStrip
-              ariaLabel="Qué sale de caja"
-              metrics={[
+            {(() => {
+              const base =
+                resumen.vencido + resumen.hoy + resumen.proximos7 + resumen.proximos30;
+              const escalaCaja: ScaleItem[] = [
                 {
+                  key: "vencido",
                   label: "Vencido",
                   value: <Money value={resumen.vencido} />,
-                  tone: resumen.vencido > 0 ? "danger" : "default",
+                  tone: resumen.vencido > 0 ? "danger" : "mute",
                   hint: resumen.vencido > 0 ? "ya debió salir" : "nada atrasado",
+                  share: base > 0 ? resumen.vencido / base : 0,
                 },
-                { label: "Hoy", value: <Money value={resumen.hoy} />, hint: "sale hoy" },
                 {
+                  key: "hoy",
+                  label: "Hoy",
+                  value: <Money value={resumen.hoy} />,
+                  tone: resumen.hoy > 0 ? "warning" : "mute",
+                  hint: "sale hoy",
+                  share: base > 0 ? resumen.hoy / base : 0,
+                },
+                {
+                  key: "proximos7",
                   label: "Próximos 7 días",
                   value: <Money value={resumen.proximos7} />,
+                  tone: "mute",
                   hint: "esta semana",
+                  share: base > 0 ? resumen.proximos7 / base : 0,
                 },
                 {
+                  key: "proximos30",
                   label: "Próximos 30 días",
                   value: <Money value={resumen.proximos30} />,
+                  tone: "mute",
                   hint: "el mes",
+                  share: base > 0 ? resumen.proximos30 / base : 0,
                 },
-              ]}
-            />
+              ];
+              return (
+                <FilterScale
+                  ariaLabel="Qué sale de caja"
+                  items={escalaCaja}
+                  active={aging}
+                  onSelect={(clave) => onAging((clave || "") as AgingBucket | "")}
+                  minCellWidth={128}
+                />
+              );
+            })()}
           </div>
 
           {/* Lo vencido no es una cifra suelta: el API manda a quién se le
