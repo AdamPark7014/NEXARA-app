@@ -1,9 +1,9 @@
 # RELEVO
 
-- **Último turno:** cursor
+- **Último turno:** claude-code (tras cursor)
 - **Fecha:** 2026-09-20
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** P0 tenant/stamp/match/cierre + merges gate + hub
+- **HEAD:** writers merge + P0 tenant UI Contadora
 
 ## Puente — no cambiar
 
@@ -11,50 +11,47 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-### Merges gate (toast/labels/money/inv)
+### Merges writers (post-flota)
 
-Integrados en `mejora/calidad-y-web` (RELEVO-ours en conflictos `.ai/`):
+- `gate/labels-rep` — enums ES balanza/gastos reportes (25/25)
+- `feat/gate-toast-pre` — toast OT/batch PrenominaPanel
+- `feat/gate-accounting-close-link` — accounting UI → `/erp/contabilidad/cierres`
+- `feat/gate-erpFetch-spec` — `erp-api.spec.ts` 3/3
+- `feat/gate-stamp-period-spec` — closed-period 10/10 (stamp+NC)
+- `feat/gate-match-idor-spec` — gate-match-idor 2/2
 
-- `feat/gate-proteccion-spec`, `gate/ds-gastos`, `gate/toast-cierre`
-- `feat/gate-toast-con`, `gate/toast-cxc`, `feat/gate-labels-con/fac`
-- `feat/gate-status-labels`, `feat/gate-invoice-feedback`, `gate/inv-catch`, `gate/money2`
-- `feat/gate-hub` (merge `b99c6e99`) — hub silencioso + nuestros Money/MetricStrip/labels
-
-Abortados por conflicto real (reintento en cloud writers): `gate/labels-mov`, `feat/gate-labels-cx`.
-
-### P0 seguridad / tenant / periodo
+### P0 follow-up auditorías
 
 | Fix | Dónde |
 |-----|--------|
-| `erpFetch` → `withTenantHeaders` | `apps/web/lib/erp-api.ts` (`ba9b05ce` Claude + confirmado) |
-| `stampInvoice` + `createCreditNote` → `assertDateNotInClosedPeriod` | `accounting.service.ts` |
-| `evaluateThreeWayMatch` → `companyWhere` + `assertCompanyAccess`; controller pasa `companyId` | service + `invoices.controller.ts` |
-| PATCH `fiscal-periods/:id/close` ya no cierra en silencio | `accounts.controller` → `PeriodCloseService.closePeriod` (checklist) |
+| Hub dashboard → `erpFetch` | `contabilidad/page.tsx` |
+| Export CSV movimientos → `withTenantHeaders` | `movimientos/page.tsx` |
+| ContabilidadInvoicesView → `erpFetch` + STAMPING label | `ContabilidadInvoicesView.tsx` |
+| Traspaso/ajuste muestran `monto` en grilla | `movimientos/page.tsx` |
+| Pago CxC: toast éxito no se pisa si falla refresh | `CarteraView.tsx` |
+| XML descarga + tenant | `CarteraView.tsx` |
+| WAIVED match `getInvoice(..., companyId)` | ya en HEAD vía merge specs |
 
 ### Verificación
 
-- `closed-period-writes.spec` 8/8 PASS
-- `period-close.spec` 22/22 PASS
-- `apps/api` `tsc --noEmit` PASS
-- Flota micro-agentes explore + cloud writers en paralelo (labels-mov-v2, accounting-close-link, erpFetch-spec, match-idor-spec, stamp-period-spec)
+- closed-period-writes **10/10**
+- gate-match-idor **2/2**
+- erp-api.spec **3/3**
+- lucide-react: **ausente** en contabilidad (gate viejo obsoleto)
+- **MIGRATE REQUIRED: NO**
 
-### Migraciones
+## A medias
 
-**MIGRATE REQUIRED: NO**
-
-## A medias / pendiente real
-
-- **Deploy BLOCKED:** `~/.ssh/config` Host `hetzner-nexara` → `HostName REEMPLAZA_CON_IP_HETZNER`. Llave `id_ed25519_nexara_hetzner` existe.
-- Cloud writers pueden traer ramas `feat/gate-*` listas para merge (labels-mov-v2, close-link, specs).
-- UI vieja `erp/accounting` aún ofrece botón Cerrar; backend ya exige checklist (fallará con pendientes) — preferir `/erp/contabilidad/cierres`.
-- ~67 `apiFetch` locales sin tenant (CRM/OPS/…) — anotado por Claude, fuera de Contadora.
-- Smoke navegador Contadora con datos reales.
+- Deploy **BLOCKED** sin IP `hetzner-nexara` (`HostName REEMPLAZA…`; docs sugieren `5.78.215.109` + Port 2222).
+- Portal CFDI / client-portal sin companyId (audit P0 — fuera Contadora staff).
+- Viáticos/gastos sin assert periodo en dominio (solo vía journal al pagar).
+- ~9 web tests ajenos (EvidenciaPorCampos, cotizaciones…) — no Contadora.
 
 ## Siguiente
 
-1. Adam pone IP Hetzner en `HostName` (o la da por nombre).
-2. Merge cloud writers listos si pasan review.
-3. `./deploy/update.sh --force-all` + smoke Contadora.
+1. Adam: IP en `~/.ssh/config` Host `hetzner-nexara` (+ Port 2222).
+2. Push `mejora/calidad-y-web` → `./deploy/update.sh --force-all`.
+3. Smoke Contadora.
 
 ## No tocar
 

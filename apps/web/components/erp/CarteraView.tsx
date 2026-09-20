@@ -20,6 +20,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { withTenantHeaders } from "@/lib/tenant";
 import { financeStatusLabel } from "@/lib/finance-status-labels";
 import { toast } from "@/components/Toast";
 
@@ -400,7 +401,7 @@ export default function CarteraView({
       try {
         const res = await fetch(buildApiUrl(url), {
           credentials: "include",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: withTenantHeaders({ Authorization: `Bearer ${token}` }),
         });
         if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
         const blob = await res.blob();
