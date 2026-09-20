@@ -35,6 +35,9 @@ function build(over: Record<string, any> = {}) {
         items: [],
         emisorRfc: 'AAA010101AAA',
       }),
+      updateMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
     },
     bankAccount: {
       findFirst: jest.fn().mockResolvedValue({ id: 5, companyId: EMPRESA }),
@@ -160,5 +163,62 @@ describe('periodo fiscal cerrado · escrituras', () => {
       ),
     ).rejects.toThrow(/Periodo fiscal cerrado/);
     expect(prisma.bankTransaction.createMany).not.toHaveBeenCalled();
+  });
+
+  it('stampInvoice rechaza issueDate en periodo cerrado', async () => {
+    const { service, prisma } = build();
+    await expect(service.stampInvoice(10, 1, EMPRESA)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(service.stampInvoice(10, 1, EMPRESA)).rejects.toThrow(/Periodo fiscal cerrado/);
+    expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('createCreditNote rechaza issueDate de la factura original en periodo cerrado', async () => {
+    const { service, prisma } = build({
+      invoice: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 10,
+          issueDate: new Date('2026-08-15T12:00:00.000Z'),
+          companyId: EMPRESA,
+          cfdiUuid: '550e8400-e29b-41d4-a716-446655440000',
+          isCancelled: false,
+          invoiceNumber: 'F-001',
+          totalAmount: 116,
+          clientId: 1,
+          currency: 'MXN',
+          satPaymentForm: '03',
+          satPaymentMethod: 'PUE',
+          emisorRfc: 'AAA010101AAA',
+          emisorName: 'Emisor',
+          emisorRegime: '601',
+          receptorRfc: 'BBB010101BBB',
+          receptorName: 'Receptor',
+          receptorRegime: '601',
+          receptorZipCode: '01000',
+          cfdiSerie: 'A',
+          items: [
+            {
+              description: 'Servicio',
+              quantity: 1,
+              unitPrice: 100,
+              taxRate: 16,
+              total: 116,
+              satProductKey: '84111506',
+              satUnitKey: 'E48',
+              unitName: 'Servicio',
+            },
+          ],
+        }),
+        updateMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    await expect(
+      service.createCreditNote(10, { reason: 'Devolución parcial' }, 1, EMPRESA),
+    ).rejects.toThrow(/Periodo fiscal cerrado/);
+    expect(prisma.invoice.create).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 });
