@@ -26,6 +26,7 @@ import {
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
+import { PeerRequestsService } from './peer-requests.service.js';
 import { ActivityToolsService } from '../activities/tools/activity-tools.service.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { COLUMNAS_KPIS_DIAS, COLUMNAS_KPIS_PERSONAS } from '../common/excel/reportes.js';
@@ -50,6 +51,7 @@ export class MeController {
     private readonly kpis: KpisEquipoService,
     private readonly excel: ExcelExportService,
     private readonly activityTools: ActivityToolsService,
+    private readonly peerRequests: PeerRequestsService,
   ) {}
 
   /** Mis actividades: cola personal (todos menos el CEO). */
@@ -59,6 +61,57 @@ export class MeController {
       throw new UnauthorizedException('Token de usuario inválido');
     }
     return this.myActivities.list({ id: Number(user.id), email: user.email ?? null }, companyId);
+  }
+
+  /** Solicitudes de equipo (pares / mismo rango o superior). */
+  @Get('activity-requests')
+  listPeerRequests(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.peerRequests.listMine({ id: Number(user.id), email: user.email }, companyId);
+  }
+
+  @Post('activity-requests')
+  createPeerRequest(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { toUserId?: number; title?: string; description?: string },
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.peerRequests.create({ id: Number(user.id), email: user.email }, companyId, body);
+  }
+
+  @Patch('activity-requests/:id/accept')
+  acceptPeerRequest(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.peerRequests.accept({ id: Number(user.id), email: user.email }, companyId, id);
+  }
+
+  @Patch('activity-requests/:id/reject')
+  rejectPeerRequest(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { reason?: string },
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.peerRequests.reject(
+      { id: Number(user.id), email: user.email },
+      companyId,
+      id,
+      body?.reason,
+    );
   }
 
   /** Encargados de área: reordenan su cola con justificación obligatoria. */
@@ -357,11 +410,29 @@ export class MeController {
     );
   }
 
-  /**
-   * KPI del equipo (dashboard): retardos, uniforme, horas laboradas contra productivas,
-   * inactividad y tiempo extra, por persona y en total. Mismo alcance que la pizarra.
-   * `desde`/`hasta` en `AAAA-MM-DD` (por omisión, hoy; máximo 93 días); `userId` deja una sola fila.
-   */
+  /** Pipeline de flujo de actividades del alcance del viewer (Ola C). */
+  @Get('kpis/flujo')
+  kpisFlujo(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.teamBoard.getWorkflow(
+      {
+        id: Number(user.id),
+        roleKey: user.roleKey ?? null,
+        email: user.email ?? null,
+        isSuperAdmin: Boolean(user.isSuperAdmin),
+      },
+      companyId,
+      this.teamBoard.resolveRange(desde, hasta),
+    );
+  }
+
   @Get('kpis/equipo')
   kpisEquipo(
     @CurrentUser() user: any,
