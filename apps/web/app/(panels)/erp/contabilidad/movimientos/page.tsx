@@ -6,6 +6,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -28,62 +30,25 @@ import {
   type LedgerFilters,
   type LedgerResponse,
   type LedgerRow,
-  type LedgerTipo,
 } from "./_ledger";
 
 const PAGE_SIZE = 50;
 
 type BankAccountOption = { id: number; name: string; bankName?: string | null };
 
-const TIPO_COLOR: Record<LedgerTipo, string> = {
-  INGRESO: "var(--success)",
-  EGRESO: "var(--danger)",
-  TRANSFERENCIA: "var(--text-secondary)",
-  AJUSTE: "var(--text-tertiary)",
-};
-
-function TotalTile({
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  label: string;
-  value: number;
-  hint?: string;
-  tone?: "in" | "out" | "net";
-}) {
-  const color =
-    tone === "in" ? "var(--success)" : tone === "out" ? "var(--danger)" : "var(--text-primary)";
-  return (
-    <div
-      style={{
-        flex: "1 1 150px",
-        minWidth: 140,
-        padding: "8px 12px",
-        borderRight: "1px solid var(--nx-panel-hairline, var(--border))",
-      }}
-      title={hint}
-    >
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          color: "var(--text-tertiary)",
-        }}
-      >
-        {label}
-      </div>
-      <div style={{ fontSize: 17, marginTop: 2, color }}>
-        <Money value={value} />
-      </div>
-      {hint && (
-        <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", marginTop: 1 }}>{hint}</div>
-      )}
-    </div>
-  );
+/**
+ * El estado del renglón como punto y palabra. La API manda la cadena libre, así
+ * que el tono se deduce de lo que dice: color solo cuando el renglón pide una
+ * acción (por autorizar, por conciliar) o algo salió mal (vencido, cancelado).
+ * Todo lo demás es flujo normal y se queda neutro.
+ */
+function tonoEstado(estado: string | null | undefined): StatusTone {
+  const e = (estado ?? "").toLowerCase();
+  if (!e) return "neutral";
+  if (/vencid|rechaz|cancelad|sin comprobante|devuelt/.test(e)) return "danger";
+  if (/pendiente|parcial|autoriz|revis|borrador|sin concilia|proceso/.test(e)) return "warning";
+  if (/pagad|cobrad|liquidad|conciliad|aplicad|timbrad/.test(e)) return "success";
+  return "neutral";
 }
 
 export default function MovimientosPage() {
@@ -189,12 +154,10 @@ export default function MovimientosPage() {
       {
         key: "tipo",
         label: "Tipo",
-        width: 96,
-        render: (r) => (
-          <span style={{ fontSize: 12, fontWeight: 700, color: TIPO_COLOR[r.tipo] }}>
-            {TIPO_LABELS[r.tipo]}
-          </span>
-        ),
+        width: 104,
+        // Clasificación normal del flujo: punto neutro. El color se reserva
+        // para el estado, que es lo que llega a pedir acción.
+        render: (r) => <StatusDot label={TIPO_LABELS[r.tipo]} tone="neutral" />,
       },
       {
         key: "concepto",
@@ -229,11 +192,11 @@ export default function MovimientosPage() {
         label: "Ingreso",
         align: "right",
         numeric: true,
+        // Sin verde ni rojo: la columna ya dice de qué lado cae el monto, y con
+        // cincuenta filas el color convierte el libro en un semáforo.
         render: (r) =>
           r.ingreso ? (
-            <span style={{ color: "var(--success)" }}>
-              <Money value={r.ingreso} />
-            </span>
+            <Money value={r.ingreso} bold={false} />
           ) : (
             <span style={{ color: "var(--text-tertiary)" }}>—</span>
           ),
@@ -245,20 +208,70 @@ export default function MovimientosPage() {
         numeric: true,
         render: (r) =>
           r.egreso ? (
-            <span style={{ color: "var(--danger)" }}>
-              <Money value={r.egreso} />
-            </span>
+            <Money value={r.egreso} bold={false} />
           ) : (
             <span style={{ color: "var(--text-tertiary)" }}>—</span>
           ),
       },
-      { key: "estado", label: "Estado", render: (r) => r.estado || "—" },
+      {
+        key: "estado",
+        label: "Estado",
+        render: (r) =>
+          r.estado ? (
+            <StatusDot label={r.estado} tone={tonoEstado(r.estado)} />
+          ) : (
+            <span style={{ color: "var(--text-tertiary)" }}>—</span>
+          ),
+      },
       { key: "registradoPor", label: "Registró", render: (r) => r.registradoPor ?? "—" },
     ],
     [],
   );
 
   const totalPages = data?.totalPages ?? 1;
+
+  /**
+   * La tira de totales. Las pistas NO son decorado: «Ingresos» suma efectivo y
+   * devengado, así que una factura y su cobro cuentan las dos veces, a
+   * propósito. Sin esa línea la cifra se lee como dinero que entró, y no lo es
+   * —para eso está «Efectivo»—. Si algún día se recorta la tira, la pista se
+   * queda.
+   */
+  const totalesStrip: Metric[] = useMemo(
+    () => [
+      {
+        label: "Ingresos",
+        value: <Money value={totals.ingresos} />,
+        hint: "Facturado y cobrado juntos",
+      },
+      {
+        label: "Egresos",
+        value: <Money value={totals.egresos} />,
+        hint: "Devengado y pagado juntos",
+      },
+      {
+        label: "Neto",
+        value: <Money value={totals.neto} />,
+        hint: "Ingresos menos egresos",
+      },
+      {
+        label: "Efectivo",
+        value: <Money value={totals.efectivo.neto} />,
+        hint: "Ya pasó por banco o caja",
+      },
+      {
+        label: "Devengado",
+        value: <Money value={totals.devengado.neto} />,
+        hint: "Registrado, aún sin liquidar",
+      },
+      {
+        label: "Movimientos",
+        value: totals.conteo.toLocaleString("es-MX"),
+        hint: `${totals.transferencias.conteo} traspaso(s) · ${totals.ajustes.conteo} ajuste(s)`,
+      },
+    ],
+    [totals],
+  );
 
   return (
     <>
@@ -282,68 +295,15 @@ export default function MovimientosPage() {
       {/* Totales pegados arriba: es lo que la contadora cuadra. */}
       <div
         style={{
-          display: "flex",
-          flexWrap: "wrap",
           position: "sticky",
           top: 0,
           zIndex: 3,
           marginBottom: 10,
           background: "var(--surface)",
-          border: "1px solid var(--nx-panel-hairline, var(--border))",
           borderRadius: 10,
-          boxShadow: "var(--nx-panel-elev-1)",
         }}
       >
-        {/* Estos tres suman efectivo + devengado: una factura y su cobro cuentan
-            las dos veces, a propósito. Sin decirlo, «Ingresos» se lee como dinero
-            que entró. Para eso está la tarjeta Efectivo. */}
-        <TotalTile
-          label="Ingresos"
-          value={totals.ingresos}
-          tone="in"
-          hint="Facturado y cobrado juntos"
-        />
-        <TotalTile
-          label="Egresos"
-          value={totals.egresos}
-          tone="out"
-          hint="Devengado y pagado juntos"
-        />
-        <TotalTile
-          label="Neto"
-          value={totals.neto}
-          tone="net"
-          hint="Ingresos menos egresos"
-        />
-        <TotalTile
-          label="Efectivo"
-          value={totals.efectivo.neto}
-          hint="Ya pasó por banco o caja"
-        />
-        <TotalTile
-          label="Devengado"
-          value={totals.devengado.neto}
-          hint="Registrado, aún sin liquidar"
-        />
-        <div style={{ flex: "1 1 150px", minWidth: 140, padding: "8px 12px" }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              color: "var(--text-tertiary)",
-            }}
-          >
-            Movimientos
-          </div>
-          <div style={{ fontSize: 17, marginTop: 2, fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
-            {totals.conteo.toLocaleString("es-MX")}
-          </div>
-          <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", marginTop: 1 }}>
-            {totals.transferencias.conteo} traspaso(s) · {totals.ajustes.conteo} ajuste(s)
-          </div>
-        </div>
+        <MetricStrip metrics={totalesStrip} ariaLabel="Totales del periodo filtrado" />
       </div>
 
       <div style={{ marginBottom: 12 }}>
