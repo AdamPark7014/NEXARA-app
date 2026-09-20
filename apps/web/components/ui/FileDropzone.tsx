@@ -51,6 +51,7 @@ export default function FileDropzone({ file, onFile, accept = "image/*,.pdf", la
             inputRef.current?.click();
           }
         }}
+        className="nx-file-dropzone"
         style={{
           border: `2px dashed ${dragActive ? "var(--primary)" : "var(--border)"}`,
           borderRadius: 12,
@@ -77,6 +78,12 @@ export default function FileDropzone({ file, onFile, accept = "image/*,.pdf", la
           onChange={(e) => pick(e.target.files?.[0] ?? null)}
         />
       </div>
+      <style jsx>{`
+        .nx-file-dropzone:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+        }
+      `}</style>
     </div>
   );
 }

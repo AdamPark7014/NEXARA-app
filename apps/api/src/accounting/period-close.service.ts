@@ -252,14 +252,13 @@ export class PeriodCloseService {
           'Contabilizar pólizas que sigan en borrador dentro del periodo',
           'Cancelar una póliza ya contabilizada del periodo',
           'Marcar como pagado un gasto, viático o pago a personal con fecha del periodo',
-        ],
-        noBloqueado: [
           'Registrar el pago de una factura con fecha dentro del periodo',
           'Conciliar movimientos bancarios del periodo',
           'Cancelar ante el SAT una factura timbrada del periodo',
           'Importar movimientos bancarios con fecha del periodo',
-          'Emitir o editar en borrador una factura con fecha del periodo',
+          'Emitir, editar o eliminar un borrador de factura con fecha del periodo',
         ],
+        noBloqueado: [],
       },
       generadoEl: new Date().toISOString(),
     };
