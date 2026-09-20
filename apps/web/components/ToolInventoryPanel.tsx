@@ -1,5 +1,6 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { resolveAssetUrl } from "@/lib/evidence-display";
 import React, { useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -19,6 +20,20 @@ interface InventoryItem {
   status: 'AVAILABLE' | 'ASSIGNED' | 'IN_REPAIR' | 'RETIRED';
   replacements?: { id: number; serialNumber: string; status: string; createdAt: string }[];
 }
+
+const STATUS_LABEL: Record<InventoryItem["status"], string> = {
+  AVAILABLE: "Disponible",
+  ASSIGNED: "Asignada",
+  IN_REPAIR: "En reparación",
+  RETIRED: "Retirada",
+};
+
+const STATUS_CLASS: Record<InventoryItem["status"], string> = {
+  AVAILABLE: styles.statusAvailable,
+  ASSIGNED: styles.statusAssigned,
+  IN_REPAIR: styles.statusRepair,
+  RETIRED: styles.statusRetired,
+};
 
 const ToolInventoryPanel: React.FC = () => {
   const { user } = useUser();
@@ -674,14 +689,25 @@ const ToolInventoryPanel: React.FC = () => {
           </div>
         ) : (
           <div className={styles.gallery}>
-            {items.map((item) => (
+            {items.map((item) => {
+              const panoramicSrc = resolveAssetUrl(item.panoramicPhotoUrl);
+              const serialSrc = resolveAssetUrl(item.serialPhotoUrl);
+              return (
               <article key={item.id} className={styles.galleryCard}>
                 <div className={styles.photoRow}>
-                  <a href={item.panoramicPhotoUrl} target="_blank" rel="noreferrer" className={styles.photoLink}>
-                    <img src={item.panoramicPhotoUrl} alt={`${item.toolName} panorámica`} className={styles.galleryPhoto} />
+                  <a href={panoramicSrc || undefined} target="_blank" rel="noreferrer" className={styles.photoLink}>
+                    {panoramicSrc ? (
+                      <img src={panoramicSrc} alt={`${item.toolName} panorámica`} className={styles.galleryPhoto} />
+                    ) : (
+                      <div className={styles.photoPlaceholder}>Sin foto</div>
+                    )}
                   </a>
-                  <a href={item.serialPhotoUrl} target="_blank" rel="noreferrer" className={styles.photoLink}>
-                    <img src={item.serialPhotoUrl} alt={`${item.toolName} serie`} className={styles.galleryPhoto} />
+                  <a href={serialSrc || undefined} target="_blank" rel="noreferrer" className={styles.photoLink}>
+                    {serialSrc ? (
+                      <img src={serialSrc} alt={`${item.toolName} serie`} className={styles.galleryPhoto} />
+                    ) : (
+                      <div className={styles.photoPlaceholder}>Sin foto</div>
+                    )}
                   </a>
                 </div>
                 <div className={styles.galleryBody}>
@@ -696,22 +722,28 @@ const ToolInventoryPanel: React.FC = () => {
                       {item.barcode ? `Barras ${item.barcode}` : null}
                     </div>
                   )}
-                  <div className={styles.galleryMeta}>
-                    Estado: {item.status} · Reemplazos: {item.replacements?.length || 0}
+                  <div className={styles.statusRow}>
+                    <span className={`${styles.statusBadge} ${STATUS_CLASS[item.status]}`}>
+                      {STATUS_LABEL[item.status]}
+                    </span>
+                    <span className={styles.galleryMeta}>
+                      Reemplazos: {item.replacements?.length || 0}
+                    </span>
                   </div>
                   <div className={styles.galleryActions}>
-                    <button type="button" className="button-secondary" onClick={() => void printLabel(item, 'pdf')}>
+                    <button type="button" className={`button-secondary ${styles.actionBtn}`} onClick={() => void printLabel(item, 'pdf')}>
                       Imprimir etiqueta
                     </button>
-                    <button type="button" className="button-secondary" onClick={() => void printLabel(item, 'zpl')}>
+                    <button type="button" className={`button-secondary ${styles.actionBtn}`} onClick={() => void printLabel(item, 'zpl')}>
                       ZPL
                     </button>
-                    <button type="button" className="button-secondary" onClick={() => startEdit(item)}>Editar</button>
-                    <button type="button" className="button-secondary" onClick={() => startReplacement(item)}>Reemplazar</button>
+                    <button type="button" className={`button-secondary ${styles.actionBtn}`} onClick={() => startEdit(item)}>Editar</button>
+                    <button type="button" className={`button-secondary ${styles.actionBtn}`} onClick={() => startReplacement(item)}>Reemplazar</button>
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -27,3 +27,13 @@ export function maxOrgDepth(nodes: OrgChartNode[], depth = 0): number {
 export function countWithManager(nodes: OrgChartNode[]): number {
   return flattenOrgNodes(nodes).filter((node) => node.managerId != null).length;
 }
+
+/** Personas sin jefe asignado (`managerId` null), no el conteo de raíces del bosque. */
+export function countWithoutManager(nodes: OrgChartNode[]): number {
+  return flattenOrgNodes(nodes).filter((node) => node.managerId == null).length;
+}
+
+/** Raíces de visualización cuyo managerId apunta a alguien fuera del mapa (inactivo / otro tenant). */
+export function countOrphanRoots(nodes: OrgChartNode[]): number {
+  return nodes.filter((node) => node.managerId != null).length;
+}

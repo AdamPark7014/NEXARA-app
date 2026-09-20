@@ -15,6 +15,7 @@ import ToolRequestsTable from "@/components/ToolRequestsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
 import ToolUserKitPanel from "@/components/ToolUserKitPanel";
 import ToolMyKitPanel from "@/components/ToolMyKitPanel";
+import ToolInventoryPanel from "@/components/ToolInventoryPanel";
 
 /**
  * Almacén de Core (`/erp/almacen`): la casa de todo lo que entra, sale y se presta.
@@ -93,6 +94,7 @@ export default function AlmacenPage() {
         (gestionaHerramientas ? (
           <div style={{ display: "grid", gap: 16 }}>
             <RecoleccionAlmacenPanel />
+            <ToolInventoryPanel />
             <ToolRequestsTable highlightId={highlightId} />
           </div>
         ) : (

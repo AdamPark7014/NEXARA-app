@@ -78,16 +78,17 @@ export default function Section({
         <header
           style={{
             display: "flex",
-            alignItems: "flex-end",
+            alignItems: "flex-start",
             justifyContent: "space-between",
             gap: 14,
+            flexWrap: "wrap",
             padding: `${headerPadY}px 22px ${dense ? 10 : 14}px`,
             borderBottom: "1px solid var(--nx-panel-hairline-soft)",
             background:
               "linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 45%, transparent) 0%, transparent 100%)",
           }}
         >
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 200, flex: "1 1 240px", maxWidth: "100%" }}>
             {eyebrow && (
               <div
                 style={{
@@ -124,6 +125,7 @@ export default function Section({
                   color: "var(--text-secondary)",
                   marginTop: 4,
                   lineHeight: 1.45,
+                  maxWidth: 560,
                 }}
               >
                 {subtitle}
@@ -131,7 +133,17 @@ export default function Section({
             )}
           </div>
           {actions && (
-            <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flex: "1 1 auto",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                minWidth: 0,
+              }}
+            >
               {actions}
             </div>
           )}

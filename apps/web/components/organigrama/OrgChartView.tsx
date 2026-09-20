@@ -14,6 +14,7 @@ import { Tag } from "@/components/ui/DataTable";
 import HrModuleRail from "@/components/hr/HrModuleRail";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { resolveAssetUrl } from "@/lib/evidence-display";
 import KpiCard from "@/components/ui/KpiCard";
 import {
   type OrgChartNode,
@@ -21,6 +22,8 @@ import {
   orgNodeSubtitle,
   maxOrgDepth,
   countWithManager,
+  countWithoutManager,
+  countOrphanRoots,
 } from "@/lib/orgchart-layout";
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
@@ -36,13 +39,14 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
   return res.json();
 }
 
-const LINE = "color-mix(in srgb, var(--primary) 40%, var(--border))";
+const LINE = "color-mix(in srgb, var(--primary) 55%, var(--border))";
 
 function Avatar({ url, name }: { url?: string | null; name: string }) {
-  if (url) {
+  const src = url ? resolveAssetUrl(url) : "";
+  if (src) {
     return (
       <img
-        src={url}
+        src={src}
         alt={name}
         style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
       />
@@ -123,7 +127,9 @@ function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: Node
   return (
     <div
       style={{
+        position: "relative",
         padding: "12px 14px",
+        paddingRight: canEditOrg ? 36 : 14,
         background: isRoot
           ? "color-mix(in srgb, var(--primary) 10%, transparent)"
           : "var(--surface)",
@@ -132,58 +138,71 @@ function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: Node
         display: "flex",
         flexDirection: "column",
         gap: 8,
-        minWidth: 200,
-        maxWidth: 260,
+        minWidth: 220,
+        width: 240,
         boxShadow: "0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      {canEditOrg && (
+        <button
+          type="button"
+          onClick={() => {
+            setEditing((e) => !e);
+            setSelectedManager(node.managerId ? String(node.managerId) : "");
+            setSaveErr(null);
+          }}
+          title="Editar jefe"
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 14,
+            color: "var(--text-tertiary)",
+            padding: "4px 6px",
+            flexShrink: 0,
+            minHeight: 28,
+            lineHeight: 1,
+          }}
+        >
+          ✎
+        </button>
+      )}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         <Avatar url={node.avatarUrl} name={node.nombre} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               fontWeight: 700,
               fontSize: 13,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              lineHeight: 1.3,
+              wordBreak: "break-word",
             }}
           >
             {node.nombre}
           </div>
           {puesto ? (
-            <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2 }}>
+            <div
+              style={{
+                fontSize: 11.5,
+                color: "var(--text-secondary)",
+                marginTop: 3,
+                lineHeight: 1.35,
+                wordBreak: "break-word",
+              }}
+            >
               {puesto}
             </div>
           ) : null}
         </div>
-        {node.department && (
-          <Tag variant={isRoot ? "accent" : "neutral"}>{node.department.nombre}</Tag>
-        )}
-        {canEditOrg && (
-          <button
-            type="button"
-            onClick={() => {
-              setEditing((e) => !e);
-              setSelectedManager(node.managerId ? String(node.managerId) : "");
-              setSaveErr(null);
-            }}
-            title="Editar jefe"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 14,
-              color: "var(--text-tertiary)",
-              padding: "4px 6px",
-              flexShrink: 0,
-              minHeight: 32,
-            }}
-          >
-            ✎
-          </button>
-        )}
       </div>
+      {node.department && (
+        <div>
+          <Tag variant={isRoot ? "accent" : "neutral"}>{node.department.nombre}</Tag>
+        </div>
+      )}
 
       {editing && (
         <div
@@ -308,7 +327,7 @@ function TreeBranch({
           {/* Drop from parent to horizontal bar */}
           <div
             aria-hidden
-            style={{ width: 2, height: 20, background: LINE, flexShrink: 0 }}
+            style={{ width: 2, height: 24, background: LINE, flexShrink: 0, borderRadius: 1 }}
           />
 
           <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
@@ -324,6 +343,7 @@ function TreeBranch({
                   height: 2,
                   background: LINE,
                   pointerEvents: "none",
+                  borderRadius: 1,
                 }}
               />
             )}
@@ -333,7 +353,7 @@ function TreeBranch({
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "flex-start",
-                gap: 20,
+                gap: 24,
               }}
             >
               {kids.map((child) => (
@@ -347,7 +367,7 @@ function TreeBranch({
                 >
                   <div
                     aria-hidden
-                    style={{ width: 2, height: 20, background: LINE, flexShrink: 0 }}
+                    style={{ width: 2, height: 24, background: LINE, flexShrink: 0, borderRadius: 1 }}
                   />
                   <TreeBranch
                     node={child}
@@ -409,7 +429,11 @@ export default function OrgChartView({
 
   const allUsers = useMemo(() => flattenOrgNodes(roots), [roots]);
   const withManager = useMemo(() => countWithManager(roots), [roots]);
+  const withoutManager = useMemo(() => countWithoutManager(roots), [roots]);
+  const orphanRoots = useMemo(() => countOrphanRoots(roots), [roots]);
   const levels = useMemo(() => maxOrgDepth(roots), [roots]);
+  const trueRoots = useMemo(() => roots.filter((r) => r.managerId == null), [roots]);
+  const danglingRoots = useMemo(() => roots.filter((r) => r.managerId != null), [roots]);
 
   return (
     <>
@@ -439,9 +463,15 @@ export default function OrgChartView({
             label="Con manager"
             value={withManager}
             icon="🔗"
-            variant={withManager === allUsers.length - roots.length ? "positive" : "warning"}
+            variant={withManager + withoutManager === allUsers.length ? "positive" : "warning"}
           />
-          <KpiCard label="Sin manager" value={roots.length} icon="🏛️" variant="accent" hint="Raíces del org" />
+          <KpiCard
+            label="Sin manager"
+            value={withoutManager}
+            icon="🏛️"
+            variant="accent"
+            hint={orphanRoots > 0 ? `${orphanRoots} con jefe inválido` : "Raíces del org"}
+          />
           <KpiCard label="Niveles" value={levels} icon="📊" />
         </div>
       )}
@@ -492,7 +522,7 @@ export default function OrgChartView({
                     key={dept}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "120px 1fr 36px",
+                      gridTemplateColumns: "minmax(110px, 160px) 1fr 36px",
                       gap: 10,
                       alignItems: "center",
                     }}
@@ -585,7 +615,7 @@ export default function OrgChartView({
                 minWidth: "min-content",
               }}
             >
-              {roots.map((root) => (
+              {trueRoots.map((root) => (
                 <TreeBranch
                   key={root.id}
                   node={root}
@@ -597,6 +627,45 @@ export default function OrgChartView({
                 />
               ))}
             </div>
+
+            {danglingRoots.length > 0 && (
+              <div style={{ marginTop: 28 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--warning)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    marginBottom: 12,
+                    textAlign: "center",
+                  }}
+                >
+                  Sin línea de reporte válida ({danglingRoots.length})
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                    gap: 20,
+                    minWidth: "min-content",
+                  }}
+                >
+                  {danglingRoots.map((root) => (
+                    <TreeBranch
+                      key={root.id}
+                      node={root}
+                      allUsers={allUsers}
+                      token={token}
+                      onRefresh={load}
+                      canEditOrg={canEditOrg}
+                      isRoot
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Section>
