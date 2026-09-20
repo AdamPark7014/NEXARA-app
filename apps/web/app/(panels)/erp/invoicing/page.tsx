@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
@@ -170,6 +170,7 @@ export default function InvoicingPage() {
   /** Errores de timbrar/cancelar que mueren con el ConfirmDialog si solo hay toast. */
   const [actionError, setActionError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const payingRef = useRef(false);
   const [pacInfo, setPacInfo] = useState<{ provider?: string; configured?: boolean; productionWarning?: string | null; env?: string; csd?: { configured?: boolean } } | null>(null);
   const [issuerProfile, setIssuerProfile] = useState<{ emisorRfc?: string | null; emisorName?: string | null; emisorZipCode?: string | null; source?: string } | null>(null);
   const [rfcValidation, setRfcValidation] = useState<{ valid?: boolean; message?: string } | null>(null);
@@ -194,7 +195,11 @@ export default function InvoicingPage() {
   const inp = financeInputStyle;
 
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      setError("Esperando sesión. Vuelve a entrar si esto no se resuelve.");
+      return;
+    }
     setLoading(true); setError(null);
     try {
       const apiType = apiTypeParam(filter);
@@ -318,8 +323,10 @@ export default function InvoicingPage() {
 
   const submitPayment = async () => {
     if (!token || !paymentTarget) return;
+    if (payingRef.current) return;
     const amount = Number(paymentForm.amount);
     if (!amount || amount <= 0) { setPaymentErr("Indica un monto válido."); return; }
+    payingRef.current = true;
     setPaying(true);
     setPaymentErr(null);
     try {
@@ -348,6 +355,7 @@ export default function InvoicingPage() {
       setPaymentErr(msg);
       toast.error(msg);
     } finally {
+      payingRef.current = false;
       setPaying(false);
     }
   };

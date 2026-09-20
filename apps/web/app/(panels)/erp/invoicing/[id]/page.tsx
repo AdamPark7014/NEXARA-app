@@ -152,7 +152,12 @@ export default function InvoiceDetailPage() {
   const [matching, setMatching] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token || !id) return;
+    if (!token) {
+      setLoading(false);
+      setError("Esperando sesión. Vuelve a entrar si esto no se resuelve.");
+      return;
+    }
+    if (!id) return;
     setLoading(true);
     setError(null);
     try {

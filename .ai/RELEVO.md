@@ -3,7 +3,7 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
 - **Rama:** feat/gate-invoice-feedback
-- **HEAD:** (pendiente de cerrar) feedback visible en create/pay/stamp de facturas
+- **HEAD:** feedback visible en create/pay/stamp de facturas (+ sesión / cerrojo pago)
 
 ## Puente — no cambiar
 
@@ -16,8 +16,8 @@ Puerta de producción: create / pay / stamp de facturas ya no tragan el error en
 | Pantalla | Qué se cerró |
 |----------|--------------|
 | `contabilidad/facturas` (`ContabilidadInvoicesView`) | Pago: `payErr` + `InlineAlert` en el modal + toast; validación de monto bajo el campo; cerrojo anti doble clic; sin sesión deja de quedar en «Cargando…» |
-| `erp/invoicing` (lista) | Crear: validación con `formErr` (antes return mudo); catch con `formatApiError` + toast; Timbrar/Cancelar: `actionError` persistente (el ConfirmDialog mata el toast solo); Pago: toast + `paymentErr` |
-| `erp/invoicing/[id]` | Pago: toast + inline; Timbrar / complemento: `actionError` + toast con `formatApiError` |
+| `erp/invoicing` (lista) | Crear: validación con `formErr` (antes return mudo); catch con `formatApiError` + toast; Timbrar/Cancelar: `actionError` persistente; Pago: toast siempre + `paymentErr` + cerrojo; sin sesión no se queda en Cargando |
+| `erp/invoicing/[id]` | Pago: toast + inline; Timbrar / complemento: `actionError` + toast; sin sesión no se queda en Cargando |
 
 Patrón alineado con `feat/gate-gastos` y `feat/gate-cartera`: error junto a la acción, no solo un toast que se va detrás del modal.
 
