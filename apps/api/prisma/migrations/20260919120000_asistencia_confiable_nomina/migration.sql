@@ -83,5 +83,5 @@ $$;
 -- ---------------------------------------------------------------------------
 -- De estas dos fotos salen las horas productivas; si la ubicación era falsa hay que poder
 -- saberlo. NULL = foto vieja o cliente que todavía no lo informa (no es lo mismo que FALSE).
-ALTER TABLE "ActivityEvidence" ADD COLUMN IF NOT EXISTS "entryMockLocation" BOOLEAN;
-ALTER TABLE "ActivityEvidence" ADD COLUMN IF NOT EXISTS "exitMockLocation" BOOLEAN;
+ALTER TABLE "activity_evidences" ADD COLUMN IF NOT EXISTS "entryMockLocation" BOOLEAN;
+ALTER TABLE "activity_evidences" ADD COLUMN IF NOT EXISTS "exitMockLocation" BOOLEAN;
