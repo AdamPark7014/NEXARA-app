@@ -2,9 +2,9 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** `2a2529a6` (Hetzner healthy; script org corrido)
-- **Migraciones:** ya aplicadas `2026092001*`
+- **Rama:** feat/opt-opt-params
+- **HEAD:** (ver git log tras cerrar)
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-opt-params` — no tocar `C:\dev\apps\NEXARA-app`
 
 ## Puente — no cambiar
 
@@ -12,15 +12,19 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-1. **Organigrama:** Christian (`gerencia@`) vuelve a salir como DG raíz; Claudia (`claudia.bernal@`) excluida del chart (tester).
-2. Seed demo: puesto Claudia → «Tester de plataforma».
-3. Script `fix-org-puestos-jefes.js` actualizado y corrido en prod (1 cambio: puesto Claudia).
+1. **section-views copy Core:** acortados subtítulos/descripciones de Almacén, Herramientas, Vehículos, Actividades, Asistencias, Organigrama (kpi), Clientes/Cotizaciones/Proyectos y nav unificado OPS.
+2. **Fix tools viewMode:** ADMINISTRATIVO / warehouse / OPS managers ya no heredan `execute` de actividades; gestionan inventario de herramientas. Field/support siguen en execute.
+3. No se tocó `access-matrix.ts`. Sin tests nuevos (no hay spec de section-views; vitest sin node_modules en worktree).
+
+## A medias
+
+- EXEC-PACKET.md sigue siendo el plan viejo (13-09 Actividades/Asistencias UX) — **no** es este turno; no cerrar ese packet aquí.
 
 ## Siguiente
 
-- QA: recargar `/erp/organigrama` — raíz = Christian; sin bloque huérfanos por Christian excluido.
-- Rotar Maps key / contraseñas: lado Adam.
+- Merge / PR de `feat/opt-opt-params` cuando Adam quiera.
+- QA visual PageHeader Core (Hoy/Recursos) con CEO vs técnico.
 
 ## No tocar
 
-Puente NAS.
+Puente NAS · repo principal `NEXARA-app` desde este worktree.
