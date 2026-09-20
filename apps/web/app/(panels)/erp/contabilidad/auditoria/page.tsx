@@ -491,6 +491,7 @@ export default function AuditoriaPage() {
             rows={filtradas}
             rowKey={(r) => r.id}
             density="compact"
+            ariaLabel="Auditoría contable"
             onRowClick={(r) => {
               setAbierta(r);
               setSoloCambios(true);

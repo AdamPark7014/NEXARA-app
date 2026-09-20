@@ -574,6 +574,7 @@ export default function MovimientosPage() {
             rows={rows}
             rowKey={(r) => r.id}
             density="compact"
+            ariaLabel="Movimientos del libro"
             onRowClick={(r) => setDetail(r)}
           />
           <div

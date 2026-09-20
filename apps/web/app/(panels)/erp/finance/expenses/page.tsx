@@ -954,6 +954,7 @@ export default function ExpensesPage() {
                 rows={visibleItems}
                 rowKey={(e) => e.id}
                 density="compact"
+                ariaLabel="Gastos administrativos"
                 emptyTitle="Sin gastos"
                 emptyDescription={
                   searchQ || filterCat || filterEstado
