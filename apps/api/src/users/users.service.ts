@@ -11,7 +11,7 @@ import { ChatService } from '../chat/chat.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
-import { NON_EMPLOYEE_EMAILS } from '../common/platform-accounts.js';
+import { NON_EMPLOYEE_EMAILS, PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL } from '../common/platform-accounts.js';
 import { asignablesDe, esJefe } from '../me/equipo-alcance.js';
 import {
   buildAccessScheduleAssignment,
@@ -1140,10 +1140,17 @@ export class UsersService {
 
   async getOrgchart(companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
+    // Christian (dueño) sí va en el organigrama como raíz. Claudia (tester), Adam
+    // (dev) y la cuenta demo no: no son la jerarquía operativa.
+    const orgchartExcluded = [
+      TESTER_CEO_EMAIL,
+      PLATFORM_DEVELOPER_EMAIL,
+      STORE_REVIEWER_EMAIL,
+    ];
     const users = await this.prisma['user'].findMany({
       where: {
         isActive: true,
-        email: { notIn: this.superAdminEmails },
+        email: { notIn: orgchartExcluded },
         ...this.companyMembershipFilter(tenantId),
       },
       select: {
