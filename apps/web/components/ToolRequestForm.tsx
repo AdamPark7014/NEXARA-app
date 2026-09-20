@@ -6,6 +6,10 @@ import { useUser } from './UserContext';
 import styles from './ToolRequestForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import {
+  listarMisActividadesParaHerramienta,
+  type ActividadSolicitable,
+} from '@/lib/almacen-api';
 
 interface ToolRequestFormProps {
   onSuccess?: () => void;
@@ -28,6 +32,10 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const [inventoryOptions, setInventoryOptions] = useState<InventoryOption[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [reason, setReason] = useState('');
+  // «Con base en las instalaciones/servicios asignados»: la solicitud puede colgarse de
+  // una OT propia. Vacío = préstamo suelto, que sigue siendo válido.
+  const [actividades, setActividades] = useState<ActividadSolicitable[]>([]);
+  const [activityId, setActivityId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
   const [loading, setLoading] = useState(false);
@@ -104,6 +112,19 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     };
   }, [user?.token, inventoryQuery, searchInventory]);
 
+  // Sus actividades abiertas: la API solo acepta una OT que de verdad tenga asignada.
+  useEffect(() => {
+    if (!user?.token) {
+      setActividades([]);
+      return;
+    }
+    let vigente = true;
+    void listarMisActividadesParaHerramienta(user.token)
+      .then((res) => { if (vigente) setActividades(res); })
+      .catch(() => { if (vigente) setActividades([]); });
+    return () => { vigente = false; };
+  }, [user?.token]);
+
   const inventoryHasPhotos = (item: InventoryOption) =>
     Boolean(item.panoramicPhotoUrl?.trim() && item.serialPhotoUrl?.trim());
 
@@ -166,6 +187,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
         body: JSON.stringify({
           usuarioId: user.id,
           inventoryItemId: selectedInventoryItem.id,
+          activityId: activityId ? Number(activityId) : undefined,
           reason,
           startDate: new Date(startDate).toISOString(),
           expectedReturnDate: new Date(expectedReturnDate).toISOString(),
@@ -179,6 +201,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
 
       setSuccess('Solicitud de herramienta realizada correctamente');
       clearSelection();
+      setActivityId('');
       setReason('');
       setStartDate('');
       setExpectedReturnDate('');
@@ -301,6 +324,23 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       )}
 
       <label className={styles.fieldLabel}>
+        Actividad asignada
+        <select
+          className="input"
+          value={activityId}
+          onChange={(e) => setActivityId(e.target.value)}
+        >
+          <option value="">Sin actividad (préstamo suelto)</option>
+          {actividades.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.anNumber} — {a.titulo}
+              {a.client ? ` · ${a.client.name}` : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className={styles.fieldLabel}>
         Motivo del uso *
         <textarea
           className={`input ${styles.reasonInput}`}
@@ -340,6 +380,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
           type="button"
           onClick={() => {
             clearSelection();
+            setActivityId('');
             setReason('');
             setStartDate('');
             setExpectedReturnDate('');
