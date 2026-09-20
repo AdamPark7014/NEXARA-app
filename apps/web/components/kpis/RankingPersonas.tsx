@@ -24,7 +24,10 @@ export default function RankingPersonas({ personas, hrefDe }: { personas: KpiPer
       {personas.map((p, i) => {
         const t = p.totales;
         const pctProductivo = t.minutosLaborados > 0 ? Math.min(100, (t.minutosProductivos / t.minutosLaborados) * 100) : 0;
-        const avisos = avisosDePersona(t);
+        // Dos avisos como mucho; el resto se ve al abrir a la persona.
+        const todos = avisosDePersona(t);
+        const avisos = todos.slice(0, 2);
+        const demas = todos.length - avisos.length;
         return (
           <li key={p.persona.id}>
           <Link
@@ -51,16 +54,17 @@ export default function RankingPersonas({ personas, hrefDe }: { personas: KpiPer
                 <span className={s.barraProductiva} style={{ width: `${pctProductivo}%` }} />
               </span>
               <span className={s.detalle}>
-                <span>
+                <span title="Horas en actividades de sus horas en jornada">
                   {t.minutosLaborados > 0
-                    ? `${horasEnPalabras(t.minutosProductivos)} en actividades de ${horasEnPalabras(t.minutosLaborados)}`
-                    : "Sin horas en jornada"}
+                    ? `${horasEnPalabras(t.minutosProductivos)} / ${horasEnPalabras(t.minutosLaborados)}`
+                    : "Sin jornada"}
                 </span>
                 {avisos.map((a) => (
                   <Badge key={a.clave} tone={a.tono === "neutral" ? "neutral" : a.tono}>
                     {a.texto}
                   </Badge>
                 ))}
+                {demas > 0 ? <span title={todos.slice(2).map((a) => a.texto).join(" · ")}>+{demas}</span> : null}
               </span>
             </span>
             <span className={`${s.pct} ${CLASE_PCT[tonoProductividad(t.productividadPct)]}`}>{formatPctKpi(t.productividadPct)}</span>

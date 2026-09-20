@@ -12,6 +12,7 @@ import {
   Button,
   ButtonLink,
   EmptyState,
+  InfoPopover,
   Kbd,
   LinkButton,
   PageHead,
@@ -50,8 +51,6 @@ const ROL: Record<string, string> = {
   APROBO: "Aprobó",
   ENVIO: "Envió",
 };
-
-const CLAVE_EXPLICACION = "nexara.cotizaciones.explicaFolio";
 
 const TONO_ESTADO: Record<"neutral" | "info" | "ok" | "alerta", Tone> = {
   neutral: "neutral",
@@ -132,16 +131,7 @@ export default function CotizacionesPage() {
   const [q, setQ] = useState("");
   const [segmento, setSegmento] = useState<Segmento | null>(null);
   const [estado, setEstado] = useState<EstadoCotizacion | null>(null);
-  const [explicaAbierta, setExplicaAbierta] = useState(true);
   const buscador = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem(CLAVE_EXPLICACION) === "cerrada") setExplicaAbierta(false);
-    } catch {
-      /* sin almacenamiento: queda abierta */
-    }
-  }, []);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -250,18 +240,32 @@ export default function CotizacionesPage() {
     <div className={styles.wrap}>
       <PageHead
         title="Cotizaciones"
-        description="Propuestas técnicas con folio de seguimiento: de quién es, quién intervino y en qué revisión va."
         actions={
-          <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
-            Nueva cotización <Kbd>N</Kbd>
-          </ButtonLink>
+          <>
+            <InfoPopover label="¿Cómo se lee un folio?" title="Cómo se lee un folio">
+              <FolioExplicado
+                folio={ejemplo?.folio ?? "NEX-LJ75100126-0007-JA.CE-R2"}
+                elaboro={ejemplo?.elaboro ?? null}
+                intervinieron={ejemplo?.intervinieron ?? []}
+                revision={ejemplo?.revision}
+              />
+              <p style={{ margin: "10px 0 0" }}>
+                El folio lo emite el servidor al crear la cotización, con la nomenclatura de RH de quien la hace y su
+                propio consecutivo. Al enviarla se agregan las siglas de quienes intervinieron (revisó, aprobó, envió)
+                y, desde el segundo envío, la revisión. El segmento no va en el folio: es un filtro.
+              </p>
+            </InfoPopover>
+            <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
+              Nueva cotización <Kbd>N</Kbd>
+            </ButtonLink>
+          </>
         }
       />
 
       {!cargando && items.length ? (
         <StatRow>
           <Stat label="En la vista" value={visibles.length} hint={`de ${items.length} cotizaciones`} />
-          <Stat label="Borradores" value={cifras.borradores} hint="por terminar y enviar" />
+          <Stat label="Borradores" value={cifras.borradores} hint="por terminar" />
           <Stat
             label="Enviadas por cerrar"
             value={formatoMoneda(cifras.porCerrar)}
@@ -291,39 +295,9 @@ export default function CotizacionesPage() {
             </LinkButton>
           }
         >
-          {viejos === 1 ? "1 borrador trae" : `${viejos} borradores traen`} folio viejo, sin nomenclatura (no dice de quién
-          es). Ábrelo y usa «Asignar folio» en Seguimiento.
+          {viejos === 1 ? "1 borrador con folio viejo" : `${viejos} borradores con folio viejo`}, sin nomenclatura.
         </Alert>
       ) : null}
-
-      <details
-        className={styles.explica}
-        open={explicaAbierta}
-        onToggle={(e) => {
-          const abierta = (e.currentTarget as HTMLDetailsElement).open;
-          setExplicaAbierta(abierta);
-          try {
-            window.localStorage.setItem(CLAVE_EXPLICACION, abierta ? "abierta" : "cerrada");
-          } catch {
-            /* sin almacenamiento */
-          }
-        }}
-      >
-        <summary>¿Cómo se lee un folio?</summary>
-        <div className={styles.explicaCuerpo}>
-          <FolioExplicado
-            folio={ejemplo?.folio ?? "NEX-LJ75100126-0007-JA.CE-R2"}
-            elaboro={ejemplo?.elaboro ?? null}
-            intervinieron={ejemplo?.intervinieron ?? []}
-            revision={ejemplo?.revision}
-          />
-          <p>
-            El folio lo emite el servidor al crear la cotización, con la nomenclatura de RH de quien la hace y su propio
-            consecutivo. Al enviarla se agregan las siglas de quienes intervinieron (revisó, aprobó, envió) y, desde el
-            segundo envío, la revisión. El segmento no va en el folio: es un filtro.
-          </p>
-        </div>
-      </details>
 
       <div className={tabla.marco}>
         <div className={tabla.barra}>
@@ -383,7 +357,6 @@ export default function CotizacionesPage() {
           <EmptyState
             icon={<RequestQuoteOutlinedIcon />}
             title="Todavía no hay cotizaciones"
-            description="Aquí se arma la propuesta técnica completa, como la recibe el cliente: objetivo, alcance, planos y la tabla de precios con sus términos. Se guarda sola mientras escribes y el PDF se ve al lado."
             action={
               <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
                 Crear la primera
@@ -394,7 +367,6 @@ export default function CotizacionesPage() {
           <EmptyState
             icon={<FilterAltOffOutlinedIcon />}
             title="Nada con estos filtros"
-            description="Prueba con otro segmento o estado, o busca por el nombre del cliente."
             action={<Button onClick={quitarFiltros}>Quitar filtros</Button>}
           />
         ) : visibles.length ? (

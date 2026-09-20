@@ -133,10 +133,12 @@ describe("línea de tiempo con escala común", () => {
     expect(productivo.actividades).toEqual([{ anNumber: "AN-513", titulo: "Reubicación de cámara" }]);
   });
 
-  it("las actividades del rango con su duración real y por qué cuentan", () => {
+  it("las actividades del rango con su duración real y solo la nota de lo que no cuenta", () => {
     const [a] = actividadesDelRango([{ ...dia, actividades: [{ ...dia.actividades[0], minutosEnJornada: 40 }] }]);
     expect(a.minutosReales).toBe(60);
-    expect(porQueCuenta(a)).toBe("Cuenta 40 min: 20 min cayeron en comida o fuera de jornada");
-    expect(porQueCuenta({ minutosReales: 60, minutosEnJornada: 60, enCurso: false })).toBe("Cuenta completa");
+    expect(porQueCuenta(a)).toBe("20 min fuera de jornada");
+    // Lo que cuenta completo no lleva nota: la tabla no repite lo obvio.
+    expect(porQueCuenta({ minutosReales: 60, minutosEnJornada: 60, enCurso: false })).toBe("");
+    expect(porQueCuenta({ minutosReales: 60, minutosEnJornada: 0, enCurso: false })).toBe("No cuenta: fuera de jornada");
   });
 });

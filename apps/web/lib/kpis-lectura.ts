@@ -216,10 +216,13 @@ export function actividadesDelRango(dias: Pick<DiaKpi, "fecha" | "actividades">[
   return out.sort((a, b) => b.fecha.localeCompare(a.fecha) || a.inicio.localeCompare(b.inicio));
 }
 
-/** Por qué una actividad cuenta completa, a medias o nada. */
+/**
+ * Nota corta cuando la actividad NO cuenta completa; vacío cuando sí (la tabla no repite
+ * lo obvio, y el «por qué» largo vive en la ⓘ de la tarjeta).
+ */
 export function porQueCuenta(a: Pick<ActividadDelRango, "minutosReales" | "minutosEnJornada" | "enCurso">): string {
   const fuera = a.minutosReales - a.minutosEnJornada;
-  if (a.minutosEnJornada <= 0) return "No cuenta: fue fuera de su jornada";
-  if (fuera <= 1) return a.enCurso ? "Cuenta hasta ahora (sigue abierta)" : "Cuenta completa";
-  return `Cuenta ${horasEnPalabras(a.minutosEnJornada)}: ${horasEnPalabras(fuera)} cayeron en comida o fuera de jornada`;
+  if (a.minutosEnJornada <= 0) return "No cuenta: fuera de jornada";
+  if (fuera <= 1) return a.enCurso ? "En curso" : "";
+  return `${horasEnPalabras(fuera)} fuera de jornada`;
 }

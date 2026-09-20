@@ -68,7 +68,7 @@ export default function KpisEquipoPage() {
   const hrefDe = (p: KpiPersonaFila) => `${KPIS_PATH}/${p.persona.id}${qs}`;
   const soloYo = data != null && data.personas.length === 1 && data.personas[0].persona.id === user?.id;
 
-  // Lo que cambia cómo leer los números: en corto, debajo de las cifras.
+  // Lo que cambia cómo leer los números. No va en la página: va en la ⓘ.
   const notas: string[] = [];
   if (data) {
     const t = data.equipo.totales;
@@ -86,11 +86,6 @@ export default function KpisEquipoPage() {
       <PageHead
         back={{ href: "/erp/asistencias", label: "Asistencias" }}
         title="KPIs del equipo"
-        description={
-          soloYo
-            ? "No tienes gente a tu cargo: aquí ves lo tuyo."
-            : "Qué parte de la jornada de cada persona se fue en actividades, quién llegó tarde y cómo va el uniforme."
-        }
         actions={
           <>
             <RangoSelector
@@ -103,6 +98,13 @@ export default function KpisEquipoPage() {
             />
             {data ? (
               <InfoPopover label="¿Cómo se calcula?" title="Cómo se calcula">
+                {notas.length ? (
+                  <>
+                    <p style={{ margin: "0 0 8px" }}>
+                      <strong style={{ color: "var(--ui-fg)" }}>En estas fechas:</strong> {notas.join(" · ")}.
+                    </p>
+                  </>
+                ) : null}
                 <ul>
                   {data.supuestos.map((x) => (
                     <li key={x}>{x}</li>
@@ -123,51 +125,40 @@ export default function KpisEquipoPage() {
       {t ? (
         <StatRow>
           <Stat
-            label="Productividad del equipo"
+            label="Productividad"
             value={formatPctKpi(t.productividadPct)}
-            hint="Horas en actividades ÷ horas en jornada"
+            title="Horas en actividades ÷ horas en jornada"
             tone={TONO_STAT[tonoProductividad(t.productividadPct)]}
           />
           <Stat
-            label="Horas productivas / en jornada"
+            label="Horas productivas"
             value={
               <>
                 {Math.round(t.minutosProductivos / 60)} h
                 <span style={{ color: "var(--ui-fg-3)", fontWeight: 500 }}> / {Math.round(t.minutosLaborados / 60)} h</span>
               </>
             }
-            hint={`${horasEnPalabras(t.minutosInactivos)} en jornada sin actividad`}
+            hint={`${horasEnPalabras(t.minutosInactivos)} sin actividad`}
+            title="Horas en actividades de las horas en jornada"
           />
           <Stat
             label="Retardos"
             value={t.retardos}
-            hint={t.retardos ? `${horasEnPalabras(t.minutosTarde)} tarde en total` : "Todos a tiempo"}
+            hint={t.retardos ? `${horasEnPalabras(t.minutosTarde)} tarde` : "Todos a tiempo"}
             tone={t.retardos >= 3 ? "warning" : "default"}
           />
           <Stat
             label="Uniforme"
             value={formatPctKpi(t.uniforme.pct)}
-            hint={t.uniforme.revisadas ? `${t.uniforme.ok} de ${t.uniforme.revisadas} entradas revisadas` : "Sin entradas revisadas"}
+            hint={t.uniforme.revisadas ? `${t.uniforme.ok} de ${t.uniforme.revisadas} revisadas` : "Sin revisar"}
             tone={t.uniforme.pct != null && t.uniforme.pct < 80 ? "warning" : "default"}
           />
         </StatRow>
       ) : null}
 
-      {notas.length ? (
-        <p style={{ margin: "-12px 0 16px", fontSize: 12, lineHeight: 1.5, color: "var(--ui-fg-3)" }}>
-          <span style={{ fontWeight: 500, color: "var(--ui-fg-2)" }}>Para leer bien las cifras: </span>
-          {notas.join(" · ")}.
-        </p>
-      ) : null}
-
       <Card>
         <CardHead
           title={soloYo ? "Tus horas" : "Por persona"}
-          subtitle={
-            data
-              ? `${data.personas.length} persona(s) · ${data.scope === "company" ? "toda la empresa" : "tu organigrama"} · toca a alguien para ver su día a día`
-              : undefined
-          }
           actions={
             <>
               <LeyendaJornada />
@@ -182,11 +173,7 @@ export default function KpisEquipoPage() {
             <RankingPersonas personas={personas} hrefDe={hrefDe} />
           </div>
         ) : data ? (
-          <EmptyState
-            icon={<GroupsOutlinedIcon />}
-            title="Nadie en tu alcance"
-            description="Aquí aparece la gente que te reporta en el organigrama."
-          />
+          <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu alcance" />
         ) : null}
       </Card>
     </div>

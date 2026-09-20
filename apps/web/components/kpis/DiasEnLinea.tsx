@@ -8,18 +8,14 @@ import s from "./kpis.module.css";
 
 const hhmm = (min: number) => `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:00`;
 
-/** Lo que hay que saber de ese día, en insignias chicas. El uniforme correcto no se anuncia. */
+/**
+ * Solo lo que pide atención ese día, en dos insignias como mucho (el resto, en su `title`).
+ * Lo normal —uniforme correcto, uniforme aún sin revisar— no se anuncia: ya está en la frase de arriba.
+ */
 function avisosDelDia(d: DiaKpi): ReactNode[] {
   const out: ReactNode[] = [];
-  if (d.retardo) out.push(<Badge key="r" tone="warning">Retardo · {horasEnPalabras(d.minutosTarde)}</Badge>);
+  if (d.retardo) out.push(<Badge key="r" tone="warning">Retardo {horasEnPalabras(d.minutosTarde)}</Badge>);
   if (d.conJornada && d.uniformeOk === false) out.push(<Badge key="u" tone="danger">Sin uniforme</Badge>);
-  if (d.conJornada && d.uniformeOk == null) {
-    out.push(
-      <Badge key="u" title="Márcalo en Asistencias, en la foto de entrada">
-        Uniforme sin revisar
-      </Badge>,
-    );
-  }
   if (d.abierta) out.push(<Badge key="a" tone="success" dot>En jornada</Badge>);
   if (d.sinSalida) {
     out.push(
@@ -28,15 +24,15 @@ function avisosDelDia(d: DiaKpi): ReactNode[] {
       </Badge>,
     );
   }
-  if (d.cierreAutomatico) out.push(<Badge key="c" tone="violet">Salida automática</Badge>);
+  if (d.cierreAutomatico) out.push(<Badge key="c" tone="violet" title="La puso el cierre automático de las 23:30">Salida automática</Badge>);
   if (d.conJornada && d.actividadesFueraDeJornada) {
     out.push(
-      <Badge key="o" tone="warning" title="Empezaron sin estar checado: no suman productividad">
-        {d.actividadesFueraDeJornada === 1 ? "1 actividad sin checar entrada — no cuenta" : `${d.actividadesFueraDeJornada} actividades sin checar entrada — no cuentan`}
+      <Badge key="o" tone="warning" title="Empezaron sin checar entrada: no suman productividad">
+        {d.actividadesFueraDeJornada === 1 ? "1 sin checar entrada" : `${d.actividadesFueraDeJornada} sin checar entrada`}
       </Badge>,
     );
   }
-  if (!d.laborable && d.conJornada) out.push(<Badge key="d" tone="info">Día de descanso</Badge>);
+  if (!d.laborable && d.conJornada) out.push(<Badge key="d" tone="info">Descanso</Badge>);
   return out;
 }
 
@@ -45,14 +41,12 @@ function sinJornada(d: DiaKpi): ReactNode {
   if (d.faltaJustificada) return <Badge tone="violet">Falta justificada</Badge>;
   if (d.actividadesFueraDeJornada) {
     return (
-      <Badge tone="warning">
-        {d.actividadesFueraDeJornada === 1
-          ? "Trabajó sin checar entrada: 1 actividad no cuenta"
-          : `Trabajó sin checar entrada: ${d.actividadesFueraDeJornada} actividades no cuentan`}
+      <Badge tone="warning" title="Trabajó sin checar entrada: esas actividades no cuentan">
+        {d.actividadesFueraDeJornada === 1 ? "1 sin checar entrada" : `${d.actividadesFueraDeJornada} sin checar entrada`}
       </Badge>
     );
   }
-  if (d.sinChecada) return <Badge tone="danger">Sin checada: no registró entrada</Badge>;
+  if (d.sinChecada) return <Badge tone="danger">Sin checada</Badge>;
   return <span className={s.sinJornada}>Aún sin entrada</span>;
 }
 
@@ -131,7 +125,7 @@ export default function DiasEnLinea({ dias }: { dias: DiaKpi[] }) {
             </div>
             <div className={s.diaPista}>
               {d.conJornada && escala ? <Pista d={d} escala={escala} /> : sinJornada(d)}
-              {avisos.length ? <div className={s.chips}>{avisos}</div> : null}
+              {avisos.length ? <div className={s.chips}>{avisos.slice(0, 2)}</div> : null}
             </div>
             <div className={s.diaResumen}>
               {d.conJornada ? (

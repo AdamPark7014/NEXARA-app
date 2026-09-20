@@ -61,13 +61,13 @@ const ETIQUETA_CIFRA: Record<BoardUserStatus, string> = {
   inactivo: "Inactivos",
 };
 
-/** Qué dice cada cifra de arriba. */
-const PISTA_ESTADO: Partial<Record<BoardUserStatus, string>> = {
-  activo: "con una actividad en curso",
-  atrasado: "pasados de su fecha máxima",
-  libre: "ya cerraron lo que tenían",
-  sin_actividad: "sin nada abierto",
-  inactivo: "sin registro reciente",
+/** Qué significa cada cifra: en el `title`, no en la pantalla. */
+const PISTA_ESTADO: Record<BoardUserStatus, string> = {
+  activo: "Con una actividad en curso",
+  atrasado: "Pasados de su fecha máxima",
+  libre: "Ya cerraron lo que tenían",
+  sin_actividad: "Sin nada abierto",
+  inactivo: "Sin registro reciente",
 };
 
 /** Estado con detalle: cuánto atraso lleva o desde cuándo terminó su última actividad. */
@@ -310,7 +310,7 @@ export default function PizarraPage() {
   if (cargandoEquipo) {
     return (
       <div className={p.pagina}>
-        <PageHead title="Actividades" description="Cargando actividades…" />
+        <PageHead title="Actividades" />
         <TarjetasCargando />
       </div>
     );
@@ -328,13 +328,6 @@ export default function PizarraPage() {
     <div className={p.pagina}>
       <PageHead
         title="Actividades"
-        description={
-          verMias
-            ? "Lo tuyo, en orden. En «Mi equipo» ves a tu gente y le asignas trabajo."
-            : verAsignadas
-              ? "Lo que repartiste en el rango, con quién lo tiene y cómo va."
-              : "Tú y tu equipo. Toca a alguien para ver su día o asignarle trabajo."
-        }
         actions={
           verMias ? null : (
             <Button onClick={() => void load()} disabled={loading || !token}>
@@ -381,7 +374,7 @@ export default function PizarraPage() {
                     label={ETIQUETA_CIFRA[key]}
                     dot={TONE_COLOR[TONO_ESTADO[key]]}
                     value={counts[key] ?? 0}
-                    hint={PISTA_ESTADO[key]}
+                    title={PISTA_ESTADO[key]}
                     tone={key === "atrasado" && (counts[key] ?? 0) > 0 ? "danger" : "default"}
                   />
                 ))}
@@ -394,7 +387,7 @@ export default function PizarraPage() {
                   {error}
                 </Alert>
               ) : users.length === 0 ? (
-                <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu equipo por ahora." />
+                <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu equipo" />
               ) : (
                 <div className={p.rejilla}>
                   {users.map((u) => (
