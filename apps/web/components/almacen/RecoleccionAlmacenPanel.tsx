@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { type Column } from "@/components/ui/DataTable";
+import StatusDot from "@/components/ui/StatusDot";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
@@ -33,13 +35,12 @@ const inp: React.CSSProperties = {
 };
 
 function vigencia(p: { vencido: boolean; horasRestantes: number | null }) {
-  if (p.vencido) return <Tag variant="danger" dot size="sm">Vencido</Tag>;
-  if (p.horasRestantes == null) return <Tag variant="neutral" size="sm">Sin límite</Tag>;
-  return (
-    <Tag variant={p.horasRestantes <= 6 ? "warning" : "positive"} dot size="sm">
-      {p.horasRestantes} h
-    </Tag>
-  );
+  if (p.vencido) return <StatusDot tone="danger" label="Caducó" title="Hay que volver a pedirla" />;
+  if (p.horasRestantes == null) return <StatusDot label="Sin caducidad" />;
+  if (p.horasRestantes <= 6) {
+    return <StatusDot tone="warning" label={`Caduca en ${p.horasRestantes} h`} />;
+  }
+  return <StatusDot label={`${p.horasRestantes} h`} />;
 }
 
 /**
@@ -136,7 +137,7 @@ export default function RecoleccionAlmacenPanel() {
     { key: "quien", label: "Para", width: 150, accessor: (p) => p.usuario?.nombre ?? "—" },
     {
       key: "ot",
-      label: "OT",
+      label: "Actividad",
       width: 150,
       render: (p) =>
         p.activity ? (
@@ -147,7 +148,7 @@ export default function RecoleccionAlmacenPanel() {
           <span style={{ color: "var(--text-tertiary)" }}>Préstamo suelto</span>
         ),
     },
-    { key: "vigencia", label: "Vigencia", width: 96, render: (p) => vigencia(p) },
+    { key: "vigencia", label: "Código válido", width: 132, render: (p) => vigencia(p) },
     {
       key: "acciones",
       label: "",
@@ -166,7 +167,7 @@ export default function RecoleccionAlmacenPanel() {
   ];
 
   return (
-    <div style={{ display: "grid", gap: 10 }}>
+    <div style={{ display: "grid", gap: 24 }}>
       <Section
         title="Entregar con código"
         actions={<InfoBreve etiqueta="Código de recolección" texto={INFO} />}
@@ -189,26 +190,25 @@ export default function RecoleccionAlmacenPanel() {
               textTransform: "uppercase",
             }}
           />
-          <Button variant="primary" onClick={() => void buscar()} loading={buscando} disabled={!codigo.trim()}>
+          {/* Mientras no hay hallazgo, verificar es la acción a la que vino;
+              en cuanto lo hay, el primario pasa a la entrega y este baja a gris. */}
+          <Button
+            variant={hallazgo?.valido ? "secondary" : "primary"}
+            onClick={() => void buscar()}
+            loading={buscando}
+            disabled={!codigo.trim()}
+          >
             Verificar
           </Button>
         </div>
 
         {hallazgo && (
-          <div
-            style={{
-              marginTop: 14,
-              padding: 14,
-              borderRadius: 12,
-              border: `1px solid ${hallazgo.valido ? "var(--nx-panel-hairline)" : "color-mix(in srgb, var(--danger) 45%, var(--border))"}`,
-              background: "var(--surface-2)",
-              display: "grid",
-              gap: 8,
-            }}
-          >
+          // Sin recuadro: los datos de la solicitud se separan del buscador con
+          // aire, y lo que sí necesita caja es el motivo del rechazo.
+          <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
-              <strong style={{ fontSize: 14 }}>{hallazgo.solicitud.toolName}</strong>
-              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+              <strong style={{ fontSize: 15 }}>{hallazgo.solicitud.toolName}</strong>
+              <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
                 {hallazgo.solicitud.model} · {hallazgo.solicitud.serialNumber}
               </span>
               {vigencia(hallazgo.solicitud)}
@@ -220,15 +220,12 @@ export default function RecoleccionAlmacenPanel() {
                 : " · préstamo suelto"}
             </div>
             {!hallazgo.valido && hallazgo.mensaje && (
-              <p role="alert" style={{ margin: 0, fontSize: 12.5, color: "var(--danger)", fontWeight: 600 }}>
-                {hallazgo.mensaje}
-              </p>
+              <InlineAlert variant="danger" message={hallazgo.mensaje} />
             )}
             {hallazgo.valido && (
               <div>
                 <Button
                   variant="primary"
-                  size="sm"
                   loading={entregando}
                   onClick={() =>
                     void entregar(
@@ -246,23 +243,42 @@ export default function RecoleccionAlmacenPanel() {
         )}
       </Section>
 
-      <Section title={cargando ? "Cargando…" : `${pendientes.length} por entregar`} flush>
+      <Section
+        title="Esperando a que las recojan"
+        subtitle={
+          pendientes.length > 0
+            ? `${pendientes.length} herramienta${pendientes.length === 1 ? "" : "s"}, ${pendientes.filter((p) => p.vencido).length} con el código caducado`
+            : undefined
+        }
+        flush
+      >
         {error && (
-          <div role="alert" style={{ margin: 16, fontSize: 12.5 }}>
-            {error}{" "}
-            <Button size="sm" variant="ghost" onClick={() => void cargar()}>
-              Reintentar
-            </Button>
+          <div style={{ marginBottom: 12 }}>
+            <InlineAlert
+              variant="danger"
+              message={error}
+              action={
+                <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+                  Reintentar
+                </Button>
+              }
+            />
           </div>
         )}
-        <DataTable
-          columns={columnas}
-          rows={pendientes}
-          rowKey={(p) => p.id}
-          density="compact"
-          emptyTitle="Nada por entregar"
-          emptyDescription="Las aprobadas aparecen aquí con su código."
-        />
+        {cargando && pendientes.length === 0 ? (
+          <p role="status" style={{ margin: 0, padding: "24px 0", fontSize: 12.5, color: "var(--text-tertiary)" }}>
+            Cargando…
+          </p>
+        ) : (
+          <DataTable
+            columns={columnas}
+            rows={pendientes}
+            rowKey={(p) => p.id}
+            density="compact"
+            emptyTitle="Nadie tiene nada que recoger"
+            emptyDescription="Cuando se apruebe un préstamo, la herramienta aparecerá aquí con el código que trae quien viene por ella."
+          />
+        )}
       </Section>
     </div>
   );

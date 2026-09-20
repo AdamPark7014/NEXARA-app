@@ -1,88 +1,85 @@
+/*
+ * Inventario de herramientas.
+ *
+ * Se fueron las clases de la tabla vieja, las pastillas de estado (ahora
+ * `StatusDot`) y las dos tarjetas que envolvían el formulario y la lista
+ * (ahora `Section`). Lo que queda son las fotos, que sí necesitan marco, y
+ * las zonas de soltar, que ahora son botones de verdad.
+ */
+
 .wrapper {
   display: grid;
-  gap: 8px;
-}
-
-.formCard {
-  display: grid;
-  gap: 8px;
-  border: 1px solid var(--border);
-}
-
-.listCard {
-  display: grid;
-  gap: 8px;
-}
-
-.title {
-  color: var(--foreground);
-  margin-bottom: 0;
-  font-size: 14px;
+  gap: 24px;
 }
 
 .fieldsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 8px;
-  align-items: end;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--ui-s3, 12px);
+  align-items: start;
 }
 
 .fieldsGridMobile {
   grid-template-columns: 1fr;
-  align-items: stretch;
 }
 
-.fieldsRow {
-  display: contents;
-}
-
+/* Zona de soltar: un botón, no un div con onClick. */
 .dropzone {
-  border: 1px dashed var(--muted);
-  border-radius: 8px;
-  padding: 8px 10px;
-  min-height: auto;
+  width: 100%;
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  border: 1px dashed var(--ui-border-strong, var(--border-strong));
+  border-radius: var(--ui-radius, 8px);
+  padding: 10px 12px;
   display: grid;
   gap: 3px;
   align-content: start;
-  background: var(--surface-light);
-  transition: all 0.2s ease;
+  background: var(--ui-surface-2, var(--surface-2));
+  color: inherit;
   cursor: pointer;
+  transition:
+    border-color var(--ui-duration-fast, 120ms) var(--ui-ease-standard, ease),
+    background var(--ui-duration-fast, 120ms) var(--ui-ease-standard, ease);
+}
+
+.dropzone:hover {
+  border-color: var(--ui-brand, var(--primary));
+}
+
+.dropzone:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring, 0 0 0 3px rgba(37, 99, 235, 0.35));
 }
 
 .dropzoneActive {
-  border-color: var(--primary);
-  background: var(--surface);
-  box-shadow: 0 0 0 1px var(--primary);
+  border-style: solid;
+  border-color: var(--ui-brand, var(--primary));
+  background: var(--ui-surface, var(--surface));
 }
 
-.dropzoneLabel,
-.fileName,
-.checkboxLabel {
-  font-size: 12px;
-  color: var(--text-secondary);
+.dropzoneLabel {
+  font-size: var(--ui-fs-label, 13px);
+  font-weight: var(--ui-fw-label, 550);
+  color: var(--ui-fg, var(--text-primary));
 }
 
 .dropzoneHint {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: var(--ui-fs-caption, 11px);
+  color: var(--ui-fg-3, var(--text-tertiary));
+  overflow-wrap: anywhere;
 }
 
 .hiddenInput {
   display: none;
 }
 
-.selectImageBtn {
-  justify-self: start;
-  padding: 5px 8px;
-  font-size: 12px;
-}
-
 .previewImage {
   width: 100%;
   height: 64px;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid var(--muted);
+  border-radius: var(--ui-radius-sm, 6px);
+  margin-top: 4px;
 }
 
 .formActions,
@@ -93,20 +90,10 @@
   align-items: center;
 }
 
-.formActionsInline {
-  display: flex;
-  align-items: end;
-  min-height: 36px;
-}
-
-.topBar {
-  justify-content: space-between;
-}
-
 .searchInput {
   flex: 1 1 240px;
   min-width: 0;
-  max-width: 480px;
+  max-width: 320px;
 }
 
 .searchInputMobile {
@@ -119,64 +106,34 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-2, var(--text-secondary));
   white-space: nowrap;
-  margin-left: auto;
-}
-
-.errorText {
-  color: var(--danger);
 }
 
 .centerLoading {
-  text-align: center;
-  padding: 12px;
-}
-
-.centerEmpty {
-  text-align: center;
-  color: var(--text-secondary);
-  padding: 14px;
-}
-
-.tableWrap {
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.tableHeadRow,
-.tableRow {
-  border-bottom: 1px solid var(--muted);
-}
-
-.thLeft,
-.td {
-  text-align: left;
-  padding: 8px;
-}
-
-.thCenter,
-.tdCenter {
-  text-align: center;
-  padding: 8px;
+  margin: 0;
+  padding: 24px 0;
+  font-size: var(--ui-fs-meta, 12.5px);
+  color: var(--ui-fg-3, var(--text-tertiary));
 }
 
 .gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
+/*
+ * La ficha sí lleva borde: agrupa dos fotos, un estado y cuatro acciones, y
+ * sin él las tarjetas vecinas se leerían como una sola lista revuelta. Es el
+ * único rectángulo de la pantalla, y ya no vive dentro de otro.
+ */
 .galleryCard {
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--ui-border, var(--border));
+  border-radius: var(--ui-radius-lg, 12px);
   overflow: hidden;
-  background: var(--surface);
+  background: var(--ui-surface, var(--surface));
   display: grid;
 }
 
@@ -184,7 +141,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2px;
-  background: var(--surface-2);
+  background: var(--ui-surface-2, var(--surface-2));
 }
 
 .photoLink {
@@ -192,6 +149,11 @@
   min-height: 96px;
   text-decoration: none;
   color: inherit;
+}
+
+.photoLink:focus-visible {
+  outline: none;
+  box-shadow: inset var(--ui-ring, 0 0 0 3px rgba(37, 99, 235, 0.35));
 }
 
 .galleryPhoto {
@@ -207,92 +169,60 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  background: color-mix(in srgb, var(--surface-2) 80%, var(--border));
+  text-align: center;
+  padding: 0 8px;
+  font-size: var(--ui-fs-caption, 11px);
+  color: var(--ui-fg-3, var(--text-tertiary));
+  background: var(--ui-surface-2, var(--surface-2));
 }
 
 .galleryBody {
-  padding: 8px 10px 10px;
+  padding: 10px 12px 12px;
   display: grid;
   gap: 4px;
 }
 
 .galleryTitle {
-  font-weight: 700;
-  font-size: 14px;
+  font-size: var(--ui-fs-section, 15px);
+  font-weight: var(--ui-fw-section, 600);
+  color: var(--ui-fg, var(--text-primary));
 }
 
 .galleryMeta {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: var(--ui-fs-caption, 11px);
+  color: var(--ui-fg-3, var(--text-tertiary));
 }
 
 .statusRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-top: 2px;
-}
-
-.statusBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.statusAvailable {
-  background: color-mix(in srgb, var(--success) 16%, transparent);
-  color: var(--success);
-}
-
-.statusAssigned {
-  background: color-mix(in srgb, var(--primary) 16%, transparent);
-  color: var(--primary);
-}
-
-.statusRepair {
-  background: color-mix(in srgb, var(--warning) 18%, transparent);
-  color: var(--warning);
-}
-
-.statusRetired {
-  background: color-mix(in srgb, var(--text-tertiary) 18%, transparent);
-  color: var(--text-secondary);
 }
 
 .galleryActions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  margin-top: 6px;
-}
-
-.actionBtn {
-  width: 100%;
-  min-height: 32px;
-  justify-content: center;
-  font-size: 12px;
-  padding: 5px 8px;
+  margin-top: 8px;
 }
 
 .urlDetails {
-  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .urlSummary {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: var(--ui-fs-meta, 12px);
+  color: var(--ui-fg-2, var(--text-secondary));
   cursor: pointer;
   user-select: none;
   list-style-position: inside;
+  padding: 4px 0;
 }
 
-.urlFields {
-  margin-top: 8px;
+.urlSummary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring, 0 0 0 3px rgba(37, 99, 235, 0.35));
+  border-radius: var(--ui-radius-sm, 6px);
 }
