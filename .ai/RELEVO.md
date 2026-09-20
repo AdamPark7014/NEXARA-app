@@ -2,8 +2,9 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** fix(accounting): blindar periodo cerrado en escrituras
+- **Rama:** feat/gate-labels-fac
+- **HEAD:** (pending commit) labels ES facturas
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-gate-labels-fac`
 
 ## Puente — no cambiar
 
@@ -11,36 +12,24 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-Blindaje de periodo fiscal cerrado en escrituras financieras críticas:
+### Gate labels — facturas (`contabilidad/facturas`)
 
-- `assertDateNotInClosedPeriod` ahora se llama desde:
-  - `registerPayment` → `paymentDate`
-  - `reconcileTransaction` → `transactionDate`
-  - `cancelInvoice` → `issueDate` + hoy
-  - `createInvoice` → `issueDate`
-  - `updateInvoiceDraft` → `dto.issueDate` o `invoice.issueDate`
-  - `deleteInvoice` → `issueDate`
-  - `importBankTransactions` → cada `transactionDate`
-- Ya cubierto antes: `reverseJournalEntry`; crear/postear pólizas vía `resolveOpenFiscalPeriodId`.
-- Suite nueva: `apps/api/src/accounting/closed-period-writes.spec.ts` — **8/8 PASS**.
+En `ContabilidadInvoicesView` (usado por `/erp/contabilidad/facturas`):
 
-## A medias / pendiente real
+- Mapa `ESTATUS_FACTURA`: DRAFT/STAMPING/SENT/PARTIALLY_PAID/PAID/OVERDUE/CANCELLED/CREDITED → español
+- `statusLabel` ya no deja enums crudos; SENT→Enviada, STAMPING→Timbrando, etc.
+- «Parcial» alineado a «Pago parcial»
+- Columna **Tipo** solo en `mode=all`: Emitida / Recibida (no ACCOUNTS_*)
 
-- **Deploy bloqueado:** `~/.ssh/config` tiene `hetzner-nexara` con
-  `HostName REEMPLAZA_CON_IP_HETZNER`. Falta IP/llave. En servidor:
-  `./deploy/update.sh --force-all`
-- **AuditLog no guarda el estado anterior** salvo en el cierre de periodo.
-- Bonos/descuentos no existen en pre-nómina (no inventados).
-- Sin smoke de navegador contra datos reales.
-- UI de cierres (`proteccion.noBloqueado`) puede actualizarse a reflejar el
-  blindaje API; no se tocó web en este turno.
+## A medias
+
+- Merge de `feat/gate-labels-fac` → `mejora/calidad-y-web` (coordinar con otras gate-labels-*)
+- Ollama `implement -Apply` reescribió basura MUI; se restauró con checkout y edición quirúrgica
 
 ## Siguiente
 
-1. Adam da IP/llave Hetzner o corre deploy.
-2. Smoke contadora contra datos reales.
-3. Opcional: alinear copy de UI cierres con el blindaje API.
-4. AuditLog `previousData` en updates.
+1. Parent: merge feat/gate-labels-* tras revisar
+2. Smoke UI facturas con datos reales
 
 ## No tocar
 

@@ -62,15 +62,41 @@ function daysOverdue(due?: string | null) {
   return Math.floor((today.getTime() - d.getTime()) / 86_400_000);
 }
 
+/** Claves del modelo → español. Nunca mostrar DRAFT/SENT/PAID crudos. */
+const ESTATUS_FACTURA: Record<string, string> = {
+  DRAFT: "Borrador",
+  STAMPING: "Timbrando",
+  SENT: "Enviada",
+  PARTIALLY_PAID: "Pago parcial",
+  PAID: "Pagada",
+  OVERDUE: "Vencida",
+  CANCELLED: "Cancelada",
+  CREDITED: "Nota de crédito",
+};
+
+const TIPO_FACTURA: Record<string, string> = {
+  ACCOUNTS_RECEIVABLE: "Emitida",
+  INCOME: "Emitida",
+  ACCOUNTS_PAYABLE: "Recibida",
+  EXPENSE: "Recibida",
+};
+
+function tipoFacturaLabel(type: string): string {
+  return TIPO_FACTURA[type] ?? "Documento";
+}
+
 /** Estado para humanos — nunca enums crudos. */
 function statusLabel(row: InvoiceRow): { text: string; tone: "ok" | "warn" | "bad" | "mute" } {
   const pend = pendingOf(row);
   const od = daysOverdue(row.dueDate);
-  if (row.status === "CANCELLED" || row.status === "DRAFT") return { text: row.status === "DRAFT" ? "Borrador" : "Cancelada", tone: "mute" };
-  if (pend <= 0.01 || row.status === "PAID") return { text: "Pagada", tone: "ok" };
+  if (row.status === "CANCELLED") return { text: ESTATUS_FACTURA.CANCELLED, tone: "mute" };
+  if (row.status === "DRAFT") return { text: ESTATUS_FACTURA.DRAFT, tone: "mute" };
+  if (pend <= 0.01 || row.status === "PAID") return { text: ESTATUS_FACTURA.PAID, tone: "ok" };
   if (od != null && od > 0) return { text: `Vencida · ${od}d`, tone: "bad" };
-  if (Number(row.paidAmount || 0) > 0) return { text: "Parcial", tone: "warn" };
-  return { text: "Pendiente", tone: "mute" };
+  if (Number(row.paidAmount || 0) > 0 || row.status === "PARTIALLY_PAID") {
+    return { text: ESTATUS_FACTURA.PARTIALLY_PAID, tone: "warn" };
+  }
+  return { text: ESTATUS_FACTURA[row.status] ?? "Pendiente", tone: "mute" };
 }
 
 /** El tono del estado, en el vocabulario de `StatusDot`: punto y palabra. */
@@ -243,6 +269,19 @@ export default function ContabilidadInvoicesView({
         </div>
       ),
     },
+    ...(mode === "all"
+      ? [
+          {
+            key: "tipo",
+            label: "Tipo",
+            render: (r: InvoiceRow) => (
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+                {tipoFacturaLabel(r.type)}
+              </span>
+            ),
+          } as Column<InvoiceRow>,
+        ]
+      : []),
     {
       key: "due",
       label: "Vence",
