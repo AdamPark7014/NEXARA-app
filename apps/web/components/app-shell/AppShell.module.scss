@@ -105,8 +105,31 @@
 
 /* ============================================================
    SIDEBAR
+   ------------------------------------------------------------
+   Jerarquía, de mayor a menor peso:
+     1. marca / panel        (identidad, alineada con la topbar)
+     2. filtro del menú      (utilidad, silencioso hasta el foco)
+     3. micro-etiqueta       (11 px, tracking amplio: rotula, no titula)
+     4. módulo               (13.5 px — el único nivel «legible de lejos»)
+     5. navegación secundaria (Mi cuenta: baja al fondo por espacio, no por borde)
+     6. perfil               (pie, única franja con línea porque separa scroll de fijo)
+
+   Todo el ritmo vertical sale de las medidas locales de abajo. Ningún nivel
+   usa tarjeta ni borde para diferenciarse: solo espacio, tipografía y color.
    ============================================================ */
 .sidebar {
+  /* Ritmo y métrica del menú. Local al shell: no redefine tokens globales. */
+  --nav-gutter: 10px; /* sangría del menú; el riel del activo vive en su borde */
+  --nav-item-h: var(--ui-nav-item-h, 32px);
+  --nav-item-gap: 2px; /* módulo ↔ módulo */
+  --nav-label-gap: 4px; /* micro-etiqueta ↔ primer módulo */
+  --nav-group-gap: 22px; /* grupo ↔ grupo (≈10× el anterior: la agrupación se ve) */
+  --nav-icon-box: 18px;
+  --nav-icon-gap: 10px;
+  /* Tintas propias del menú: la etiqueta baja de tono sin bajar de contraste. */
+  --nav-label-ink: color-mix(in srgb, var(--ui-fg-2) 85%, var(--ui-fg-3));
+  --nav-icon-ink: color-mix(in srgb, var(--ui-fg-2) 70%, var(--ui-fg-3));
+
   grid-area: sidebar;
   position: sticky;
   top: 0;
@@ -117,34 +140,50 @@
   background: var(--ui-surface);
   border-right: 1px solid var(--ui-border);
   z-index: 30;
-  overflow: hidden;
+  /* visible: el menú de perfil se despliega fuera del riel cuando está colapsado.
+     El scroll lo gestiona `.menu`, no el aside. */
+  overflow: visible;
   transition: width 200ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 @media (max-width: 900px) {
   .sidebar {
+    /* Cajón táctil: mismo lenguaje, renglón de 44 px (objetivo mínimo). */
+    --nav-item-h: 44px;
+    --nav-group-gap: 24px;
+
     position: fixed;
     top: 0;
     left: 0;
     height: 100vh;
     height: 100dvh;
-    width: 280px;
+    width: min(288px, 86vw);
     transform: translateX(-100%);
-    transition: transform 220ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+    /* Cerrado no es solo invisible: sale del orden de tabulación. */
+    visibility: hidden;
     box-shadow: var(--ui-shadow-pop);
+    transition:
+      transform 220ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+      visibility 0s linear 220ms;
   }
 
   .shell[data-mobile-open="true"] .sidebar {
     transform: translateX(0);
+    visibility: visible;
+    transition:
+      transform 220ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1)),
+      visibility 0s;
   }
 }
 
+/* ── 1 · Marca ──────────────────────────────────────────── */
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   height: var(--ui-topbar-h);
-  padding: 0 16px;
+  /* 18 px = borde izquierdo exacto de los iconos del menú. */
+  padding: 0 12px 0 18px;
   border-bottom: 1px solid var(--ui-border);
   position: relative;
   flex: 0 0 auto;
@@ -153,14 +192,10 @@
 .brandLogo {
   height: 24px;
   width: 24px;
-  border-radius: 0;
-  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  overflow: visible;
-  box-shadow: none;
 }
 
 .brandLogoMark {
@@ -168,16 +203,6 @@
   width: 24px;
   height: 24px;
   object-fit: contain;
-}
-
-.shell[data-collapsed="true"] .brandLogo {
-  width: 24px;
-  max-width: 24px;
-}
-
-.shell[data-collapsed="true"] .brand {
-  justify-content: center;
-  padding: 0;
 }
 
 .brandText {
@@ -200,68 +225,110 @@
 .brandPanel {
   font-size: 12px;
   font-weight: 500;
-  color: var(--ui-fg-3);
+  color: var(--nav-label-ink);
   line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.shell[data-collapsed="true"] .brandText,
-.shell[data-collapsed="true"] .userInfo,
-.shell[data-collapsed="true"] .menuItemLabel,
-.shell[data-collapsed="true"] .groupTitle,
-.shell[data-collapsed="true"] .search {
+/* Cierre del cajón: solo existe donde el cajón existe. */
+.drawerClose {
   display: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--ui-radius);
+  background: transparent;
+  color: var(--ui-fg-2);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-right: -4px;
+
+  &:hover {
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ui-brand);
+    outline-offset: 1px;
+  }
+
+  @media (max-width: 900px) {
+    display: inline-flex;
+  }
 }
 
+/* ── 2 · Filtro del menú ────────────────────────────────── */
 .search {
-  padding: 12px 12px 4px;
+  padding: 12px var(--nav-gutter) 2px;
+  flex: 0 0 auto;
+}
+
+.searchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  /* 9 px + gutter = 19 px: misma vertical que el trazo de los iconos del menú. */
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--nav-icon-ink);
+  pointer-events: none;
 }
 
 .searchInput {
   width: 100%;
   height: 32px;
-  padding: 0 10px 0 32px;
-  font-size: 13px;
+  /* 36 px = la etiqueta del filtro cae en la misma columna que la del módulo. */
+  padding: 0 10px 0 36px;
   font-family: inherit;
-  background: var(--ui-surface-2);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
   color: var(--ui-fg);
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 
   &::placeholder {
     color: var(--ui-fg-3);
   }
 
+  &:hover {
+    background: var(--ui-hover);
+  }
+
   &:focus {
-    border-color: var(--ui-brand);
     background: var(--ui-surface);
+    border-color: color-mix(in srgb, var(--ui-brand) 45%, transparent);
     box-shadow: var(--ui-ring);
   }
 }
 
-.searchWrap {
-  position: relative;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--ui-fg-3);
-  pointer-events: none;
-}
-
+/* ── 3 · Menú ───────────────────────────────────────────── */
 .menu {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  padding: 8px 8px 16px;
+  overscroll-behavior: contain;
+  padding: 10px var(--nav-gutter) 14px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--nav-group-gap);
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-tertiary) 30%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--ui-fg-3) 45%, transparent) transparent;
 }
 
 .menu::-webkit-scrollbar {
@@ -271,54 +338,100 @@
   background: transparent;
 }
 .menu::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-tertiary) 25%, transparent);
+  background: color-mix(in srgb, var(--ui-fg-3) 30%, transparent);
   border-radius: 999px;
 }
 .menu:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-tertiary) 40%, transparent);
+  background: color-mix(in srgb, var(--ui-fg-3) 55%, transparent);
+}
+
+.menuEmpty {
+  margin: 0;
+  padding: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ui-fg-2);
 }
 
 .group {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--nav-item-gap);
 }
 
+/* Navegación secundaria (Mi cuenta): se separa cayendo al fondo, sin línea. */
+.group[data-kind="secondary"] {
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.group[data-kind="secondary"] .menuItem:not(.active) .menuItemIcon {
+  opacity: 0.72;
+}
+
+/* Micro-etiqueta: rotula el grupo, no compite con los módulos. */
 .groupTitle {
+  margin: 0 0 var(--nav-label-gap);
+  padding: 0 8px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.2;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ui-fg-3);
-  padding: 4px 8px 6px;
-  margin: 0;
+  letter-spacing: 0.09em;
+  color: var(--nav-label-ink);
+  user-select: none;
 }
 
-/* Renglón del menú: 32 px, neutro; activo = fondo gris, icono teal y rayita teal a la izquierda. */
+/* ── 4 · Módulo ─────────────────────────────────────────── */
 .menuItem {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: var(--ui-nav-item-h);
+  gap: var(--nav-icon-gap);
+  min-height: var(--nav-item-h);
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: 7px;
   font-size: 13.5px;
   font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
   color: var(--ui-fg-2);
   text-decoration: none;
-  transition: background 100ms ease, color 100ms ease;
   position: relative;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 
   &:hover {
     background: var(--ui-hover);
     color: var(--ui-fg);
   }
+
+  &:hover .menuItemIcon {
+    color: var(--ui-fg-2);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ui-brand);
+    outline-offset: 1px;
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+  }
 }
 
+/* Activo = cuatro señales débiles que solo coinciden en un sitio:
+   tinte de marca, riel de 2 px en el borde del panel, icono teal y peso 600.
+   Ninguna basta sola; juntas se leen antes de leer el texto. */
 .menuItem.active {
-  background: var(--ui-hover);
+  background: color-mix(in srgb, var(--ui-brand) 9%, var(--ui-surface));
   color: var(--ui-fg);
+  font-weight: 600;
+}
+
+.menuItem.active:hover {
+  background: color-mix(in srgb, var(--ui-brand) 14%, var(--ui-surface));
 }
 
 .menuItem.active .menuItemIcon {
@@ -328,90 +441,66 @@
 .menuItem.active::before {
   content: "";
   position: absolute;
-  left: -8px;
-  top: 8px;
-  bottom: 8px;
+  left: calc(-1 * var(--nav-gutter));
+  top: 7px;
+  bottom: 7px;
   width: 2px;
   border-radius: 0 2px 2px 0;
   background: var(--ui-brand);
 }
 
 .menuItemIcon {
+  flex: 0 0 auto;
+  width: var(--nav-icon-box);
+  height: var(--nav-icon-box);
+  display: grid;
+  place-items: center;
   line-height: 1;
-  flex-shrink: 0;
-  width: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ui-fg-3);
-  transition: color 100ms ease;
-}
-
-.shell[data-collapsed="true"] .menuItem {
-  justify-content: center;
-  padding: 0;
-}
-
-/* Integra: iconos densos, sin pastilla suave de marketing */
-.shell[data-panel="integra"] .menuItemIcon {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  font-size: 13px;
-  background: color-mix(in srgb, var(--panel-accent, #0e7490) 10%, var(--surface-2, #f1f5f9));
-  border: 1px solid color-mix(in srgb, var(--panel-accent, #0e7490) 16%, transparent);
-  color: var(--panel-accent, #0e7490);
-}
-
-.shell[data-panel="integra"] .menuItem:hover .menuItemIcon {
-  background: color-mix(in srgb, var(--panel-accent, #0e7490) 16%, var(--surface));
-  border-color: color-mix(in srgb, var(--panel-accent, #0e7490) 32%, transparent);
-}
-
-.shell[data-panel="integra"] .menuItem.active .menuItemIcon {
-  background: color-mix(in srgb, var(--panel-accent, #0e7490) 20%, var(--surface));
-  border-color: color-mix(in srgb, var(--panel-accent, #0e7490) 42%, transparent);
-  box-shadow: none;
-}
-
-.shell[data-panel="integra"] .groupTitle {
-  padding-top: 4px;
-  letter-spacing: 0.08em;
-}
-
-.shell[data-panel="integra"] .menu {
-  gap: 10px;
-  padding-top: 8px;
-}
-
-.shell[data-panel="integra"] .menuItem {
-  padding: 7px 9px;
-  border-radius: 6px;
-}
-
-.shell[data-panel="integra"] .menuItem.active {
-  background: color-mix(in srgb, var(--panel-accent, #0e7490) 10%, var(--surface));
-  box-shadow: inset 2px 0 0 var(--panel-accent, #0e7490);
+  color: var(--nav-icon-ink);
+  transition: color 120ms ease;
 }
 
 .menuItemLabel {
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: -0.005em;
 }
 
+/* ── 6 · Perfil ─────────────────────────────────────────── */
 .userBlock {
   position: relative;
+  flex: 0 0 auto;
+  /* Única línea del cuerpo del menú: separa lo que hace scroll de lo fijo. */
   border-top: 1px solid var(--ui-border);
-  padding: 10px 12px;
+  padding: 8px var(--nav-gutter);
+}
+
+.userTrigger {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 6px 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+
+  &:hover {
+    background: var(--ui-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ui-brand);
+    outline-offset: 1px;
+  }
 }
 
 .avatar {
@@ -427,29 +516,19 @@
   font-size: 11px;
   font-family: var(--ui-font);
   flex-shrink: 0;
-  position: relative;
-
-  &::after {
-    content: "";
-    position: absolute;
-    bottom: -1px;
-    right: -1px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--ui-success);
-    border: 2px solid var(--ui-surface);
-  }
 }
 
 .userInfo {
+  display: block;
   min-width: 0;
   flex: 1;
 }
 
 .userName {
+  display: block;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.25;
   color: var(--ui-fg);
   white-space: nowrap;
   overflow: hidden;
@@ -457,39 +536,170 @@
 }
 
 .userRole {
-  font-size: 12px;
-  color: var(--ui-fg-3);
+  display: block;
+  margin-top: 1px;
+  font-size: 11.5px;
+  line-height: 1.25;
+  color: var(--nav-label-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.userMenuBtn {
-  background: transparent;
-  border: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  cursor: pointer;
+.userTriggerIcon {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 20px;
+  flex: 0 0 auto;
   color: var(--ui-fg-3);
+}
 
-  &:hover:not(:disabled) {
-    background: var(--ui-hover);
-    color: var(--ui-fg);
-    transform: none;
-    box-shadow: none;
+/* Menú de cuenta: superficie + 1 px + elevación mínima. */
+.userMenu {
+  position: absolute;
+  bottom: calc(100% - 4px);
+  left: var(--nav-gutter);
+  right: var(--nav-gutter);
+  min-width: 208px;
+  z-index: 40;
+  padding: 5px;
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow-pop);
+  animation: shellMenuIn 150ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+@keyframes shellMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.shell[data-collapsed="true"] .userMenuBtn {
-  display: none;
+.userMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ui-fg-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+
+  &:hover {
+    background: var(--ui-hover);
+    color: var(--ui-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ui-brand);
+    outline-offset: -1px;
+  }
 }
 
-.shell[data-collapsed="true"] .userBlock {
-  justify-content: center;
+.userMenuItem[data-variant="danger"] {
+  color: var(--ui-danger-text);
+}
+
+.userMenuItemIcon {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: var(--nav-icon-ink);
+}
+
+.userMenuItem[data-variant="danger"] .userMenuItemIcon {
+  color: currentColor;
+}
+
+.userMenuItem[data-state="on"] .userMenuItemIcon {
+  color: var(--ui-brand);
+}
+
+/* Estado del interruptor sin decirlo con palabras. */
+.userMenuState {
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ui-brand);
+  flex: 0 0 auto;
+}
+
+.userMenuSep {
+  height: 1px;
+  margin: 5px 6px;
+  border: 0;
+  background: var(--ui-border);
+}
+
+/* ── Colapsado (solo escritorio) ────────────────────────── */
+@media (min-width: 901px) {
+  /* El texto se oculta a la vista, no al lector de pantalla: si desapareciera
+     del DOM, los enlaces del menú se quedarían sin nombre accesible. */
+  .shell[data-collapsed="true"] .brandText,
+  .shell[data-collapsed="true"] .userInfo,
+  .shell[data-collapsed="true"] .menuItemLabel,
+  .shell[data-collapsed="true"] .groupTitle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .shell[data-collapsed="true"] .search {
+    display: none;
+  }
+
+  .shell[data-collapsed="true"] .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .shell[data-collapsed="true"] .menuItem {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .shell[data-collapsed="true"] .userTrigger {
+    justify-content: center;
+    padding: 4px;
+  }
+
+  .shell[data-collapsed="true"] .userTriggerIcon {
+    display: none;
+  }
+
+  /* Colapsado el menú no cabe dentro del riel: sale al lado. */
+  .shell[data-collapsed="true"] .userMenu {
+    left: calc(100% + 8px);
+    right: auto;
+    bottom: 8px;
+    width: 232px;
+  }
 }
 
 /* ============================================================
@@ -790,26 +1000,25 @@
   max-width: 400px;
   max-height: 540px;
   overflow-y: auto;
-  background: var(--surface, #fff);
-  border: 1px solid var(--nx-panel-hairline);
-  border-radius: 16px;
-  box-shadow:
-    0 4px 8px rgba(8, 24, 38, 0.06),
-    0 28px 60px rgba(8, 24, 38, 0.18);
-  padding: 8px;
+  /* Misma profundidad que el menú de cuenta: superficie, 1 px y elevación
+     mínima. Sin blur ni sombras marcadas. */
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-pop);
+  padding: 6px;
   z-index: 50;
-  animation: switcherIn 220ms var(--nx-ease-spring);
-  backdrop-filter: blur(20px) saturate(140%);
+  animation: switcherIn 180ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 @keyframes switcherIn {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.96);
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -1016,5 +1225,31 @@
 @media (min-width: 901px) {
   .overlay {
     display: none;
+  }
+}
+
+/* ============================================================
+   MOVIMIENTO
+   ------------------------------------------------------------
+   Nada del shell depende de la animación para entenderse: con
+   `prefers-reduced-motion` todo llega ya colocado.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .searchInput,
+  .menuItem,
+  .menuItemIcon,
+  .userTrigger,
+  .userMenuItem,
+  .overlay,
+  .iconBtn,
+  .paletteBtn {
+    transition-duration: 1ms;
+  }
+
+  .userMenu,
+  .switcherDropdown,
+  .contentInner {
+    animation: none;
   }
 }
