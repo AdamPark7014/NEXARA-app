@@ -65,9 +65,9 @@ export default function AuditoriaPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
-        title="Auditoría financiera"
-        subtitle="Trail quién/qué/antes/después desde AuditLog."
+        eyebrow="Contabilidad"
+        title="Auditoría"
+        subtitle="Quién cambió qué y cuándo."
         density="ops"
         actions={<Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>Actualizar</Button>}
       />

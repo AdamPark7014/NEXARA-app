@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
-import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -82,20 +82,22 @@ export default function CierresPage() {
       key: "status",
       label: "Estado",
       render: (r) => (
-        <Tag variant={r.isClosed ? "neutral" : "positive"}>{r.isClosed ? "Cerrado" : "Abierto"}</Tag>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: r.isClosed ? "var(--text-tertiary)" : "var(--success)" }}>
+          {r.isClosed ? "Cerrado" : "Abierto"}
+        </span>
       ),
     },
     {
       key: "actions",
-      label: "Checklist",
+      label: "",
       render: (r) =>
         r.isClosed ? (
           <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-            {r.closedAt ? new Date(r.closedAt).toLocaleString("es-MX") : "—"}
+            {r.closedAt ? new Date(r.closedAt).toLocaleDateString("es-MX") : "—"}
           </span>
         ) : (
-          <Button size="sm" variant="secondary" disabled={busyId === r.id} onClick={() => void closePeriod(r.id)}>
-            Cerrar periodo
+          <Button size="sm" variant="primary" disabled={busyId === r.id} onClick={() => void closePeriod(r.id)}>
+            Cerrar
           </Button>
         ),
     },
@@ -104,23 +106,50 @@ export default function CierresPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
-        title="Cierres fiscales"
-        subtitle="Checklist sobre FiscalPeriod. Al cerrar, el service bloquea journal del periodo."
+        eyebrow="Contabilidad"
+        title="Cierres"
+        subtitle="Antes de cerrar: revisa cobros, pagos y banco. Al cerrar se bloquean pólizas del periodo."
         density="ops"
         actions={<Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>Actualizar</Button>}
       />
-      <ul style={{ margin: "0 0 14px", paddingLeft: 18, fontSize: 13, color: "var(--text-secondary)", display: "grid", gap: 4 }}>
-        <li>Revisar CxC/CxP vencidas en el hub</li>
-        <li>Conciliar movimientos bancarios pendientes</li>
-        <li>Confirmar prenómina del periodo</li>
-        <li>Cerrar periodo → lock de pólizas</li>
-      </ul>
+      <ol
+        style={{
+          margin: "0 0 16px",
+          paddingLeft: 18,
+          fontSize: 13,
+          color: "var(--text-secondary)",
+          display: "grid",
+          gap: 6,
+        }}
+      >
+        <li>
+          Revisar{" "}
+          <a href="/erp/contabilidad/cuentas-por-cobrar" style={{ color: "var(--primary)" }}>
+            cobros vencidos
+          </a>{" "}
+          y{" "}
+          <a href="/erp/contabilidad/cuentas-por-pagar" style={{ color: "var(--primary)" }}>
+            pagos vencidos
+          </a>
+        </li>
+        <li>
+          <a href="/erp/contabilidad/conciliacion" style={{ color: "var(--primary)" }}>
+            Conciliar banco
+          </a>
+        </li>
+        <li>
+          Confirmar{" "}
+          <a href="/erp/contabilidad/pre-nomina" style={{ color: "var(--primary)" }}>
+            pre-nómina
+          </a>
+        </li>
+        <li>Cerrar el periodo abierto abajo</li>
+      </ol>
       {error && <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
       {loading ? (
         <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando…</p>
       ) : rows.length === 0 ? (
-        <EmptyState title="Sin periodos" description="Crea periodos desde Contabilidad general." />
+        <EmptyState title="Sin periodos" description="Crea un periodo fiscal desde Contabilidad general." />
       ) : (
         <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} density="compact" />
       )}

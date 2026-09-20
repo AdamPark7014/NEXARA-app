@@ -6,8 +6,8 @@ export default function CuentasPorCobrarPage() {
   return (
     <ContabilidadInvoicesView
       mode="cxc"
-      title="Cuentas por cobrar"
-      subtitle="Aging de clientes sobre facturas de ingreso abiertas."
+      title="Por cobrar"
+      subtitle="Quién te debe y qué urge cobrar."
     />
   );
 }

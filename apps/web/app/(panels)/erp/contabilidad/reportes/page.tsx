@@ -17,9 +17,9 @@ export default function ReportesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
+        eyebrow="Contabilidad"
         title="Reportes"
-        subtitle="Biblioteca de reportes: wrappers sobre accounting exports existentes."
+        subtitle="Elige qué necesitas revisar o exportar."
         density="ops"
       />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>

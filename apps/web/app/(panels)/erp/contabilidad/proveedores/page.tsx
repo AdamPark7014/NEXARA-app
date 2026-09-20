@@ -81,9 +81,9 @@ export default function ProveedoresPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
+        eyebrow="Contabilidad"
         title="Proveedores"
-        subtitle="Vendor 360° agregado desde facturas de egreso."
+        subtitle="A quién le debes y cuánto."
         density="ops"
         actions={<Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>Actualizar</Button>}
       />

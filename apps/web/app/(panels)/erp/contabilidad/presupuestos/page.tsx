@@ -82,9 +82,9 @@ export default function PresupuestosPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
+        eyebrow="Contabilidad"
         title="Presupuestos"
-        subtitle="Presupuesto vs real por categoría / centro de costo."
+        subtitle="Plan vs real por centro de costo."
         density="ops"
         actions={<Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>Actualizar</Button>}
       />
