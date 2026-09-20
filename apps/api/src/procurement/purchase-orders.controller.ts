@@ -7,6 +7,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { generateProcurementDashboardPdf } from './procurement-dashboard-pdf.js';
+import { CreateSupplierDto } from './dto/supplier.dto.js';
 
 @Controller('procurement/purchase-orders')
 @UseGuards(RbacGuard)
@@ -21,7 +22,7 @@ export class PurchaseOrdersController {
 
   @Post('suppliers')
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_MANAGE] })
-  createSupplier(@Body() dto: any, @CurrentCompanyId() companyId: number | null) {
+  createSupplier(@Body() dto: CreateSupplierDto, @CurrentCompanyId() companyId: number | null) {
     return this.svc.createSupplier(dto, companyId);
   }
 

@@ -263,7 +263,7 @@ export default function WholesalePanel({
           <EmptyState
             icon="🏭"
             title="Ningún proveedor marcado como mayorista"
-            description="Abre un proveedor desde una orden de compra y guarda sus condiciones de convenio: crédito, descuento, tiempo de entrega y pedido mínimo. A partir de ahí aparecerá aquí."
+            description="Da de alta un proveedor con «Nuevo proveedor» y marca la casilla de convenio, o abre uno que ya sea mayorista para ajustar crédito, descuento, tiempo de entrega y pedido mínimo."
           />
         ) : (
           <div style={{ overflowX: "auto" }}>

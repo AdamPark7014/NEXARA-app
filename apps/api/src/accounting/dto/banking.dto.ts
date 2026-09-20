@@ -53,6 +53,16 @@ export class CreateBankAccountDto {
   @IsOptional()
   @IsBoolean()
   speiEnabled?: boolean;
+
+  /**
+   * Saldo inicial de la cuenta. Es el único momento en que el saldo se captura
+   * a mano: a partir del alta lo mueven los movimientos bancarios. Sin esto la
+   * cuenta arranca en cero y la conciliación del primer mes nunca cuadra.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  currentBalance?: number;
 }
 
 export class UpdateBankAccountDto {

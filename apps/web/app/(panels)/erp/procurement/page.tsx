@@ -17,6 +17,10 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import WholesalePanel from "@/components/WholesalePanel";
 import EmptyState from "@/components/ui/EmptyState";
+import Modal from "@/components/ui/Modal";
+import InlineAlert from "@/components/ui/InlineAlert";
+import { FinanceField, FinanceFormGrid } from "@/components/finance/FinanceModuleShell";
+import { updateWholesaleTerms } from "@/lib/wholesale-api";
 import chrome from "@/components/crm/crm-chrome.module.css";
 
 type ProcTab = "orders" | "requisitions" | "receipts" | "rfq" | "mayoristas";
@@ -191,6 +195,15 @@ const emptyReqItem: ReqItem = { description: "", quantity: 1, estimatedCost: "" 
 const emptyPoForm  = { supplierName: "", expectedDate: "" };
 const emptyPoItem: PoItem  = { description: "", quantity: 1, unitPrice: "" };
 
+const emptySupplierForm = {
+  name: "",
+  rfc: "",
+  description: "",
+  esMayorista: false,
+  creditoDias: "",
+  limiteCredito: "",
+};
+
 const inp: React.CSSProperties = {
   width: "100%", padding: "7px 9px", border: "1px solid var(--border)",
   borderRadius: 7, background: "var(--surface)", color: "var(--foreground)", fontSize: 12.5, boxSizing: "border-box",
@@ -246,6 +259,17 @@ export default function ProcurementPage() {
   const [rfqs, setRfqs] = useState<Rfq[]>([]);
   const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string; rfc?: string | null }>>([]);
   const [savingSupplierRfcId, setSavingSupplierRfcId] = useState<number | null>(null);
+
+  // ── Alta de proveedor ──────────────────────────────────────────────────
+  // Hasta ahora el proveedor nacía de rebote: alguien tecleaba un nombre en la
+  // orden de compra y quedaba una ficha con nombre y nada más. Sin RFC no hay
+  // DIOT ni factura de proveedor que cuadre, y las condiciones de convenio no
+  // tenían por dónde entrar —la pestaña de mayoristas solo lista a los que ya
+  // lo son, así que el primero no podía marcarse nunca—.
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({ ...emptySupplierForm });
+  const [savingSupplier, setSavingSupplier] = useState(false);
+  const [supplierErr, setSupplierErr] = useState<string | null>(null);
   const [showRfqForm, setShowRfqForm] = useState(false);
   const [rfqForm, setRfqForm] = useState<{ requisitionId: string; supplierIds: number[]; dueDate: string; notes: string }>({ requisitionId: "", supplierIds: [], dueDate: "", notes: "" });
   const [savingRfq, setSavingRfq] = useState(false);
@@ -638,6 +662,71 @@ export default function ProcurementPage() {
     }
   };
 
+  const loadSuppliers = useCallback(async () => {
+    if (!token) return;
+    try {
+      const rows = await apiFetch<Array<{ id: number; name: string; rfc?: string | null }> | { data: Array<{ id: number; name: string; rfc?: string | null }> }>(
+        "procurement/purchase-orders/suppliers",
+        token,
+      );
+      setSuppliers(unwrapList<{ id: number; name: string; rfc?: string | null }>(rows));
+    } catch {
+      /* La lista es un apoyo del formulario: si no carga, el alta sigue en pie. */
+    }
+  }, [token]);
+
+  const openSupplierForm = () => {
+    setSupplierForm({ ...emptySupplierForm });
+    setSupplierErr(null);
+    setShowSupplierForm(true);
+  };
+
+  const saveSupplier = async () => {
+    if (!token) return;
+    const name = supplierForm.name.trim();
+    if (!name) { setSupplierErr("Ponle el nombre o razón social del proveedor."); return; }
+    const rfc = supplierForm.rfc.trim().toUpperCase();
+    if (rfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc)) {
+      setSupplierErr("El RFC no tiene el formato del SAT (12 dígitos para moral, 13 para física).");
+      return;
+    }
+    setSavingSupplier(true);
+    setSupplierErr(null);
+    try {
+      const created = await apiFetch<{ id: number; name: string; rfc?: string | null }>(
+        "procurement/purchase-orders/suppliers",
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            name,
+            rfc: rfc || undefined,
+            description: supplierForm.description.trim() || undefined,
+          }),
+        },
+      );
+      // Las condiciones de convenio viven en otra ruta. Se mandan solo si el
+      // usuario marcó la casilla: así el primer mayorista puede marcarse desde
+      // aquí, que era lo que no tenía salida.
+      if (supplierForm.esMayorista && created?.id) {
+        await updateWholesaleTerms(token, created.id, {
+          esMayorista: true,
+          creditoDias: supplierForm.creditoDias ? Number(supplierForm.creditoDias) : null,
+          limiteCredito: supplierForm.limiteCredito ? Number(supplierForm.limiteCredito) : null,
+        });
+      }
+      toast.success(`Proveedor "${name}" dado de alta`);
+      setShowSupplierForm(false);
+      setSupplierForm({ ...emptySupplierForm });
+      void loadSuppliers();
+      void load();
+    } catch (e) {
+      setSupplierErr(e instanceof Error ? e.message : "No se pudo dar de alta el proveedor");
+    } finally {
+      setSavingSupplier(false);
+    }
+  };
+
   const saveSupplierRfc = async (supplierId: number, name: string, rfc: string) => {
     if (!token) return;
     setSavingSupplierRfcId(supplierId);
@@ -966,6 +1055,9 @@ export default function ProcurementPage() {
         actions={
           <>
             <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
+            {cfg.canCreate && (
+              <Button variant="secondary" size="sm" iconLeft="+" onClick={openSupplierForm}>Nuevo proveedor</Button>
+            )}
             {cfg.canCreate && tab === "requisitions" && (
               <Button variant="primary" size="sm" onClick={() => { setShowReqForm(true); setShowPoForm(false); }}>Nueva requisición</Button>
             )}
@@ -1065,7 +1157,7 @@ export default function ProcurementPage() {
             <div style={{ gridColumn: "1 / -1" }}>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Proveedores a cotizar *</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {suppliers.length === 0 && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin proveedores — agrega uno en Órdenes de compra.</span>}
+                {suppliers.length === 0 && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin proveedores — da de alta el primero con «Nuevo proveedor».</span>}
                 {suppliers.map((s) => {
                   const checked = rfqForm.supplierIds.includes(s.id);
                   return (
@@ -1272,6 +1364,60 @@ export default function ProcurementPage() {
           y la Section de abajo filtran órdenes y requisiciones, que aquí no
           aplican, así que se ocultan en vez de mostrarse vacíos. */}
       {tab === "mayoristas" && <WholesalePanel token={token} canManage={cfg.canCreate} />}
+
+      {/* ── Alta de proveedor ─────────────────────────────────────────── */}
+      <Modal
+        open={showSupplierForm}
+        onClose={() => setShowSupplierForm(false)}
+        title="Nuevo proveedor"
+        footer={
+          <>
+            <Button size="sm" variant="secondary" onClick={() => setShowSupplierForm(false)}>Cancelar</Button>
+            <Button size="sm" variant="primary" onClick={() => void saveSupplier()} disabled={savingSupplier}>
+              {savingSupplier ? "Guardando…" : "Dar de alta"}
+            </Button>
+          </>
+        }
+      >
+        {supplierErr && <InlineAlert variant="danger" message={supplierErr} style={{ marginBottom: 12 }} />}
+        <FinanceFormGrid>
+          <FinanceField label="Nombre o razón social" fullWidth hint="Tal como lo emite en sus facturas. Si ya existe, se completa su ficha en vez de duplicarla.">
+            <input value={supplierForm.name} onChange={e => setSupplierForm(f => ({ ...f, name: e.target.value }))} placeholder="Distribuidora del Norte S.A. de C.V." style={inp} />
+          </FinanceField>
+          <FinanceField label="RFC" optional hint="Sin él no entra en la DIOT ni cuadra su factura recibida.">
+            <input
+              value={supplierForm.rfc}
+              onChange={e => setSupplierForm(f => ({ ...f, rfc: e.target.value.toUpperCase() }))}
+              placeholder="DNO920101AB1"
+              maxLength={13}
+              style={{ ...inp, textTransform: "uppercase" }}
+            />
+          </FinanceField>
+          <FinanceField label="Qué surte" optional hint="Una línea: para reconocerlo al cotizar.">
+            <input value={supplierForm.description} onChange={e => setSupplierForm(f => ({ ...f, description: e.target.value }))} placeholder="Material eléctrico y canalización" style={inp} />
+          </FinanceField>
+          <FinanceField label="Convenio de mayorista" fullWidth optional hint="Márcalo solo si hay condiciones pactadas. Es lo que lo hace aparecer en la pestaña de Mayoristas.">
+            <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
+              <input
+                type="checkbox"
+                checked={supplierForm.esMayorista}
+                onChange={e => setSupplierForm(f => ({ ...f, esMayorista: e.target.checked }))}
+              />
+              Es mayorista con convenio
+            </span>
+          </FinanceField>
+          {supplierForm.esMayorista && (
+            <>
+              <FinanceField label="Días de crédito" optional hint="Vacío o cero = pago de contado.">
+                <input type="number" min={0} value={supplierForm.creditoDias} onChange={e => setSupplierForm(f => ({ ...f, creditoDias: e.target.value }))} style={inp} />
+              </FinanceField>
+              <FinanceField label="Límite de crédito" optional hint="Tope de saldo por pagar. La orden avisa antes de pasarse.">
+                <input type="number" min={0} step="0.01" value={supplierForm.limiteCredito} onChange={e => setSupplierForm(f => ({ ...f, limiteCredito: e.target.value }))} style={inp} />
+              </FinanceField>
+            </>
+          )}
+        </FinanceFormGrid>
+      </Modal>
 
       {tab !== "mayoristas" && (
       <FilterToolbar

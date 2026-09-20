@@ -8,6 +8,7 @@ import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot from "@/components/ui/StatusDot";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
 import {
   FinanceField,
   FinanceFormGrid,
@@ -31,6 +32,7 @@ interface BankAccount {
   accountNumber: string;
   clabe?: string | null;
   currency: string;
+  accountType?: string | null;
   currentBalance: number | string;
   isActive: boolean;
 }
@@ -58,7 +60,23 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   return t ? JSON.parse(t) : null;
 }
 
-const emptyForm = { name: "", bankName: "", accountNumber: "", clabe: "", currentBalance: 0 };
+const emptyForm = {
+  name: "",
+  bankName: "",
+  accountNumber: "",
+  clabe: "",
+  currency: "MXN",
+  accountType: "CHEQUES",
+  currentBalance: 0,
+};
+
+const TIPOS_CUENTA = [
+  { value: "CHEQUES", label: "Cheques" },
+  { value: "INVERSION", label: "Inversión" },
+  { value: "NOMINA", label: "Nómina" },
+];
+
+const MONEDAS = ["MXN", "USD", "EUR"];
 
 const emptyTxForm = {
   transactionDate: new Date().toISOString().slice(0, 10),
@@ -86,6 +104,7 @@ export default function BankingPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showTxForm, setShowTxForm] = useState(false);
   const [txForm, setTxForm] = useState({ ...emptyTxForm });
@@ -137,28 +156,68 @@ export default function BankingPage() {
 
   const totalBalance = accounts.reduce((s, a) => s + Number(a.currentBalance), 0);
 
-  const openNewAccount = () => { setEditingAccount(null); setForm({ ...emptyForm }); setShowForm(true); };
+  const openNewAccount = () => { setEditingAccount(null); setForm({ ...emptyForm }); setFormErr(null); setShowForm(true); };
   const openEditAccount = (a: BankAccount) => {
     setEditingAccount(a);
-    setForm({ name: a.name, bankName: a.bankName, accountNumber: a.accountNumber, clabe: a.clabe ?? "", currentBalance: Number(a.currentBalance) });
+    setForm({
+      name: a.name,
+      bankName: a.bankName,
+      accountNumber: a.accountNumber,
+      clabe: a.clabe ?? "",
+      currency: a.currency || "MXN",
+      accountType: a.accountType || "CHEQUES",
+      currentBalance: Number(a.currentBalance),
+    });
+    setFormErr(null);
     setShowForm(true);
   };
 
   const saveAccount = async () => {
-    if (!token || !form.name || !form.bankName || !form.accountNumber) return;
+    if (!token) { setFormErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión."); return; }
+    // Antes el botón se limitaba a no hacer nada si faltaba el número de
+    // cuenta: se veía como si el sistema se hubiera colgado. Ahora lo dice.
+    if (!form.name.trim()) { setFormErr("Ponle un nombre a la cuenta."); return; }
+    if (!form.bankName.trim()) { setFormErr("Indica el banco."); return; }
+    if (!form.accountNumber.trim()) { setFormErr("Indica el número de cuenta."); return; }
     setSaving(true);
+    setFormErr(null);
     try {
       if (editingAccount) {
-        await apiFetch(`accounting/banking/accounts/${editingAccount.id}`, token, { method: "PATCH", body: JSON.stringify(form) });
+        // El saldo NO se manda al editar: a partir del alta lo mueven los
+        // movimientos. Mandarlo, además, rebotaba con 400 porque el API
+        // rechaza cualquier campo que no esté en el contrato de actualización.
+        await apiFetch(`accounting/banking/accounts/${editingAccount.id}`, token, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: form.name.trim(),
+            bankName: form.bankName.trim(),
+            accountNumber: form.accountNumber.trim(),
+            clabe: form.clabe.trim(),
+          }),
+        });
       } else {
-        await apiFetch("accounting/banking/accounts", token, { method: "POST", body: JSON.stringify(form) });
+        await apiFetch("accounting/banking/accounts", token, {
+          method: "POST",
+          body: JSON.stringify({
+            name: form.name.trim(),
+            bankName: form.bankName.trim(),
+            accountNumber: form.accountNumber.trim(),
+            clabe: form.clabe.trim() || undefined,
+            currency: form.currency || undefined,
+            accountType: form.accountType || undefined,
+            currentBalance: Number(form.currentBalance) || 0,
+          }),
+        });
       }
+      toast.success(editingAccount ? "Cuenta actualizada" : "Cuenta creada");
       setShowForm(false);
       setEditingAccount(null);
       setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo guardar la cuenta"));
+      const msg = formatApiError(e, "No se pudo guardar la cuenta");
+      setFormErr(msg);
+      toast.error(msg);
     } finally { setSaving(false); }
   };
 
@@ -334,6 +393,16 @@ export default function BankingPage() {
       {!loading && !error && (
         <>
           <Section title="Cuentas" subtitle="El saldo manda; elige una cuenta para ver sus movimientos.">
+            {accounts.length === 0 && (
+              <EmptyState
+                icon="🏦"
+                title="Todavía no hay cuentas bancarias"
+                description="La cuenta bancaria es el primer dato del módulo: sin ella no hay saldo, ni movimientos, ni conciliación. Da de alta la que usa la operación con su saldo del día que arrancas."
+                action={cfg.canCreate
+                  ? <Button size="sm" variant="primary" iconLeft="+" onClick={openNewAccount}>Crear la primera cuenta</Button>
+                  : undefined}
+              />
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10 }}>
               {accounts.map((a) => {
                 const saldo = Number(a.currentBalance);
@@ -482,12 +551,13 @@ export default function BankingPage() {
         footer={
           <>
             <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button size="sm" variant="primary" onClick={() => void saveAccount()} disabled={saving || !form.name || !form.bankName}>
+            <Button size="sm" variant="primary" onClick={() => void saveAccount()} disabled={saving}>
               {saving ? "Guardando…" : editingAccount ? "Guardar cambios" : "Crear cuenta"}
             </Button>
           </>
         }
       >
+        {formErr && <InlineAlert variant="danger" message={formErr} style={{ marginBottom: 12 }} />}
         <FinanceFormGrid>
           <FinanceField label="Nombre / alias" hint="Como la llaman en la operación, no como la nombra el banco.">
             <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Cuenta operativa MXN" style={inp} />
@@ -502,9 +572,21 @@ export default function BankingPage() {
             <input value={form.clabe} onChange={(e) => setForm((f) => ({ ...f, clabe: e.target.value }))} style={inp} />
           </FinanceField>
           {!editingAccount && (
-            <FinanceField label="Saldo inicial" fullWidth hint="Pesos. Solo se captura al dar de alta la cuenta; después lo mueven los movimientos.">
-              <input type="number" value={form.currentBalance} onChange={(e) => setForm((f) => ({ ...f, currentBalance: Number(e.target.value) }))} style={inp} />
-            </FinanceField>
+            <>
+              <FinanceField label="Moneda" hint="La del estado de cuenta. No se cambia después.">
+                <select value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} style={inp}>
+                  {MONEDAS.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </FinanceField>
+              <FinanceField label="Tipo de cuenta" hint="Separa la operativa de la de inversión y la de nómina.">
+                <select value={form.accountType} onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))} style={inp}>
+                  {TIPOS_CUENTA.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </FinanceField>
+              <FinanceField label="Saldo inicial" fullWidth hint="Solo se captura al dar de alta la cuenta; después lo mueven los movimientos. Cópialo del estado de cuenta del día que arrancas.">
+                <input type="number" step="0.01" value={form.currentBalance} onChange={(e) => setForm((f) => ({ ...f, currentBalance: Number(e.target.value) }))} style={inp} />
+              </FinanceField>
+            </>
           )}
         </FinanceFormGrid>
       </Modal>
