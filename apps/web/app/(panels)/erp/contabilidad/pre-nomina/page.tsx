@@ -4,11 +4,17 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
-import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
 import EmptyState from "@/components/ui/EmptyState";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot from "@/components/ui/StatusDot";
+import {
+  FinanceField,
+  FinanceFormGrid,
+  financeInputStyle,
+} from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { fetchPrenominaPreview, type PrenominaPreviewRow } from "@/lib/finance-api";
@@ -121,6 +127,47 @@ export default function ContabilidadPrenominaPage() {
     [rows],
   );
 
+  /**
+   * La tira del periodo. Cada pista dice de qué está hecha la cifra, porque
+   * «Total sugerido» no es lo que se va a pagar: no lleva bonos ni descuentos,
+   * y deja fuera a quien no tiene sueldo capturado.
+   */
+  const resumenStrip: Metric[] = useMemo(
+    () => [
+      {
+        label: "Empleados",
+        value: resumen.empleados,
+        hint: "Con alta activa",
+      },
+      {
+        label: "Sueldo base semanal",
+        value: <Money value={resumen.sueldoBase} />,
+        hint: "Suma de los sueldos capturados",
+      },
+      {
+        label: "Horas extra aprobadas",
+        value: horasYMinutos(resumen.minutosExtra),
+        hint: "Solo las ya autorizadas",
+      },
+      {
+        label: "Total sugerido",
+        value: <Money value={resumen.total} />,
+        hint:
+          resumen.sinMonto > 0
+            ? `Ordinario + extras · ${resumen.sinMonto} de captura manual`
+            : "Ordinario + extras del periodo",
+      },
+      {
+        label: "Por revisar",
+        value: resumen.conIncidencia,
+        hint:
+          resumen.conIncidencia === 0 ? "Nada pendiente" : "Filas que no deben pagarse así",
+        tone: resumen.conIncidencia > 0 ? "warning" : "default",
+      },
+    ],
+    [resumen],
+  );
+
   const columnas: Column<PrenominaPreviewRow>[] = [
     {
       key: "persona",
@@ -172,13 +219,25 @@ export default function ContabilidadPrenominaPage() {
       label: "Revisar",
       render: (r) => {
         const motivos = incidenciasDe(r);
-        if (motivos.length === 0) {
-          return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
-        }
-        return (
-          <span style={{ fontSize: 12, color: "var(--state-warning-text, #b45309)" }}>
-            {motivos.join(" · ")}
-          </span>
+        // El motivo completo se conserva —es lo que dice por qué no se puede
+        // pagar la fila tal cual—, pero baja a 11px bajo la palabra para no
+        // ensanchar la tabla. El color solo aparece cuando hay un motivo.
+        return motivos.length === 0 ? (
+          <StatusDot label="Sin pendientes" tone="neutral" />
+        ) : (
+          <div style={{ maxWidth: 230 }}>
+            <StatusDot label="Por revisar" tone="warning" />
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-tertiary)",
+                marginTop: 2,
+                lineHeight: 1.35,
+              }}
+            >
+              {motivos.join(" · ")}
+            </div>
+          </div>
         );
       },
     },
@@ -203,51 +262,46 @@ export default function ContabilidadPrenominaPage() {
         }
       />
 
-      <Section
-        title="Periodo"
-        subtitle="Elige el rango y vuelve a calcular."
-        dense
-        actions={
-          <Button size="sm" onClick={() => void cargar()} loading={cargando} disabled={!token}>
-            Calcular
-          </Button>
-        }
-      >
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
-          <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--text-secondary)" }}>
-            Desde
+      <Section title="Periodo" subtitle="Elige el rango y vuelve a calcular." dense>
+        <FinanceFormGrid>
+          <FinanceField label="Desde" hint="Primer día que entra al cálculo">
             <input
               type="date"
               value={desde}
               max={hasta}
               onChange={(e) => setDesde(e.target.value)}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--text-primary)",
-                fontSize: 13,
-              }}
+              style={financeInputStyle}
             />
-          </label>
-          <label style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--text-secondary)" }}>
-            Hasta
+          </FinanceField>
+          <FinanceField label="Hasta" hint="Último día, inclusive">
             <input
               type="date"
               value={hasta}
               min={desde}
               onChange={(e) => setHasta(e.target.value)}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--text-primary)",
-                fontSize: 13,
-              }}
+              style={financeInputStyle}
             />
-          </label>
+          </FinanceField>
+        </FinanceFormGrid>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            marginTop: 14,
+            paddingTop: 12,
+            borderTop: "1px solid var(--nx-panel-hairline, var(--border))",
+          }}
+        >
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => void cargar()}
+            loading={cargando}
+            disabled={!token}
+          >
+            Calcular
+          </Button>
         </div>
       </Section>
 
@@ -276,42 +330,7 @@ export default function ContabilidadPrenominaPage() {
       {hayDatos ? (
         <>
           <Section title="Resumen del periodo" subtitle={`${desde} → ${hasta}`} dense>
-            <div
-              style={{
-                display: "grid",
-                gap: 12,
-                gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-              }}
-            >
-              <KpiCard label="Empleados" value={resumen.empleados} hint="Con alta activa" />
-              <KpiCard
-                label="Sueldo base semanal"
-                value={<Money value={resumen.sueldoBase} />}
-                hint="Suma de los sueldos capturados"
-              />
-              <KpiCard
-                label="Horas extra aprobadas"
-                value={horasYMinutos(resumen.minutosExtra)}
-                hint="Solo las ya autorizadas"
-                variant={resumen.minutosExtra > 0 ? "accent" : "default"}
-              />
-              <KpiCard
-                label="Total sugerido"
-                value={<Money value={resumen.total} />}
-                hint="Ordinario + extras del periodo"
-                variant="positive"
-              />
-              <KpiCard
-                label="Por revisar"
-                value={resumen.conIncidencia}
-                hint={
-                  resumen.conIncidencia === 0
-                    ? "Nada pendiente"
-                    : "Filas que no deben pagarse así"
-                }
-                variant={resumen.conIncidencia > 0 ? "warning" : "default"}
-              />
-            </div>
+            <MetricStrip metrics={resumenStrip} ariaLabel="Resumen de la pre-nómina" />
 
             <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
               La pre-nómina no lleva bonos ni descuentos: se capturan al generar el pago en el

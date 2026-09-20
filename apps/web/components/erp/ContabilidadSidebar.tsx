@@ -189,7 +189,12 @@ function isActive(pathname: string, item: NavItem) {
 
 /**
  * Subnavegación del hub Contadora.
- * Agrupada por tarea (no por tabla BD). Compacta; en móvil hace scroll horizontal por grupo.
+ *
+ * Agrupada por tarea (no por tabla BD). Los grupos fluyen y envuelven: en móvil
+ * se apilan en vez de irse a scroll horizontal, que obligaba a arrastrar el
+ * menú para encontrar una sección. El grupo que contiene la página abierta
+ * levanta su encabezado, y el enlace activo es lo único con acento: así se ve
+ * dónde estás sin pintar la barra entera.
  */
 export default function ContabilidadSidebar() {
   const pathname = usePathname() ?? "";
@@ -203,36 +208,31 @@ export default function ContabilidadSidebar() {
       aria-label="Módulos de contabilidad"
       style={{
         display: "flex",
-        flexDirection: "column",
-        gap: 14,
-        paddingBottom: 4,
-        borderBottom: "1px solid var(--nx-panel-hairline)",
+        flexWrap: "wrap",
+        gap: "14px 26px",
+        alignItems: "flex-start",
+        paddingBottom: 12,
+        borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
         marginBottom: 4,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "12px 20px",
-          alignItems: "flex-start",
-        }}
-      >
-        {groups.map((group) => (
+      {groups.map((group) => {
+        const grupoActivo = group.items.some((item) => isActive(pathname, item));
+        return (
           <div key={group.id} style={{ minWidth: 0 }}>
             <div
               style={{
                 fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.08em",
+                fontWeight: 600,
+                letterSpacing: "0.09em",
                 textTransform: "uppercase",
-                color: "var(--text-tertiary)",
-                marginBottom: 6,
+                color: grupoActivo ? "var(--text-secondary)" : "var(--text-tertiary)",
+                marginBottom: 5,
               }}
             >
               {group.label}
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
               {group.items.map((item) => {
                 const active = isActive(pathname, item);
                 return (
@@ -240,21 +240,22 @@ export default function ContabilidadSidebar() {
                     key={item.id}
                     href={item.href}
                     aria-current={active ? "page" : undefined}
+                    className="nx-contab-nav-link"
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
-                      padding: "5px 10px",
-                      borderRadius: 7,
+                      height: 26,
+                      padding: "0 9px",
+                      borderRadius: 6,
                       fontSize: 12.5,
-                      fontWeight: active ? 700 : 500,
+                      fontWeight: active ? 600 : 400,
+                      lineHeight: 1,
+                      whiteSpace: "nowrap",
                       textDecoration: "none",
-                      color: active ? "var(--text-primary)" : "var(--text-secondary)",
+                      color: active ? "var(--primary)" : "var(--text-secondary)",
                       background: active
-                        ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
+                        ? "color-mix(in srgb, var(--primary) 9%, transparent)"
                         : "transparent",
-                      border: active
-                        ? "1px solid color-mix(in srgb, var(--primary) 28%, var(--border))"
-                        : "1px solid transparent",
                     }}
                   >
                     {item.label}
@@ -263,8 +264,19 @@ export default function ContabilidadSidebar() {
               })}
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
+
+      <style>{`
+        .nx-contab-nav-link:hover {
+          background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+          color: var(--text-primary);
+        }
+        .nx-contab-nav-link[aria-current="page"]:hover {
+          background: color-mix(in srgb, var(--primary) 14%, transparent);
+          color: var(--primary);
+        }
+      `}</style>
     </nav>
   );
 }
