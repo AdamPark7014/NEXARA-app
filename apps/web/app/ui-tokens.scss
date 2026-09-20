@@ -1,0 +1,152 @@
+/* ============================================================
+   NEXARA · Tokens de la interfaz de los paneles (dirección «Minimalista»)
+   ------------------------------------------------------------
+   Prefijo `--ui-*`: no choca con los del sitio público (`--ds-*`, `--nx-*`)
+   ni con los semánticos viejos (`--surface`, `--primary`…), que siguen igual
+   para los módulos que aún no se migran.
+
+   Reglas de uso:
+   - Neutros para todo; el teal de marca solo en botón primario, foco,
+     navegación activa y cifras clave.
+   - Bordes de 1 px, sin sombras pesadas. Radio 8 px (tarjetas 12 px).
+   - Espaciado 4 / 8 / 12 / 16 / 24 / 32.
+   El modo oscuro sigue siendo `body.dark` (ThemeContext).
+   ============================================================ */
+
+:root {
+  --ui-font: var(--nx-font-app, "Inter"), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ui-font-mono: var(--ds-font-mono, "JetBrains Mono"), ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+
+  /* Tipografía */
+  --ui-text-xs: 12px;
+  --ui-text-sm: 13px;
+  --ui-text-base: 14px;
+  --ui-text-lg: 16px;
+  --ui-text-title: 20px;
+  --ui-text-stat: 24px;
+
+  /* Neutros */
+  --ui-fg: #0f172a;
+  --ui-fg-2: #475569;
+  --ui-fg-3: #94a3b8;
+  --ui-border: #e2e8f0;
+  --ui-border-strong: #cbd5e1;
+  --ui-bg: #f8fafc;
+  --ui-surface: #ffffff;
+  --ui-surface-2: #f8fafc;
+  --ui-hover: #f1f5f9;
+  --ui-track: #eef2f6;
+
+  /* Marca */
+  --ui-brand: #1f9e84;
+  --ui-brand-hover: #1a8972;
+  --ui-brand-fg: #ffffff;
+  --ui-brand-text: #147a65;
+  --ui-brand-soft: #e8f6f2;
+  --ui-ring: 0 0 0 3px color-mix(in srgb, #1f9e84 26%, transparent);
+
+  /* Estados: texto legible + fondo tenue */
+  --ui-success: #16a34a;
+  --ui-success-text: #15803d;
+  --ui-success-bg: #f0fdf4;
+  --ui-warning: #d97706;
+  --ui-warning-text: #b45309;
+  --ui-warning-bg: #fffbeb;
+  --ui-danger: #dc2626;
+  --ui-danger-text: #b91c1c;
+  --ui-danger-bg: #fef2f2;
+  --ui-info: #0284c7;
+  --ui-info-text: #0369a1;
+  --ui-info-bg: #f0f9ff;
+  --ui-violet: #7c3aed;
+  --ui-violet-text: #6d28d9;
+  --ui-violet-bg: #f5f3ff;
+  --ui-neutral-text: #475569;
+  --ui-neutral-bg: #f1f5f9;
+
+  /* Forma */
+  --ui-radius: 8px;
+  --ui-radius-lg: 12px;
+  --ui-radius-pill: 999px;
+  --ui-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --ui-shadow-pop: 0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.1);
+
+  /* Espaciado */
+  --ui-s1: 4px;
+  --ui-s2: 8px;
+  --ui-s3: 12px;
+  --ui-s4: 16px;
+  --ui-s5: 24px;
+  --ui-s6: 32px;
+
+  /* Medidas */
+  --ui-control-h: 32px;
+  --ui-control-h-lg: 36px;
+  --ui-row-h: 40px;
+  --ui-topbar-h: 52px;
+  --ui-nav-item-h: 32px;
+}
+
+body.dark {
+  --ui-fg: #e2e8f0;
+  --ui-fg-2: #94a3b8;
+  --ui-fg-3: #64748b;
+  --ui-border: #1e293b;
+  --ui-border-strong: #334155;
+  --ui-bg: #0b1120;
+  --ui-surface: #0f172a;
+  --ui-surface-2: #111a2e;
+  --ui-hover: #172136;
+  --ui-track: #1b2438;
+
+  --ui-brand: #1f9e84;
+  --ui-brand-hover: #25b193;
+  --ui-brand-fg: #ffffff;
+  --ui-brand-text: #3cc9a9;
+  --ui-brand-soft: color-mix(in srgb, #1f9e84 16%, transparent);
+  --ui-ring: 0 0 0 3px color-mix(in srgb, #3cc9a9 32%, transparent);
+
+  --ui-success: #22c55e;
+  --ui-success-text: #4ade80;
+  --ui-success-bg: color-mix(in srgb, #22c55e 12%, transparent);
+  --ui-warning: #f59e0b;
+  --ui-warning-text: #fbbf24;
+  --ui-warning-bg: color-mix(in srgb, #f59e0b 12%, transparent);
+  --ui-danger: #ef4444;
+  --ui-danger-text: #f87171;
+  --ui-danger-bg: color-mix(in srgb, #ef4444 12%, transparent);
+  --ui-info: #38bdf8;
+  --ui-info-text: #7dd3fc;
+  --ui-info-bg: color-mix(in srgb, #38bdf8 12%, transparent);
+  --ui-violet: #a78bfa;
+  --ui-violet-text: #c4b5fd;
+  --ui-violet-bg: color-mix(in srgb, #a78bfa 14%, transparent);
+  --ui-neutral-text: #cbd5e1;
+  --ui-neutral-bg: #1e293b;
+
+  --ui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ui-shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* ------------------------------------------------------------
+   Dentro del shell de los paneles: tipografía única (Inter 14 px).
+   Los módulos que piden Space Grotesk / Manrope por variable heredan
+   Inter sin tocar su código; su color y su forma no cambian aquí.
+   ------------------------------------------------------------ */
+.nx-app-shell {
+  --font-base: var(--ui-font);
+  --font-heading: var(--ui-font);
+  --nx-font-body: var(--ui-font);
+  --nx-font-display: var(--ui-font);
+  --nx-font-ui: var(--ui-font);
+  font-family: var(--ui-font);
+  font-size: var(--ui-text-base);
+  line-height: 1.5;
+  letter-spacing: normal;
+  font-feature-settings: "cv11", "ss01";
+}
+
+.nx-app-shell ::selection {
+  background: color-mix(in srgb, var(--ui-brand) 22%, transparent);
+  color: inherit;
+}

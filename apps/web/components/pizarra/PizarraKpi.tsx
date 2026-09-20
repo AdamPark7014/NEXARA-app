@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { Segmented, fieldClass } from "@/components/base";
 import {
   PRIORIDAD_COLORS,
   PRIORIDAD_LABELS,
@@ -33,7 +34,6 @@ export function SemaforoDot({ semaforo, size = 9 }: { semaforo?: Semaforo; size?
         height: size,
         borderRadius: "50%",
         background: color,
-        boxShadow: `0 0 0 2px color-mix(in srgb, ${color} 22%, transparent)`,
       }}
     />
   );
@@ -57,14 +57,13 @@ export function Chip({
         display: "inline-flex",
         alignItems: "center",
         gap: 4,
-        fontSize: 10.5,
-        fontWeight: 650,
+        fontSize: 11,
+        fontWeight: 500,
         lineHeight: 1.2,
-        padding: "2px 7px",
+        padding: "3px 7px",
         borderRadius: 999,
         color,
-        background: `color-mix(in srgb, ${color} 10%, var(--surface))`,
-        border: `1px solid color-mix(in srgb, ${color} 30%, var(--border))`,
+        background: `color-mix(in srgb, ${color} 11%, transparent)`,
         whiteSpace: "nowrap",
         ...style,
       }}
@@ -155,20 +154,9 @@ export function KpiStrip({ kpis, compacta = false }: { kpis?: BoardKpis; compact
   );
 }
 
-const botonRango = (activo: boolean): CSSProperties => ({
-  minHeight: 36,
-  padding: "6px 12px",
-  borderRadius: 9,
-  border: "none",
-  background: activo ? "var(--primary)" : "transparent",
-  color: activo ? "#fff" : "inherit",
-  fontWeight: activo ? 750 : 650,
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-});
+const PRESETS: RangoPreset[] = ["hoy", "semana", "mes", "personalizado"];
 
-/** Hoy / Semana / Mes / personalizado. Lo elegido viaja como `desde`/`hasta`. */
+/** Hoy / Semana / Mes / personalizado (control segmentado). Lo elegido viaja como `desde`/`hasta`. */
 export function RangoSelector({
   preset,
   rango,
@@ -179,66 +167,37 @@ export function RangoSelector({
   onChange: (preset: RangoPreset, rango: BoardRange) => void;
 }) {
   const hoy = fechaMx();
-  const input: CSSProperties = {
-    minHeight: 36,
-    padding: "6px 8px",
-    borderRadius: 9,
-    border: "1px solid var(--border)",
-    background: "var(--surface)",
-    color: "inherit",
-    fontFamily: "inherit",
-    fontSize: 13,
-  };
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-      <div
-        role="group"
-        aria-label="Rango de fechas"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 4,
-          padding: 4,
-          borderRadius: 12,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        {(["hoy", "semana", "mes", "personalizado"] as RangoPreset[]).map((p) => (
-          <button
-            key={p}
-            type="button"
-            aria-pressed={preset === p}
-            onClick={() =>
-              onChange(
-                p,
-                p === "personalizado" ? { desde: rango.desde ?? hoy, hasta: rango.hasta ?? hoy } : rangoDePreset(p, hoy),
-              )
-            }
-            style={botonRango(preset === p)}
-          >
-            {RANGO_LABELS[p]}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        ariaLabel="Rango de fechas"
+        items={PRESETS.map((p) => ({ id: p, label: RANGO_LABELS[p] }))}
+        value={preset}
+        onChange={(p) =>
+          onChange(
+            p,
+            p === "personalizado" ? { desde: rango.desde ?? hoy, hasta: rango.hasta ?? hoy } : rangoDePreset(p, hoy),
+          )
+        }
+      />
       {preset === "personalizado" ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
           <input
             type="date"
             aria-label="Desde"
+            className={fieldClass}
             value={rango.desde ?? hoy}
             max={rango.hasta ?? hoy}
             onChange={(e) => onChange("personalizado", { ...rango, desde: e.target.value })}
-            style={input}
           />
-          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>a</span>
+          <span style={{ fontSize: 12, color: "var(--ui-fg-3)" }}>a</span>
           <input
             type="date"
             aria-label="Hasta"
+            className={fieldClass}
             value={rango.hasta ?? hoy}
             min={rango.desde ?? undefined}
             onChange={(e) => onChange("personalizado", { ...rango, hasta: e.target.value })}
-            style={input}
           />
         </div>
       ) : null}

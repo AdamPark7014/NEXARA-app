@@ -1,0 +1,143 @@
+/*
+ * NEXARA · Tabla de datos («Minimalista»).
+ * Sirve para <table> y para listas en rejilla (filas que son <Link>):
+ *   <div className={t.tabla}><div className={t.cabeza}>…</div><a className={t.fila}>…</a></div>
+ * Renglón de 40 px, cabecera pegada bajo la barra superior, hover, números a la derecha.
+ */
+
+.marco {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  min-width: 0;
+  overflow: clip;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+}
+
+/* Cabecera: en <table> son <th>; en rejilla, un renglón con la clase `cabeza`. */
+.tabla thead th,
+.cabeza {
+  position: sticky;
+  top: var(--ui-sticky-top, 0px);
+  z-index: 2;
+  height: 36px;
+  padding: 0 var(--ui-s4);
+  background: var(--ui-surface-2);
+  border-bottom: 1px solid var(--ui-border);
+  font-size: var(--ui-text-xs);
+  font-weight: 500;
+  color: var(--ui-fg-3);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.cabeza {
+  display: grid;
+  align-items: center;
+}
+
+.tabla tbody td {
+  height: var(--ui-row-h);
+  padding: 6px var(--ui-s4);
+  border-bottom: 1px solid var(--ui-border);
+  vertical-align: middle;
+}
+
+.tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tabla tbody tr:hover td {
+  background: var(--ui-surface-2);
+}
+
+.fila {
+  display: grid;
+  align-items: center;
+  min-height: var(--ui-row-h);
+  padding: 6px var(--ui-s4);
+  border-bottom: 1px solid var(--ui-border);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 80ms ease;
+}
+
+.fila:last-child {
+  border-bottom: none;
+}
+
+.fila:hover {
+  background: var(--ui-surface-2);
+  color: inherit;
+}
+
+.fila:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-brand) 55%, transparent);
+}
+
+.num {
+  text-align: right;
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fuerte {
+  font-weight: 500;
+  color: var(--ui-fg);
+}
+
+.tenue {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.celda {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.celda > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  padding: 10px var(--ui-s4);
+  border-top: 1px solid var(--ui-border);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+}
+
+/* Barra superior de la tarjeta de la tabla: pestañas y filtros. */
+.barra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s3);
+  padding: 0 var(--ui-s4) var(--ui-s3);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.barraTabs {
+  border-bottom: 1px solid var(--ui-border);
+  margin: 0 calc(-1 * var(--ui-s4));
+  padding: 0 var(--ui-s4);
+}
