@@ -23,7 +23,6 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
-import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
 
 interface JournalEntry {
   id: number;
@@ -1201,8 +1200,8 @@ export default function AccountingPage() {
     <>
       <PageHeader
         eyebrow="ERP · Finanzas"
-        title="Contabilidad"
-        subtitle="Pólizas, catálogo, balanza, estados financieros y presupuesto."
+        title="Pólizas y libros"
+        subtitle="Asientos, catálogo, balanza y presupuesto."
         density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1215,27 +1214,13 @@ export default function AccountingPage() {
           </div>
         }
       />
-      <FinanceModuleRail />
 
-      <div
-        style={{
-          marginBottom: 14,
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          alignItems: "center",
-          fontSize: 12.5,
-          color: "var(--text-tertiary)",
-        }}
-      >
-        <span>
-          Control de viáticos con refs contables (VIAT-…), analítica por proyecto, persona y categoría, y PDF del periodo.
-        </span>
-        <Link href="/erp/finance/viatics" style={{ fontSize: 12.5, fontWeight: 600 }}>
-          Abrir módulo de viáticos →
+      <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)" }}>
+        Escritorio Contadora:{" "}
+        <Link href="/erp/contabilidad" style={{ fontWeight: 600 }}>
+          CxC, CxP, cierres y conciliación →
         </Link>
-      </div>
+      </p>
 
       {/* Pestañas como pestañas: ocho botones rellenos competían con el único
           primario de la pantalla y ninguno destacaba. */}

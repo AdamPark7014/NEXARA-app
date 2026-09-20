@@ -3,7 +3,7 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** ariaLabel en DataTables presupuestos/proyectos/proveedores
+- **HEAD:** UI limpia herramientas + Contabilidad → hub
 
 ## Puente — no cambiar
 
@@ -11,21 +11,30 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-- Follow-up [Audit DataTable ariaLabel]: `ariaLabel` explícito en las 14 tablas que usaban el default `"Tabla"`:
-  - presupuestos ×2
-  - proyectos ×4
-  - proveedores ×8
-- Previos merges a11y-dropzone + datatable-aria siguen en la rama.
+Adam seguía viendo UI sucia en **prod** (`/erp/almacen/herramientas` y `/erp/accounting`).
+
+### Herramientas
+- `ToolInventoryPanel`: `MetricStrip` en vez de 5 `KpiCard` + barra «Por estado»
+- URLs opcionales detrás de `<details>`
+- CSS: dropzones/galería más compactos, borde neutro, título sin primary
+
+### Contabilidad
+- Entrada panel/menú: `/erp/contabilidad` (access-matrix, panel-routing, module-map, FinanceModuleRail)
+- Remap: `/erp/accounting` → `/erp/contabilidad`
+- Página legacy: sin `FinanceModuleRail` ni banner de viáticos; título «Pólizas y libros» + enlace al hub
+
+**Nota:** cambios en `mejora/calidad-y-web` — **no están en prod** hasta push + deploy (sigue BLOCKED sin IP Hetzner).
 
 ## A medias
 
-- Deploy BLOCKED: `HostName REEMPLAZA_CON_IP_HETZNER`.
-- Ramas gate con conflicto real aún fuera (factura, labels-cx, uuid, etc.).
+- Deploy BLOCKED: `HostName REEMPLAZA…`
+- Soft highlight «Banca y conciliación» en sidebar (si sigue): revisar focus ring ContextRail
 
 ## Siguiente
 
-1. Adam: IP Hetzner + Port 2222.
-2. Push + deploy `--force-all`.
+1. Adam: IP Hetzner.
+2. Push + `./deploy/update.sh --force-all`.
+3. Abrir `/erp/contabilidad` y `/erp/almacen/herramientas` en prod.
 
 ## No tocar
 

@@ -96,7 +96,7 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/core\/mantenimiento(\/?.*)$/, '/ops/maintenance'],
   [/^\/core\/sla(\/?.*)$/, '/ops/support/sla'],
   [/^\/core\/viaticos(\/?.*)$/, '/erp/finance/viatics'],
-  [/^\/core\/contabilidad(\/?.*)$/, '/erp/accounting'],
+  [/^\/core\/contabilidad(\/?.*)$/, '/erp/contabilidad'],
   [/^\/core\/facturacion(\/?.*)$/, '/erp/invoicing'],
   [/^\/core\/banca(\/?.*)$/, '/erp/banking'],
   [/^\/core\/gastos(\/?.*)$/, '/erp/finance/expenses'],
@@ -180,7 +180,9 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/erp\/expenses(\/?.*)$/, '/erp/finance/expenses'],
   [/^\/erp\/employee-payments(\/?.*)$/, '/erp/finance/employee-payments'],
   [/^\/erp\/contact-messages(\/?.*)$/, '/studio/contacts'],
-  [/^\/erp\/accounting\/reports(\/?.*)$/, '/erp/accounting'],
+  [/^\/erp\/accounting\/reports(\/?.*)$/, '/erp/contabilidad/reportes'],
+  // Escritorio Contadora: la ruta vieja de pólizas redirige al hub limpio.
+  [/^\/erp\/accounting\/?$/, '/erp/contabilidad'],
   [/^\/erp\/procurement\/dashboard(\/?.*)$/, '/erp/procurement'],
   [/^\/ops\/work-projects(\/?.*)$/, '/ops/projects'],
   [/^\/ops\/assets\/depreciation(\/?.*)$/, '/ops/assets'],
@@ -232,6 +234,11 @@ export function remapLegacySlugs(pathname: string): string {
   // `herramientas`→`tools`, `vehiculos`→`vehicles` y el remapeo de `organigrama` los sacaban
   // de su página (308 a rutas de OPS/RH que en Core rebotan).
   if (/^\/erp\/(almacen|vehiculos|organigrama)(\/|$)/.test(pathname)) {
+    return pathname;
+  }
+
+  // Contabilidad hub: no traducir "contabilidad"→"accounting" (ruta vieja de pólizas).
+  if (pathname === '/erp/contabilidad' || pathname.startsWith('/erp/contabilidad/')) {
     return pathname;
   }
 

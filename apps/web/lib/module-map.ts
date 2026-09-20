@@ -433,7 +433,7 @@ export const MODULE_DEFAULT_ROUTE: Record<ModuleId, { panel: PanelSlug; path: st
   noc: { panel: "noc", path: "/ops/noc" },
   support: { panel: "support", path: "/ops/support" },
   tickets: { panel: "tickets", path: "/tickets" },
-  accounting: { panel: "contabilidad", path: "/erp/accounting" },
+  accounting: { panel: "contabilidad", path: "/erp/contabilidad" },
   invoicing: { panel: "contabilidad", path: "/erp/invoicing" },
   banking: { panel: "contabilidad", path: "/erp/banking" },
   hr: { panel: "console", path: "/erp/hr" },

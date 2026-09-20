@@ -146,10 +146,15 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
   });
 
   it('deja intactas las rutas ya canónicas (es idempotente)', () => {
-    for (const path of ['/erp/accounting', '/crm/quotes/12', '/ops/activities', '/tickets/4']) {
+    for (const path of ['/erp/contabilidad', '/crm/quotes/12', '/ops/activities', '/tickets/4']) {
       expect(normalizeLegacyPath(path)).toBe(path);
       expect(normalizeLegacyPath(normalizeLegacyPath(path))).toBe(path);
     }
+  });
+
+  it('manda /erp/accounting al escritorio Contadora', () => {
+    expect(normalizeLegacyPath('/erp/accounting')).toBe('/erp/contabilidad');
+    expect(normalizeLegacyPath('/erp/accounting/')).toBe('/erp/contabilidad');
   });
 
   it('remapLegacySlugs no toca paneles ajenos al ERP', () => {

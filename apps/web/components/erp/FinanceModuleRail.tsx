@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import ContextRail from "@/components/ui/ContextRail";
 
 const FINANCE_LINKS = [
-  { id: "accounting", label: "Contabilidad", href: "/erp/accounting" },
+  { id: "accounting", label: "Contabilidad", href: "/erp/contabilidad" },
   { id: "invoicing", label: "Facturación CFDI", href: "/erp/invoicing" },
   { id: "banking", label: "Bancos", href: "/erp/banking" },
   { id: "viatics", label: "Viáticos", href: "/erp/finance/viatics" },
@@ -23,7 +23,13 @@ export default function FinanceModuleRail() {
         id: l.id,
         label: l.label,
         href: l.href,
-        active: pathname === l.href || pathname.startsWith(`${l.href}/`),
+        active:
+          l.href === "/erp/contabilidad"
+            ? pathname === l.href ||
+              pathname.startsWith(`${l.href}/`) ||
+              pathname === "/erp/accounting" ||
+              pathname.startsWith("/erp/accounting/")
+            : pathname === l.href || pathname.startsWith(`${l.href}/`),
       }))}
     />
   );
