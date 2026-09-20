@@ -1,13 +1,10 @@
 "use client";
 
 /**
- * Organigrama: árbol de quién reporta a quién (`GET users/orgchart`, abierto a cualquier sesión).
- *
- * Lo montan dos páginas: `/erp/organigrama` (Core, lectura para todo el personal) y
- * `/erp/hr/orgchart` (RH, con su guard y su carril). Mover a alguien de jefe (✎) solo aparece
- * con `canEditOrg`, y la API lo vuelve a exigir (`USERS_MANAGE` / `CONSOLE_ADMIN`).
+ * Organigrama: diagrama de flujo (nodos + conectores) de quién reporta a quién.
+ * `GET users/orgchart` — muestra `puesto` (no el nombre del rol RBAC).
  */
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
@@ -19,6 +16,7 @@ import KpiCard from "@/components/ui/KpiCard";
 interface OrgNode {
   id: number;
   nombre: string;
+  puesto?: string | null;
   avatarUrl?: string | null;
   managerId?: number | null;
   role?: { id: number; nombre: string } | null;
@@ -39,7 +37,6 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
   return res.json();
 }
 
-// Flatten tree to list for manager picker dropdown
 function flatten(nodes: OrgNode[]): OrgNode[] {
   const out: OrgNode[] = [];
   function walk(n: OrgNode) {
@@ -50,24 +47,36 @@ function flatten(nodes: OrgNode[]): OrgNode[] {
   return out;
 }
 
-function Avatar({ url, name }: { url?: string | null; name: string }) {
+function Avatar({ url, name, size = 44 }: { url?: string | null; name: string; size?: number }) {
   if (url) {
     return (
       <img
         src={url}
         alt={name}
-        style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
       />
     );
   }
-  const initials = name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  const initials = name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
   return (
     <div
       style={{
-        width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-        background: "color-mix(in srgb, var(--primary) 20%, var(--surface))",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 12, fontWeight: 700, color: "var(--primary)",
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        flexShrink: 0,
+        background: "color-mix(in srgb, var(--primary) 22%, var(--surface))",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: size * 0.32,
+        fontWeight: 700,
+        color: "var(--primary)",
       }}
     >
       {initials}
@@ -75,27 +84,26 @@ function Avatar({ url, name }: { url?: string | null; name: string }) {
   );
 }
 
-interface NodeProps {
+interface NodeCardProps {
   node: OrgNode;
-  depth?: number;
   allUsers: OrgNode[];
   token: string;
   onRefresh: () => void;
   canEditOrg: boolean;
+  isRoot?: boolean;
 }
 
-function Node({ node, depth = 0, allUsers, token, onRefresh, canEditOrg }: NodeProps) {
+function NodeCard({ node, allUsers, token, onRefresh, canEditOrg, isRoot }: NodeCardProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
-  const [selectedManager, setSelectedManager] = useState<string>(
-    node.managerId ? String(node.managerId) : ""
-  );
+  const [selectedManager, setSelectedManager] = useState(node.managerId ? String(node.managerId) : "");
 
   const saveManager = async () => {
     setSaving(true);
+    setSaveErr(null);
     try {
-      const managerId = selectedManager ? parseInt(selectedManager) : null;
+      const managerId = selectedManager ? parseInt(selectedManager, 10) : null;
       await apiFetch(`users/${node.id}/manager`, token, {
         method: "PATCH",
         body: JSON.stringify({ managerId }),
@@ -109,94 +117,159 @@ function Node({ node, depth = 0, allUsers, token, onRefresh, canEditOrg }: NodeP
     }
   };
 
-  // Exclude self and descendants from manager options to prevent cycles
   const descendants = new Set<number>();
   function collectDesc(n: OrgNode) {
     descendants.add(n.id);
     n.children.forEach(collectDesc);
   }
   collectDesc(node);
-  const managerOptions = allUsers.filter(u => !descendants.has(u.id));
+  const managerOptions = allUsers.filter((u) => !descendants.has(u.id));
+  const titulo = node.puesto?.trim() || node.role?.nombre || "Sin puesto";
 
   return (
-    <div style={{ paddingLeft: depth === 0 ? 0 : 20, position: "relative" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 0,
+        minWidth: 200,
+      }}
+    >
       <div
         style={{
-          padding: "10px 14px",
-          background: depth === 0
-            ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+          padding: "14px 16px",
+          background: isRoot
+            ? "linear-gradient(160deg, color-mix(in srgb, var(--primary) 14%, var(--surface)), var(--surface))"
             : "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 12,
-          display: "inline-flex",
+          border: isRoot ? "2px solid var(--primary)" : "1px solid var(--border)",
+          borderRadius: 16,
+          display: "flex",
           flexDirection: "column",
-          gap: 6,
-          marginBottom: 8,
-          minWidth: 260,
-          maxWidth: 320,
+          gap: 8,
+          minWidth: 200,
+          maxWidth: 240,
+          boxShadow: "0 8px 24px color-mix(in srgb, var(--foreground) 6%, transparent)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar url={node.avatarUrl} name={node.nombre} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div
+              style={{
+                fontWeight: 750,
+                fontSize: 13.5,
+                lineHeight: 1.25,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={node.nombre}
+            >
               {node.nombre}
             </div>
-            {node.role && (
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
-                {node.role.nombre}
-              </div>
-            )}
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--primary)",
+                marginTop: 2,
+                lineHeight: 1.3,
+              }}
+            >
+              {titulo}
+            </div>
           </div>
-          {node.department && (
-            <Tag variant={depth === 0 ? "accent" : "neutral"}>{node.department.nombre}</Tag>
-          )}
           {canEditOrg && (
             <button
-              onClick={() => { setEditing(e => !e); setSelectedManager(node.managerId ? String(node.managerId) : ""); }}
-              title="Editar manager"
-              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--text-tertiary)", padding: "2px 4px", flexShrink: 0 }}
+              type="button"
+              onClick={() => {
+                setEditing((e) => !e);
+                setSelectedManager(node.managerId ? String(node.managerId) : "");
+              }}
+              title="Editar jefe"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 14,
+                color: "var(--text-tertiary)",
+                padding: 4,
+              }}
             >
               ✎
             </button>
           )}
         </div>
-
+        {node.department && (
+          <Tag variant={isRoot ? "accent" : "neutral"}>{node.department.nombre}</Tag>
+        )}
         {editing && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 4, borderTop: "1px solid var(--border)" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              paddingTop: 6,
+              borderTop: "1px solid var(--border)",
+            }}
+          >
             <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600 }}>
-              Manager / Reporta a:
+              Reporta a
             </label>
             <select
               value={selectedManager}
-              onChange={e => setSelectedManager(e.target.value)}
+              onChange={(e) => setSelectedManager(e.target.value)}
               style={{
-                fontSize: 12, border: "1px solid var(--border)", borderRadius: 6,
-                padding: "4px 6px", background: "var(--surface)", color: "var(--foreground)",
+                fontSize: 12,
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                padding: "6px 8px",
+                background: "var(--surface)",
+                color: "var(--foreground)",
               }}
             >
-              <option value="">— Sin manager (raíz) —</option>
-              {managerOptions.map(u => (
-                <option key={u.id} value={u.id}>{u.nombre}{u.role ? ` · ${u.role.nombre}` : ""}</option>
+              <option value="">— Sin jefe (raíz) —</option>
+              {managerOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nombre}
+                  {u.puesto ? ` · ${u.puesto}` : ""}
+                </option>
               ))}
             </select>
+            {saveErr && (
+              <div style={{ fontSize: 11, color: "var(--danger)" }}>{saveErr}</div>
+            )}
             <div style={{ display: "flex", gap: 6 }}>
               <button
-                onClick={saveManager}
+                type="button"
+                onClick={() => void saveManager()}
                 disabled={saving}
                 style={{
-                  fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer",
-                  background: "var(--primary)", color: "#fff", border: "none", fontWeight: 600,
+                  fontSize: 11,
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  background: "var(--primary)",
+                  color: "#fff",
+                  border: "none",
+                  fontWeight: 650,
                   opacity: saving ? 0.6 : 1,
                 }}
               >
                 {saving ? "Guardando…" : "Guardar"}
               </button>
               <button
+                type="button"
                 onClick={() => setEditing(false)}
                 style={{
-                  fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer",
-                  background: "var(--surface-2)", color: "var(--foreground)", border: "1px solid var(--border)",
+                  fontSize: 11,
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  background: "var(--surface-2)",
+                  color: "var(--foreground)",
+                  border: "1px solid var(--border)",
                 }}
               >
                 Cancelar
@@ -207,28 +280,67 @@ function Node({ node, depth = 0, allUsers, token, onRefresh, canEditOrg }: NodeP
       </div>
 
       {node.children.length > 0 && (
-        <div
-          style={{
-            marginLeft: 14,
-            borderLeft: "2px dashed var(--border)",
-            paddingLeft: 14,
-            marginTop: 4,
-          }}
-        >
-          {node.children.map(c => (
-            <Node key={c.id} node={c} depth={depth + 1} allUsers={allUsers} token={token} onRefresh={onRefresh} canEditOrg={canEditOrg} />
-          ))}
-        </div>
+        <>
+          <div
+            aria-hidden
+            style={{
+              width: 2,
+              height: 18,
+              background: "color-mix(in srgb, var(--primary) 45%, var(--border))",
+            }}
+          />
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              gap: 20,
+              paddingTop: 0,
+              position: "relative",
+            }}
+          >
+            {node.children.length > 1 && (
+              <div
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: "10%",
+                  right: "10%",
+                  height: 2,
+                  background: "color-mix(in srgb, var(--primary) 35%, var(--border))",
+                }}
+              />
+            )}
+            {node.children.map((c) => (
+              <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div
+                  aria-hidden
+                  style={{
+                    width: 2,
+                    height: 14,
+                    background: "color-mix(in srgb, var(--primary) 45%, var(--border))",
+                  }}
+                />
+                <NodeCard
+                  node={c}
+                  allUsers={allUsers}
+                  token={token}
+                  onRefresh={onRefresh}
+                  canEditOrg={canEditOrg}
+                />
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
 export type OrgChartViewProps = {
-  /** Muestra ✎ para reasignar jefe: RH y dirección (`getHrSectionConfig(user).canAssign`). */
   canEditOrg: boolean;
   eyebrow: string;
-  /** Carril de RH (plantilla, incidencias, KPIs): solo dentro de `/erp/hr`. */
   showHrRail?: boolean;
 };
 
@@ -239,9 +351,9 @@ export default function OrgChartView({ canEditOrg, eyebrow, showHrRail = false }
   const { user } = useUser();
   const token = user?.token ?? "";
 
-  const [roots, setRoots]     = useState<OrgNode[]>([]);
+  const [roots, setRoots] = useState<OrgNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -257,96 +369,87 @@ export default function OrgChartView({ canEditOrg, eyebrow, showHrRail = false }
     }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const allUsers = flatten(roots);
+  const allUsers = useMemo(() => flatten(roots), [roots]);
+
+  const maxDepth = useMemo(() => {
+    function calc(nodes: OrgNode[], d: number): number {
+      if (!nodes.length) return d;
+      return Math.max(...nodes.map((n) => calc(n.children, d + 1)));
+    }
+    return calc(roots, 0);
+  }, [roots]);
 
   return (
     <>
       <PageHeader
         eyebrow={eyebrow}
         title={TITULO}
-        subtitle={canEditOrg
-          ? `${SUBTITULO} Haz clic en ✎ en cualquier nodo para reasignar su manager.`
-          : `${SUBTITULO} Solo RH y Dirección pueden reasignar managers.`}
+        subtitle={
+          canEditOrg
+            ? `${SUBTITULO} Haz clic en ✎ para reasignar el jefe.`
+            : `${SUBTITULO} Solo RH y Dirección pueden reasignar jefes.`
+        }
       />
 
       {showHrRail && <HrModuleRail />}
 
-      {!loading && allUsers.length > 0 && (() => {
-        const withManager = allUsers.filter((u) => !!u.managerId).length;
-        const rootCount = roots.length;
-        const maxDepth = (function calcDepth(nodes: OrgNode[], d: number): number {
-          if (!nodes.length) return d;
-          return Math.max(...nodes.map((n) => calcDepth(n.children ?? [], d + 1)));
-        })(roots, 0);
-        return (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
-            <KpiCard label="Total personas" value={allUsers.length} icon="👥" />
-            <KpiCard label="Con manager" value={withManager} icon="🔗" variant={withManager === allUsers.length - rootCount ? "positive" : "warning"} />
-            <KpiCard label="Sin manager" value={rootCount} icon="🏛️" variant="accent" hint="Raíces del org" />
-            <KpiCard label="Niveles" value={maxDepth} icon="📊" />
-          </div>
-        );
-      })()}
-
-      {!loading && allUsers.length > 1 && (() => {
-        const byDept: Record<string, number> = {};
-        for (const u of allUsers) {
-          const dept = u.department?.nombre ?? "Sin área";
-          byDept[dept] = (byDept[dept] ?? 0) + 1;
-        }
-        const total = allUsers.length;
-        const colors = ["var(--primary)", "var(--success)", "var(--warning)", "#a855f7", "#0ea5e9", "#f59e0b", "var(--danger)"];
-        return (
-          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Por departamento</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {Object.entries(byDept).sort((a, b) => b[1] - a[1]).map(([dept, count], i) => (
-                <div key={dept} style={{ display: "grid", gridTemplateColumns: "120px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dept}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: colors[i % colors.length], borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {error && (
-        <div style={{
-          padding: 12, borderRadius: 10, marginBottom: 12,
-          background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-          color: "var(--danger)", fontSize: 13,
-        }}>
-          {error}
+      {!loading && allUsers.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 12,
+            marginBottom: 20,
+          }}
+        >
+          <KpiCard label="Personas" value={String(allUsers.length)} />
+          <KpiCard label="Raíces" value={String(roots.length)} />
+          <KpiCard label="Con jefe" value={String(allUsers.filter((u) => !!u.managerId).length)} />
+          <KpiCard label="Niveles" value={String(maxDepth)} />
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${allUsers.length} personas`}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            Cargando organigrama…
-          </div>
-        ) : roots.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            No hay usuarios en la base de datos aún.
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto", paddingBottom: 8 }}>
-            {roots.map(root => (
-              <Node
-                key={root.id}
-                node={root}
-                allUsers={allUsers}
-                token={token}
-                onRefresh={load}
-                canEditOrg={canEditOrg}
-              />
-            ))}
+      <Section title="Diagrama">
+        {loading && <p style={{ color: "var(--text-secondary)" }}>Cargando organigrama…</p>}
+        {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+        {!loading && !error && roots.length === 0 && (
+          <p style={{ color: "var(--text-secondary)" }}>No hay personas activas para mostrar.</p>
+        )}
+        {!loading && !error && roots.length > 0 && (
+          <div
+            style={{
+              overflowX: "auto",
+              padding: "24px 12px 40px",
+              background:
+                "radial-gradient(ellipse at top, color-mix(in srgb, var(--primary) 6%, transparent), transparent 55%)",
+              borderRadius: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                gap: 28,
+                minWidth: "min-content",
+              }}
+            >
+              {roots.map((r) => (
+                <NodeCard
+                  key={r.id}
+                  node={r}
+                  allUsers={allUsers}
+                  token={token}
+                  onRefresh={load}
+                  canEditOrg={canEditOrg}
+                  isRoot
+                />
+              ))}
+            </div>
           </div>
         )}
       </Section>
