@@ -2497,8 +2497,10 @@ export class AccountingService {
     return { ...payment, journalEntryId };
   }
 
-  async getInvoiceXml(id: number) {
-    const invoice = await this.getInvoice(id);
+  async getInvoiceXml(id: number, companyId?: number | null) {
+    // Sin la empresa, companyWhere(null) es deny-all y esto respondía 404 siempre:
+    // descargar el XML de una factura timbrada nunca funcionó.
+    const invoice = await this.getInvoice(id, companyId);
     if (!invoice.cfdiUuid || !invoice.cfdiXml) {
       throw new BadRequestException('La factura no tiene XML CFDI timbrado');
     }
@@ -2510,8 +2512,8 @@ export class AccountingService {
     };
   }
 
-  async getInvoicePdf(id: number) {
-    const invoice = await this.getInvoice(id);
+  async getInvoicePdf(id: number, companyId?: number | null) {
+    const invoice = await this.getInvoice(id, companyId);
     if (!invoice.pdfUrl) {
       throw new BadRequestException('PDF no disponible para esta factura (el PAC no generó representación impresa)');
     }
