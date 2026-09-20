@@ -298,7 +298,7 @@ export default function CierresPage() {
             description="Crea un periodo fiscal desde Contabilidad general."
           />
         ) : (
-          <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} density="compact" />
+          <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} density="compact" ariaLabel="Periodos de cierre" />
         )}
       </Section>
 

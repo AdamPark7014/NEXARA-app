@@ -351,6 +351,7 @@ export default function ContabilidadPrenominaPage() {
                 rows={filasConIncidencia}
                 rowKey={(r) => r.userId}
                 density="compact"
+                ariaLabel="Incidencias de pre-nómina"
                 emptyTitle="Sin incidencias"
               />
             </Section>
@@ -375,6 +376,7 @@ export default function ContabilidadPrenominaPage() {
               rows={rows}
               rowKey={(r) => r.userId}
               density="compact"
+              ariaLabel="Detalle de pre-nómina"
               emptyTitle="Sin personas en el periodo"
             />
           </Section>

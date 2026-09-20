@@ -395,6 +395,7 @@ export default function ContabilidadInvoicesView({
           rows={filtered}
           rowKey={(r) => r.id}
           density="compact"
+          ariaLabel="Facturas de contabilidad"
           onRowClick={(r) => setSelected(r)}
         />
       )}

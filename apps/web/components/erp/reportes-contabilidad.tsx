@@ -318,6 +318,7 @@ export function DetalleModal({
             rows={detalle.filas}
             rowKey={(f) => f.clave}
             density="compact"
+            ariaLabel="Detalle del reporte"
             stickyHeader={false}
           />
           <div style={{ marginTop: 10, textAlign: "right", fontSize: 13 }}>
