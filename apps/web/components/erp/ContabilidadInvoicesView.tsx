@@ -20,6 +20,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
+import TruncatedId from "@/components/ui/TruncatedId";
 
 type InvoiceRow = {
   id: number;
@@ -496,6 +497,11 @@ export default function ContabilidadInvoicesView({
                   tone={TONO_ESTADO[statusLabel(selected).tone]}
                 />
               </Dato>
+              {selected.cfdiUuid ? (
+                <Dato etiqueta="UUID CFDI">
+                  <TruncatedId value={selected.cfdiUuid} label="UUID CFDI" keep={8} />
+                </Dato>
+              ) : null}
             </div>
 
             <div style={{ fontSize: 12.5 }}>
