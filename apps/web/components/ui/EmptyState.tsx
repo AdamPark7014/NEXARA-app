@@ -1,23 +1,35 @@
 "use client";
 
-import { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 /**
- * NEXARA · EmptyState (premium)
- * Estado vacío profesional con icono en pill, jerarquía clara y
- * orientación al siguiente paso. Variantes "default" y "compact".
+ * NEXARA · EmptyState
+ *
+ * Icono → título → una línea → acción. Nada más.
+ *
+ * Antes venía dentro de una caja de borde punteado con el icono en otra caja
+ * redondeada: dos rectángulos para decir que no hay nada. El vacío ya es un
+ * hueco; encerrarlo lo hace más grande, no más claro. Ahora el aire y la
+ * tipografía hacen el trabajo, y el bloque cae igual de bien dentro de una
+ * tabla vacía (`compact`) que en una pantalla entera (`page`).
  */
 
-type Variant = "default" | "compact";
+type Variant = "default" | "compact" | "page";
 
 function DefaultIcon() {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M8 12h8M8 15h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+      <rect x="3.2" y="5.2" width="17.6" height="13.6" rx="2.4" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M7.4 11.6h9.2M7.4 14.8h5.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
+
+const SPACE: Record<Variant, { padY: number; padX: number; icon: number; title: number; body: number; gap: number }> = {
+  compact: { padY: 24, padX: 16, icon: 22, title: 14, body: 12.5, gap: 6 },
+  default: { padY: 40, padX: 24, icon: 26, title: 15.5, body: 13, gap: 8 },
+  page: { padY: 72, padX: 32, icon: 32, title: 18, body: 13.5, gap: 10 },
+};
 
 export default function EmptyState({
   icon,
@@ -25,83 +37,77 @@ export default function EmptyState({
   description,
   action,
   variant = "default",
+  className,
+  style,
 }: {
   icon?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;
   variant?: Variant;
+  className?: string;
+  style?: CSSProperties;
 }) {
-  const isCompact = variant === "compact";
-  const resolvedIcon = icon ?? <DefaultIcon />;
+  const s = SPACE[variant] ?? SPACE.default;
 
   return (
     <div
       role="status"
+      className={className}
       style={{
-        position: "relative",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        justifyContent: "center",
         textAlign: "center",
-        padding: isCompact ? "22px 16px" : "36px 24px",
-        gap: isCompact ? 8 : 12,
-        background:
-          "color-mix(in srgb, var(--surface-2) 55%, transparent)",
-        border: "1px dashed var(--nx-panel-hairline)",
-        borderRadius: "var(--nx-panel-radius-sm, 12px)",
-        overflow: "hidden",
+        padding: `${s.padY}px ${s.padX}px`,
+        gap: s.gap,
+        // Sin fondo, sin borde, sin radio: el hueco se entiende solo.
+        ...style,
       }}
     >
-      <div
+      <span
         aria-hidden="true"
         style={{
-          width: isCompact ? 44 : 56,
-          height: isCompact ? 44 : 56,
-          borderRadius: 12,
-          background:
-            "color-mix(in srgb, var(--primary) 10%, var(--surface))",
-          color: "var(--primary)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: isCompact ? 20 : 26,
-          border: "1px solid color-mix(in srgb, var(--primary) 20%, var(--border))",
-          boxShadow: "none",
+          display: "inline-flex",
+          // El icono orienta, no decora: gris terciario, sin píldora detrás.
+          color: "var(--text-tertiary)",
+          marginBottom: 2,
         }}
       >
-        {resolvedIcon}
-      </div>
-      <div>
-        <h3
+        {icon ?? <DefaultIcon />}
+      </span>
+
+      <h3
+        style={{
+          fontFamily: "var(--nx-font-display)",
+          fontWeight: 650,
+          fontSize: s.title,
+          margin: 0,
+          color: "var(--text-primary)",
+          letterSpacing: "-0.01em",
+          lineHeight: 1.3,
+        }}
+      >
+        {title}
+      </h3>
+
+      {description && (
+        <p
           style={{
-            fontFamily: "var(--nx-font-display)",
-            fontWeight: 700,
-            fontSize: isCompact ? 15 : 17,
+            fontSize: s.body,
+            color: "var(--text-secondary)",
             margin: 0,
-            color: "var(--text-primary)",
-            letterSpacing: "-0.01em",
+            // Una línea corta se lee de un vistazo; un párrafo se salta.
+            maxWidth: variant === "compact" ? 360 : 420,
+            lineHeight: 1.5,
           }}
         >
-          {title}
-        </h3>
-        {description && (
-          <p
-            style={{
-              fontSize: isCompact ? 12.5 : 13.5,
-              color: "var(--text-secondary)",
-              marginTop: 6,
-              marginBottom: 0,
-              maxWidth: 460,
-              lineHeight: 1.55,
-              marginInline: "auto",
-            }}
-          >
-            {description}
-          </p>
-        )}
-      </div>
-      {action && <div style={{ marginTop: 4 }}>{action}</div>}
+          {description}
+        </p>
+      )}
+
+      {action && <div style={{ marginTop: s.gap }}>{action}</div>}
     </div>
   );
 }

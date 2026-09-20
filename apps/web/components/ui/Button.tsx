@@ -3,10 +3,23 @@
 import { ButtonHTMLAttributes, forwardRef, ReactNode } from "react";
 
 /**
- * NEXARA · Button (premium)
- * Variantes: primary · secondary · ghost · danger · accent · link
- * Tamaños: sm · md · lg
- * Microinteracciones: shimmer en primary, hover lift sutil, focus ring.
+ * NEXARA · Button
+ *
+ * Cuatro niveles, y se distinguen de verdad:
+ *
+ *   primary   — la acción a la que vino la persona. **Una por pantalla.**
+ *   secondary — superficie + borde de 1px. Todo lo demás que es un botón.
+ *   ghost     — terciario: sin fondo ni borde hasta que lo tocas.
+ *   danger    — destructivo. Mismo peso que primary, color de alarma.
+ *
+ * `accent` y `link` siguen existiendo por compatibilidad: `accent` es un
+ * primario de otro módulo, `link` es texto que navega.
+ *
+ * Se fueron los degradados, el brillo interior y la sombra de color: el
+ * relleno sólido ya dice «esto es el botón». Lo que queda de profundidad es
+ * un borde de 1px y una sombra mínima, solo en los sólidos.
+ *
+ * Tamaños: sm (32/13 · el que fija .ai/DISENO-FINANZAS.md) · md · lg.
  */
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "accent" | "link";
@@ -26,51 +39,50 @@ const SIZES: Record<Size, { height: number; padX: number; fontSize: number; radi
   // de por qué las pantallas se sentían poco serias. Es el tamaño que fija
   // .ai/DISENO-FINANZAS.md para todo lo que no es la acción principal.
   sm: { height: 32, padX: 12, fontSize: 13, radius: 8, iconSize: 15 },
-  md: { height: 36, padX: 14, fontSize: 13, radius: 10, iconSize: 15 },
-  lg: { height: 44, padX: 20, fontSize: 14, radius: 12, iconSize: 16 },
+  md: { height: 36, padX: 14, fontSize: 13, radius: 9, iconSize: 15 },
+  lg: { height: 44, padX: 20, fontSize: 14, radius: 10, iconSize: 16 },
 };
 
+/**
+ * Los sólidos se oscurecen contra `--nx-ink` (un token real, fijo en los dos
+ * temas) en vez de pintarse con el color de marca tal cual: así el texto
+ * blanco mantiene contraste también en oscuro, donde `--primary` aclara.
+ */
 const VARIANT_BASE: Record<Variant, React.CSSProperties> = {
   primary: {
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--primary) 90%, white) 0%, var(--primary) 60%, var(--primary-strong) 100%)",
+    background: "color-mix(in srgb, var(--primary) 85%, var(--nx-ink))",
     color: "#fff",
-    border: "1px solid color-mix(in srgb, var(--primary-strong) 70%, transparent)",
-    boxShadow:
-      "0 1px 0 rgba(255,255,255,0.18) inset, 0 -1px 0 rgba(0,0,0,0.10) inset, 0 6px 14px color-mix(in srgb, var(--primary) 32%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--primary) 62%, var(--nx-ink))",
+    boxShadow: "0 1px 2px rgba(8, 24, 38, 0.14)",
   },
   secondary: {
     background: "var(--surface)",
     color: "var(--text-primary)",
     border: "1px solid var(--border)",
-    boxShadow: "0 1px 2px rgba(8,24,38,0.04)",
   },
   ghost: {
     background: "transparent",
     color: "var(--text-secondary)",
+    // Borde transparente, no `none`: así queda a la misma altura que un
+    // secondary cuando van uno al lado del otro.
     border: "1px solid transparent",
   },
   danger: {
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--danger) 88%, white) 0%, var(--danger) 100%)",
+    background: "color-mix(in srgb, var(--danger) 85%, var(--nx-ink))",
     color: "#fff",
-    border: "1px solid color-mix(in srgb, var(--danger) 80%, black)",
-    boxShadow:
-      "0 1px 0 rgba(255,255,255,0.15) inset, 0 6px 14px color-mix(in srgb, var(--danger) 30%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--danger) 62%, var(--nx-ink))",
+    boxShadow: "0 1px 2px rgba(8, 24, 38, 0.14)",
   },
   accent: {
-    background:
-      "linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white) 0%, var(--accent) 100%)",
+    background: "color-mix(in srgb, var(--accent) 85%, var(--nx-ink))",
     color: "#fff",
-    border: "1px solid color-mix(in srgb, var(--accent-strong) 70%, transparent)",
-    boxShadow:
-      "0 1px 0 rgba(255,255,255,0.18) inset, 0 6px 14px color-mix(in srgb, var(--accent) 32%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--accent) 62%, var(--nx-ink))",
+    boxShadow: "0 1px 2px rgba(8, 24, 38, 0.14)",
   },
   link: {
     background: "transparent",
     color: "var(--primary)",
     border: "1px solid transparent",
-    padding: "0 4px",
   },
 };
 
@@ -86,17 +98,29 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
     style,
     disabled,
     className,
+    title,
+    "aria-label": ariaLabel,
     ...rest
   },
   ref,
 ) {
   const s = SIZES[size];
 
+  // Un botón que solo es un icono tiene que decir qué hace: al puntero con
+  // tooltip nativo, al lector de pantalla con nombre accesible. Con dar uno
+  // de los dos basta; el componente completa el otro.
+  const iconOnly = !children && Boolean(iconLeft || iconRight);
+  const resolvedLabel = ariaLabel ?? (iconOnly && typeof title === "string" ? title : undefined);
+  const resolvedTitle = title ?? (iconOnly ? ariaLabel : undefined);
+
   return (
     <button
       ref={ref}
       type={rest.type || "button"}
       disabled={disabled || loading}
+      aria-label={resolvedLabel}
+      aria-busy={loading || undefined}
+      title={resolvedTitle}
       className={["nx-btn", `nx-btn--${variant}`, className].filter(Boolean).join(" ")}
       style={{
         position: "relative",
@@ -105,7 +129,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
         justifyContent: "center",
         gap: 8,
         height: s.height,
-        padding: variant === "link" ? "0 2px" : `0 ${s.padX}px`,
+        padding: variant === "link" ? "0 2px" : `0 ${iconOnly ? Math.max(8, s.padX - 4) : s.padX}px`,
         fontSize: s.fontSize,
         borderRadius: variant === "link" ? 6 : s.radius,
         fontFamily: "var(--nx-font-ui, 'Inter Tight', 'Manrope', sans-serif)",
@@ -113,10 +137,11 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
         letterSpacing: "0.005em",
         whiteSpace: "nowrap",
         cursor: disabled || loading ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.55 : 1,
+        opacity: disabled ? 0.5 : 1,
         width: fullWidth ? "100%" : undefined,
+        // Corta y natural: no hay nada que celebrar al pasar el ratón.
         transition:
-          "transform 140ms var(--nx-ease-out), box-shadow 200ms var(--nx-ease-out), background 200ms var(--nx-ease-out), border-color 200ms var(--nx-ease-out), color 160ms var(--nx-ease-out)",
+          "background 140ms var(--nx-ease-out, ease-out), border-color 140ms var(--nx-ease-out, ease-out), color 140ms var(--nx-ease-out, ease-out), transform 90ms var(--nx-ease-out, ease-out)",
         ...VARIANT_BASE[variant],
         ...style,
       }}
@@ -140,7 +165,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
           {iconLeft}
         </span>
       )}
-      {children && <span style={{ textDecoration: variant === "link" ? "none" : undefined }}>{children}</span>}
+      {children && <span>{children}</span>}
       {!loading && iconRight && (
         <span aria-hidden="true" style={{ display: "inline-flex", fontSize: s.iconSize, lineHeight: 1, opacity: 0.85 }}>
           {iconRight}
@@ -153,37 +178,84 @@ const Button = forwardRef<HTMLButtonElement, Props>(function Button(
             transform: rotate(360deg);
           }
         }
-        .nx-btn:hover:not(:disabled) {
-          transform: translateY(-1px);
+
+        /* El foco va en outline, no en box-shadow: los sólidos traen su propia
+           sombra en línea y tapaban el anillo, así que con el teclado no se
+           veía dónde estabas. */
+        .nx-btn:focus-visible {
+          outline: 2px solid var(--primary);
+          outline-offset: 2px;
         }
-        .nx-btn--primary:hover:not(:disabled),
-        .nx-btn--danger:hover:not(:disabled),
+        .nx-btn--danger:focus-visible {
+          outline-color: var(--danger);
+        }
+        .nx-btn--accent:focus-visible {
+          outline-color: var(--accent);
+        }
+        .nx-btn--primary:focus-visible,
+        .nx-btn--danger:focus-visible,
+        .nx-btn--accent:focus-visible {
+          /* Sobre relleno oscuro, el anillo necesita un hueco claro detrás. */
+          box-shadow: 0 0 0 2px var(--surface) !important;
+        }
+
+        .nx-btn--primary:hover:not(:disabled) {
+          background: color-mix(in srgb, var(--primary) 68%, var(--nx-ink)) !important;
+        }
+        .nx-btn--danger:hover:not(:disabled) {
+          background: color-mix(in srgb, var(--danger) 68%, var(--nx-ink)) !important;
+        }
         .nx-btn--accent:hover:not(:disabled) {
-          filter: brightness(1.04) saturate(1.05);
+          background: color-mix(in srgb, var(--accent) 68%, var(--nx-ink)) !important;
         }
+        /* En oscuro, --primary/--accent/--danger se aclaran (están pensados
+           para texto sobre fondo oscuro): con texto blanco encima el contraste
+           caía a ~2.5:1. Aquí se oscurecen más para volver a pasar AA. */
+        :global(body.dark) .nx-btn--primary {
+          background: color-mix(in srgb, var(--primary) 65%, var(--nx-ink)) !important;
+        }
+        :global(body.dark) .nx-btn--danger {
+          background: color-mix(in srgb, var(--danger) 65%, var(--nx-ink)) !important;
+        }
+        :global(body.dark) .nx-btn--accent {
+          background: color-mix(in srgb, var(--accent) 65%, var(--nx-ink)) !important;
+        }
+        :global(body.dark) .nx-btn--primary:hover:not(:disabled) {
+          background: color-mix(in srgb, var(--primary) 50%, var(--nx-ink)) !important;
+        }
+        :global(body.dark) .nx-btn--danger:hover:not(:disabled) {
+          background: color-mix(in srgb, var(--danger) 50%, var(--nx-ink)) !important;
+        }
+        :global(body.dark) .nx-btn--accent:hover:not(:disabled) {
+          background: color-mix(in srgb, var(--accent) 50%, var(--nx-ink)) !important;
+        }
+
         .nx-btn--secondary:hover:not(:disabled) {
           background: var(--surface-2) !important;
-          border-color: color-mix(in srgb, var(--primary) 35%, var(--border)) !important;
+          border-color: var(--border-strong) !important;
         }
         .nx-btn--ghost:hover:not(:disabled) {
-          background: color-mix(in srgb, var(--primary) 8%, transparent) !important;
+          background: color-mix(in srgb, var(--text-primary) 7%, transparent) !important;
           color: var(--text-primary) !important;
         }
         .nx-btn--link:hover:not(:disabled) {
-          color: var(--primary-strong) !important;
+          color: var(--primary-hover) !important;
           text-decoration: underline;
           text-underline-offset: 3px;
         }
+
+        /* Pulsado: un píxel. Se siente, no se ve. */
         .nx-btn:active:not(:disabled) {
-          transform: translateY(0) scale(0.985);
+          transform: translateY(1px);
         }
-        .nx-btn:focus-visible {
-          outline: none;
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent),
-            var(--nx-panel-elev-1, 0 6px 14px rgba(0, 0, 0, 0.08));
-        }
-        .nx-btn--danger:focus-visible {
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 28%, transparent);
+
+        @media (prefers-reduced-motion: reduce) {
+          .nx-btn {
+            transition: none !important;
+          }
+          .nx-btn:active:not(:disabled) {
+            transform: none;
+          }
         }
       `}</style>
     </button>
