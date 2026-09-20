@@ -747,6 +747,31 @@ export default function AccountingPage() {
   };
 
   // ── Catálogo de cuentas actions ──────────────────────────────────────
+  const [seedBaseBusy, setSeedBaseBusy] = useState(false);
+
+  const seedBaseCatalog = async () => {
+    if (!token || seedBaseBusy) return;
+    setSeedBaseBusy(true);
+    try {
+      const result = await apiFetch("accounting/accounts/seed-base", token, { method: "POST" });
+      const created = Number(result?.created ?? 0);
+      const skipped = Number(result?.skipped ?? 0);
+      toast.success(
+        created > 0
+          ? `Catálogo base: ${created} cuentas nuevas${skipped ? ` (${skipped} ya existían)` : ""}.`
+          : skipped
+            ? `El catálogo base ya estaba cargado (${skipped} cuentas).`
+            : "No se agregó ninguna cuenta.",
+      );
+      void loadAccounts();
+      void loadAccountOptions();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cargar el catálogo base"));
+    } finally {
+      setSeedBaseBusy(false);
+    }
+  };
+
   const saveAccount = async () => {
     if (!token || !accountForm.code.trim() || !accountForm.name.trim()) {
       setAccountSaveErr("Código y nombre son obligatorios.");
@@ -1498,6 +1523,16 @@ export default function AccountingPage() {
                   <option value="">Todos los tipos</option>
                   {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{ACCOUNT_TYPE_LABEL[t]}</option>)}
                 </select>
+                {cfg.canCreate && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void seedBaseCatalog()}
+                    disabled={seedBaseBusy}
+                  >
+                    {seedBaseBusy ? "Cargando…" : "Cargar catálogo base"}
+                  </Button>
+                )}
                 {cfg.canCreate && (
                   <Button variant="secondary" size="sm" iconLeft="+" onClick={() => { setAccountForm({ ...emptyAccountForm }); setShowAccountForm(true); }}>
                     Nueva cuenta

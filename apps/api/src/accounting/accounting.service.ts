@@ -10,6 +10,7 @@ import { FolioService } from '../common/folio/folio.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { cents } from '../pac/cfdi-xml.builder.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import { BASE_CHART_OF_ACCOUNTS } from './base-chart-of-accounts.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -203,6 +204,38 @@ export class AccountingService {
       include: { parent: true, children: true },
       orderBy: { code: 'asc' },
     });
+  }
+
+  /**
+   * Carga el catálogo base (~80 cuentas) sin pisar las que ya existen.
+   * Pensado para el arranque: una empresa vacía deja de necesitar ~100 altas a mano.
+   */
+  async seedBaseChartOfAccounts(companyId?: number | null) {
+    const cid = await this.resolveCompanyId(companyId);
+    const existing = await this.prisma.account.findMany({
+      where: { companyId: cid },
+      select: { code: true },
+    });
+    const have = new Set(existing.map((a) => a.code));
+    let created = 0;
+    for (const account of BASE_CHART_OF_ACCOUNTS) {
+      if (have.has(account.code)) continue;
+      await this.prisma.account.create({
+        data: {
+          code: account.code,
+          name: account.name,
+          type: account.type,
+          satAgrupador: account.satAgrupador ?? null,
+          companyId: cid,
+        },
+      });
+      created += 1;
+    }
+    return {
+      created,
+      skipped: BASE_CHART_OF_ACCOUNTS.length - created,
+      total: BASE_CHART_OF_ACCOUNTS.length,
+    };
   }
 
   async getAccount(id: number, companyId?: number | null) {
@@ -759,30 +792,24 @@ export class AccountingService {
     }
   }
 
-  private async ensureDefaultAccounts() {
-    const defaults = [
-      { code: '105.01', name: 'Clientes nacionales', type: 'ASSET' as const },
-      { code: '102.01', name: 'Bancos', type: 'ASSET' as const },
-      { code: '401.01', name: 'Ingresos por servicios', type: 'REVENUE' as const },
-      { code: '208.01', name: 'IVA trasladado cobrado', type: 'LIABILITY' as const },
-      { code: '601.01', name: 'Gastos de administración', type: 'EXPENSE' as const },
-      { code: '601.02', name: 'Viáticos y gastos de viaje', type: 'EXPENSE' as const },
-      { code: '602.01', name: 'Sueldos y salarios', type: 'EXPENSE' as const },
-      { code: '115.01', name: 'Inventario de mercancías', type: 'ASSET' as const },
-      { code: '501.01', name: 'Costo de ventas', type: 'EXPENSE' as const },
-      { code: '201.01', name: 'Proveedores nacionales', type: 'LIABILITY' as const },
-      { code: '209.01', name: 'IVA acreditable pagado', type: 'ASSET' as const },
-    ];
-
+  private async ensureDefaultAccounts(companyId?: number | null) {
+    // Solo las cuentas que pisan los asientos automáticos (rápido).
+    // El catálogo completo (~80) se carga a demanda vía POST …/seed-base.
+    const cid = await this.resolveCompanyId(companyId);
+    const defaults = BASE_CHART_OF_ACCOUNTS.filter((a) =>
+      ['102.01', '105.01', '115.01', '201.01', '208.01', '209.01', '401.01', '501.01', '601.01', '601.02', '602.01'].includes(
+        a.code,
+      ),
+    );
     for (const account of defaults) {
-      const companyId = await this.resolveCompanyId();
       await this.prisma.account.upsert({
-        where: { companyId_code: { companyId, code: account.code } },
+        where: { companyId_code: { companyId: cid, code: account.code } },
         create: {
           code: account.code,
           name: account.name,
           type: account.type,
-          companyId,
+          satAgrupador: account.satAgrupador ?? null,
+          companyId: cid,
         },
         update: {},
       });
@@ -791,7 +818,7 @@ export class AccountingService {
 
   private async getAccountByCode(code: string, companyId?: number | null) {
     const cid = await this.resolveCompanyId(companyId);
-    await this.ensureDefaultAccounts();
+    await this.ensureDefaultAccounts(cid);
     const account = await this.prisma.account.findUnique({
       where: { companyId_code: { companyId: cid, code } },
     });

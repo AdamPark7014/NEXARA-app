@@ -55,7 +55,7 @@ export type Destino = {
 export const DESTINOS = {
   catalogoCuentas: {
     href: "/erp/contabilidad/polizas?tab=cuentas",
-    etiqueta: "Dar de alta las cuentas",
+    etiqueta: "Cargar catálogo base",
     loHace: "quien lleva la contabilidad general",
   },
   periodoFiscal: {

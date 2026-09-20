@@ -30,6 +30,14 @@ export class AccountsController {
     return this.service.createAccount({ ...dto, companyId });
   }
 
+  /** Catálogo base (~80 cuentas NIF). Solo crea las que faltan; no pisa las existentes. */
+  @Post('seed-base')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
+  seedBase(@CurrentCompanyId() companyId: number | null) {
+    return this.service.seedBaseChartOfAccounts(companyId);
+  }
+
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_VIEW] })

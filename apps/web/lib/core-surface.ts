@@ -53,6 +53,10 @@ const MOVED_TO_CORE: ReadonlyArray<[RegExp, (m: RegExpMatchArray) => string]> = 
   [/^\/ops\/(?:tools|herramientas)(?:\/.*)?$/, () => '/erp/almacen/herramientas'],
   [/^\/erp\/warehouse(?:\/.*)?$/, () => '/erp/almacen'],
   [/^\/erp\/hr\/orgchart(?:\/.*)?$/, () => '/erp/organigrama'],
+  // CRM ola1 ya vive en Core: sin este mapa, /crm/quotes cae en la pizarra.
+  [/^\/crm\/(?:quotes|cotizaciones)(?:\/(\d+))?(?:\/.*)?$/, (m) => (m[1] ? `/erp/cotizaciones/${m[1]}` : '/erp/cotizaciones')],
+  [/^\/crm\/(?:clients|clientes)(?:\/(\d+))?(?:\/.*)?$/, (m) => (m[1] ? `/erp/clientes/${m[1]}` : '/erp/clientes')],
+  [/^\/crm\/(?:projects|proyectos)(?:\/(\d+))?(?:\/.*)?$/, (m) => (m[1] ? `/erp/proyectos/${m[1]}` : '/erp/proyectos')],
 ];
 
 /** Core-only: la ruta nueva de un módulo que se mudó a /erp, o null si no es uno de ellos. */
@@ -68,8 +72,9 @@ export function coreMovedModulePath(pathname: string): string | null {
 /**
  * Core-only: destino dentro de /erp para una ruta de otro panel, o null si no aplica.
  * Detalle de actividad, evidencias y proyecto conservan el id; «Mi perfil» y «Mis
- * actividades» van a su equivalente; vehículos, herramientas, almacén y organigrama abren su
- * página de Core ({@link coreMovedModulePath}); todo lo demás cae en CORE_HOME_PATH.
+ * actividades» van a su equivalente; vehículos, herramientas, almacén, organigrama,
+ * cotizaciones/clientes/proyectos CRM abren su página de Core
+ * ({@link coreMovedModulePath}); todo lo demás cae en CORE_HOME_PATH.
  */
 export function coreSurfaceRedirect(
   pathname: string,

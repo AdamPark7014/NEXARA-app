@@ -284,8 +284,8 @@ export default function ContabilidadDashboardPage() {
     () => [
       {
         id: "cuentas",
-        titulo: "Da de alta el catálogo de cuentas",
-        porque: "Sin cuentas contables no se puede registrar una póliza ni sacar la balanza.",
+        titulo: "Carga el catálogo de cuentas",
+        porque: "Sin cuentas contables no se puede registrar una póliza ni sacar la balanza. El catálogo base evita ~80 altas a mano.",
         destino: DESTINOS.catalogoCuentas,
         estado: arranque?.cuentas ?? "desconocido",
       },
