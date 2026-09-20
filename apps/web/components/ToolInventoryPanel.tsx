@@ -12,6 +12,8 @@ interface InventoryItem {
   toolName: string;
   model: string;
   serialNumber: string;
+  codigoInterno?: string | null;
+  barcode?: string | null;
   panoramicPhotoUrl: string;
   serialPhotoUrl: string;
   status: 'AVAILABLE' | 'ASSIGNED' | 'IN_REPAIR' | 'RETIRED';
@@ -178,6 +180,30 @@ const ToolInventoryPanel: React.FC = () => {
       socket.disconnect();
     };
   }, [user?.token, query, includeRetired]);
+
+  const printLabel = async (item: InventoryItem, format: 'pdf' | 'zpl' = 'pdf') => {
+    if (!user?.token) return;
+    try {
+      const res = await fetch(
+        buildApiUrl(`tool-requests/inventory/${item.id}/label?format=${format}`),
+        { headers: { Authorization: `Bearer ${user.token}` } },
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (format === 'pdf') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `etiqueta-${item.codigoInterno || item.serialNumber}.zpl`;
+        a.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo generar la etiqueta');
+    }
+  };
 
   const createItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -647,36 +673,45 @@ const ToolInventoryPanel: React.FC = () => {
               : 'No hay herramientas en inventario'}
           </div>
         ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr className={styles.tableHeadRow}>
-                  <th className={styles.thLeft}>Herramienta</th>
-                  <th className={styles.thLeft}>Modelo</th>
-                  <th className={styles.thLeft}>Serie</th>
-                  <th className={styles.thLeft}>Estado</th>
-                  <th className={styles.thLeft}>Reemplazos</th>
-                  <th className={styles.thCenter}>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className={styles.tableRow}>
-                    <td className={styles.td}>{item.toolName}</td>
-                    <td className={styles.td}>{item.model}</td>
-                    <td className={styles.td}>{item.serialNumber}</td>
-                    <td className={styles.td}>{item.status}</td>
-                    <td className={styles.td}>{item.replacements?.length || 0}</td>
-                    <td className={styles.tdCenter}>
-                      <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
-                        <button type="button" className="button-secondary" onClick={() => startEdit(item)}>Editar</button>
-                        <button type="button" className="button-secondary" onClick={() => startReplacement(item)}>Reemplazar</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className={styles.gallery}>
+            {items.map((item) => (
+              <article key={item.id} className={styles.galleryCard}>
+                <div className={styles.photoRow}>
+                  <a href={item.panoramicPhotoUrl} target="_blank" rel="noreferrer" className={styles.photoLink}>
+                    <img src={item.panoramicPhotoUrl} alt={`${item.toolName} panorámica`} className={styles.galleryPhoto} />
+                  </a>
+                  <a href={item.serialPhotoUrl} target="_blank" rel="noreferrer" className={styles.photoLink}>
+                    <img src={item.serialPhotoUrl} alt={`${item.toolName} serie`} className={styles.galleryPhoto} />
+                  </a>
+                </div>
+                <div className={styles.galleryBody}>
+                  <div className={styles.galleryTitle}>{item.toolName}</div>
+                  <div className={styles.galleryMeta}>
+                    {item.model} · Serie {item.serialNumber}
+                  </div>
+                  {(item.codigoInterno || item.barcode) && (
+                    <div className={styles.galleryMeta}>
+                      {item.codigoInterno ? `Código ${item.codigoInterno}` : null}
+                      {item.codigoInterno && item.barcode ? ' · ' : null}
+                      {item.barcode ? `Barras ${item.barcode}` : null}
+                    </div>
+                  )}
+                  <div className={styles.galleryMeta}>
+                    Estado: {item.status} · Reemplazos: {item.replacements?.length || 0}
+                  </div>
+                  <div className={styles.galleryActions}>
+                    <button type="button" className="button-secondary" onClick={() => void printLabel(item, 'pdf')}>
+                      Imprimir etiqueta
+                    </button>
+                    <button type="button" className="button-secondary" onClick={() => void printLabel(item, 'zpl')}>
+                      ZPL
+                    </button>
+                    <button type="button" className="button-secondary" onClick={() => startEdit(item)}>Editar</button>
+                    <button type="button" className="button-secondary" onClick={() => startReplacement(item)}>Reemplazar</button>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </div>

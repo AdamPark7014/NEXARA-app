@@ -12,7 +12,9 @@ import {
   UploadedFiles,
   UnauthorizedException,
   ForbiddenException,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileFieldsInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
@@ -30,6 +32,7 @@ import {
   ReportKitEventDto,
   ResolveKitEventDto,
 } from './tool-requests.service.js';
+import { assertCanCreateToolLoan } from './tools-access.js';
 
 interface MulterFile {
   filename: string;
@@ -94,6 +97,22 @@ export class ToolRequestsController {
       user.id,
       companyId,
     );
+  }
+
+  /** Etiqueta PDF o ZPL para impresora térmica. */
+  @Get('inventory/:id/label')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async inventoryLabel(
+    @Param('id') id: string,
+    @Query('format') format: string | undefined,
+    @Res() res: Response,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    const fmt = String(format || '').toLowerCase() === 'zpl' ? 'zpl' : 'pdf';
+    const label = await this.toolRequestsService.getInventoryLabel(Number(id), fmt, companyId);
+    res.setHeader('Content-Type', label.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${label.filename}"`);
+    return res.send(label.body);
   }
 
   @Put('inventory/:id')
@@ -365,11 +384,17 @@ export class ToolRequestsController {
     @Body() data: CreateToolRequestDto,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    assertCanCreateToolLoan(user?.email);
     // El usuario solo puede crear solicitudes para sí mismo
     if (data.usuarioId !== user.id) {
       throw new UnauthorizedException('No puedes crear solicitudes para otros usuarios');
     }
-    return this.toolRequestsService.create(data, companyId);
+    try {
+      assertCanCreateToolLoan(user.email);
+    } catch (e) {
+      throw new ForbiddenException(e instanceof Error ? e.message : 'No puedes solicitar herramientas');
+    }
+    return this.toolRequestsService.create(data, companyId, user?.email);
   }
 
   // Obtener todas las solicitudes (admin/superadmin)

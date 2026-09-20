@@ -16,6 +16,7 @@ import {
 import { LEGACY_TO_V2, ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { fechaAviso } from '../notifications/notification-push-meta.js';
+import { canManageTools } from '../tool-requests/tools-access.js';
 
 type UserWithRole = {
   roleKey?: string | null;
@@ -103,9 +104,12 @@ export class AuthService {
       return this.addV2RolePermissions(
         this.buildBaseAuthenticatedPermissions(isSuperAdmin),
         roleKey,
+        user.email,
       );
     }
-    return this.buildPermissions(user.role, isSuperAdmin);
+    const legacy = this.buildPermissions(user.role, isSuperAdmin);
+    // TOOLS_MANAGE es por email (Christian / Iván), no por flag legacy de consola.
+    return this.applyToolsManageByEmail(legacy, user.email);
   }
 
   /** Permisos mínimos de cualquier empleado autenticado (sin flags acceso*). */
@@ -194,7 +198,6 @@ export class AuthService {
         PERMISSIONS.ROLES_MANAGE,
         PERMISSIONS.TOOLS_VIEW,
         PERMISSIONS.TOOLS_REQUEST,
-        PERMISSIONS.TOOLS_MANAGE,
         PERMISSIONS.TOOLS_INVENTORY,
         PERMISSIONS.PANEL_VENTAS,
         PERMISSIONS.SALES_VIEW,
@@ -399,8 +402,24 @@ export class AuthService {
    * (accesoBI, accesoRRHH, etc.) accedan correctamente a los endpoints
    * protegidos por `RbacGuard`.
    */
-  private addV2RolePermissions(permissions: string[], roleKey: string | null | undefined): string[] {
-    if (!roleKey) return permissions;
+  /** TOOLS_MANAGE solo para Christian (gerencia@) e Iván (administracion.ventas@). */
+  private applyToolsManageByEmail(permissions: string[], email?: string | null): string[] {
+    const set = new Set(permissions);
+    set.delete(PERMISSIONS.TOOLS_MANAGE);
+    if (canManageTools(email)) {
+      set.add(PERMISSIONS.TOOLS_MANAGE);
+      set.add(PERMISSIONS.TOOLS_VIEW);
+      set.add(PERMISSIONS.TOOLS_INVENTORY);
+    }
+    return Array.from(set);
+  }
+
+  private addV2RolePermissions(
+    permissions: string[],
+    roleKey: string | null | undefined,
+    email?: string | null,
+  ): string[] {
+    if (!roleKey) return this.applyToolsManageByEmail(permissions, email);
     const set = new Set(permissions);
 
     // ── BI / Analytics ─────────────────────────────────────────────
@@ -534,7 +553,8 @@ export class AuthService {
       set.add(PERMISSIONS.VEHICLES_VIEW);
       set.add(PERMISSIONS.VEHICLES_REVIEW);
       set.add(PERMISSIONS.VEHICLES_INVENTORY);
-      set.add(PERMISSIONS.TOOLS_MANAGE);
+      // TOOLS_MANAGE solo Christian/Iván (applyToolsManageByEmail). Inventario de consulta para mandos.
+      set.add(PERMISSIONS.TOOLS_VIEW);
       set.add(PERMISSIONS.TOOLS_INVENTORY);
       set.add(PERMISSIONS.VIATICS_MANAGE);
       set.add(PERMISSIONS.VIATICS_VIEW);
@@ -677,7 +697,7 @@ export class AuthService {
       set.add(PERMISSIONS.STOCK_VIEW);
     }
 
-        return Array.from(set);
+    return this.applyToolsManageByEmail(Array.from(set), email);
   }
 
   private pickRoleFlags(role: any) {
