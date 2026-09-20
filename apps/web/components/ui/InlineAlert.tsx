@@ -6,7 +6,12 @@ const STYLES: Record<Variant, { bg: string; border: string; color: string }> = {
   danger: { bg: "var(--state-danger-bg, #fef2f2)", border: "var(--danger)", color: "var(--danger)" },
   warning: { bg: "var(--state-warning-bg, #fffbeb)", border: "var(--state-warning-border, #f59e0b)", color: "var(--state-warning-text, #b45309)" },
   info: { bg: "var(--surface-2)", border: "var(--border)", color: "var(--text-secondary)" },
-  success: { bg: "#f0fdf4", border: "#22c55e", color: "#15803d" },
+  // Eran hex fijos: en modo oscuro quedaban ilegibles.
+  success: {
+    bg: "var(--state-success-bg, #f0fdf4)",
+    border: "var(--state-success-border, #22c55e)",
+    color: "var(--state-success-text, #15803d)",
+  },
 };
 
 export default function InlineAlert({

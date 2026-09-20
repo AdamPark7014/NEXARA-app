@@ -40,6 +40,17 @@ export default function FileDropzone({ file, onFile, accept = "image/*,.pdf", la
         onDragLeave={() => setDragActive(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
+        // Era un `div` con `onClick` y el `input` oculto: con teclado no había
+        // forma de adjuntar un comprobante en ninguna pantalla de finanzas.
+        role="button"
+        tabIndex={0}
+        aria-label={label ? `${label}. Elegir archivo` : "Elegir archivo"}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
         style={{
           border: `2px dashed ${dragActive ? "var(--primary)" : "var(--border)"}`,
           borderRadius: 12,

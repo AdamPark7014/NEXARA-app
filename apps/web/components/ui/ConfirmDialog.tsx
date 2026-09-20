@@ -141,6 +141,9 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
             lineHeight: 1.55,
             color: "var(--text-primary)",
             fontWeight: 500,
+            // El mensaje suele enumerar qué queda bloqueado; sin esto los
+            // saltos de línea se corrían y las viñetas salían en un párrafo.
+            whiteSpace: "pre-line",
           }}
         >
           {state.message}
