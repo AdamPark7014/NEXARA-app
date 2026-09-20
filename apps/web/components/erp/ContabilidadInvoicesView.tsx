@@ -18,6 +18,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import Modal from "@/components/ui/Modal";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { financeStatusLabel } from "@/lib/finance-status-labels";
 import { toast } from "@/components/Toast";
 import TruncatedId from "@/components/ui/TruncatedId";
 
@@ -48,18 +49,6 @@ function daysOverdue(due?: string | null) {
   return Math.floor((today.getTime() - d.getTime()) / 86_400_000);
 }
 
-/** Claves del modelo → español. Nunca mostrar DRAFT/SENT/PAID crudos. */
-const ESTATUS_FACTURA: Record<string, string> = {
-  DRAFT: "Borrador",
-  STAMPING: "Timbrando",
-  SENT: "Enviada",
-  PARTIALLY_PAID: "Pago parcial",
-  PAID: "Pagada",
-  OVERDUE: "Vencida",
-  CANCELLED: "Cancelada",
-  CREDITED: "Nota de crédito",
-};
-
 const TIPO_FACTURA: Record<string, string> = {
   ACCOUNTS_RECEIVABLE: "Emitida",
   INCOME: "Emitida",
@@ -71,19 +60,28 @@ function tipoFacturaLabel(type: string): string {
   return TIPO_FACTURA[type] ?? "Documento";
 }
 
-/** Estado para humanos — nunca enums crudos. */
+/**
+ * Estado para quien cobra — nunca la clave cruda del modelo. Las traducciones
+ * salen del catálogo compartido, para que «Pago parcial» se diga igual aquí,
+ * en Por cobrar y en el expediente del proveedor.
+ */
 function statusLabel(row: InvoiceRow): { text: string; tone: "ok" | "warn" | "bad" | "mute" } {
   const pend = pendingOf(row);
   const od = daysOverdue(row.dueDate);
-  if (row.status === "STAMPING") return { text: ESTATUS_FACTURA.STAMPING, tone: "warn" };
-  if (row.status === "CANCELLED") return { text: ESTATUS_FACTURA.CANCELLED, tone: "mute" };
-  if (row.status === "DRAFT") return { text: ESTATUS_FACTURA.DRAFT, tone: "mute" };
-  if (pend <= 0.01 || row.status === "PAID") return { text: ESTATUS_FACTURA.PAID, tone: "ok" };
-  if (od != null && od > 0) return { text: `Vencida · ${od}d`, tone: "bad" };
-  if (Number(row.paidAmount || 0) > 0 || row.status === "PARTIALLY_PAID") {
-    return { text: ESTATUS_FACTURA.PARTIALLY_PAID, tone: "warn" };
+  if (row.status === "STAMPING") return { text: financeStatusLabel("STAMPING"), tone: "warn" };
+  if (row.status === "CANCELLED") return { text: financeStatusLabel("CANCELLED"), tone: "mute" };
+  if (row.status === "DRAFT") return { text: financeStatusLabel("DRAFT"), tone: "mute" };
+  if (pend <= 0.01 || row.status === "PAID") return { text: financeStatusLabel("PAID"), tone: "ok" };
+  // Mismo texto que la columna «Vencida» de Por cobrar: días completos, sin
+  // abreviar. «Vencida · 12d» obligaba a adivinar qué era la d.
+  if (od != null && od > 0) {
+    return { text: `Vencida · ${od} ${od === 1 ? "día" : "días"}`, tone: "bad" };
   }
-  return { text: ESTATUS_FACTURA[row.status] ?? "Pendiente", tone: "mute" };
+  if (Number(row.paidAmount || 0) > 0 || row.status === "PARTIALLY_PAID") {
+    return { text: financeStatusLabel("PARTIALLY_PAID"), tone: "warn" };
+  }
+  // Sin estado, pero con saldo abierto: eso sí lo sabemos y se dice.
+  return { text: row.status ? financeStatusLabel(row.status) : "Pendiente", tone: "mute" };
 }
 
 /** El tono del estado, en el vocabulario de `StatusDot`: punto y palabra. */
@@ -134,7 +132,9 @@ export default function ContabilidadInvoicesView({
   const load = useCallback(async () => {
     if (!token) {
       setLoading(false);
-      setError("Esperando sesión. Vuelve a entrar si esto no se resuelve.");
+      setError(
+        "Tu sesión todavía no está lista, así que no se pueden pedir las facturas. Espera unos segundos; si sigue igual, vuelve a entrar.",
+      );
       return;
     }
     setLoading(true);
@@ -227,7 +227,9 @@ export default function ContabilidadInvoicesView({
     setIntentado(true);
     const pend = pendingOf(row);
     if (pend <= 0) {
-      setPayErr("Esta factura ya no tiene saldo pendiente.");
+      setPayErr(
+        "Esta factura ya no tiene saldo pendiente: alguien registró el pago mientras tenías la pantalla abierta. Cierra y vuelve a abrirla.",
+      );
       return;
     }
     const amount = Number(payAmount);
@@ -250,11 +252,11 @@ export default function ContabilidadInvoicesView({
       });
       if (result?.complement?.cfdiPaymentUuid) {
         toast.success(
-          `Pago y complemento timbrados (${String(result.complement.cfdiPaymentUuid).slice(0, 8)}…)`,
+          `Pago registrado y complemento de pago timbrado (folio fiscal ${String(result.complement.cfdiPaymentUuid).slice(0, 8)}…)`,
         );
       } else if (result?.complementStampWarning) {
         toast.warning(
-          `Pago registrado; complemento no timbrado: ${result.complementStampWarning}`,
+          `El pago quedó registrado, pero el complemento de pago no se timbró ante el SAT: ${result.complementStampWarning} Vuelve a timbrarlo desde Facturación.`,
         );
       } else {
         toast.success("Pago registrado");
@@ -267,7 +269,9 @@ export default function ContabilidadInvoicesView({
       await load();
     } catch (e) {
       // El formulario NO se cierra: si se cerrara, nadie sabría si el dinero quedó aplicado.
-      setPayErr(`No se pudo registrar el pago. ${formatApiError(e)}`);
+      setPayErr(
+        `No se pudo registrar el pago. ${formatApiError(e)} El saldo no cambió: corrige el monto y vuelve a guardar.`,
+      );
       toast.error(formatApiError(e));
     } finally {
       payingRef.current = false;
@@ -275,7 +279,13 @@ export default function ContabilidadInvoicesView({
     }
   }
 
-  const partyLabel = mode === "cxp" ? "Proveedor" : mode === "cxc" ? "Cliente" : "Contraparte";
+  /**
+   * Cómo se llama la otra parte. En la lista mezclada no es «Contraparte»
+   * —palabra de contrato, no de trabajo—: es un cliente o un proveedor.
+   */
+  const partyLabel =
+    mode === "cxp" ? "Proveedor" : mode === "cxc" ? "Cliente" : "Cliente o proveedor";
+  const partySearchLabel = mode === "cxp" ? "proveedor" : mode === "cxc" ? "cliente" : "nombre";
 
   /** El mismo criterio que aplica `registerPayment`, mostrado bajo el campo. */
   const errorMonto = (() => {
@@ -405,16 +415,23 @@ export default function ContabilidadInvoicesView({
         ? "Qué debes pagar y cuándo."
         : "Documentos emitidos y recibidos.");
 
-  const emptyTitle =
-    mode === "cxc"
+  /**
+   * Tres vacíos distintos, como en el resto del escritorio: el que el filtro
+   * esconde, el que todavía no tiene movimiento y el que ya está liquidado.
+   */
+  const hayBusqueda = q.trim() !== "" || aging !== "";
+  const emptyTitle = hayBusqueda
+    ? "Sin resultados con estos filtros"
+    : mode === "cxc"
       ? "Nada por cobrar"
       : mode === "cxp"
         ? "Nada por pagar"
-        : "Sin facturas";
-  const emptyDesc =
-    mode === "all"
-      ? "Cuando registres o recibas una factura, aparecerá aquí."
-      : "No hay saldos abiertos con estos filtros.";
+        : "Todavía no hay facturas";
+  const emptyDesc = hayBusqueda
+    ? "Ninguna factura coincide. Borra la búsqueda o elige otro tramo de vencimiento."
+    : mode === "all"
+      ? "En cuanto emitas o registres una factura, aparecerá aquí con su saldo y su fecha de vencimiento."
+      : "Todas las facturas están liquidadas: no queda saldo abierto.";
 
   return (
     <>
@@ -434,7 +451,7 @@ export default function ContabilidadInvoicesView({
                   padding: "6px 12px",
                   borderRadius: 8,
                   background: "var(--primary)",
-                  color: "#fff",
+                  color: "var(--ui-brand-fg, #ffffff)",
                   textDecoration: "none",
                 }}
               >
@@ -465,7 +482,7 @@ export default function ContabilidadInvoicesView({
           search={{
             value: q,
             onChange: setQ,
-            placeholder: `Buscar ${partyLabel.toLowerCase()} o folio…`,
+            placeholder: `Buscar ${partySearchLabel}, folio o folio fiscal…`,
           }}
           resultCount={filtered.length}
         />
@@ -473,7 +490,11 @@ export default function ContabilidadInvoicesView({
 
       {error && (
         <>
-          <InlineAlert variant="danger" message={`No se pudo cargar la lista. ${error}`} />
+          {/* Qué pasó, por qué, y qué hacer — junto a la tabla que quedó vacía. */}
+          <InlineAlert
+            variant="danger"
+            message={`No se pudieron cargar las facturas. ${error} Vuelve a intentarlo; si sigue igual, avisa a soporte.`}
+          />
           <div style={{ margin: "-4px 0 12px" }}>
             <Button size="sm" variant="secondary" onClick={() => void load()}>
               Reintentar
@@ -489,7 +510,18 @@ export default function ContabilidadInvoicesView({
           title={emptyTitle}
           description={emptyDesc}
           action={
-            mode === "all" ? (
+            hayBusqueda ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setQ("");
+                  setAging("");
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            ) : mode === "all" ? (
               <Link href="/erp/invoicing" style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
                 Ir a facturación
               </Link>
@@ -567,21 +599,24 @@ export default function ContabilidadInvoicesView({
                   tone={TONO_ESTADO[statusLabel(selected).tone]}
                 />
               </Dato>
+              {/* «UUID CFDI» es como lo llama el sistema; en la factura
+                  impresa ese mismo número se llama folio fiscal. */}
               {selected.cfdiUuid ? (
-                <Dato etiqueta="UUID CFDI">
-                  <TruncatedId value={selected.cfdiUuid} label="UUID CFDI" keep={8} />
+                <Dato etiqueta="Folio fiscal">
+                  <TruncatedId value={selected.cfdiUuid} label="Folio fiscal" keep={8} />
                 </Dato>
               ) : null}
             </div>
 
             <div style={{ fontSize: 12.5 }}>
               {selected.cfdiXml || selected.cfdiUuid ? (
-                <StatusDot label="CFDI con XML" tone="neutral" />
+                <StatusDot label="Timbrada ante el SAT" tone="neutral" />
               ) : (
                 <StatusDot
-                  label="Sin XML — completar cuando exista"
+                  label="Sin timbrar ante el SAT"
                   tone="warning"
-                  title="La factura no tiene el CFDI timbrado adjunto"
+                  wrap
+                  title="No tiene folio fiscal ni archivo XML: no se puede deducir ni acreditar hasta que se timbre"
                 />
               )}
             </div>

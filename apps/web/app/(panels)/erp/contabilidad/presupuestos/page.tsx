@@ -16,6 +16,7 @@ import {
   DetalleModal,
   Variacion,
   descargarCsv,
+  fechaLegible,
   hoyIso,
   inicioDeMesIso,
   pedirJson,
@@ -230,7 +231,8 @@ export default function PresupuestosPage() {
 
       {error && (
         <InlineAlert
-          message={error}
+          variant="danger"
+          message={`No se pudo comparar el presupuesto contra lo gastado. ${error} Reintenta o acota el periodo; si sigue igual, avisa a soporte.`}
           onDismiss={() => setError(null)}
           action={
             <Button size="sm" variant="secondary" onClick={() => void cargar()}>
@@ -271,7 +273,12 @@ export default function PresupuestosPage() {
             : "Esperando la sesión para pedir el comparativo…"}
         </p>
       ) : !data ? (
-        error ? null : <EmptyState title="Sin datos" description="Ajusta el periodo y vuelve a intentar." />
+        error ? null : (
+          <EmptyState
+            title="Todavía no hay comparativo"
+            description="No se ha calculado nada para este periodo. Fija las fechas arriba y pulsa Actualizar."
+          />
+        )
       ) : data.centros.length === 0 ? (
         /* Sin configurar: no es que falte el presupuesto, falta contra qué
            medirlo. `centros` son TODOS los centros de costo de la empresa, no
@@ -295,7 +302,7 @@ export default function PresupuestosPage() {
         ) : (
           <VacioConPrimerPaso
             title="Sin presupuestos en este periodo"
-            description={`Los centros de costo ya existen, pero ninguno tiene presupuesto entre el ${data.periodo.from} y el ${data.periodo.to}. Captura el del año y aquí verás, mes a mes, cuánto llevas gastado contra lo planeado.`}
+            description={`Los centros de costo ya existen, pero ninguno tiene presupuesto entre el ${fechaLegible(data.periodo.from)} y el ${fechaLegible(data.periodo.to)}. Captura el del año y aquí verás, mes a mes, cuánto llevas gastado contra lo planeado.`}
             destino={DESTINOS.presupuesto}
           />
         )
@@ -304,7 +311,7 @@ export default function PresupuestosPage() {
           {/* El periodo que el API dice haber comparado: cuando acota el rango
               pedido, la pantalla enseñaba las fechas del filtro y no las suyas. */}
           <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
-            Comparando del {data.periodo.from} al {data.periodo.to}.
+            Comparando del {fechaLegible(data.periodo.from)} al {fechaLegible(data.periodo.to)}.
           </p>
 
           <div style={{ marginBottom: 12 }}>

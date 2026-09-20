@@ -14,6 +14,11 @@ import Modal from "@/components/ui/Modal";
 import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import {
+  auditActionLabel,
+  auditEntityLabel,
+  auditFieldLabel,
+} from "@/lib/finance-status-labels";
 import { VacioConPrimerPaso } from "../_arranque";
 
 type AuditRow = {
@@ -233,13 +238,24 @@ export default function AuditoriaPage() {
     [catalogos.usuarios],
   );
 
+  /**
+   * El valor es el que entiende el servidor (`Invoice`, `CREATE`); la etiqueta
+   * es la que entiende quien revisa. No se cambia el contrato, se traduce al
+   * pintarlo.
+   */
   const opcionesEntidad = useMemo(
-    () => catalogos.entidades.map((v) => ({ value: v, label: v })),
+    () =>
+      catalogos.entidades
+        .map((v) => ({ value: v, label: auditEntityLabel(v) }))
+        .sort((a, b) => a.label.localeCompare(b.label, "es")),
     [catalogos.entidades],
   );
 
   const opcionesAccion = useMemo(
-    () => catalogos.acciones.map((v) => ({ value: v, label: v })),
+    () =>
+      catalogos.acciones
+        .map((v) => ({ value: v, label: auditActionLabel(v) }))
+        .sort((a, b) => a.label.localeCompare(b.label, "es")),
     [catalogos.acciones],
   );
 
@@ -247,7 +263,9 @@ export default function AuditoriaPage() {
     const q = busqueda.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      `${r.user?.nombre ?? "Sistema"} ${r.user?.email ?? ""} ${r.action} ${r.entityType} ${r.entityId}`
+      `${r.user?.nombre ?? "Sistema"} ${r.user?.email ?? ""} ${r.action} ${auditActionLabel(
+        r.action,
+      )} ${r.entityType} ${auditEntityLabel(r.entityType)} ${r.entityId}`
         .toLowerCase()
         .includes(q),
     );
@@ -272,20 +290,26 @@ export default function AuditoriaPage() {
     {
       key: "action",
       label: "Acción",
-      render: (r) => <StatusDot label={r.action} tone={tonoAccion(r.action)} />,
+      render: (r) => (
+        <StatusDot label={auditActionLabel(r.action)} tone={tonoAccion(r.action)} title={r.action} />
+      ),
     },
     {
       // Sin `render` la celda salía VACÍA: `DataTable` no cae al valor de la
       // fila por su `key`, pinta cadena vacía. La columna «Entidad» llevaba
       // tiempo en blanco y el dato venía en cada evento.
       key: "entityType",
-      label: "Entidad",
+      label: "Tipo de registro",
       render: (r) =>
-        r.entityType || <span style={{ color: "var(--text-tertiary)" }}>—</span>,
+        r.entityType ? (
+          <span title={r.entityType}>{auditEntityLabel(r.entityType)}</span>
+        ) : (
+          <span style={{ color: "var(--text-tertiary)" }}>—</span>
+        ),
     },
     {
       key: "entityId",
-      label: "Registro",
+      label: "Número",
       align: "right",
       numeric: true,
       render: (r) => (r.entityId ? `#${r.entityId}` : "—"),
@@ -355,9 +379,9 @@ export default function AuditoriaPage() {
         hint: "Quién tocó algo en esta página",
       },
       {
-        label: "Entidades",
+        label: "Tipos de registro",
         value: loading ? "…" : new Set(filtradas.map((r) => r.entityType)).size,
-        hint: "Tipos de registro afectados",
+        hint: "Facturas, pólizas, proveedores…",
       },
       {
         label: "Bajas y rechazos",
@@ -406,7 +430,7 @@ export default function AuditoriaPage() {
 
       {error && (
         <InlineAlert
-          message={error}
+          message={`No se pudo cargar la bitácora. ${error} Reintenta; si sigue igual, avisa a soporte.`}
           variant="danger"
           onDismiss={() => setError(null)}
           action={
@@ -432,7 +456,7 @@ export default function AuditoriaPage() {
           onChange: setBusqueda,
           // El buscador no va al servidor: la API de auditoría no acepta texto
           // libre. Decirlo evita concluir «no existe» cuando solo no está aquí.
-          placeholder: "Filtrar esta página por usuario, acción o entidad…",
+          placeholder: "Filtrar esta página por usuario, acción o tipo de registro…",
         }}
         selects={[
           {
@@ -443,7 +467,7 @@ export default function AuditoriaPage() {
             allowAll: true,
           },
           {
-            label: "Entidad",
+            label: "Tipo de registro",
             value: fEntidad,
             onChange: filtrar(setFEntidad),
             options: opcionesEntidad,
@@ -472,7 +496,13 @@ export default function AuditoriaPage() {
       </p>
 
       <Section
-        title={loading ? "Cargando…" : `${filtradas.length} evento(s) en esta página`}
+        title={
+          loading
+            ? "Cargando…"
+            : `${filtradas.length} ${
+                filtradas.length === 1 ? "evento" : "eventos"
+              } en esta página`
+        }
         subtitle={
           !sinSesion && total > rows.length
             ? `${total.toLocaleString("es-MX")} eventos con estos filtros; se traen de ${LIMITE} en ${LIMITE}.`
@@ -563,7 +593,13 @@ export default function AuditoriaPage() {
       <Modal
         open={!!abierta}
         onClose={() => setAbierta(null)}
-        title={abierta ? `${abierta.action} · ${abierta.entityType} #${abierta.entityId}` : ""}
+        title={
+          abierta
+            ? `${auditActionLabel(abierta.action)} · ${auditEntityLabel(
+                abierta.entityType,
+              )} #${abierta.entityId}`
+            : ""
+        }
         maxWidth={780}
         footer={
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -755,7 +791,7 @@ export default function AuditoriaPage() {
                               wordBreak: "break-word",
                             }}
                           >
-                            {f.campo}
+                            <span title={f.campo}>{auditFieldLabel(f.campo)}</span>
                           </th>
                           <td
                             style={{

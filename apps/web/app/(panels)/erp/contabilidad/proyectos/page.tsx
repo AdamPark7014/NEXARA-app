@@ -398,7 +398,7 @@ export default function ContabilidadProyectosPage() {
       },
       {
         key: "estatus",
-        label: "Estatus",
+        label: "Estado",
         render: (r) => (
           <EstatusDot estatus={r.estatus} />
         ),
@@ -438,7 +438,7 @@ export default function ContabilidadProyectosPage() {
       },
       {
         key: "margenPct",
-        label: "% margen",
+        label: "% de margen",
         align: "right",
         numeric: true,
         render: (r) => <MargenPct pct={r.margenPct} />,
@@ -469,7 +469,7 @@ export default function ContabilidadProyectosPage() {
 
       {error && (
         <InlineAlert
-          message={`No se pudieron cargar los proyectos. ${error}`}
+          message={`No se pudieron cargar los proyectos. ${error} Reintenta; si sigue igual, avisa a soporte.`}
           onDismiss={() => setError(null)}
           action={
             <Button size="sm" variant="secondary" onClick={() => void load()}>
@@ -583,7 +583,7 @@ export default function ContabilidadProyectosPage() {
           </p>
         ) : detalleError ? (
           <InlineAlert
-            message={`No se pudo abrir el desglose. ${detalleError}`}
+            message={`No se pudo abrir el desglose de ${abierto?.titulo ?? "este proyecto"}. ${detalleError} Reintenta; el resto de la lista sigue disponible.`}
             action={
               abierto ? (
                 <Button size="sm" variant="secondary" onClick={() => void abrir(abierto)}>
@@ -664,7 +664,7 @@ export default function ContabilidadProyectosPage() {
                 />
                 <Dato label="Moneda" value={detalle.proyecto.moneda || "—"} />
                 <Dato
-                  label="Estatus"
+                  label="Estado"
                   value={<EstatusDot estatus={detalle.proyecto.estatus} />}
                 />
               </div>
@@ -719,7 +719,7 @@ export default function ContabilidadProyectosPage() {
 
             <Section
               title="Costos por categoría"
-              subtitle="El ancho de cada barra es su parte del costo. Haz clic para ver las transacciones que la forman."
+              subtitle="El ancho de cada barra es su parte del costo. Haz clic para ver los movimientos que la forman."
               dense
             >
               {detalle.categorias.length === 0 ? (
@@ -767,9 +767,11 @@ export default function ContabilidadProyectosPage() {
                   <Section
                     title={
                       detalle.categorias.find((c) => c.key === categoriaAbierta)?.label ??
-                      "Transacciones"
+                      "Movimientos"
                     }
-                    subtitle={`${transaccionesDeCategoria.length} movimiento(s) · haz clic en un renglón para ver el documento.`}
+                    subtitle={`${transaccionesDeCategoria.length} ${
+                      transaccionesDeCategoria.length === 1 ? "movimiento" : "movimientos"
+                    } · abre uno para ver su documento.`}
                     dense
                     flush
                     actions={
@@ -783,9 +785,9 @@ export default function ContabilidadProyectosPage() {
                       rowKey={(t) => t.key}
                       density="compact"
                       stickyHeader={false}
-                      ariaLabel="Transacciones por categoría"
+                      ariaLabel="Movimientos por categoría"
                       onRowClick={(t) => setDocumento(t)}
-                      emptyTitle="Sin transacciones"
+                      emptyTitle="Sin movimientos"
                       emptyDescription="Esta categoría no tiene movimientos individuales registrados."
                       columns={[
                         { key: "fecha", label: "Fecha", render: (t) => fecha(t.fecha) },
@@ -816,7 +818,7 @@ export default function ContabilidadProyectosPage() {
                         },
                         {
                           key: "estatus",
-                          label: "Estatus",
+                          label: "Estado",
                           render: (t) => <EstatusDot estatus={t.estatus} />,
                         },
                       ]}
@@ -860,7 +862,7 @@ export default function ContabilidadProyectosPage() {
                     },
                     {
                       key: "estatus",
-                      label: "Estatus",
+                      label: "Estado",
                       render: (f) => (
                         <EstatusDot estatus={f.estatus} />
                       ),
@@ -922,7 +924,7 @@ export default function ContabilidadProyectosPage() {
               }}
             >
               <Dato label="Fecha" value={fecha(documento.fecha)} />
-              <Dato label="Estatus" value={<EstatusDot estatus={documento.estatus} />} />
+              <Dato label="Estado" value={<EstatusDot estatus={documento.estatus} />} />
             </div>
             <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
               Registro #{documento.refId} en {TIPO_TX[documento.tipo] ?? documento.tipo}.

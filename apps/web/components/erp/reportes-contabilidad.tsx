@@ -71,6 +71,19 @@ export type DetalleReporte = {
 
 export const hoyIso = () => new Date().toISOString().slice(0, 10);
 
+/**
+ * `2026-09-20` → `20 sep 2026`. Las fechas del API viajan en ISO porque así se
+ * comparan; nadie las lee así. Si no es una fecha se devuelve tal cual: no se
+ * inventa una.
+ */
+export function fechaLegible(iso: string | null | undefined): string {
+  const raw = (iso ?? "").trim();
+  if (!raw) return "—";
+  const d = new Date(raw.length <= 10 ? `${raw}T12:00:00` : raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export const inicioDeMesIso = () => {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
@@ -133,6 +146,11 @@ export function Celda({ valor, tipo }: { valor: unknown; tipo: TipoColumna }): R
   if (tipo === "numero") return <span style={{ fontVariantNumeric: "tabular-nums" }}>{formateadorNumero.format(Number(valor) || 0)}</span>;
   if (tipo === "porcentaje") {
     return <span style={{ fontVariantNumeric: "tabular-nums" }}>{(Number(valor) || 0).toFixed(1)}%</span>;
+  }
+  if (tipo === "fecha") {
+    return (
+      <span style={{ fontVariantNumeric: "tabular-nums" }}>{fechaLegible(String(valor))}</span>
+    );
   }
   return <span>{String(valor)}</span>;
 }
@@ -250,7 +268,7 @@ export function Resumen({ items }: { items: Array<{ etiqueta: string; valor: num
 }
 
 /**
- * Detalle de una línea: las transacciones que la forman. Pide el detalle al
+ * Detalle de una línea: los movimientos que la forman. Pide el detalle al
  * abrirse, con los mismos filtros con los que se calculó el reporte.
  */
 export function DetalleModal({
@@ -301,15 +319,25 @@ export function DetalleModal({
 
   return (
     <Modal open={abierto} onClose={onClose} title={titulo} maxWidth={900}>
-      {error && <InlineAlert message={error} />}
+      {error && (
+        <InlineAlert
+          variant="danger"
+          message={`No se pudo abrir el detalle de esta línea. ${error} Cierra y vuelve a abrirla; si sigue igual, exporta el reporte.`}
+        />
+      )}
       {cargando ? (
         <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando el detalle…</p>
       ) : !detalle ? (
-        error ? null : <EmptyState title="Sin detalle" description="No hay transacciones para esta línea." />
+        error ? null : (
+          <EmptyState
+            title="Sin detalle"
+            description="Esta línea no trae movimientos que desglosar."
+          />
+        )
       ) : detalle.filas.length === 0 ? (
         <EmptyState
-          title="Sin transacciones"
-          description="Esta línea no tiene movimientos registrados en el periodo seleccionado."
+          title="Sin movimientos"
+          description="Esta línea no tiene movimientos registrados en el periodo elegido."
         />
       ) : (
         <>

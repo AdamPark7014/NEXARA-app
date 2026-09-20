@@ -7,7 +7,7 @@ export default function ContabilidadFacturasPage() {
     <ContabilidadInvoicesView
       mode="all"
       title="Facturas"
-      subtitle="Documentos emitidos y recibidos. El detalle se abre al elegir una fila."
+      subtitle="Lo que emitiste y lo que te facturaron, con su saldo y su vencimiento."
     />
   );
 }
