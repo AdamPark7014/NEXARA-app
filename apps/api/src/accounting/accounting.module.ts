@@ -10,6 +10,8 @@ import { InvoicesController } from './invoices.controller.js';
 import { BankingController } from './banking.controller.js';
 import { BudgetsController } from './budgets.controller.js';
 import { AccountingWorkspaceController } from './workspace.controller.js';
+import { AccountingWorkspaceReportsController } from './workspace-reports.controller.js';
+import { AccountingWorkspaceReportsService } from './workspace-reports.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule],
@@ -20,8 +22,9 @@ import { AccountingWorkspaceController } from './workspace.controller.js';
     BankingController,
     BudgetsController,
     AccountingWorkspaceController,
+    AccountingWorkspaceReportsController,
   ],
-  providers: [AccountingService],
+  providers: [AccountingService, AccountingWorkspaceReportsService],
   exports: [AccountingService],
 })
 export class AccountingModule {}

@@ -1,101 +1,358 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
+import ListExportActions from "@/components/ui/ListExportActions";
+import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
+import {
+  Celda,
+  DetalleModal,
+  Variacion,
+  descargarCsv,
+  hoyIso,
+  inicioDeMesIso,
+  pedirJson,
+  queryString,
+} from "@/components/erp/reportes-contabilidad";
 
-type BudgetRow = {
-  id: number;
-  name: string;
+type LineaComparativo = {
+  clave: string;
+  costCenterId: number;
+  centro: string;
+  presupuesto: string;
   year: number;
-  month?: number | null;
-  plannedAmount: number | string;
-  actualAmount: number | string;
-  costCenter?: { name?: string } | null;
+  month: number | null;
+  periodo: string;
+  planeado: number;
+  real: number;
+  variacion: number;
+  variacionPct: number;
 };
 
+type FilaCentro = {
+  costCenterId: number;
+  centro: string;
+  planeado: number;
+  real: number;
+  variacion: number;
+  variacionPct: number;
+};
+
+type Comparativo = {
+  periodo: { from: string; to: string };
+  centros: Array<{ id: number; etiqueta: string }>;
+  lineas: LineaComparativo[];
+  porCentro: FilaCentro[];
+  totales: { planeado: number; real: number; variacion: number; variacionPct: number };
+  nota: string | null;
+};
+
+/**
+ * Presupuesto contra real.
+ *
+ * Variación positiva = quedó presupuesto sin gastar. Negativa = se pasó. Se
+ * marca con el signo y un rojo sobrio, no con semáforos.
+ */
 export default function PresupuestosPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
-  const [rows, setRows] = useState<BudgetRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const [from, setFrom] = useState(inicioDeMesIso);
+  const [to, setTo] = useState(hoyIso);
+  const [centroId, setCentroId] = useState("");
+
+  const [data, setData] = useState<Comparativo | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [exportando, setExportando] = useState(false);
+  const [detalle, setDetalle] = useState<{ titulo: string; path: string } | null>(null);
+
+  const filtros = useMemo(() => ({ from, to, costCenterId: centroId }), [from, to, centroId]);
+
+  const cargar = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    setCargando(true);
     setError(null);
     try {
-      const res = await fetch(buildApiUrl("accounting/budgets"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setRows(Array.isArray(data) ? data : data?.items ?? []);
+      const res = await pedirJson<Comparativo>(
+        `accounting/workspace/presupuestos/comparativo${queryString(filtros)}`,
+        token,
+      );
+      setData(res);
     } catch (e) {
       setError(formatApiError(e));
-      setRows([]);
+      setData(null);
     } finally {
-      setLoading(false);
+      setCargando(false);
     }
-  }, [token]);
+  }, [token, filtros]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void cargar();
+  }, [cargar]);
 
-  const columns: Column<BudgetRow>[] = [
-    { key: "name", label: "Presupuesto" },
-    { key: "cc", label: "Centro", render: (r) => r.costCenter?.name || "—" },
-    { key: "period", label: "Periodo", render: (r) => `${r.year}${r.month ? `-${String(r.month).padStart(2, "0")}` : ""}` },
-    {
-      key: "planned",
-      label: "Plan",
-      align: "right",
-      numeric: true,
-      render: (r) => <Money value={Number(r.plannedAmount || 0)} />,
-    },
-    {
-      key: "actual",
-      label: "Real",
-      align: "right",
-      numeric: true,
-      render: (r) => <Money value={Number(r.actualAmount || 0)} />,
-    },
-    {
-      key: "var",
-      label: "Variación",
-      align: "right",
-      numeric: true,
-      render: (r) => {
-        const v = Number(r.plannedAmount || 0) - Number(r.actualAmount || 0);
-        return <Money value={v} />;
+  const exportar = async () => {
+    if (!token) return;
+    setExportando(true);
+    setError(null);
+    try {
+      await descargarCsv(
+        `accounting/workspace/presupuestos/comparativo/export${queryString(filtros)}`,
+        token,
+        "presupuesto-vs-real.csv",
+      );
+    } catch (e) {
+      setError(formatApiError(e));
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  const abrirDetalle = (fila: { costCenterId: number; centro: string; year?: number; month?: number | null; periodo?: string }) => {
+    setDetalle({
+      titulo: `${fila.centro}${fila.periodo ? ` · ${fila.periodo}` : ""}`,
+      path: `accounting/workspace/presupuestos/comparativo/detalle${queryString({
+        costCenterId: fila.costCenterId,
+        year: fila.year ?? new Date(to).getFullYear(),
+        month: fila.month ?? null,
+      })}`,
+    });
+  };
+
+  const columnasLinea: Column<LineaComparativo>[] = useMemo(
+    () => [
+      { key: "centro", label: "Centro de costo" },
+      { key: "presupuesto", label: "Presupuesto" },
+      { key: "periodo", label: "Periodo" },
+      {
+        key: "planeado",
+        label: "Presupuestado",
+        align: "right",
+        numeric: true,
+        render: (r) => <Money value={r.planeado} bold={false} />,
       },
-    },
-  ];
+      {
+        key: "real",
+        label: "Real",
+        align: "right",
+        numeric: true,
+        render: (r) => <Money value={r.real} bold={false} />,
+      },
+      {
+        key: "variacion",
+        label: "Variación",
+        align: "right",
+        numeric: true,
+        render: (r) => <Variacion valor={r.variacion} porcentaje={r.variacionPct} />,
+      },
+    ],
+    [],
+  );
+
+  const columnasCentro: Column<FilaCentro>[] = useMemo(
+    () => [
+      { key: "centro", label: "Centro de costo" },
+      {
+        key: "planeado",
+        label: "Presupuestado",
+        align: "right",
+        numeric: true,
+        render: (r) => <Money value={r.planeado} bold={false} />,
+      },
+      { key: "real", label: "Real", align: "right", numeric: true, render: (r) => <Money value={r.real} bold={false} /> },
+      {
+        key: "variacion",
+        label: "Variación",
+        align: "right",
+        numeric: true,
+        render: (r) => <Variacion valor={r.variacion} porcentaje={r.variacionPct} />,
+      },
+    ],
+    [],
+  );
+
+  const resumen = data
+    ? [
+        { etiqueta: "Presupuestado", valor: data.totales.planeado },
+        { etiqueta: "Real", valor: data.totales.real },
+      ]
+    : [];
 
   return (
     <>
       <PageHeader
         eyebrow="Contabilidad"
         title="Presupuestos"
-        subtitle="Plan vs real por centro de costo."
+        subtitle="Presupuestado contra lo que de verdad se gastó, por centro de costo y periodo."
         density="ops"
-        actions={<Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>Actualizar</Button>}
+        actions={
+          <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <ListExportActions
+              onExcel={() => void exportar()}
+              excelBusy={exportando}
+              excelDisabled={cargando || !data || data.lineas.length === 0}
+            />
+            <Button size="sm" variant="ghost" onClick={() => void cargar()} disabled={cargando}>
+              Actualizar
+            </Button>
+          </div>
+        }
       />
-      {error && <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
-      {loading ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando…</p>
-      ) : rows.length === 0 ? (
-        <EmptyState title="Sin presupuestos" description="Crea presupuestos desde Contabilidad general." />
+
+      {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
+
+      <div style={{ marginBottom: 12 }}>
+        <FilterToolbar
+          dates={[
+            { label: "Desde", value: from, onChange: setFrom },
+            { label: "Hasta", value: to, onChange: setTo },
+          ]}
+          selects={[
+            {
+              label: "Centro de costo",
+              value: centroId,
+              onChange: setCentroId,
+              options: (data?.centros ?? []).map((c) => ({ value: String(c.id), label: c.etiqueta })),
+              allLabel: "Todos los centros",
+            },
+          ]}
+          onClear={() => {
+            setFrom(inicioDeMesIso());
+            setTo(hoyIso());
+            setCentroId("");
+          }}
+          resultCount={data?.lineas.length ?? null}
+        />
+      </div>
+
+      {cargando ? (
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Comparando presupuesto contra real…</p>
+      ) : !data ? (
+        error ? null : <EmptyState title="Sin datos" description="Ajusta el periodo y vuelve a intentar." />
+      ) : data.lineas.length === 0 ? (
+        <EmptyState
+          title="Sin presupuestos en este periodo"
+          description="No hay presupuestos que caigan dentro del rango elegido. Créalos desde Contabilidad general o amplía el periodo."
+        />
       ) : (
-        <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} density="compact" />
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+              gap: 10,
+              marginBottom: 12,
+            }}
+          >
+            {resumen.map((k) => (
+              <div
+                key={k.etiqueta}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "var(--nx-panel-radius)",
+                  border: "1px solid var(--nx-panel-hairline)",
+                  background: "var(--surface)",
+                }}
+              >
+                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)" }}>
+                  {k.etiqueta}
+                </div>
+                <div style={{ marginTop: 4, fontSize: 18 }}>
+                  <Celda valor={k.valor} tipo="moneda" />
+                </div>
+              </div>
+            ))}
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: "var(--nx-panel-radius)",
+                border: "1px solid var(--nx-panel-hairline)",
+                background: "var(--surface)",
+              }}
+            >
+              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)" }}>
+                Variación
+              </div>
+              <div style={{ marginTop: 4, fontSize: 18 }}>
+                <Variacion valor={data.totales.variacion} porcentaje={data.totales.variacionPct} />
+              </div>
+            </div>
+          </div>
+
+          {data.porCentro.length > 1 && (
+            <Section title="Por centro de costo" dense flush>
+              <DataTable
+                columns={columnasCentro}
+                rows={data.porCentro}
+                rowKey={(r) => r.costCenterId}
+                density="compact"
+                stickyHeader={false}
+                onRowClick={(r) => abrirDetalle({ ...r, year: new Date(data.periodo.to).getFullYear(), month: null })}
+              />
+            </Section>
+          )}
+
+          <div style={{ marginTop: data.porCentro.length > 1 ? 12 : 0 }}>
+            <DataTable
+              columns={columnasLinea}
+              rows={data.lineas}
+              rowKey={(r) => r.clave}
+              density="compact"
+              onRowClick={abrirDetalle}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 8,
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 24,
+              padding: "10px 16px",
+              borderRadius: "var(--nx-panel-radius)",
+              border: "1px solid var(--nx-panel-hairline)",
+              background: "var(--surface-2)",
+              fontSize: 12.5,
+            }}
+          >
+            <span style={{ color: "var(--text-secondary)", fontWeight: 700 }}>Total</span>
+            <span>
+              <span style={{ color: "var(--text-tertiary)", marginRight: 6 }}>Presupuestado</span>
+              <Money value={data.totales.planeado} bold={false} />
+            </span>
+            <span>
+              <span style={{ color: "var(--text-tertiary)", marginRight: 6 }}>Real</span>
+              <Money value={data.totales.real} bold={false} />
+            </span>
+            <span>
+              <span style={{ color: "var(--text-tertiary)", marginRight: 6 }}>Variación</span>
+              <Variacion valor={data.totales.variacion} porcentaje={data.totales.variacionPct} />
+            </span>
+          </div>
+
+          {data.nota && (
+            <p style={{ marginTop: 10, fontSize: 12, color: "var(--text-tertiary)" }}>{data.nota}</p>
+          )}
+          <p style={{ marginTop: 6, fontSize: 12, color: "var(--text-tertiary)" }}>
+            Haz clic en una línea para ver las pólizas que formaron el «real».
+          </p>
+        </>
       )}
+
+      <DetalleModal
+        abierto={Boolean(detalle)}
+        titulo={detalle?.titulo ?? ""}
+        path={detalle?.path ?? null}
+        token={token}
+        onClose={() => setDetalle(null)}
+      />
     </>
   );
 }
