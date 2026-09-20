@@ -329,3 +329,15 @@ tres escalas paralelas.
 - [ ] Sombra dentro de la escala `--ui-elev-*`. Sin `backdrop-filter`, sin degradados.
 - [ ] Radios y espaciado de la escala, sin valores intermedios.
 - [ ] Foco visible con `--ui-ring`.
+
+
+## Tintas de chrome de navegación
+
+| Token | Para qué | Por qué existe |
+|-------|----------|----------------|
+| `--ui-fg-label` | Micro-etiquetas de grupo del sidebar (HOY, FINANZAS, MI CUENTA) | `--ui-fg-3` da 2.8:1 sobre blanco: vale para un separador, no para texto |
+| `--ui-icon` | Icono de un elemento de navegación inactivo | Mismo motivo: un icono que hay que reconocer necesita ~4.5:1 |
+
+Tres agentes tropezaron con esto por separado y cada uno lo resolvió con una
+mezcla local distinta. Si necesitas una tinta apagada **que se tenga que leer**,
+usa estos dos y no `--ui-fg-3`.

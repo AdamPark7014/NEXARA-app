@@ -123,6 +123,15 @@
   --ui-fg-muted: var(--ui-fg-3);
   --ui-fg-on-brand: #ffffff;
 
+  /* Tintas de chrome de navegación.
+     `--ui-fg-3` (#94a3b8) da 2.8:1 sobre blanco: sirve para un separador, no
+     para texto ni para un icono que hay que reconocer. Tres agentes lo
+     resolvieron por su cuenta con mezclas locales; se sube aquí para que no
+     haya tres respuestas distintas a la misma pregunta.
+     Micro-etiqueta de grupo (HOY, FINANZAS): ~6.5:1. Icono inactivo: ~4.8:1. */
+  --ui-fg-label: #5b6b80;
+  --ui-icon: #64748b;
+
   /* ----------------------------------------------------------
      Bordes · tres pesos
      ---------------------------------------------------------- */
@@ -253,6 +262,9 @@ body.dark {
   --ui-fg-3: #64748b;
   --ui-fg-4: #4a5569;
   --ui-fg-on-brand: #ffffff;
+  /* En oscuro la tinta sube en vez de bajar; mismos papeles, mismo contraste. */
+  --ui-fg-label: #9aa8bd;
+  --ui-icon: #8b9ab0;
 
   /* Bordes */
   --ui-border-subtle: #16202f;
