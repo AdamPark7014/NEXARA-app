@@ -299,6 +299,60 @@ export async function definirCamposEvidencia(
 }
 
 /**
+ * `POST activity-evidence/:id/campos/:fieldId/foto` — mismo cuerpo que entrada/salida:
+ * `photoUrl` puede ser data URL; la API la guarda en disco. Responde la lista completa.
+ */
+export async function guardarFotoDeCampo(
+  token: string,
+  activityId: number,
+  fieldId: number,
+  body: {
+    momento: Momento;
+    photoUrl: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    capturedAt?: string | null;
+  },
+): Promise<CampoEvidencia[]> {
+  const data = await erpFetch<CampoEvidencia[] | null>(
+    `activity-evidence/${activityId}/campos/${fieldId}/foto`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        momento: body.momento,
+        photoUrl: body.photoUrl,
+        ...(body.latitude != null ? { latitude: body.latitude } : {}),
+        ...(body.longitude != null ? { longitude: body.longitude } : {}),
+        ...(body.capturedAt != null ? { capturedAt: body.capturedAt } : {}),
+      }),
+    },
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+/** Quita la foto de un hueco (campo × momento); el hueco vuelve a pendiente. */
+export async function quitarFotoDeCampo(
+  token: string,
+  activityId: number,
+  fieldId: number,
+  momento: Momento,
+): Promise<CampoEvidencia[]> {
+  const data = await erpFetch<CampoEvidencia[] | null>(
+    `activity-evidence/${activityId}/campos/${fieldId}/foto/quitar`,
+    token,
+    { method: "POST", body: JSON.stringify({ momento }) },
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+/** Huecos pendientes en toda la actividad (campo × momento). */
+export function faltanFotosDeCampos(campos: readonly CampoEvidencia[]): number {
+  const { requeridas, cumplidas } = progresoDeCampos(campos);
+  return Math.max(0, requeridas - cumplidas);
+}
+
+/**
  * «Descargar evidencia»: el ZIP con la carpeta de la actividad. Va con la sesión (cookie +
  * Bearer) como las demás descargas; un `<a href>` suelto no la manda y la API responde 401.
  */

@@ -111,6 +111,7 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
   const onReject = async (id: number) => {
     if (!token) return;
     const reason = (rejectDraft[id] ?? "").trim();
+    if (reason.length < 3) return;
     setBusyId(id);
     try {
       await rejectPeerRequest(token, id, reason);
@@ -233,16 +234,27 @@ export default function SolicitudesEquipoView({ token }: { token: string | null 
                       >
                         Aceptar
                       </Button>
-                      <input
-                        className={fieldClass}
-                        placeholder="Motivo si rechazas"
-                        value={rejectDraft[r.id] ?? ""}
-                        onChange={(e) => setRejectDraft((d) => ({ ...d, [r.id]: e.target.value }))}
-                        style={{ flex: 1, minWidth: 120, minHeight: 40, fontSize: 16 }}
-                      />
+                      <div style={{ flex: 1, minWidth: 120, display: "grid", gap: 4 }}>
+                        <input
+                          className={fieldClass}
+                          placeholder="Motivo si rechazas"
+                          value={rejectDraft[r.id] ?? ""}
+                          onChange={(e) => setRejectDraft((d) => ({ ...d, [r.id]: e.target.value }))}
+                          aria-describedby={`reject-hint-${r.id}`}
+                          style={{ width: "100%", minHeight: 40, fontSize: 16 }}
+                        />
+                        {(rejectDraft[r.id] ?? "").trim().length < 3 ? (
+                          <span
+                            id={`reject-hint-${r.id}`}
+                            style={{ fontSize: 12, color: "var(--text-tertiary)" }}
+                          >
+                            Escribe al menos 3 caracteres para poder rechazar.
+                          </span>
+                        ) : null}
+                      </div>
                       <Button
                         onClick={() => void onReject(r.id)}
-                        disabled={busyId === r.id}
+                        disabled={busyId === r.id || (rejectDraft[r.id] ?? "").trim().length < 3}
                         style={{ minHeight: 40 }}
                       >
                         Rechazar

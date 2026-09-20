@@ -2,26 +2,30 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** `7322717c` (en Hetzner; web+api healthy)
-- **Migraciones:** ya aplicadas `2026092001*`
+- **Rama:** feat/hard-act-flow
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-hard-act-flow`
+- **HEAD:** (este commit)
 
-## Puente — no cambiar
+## Hecho este turno (audit hard-act-flow)
 
-NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
+1. **Web field-photo capture:** `ActivityEvidenceFlow` carga `campos` del GET evidence; si hay campos, captura ANTES/EN_PROGRESO/DESPUES vía `POST activity-evidence/:id/campos/:fieldId/foto` (`guardarFotoDeCampo` / `quitarFotoDeCampo` en `evidencia-campos.ts`). Avance del paso manda `photoUrls: []` para no duplicar en ZIP.
+2. **Gallery UX:** click en miniatura abre lightbox; borrar solo con ✕ / «Quitar foto».
+3. **Peer reject:** `SolicitudesEquipoView` deshabilita Rechazar hasta `rejectReason.trim().length >= 3` + hint inline.
+4. **AsignadasPorMiView:** chips cliente semáforo / excedida / terminada + select persona; helper `filtrarAsignadasPorMi` + spec.
+5. Tests: `evidencia-campos.spec.ts` (+faltanFotosDeCampos) y `AsignadasPorMiView.spec.ts` — 27 verdes.
 
-## Hecho este turno (optimización densidad · 4 agentes)
+## No tocado (por diseño / conflicto)
 
-1. **Shell** (`58241797`): menos padding PageHeader / Section / PanelTabs / KpiCard.
-2. **Organigrama** (`8725d527`): KPIs + depto en franja; nodos ~204px.
-3. **Almacén** (`ea1b5ddd`): sin doble chrome embedded; herramientas densas; fotos 140px.
-4. **section-views** (`2e2a6b10`): copy Core corto; tools manage para admin/warehouse.
+- Mis actividades → PersonaPhotoCard (dos layouts se mantienen).
+- EquipoEvidencias (otro worktree hard-act-photos).
+- CFDI, ZIP download intacto.
 
 ## Siguiente
 
-- QA visual en prod tras deploy.
-- Rotar Maps key / contraseñas: lado Adam.
+- Merge con hard-act-photos / rama base cuando Adam diga.
+- QA manual: actividad con campos en web + rechazo peer + filtros asignadas.
+- EXEC-PACKET del repo sigue siendo el de Core UX 13-09 (stale); este turno siguió el brief del audit.
 
 ## No tocar
 
-Puente NAS.
+Puente NAS Synology `192.168.9.32` / `nas-nexara`.
