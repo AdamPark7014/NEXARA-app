@@ -98,6 +98,10 @@ export async function createStockMovement(
     purchaseOrderId?: number;
     productionOrderId?: number;
     activityId?: number;
+    /** Norma de empaque: presentación elegida y lo que tecleó la persona («3 cajas»). */
+    packagingId?: number;
+    unidadCaptura?: string;
+    cantidadCapturada?: number;
   },
 ) {
   return stockRequest<unknown>("stock/movements", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo registrar el movimiento");
@@ -116,6 +120,10 @@ export type StockMovementRow = {
   totalCost?: number | string;
   reference?: string | null;
   notes?: string | null;
+  /** Empaque con que se capturó: `quantity` sigue en unidad base. */
+  unidadCaptura?: string | null;
+  factorConversion?: number | string | null;
+  cantidadCapturada?: number | string | null;
   createdAt: string;
   product?: { id: number; name: string; sku: string } | null;
   fromWarehouse?: { id: number; name: string; code?: string } | null;
