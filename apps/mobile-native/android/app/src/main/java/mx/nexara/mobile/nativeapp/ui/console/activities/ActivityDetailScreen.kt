@@ -289,6 +289,11 @@ fun ActivityDetailScreen(
                             topContent = {
                                 // «Iniciar actividad»: la única acción de quien la recibe (aquí cae el push).
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    // El checklist va antes del trabajo: sin palomearlo, `iniciar` da 400.
+                                    HerramientasChecklistSection(
+                                        activityId = detail.id,
+                                        refreshKey = recarga,
+                                    )
                                     if (puedeIniciar) {
                                         IniciarActividadBanner(
                                             onIniciar = {

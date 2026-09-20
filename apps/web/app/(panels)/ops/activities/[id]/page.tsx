@@ -9,6 +9,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
 import EquipoEvidencias from "@/components/ops/EquipoEvidencias";
 import EvidenciaPorCampos from "@/components/ops/EvidenciaPorCampos";
+import HerramientasChecklist from "@/components/ops/HerramientasChecklist";
 import CotizacionDeActividad, { type CotizacionLigada } from "@/components/erp/CotizacionDeActividad";
 import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import ActivitySuperiorActions from "@/components/ops/ActivitySuperiorActions";
@@ -592,6 +593,9 @@ export default function ActivityDetailPage() {
           />
         </DetailSection>
       ) : null}
+
+      {/* El checklist va antes de la evidencia: se revisa lo que se lleva y luego se trabaja. */}
+      <HerramientasChecklist activityId={activity.id} style={{ margin: "20px 0" }} />
 
       <DetailSection title="Evidencias del equipo">
         <EquipoEvidencias activityId={activity.id} compact verMasHref={hrefs.evidences} />

@@ -861,6 +861,67 @@ struct EvidenceFlowActivityInfo: Decodable, Hashable {
     let estatus: String?
 }
 
+// MARK: - Checklist de herramientas (GET me/activities/:id/herramientas)
+
+/// Producto del catálogo que respalda un renglón (material de consumo).
+struct HerramientaProducto: Decodable, Hashable {
+    let id: Int?
+    let sku: String?
+    let nombre: String?
+}
+
+/// Herramienta concreta del inventario (por número de serie).
+struct HerramientaInventario: Decodable, Hashable {
+    let id: Int?
+    let nombre: String?
+    let serie: String?
+}
+
+/// Último palomeo de un renglón; nulo = nadie lo ha revisado.
+struct HerramientaCheck: Decodable, Hashable {
+    let ok: Bool?
+    let nota: String?
+    let fotoUrl: String?
+    let at: String?
+    let por: EvidenceCampoFotoAutor?
+}
+
+/// Un renglón del checklist: qué hay que llevar y si ya se palomeó.
+/// Espejo de `RequisitoConCheck` en
+/// apps/api/src/activities/tools/herramientas-checklist.helpers.ts.
+struct HerramientaRequisito: Decodable, Hashable, Identifiable {
+    let id: Int?
+    let descripcion: String?
+    let cantidad: Double?
+    let productId: Int?
+    let producto: HerramientaProducto?
+    let toolId: Int?
+    let herramienta: HerramientaInventario?
+    let check: HerramientaCheck?
+
+    /// Un renglón cuenta como listo SOLO con un palomeo en `ok`: marcarlo
+    /// «falta o está dañado» es justamente lo que no deja arrancar.
+    var listo: Bool { check?.ok == true }
+
+    /// Clave estable para `ForEach` aunque el API no mande id.
+    var rowKey: String { "\(id ?? 0)-\(descripcion ?? "")" }
+}
+
+/// Estado completo del checklist. Lo devuelven el GET y el POST de palomeo.
+struct HerramientasChecklist: Decodable, Hashable {
+    let activityId: Int?
+    let requisitos: [HerramientaRequisito]?
+    let total: Int?
+    let listos: Int?
+    let pendientes: [String]?
+    let completo: Bool?
+
+    var items: [HerramientaRequisito] { requisitos ?? [] }
+    var listosCount: Int { listos ?? items.filter(\.listo).count }
+    var totalCount: Int { total ?? items.count }
+    var estaCompleto: Bool { completo ?? items.allSatisfy(\.listo) }
+}
+
 /// Un «campo» que hay que fotografiar («Cámara 1», «Rack») y en qué momentos.
 /// Espejo de `CampoDto` en apps/api/src/activities/evidence/activity-evidence-fields.service.ts.
 struct EvidenceCampo: Decodable, Hashable {

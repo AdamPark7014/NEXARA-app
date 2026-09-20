@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { MyActivitiesService } from './my-activities.service.js';
 import { MENSAJE_SIN_RECHAZO } from '../activities/actividad-tiempos.js';
 
@@ -21,7 +21,7 @@ function fila(over: Record<string, unknown> = {}) {
   };
 }
 
-function build(row: unknown) {
+function build(row: unknown, checklist?: { asertar?: jest.Mock }) {
   const prisma = {
     activityAssignee: {
       findFirst: jest.fn().mockResolvedValue(row),
@@ -30,14 +30,19 @@ function build(row: unknown) {
     activity: { update: jest.fn().mockResolvedValue({}) },
   };
   const notificationHierarchy = { notifyActivityStartedByAssignee: jest.fn() };
+  // Sin checklist de herramientas el candado no hace nada: la OT arranca igual.
+  const activityTools = {
+    asertarChecklistCompleto: checklist?.asertar ?? jest.fn().mockResolvedValue(undefined),
+  };
   const service = new MyActivitiesService(
     prisma as any,
     {} as any,
     {} as any,
     {} as any,
     notificationHierarchy as any,
+    activityTools as any,
   );
-  return { service, prisma, notificationHierarchy };
+  return { service, prisma, notificationHierarchy, activityTools };
 }
 
 describe('iniciar actividad', () => {
@@ -90,6 +95,24 @@ describe('iniciar actividad', () => {
   it('si no es suya no inicia nada', async () => {
     const { service } = build(null);
     await expect(service.iniciar(VIEWER, 7, 10)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('revisa el checklist de herramientas antes de tocar nada', async () => {
+    const { service, activityTools } = build(fila());
+    await service.iniciar(VIEWER, 7, 10);
+    expect(activityTools.asertarChecklistCompleto).toHaveBeenCalledWith(10, 7);
+  });
+
+  it('con herramientas sin palomear no arranca ni marca la hora', async () => {
+    const asertar = jest
+      .fn()
+      .mockRejectedValue(new BadRequestException('Falta palomear el checklist de herramientas'));
+    const { service, prisma, notificationHierarchy } = build(fila(), { asertar });
+
+    await expect(service.iniciar(VIEWER, 7, 10)).rejects.toThrow(/checklist de herramientas/);
+    expect(prisma.activityAssignee.update).not.toHaveBeenCalled();
+    expect(prisma.activity.update).not.toHaveBeenCalled();
+    expect(notificationHierarchy.notifyActivityStartedByAssignee).not.toHaveBeenCalled();
   });
 });
 

@@ -10,6 +10,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
+import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from '../warehouse/empaque.js';
 import { generatePurchaseOrderPdf, type PurchaseOrderPdfPayload } from './purchase-order-pdf.js';
 import { generateGoodsReceiptPdf, type GoodsReceiptPdfPayload } from './goods-receipt-pdf.js';
 
@@ -24,6 +25,36 @@ export class ProcurementService {
     private readonly audit: AuditService,
     private readonly folio: FolioService,
   ) {}
+
+  /**
+   * Presentaciones de varios productos de un jalón: la orden de compra trae muchas
+   * partidas y una consulta por partida eran N viajes a la base por orden.
+   */
+  private async empaquesDeProductos(
+    productIds: Array<number | undefined>,
+    companyId: number,
+  ): Promise<Map<number, Empaque[]>> {
+    const ids = [...new Set(productIds.filter((id): id is number => typeof id === 'number'))];
+    const mapa = new Map<number, Empaque[]>();
+    if (!ids.length) return mapa;
+
+    const filas = await this.prisma.productPackaging.findMany({
+      where: { productId: { in: ids }, ...companyWhere(companyId) },
+      select: { id: true, productId: true, nombre: true, piezasPorUnidad: true, esDefaultCompra: true },
+      orderBy: [{ esDefaultCompra: 'desc' }, { piezasPorUnidad: 'desc' }],
+    });
+    for (const fila of filas) {
+      const lista = mapa.get(fila.productId) ?? [];
+      lista.push({
+        id: fila.id,
+        nombre: fila.nombre,
+        piezasPorUnidad: Number(fila.piezasPorUnidad),
+        esDefaultCompra: fila.esDefaultCompra,
+      });
+      mapa.set(fila.productId, lista);
+    }
+    return mapa;
+  }
 
   // ── Purchase Requisitions ─────────────────────────────────────────
   private generateReqNumber(companyId: number): Promise<string> {
@@ -221,7 +252,21 @@ export class ProcurementService {
     shippingAddress?: string;
     notes?: string;
     companyId?: number | null;
-    items: Array<{ productId?: number; description: string; quantity: number; unitPrice: number; taxRate?: number }>;
+    items: Array<{
+      productId?: number;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      taxRate?: number;
+      /**
+       * Norma de empaque: se pide en cajas y se guarda en piezas. `unitPrice` sigue
+       * siendo el precio de la **unidad base**, para no descuadrar recepciones ni
+       * facturas; lo que cambia es la cantidad.
+       */
+      packagingId?: number;
+      unidadCaptura?: string;
+      cantidadCapturada?: number;
+    }>;
   }, userId: number) {
     if (!dto.supplierId && !dto.supplierName) {
       throw new BadRequestException('Se requiere supplierId o supplierName');
@@ -256,12 +301,38 @@ export class ProcurementService {
     ]);
 
     const poNumber = await this.generatePONumber(companyId);
-    const items = dto.items.map((i) => ({
-      ...i,
-      total: i.quantity * i.unitPrice * (1 + (i.taxRate || 0) / 100),
-    }));
-    const subtotal = dto.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-    const taxAmount = dto.items.reduce((s, i) => s + i.quantity * i.unitPrice * ((i.taxRate || 0) / 100), 0);
+
+    // Quien compra teclea «3 cajas»; la partida queda en piezas y conserva lo tecleado.
+    const empaquesPorProducto = await this.empaquesDeProductos(
+      dto.items.map((i) => i.productId),
+      companyId,
+    );
+    const items = dto.items.map((i) => {
+      let captura;
+      try {
+        captura = convertirCaptura(
+          {
+            packagingId: i.packagingId,
+            unidadCaptura: i.unidadCaptura,
+            cantidadCapturada: i.cantidadCapturada,
+            quantity: i.quantity,
+          },
+          i.productId ? (empaquesPorProducto.get(i.productId) ?? []) : [],
+        );
+      } catch (err) {
+        if (err instanceof EmpaqueInvalidoError) {
+          throw new BadRequestException(`${i.description.trim()}: ${err.message}`);
+        }
+        throw err;
+      }
+      return {
+        ...i,
+        ...captura,
+        total: captura.quantity * i.unitPrice * (1 + (i.taxRate || 0) / 100),
+      };
+    });
+    const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const taxAmount = items.reduce((s, i) => s + i.quantity * i.unitPrice * ((i.taxRate || 0) / 100), 0);
 
     const created = await this.prisma.purchaseOrder.create({
       data: {
@@ -284,6 +355,11 @@ export class ProcurementService {
             productId: i.productId ?? null,
             description: i.description.trim(),
             quantity: new Prisma.Decimal(i.quantity),
+            unidadCaptura: i.unidadCaptura,
+            factorConversion:
+              i.factorConversion != null ? new Prisma.Decimal(i.factorConversion) : null,
+            cantidadCapturada:
+              i.cantidadCapturada != null ? new Prisma.Decimal(i.cantidadCapturada) : null,
             unitPrice: new Prisma.Decimal(i.unitPrice),
             taxRate: new Prisma.Decimal(i.taxRate || 0),
             total: new Prisma.Decimal(i.total),

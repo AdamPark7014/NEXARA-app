@@ -3,6 +3,7 @@ import { alertaDto } from '../activities/geofence/activity-geofence.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { ActivityTeamService, type AssigneeRole } from '../activities/activity-team.service.js';
 import { ActivityEvidenceService } from '../activities/evidence/activity-evidence.service.js';
+import { ActivityToolsService } from '../activities/tools/activity-tools.service.js';
 import { evidenceProgressPct } from '../activities/evidence/evidence-flow.helpers.js';
 import type { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -192,6 +193,7 @@ export class MyActivitiesService {
     private readonly team: ActivityTeamService,
     private readonly evidence: ActivityEvidenceService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly activityTools: ActivityToolsService,
   ) {}
 
   /**
@@ -205,6 +207,9 @@ export class MyActivitiesService {
    */
   async iniciar(viewer: MyActivitiesViewer, companyId: number | null, activityId: number) {
     const fila = await this.filaAsignada(viewer, companyId, activityId);
+    // Regla del dueño: antes de atender la instalación se palomea el checklist de
+    // herramientas. Solo aplica si la OT pide algo; el mensaje dice qué falta.
+    await this.activityTools.asertarChecklistCompleto(activityId, companyId);
     const despachador =
       fila.activity.assignmentCharge === 'despacho' && String(fila.rol) === 'LEAD';
     const ahora = new Date();
