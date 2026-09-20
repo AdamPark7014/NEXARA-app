@@ -11,7 +11,39 @@ export type PathModuleHint = {
   web?: string[];
 };
 
+/**
+ * Módulos de Core que la web registra en `CORE_OLA1_MODULE_IDS` y que las apps listan en «Más».
+ * Misma clave en los dos espacios de nombres. `url` es la página canónica: un comodín de panel
+ * (`/erp/**` de CEO y Dir. Administrativa, `/**` del super admin) los abre todos, porque esas
+ * reglas no nombran cada página y sin esto la app no les mostraba ninguno.
+ */
+export const CORE_EXTRA_MODULES: ReadonlyArray<{ key: string; url: string }> = [
+  { key: 'erp-cotizaciones', url: '/erp/cotizaciones' },
+  { key: 'erp-proyectos', url: '/erp/proyectos' },
+  { key: 'kpis-equipo', url: '/erp/asistencias/indicadores' },
+  { key: 'erp-almacen', url: '/erp/almacen' },
+  { key: 'erp-herramientas', url: '/erp/almacen/herramientas' },
+  { key: 'erp-vehiculos', url: '/erp/vehiculos' },
+  { key: 'erp-organigrama', url: '/erp/organigrama' },
+];
+
+/** Comodines que abren un panel entero: devuelve su base (`''` = todo). */
+function panelWildcardBase(path: string): string | null {
+  if (path === '/**') return '';
+  if (path === '/erp/**') return '/erp';
+  return null;
+}
+
 export const PATH_MODULE_HINTS: PathModuleHint[] = [
+  // Core «Más». Anclados a /erp: `/erp/actividades/proyectos` no es Proyectos, y
+  // `/erp/almacen/herramientas` (todo el personal) no abre el Almacén.
+  { match: /^\/erp\/cotizaciones(\/|$)/, android: ['erp-cotizaciones'], web: ['erp-cotizaciones'] },
+  { match: /^\/erp\/proyectos(\/|$)/, android: ['erp-proyectos'], web: ['erp-proyectos'] },
+  { match: /^\/erp\/asistencias\/indicadores(\/|$)/, android: ['kpis-equipo'], web: ['kpis-equipo'] },
+  { match: /^\/erp\/almacen(\/\*\*)?$/, android: ['erp-almacen'], web: ['erp-almacen'] },
+  { match: /^\/erp\/almacen\/herramientas(\/|$)/, android: ['erp-herramientas'], web: ['erp-herramientas'] },
+  { match: /^\/erp\/vehiculos(\/|$)/, android: ['erp-vehiculos'], web: ['erp-vehiculos'] },
+  { match: /^\/erp\/organigrama(\/|$)/, android: ['erp-organigrama'], web: ['erp-organigrama'] },
   { match: /\/my-profile|\/users\/profile/, android: ['my-profile'], web: ['my-profile'] },
   { match: /user-preferences|my-preferences/, android: ['my-preferences'], web: ['my-preferences'] },
   { match: /\/calendar/, android: ['calendar'], web: ['calendar'] },
@@ -127,6 +159,15 @@ export function deriveModuleKeysFromPaths(paths: string[]): {
   const android = new Set<string>(['my-profile', 'my-preferences', 'dashboard']);
   const web = new Set<string>(['my-profile', 'my-preferences', 'dashboard']);
   for (const path of paths) {
+    const wildcard = panelWildcardBase(path);
+    if (wildcard !== null) {
+      for (const m of CORE_EXTRA_MODULES) {
+        if (m.url === wildcard || m.url.startsWith(`${wildcard}/`)) {
+          android.add(m.key);
+          web.add(m.key);
+        }
+      }
+    }
     for (const hint of PATH_MODULE_HINTS) {
       if (hint.match.test(path)) {
         for (const k of hint.android) android.add(k);

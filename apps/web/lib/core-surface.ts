@@ -12,6 +12,12 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'erp-proyectos',
   // KPIs del equipo (retardos, uniforme, horas laboradas vs productivas): vive en /erp/asistencias.
   'kpis-equipo',
+  // Recursos: almacén (inventario), herramientas y vehículos para todo el personal, y el
+  // organigrama de solo lectura. Antes vivían en /ops y /erp/hr, fuera de Core.
+  'erp-almacen',
+  'erp-herramientas',
+  'erp-vehiculos',
+  'erp-organigrama',
 ];
 export const CORE_PANEL_ID = 'erp' as const;
 
@@ -26,15 +32,41 @@ const NON_ERP_PANEL_RE =
   /^\/(ops|crm|studio|lab|integra|finance|hr|sales|console|consola|contabilidad|people|operacion|noc|support|ventas)(\/|$)/;
 
 /**
+ * Módulos que se mudaron a Core con el mismo contenido: la ruta vieja abre la nueva y conserva
+ * el id (y, donde se usa, la query: `?highlight=`, `?tab=`, `?productId=`).
+ */
+const MOVED_TO_CORE: ReadonlyArray<[RegExp, (m: RegExpMatchArray) => string]> = [
+  [/^\/ops\/(?:vehicles|vehiculos)\/(\d+)(?:\/.*)?$/, (m) => `/erp/vehiculos/${m[1]}`],
+  [/^\/ops\/(?:vehicles|vehiculos)$/, () => '/erp/vehiculos'],
+  [/^\/ops\/(?:my-vehicles|mis-vehiculos)(?:\/.*)?$/, () => '/erp/vehiculos/mis-vehiculos'],
+  [/^\/ops\/(?:tools|herramientas)(?:\/.*)?$/, () => '/erp/almacen/herramientas'],
+  [/^\/erp\/warehouse(?:\/.*)?$/, () => '/erp/almacen'],
+  [/^\/erp\/hr\/orgchart(?:\/.*)?$/, () => '/erp/organigrama'],
+];
+
+/** Core-only: la ruta nueva de un módulo que se mudó a /erp, o null si no es uno de ellos. */
+export function coreMovedModulePath(pathname: string): string | null {
+  const clean = pathname.replace(/\/+$/, '') || '/';
+  for (const [re, target] of MOVED_TO_CORE) {
+    const m = clean.match(re);
+    if (m) return target(m);
+  }
+  return null;
+}
+
+/**
  * Core-only: destino dentro de /erp para una ruta de otro panel, o null si no aplica.
  * Detalle de actividad, evidencias y proyecto conservan el id; «Mi perfil» y «Mis
- * actividades» van a su equivalente; todo lo demás cae en CORE_HOME_PATH.
+ * actividades» van a su equivalente; vehículos, herramientas, almacén y organigrama abren su
+ * página de Core ({@link coreMovedModulePath}); todo lo demás cae en CORE_HOME_PATH.
  */
 export function coreSurfaceRedirect(
   pathname: string,
   search?: URLSearchParams | string | null,
 ): string | null {
   const clean = pathname.replace(/\/+$/, '') || '/';
+  const moved = coreMovedModulePath(clean);
+  if (moved) return moved;
   if (!NON_ERP_PANEL_RE.test(clean)) return null;
 
   const act = clean.match(/^\/ops\/(?:activities|actividades)\/(\d+)(\/.*)?$/);

@@ -293,7 +293,7 @@ export class AlertsService {
             message: `${productName} en ${wh}: ${qty} / mínimo ${min}. Genera requisición de compra.`,
             entityType: 'StockLevel',
             relatedEntityId: level.id,
-            relatedUrl: `/erp/warehouse?productId=${level.productId}`,
+            relatedUrl: `/erp/almacen?productId=${level.productId}`,
             priority: qty <= 0 ? 'high' : 'normal',
           },
           {

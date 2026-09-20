@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import ContextRail from "@/components/ui/ContextRail";
@@ -12,6 +12,7 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getVehiclesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
+import { VEHICULOS_GPS_PATH, isCoreMount, puedeVerGpsDireccion, vehiclesBasePath } from "@/lib/recursos-core";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
@@ -69,6 +70,10 @@ export default function VehiclesPage() {
   const focusRequests = tabParam === "requests";
   const cfg = useMemo(() => getVehiclesSectionConfig(user), [user]);
   useOpsCanonicalRoute(user, "vehicles");
+  // Montada en Core (`/erp/vehiculos`) o en OPS: los enlaces siguen a la página.
+  const pathname = usePathname();
+  const enCore = isCoreMount(pathname);
+  const base = vehiclesBasePath(pathname);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Vehicle[]>([]);
@@ -243,7 +248,7 @@ export default function VehiclesPage() {
 
   const columns: Column<Vehicle>[] = [
     { key: "nombre", label: "Vehículo", render: v => (
-      <Link href={`/ops/vehicles/${v.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{v.nombre ?? "—"}</Link>
+      <Link href={`${base}/${v.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{v.nombre ?? "—"}</Link>
     ) },
     { key: "placas", label: "Placas", render: v => <Tag variant="accent">{v.placas ?? "—"}</Tag>, width: 120 },
     { key: "estatus", label: "Estado", render: v => <Tag variant={v.estatus === "Asignado" ? "warning" : v.estatus === "Fuera_de_servicio" || v.estatus === "En_mantenimiento" ? "danger" : "positive"}>{(v.estatus ?? "Disponible").replace(/_/g, " ")}</Tag>, width: 150 },
@@ -269,13 +274,23 @@ export default function VehiclesPage() {
 
       <ContextRail
         ariaLabel="Flotilla"
-        items={[
-          { id: "vehiculos", label: "Vehículos", href: "/ops/vehicles", active: true },
-          { id: "gps", label: "GPS", href: "/ops/gps", active: false },
-        ]}
+        items={
+          enCore
+            ? [
+                { id: "vehiculos", label: "Vehículos", href: base, active: true },
+                // GPS de la flotilla: solo Dirección General.
+                ...(puedeVerGpsDireccion(user)
+                  ? [{ id: "gps", label: "GPS", href: VEHICULOS_GPS_PATH, active: false }]
+                  : []),
+              ]
+            : [
+                { id: "vehiculos", label: "Vehículos", href: "/ops/vehicles", active: true },
+                { id: "gps", label: "GPS", href: "/ops/gps", active: false },
+              ]
+        }
       />
       <PageHeader
-        eyebrow="OPS · Campo"
+        eyebrow={enCore ? "Core · Recursos" : "OPS · Campo"}
         title={cfg.title}
         subtitle={cfg.subtitle}
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar vehículo</Button> : undefined}

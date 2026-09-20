@@ -98,8 +98,12 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-tenders',
     'documents',
     'employee-payments',
+    'erp-almacen',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'executive',
     'expenses-admin',
     'exports',
@@ -200,8 +204,12 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-tenders',
     'documents',
     'employee-payments',
+    'erp-almacen',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'executive',
     'expenses-admin',
     'exports',
@@ -283,8 +291,12 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-quotes',
     'dashboard',
     'documents',
+    'erp-almacen',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'integra-access',
     'integra-alarms',
     'integra-anpr',
@@ -344,8 +356,12 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'employee-payments',
+    'erp-almacen',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'executive',
     'expenses-admin',
     'exports',
@@ -423,8 +439,12 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'employee-payments',
+    'erp-almacen',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'executive',
     'expenses-admin',
     'exports',
@@ -470,8 +490,12 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'employee-payments',
+    'erp-almacen',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'expenses-admin',
     'exports',
     'fines',
@@ -506,8 +530,12 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-quotes',
     'dashboard',
     'documents',
+    'erp-almacen',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'expenses-admin',
     'invoicing',
     'lunch-breaks',
@@ -529,8 +557,12 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'chat',
     'crm-quotes',
     'documents',
+    'erp-almacen',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'integra-access',
     'integra-alarms',
     'integra-anpr',
@@ -580,6 +612,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'calendar',
     'chat',
     'documents',
+    'erp-herramientas',
+    'erp-organigrama',
+    'erp-vehiculos',
     'lunch-breaks',
     'my-profile',
     'notifications-center',
@@ -600,6 +635,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'chat',
     'crm-quotes',
     'documents',
+    'erp-herramientas',
+    'erp-organigrama',
+    'erp-vehiculos',
     'integra-access',
     'integra-alarms',
     'integra-anpr',
@@ -657,7 +695,10 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'erp-cotizaciones',
+    'erp-herramientas',
+    'erp-organigrama',
     'erp-proyectos',
+    'erp-vehiculos',
     'kb',
     'lunch-breaks',
     'my-profile',
@@ -681,6 +722,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-products',
     'crm-projects',
     'crm-quotes',
+    'erp-herramientas',
+    'erp-organigrama',
+    'erp-vehiculos',
     'lunch-breaks',
     'my-profile',
     'notifications-center',
@@ -694,6 +738,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'crm-products',
     'crm-quotes',
     'crm-templates',
+    'erp-herramientas',
+    'erp-organigrama',
+    'erp-vehiculos',
     'lunch-breaks',
     'my-profile',
     'notifications-center',
@@ -716,6 +763,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'chat',
     'crm-products',
     'crm-quotes',
+    'erp-herramientas',
+    'erp-organigrama',
+    'erp-vehiculos',
     'lunch-breaks',
     'my-profile',
     'notifications-center',
@@ -739,6 +789,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'employee-payments',
+    'erp-herramientas',
+    'erp-organigrama',
+    'erp-vehiculos',
     'fines',
     'hr',
     'kb',
@@ -763,6 +816,9 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'dashboard',
     'documents',
     'employee-payments',
+    'erp-herramientas',
+    'erp-organigrama',
+    'erp-vehiculos',
     'expenses-admin',
     'exports',
     'invoicing',
@@ -959,6 +1015,8 @@ describe('el modulo se abre entero, no solo su listado', () => {
       '/ops/service-clients',
       '/ops/support',
       '/ops/vehicles',
+      '/erp/almacen',
+      '/erp/vehiculos',
     ];
     const broken: string[] = [];
     for (const role of ALL_ROLES) {
@@ -1071,5 +1129,46 @@ describe('cada puesto llega a su objeto de trabajo', () => {
     // Facturacion fiscal sigue fuera del alcance operativo.
     expect(canOpenPage(ROLES.ING_CAMPO, '/erp/invoicing')).toBe(false);
     expect(canOpenPage(ROLES.VENDEDOR, '/erp/invoicing')).toBe(false);
+  });
+});
+
+describe('Core · Recursos (almacen, herramientas, vehiculos, organigrama)', () => {
+  const INTERNAL = ALL_ROLES.filter((r) => r !== ROLES.CLIENTE);
+
+  it('todo el personal interno pide herramienta y vehiculo, y ve el organigrama', () => {
+    for (const role of INTERNAL) {
+      expect(visibleModules(role), role).toEqual(
+        expect.arrayContaining(['erp-herramientas', 'erp-vehiculos', 'erp-organigrama']),
+      );
+      expect(canOpenPage(role, '/erp/almacen/herramientas'), role).toBe(true);
+      expect(canOpenPage(role, '/erp/vehiculos/mis-vehiculos'), role).toBe(true);
+      expect(canOpenPage(role, '/erp/organigrama'), role).toBe(true);
+    }
+    expect(visibleModules(ROLES.CLIENTE)).not.toContain('erp-vehiculos');
+    expect(canOpenPage(ROLES.CLIENTE, '/erp/vehiculos')).toBe(false);
+  });
+
+  it('el almacen lo operan almacen y administracion, y lo consultan direccion y coordinadores', () => {
+    for (const role of [
+      ROLES.CEO,
+      ROLES.DIR_ADMIN,
+      ROLES.DIR_OPERACIONES,
+      ROLES.COORD_ADMIN,
+      ROLES.ADMINISTRATIVO,
+      ROLES.COORD_OPERACIONES,
+      ROLES.ARQUITECTO,
+    ]) {
+      expect(visibleModules(role), role).toContain('erp-almacen');
+      expect(canOpenPage(role, '/erp/almacen/5'), role).toBe(true);
+    }
+    for (const role of [ROLES.ING_CAMPO, ROLES.ING_SOPORTE, ROLES.VENDEDOR, ROLES.RH, ROLES.CONTABILIDAD]) {
+      expect(visibleModules(role), role).not.toContain('erp-almacen');
+      expect(canOpenPage(role, '/erp/almacen'), role).toBe(false);
+    }
+  });
+
+  it('pedir herramienta no abre el almacen', () => {
+    expect(canOpenPage(ROLES.ING_CAMPO, '/erp/almacen/herramientas?tab=requests')).toBe(true);
+    expect(canOpenPage(ROLES.ING_CAMPO, '/erp/almacen')).toBe(false);
   });
 });

@@ -18,23 +18,44 @@ export const appUrls = {
   opsEvidencesReview: (activityId: number) => `/ops/evidences?activityId=${activityId}`,
   opsViatic: (id: number) => `/ops/viatics?highlight=${id}`,
   opsMyViatics: (id?: number) => (id ? `/ops/my-viatics?highlight=${id}` : `/ops/my-viatics`),
-  opsMyVehicles: (id?: number) => (id ? `/ops/my-vehicles?highlight=${id}` : `/ops/my-vehicles`),
+  /**
+   * Herramientas, vehículos, almacén y organigrama viven en Core (`/erp`): las rutas de OPS
+   * rebotaban a la pizarra y el aviso no llevaba a ningún lado. Los nombres `ops*` y
+   * `erpWarehouse` de abajo quedan como alias para no romper a quien ya los llama.
+   */
+  erpMisVehiculos: (id?: number) =>
+    id ? `/erp/vehiculos/mis-vehiculos?highlight=${id}` : `/erp/vehiculos/mis-vehiculos`,
+  erpVehiculos: (id?: number, tab?: "requests" | "inventory") => {
+    const params = new URLSearchParams();
+    if (tab) params.set("tab", tab);
+    if (id != null) params.set("highlight", String(id));
+    const qs = params.toString();
+    return qs ? `/erp/vehiculos?${qs}` : `/erp/vehiculos`;
+  },
+  erpHerramientas: (id?: number, tab?: "requests" | "renewals" | "inventory" | "kits") => {
+    const params = new URLSearchParams();
+    if (tab) params.set("tab", tab);
+    if (id != null) params.set("highlight", String(id));
+    const qs = params.toString();
+    return qs ? `/erp/almacen/herramientas?${qs}` : `/erp/almacen/herramientas`;
+  },
+  erpAlmacen: (params?: { productId?: number; movementId?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.productId != null) qs.set("productId", String(params.productId));
+    if (params?.movementId != null) qs.set("movementId", String(params.movementId));
+    const s = qs.toString();
+    return s ? `/erp/almacen?${s}` : `/erp/almacen`;
+  },
+  erpOrganigrama: () => `/erp/organigrama`,
+  /** @deprecated Usa `erpMisVehiculos`. */
+  opsMyVehicles: (id?: number): string => appUrls.erpMisVehiculos(id),
   opsProject: (id: number) => `/ops/projects/${id}`,
   opsMaintenance: (woId?: number) => (woId ? `/ops/maintenance?woId=${woId}` : `/ops/maintenance`),
-  opsTools: (id?: number, tab?: "requests" | "renewals" | "inventory" | "kits") => {
-    const params = new URLSearchParams();
-    if (tab) params.set("tab", tab);
-    if (id != null) params.set("highlight", String(id));
-    const qs = params.toString();
-    return qs ? `/ops/tools?${qs}` : `/ops/tools`;
-  },
-  opsVehicles: (id?: number, tab?: "requests" | "inventory") => {
-    const params = new URLSearchParams();
-    if (tab) params.set("tab", tab);
-    if (id != null) params.set("highlight", String(id));
-    const qs = params.toString();
-    return qs ? `/ops/vehicles?${qs}` : `/ops/vehicles`;
-  },
+  /** @deprecated Usa `erpHerramientas`. */
+  opsTools: (id?: number, tab?: "requests" | "renewals" | "inventory" | "kits"): string =>
+    appUrls.erpHerramientas(id, tab),
+  /** @deprecated Usa `erpVehiculos`. */
+  opsVehicles: (id?: number, tab?: "requests" | "inventory"): string => appUrls.erpVehiculos(id, tab),
   opsActivities: () => `/ops/activities`,
   opsMaintenanceContracts: (highlightId?: number) =>
     highlightId
@@ -64,8 +85,8 @@ export const appUrls = {
   erpProcurement: (tab: string, id?: number) =>
     id ? `/erp/procurement?tab=${tab}&id=${id}` : `/erp/procurement?tab=${tab}`,
   erpProcurementReceipt: (poId: number) => `/erp/procurement?tab=receipts&poId=${poId}`,
-  erpWarehouse: (productId?: number) =>
-    productId ? `/erp/warehouse?productId=${productId}` : `/erp/warehouse`,
+  /** @deprecated Usa `erpAlmacen`. */
+  erpWarehouse: (productId?: number): string => appUrls.erpAlmacen(productId ? { productId } : undefined),
   erpAccounting: (entryId?: number) =>
     entryId ? `/erp/accounting?highlight=${entryId}` : `/erp/accounting`,
   erpInvoicing: (invoiceId?: number, invoiceRef?: string) => {

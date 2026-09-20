@@ -37,10 +37,22 @@ model Product {
   protegido       Boolean?        @default(false)
   sustituto       String?
   tipoCambio      Float?
+  /// Reabastecimiento: material de consumo que rota y se repone solo (no equipo de proyecto).
+  esCirculante       Boolean  @default(false)
+  /// Días que tarda el proveedor en surtir.
+  leadTimeDias       Int?
+  /// Compra mínima al proveedor, en unidad base del producto.
+  compraMinima       Decimal? @db.Decimal(14, 4)
+  /// Días de consumo que se guardan de colchón sobre el lead time.
+  stockSeguridadDias Int?
   companyId       Int
   brand           Brand?          @relation(fields: [brandId], references: [id])
   company         CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   sources         ProductSource[]
+  /// Presentaciones de compra/captura («Caja» = 100 piezas).
+  packagings               ProductPackaging[]
+  /// Renglones de checklist de OT que piden este producto.
+  activityToolRequirements ActivityToolRequirement[]
 
   // === ERP Industrial Relations ===
   invoiceItems        InvoiceItem[]
@@ -64,6 +76,33 @@ model Product {
 
   @@unique([companyId, sku])
   @@index([companyId])
+}
+
+/// Presentación en que se compra o se captura un producto: «Caja» = 100 piezas, «Rollo» = 305 m.
+/// El inventario se sigue llevando en la unidad base del producto; esto solo convierte al capturar
+/// (quien recibe teclea «3 cajas» y el movimiento queda en 300 piezas).
+model ProductPackaging {
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  /// Nombre de la presentación: «Caja», «Bolsa», «Rollo».
+  nombre          String   @db.VarChar(60)
+  /// Cuántas unidades base trae una de estas.
+  piezasPorUnidad Decimal  @db.Decimal(14, 4)
+  /// Código de barras de la presentación (no el de la pieza suelta).
+  codigoBarras    String?  @db.VarChar(64)
+  /// Presentación que se propone por defecto al comprar.
+  esDefaultCompra Boolean  @default(false)
+  companyId       Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, nombre])
+  @@index([codigoBarras])
+  @@index([companyId])
+  @@map("product_packagings")
 }
 
 model ProductSource {
@@ -911,6 +950,14 @@ model User {
 
   geofenceAlerts          ActivityGeofenceAlert[] @relation("GeofenceAlertUser")
   evidenceFieldPhotos     ActivityEvidenceFieldPhoto[] @relation("EvidenceFieldPhotoAuthor")
+
+  // === Asistencia confiable, herramientas de la OT, kits y horas extra ===
+  checadasRechazadas    AttendanceRejection[] @relation("AttendanceRejectionUser")
+  toolRequestsRecogidas ToolRequest[]         @relation("ToolRequestPickedUpBy")
+  activityToolChecks    ActivityToolCheck[]   @relation("ActivityToolCheckUser")
+  toolKitInspections    ToolKitInspection[]   @relation("ToolKitInspectionInspector")
+  horasExtra            OvertimeApproval[]    @relation("OvertimeApprovalUser")
+  horasExtraDecididas   OvertimeApproval[]    @relation("OvertimeApprovalAprobador")
   @@unique([oidcProvider, oidcSubject])
   @@index([lastLoginAt])
   @@index([isActive, lastLoginAt])
@@ -1152,6 +1199,10 @@ model Activity {
   /// Qué hay que documentar en esta actividad («Cámara 1», «Rack») y en qué momentos.
   evidenceFields          ActivityEvidenceField[]
   evidenceFieldPhotos     ActivityEvidenceFieldPhoto[]
+  /// Checklist de herramientas y material que hay que llevar a esta OT.
+  toolRequirements        ActivityToolRequirement[] @relation("ActivityToolRequirements")
+  /// Préstamos de herramienta pedidos para esta OT.
+  toolRequests            ToolRequest[]             @relation("ActivityToolRequests")
   @@unique([companyId, anNumber])
   @@index([cotizacionId])
   @@index([projectId])
@@ -1523,6 +1574,13 @@ model VehicleControl {
   combustibleFinPct          Int?
   fotosSalida                Json?
   fotosDevolucion            Json?
+  /// Metadatos de cada foto de salida/devolución: [{ slot, url, capturedAt, lat, lng }].
+  /// Las fotos siguen en `fotosSalida`/`fotosDevolucion`; esto dice cuándo y dónde se tomó cada una.
+  fotosMeta                  Json?
+  /// Foto del tablero (odómetro y aguja de combustible) al salir y al devolver: respalda
+  /// los números de `odometroInicio/Fin` y `combustibleInicioPct/FinPct`.
+  fotoTableroSalidaUrl       String?        @db.VarChar(500)
+  fotoTableroDevolucionUrl   String?        @db.VarChar(500)
   actividad                  Activity       @relation(fields: [actividadId], references: [id])
   solicitante                User           @relation("SolicitanteVehiculo", fields: [solicitanteId], references: [id])
   vehiculo                   VehicleAsset?  @relation(fields: [vehicleId], references: [id])
@@ -1547,14 +1605,43 @@ model VehicleAsset {
   salidaFotos      Json? // before-checkout photos array
   devolucionFotos  Json? // after-return photos array
   tiempoUsoMinutos Int? // computed on return
+  /// Rastreador GPS del vehículo: proveedor externo (p. ej. «Traccar») y el id del equipo allá.
+  /// null = el vehículo no tiene rastreador.
+  gpsProveedor     String?          @db.VarChar(40)
+  gpsDispositivoId String?          @db.VarChar(80)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   company          CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Restrict)
   controles        VehicleControl[]
   viaticos         Viatico[]
   assignedTo       User?            @relation("VehicleAssetAssigned", fields: [assignedToId], references: [id])
+  /// Puntos del rastreador GPS.
+  positions        VehiclePosition[]
 
   @@index([companyId])
+}
+
+/// Punto de GPS de un vehículo, del rastreador del proveedor (no del teléfono del técnico,
+/// que va en `LocationTracking`).
+model VehiclePosition {
+  id             Int      @id @default(autoincrement())
+  vehicleAssetId Int
+  lat            Decimal  @db.Decimal(10, 8)
+  lng            Decimal  @db.Decimal(11, 8)
+  velocidadKmh   Decimal? @db.Decimal(6, 2)
+  /// Rumbo en grados, 0–359.99 (0 = norte).
+  rumbo          Decimal? @db.Decimal(5, 2)
+  /// Hora del punto según el GPS, no la de llegada al servidor (esa es `createdAt`).
+  at             DateTime
+  createdAt      DateTime @default(now())
+  companyId      Int
+
+  vehicleAsset VehicleAsset   @relation(fields: [vehicleAssetId], references: [id], onDelete: Cascade)
+  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([vehicleAssetId, at])
+  @@index([companyId])
+  @@map("vehicle_positions")
 }
 
 model Expense {
@@ -1599,6 +1686,9 @@ model LocationTracking {
   velocidadKmh        Decimal?       @db.Decimal(5, 2)
   estaActivo          Boolean        @default(true)
   ultimaActualizacion DateTime       @default(now())
+  /// El teléfono marcó este punto como ubicación simulada (Android `isMock`,
+  /// iOS `isSimulatedBySoftware`). null = punto viejo o cliente que no lo informa.
+  mockLocation        Boolean?
   companyId           Int
   actividad           Activity?      @relation(fields: [actividadId], references: [id])
   usuario             User           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
@@ -1700,6 +1790,8 @@ model Attendance {
   uniformeRevisadoPorId Int?
   uniformeRevisadoAt    DateTime?
   uniformeRevisadoPor   User?     @relation("AttendanceUniformeRevisor", fields: [uniformeRevisadoPorId], references: [id], onDelete: SetNull)
+  /// Desde dónde se checó: ANDROID | IOS | WEB. null = registros de antes de guardarlo.
+  origen           String?      @db.VarChar(10)
   companyId      Int
   user           User           @relation(fields: [userId], references: [id])
   company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -1725,6 +1817,72 @@ model AttendanceCorrection {
 
   @@index([attendanceId])
   @@map("attendance_corrections")
+}
+
+/// Intento de checada que el servidor rechazó (ubicación simulada, sin GPS, …).
+/// No entra a `Attendance` —de ahí sale la nómina—, pero el intento queda: RH necesita ver
+/// quién quiso checar, desde dónde y por qué no pasó.
+model AttendanceRejection {
+  id               Int       @id @default(autoincrement())
+  userId           Int
+  /// entrada | salida
+  type             String    @db.VarChar(10)
+  lat              Float?
+  lng              Float?
+  /// Precisión del GPS en metros que reportó el teléfono.
+  accuracyM        Float?
+  /// Por qué se rechazó: MOCK_LOCATION | SIN_UBICACION | …
+  motivo           String    @db.VarChar(40)
+  detalle          String?
+  /// ANDROID | IOS | WEB
+  origen           String?   @db.VarChar(10)
+  deviceInfo       String?
+  /// Hora del teléfono al intentar la checada (informativa).
+  clientCapturedAt DateTime?
+  /// Hora del servidor al rechazarla.
+  at               DateTime  @default(now())
+  companyId        Int
+
+  user    User           @relation("AttendanceRejectionUser", fields: [userId], references: [id], onDelete: Cascade)
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([userId, at])
+  @@index([motivo, at])
+  @@map("attendance_rejections")
+}
+
+enum OvertimeApprovalEstado {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+/// Horas extra de una persona en un día, que el jefe aprueba o rechaza antes de pagarlas.
+/// Una fila por persona y día; a nómina solo deben llegar los minutos en APROBADO.
+model OvertimeApproval {
+  id            Int                    @id @default(autoincrement())
+  userId        Int
+  /// Día de la jornada (sin hora).
+  fecha         DateTime               @db.Date
+  /// Minutos extra de ese día.
+  minutos       Int
+  estado        OvertimeApprovalEstado @default(PENDIENTE)
+  /// Quién aprobó o rechazó. null mientras siga PENDIENTE.
+  aprobadoPorId Int?
+  nota          String?
+  at            DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  companyId     Int
+
+  user        User           @relation("OvertimeApprovalUser", fields: [userId], references: [id], onDelete: Cascade)
+  aprobadoPor User?          @relation("OvertimeApprovalAprobador", fields: [aprobadoPorId], references: [id], onDelete: SetNull)
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, fecha])
+  @@index([estado, fecha])
+  @@index([companyId])
+  @@map("overtime_approvals")
 }
 
 model AttendanceDay {
@@ -2898,6 +3056,13 @@ enum ToolKitEventResolution {
   EQUIPMENT_FAILURE
 }
 
+/// Resultado de una inspección periódica de kit.
+enum ToolKitInspectionEstado {
+  OK
+  OBSERVADO
+  DANADO
+}
+
 model ToolRequest {
   id                     Int               @id @default(autoincrement())
   usuarioId              Int
@@ -2922,12 +3087,22 @@ model ToolRequest {
   notificationSent       Boolean           @default(false) // Notificación de vencimiento enviada
   notificationSentAt     DateTime? // Fecha de envío de notificación
   renewalCount           Int               @default(0) // Contador de renovaciones
+  /// OT para la que se pide la herramienta. null = préstamo suelto, sin OT.
+  activityId             Int?
+  /// Código que el almacén valida al entregar; deja de servir en `pickupExpiresAt`.
+  pickupCode             String?           @db.VarChar(20)
+  pickupExpiresAt        DateTime?
+  /// Recogida física en almacén: cuándo y quién la recogió.
+  pickedUpAt             DateTime?
+  pickedUpById           Int?
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
   usuario       User                      @relation("UserToolRequests", fields: [usuarioId], references: [id], onDelete: Cascade)
   inventoryItem ToolInventoryItem?        @relation("ToolInventoryToolRequests", fields: [inventoryItemId], references: [id], onDelete: SetNull)
   approver      User?                     @relation("AdminApprovals", fields: [approvedBy], references: [id])
+  activity      Activity?                 @relation("ActivityToolRequests", fields: [activityId], references: [id], onDelete: SetNull)
+  pickedUpBy    User?                     @relation("ToolRequestPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
   renewals      ToolRenewal[]             @relation("ToolRequestRenewals")
   notifications ToolRequestNotification[] @relation("ToolRequestNotifications")
   companyId     Int
@@ -2938,6 +3113,8 @@ model ToolRequest {
   @@index([status, requestDate])
   @@index([expectedReturnDate])
   @@index([companyId])
+  @@index([activityId])
+  @@index([pickupCode])
   @@map("tool_requests")
 }
 
@@ -2965,6 +3142,8 @@ model ToolInventoryItem {
   toolRequests      ToolRequest[]       @relation("ToolInventoryToolRequests")
   replacementEvents ToolKitEvent[]      @relation("ToolKitEventReplacementItem")
   company           CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  /// Renglones de checklist de OT que piden esta herramienta concreta.
+  activityRequirements ActivityToolRequirement[] @relation("ActivityToolRequirementTool")
 
   @@unique([companyId, serialNumber])
   @@index([status])
@@ -2986,6 +3165,10 @@ model ToolKitAssignment {
   isActive         Boolean            @default(true)
   replacementCount Int                @default(0)
   notes            String?            @db.Text
+  /// Cada cuántos días se inspecciona el kit. null = sin inspección periódica.
+  inspeccionCadaDias Int?
+  /// Próxima inspección programada (se recorre al registrar una).
+  proximaInspeccion  DateTime?
   companyId        Int
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -2995,10 +3178,12 @@ model ToolKitAssignment {
   assignedBy    User?             @relation("ToolKitAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
   company       CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
   events        ToolKitEvent[]    @relation("ToolKitAssignmentEvents")
+  inspections   ToolKitInspection[]
 
   @@index([userId, isActive])
   @@index([inventoryItemId, isActive])
   @@index([companyId])
+  @@index([proximaInspeccion])
   @@map("tool_kit_assignments")
 }
 
@@ -3023,6 +3208,28 @@ model ToolKitEvent {
   @@index([assignmentId, reportedAt])
   @@index([resolution])
   @@map("tool_kit_events")
+}
+
+/// Inspección periódica de un kit asignado: en qué estado estaba, notas y fotos con hora y lugar.
+model ToolKitInspection {
+  id           Int                     @id @default(autoincrement())
+  assignmentId Int
+  inspectorId  Int
+  fecha        DateTime                @default(now())
+  estado       ToolKitInspectionEstado @default(OK)
+  notas        String?
+  /// Fotos de la inspección: [{ url, capturedAt?, lat?, lng? }]
+  fotos        Json?
+  companyId    Int
+  createdAt    DateTime                @default(now())
+
+  assignment ToolKitAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  inspector  User              @relation("ToolKitInspectionInspector", fields: [inspectorId], references: [id], onDelete: Cascade)
+  company    CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId, fecha])
+  @@index([companyId])
+  @@map("tool_kit_inspections")
 }
 
 model ToolRenewal {
@@ -3064,6 +3271,54 @@ model ToolRequestNotification {
   @@index([usuarioId, isRead])
   @@index([toolRequestId, type])
   @@map("tool_request_notifications")
+}
+
+/// Renglón del checklist de herramientas y material que exige una OT: lo que el técnico
+/// tiene que llevar y palomear antes de salir. Puede apuntar a un producto del catálogo,
+/// a una herramienta concreta del inventario o a ninguno (solo `descripcion`).
+model ActivityToolRequirement {
+  id          Int      @id @default(autoincrement())
+  activityId  Int
+  productId   Int?
+  toolId      Int?
+  /// Lo que ve el técnico: «Escalera de 6 m», «Ponchadora RJ45».
+  descripcion String   @db.VarChar(300)
+  cantidad    Decimal  @default(1) @db.Decimal(14, 4)
+  companyId   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  activity Activity            @relation("ActivityToolRequirements", fields: [activityId], references: [id], onDelete: Cascade)
+  product  Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  tool     ToolInventoryItem?  @relation("ActivityToolRequirementTool", fields: [toolId], references: [id], onDelete: SetNull)
+  company  CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  checks   ActivityToolCheck[]
+
+  @@index([activityId])
+  @@index([companyId])
+  @@map("activity_tool_requirements")
+}
+
+/// Palomeo de un renglón del checklist: quién lo revisó, cuándo, si está bien y con qué foto.
+model ActivityToolCheck {
+  id            Int      @id @default(autoincrement())
+  requirementId Int
+  userId        Int
+  /// true = lo trae y sirve; false = falta o está dañado.
+  ok            Boolean
+  nota          String?
+  fotoUrl       String?  @db.VarChar(500)
+  at            DateTime @default(now())
+  companyId     Int
+
+  requirement ActivityToolRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  user        User                    @relation("ActivityToolCheckUser", fields: [userId], references: [id], onDelete: Cascade)
+  company     CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([requirementId])
+  @@index([userId, at])
+  @@index([companyId])
+  @@map("activity_tool_checks")
 }
 
 // ============================================================================
@@ -3665,6 +3920,11 @@ model StockLevel {
   unitCost        Decimal            @default(0) @db.Decimal(14, 4)
   valuationMethod ValuationMethod    @default(WEIGHTED_AVERAGE)
   lastCountDate   DateTime?
+  /// Mínimo y máximo que calculó el reabastecimiento (consumo × lead time + seguridad).
+  /// `minStock`/`maxStock` siguen siendo los capturados a mano. null = aún no calculado.
+  minCalculado    Decimal?           @db.Decimal(14, 4)
+  maxCalculado    Decimal?           @db.Decimal(14, 4)
+  calculadoAt     DateTime?
   updatedAt       DateTime           @updatedAt
   companyId       Int
   product         Product            @relation(fields: [productId], references: [id])
@@ -3695,6 +3955,12 @@ model StockMovement {
   toQtyBefore       Decimal?          @db.Decimal(14, 4)
   /// Existencia en almacén destino justo después del movimiento.
   toQtyAfter        Decimal?          @db.Decimal(14, 4)
+  /// Empaque: cómo se capturó («Caja»), su factor a unidad base y lo que se tecleó.
+  /// `quantity` queda siempre en unidad base = cantidadCapturada × factorConversion.
+  /// null = capturado directo en unidad base.
+  unidadCaptura     String?           @db.VarChar(60)
+  factorConversion  Decimal?          @db.Decimal(14, 4)
+  cantidadCapturada Decimal?          @db.Decimal(14, 4)
   unitCost          Decimal           @default(0) @db.Decimal(14, 4)
   totalCost         Decimal           @default(0) @db.Decimal(14, 2)
   lotId             Int?
@@ -3964,6 +4230,11 @@ model PurchaseOrderItem {
   unitPrice       Decimal            @db.Decimal(14, 2)
   taxRate         Decimal            @default(0) @db.Decimal(5, 2)
   total           Decimal            @db.Decimal(14, 2)
+  /// Empaque: en qué presentación se pidió («Caja»), su factor a unidad base y lo que se tecleó.
+  /// `quantity` queda en unidad base. null = pedido directo en unidad base.
+  unidadCaptura     String?          @db.VarChar(60)
+  factorConversion  Decimal?         @db.Decimal(14, 4)
+  cantidadCapturada Decimal?         @db.Decimal(14, 4)
   purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   product         Product?           @relation(fields: [productId], references: [id])
   receiptItems    GoodsReceiptItem[]
@@ -5540,6 +5811,13 @@ model CompanyProfile {
   activityGeofenceAlerts  ActivityGeofenceAlert[]
   activityEvidenceFields  ActivityEvidenceField[]
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
+  attendanceRejections        AttendanceRejection[]
+  overtimeApprovals           OvertimeApproval[]
+  productPackagings           ProductPackaging[]
+  activityToolRequirements    ActivityToolRequirement[]
+  activityToolChecks          ActivityToolCheck[]
+  toolKitInspections          ToolKitInspection[]
+  vehiclePositions            VehiclePosition[]
   @@map("company_profile")
 }
 

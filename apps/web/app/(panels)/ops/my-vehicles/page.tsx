@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -14,6 +14,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getVehiclesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
+import { isCoreMount } from "@/lib/recursos-core";
 import { exportToExcel } from "@/lib/export-excel";
 
 interface VehicleRequest {
@@ -39,6 +40,10 @@ export default function MyVehiclesPage() {
   const { user } = useUser();
   useOpsCanonicalRoute(user, "vehicles");
   const cfg = useMemo(() => getVehiclesSectionConfig(user), [user]);
+  // En Core todo el personal pide vehículo (autoriza quien tiene `VEHICLES_REVIEW` en la API);
+  // en OPS se conserva la regla de siempre.
+  const enCore = isCoreMount(usePathname());
+  const canRequest = cfg.canCreate || enCore;
   const token = user?.token ?? "";
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
@@ -127,13 +132,13 @@ export default function MyVehiclesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="OPS · Campo"
+        eyebrow={enCore ? "Core · Recursos" : "OPS · Campo"}
         title={cfg.title}
         subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && (
+            {canRequest && (
               <Button variant="primary" iconLeft="+" onClick={() => setShowRequest((s) => !s)}>
                 {showRequest ? "Ocultar formulario" : "Solicitar vehículo"}
               </Button>
@@ -191,7 +196,7 @@ export default function MyVehiclesPage() {
         );
       })()}
 
-      {showRequest && cfg.canCreate && (
+      {showRequest && canRequest && (
         <Section title="Nueva solicitud">
           <VehicleRequestForm />
         </Section>
@@ -207,7 +212,7 @@ export default function MyVehiclesPage() {
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus solicitudes de vehículo." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
         {!loading && !error && items.length === 0 && (
-          <EmptyState icon="🚗" title="Sin solicitudes" description="Solicita un vehículo para tu actividad de campo." action={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowRequest(true)}>Solicitar vehículo</Button> : undefined} />
+          <EmptyState icon="🚗" title="Sin solicitudes" description="Solicita un vehículo para tu actividad de campo." action={canRequest ? <Button size="sm" variant="primary" onClick={() => setShowRequest(true)}>Solicitar vehículo</Button> : undefined} />
         )}
         {!loading && !error && items.length > 0 && (
           <div style={{ display: "grid", gap: 12 }}>

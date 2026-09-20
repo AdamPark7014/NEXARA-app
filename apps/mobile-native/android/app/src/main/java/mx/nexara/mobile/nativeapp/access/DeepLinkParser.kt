@@ -125,6 +125,13 @@ object DeepLinkParser {
     private val PROFILE_SEGMENTS = setOf("my-profile", "mi-perfil")
     private val CLIENT_SEGMENTS = setOf("clientes")
 
+    // ── Módulos de «Más» (`CoreExtraModule`): la app abre su ficha, la web su página. ──
+    private val VEHICLE_SEGMENTS = setOf("vehiculos", "vehicles", "mis-vehiculos", "my-vehicles")
+    private val TOOL_SEGMENTS = setOf("herramientas", "tools")
+    private val WAREHOUSE_SEGMENTS = setOf("almacen", "warehouse", "inventario")
+    private val PROJECT_SEGMENTS = setOf("proyectos", "projects")
+    private val ORGCHART_SEGMENTS = setOf("organigrama", "orgchart")
+
     private fun coreDestination(parts: List<String>, params: Map<String, String>): DeepLinkDestination {
         val extra = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
         val first = parts.firstOrNull() ?: return CORE_HOME
@@ -154,7 +161,21 @@ object DeepLinkParser {
             }
             first in EVIDENCE_LIST_SEGMENTS && activityId != null ->
                 module(CoreKeys.ACTIVITIES, entityId = activityId, params = extra + ("tab" to "evidencias"))
+            // KPIs del equipo antes que Asistencias: viven dentro de la misma ruta.
+            first in ATTENDANCE_SEGMENTS && second == "indicadores" ->
+                module(CoreKeys.KPIS_EQUIPO, params = extra)
             first in ATTENDANCE_SEGMENTS -> module(CoreKeys.ATTENDANCE, params = extra)
+            first == "cotizaciones" ->
+                module(CoreKeys.COTIZACIONES, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
+            first in PROJECT_SEGMENTS ->
+                module(CoreKeys.PROYECTOS, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
+            first in WAREHOUSE_SEGMENTS && second in TOOL_SEGMENTS -> module(CoreKeys.HERRAMIENTAS, params = extra)
+            first in WAREHOUSE_SEGMENTS -> module(CoreKeys.ALMACEN, params = extra)
+            first in TOOL_SEGMENTS -> module(CoreKeys.HERRAMIENTAS, params = extra)
+            first in VEHICLE_SEGMENTS ->
+                module(CoreKeys.VEHICULOS, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
+            first in ORGCHART_SEGMENTS || (first == "hr" && second in ORGCHART_SEGMENTS) ->
+                module(CoreKeys.ORGANIGRAMA, params = extra)
             // `/erp/hr/attendance` y `/erp/hr/lunch-breaks` (appUrls viejos) → Asistencias.
             first == "hr" && second in ATTENDANCE_SEGMENTS -> module(CoreKeys.ATTENDANCE, params = extra)
             first in LUNCH_SEGMENTS || (first == "hr" && second in LUNCH_SEGMENTS) ->
@@ -211,6 +232,23 @@ object DeepLinkParser {
         if (parts.lastOrNull() == "my-profile") return module(CoreKeys.MY_PROFILE)
         if (head in LEGACY_ACTIVITY_HEADS && parts.size == 1 && first in MY_ACTIVITIES_SEGMENTS) {
             return module(CoreKeys.MY_ACTIVITIES)
+        }
+        // Módulos de OPS que se mudaron a Core (`coreSurfaceRedirect` → `MOVED_TO_CORE` en la web):
+        // vehículos, herramientas y proyectos abren su ficha de «Más».
+        if (head == "ops") {
+            when {
+                first in VEHICLE_SEGMENTS -> return module(
+                    CoreKeys.VEHICULOS,
+                    entityId = parts.getOrNull(1)?.toLongOrNull()?.takeIf { it > 0L },
+                    params = extra,
+                )
+                first in TOOL_SEGMENTS -> return module(CoreKeys.HERRAMIENTAS, params = extra)
+                first in PROJECT_SEGMENTS -> return module(
+                    CoreKeys.PROYECTOS,
+                    entityId = parts.getOrNull(1)?.toLongOrNull()?.takeIf { it > 0L },
+                    params = extra,
+                )
+            }
         }
         return CORE_HOME
     }

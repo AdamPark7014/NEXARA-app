@@ -109,6 +109,58 @@ export const ATTENDANCE_UNIFORME_URL_RULES: UrlRule[] = [
   { path: '/api/attendance/*/uniforme', methods: ['PATCH'], scope: 'approve' },
 ];
 
+/**
+ * Recursos de Core para todo el personal interno: herramientas (pedir y ver su kit), vehículos
+ * (pedir, entregar y recibir) y el organigrama de solo lectura.
+ *
+ * Son páginas: están aquí para que `/me/navigation` no recorte los módulos del menú ni de «Más»
+ * en las apps. Quién aprueba lo siguen decidiendo los permisos de cada controlador
+ * (`TOOLS_MANAGE`, `VEHICLES_REVIEW`, `USERS_MANAGE` para mover a alguien en el organigrama).
+ * `/erp/vehiculos/gps` cae dentro de `/erp/vehiculos/**`: la página solo se la muestra a
+ * Dirección General (`puedeVerGpsDireccion`).
+ */
+export const CORE_RECURSOS_URL_RULES: UrlRule[] = [
+  { path: '/erp/almacen/herramientas', scope: 'write' },
+  { path: '/erp/almacen/herramientas/**', scope: 'write' },
+  { path: '/erp/vehiculos', scope: 'write' },
+  { path: '/erp/vehiculos/**', scope: 'write' },
+  { path: '/erp/organigrama', methods: ['GET'], scope: 'read' },
+];
+
+/**
+ * Almacén en Core (`/erp/almacen`) para quien lo opera: almacén y administración. Sus API de
+ * stock, almacenes y catálogo ya estaban en sus reglas; mover existencias lo sigue decidiendo
+ * `RbacGuard` (`STOCK_MANAGE`).
+ */
+export const ALMACEN_CORE_URL_RULES: UrlRule[] = [
+  { path: '/erp/almacen', scope: 'write' },
+  { path: '/erp/almacen/**', scope: 'write' },
+];
+
+/**
+ * Almacén de consulta: dirección de operaciones y coordinadores de campo revisan existencias
+ * para planear la OT. Sin las GET de stock, almacenes y catálogo, `UrlAccessGuard` les
+ * respondía 403 al abrir la página.
+ */
+export const ALMACEN_CORE_READ_URL_RULES: UrlRule[] = [
+  { path: '/erp/almacen', methods: ['GET'], scope: 'read' },
+  { path: '/erp/almacen/**', methods: ['GET'], scope: 'read' },
+  { path: '/api/stock/**', methods: ['GET'], scope: 'read' },
+  { path: '/api/warehouse/**', methods: ['GET'], scope: 'read' },
+  { path: '/api/catalog/**', methods: ['GET'], scope: 'read' },
+];
+
+/**
+ * KPIs del equipo (`/erp/asistencias/indicadores`). La página ya la abre `/erp/asistencias/**`;
+ * esta regla existe para que `/me/navigation` emita `kpis-equipo` solo a quien ve al equipo en
+ * Asistencias (los mismos que `getAttendanceViewMode` en la web). CEO y Dir. Administrativa lo
+ * reciben por su comodín `/erp/**`.
+ */
+export const KPIS_EQUIPO_URL_RULES: UrlRule[] = [
+  { path: '/erp/asistencias/indicadores', methods: ['GET'], scope: 'read' },
+  { path: '/erp/asistencias/indicadores/**', methods: ['GET'], scope: 'read' },
+];
+
 /** Core ola1 — páginas shell (Pizarra / Asistencias / Chat / Actividades). */
 export const CORE_OLA1_URL_RULES: UrlRule[] = [
   { path: '/erp/mis-actividades', scope: 'write' },
@@ -243,6 +295,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // Supervisa OPS, valida trabajos antes de reportar a Admin + Dirección
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
@@ -290,6 +343,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR DE OPERACIONES — aprueba viáticos/proyectos nivel alto
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
+    ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
@@ -382,6 +436,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
@@ -456,6 +511,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ADMINISTRATIVO — primer nivel (operación día a día)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
@@ -514,6 +570,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD OPERACIONES — supervisa ing. de campo, project manager
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...CORE_RECURSOS_URL_RULES, ...ALMACEN_CORE_READ_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
@@ -570,6 +627,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // INGENIERO DE CAMPO — solo lo suyo
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
+    ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     // Páginas frontend
@@ -610,6 +668,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // INGENIERO DE SOPORTE — tickets, NOC, mantenimiento
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_SOPORTE]: [
+    ...CORE_RECURSOS_URL_RULES, ...KPIS_EQUIPO_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...CORE_OLA1_URL_RULES,
     ...SELF_ATTENDANCE_URL_RULES,
@@ -666,6 +725,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD VENTAS — gerente comercial
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...CORE_RECURSOS_URL_RULES,
     ...COTIZACIONES_CORE_URL_RULES,
     ...PROYECTOS_CORE_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
@@ -702,6 +762,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // VENDEDOR — CRM (sus leads, clientes, cotizaciones)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.VENDEDOR]: [
+    ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     { path: '/crm', scope: 'read' },
     { path: '/crm/dashboard', scope: 'read' },
@@ -734,6 +795,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // LÍDER DISEÑO — Studio completo
   // ─────────────────────────────────────────────────────────────────
   [ROLES.LIDER_DISENO]: [
+    ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     // Daniela (diseño) también es personal Core: actividades, asistencia, comida y chat.
     ...CORE_OLA1_URL_RULES,
@@ -767,6 +829,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DISEÑADOR — solo sus tareas en Studio
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DISENADOR]: [
+    ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     { path: '/studio', scope: 'read' },
     { path: '/studio/dashboard', scope: 'read' },
@@ -800,6 +863,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // RH
   // ─────────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_LEAD_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },
@@ -834,6 +898,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CONTABILIDAD
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...CORE_RECURSOS_URL_RULES,
     ...MEETINGS_STAFF_URL_RULES,
     ...ACTIVITY_SUPERIOR_URL_RULES,
     { path: '/erp', scope: 'read' },

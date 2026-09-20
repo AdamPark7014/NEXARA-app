@@ -3,6 +3,7 @@ package mx.nexara.mobile.nativeapp.ui.console
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Chat
@@ -55,6 +56,8 @@ import mx.nexara.mobile.nativeapp.ui.console.clients.ClientDetailScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.ClientsListScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.NewClientScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
+import mx.nexara.mobile.nativeapp.ui.console.more.ModulePlaceholderScreen
+import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
@@ -83,6 +86,15 @@ internal object ConsoleRoutes {
     const val CLIENTS_CHANGED_KEY = "clientes_cambiaron"
 
     const val MyProfile = "console/my-profile"
+
+    /** «Más»: el resto de Core que el rol puede abrir ([CoreExtraModule]). */
+    const val More = "console/more"
+
+    /** Módulo de «Más» sin pantalla propia todavía: se abre en la web. */
+    const val ModulePlaceholder = "console/more/{key}"
+
+    fun modulePlaceholder(key: String): String = "console/more/$key"
+
     const val Notifications = "console/notifications"
     const val OfflineQueue = "console/offline-queue"
     const val ActivityDetail = "console/activity/{id}?tab={tab}"
@@ -157,6 +169,8 @@ fun ConsoleNavHost(
     var unreadCount by remember { mutableIntStateOf(0) }
 
     val modules = remember(user) { CoreMenu.modulesFor(user) }
+    /** «Más»: el resto de Core (cotizaciones, proyectos, KPIs, almacén, herramientas, vehículos, organigrama). */
+    val extras = remember(user) { CoreMenu.extraModulesFor(user) }
     val tabs = remember(modules) { modules.map { ConsoleRoutes.forModule(it) to it } }
     val startRoute = tabs.firstOrNull()?.first ?: ConsoleRoutes.MyProfile
 
@@ -205,6 +219,14 @@ fun ConsoleNavHost(
         DeepLinkNavigation.actividadesVista(link)?.let { actividadesVista = it }
         DeepLinkNavigation.attendanceTab(link)?.let { attendanceTab = it }
 
+        // Módulo de «Más» (aún sin pantalla propia): su ficha, si el rol lo tiene.
+        val extra = CoreExtraModule.fromKey(link.key)
+        if (extra != null) {
+            val ruta = if (extra in extras) ConsoleRoutes.modulePlaceholder(extra.key) else startRoute
+            navController.navigate(ruta) { launchSingleTop = true }
+            return@LaunchedEffect
+        }
+
         val target = DeepLinkNavigation.consoleRoute(link)
             ?: ConsoleRoutes.forModuleKey(link.key)
                 ?.takeIf { it in modules }
@@ -232,6 +254,7 @@ fun ConsoleNavHost(
         ConsoleRoutes.ClientDetail -> "Cliente"
         ConsoleRoutes.NewClient -> "Nuevo cliente"
         ConsoleRoutes.MyProfile -> "Mi perfil"
+        ConsoleRoutes.More, ConsoleRoutes.ModulePlaceholder -> "Más"
         ConsoleRoutes.Notifications -> "Notificaciones"
         ConsoleRoutes.OfflineQueue -> "Cola offline"
         ConsoleRoutes.ActivityDetail -> "Detalle de actividad"
@@ -266,6 +289,15 @@ fun ConsoleNavHost(
                     }
                 },
                 actions = {
+                    // «Más»: el resto de Core. No cabe una sexta pestaña abajo (Material deja 5),
+                    // así que vive aquí, junto a la campana.
+                    if (extras.isNotEmpty() && currentRoute != ConsoleRoutes.More) {
+                        IconButton(
+                            onClick = { navController.navigate(ConsoleRoutes.More) { launchSingleTop = true } },
+                        ) {
+                            Icon(Icons.Default.Apps, contentDescription = "Más módulos", tint = Color.White)
+                        }
+                    }
                     // Sin «Salir» aquí: cerrar sesión vive al final de Mi perfil, con confirmación.
                     // En la bandeja no hace falta la campana: abrirla ya da todo por visto.
                     if (currentRoute != ConsoleRoutes.Notifications) {
@@ -426,6 +458,22 @@ fun ConsoleNavHost(
                     },
                     onLogout = onLogout,
                 )
+            }
+            nxComposable(ConsoleRoutes.More, style = NxNavAnimStyle.Push) {
+                MoreHubScreen(
+                    modules = extras,
+                    onOpen = { module ->
+                        navController.navigate(ConsoleRoutes.modulePlaceholder(module.key)) {
+                            launchSingleTop = true
+                        }
+                    },
+                )
+            }
+            nxComposable(ConsoleRoutes.ModulePlaceholder, style = NxNavAnimStyle.Push) { entry ->
+                val module = CoreExtraModule.fromKey(entry.arguments?.getString("key"))
+                    ?.takeIf { it in extras }
+                    ?: return@nxComposable
+                ModulePlaceholderScreen(module)
             }
             nxComposable(ConsoleRoutes.Notifications, style = NxNavAnimStyle.Push) {
                 NotificationsScreen(

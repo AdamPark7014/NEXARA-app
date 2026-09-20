@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
+import { isCoreMount } from "@/lib/recursos-core";
 import ToolInventoryPanel from "@/components/ToolInventoryPanel";
 import ToolUserKitPanel from "@/components/ToolUserKitPanel";
 import ToolMyKitPanel from "@/components/ToolMyKitPanel";
@@ -25,6 +26,8 @@ function parseManagerTab(value: string | null): ManagerTab {
 export default function ToolsPage() {
   const { user } = useUser();
   const searchParams = useSearchParams();
+  // También se monta en Core (`/erp/almacen/herramientas`).
+  const enCore = isCoreMount(usePathname());
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "tools"), [user]);
   const isManager = cfg.viewMode !== "execute";
   const highlightId = searchParams.get("highlight");
@@ -63,7 +66,7 @@ export default function ToolsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="OPS · Campo"
+        eyebrow={enCore ? "Core · Recursos" : "OPS · Campo"}
         title={cfg.title}
         subtitle={cfg.subtitle}
       />
