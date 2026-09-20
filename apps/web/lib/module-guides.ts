@@ -229,6 +229,19 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `portal KB, support`,
   },
+  'erp-contabilidad': {
+    id: 'erp-contabilidad',
+    summary: `Escritorio de la contadora: CxC, CxP, facturas, conciliacion, pre-nomina y cierres.`,
+    audience: `Contabilidad, admin, CEO.`,
+    how: `Es el hub, no un modulo de captura: cada tarjeta lleva al modulo que si escribe. El cierre de periodo calcula una lista de verificacion contra la base (facturas sin XML, banco sin conciliar, polizas en borrador, pre-nomina abierta) y rechaza el cierre mientras haya puntos bloqueantes, salvo que se escriba una justificacion, que queda en la bitacora de auditoria con el estado anterior del periodo.`,
+    steps: [
+      `Abre /erp/contabilidad y revisa las alertas del tablero.`,
+      `En Cierres, elige el periodo y pulsa "Revisar cierre" para ver que falta.`,
+      `Resuelve los puntos bloqueantes y cierra; si cierras con pendientes, explica por que.`,
+      `En Auditoria, abre cualquier evento para ver el antes y el despues campo por campo.`,
+    ],
+    connects: `accounting, invoicing, banking, employee-payments, audit`,
+  },
   'accounting': {
     id: 'accounting',
     summary: `Contabilidad: pólizas, períodos fiscales y reportes SAT.`,

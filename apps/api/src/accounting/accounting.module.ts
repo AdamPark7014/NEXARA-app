@@ -3,6 +3,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WebhooksModule } from '../webhooks/webhooks.module.js';
+import { AuditModule } from '../audit/audit.module.js';
 import { AccountingService } from './accounting.service.js';
 import { AccountsController } from './accounts.controller.js';
 import { JournalEntriesController } from './journal-entries.controller.js';
@@ -14,9 +15,11 @@ import { AccountingWorkspaceLedgerController } from './workspace-ledger.controll
 import { AccountingWorkspaceLedgerService } from './workspace-ledger.service.js';
 import { ReconciliationMatchService } from './reconciliation-match.service.js';
 import { ReconciliationMatchController } from './reconciliation-match.controller.js';
+import { PeriodCloseController } from './period-close.controller.js';
+import { PeriodCloseService } from './period-close.service.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule],
+  imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule, AuditModule],
   controllers: [
     AccountsController,
     JournalEntriesController,
@@ -26,11 +29,13 @@ import { ReconciliationMatchController } from './reconciliation-match.controller
     AccountingWorkspaceController,
     AccountingWorkspaceLedgerController,
     ReconciliationMatchController,
+    PeriodCloseController,
   ],
   providers: [
     AccountingService,
     AccountingWorkspaceLedgerService,
     ReconciliationMatchService,
+    PeriodCloseService,
   ],
   exports: [AccountingService],
 })
