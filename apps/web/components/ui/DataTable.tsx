@@ -47,7 +47,7 @@ export default function DataTable<T>({
   density = "comfortable",
   stickyHeader = true,
   emptyTitle = "Sin datos",
-  ariaLabel,
+  ariaLabel = "Tabla",
   emptyDescription = "No hay registros para mostrar todavía.",
   emptyAction,
 }: Props<T>) {
@@ -62,7 +62,7 @@ export default function DataTable<T>({
   return (
     <div
       role="region"
-      aria-label={ariaLabel ?? "Tabla de datos"}
+      aria-label={ariaLabel}
       className="nx-table-wrap"
       style={{
         overflowX: "auto",
