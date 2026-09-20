@@ -159,7 +159,9 @@ export default function CierresPage() {
   async function cerrar(periodId: number, texto?: string) {
     if (cierreEnVueloRef.current) return;
     if (!selected) {
-      setErrorCierre("No hay un periodo seleccionado. Vuelve a elegirlo en la lista.");
+      const msg = "No hay un periodo seleccionado. Vuelve a elegirlo en la lista.";
+      setErrorCierre(msg);
+      toast.error(msg);
       return;
     }
     cierreEnVueloRef.current = true;
@@ -181,7 +183,9 @@ export default function CierresPage() {
     } catch (e) {
       // El modal de justificación se queda abierto con el motivo dentro: si se
       // cerrara, nadie sabría si el periodo quedó cerrado o no.
-      setErrorCierre(`No se pudo cerrar el periodo. ${formatApiError(e)}`);
+      const msg = `No se pudo cerrar el periodo. ${formatApiError(e)}`;
+      setErrorCierre(msg);
+      toast.error(msg);
     } finally {
       cierreEnVueloRef.current = false;
       setClosing(false);
