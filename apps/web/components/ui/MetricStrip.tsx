@@ -108,6 +108,9 @@ export default function MetricStrip({
           display: "block",
           textDecoration: "none",
           color: "inherit",
+          // `border: none` se lleva por delante el anillo del navegador: sin
+          // esto, al tabular no se ve dónde estás.
+          outlineOffset: -2,
         };
 
         return m.href ? (

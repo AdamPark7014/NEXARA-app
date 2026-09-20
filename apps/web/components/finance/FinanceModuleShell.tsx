@@ -93,6 +93,8 @@ export function FinanceFormGrid({ children }: { children: ReactNode }) {
  * con un asterisco rojo— llena el formulario de alarmas para decir lo normal.
  * `error` se pinta bajo el campo y reemplaza al hint mientras esté presente.
  */
+let campoSeq = 0;
+
 export function FinanceField({
   label,
   children,
@@ -100,6 +102,7 @@ export function FinanceField({
   hint,
   optional,
   error,
+  describedById,
 }: {
   label: string;
   children: ReactNode;
@@ -107,7 +110,14 @@ export function FinanceField({
   hint?: ReactNode;
   optional?: boolean;
   error?: string | null;
+  /**
+   * Id del mensaje de error, para que el control lo referencie con
+   * `aria-describedby`. Si no se pasa, se genera uno: sin esto, un lector de
+   * pantalla anuncia el campo pero no por qué está mal.
+   */
+  describedById?: string;
 }) {
+  const errorId = describedById ?? `campo-error-${(campoSeq += 1)}`;
   return (
     <label className={`${styles.field}${fullWidth ? ` ${styles.fieldFull}` : ""}`}>
       <span className={styles.fieldLabel}>
@@ -116,7 +126,9 @@ export function FinanceField({
       </span>
       {children}
       {error ? (
-        <span className={styles.fieldError}>{error}</span>
+        <span id={errorId} role="alert" className={styles.fieldError}>
+          {error}
+        </span>
       ) : hint ? (
         <span className={styles.fieldHint}>{hint}</span>
       ) : null}

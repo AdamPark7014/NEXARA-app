@@ -33,6 +33,8 @@ type Props<T> = {
   density?: "comfortable" | "compact";
   stickyHeader?: boolean;
   emptyTitle?: ReactNode;
+  /** Nombre de la región desplazable: `role="region"` sin nombre no se anuncia. */
+  ariaLabel?: string;
   emptyDescription?: ReactNode;
   emptyAction?: ReactNode;
 };
@@ -45,6 +47,7 @@ export default function DataTable<T>({
   density = "comfortable",
   stickyHeader = true,
   emptyTitle = "Sin datos",
+  ariaLabel,
   emptyDescription = "No hay registros para mostrar todavía.",
   emptyAction,
 }: Props<T>) {
@@ -59,6 +62,7 @@ export default function DataTable<T>({
   return (
     <div
       role="region"
+      aria-label={ariaLabel ?? "Tabla de datos"}
       className="nx-table-wrap"
       style={{
         overflowX: "auto",

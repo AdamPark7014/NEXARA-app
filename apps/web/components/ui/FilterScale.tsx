@@ -92,6 +92,8 @@ export default function FilterScale({
               font: "inherit",
               color: "var(--text-primary)",
               border: "none",
+              // `border: none` se lleva por delante el anillo del navegador.
+              outlineOffset: -2,
               borderRight:
                 i < items.length - 1
                   ? "1px solid var(--nx-panel-hairline, var(--border))"
