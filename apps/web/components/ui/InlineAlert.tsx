@@ -14,11 +14,18 @@ export default function InlineAlert({
   variant = "danger",
   onDismiss,
   style,
+  action,
 }: {
   message: string;
   variant?: Variant;
   onDismiss?: () => void;
   style?: React.CSSProperties;
+  /**
+   * La salida del error, dentro del aviso. Sin esto, «Reintentar» quedaba de
+   * hermano suelto debajo de la caja roja y no se leía como la respuesta a lo
+   * que acababa de fallar.
+   */
+  action?: React.ReactNode;
 }) {
   const s = STYLES[variant];
   return (
@@ -39,7 +46,8 @@ export default function InlineAlert({
         ...style,
       }}
     >
-      <span>{message}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>{message}</span>
+      {action}
       {onDismiss && (
         <button
           type="button"
