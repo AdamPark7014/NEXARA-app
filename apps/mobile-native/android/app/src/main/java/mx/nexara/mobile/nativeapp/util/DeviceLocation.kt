@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Build
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -16,12 +17,15 @@ import kotlin.coroutines.resume
 /**
  * @param mock la lectura viene de una app de ubicación simulada (ver [MockLocation]).
  * Se manda al servidor tal cual: él decide (asistencia: 422 y aviso a sus jefes).
+ * @param fixAgeMs de cuándo es la medición, en milisegundos (ver [FixAge]). `null` si el
+ * teléfono no lo dice. El servidor rechaza una posición de hace más de media hora.
  */
 data class DeviceCoords(
     val lat: Double,
     val lng: Double,
     val accuracyM: Float? = null,
     val mock: Boolean = false,
+    val fixAgeMs: Long? = null,
 ) {
     /** Sufijo para mensajes de UI: " · GPS ±12m" / " (sin GPS)". */
     fun messageSuffix(): String =
@@ -93,6 +97,7 @@ object DeviceLocation {
             lng = longitude,
             accuracyM = if (hasAccuracy()) accuracy else null,
             mock = isSimulated(),
+            fixAgeMs = FixAge.millis(SystemClock.elapsedRealtimeNanos(), elapsedRealtimeNanos),
         )
     }
 

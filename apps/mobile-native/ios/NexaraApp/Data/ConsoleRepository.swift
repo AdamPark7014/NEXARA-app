@@ -29,11 +29,23 @@ final class ConsoleRepository {
         return AttendanceRange(raw: ConsoleHelpers.decodeMap(data))
     }
 
-    /// `photoBase64` es obligatoria en el API (`CreateAttendanceDto`): data URL JPEG.
+    /// Checada. `photoBase64` es obligatoria en el API (`CreateAttendanceDto`): data URL JPEG.
+    ///
+    /// Los tres campos de confianza viajan igual que en Android: `accuracyM` (qué tan
+    /// buena era la señal), `mockLocation` (el punto lo produjo software — el servidor
+    /// contesta 422 y avisa a sus jefes) y `fixAgeMs` (de cuándo es la medición). Hasta
+    /// ahora el iPhone no mandaba ninguno, así que una ubicación falsa desde iOS entraba
+    /// a la nómina sin que nadie pudiera notarlo.
+    ///
+    /// `timestamp` es la hora del teléfono y es informativa: la hora del registro la pone
+    /// el servidor.
     func attendanceCheckInResult(
         type: String,
         lat: Double? = nil,
         lng: Double? = nil,
+        accuracyM: Double? = nil,
+        mockLocation: Bool = false,
+        fixAgeMs: Int? = nil,
         photoBase64: String? = nil
     ) async throws -> AttendanceCheckInResult {
         struct Body: Encodable {
@@ -42,9 +54,19 @@ final class ConsoleRepository {
             let photoBase64: String?
             let latitude: Double?
             let longitude: Double?
+            let accuracyM: Double?
+            let mockLocation: Bool
+            let fixAgeMs: Int?
         }
         let data = try await api.postJSON("attendance", body: Body(
-            type: type, timestamp: ConsoleHelpers.isoNow(), photoBase64: photoBase64, latitude: lat, longitude: lng
+            type: type,
+            timestamp: ConsoleHelpers.isoNow(),
+            photoBase64: photoBase64,
+            latitude: lat,
+            longitude: lng,
+            accuracyM: accuracyM.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil },
+            mockLocation: mockLocation,
+            fixAgeMs: fixAgeMs.flatMap { $0 >= 0 ? $0 : nil }
         ))
         return AttendanceCheckInResult(raw: ConsoleHelpers.decodeMap(data))
     }
@@ -148,7 +170,17 @@ final class ConsoleRepository {
     /// `POST gps` (`CreateGpsDto`). `estaActivo` va en true como en la web: es
     /// lo que hace que el punto salga en `gps/team` y en el recorrido del día.
     /// `actividadId` liga el punto a la actividad en curso (geocerca de 100 m).
-    func gpsPost(lat: Double, lng: Double, speedKmh: Double? = nil, actividadId: Int? = nil) async throws {
+    /// - Parameter mockLocation: el punto lo produjo software. Aquí el servidor **no**
+    ///   rechaza nada —el recorrido de la jornada no decide nómina, y un hueco no se puede
+    ///   leer— pero lo guarda marcado, que es lo que permite ver después que media jornada
+    ///   venía de una app de GPS falso.
+    func gpsPost(
+        lat: Double,
+        lng: Double,
+        speedKmh: Double? = nil,
+        actividadId: Int? = nil,
+        mockLocation: Bool? = nil
+    ) async throws {
         struct Body: Encodable {
             let latitud: Double
             let longitud: Double
@@ -156,11 +188,13 @@ final class ConsoleRepository {
             let estaActivo: Bool
             let ultimaActualizacion: String
             let actividadId: Int?
+            let mockLocation: Bool?
         }
         _ = try await api.postJSON("gps", body: Body(
             latitud: lat, longitud: lng, velocidadKmh: speedKmh, estaActivo: true,
             ultimaActualizacion: ConsoleHelpers.isoNow(),
-            actividadId: actividadId
+            actividadId: actividadId,
+            mockLocation: mockLocation
         ))
     }
 }
