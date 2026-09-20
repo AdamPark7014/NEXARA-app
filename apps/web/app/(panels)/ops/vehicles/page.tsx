@@ -15,6 +15,9 @@ import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { VEHICULOS_GPS_PATH, isCoreMount, puedeVerGpsDireccion, vehiclesBasePath } from "@/lib/recursos-core";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import Modal from "@/components/ui/Modal";
+import VehicleCheckoutForm from "@/components/VehicleCheckoutForm";
+import { enviarChecklist, type ChecklistPayload } from "@/lib/vehiculos-api";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
@@ -28,8 +31,9 @@ interface Vehicle {
   notas?: string;
   assignedToId?: number | null;
   assignedAt?: string | null;
-  salidaFotos?: string[] | null;
-  devolucionFotos?: string[] | null;
+  /** Payload del check list de salida: `{ fotos, odometroKm, combustiblePct, … }`. */
+  salidaFotos?: { odometroKm?: number | null } | null;
+  devolucionFotos?: { odometroKm?: number | null } | null;
   tiempoUsoMinutos?: number | null;
 }
 
@@ -83,9 +87,7 @@ export default function VehiclesPage() {
   const [editing, setEditing] = useState<Vehicle | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [checkoutId, setCheckoutId] = useState<number | null>(null);
-  const [checkoutPhotos, setCheckoutPhotos] = useState<File[]>([]);
   const [returnId, setReturnId] = useState<number | null>(null);
-  const [returnPhotos, setReturnPhotos] = useState<File[]>([]);
   const [photoSaving, setPhotoSaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -178,34 +180,34 @@ export default function VehiclesPage() {
     }
   };
 
-  const doCheckout = async () => {
+  /** El km con el que salió, para que la devolución no pueda retroceder. */
+  const odometroDeSalida = useMemo(
+    () => items.find((v) => v.id === returnId)?.salidaFotos?.odometroKm ?? null,
+    [items, returnId],
+  );
+
+  /**
+   * Salida y devolución desde inventario. Antes bastaba con «al menos 1 foto»
+   * y no se pedía ni kilometraje ni gasolina: era la puerta de atrás del check
+   * list. Ahora pasa por el mismo formulario y el mismo multipart que una
+   * solicitud, que es lo que valida la API.
+   */
+  const doCheckout = async (payload: ChecklistPayload) => {
     if (!checkoutId || !token) return;
-    if (checkoutPhotos.length === 0) { toast.warning("Sube al menos 1 foto del estado actual del vehículo"); return; }
     setPhotoSaving(true);
     try {
-      const fd = new FormData();
-      checkoutPhotos.forEach(f => fd.append("photos", f));
-      const res = await fetch(buildApiUrl(`vehicles/inventory/${checkoutId}/checkout`), {
-        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd,
-      });
-      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-      setCheckoutId(null); setCheckoutPhotos([]); load();
+      await enviarChecklist(token, `vehicles/inventory/${checkoutId}/checkout`, payload);
+      setCheckoutId(null); load();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Error al registrar salida"); }
     finally { setPhotoSaving(false); }
   };
 
-  const doReturn = async () => {
+  const doReturn = async (payload: ChecklistPayload) => {
     if (!returnId || !token) return;
-    if (returnPhotos.length === 0) { toast.warning("Sube al menos 1 foto del estado en que se entrega el vehículo"); return; }
     setPhotoSaving(true);
     try {
-      const fd = new FormData();
-      returnPhotos.forEach(f => fd.append("photos", f));
-      const res = await fetch(buildApiUrl(`vehicles/inventory/${returnId}/return`), {
-        method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd,
-      });
-      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-      setReturnId(null); setReturnPhotos([]); load();
+      await enviarChecklist(token, `vehicles/inventory/${returnId}/return`, payload);
+      setReturnId(null); load();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Error al registrar devolución"); }
     finally { setPhotoSaving(false); }
   };
@@ -258,10 +260,10 @@ export default function VehiclesPage() {
     { key: "id", label: "", render: v => (
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         {cfg.canEdit && v.estatus !== "Asignado" && (
-          <button onClick={() => { setCheckoutId(v.id); setCheckoutPhotos([]); }} title="Registrar salida" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--primary)", background: "transparent", color: "var(--primary)", cursor: "pointer" }}>📤 Salida</button>
+          <button onClick={() => setCheckoutId(v.id)} title="Registrar salida" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--primary)", background: "transparent", color: "var(--primary)", cursor: "pointer" }}>📤 Salida</button>
         )}
         {cfg.canEdit && v.estatus === "Asignado" && (
-          <button onClick={() => { setReturnId(v.id); setReturnPhotos([]); }} title="Registrar devolución" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--success,#22c55e)", background: "transparent", color: "var(--success,#22c55e)", cursor: "pointer" }}>📥 Devolución</button>
+          <button onClick={() => setReturnId(v.id)} title="Registrar devolución" style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--success,#22c55e)", background: "transparent", color: "var(--success,#22c55e)", cursor: "pointer" }}>📥 Devolución</button>
         )}
         {cfg.canEdit && <button onClick={() => openEdit(v)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
         {cfg.canDelete && <button onClick={() => remove(v.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
@@ -454,53 +456,29 @@ export default function VehiclesPage() {
           <DataTable columns={columns} rows={visibleVehicles} rowKey={v => v.id} emptyTitle="Sin vehículos" emptyDescription="Registra el primer vehículo de la flotilla." />
         )}
       </Section>
-      {/* ── Checkout modal ── */}
-      {checkoutId !== null && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-          <div style={{ background: "var(--surface)", borderRadius: 14, padding: 28, maxWidth: 420, width: "90%", display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>📤 Registrar salida de vehículo</div>
-            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Sube fotos del estado actual del vehículo <strong>antes</strong> de entregarlo al usuario.</p>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
-              Fotos antes de salida *
-              <input type="file" accept="image/*" multiple style={{ display: "block", marginTop: 6, width: "100%" }}
-                onChange={e => setCheckoutPhotos(Array.from(e.target.files ?? []))} />
-            </label>
-            {checkoutPhotos.length > 0 && (
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{checkoutPhotos.length} foto{checkoutPhotos.length > 1 ? "s" : ""} seleccionada{checkoutPhotos.length > 1 ? "s" : ""}</div>
-            )}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <Button variant="ghost" onClick={() => { setCheckoutId(null); setCheckoutPhotos([]); }}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void doCheckout()} disabled={photoSaving || checkoutPhotos.length === 0}>
-                {photoSaving ? "Guardando…" : "Confirmar salida"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Salida y devolución: el mismo check list que exige la API ── */}
+      <Modal
+        open={checkoutId !== null}
+        onClose={() => setCheckoutId(null)}
+        title="Salida de vehículo"
+        maxWidth={720}
+      >
+        <VehicleCheckoutForm mode="salida" loading={photoSaving} onSubmit={doCheckout} />
+      </Modal>
 
-      {/* ── Return modal ── */}
-      {returnId !== null && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-          <div style={{ background: "var(--surface)", borderRadius: 14, padding: 28, maxWidth: 420, width: "90%", display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>📥 Registrar devolución de vehículo</div>
-            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Sube fotos del estado en que <strong>regresa</strong> el vehículo para evidenciar la entrega.</p>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
-              Fotos al devolver *
-              <input type="file" accept="image/*" multiple style={{ display: "block", marginTop: 6, width: "100%" }}
-                onChange={e => setReturnPhotos(Array.from(e.target.files ?? []))} />
-            </label>
-            {returnPhotos.length > 0 && (
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{returnPhotos.length} foto{returnPhotos.length > 1 ? "s" : ""} seleccionada{returnPhotos.length > 1 ? "s" : ""}</div>
-            )}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <Button variant="ghost" onClick={() => { setReturnId(null); setReturnPhotos([]); }}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void doReturn()} disabled={photoSaving || returnPhotos.length === 0}>
-                {photoSaving ? "Guardando…" : "Confirmar devolución"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={returnId !== null}
+        onClose={() => setReturnId(null)}
+        title="Devolución de vehículo"
+        maxWidth={720}
+      >
+        <VehicleCheckoutForm
+          mode="devolucion"
+          odometroInicio={odometroDeSalida}
+          loading={photoSaving}
+          onSubmit={doReturn}
+        />
+      </Modal>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
