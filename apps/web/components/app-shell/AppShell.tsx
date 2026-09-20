@@ -93,6 +93,7 @@ import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import SwitchAccountOutlinedIcon from "@mui/icons-material/SwitchAccountOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuIcon from "@mui/icons-material/Menu";
+import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -105,6 +106,14 @@ type AppShellProps = {
   panel: PanelId;
   children: React.ReactNode;
 };
+
+/**
+ * Grupos que son navegación secundaria, no módulos de trabajo: caen al final
+ * del menú y bajan de tono. El id lo genera `buildUserSidebar` a partir del
+ * título del grupo («Mi cuenta» → `mi-cuenta`); si un panel no lo trae, el
+ * grupo se pinta como cualquier otro. Es solo un gancho visual.
+ */
+const SECONDARY_NAV_GROUP_IDS = new Set(["mi-cuenta"]);
 
 type NotifPreviewItem = {
   id: number;
@@ -551,6 +560,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("");
 
+  const roleLabel = getUserRoleLabel(user);
+
   // Solo la opción más específica: en «KPIs del equipo» no se marca también «Asistencias».
   const activeMenuTarget = rutaActivaDelMenu(
     pathname,
@@ -661,6 +672,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
       {/* ───────── SIDEBAR ───────── */}
       <aside
         ref={drawerRef}
+        id="nx-sidebar-nav"
         className={styles.sidebar}
         {...(mobileOpen
           ? { role: "dialog", "aria-modal": true, "aria-label": "Menú de navegación" }
@@ -681,6 +693,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
               {panelMeta.name.replace(/^NEXARA\s+/i, "")}
             </div>
           </div>
+          {/* Solo en el cajón: cerrar sin tener que acertarle al velo. */}
+          <button
+            type="button"
+            className={styles.drawerClose}
+            onClick={() => setMobileOpen(false)}
+            aria-label="Cerrar menú"
+            title="Cerrar menú"
+          >
+            <CloseIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+          </button>
         </div>
 
         <div className={styles.search}>
@@ -691,7 +713,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
             <input
               type="search"
               className={styles.searchInput}
-              placeholder="Buscar en el menú…"
+              placeholder="Filtrar…"
+              aria-label="Filtrar el menú"
               value={navQuery}
               onChange={(e) => setNavQuery(e.target.value)}
             />
@@ -700,97 +723,94 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
         <nav className={styles.menu} aria-label="Menú principal">
           {filteredGroups.length === 0 ? (
-            <div style={{ padding: "12px 14px", fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>
-              No hay secciones disponibles en este panel para tu rol.
-            </div>
+            <p className={styles.menuEmpty}>
+              {navQuery.trim()
+                ? `Sin resultados para «${navQuery.trim()}».`
+                : "Sin módulos disponibles para tu rol."}
+            </p>
           ) : (
-            filteredGroups.map((group) => (
-            <div key={group.id} className={styles.group}>
-              <p className={styles.groupTitle}>{group.title}</p>
-              {group.items.map((item) => {
-                const target = getModuleUrl(item.id);
-                const active = target === activeMenuTarget;
-                return (
-                  <Link
-                    key={item.id}
-                    href={target}
-                    className={`${styles.menuItem} ${active ? styles.active : ""}`.trim()}
-                    title={item.description}
-                  >
-                    <span className={styles.menuItemIcon} aria-hidden="true">
-                      <ModuleIcon id={item.id} size={16} />
-                    </span>
-                    <span className={styles.menuItemLabel}>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          ))
+            filteredGroups.map((group) => {
+              const groupLabelId = `nx-nav-group-${group.id}`;
+              return (
+                <div
+                  key={group.id}
+                  className={styles.group}
+                  role="group"
+                  aria-labelledby={groupLabelId}
+                  data-kind={SECONDARY_NAV_GROUP_IDS.has(group.id) ? "secondary" : undefined}
+                >
+                  <p className={styles.groupTitle} id={groupLabelId}>
+                    {group.title}
+                  </p>
+                  {group.items.map((item) => {
+                    const target = getModuleUrl(item.id);
+                    const active = target === activeMenuTarget;
+                    return (
+                      <Link
+                        key={item.id}
+                        href={target}
+                        className={`${styles.menuItem} ${active ? styles.active : ""}`.trim()}
+                        aria-current={active ? "page" : undefined}
+                        // Colapsado el renglón es solo un icono: el globo dice el nombre.
+                        title={collapsed ? item.label : item.description || undefined}
+                      >
+                        <span className={styles.menuItemIcon} aria-hidden="true">
+                          <ModuleIcon id={item.id} size={16} />
+                        </span>
+                        <span className={styles.menuItemLabel}>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              );
+            })
           )}
         </nav>
 
         <div className={styles.userBlock} ref={userMenuRef}>
-          <div className={styles.avatar} aria-hidden="true">
-            {initials || "U"}
-          </div>
-          <div className={styles.userInfo}>
-            <div className={styles.userName}>{user.nombre || user.email}</div>
-            <div className={styles.userRole}>
-              {getUserRoleLabel(user)}
-            </div>
-          </div>
+          {/* Todo el bloque es el disparador: también funciona colapsado,
+              donde antes el botón de tres puntos desaparecía y dejaba el
+              menú de cuenta (y el cierre de sesión) sin acceso. */}
           <button
             type="button"
-            className={styles.userMenuBtn}
+            className={styles.userTrigger}
             onClick={() => setUserMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={userMenuOpen}
-            aria-label="Menú de usuario"
+            title={`${user.nombre || user.email} · ${roleLabel}`}
           >
-            <MoreVertIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            <span className={styles.avatar} aria-hidden="true">
+              {initials || "U"}
+            </span>
+            <span className={styles.userInfo}>
+              <span className={styles.userName}>{user.nombre || user.email}</span>
+              <span className={styles.userRole}>{roleLabel}</span>
+            </span>
+            <span className={styles.userTriggerIcon} aria-hidden="true">
+              <MoreVertIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            </span>
           </button>
 
           {userMenuOpen && (
-            <div
-              role="menu"
-              style={{
-                position: "absolute",
-                bottom: 68,
-                left: 12,
-                right: 12,
-                background: "var(--surface)",
-                border: "1px solid var(--nx-panel-hairline)",
-                borderRadius: 14,
-                boxShadow: "0 4px 8px rgba(8,24,38,0.08), 0 24px 48px rgba(8,24,38,0.18)",
-                padding: 6,
-                zIndex: 40,
-                animation: "switcherIn 200ms var(--nx-ease-out)",
-              }}
-            >
-              <div
-                style={{
-                  padding: "8px 10px 6px",
-                  fontSize: 10.5,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                Cuenta
-              </div>
+            <div role="menu" aria-label="Cuenta" className={styles.userMenu}>
               <Link
                 href={profileUrl ?? homeUrl}
+                role="menuitem"
                 onClick={() => setUserMenuOpen(false)}
-                style={menuItemStyle()}
+                className={styles.userMenuItem}
               >
-                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
+                <span className={styles.userMenuItemIcon} aria-hidden="true">
                   <PersonOutlineIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 </span>
                 Mi perfil
               </Link>
-              <button type="button" onClick={toggleDarkMode} style={menuItemStyle()}>
-                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={toggleDarkMode}
+                className={styles.userMenuItem}
+              >
+                <span className={styles.userMenuItemIcon} aria-hidden="true">
                   {darkMode ? (
                     <LightModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                   ) : (
@@ -801,41 +821,47 @@ export default function AppShell({ panel, children }: AppShellProps) {
               </button>
               <button
                 type="button"
+                role="menuitem"
                 onClick={() => {
                   const next = navMode === "avanzado" ? "operativo" : "avanzado";
                   writeNavMode(next);
                   setNavMode(next);
                 }}
-                style={menuItemStyle()}
+                className={styles.userMenuItem}
+                data-state={navMode === "avanzado" ? "on" : undefined}
                 aria-pressed={navMode === "avanzado"}
               >
-                <span
-                  style={{
-                    width: 18,
-                    display: "inline-flex",
-                    justifyContent: "center",
-                    color: navMode === "avanzado" ? "var(--primary)" : undefined,
-                  }}
-                >
+                <span className={styles.userMenuItemIcon} aria-hidden="true">
                   <TuneOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 </span>
-                {navMode === "avanzado" ? "Menú avanzado: on" : "Menú avanzado"}
+                Menú avanzado
+                {navMode === "avanzado" && (
+                  <span className={styles.userMenuState} aria-hidden="true" />
+                )}
               </button>
               <Link
                 href={buildFreshLoginUrl()}
+                role="menuitem"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setUserMenuOpen(false)}
-                style={menuItemStyle()}
+                className={styles.userMenuItem}
+                title="Se abre en una pestaña nueva"
               >
-                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
+                <span className={styles.userMenuItemIcon} aria-hidden="true">
                   <SwitchAccountOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 </span>
-                Otra cuenta (nueva pestaña)
+                Cambiar de cuenta
               </Link>
-              <hr style={{ border: 0, borderTop: "1px solid var(--nx-panel-hairline-soft)", margin: "4px 6px" }} />
-              <button type="button" onClick={handleLogout} style={{ ...menuItemStyle(), color: "var(--danger)" }}>
-                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>
+              <hr className={styles.userMenuSep} />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleLogout}
+                className={styles.userMenuItem}
+                data-variant="danger"
+              >
+                <span className={styles.userMenuItemIcon} aria-hidden="true">
                   <LogoutIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 </span>
                 Cerrar sesión
@@ -1263,26 +1289,6 @@ function PanelAccessDenied({
       </main>
     </div>
   );
-}
-
-function menuItemStyle(): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    width: "100%",
-    textAlign: "left",
-    padding: "9px 12px",
-    border: "none",
-    background: "transparent",
-    fontSize: 13,
-    fontWeight: 500,
-    color: "var(--text-primary)",
-    cursor: "pointer",
-    borderRadius: 9,
-    textDecoration: "none",
-    transition: "background 140ms ease",
-  };
 }
 
 /**
