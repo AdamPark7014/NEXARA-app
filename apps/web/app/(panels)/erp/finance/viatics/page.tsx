@@ -767,6 +767,7 @@ export default function ViaticosPage() {
   };
 
   const markPagadoRow = (v: Viatico) => {
+    if (rowBusyId != null) return;
     const nombre = `${folioViatico(v.id)} · ${v.concepto ?? "viático"}`;
     setConfirmState({
       message: `¿Marcar como pagado ${nombre}? Se registra la salida de dinero.`,
@@ -791,6 +792,7 @@ export default function ViaticosPage() {
   };
 
   const softDelete = (v: Viatico) => {
+    if (rowBusyId != null) return;
     const nombre = `${folioViatico(v.id)} · ${v.concepto ?? v.motivo ?? "viático"}`;
     setConfirmState({
       message: `¿Cancelar ${nombre}? Queda como rechazado.`,
