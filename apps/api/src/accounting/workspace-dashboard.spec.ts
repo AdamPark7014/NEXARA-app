@@ -1,5 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+// `apps/api` corre con jest (ver `jest.config.js`), no con vitest: el `import from 'vitest'`
+// que traía este archivo hacía fallar la suite entera antes de ejecutar un solo caso, así que
+// este contrato de autorización llevaba tiempo sin verificarse. Aquí se usan los globals de jest.
 import { PERMISSIONS } from '../common/permissions.js';
+import { AccountingService } from './accounting.service.js';
 
 /**
  * Authz contract for Contadora workspace dashboard.
@@ -37,8 +40,7 @@ describe('accounting workspace dashboard authz', () => {
 });
 
 describe('getWorkspaceDashboard shape (unit smoke)', () => {
-  it('exporta el método en AccountingService', async () => {
-    const mod = await import('./accounting.service.js');
-    expect(typeof mod.AccountingService.prototype.getWorkspaceDashboard).toBe('function');
+  it('exporta el método en AccountingService', () => {
+    expect(typeof AccountingService.prototype.getWorkspaceDashboard).toBe('function');
   });
 });
