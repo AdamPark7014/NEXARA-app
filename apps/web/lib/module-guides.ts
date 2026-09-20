@@ -229,6 +229,20 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `portal KB, support`,
   },
+  // El hub `erp-contabilidad` ya estaba en `access-matrix` pero sin guía, y `Record<ModuleId, …>`
+  // dejaba de compilar toda la web. Va aquí, junto a los módulos de los que es la puerta.
+  'erp-contabilidad': {
+    id: 'erp-contabilidad',
+    summary: `Hub financiero de la contadora: CxC, CxP, facturas, conciliación, pre-nómina y cierres.`,
+    audience: `Contabilidad, dirección administrativa y CEO.`,
+    how: `Es la puerta de entrada, no un módulo nuevo: cada sección lee del mismo API que ya opera cada área (accounting, invoicing, banking, employee-payments). El menú solo muestra lo que tu puesto puede abrir de verdad; si una entrada no aparece es porque la API te respondería 403, no porque falte la pantalla. La bitácora (Auditoría) pide \`audit.view\`, que es de dirección.`,
+    steps: [
+      `Entra a /erp/contabilidad y revisa el resumen del periodo.`,
+      `Usa Por cobrar / Por pagar para el dinero pendiente, y Conciliación para cuadrar el banco.`,
+      `En Pre-nómina revisa el periodo e incidencias; para generar los borradores de pago, abre el módulo completo en finanzas.`,
+    ],
+    connects: `accounting, invoicing, banking, employee-payments, expenses`,
+  },
   'accounting': {
     id: 'accounting',
     summary: `Contabilidad: pólizas, períodos fiscales y reportes SAT.`,

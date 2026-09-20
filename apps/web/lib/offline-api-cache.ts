@@ -232,13 +232,23 @@ export function responseFromApiCache(entry: CachedApiEntry, stale: boolean): Res
   return new Response(entry.body, { status: entry.status, statusText: entry.statusText, headers: h });
 }
 
-/** Tras recuperar red: refresca hasta `limit` entradas más recientes en segundo plano. */
+/**
+ * Tras recuperar red: refresca hasta `limit` entradas más recientes en segundo plano.
+ *
+ * `tagActual` es la etiqueta de la sesión abierta (`authCacheTag`). Sin ella, esta función
+ * pedía de nuevo TODAS las entradas guardadas —incluidas las de otra cuenta que usó el mismo
+ * navegador— con el token de quien está dentro AHORA, y guardaba la respuesta bajo la etiqueta
+ * ajena: al volver esa otra persona leía datos que no son suyos. Ahora solo se refresca lo que
+ * pertenece a la sesión actual; lo de otras etiquetas se deja intacto.
+ */
 export async function revalidateHotApiCache(
   http: typeof fetch,
   getAuthHeader: () => string | undefined,
   limit = 72,
+  tagActual?: string,
 ): Promise<void> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
+  if (!tagActual) return;
 
   const db = await openDb();
   const rows = await new Promise<CachedApiEntry[]>((resolve, reject) => {
@@ -263,9 +273,11 @@ export async function revalidateHotApiCache(
   if (!auth) return;
 
   for (const row of rows) {
+    const sep = row.key.indexOf("::");
+    const tag = sep >= 0 ? row.key.slice(0, sep) : "anon";
+    // Entrada de otra cuenta: ni se pide ni se sobrescribe con la respuesta de esta sesión.
+    if (tag !== tagActual) continue;
     try {
-      const sep = row.key.indexOf("::");
-      const tag = sep >= 0 ? row.key.slice(0, sep) : "anon";
       const headers: Record<string, string> = { Accept: "application/json", Authorization: auth };
       const res = await http(row.url, { method: "GET", headers, cache: "no-store" });
       if (res.ok) await storeApiGetCache(row.url, tag, res);
