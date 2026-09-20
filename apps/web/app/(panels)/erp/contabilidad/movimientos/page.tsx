@@ -15,6 +15,7 @@ import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { financeStatusLabel } from "@/lib/finance-status-labels";
 import {
   NATURALEZA_HINT,
   NATURALEZA_LABELS,
@@ -218,7 +219,7 @@ export default function MovimientosPage() {
         label: "Estado",
         render: (r) =>
           r.estado ? (
-            <StatusDot label={r.estado} tone={tonoEstado(r.estado)} />
+            <StatusDot label={financeStatusLabel(r.estado)} tone={tonoEstado(r.estado)} />
           ) : (
             <span style={{ color: "var(--text-tertiary)" }}>—</span>
           ),
@@ -462,7 +463,7 @@ export default function MovimientosPage() {
             <DetailRow label="Proyecto" value={detail.proyecto?.nombre ?? "—"} />
             <DetailRow label="Referencia" value={detail.referencia ?? "—"} />
             <DetailRow label="Método" value={formatMetodo(detail.metodoPago)} />
-            <DetailRow label="Estado" value={detail.estado} />
+            <DetailRow label="Estado" value={financeStatusLabel(detail.estado)} />
             <DetailRow label="Registró" value={detail.registradoPor ?? "—"} />
             <DetailRow
               label="Importe"
