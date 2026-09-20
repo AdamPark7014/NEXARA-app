@@ -2,26 +2,25 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** `7322717c` (en Hetzner; web+api healthy)
-- **Migraciones:** ya aplicadas `2026092001*`
+- **Rama:** feat/hard-warehouse
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-hard-warehouse`
+- **HEAD:** (este commit)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Hecho este turno (optimización densidad · 4 agentes)
+## Hecho este turno (warehouse audit TOP)
 
-1. **Shell** (`58241797`): menos padding PageHeader / Section / PanelTabs / KpiCard.
-2. **Organigrama** (`8725d527`): KPIs + depto en franja; nodos ~204px.
-3. **Almacén** (`ea1b5ddd`): sin doble chrome embedded; herramientas densas; fotos 140px.
-4. **section-views** (`2e2a6b10`): copy Core corto; tools manage para admin/warehouse.
+1. **ScannerAlmacenPanel**: buffer HID (ráfaga + Enter), min length 3, ignore Enter mientras loading/saving; ops RECEIPT|DISPATCH|TRANSFER|ADJUSTMENT(+baja)|RETURN; from/to según tipo; padding densificado.
+2. **VistaAlmacen**: opción RETURN en create movement + toWarehouse como RECEIPT.
+3. **page.spec** `/erp/almacen`: 6 tabs con Escáner; mock scanner; 8 tests OK.
 
 ## Siguiente
 
-- QA visual en prod tras deploy.
-- Rotar Maps key / contraseñas: lado Adam.
+- Resto del warehouse audit (DISPATCH+activityId / sin CONSUME enum).
+- Merge `feat/hard-warehouse` → rama principal cuando Adam lo pida.
 
 ## No tocar
 
-Puente NAS.
+Puente NAS · main `NEXARA-app` (este trabajo es solo worktree).
