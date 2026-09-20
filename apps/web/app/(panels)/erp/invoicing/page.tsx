@@ -25,6 +25,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import Modal from "@/components/ui/Modal";
 import { toast } from "@/components/Toast";
 import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
+import { formatApiError } from "@/lib/erp-api";
 
 interface InvoiceRow {
   id: number;
@@ -166,6 +167,8 @@ export default function InvoicingPage() {
   const [paymentTarget, setPaymentTarget] = useState<InvoiceRow | null>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "", stampComplement: true });
   const [paymentErr, setPaymentErr] = useState<string | null>(null);
+  /** Errores de timbrar/cancelar que mueren con el ConfirmDialog si solo hay toast. */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [pacInfo, setPacInfo] = useState<{ provider?: string; configured?: boolean; productionWarning?: string | null; env?: string; csd?: { configured?: boolean } } | null>(null);
   const [issuerProfile, setIssuerProfile] = useState<{ emisorRfc?: string | null; emisorName?: string | null; emisorZipCode?: string | null; source?: string } | null>(null);
@@ -268,11 +271,15 @@ export default function InvoicingPage() {
       confirmLabel: "Timbrar",
       danger: false,
       fn: async () => {
+        setActionError(null);
         try {
           await apiFetch(`accounting/invoices/${inv.id}/stamp`, token, { method: "POST" });
+          toast.success("Factura timbrada ante el PAC");
           void load();
         } catch (e) {
-          toast.error(`Error al timbrar: ${e instanceof Error ? e.message : "desconocido"}`);
+          const msg = formatApiError(e, "No se pudo timbrar");
+          setActionError(`Error al timbrar ${inv.invoiceNumber}: ${msg}`);
+          toast.error(msg);
         }
       },
     });
@@ -281,10 +288,15 @@ export default function InvoicingPage() {
   const cancel = async (inv: InvoiceRow) => {
     if (!token) return;
     setConfirmState({ message: `¿Cancelar el CFDI ${inv.invoiceNumber}?`, confirmLabel: "Cancelar CFDI", fn: async () => {
+    setActionError(null);
     try {
       await apiFetch(`accounting/invoices/${inv.id}/cancel`, token, { method: "PATCH", body: JSON.stringify({ cancelReason: "02" }) });
       void load();
-    } catch (e) { toast.error(`Error al cancelar: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) {
+      const msg = formatApiError(e, "No se pudo cancelar");
+      setActionError(`Error al cancelar ${inv.invoiceNumber}: ${msg}`);
+      toast.error(msg);
+    }
   } });
   };
 
@@ -326,11 +338,15 @@ export default function InvoicingPage() {
         toast.success(`Complemento de pago timbrado: ${result.complement.cfdiPaymentUuid.slice(0, 8)}…`);
       } else if (result?.complementStampWarning) {
         toast.warning(`Pago registrado, pero el complemento no se timbró: ${result.complementStampWarning}`);
+      } else {
+        toast.success("Pago registrado");
       }
       setPaymentTarget(null);
       void load();
     } catch (e) {
-      setPaymentErr(e instanceof Error ? e.message : "Error al registrar pago");
+      const msg = formatApiError(e, "Error al registrar pago");
+      setPaymentErr(msg);
+      toast.error(msg);
     } finally {
       setPaying(false);
     }
@@ -406,7 +422,27 @@ export default function InvoicingPage() {
   };
 
   const saveInvoice = async () => {
-    if (!token || !form.receptorName.trim() || !form.description.trim() || form.unitPrice <= 0 || !form.receptorZipCode.trim()) return;
+    if (!token) {
+      setFormErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión.");
+      toast.error("Sesión no válida");
+      return;
+    }
+    if (!form.receptorName.trim()) {
+      setFormErr("Indica el nombre del receptor.");
+      return;
+    }
+    if (!form.receptorZipCode.trim()) {
+      setFormErr("Indica el código postal del receptor.");
+      return;
+    }
+    if (!form.description.trim()) {
+      setFormErr("Indica el concepto de la factura.");
+      return;
+    }
+    if (!(form.unitPrice > 0)) {
+      setFormErr("El precio unitario debe ser mayor a cero.");
+      return;
+    }
     setSaving(true);
     setFormErr(null);
     const body = {
@@ -441,11 +477,14 @@ export default function InvoicingPage() {
           }),
         });
       }
+      toast.success(editingInvoice ? "Cambios guardados" : "Borrador creado");
       setShowForm(false);
       setEditingInvoice(null);
       void load();
     } catch (e) {
-      setFormErr(e instanceof Error ? e.message : "No se pudo guardar");
+      const msg = formatApiError(e, "No se pudo guardar");
+      setFormErr(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -807,6 +846,16 @@ export default function InvoicingPage() {
           ], "facturas")}>Excel</Button>
         ) : undefined}
       />
+
+      {actionError && (
+        <div style={{ marginBottom: 12 }}>
+          <InlineAlert
+            variant="danger"
+            message={actionError}
+            onDismiss={() => setActionError(null)}
+          />
+        </div>
+      )}
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} CFDI`}>
         {(highlightId || invoiceRef) && (
