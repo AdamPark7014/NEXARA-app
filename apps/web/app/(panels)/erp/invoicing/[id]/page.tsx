@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
@@ -22,6 +21,21 @@ import {
   FinanceFormGrid,
   financeInputStyle,
 } from "@/components/finance/FinanceModuleShell";
+import {
+  AlertIcon,
+  BlockHeading,
+  COMMERCIAL_LABEL,
+  CopyableRef,
+  Dot,
+  fiscalState,
+  FootNote,
+  LoadingIcon,
+  MetricFrame,
+  MetricHint,
+  MetricValue,
+  NoticeStack,
+  type Notice,
+} from "../_parts";
 
 interface InvoiceLine {
   id: number;
@@ -93,11 +107,6 @@ const STATUS_TONE: Record<string, StatusTone> = {
   CANCELLED: "danger",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Borrador", SENT: "Enviada", PARTIALLY_PAID: "Pago parcial",
-  PAID: "Pagada", OVERDUE: "Vencida", CANCELLED: "Cancelada",
-};
-
 const MATCH_LABELS: Record<string, string> = {
   NOT_REQUIRED: "No aplica",
   PENDING: "Pendiente",
@@ -106,15 +115,25 @@ const MATCH_LABELS: Record<string, string> = {
   WAIVED: "Eximido",
 };
 
-const MATCH_TONE: Record<string, StatusTone> = {
-  NOT_REQUIRED: "neutral",
-  PENDING: "warning",
-  MATCHED: "neutral",
-  VARIANCE: "danger",
-  WAIVED: "neutral",
-};
-
 const inp = financeInputStyle;
+
+/** Etiqueta de un dato de ficha: pequeña, callada, sin competir con el valor. */
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: 10.5,
+        fontWeight: 600,
+        color: "var(--text-tertiary)",
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        marginBottom: 3,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -365,8 +384,8 @@ export default function InvoiceDetailPage() {
     return Math.min(100, Math.round(((invoice.paidAmount ?? 0) / invoice.totalAmount) * 100));
   }, [invoice]);
 
-  if (loading) return <EmptyState icon="⏳" title="Cargando factura…" description="Consultando datos de facturación." />;
-  if (error) return <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />;
+  if (loading) return <EmptyState icon={<LoadingIcon />} title="Cargando factura…" description="Consultando el CFDI." />;
+  if (error) return <EmptyState icon={<AlertIcon />} title="No se pudo cargar la factura" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />;
   if (!invoice) return null;
 
   const isIncome = invoice.type === "ACCOUNTS_RECEIVABLE" || invoice.type === "INCOME";
@@ -374,274 +393,306 @@ export default function InvoiceDetailPage() {
 
   // Estado fiscal: lo primero que se busca en una factura. El comercial
   // (pagada, vencida) va al lado, en segundo plano.
-  const fiscal: { label: string; tone: StatusTone; title: string } =
-    invoice.isCancelled || invoice.status === "CANCELLED"
-      ? { label: "Cancelada", tone: "danger", title: "CFDI cancelado ante el SAT" }
-      : !invoice.cfdiUuid
-        ? { label: "Sin timbrar", tone: "warning", title: "Borrador: todavía no tiene UUID fiscal" }
-        : invoice.satPaymentMethod === "PPD"
-          ? { label: "Timbrada · PPD", tone: "neutral", title: "Timbrada. Cada pago exige complemento (Pagos 2.0)" }
-          : { label: "Timbrada", tone: "neutral", title: "CFDI con UUID fiscal" };
+  const fiscal = fiscalState(invoice);
+
+  const openPayment = () => {
+    setShowPayment(true);
+    setPayErr(null);
+    setPayForm((f) => ({
+      ...f,
+      amount: String(pendingAmount),
+      stampComplement: invoice.satPaymentMethod === "PPD",
+    }));
+  };
+
+  const canPay = canEdit && invoice.status !== "PAID" && invoice.status !== "CANCELLED";
+  const canStamp = canEdit && invoice.status === "DRAFT" && !invoice.cfdiUuid;
+
+  /* ---------------------------------------------------------------- *
+   * Avisos: el 3-way match dejó de ser una tarjeta propia y entra en la
+   * misma pila que el PAC. Lo que bloquea el pago se lee como lo que es.
+   * ---------------------------------------------------------------- */
+  const notices: Notice[] = [];
+  if (actionError) {
+    notices.push({ id: "action", level: "critical", text: actionError, onDismiss: () => setActionError(null) });
+  }
+  if (pacInfo?.productionWarning) {
+    notices.push({
+      id: "pac-prod",
+      level: "critical",
+      text: pacInfo.productionWarning,
+      action: { label: "Configuración", href: "/erp/settings" },
+    });
+  }
+  if (needsThreeWay) {
+    const match = invoice.matchStatus ?? "PENDING";
+    const blocked = !matchAllowsPay;
+    notices.push({
+      id: "match",
+      level: blocked ? "warning" : "info",
+      text: `3-way match OC–GR–factura: ${MATCH_LABELS[match] ?? match}.${
+        invoice.matchNotes ? ` ${invoice.matchNotes}` : blocked ? " Resuélvelo para poder pagar." : ""
+      }`,
+      secondaryAction: canEdit ? { label: "Reevaluar", onClick: () => void evaluateMatch(), busy: matching } : undefined,
+      action:
+        canEdit && (match === "VARIANCE" || match === "PENDING")
+          ? { label: "Eximir match", onClick: () => void waiveMatch(), busy: matching }
+          : undefined,
+    });
+  }
+
+  const metrics: Metric[] = [
+    {
+      label: "Total",
+      value: <MetricValue><Money value={invoice.totalAmount} bold={false} /></MetricValue>,
+      hint: <MetricHint>{isIncome ? "por cobrar al cliente" : "por pagar al proveedor"}</MetricHint>,
+    },
+    {
+      label: "Pagado",
+      value: <MetricValue><Money value={invoice.paidAmount ?? 0} bold={false} /></MetricValue>,
+      hint: <MetricHint tone={paidPct === 100 ? "success" : "default"}>{paidPct}% cubierto</MetricHint>,
+      tone: paidPct === 100 ? "success" : "default",
+    },
+    {
+      label: "Pendiente",
+      value: <MetricValue><Money value={pendingAmount} bold={false} /></MetricValue>,
+      hint: (
+        <MetricHint tone={pendingAmount > 0 && invoice.status === "OVERDUE" ? "danger" : "default"}>
+          {pendingAmount > 0
+            ? invoice.status === "OVERDUE"
+              ? "fuera de plazo"
+              : invoice.dueDate
+                ? `vence ${new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}`
+                : "saldo abierto"
+            : "sin saldo"}
+        </MetricHint>
+      ),
+      tone: pendingAmount > 0 && invoice.status === "OVERDUE" ? "danger" : pendingAmount > 0 ? "warning" : "default",
+    },
+  ];
+
+  const payments = invoice.payments ?? [];
+  const lines = invoice.items ?? [];
 
   return (
     <>
+      {/* 1 · Dónde estoy: folio, contraparte y los dos estados que importan. */}
+      <div style={{ marginBottom: 6 }}>
+        <Link
+          href="/erp/invoicing"
+          style={{ fontSize: 12, color: "var(--text-tertiary)", textDecoration: "none" }}
+        >
+          ← Facturación CFDI
+        </Link>
+      </div>
       <PageHeader
         eyebrow={`ERP · ${isIncome ? "Cuentas por cobrar" : "Cuentas por pagar"}`}
         title={invoice.invoiceNumber}
         subtitle={counterparty ?? "—"}
+        density="ops"
         meta={
           <span style={{ display: "inline-flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
             <StatusDot label={fiscal.label} tone={fiscal.tone} title={fiscal.title} />
             <StatusDot
-              label={STATUS_LABELS[invoice.status] ?? invoice.status}
+              label={COMMERCIAL_LABEL[invoice.status] ?? invoice.status}
               tone={STATUS_TONE[invoice.status] ?? "neutral"}
             />
           </span>
         }
+        /* 2 · Un solo primario: el siguiente paso fiscal de ESTA factura.
+           Lo demás (XML, PDF, estatus, nota de crédito, cancelación) actúa
+           sobre el documento timbrado y baja al bloque del CFDI. */
+        actions={
+          canStamp || canPay ? (
+            <>
+              {canPay && (
+                <Button
+                  size="sm"
+                  variant={canStamp ? "ghost" : "primary"}
+                  disabled={!matchAllowsPay}
+                  title={!matchAllowsPay ? "Resuelve el 3-way match antes de pagar" : undefined}
+                  onClick={openPayment}
+                >
+                  Registrar pago
+                </Button>
+              )}
+              {canStamp && (
+                <Button size="sm" variant="primary" onClick={() => void stampInvoice()} disabled={stamping}>
+                  {stamping ? "Timbrando…" : "Timbrar CFDI"}
+                </Button>
+              )}
+            </>
+          ) : undefined
+        }
+      />
+
+      {/* 3 · Cómo va el dinero de esta factura. */}
+      <MetricFrame>
+        <MetricStrip metrics={metrics} ariaLabel="Resumen de la factura" />
+      </MetricFrame>
+
+      <NoticeStack notices={notices} />
+
+      {/* 4 · Lo facturado. */}
+      <BlockHeading title="Conceptos" meta={lines.length > 0 ? `${lines.length} partida${lines.length === 1 ? "" : "s"}` : undefined} />
+      {lines.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", marginBottom: 22 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 70px 110px 120px", gap: 10, padding: "0 12px 6px", fontSize: 10.5, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            <span>Descripción</span><span style={{ textAlign: "right" }}>Cant.</span><span style={{ textAlign: "right" }}>P. unit.</span><span style={{ textAlign: "right" }}>Subtotal</span>
+          </div>
+          <div style={{ border: "1px solid var(--nx-panel-hairline)", borderRadius: 10, background: "var(--surface)", overflow: "hidden" }}>
+            {lines.map((line, i) => (
+              <div
+                key={line.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 70px 110px 120px",
+                  gap: 10,
+                  padding: "11px 12px",
+                  alignItems: "center",
+                  borderTop: i === 0 ? undefined : "1px solid var(--nx-panel-hairline-soft, var(--border))",
+                }}
+              >
+                <span style={{ fontSize: 13 }}>{line.description}</span>
+                <span style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{line.quantity}</span>
+                <span style={{ textAlign: "right", fontSize: 13 }}><Money value={line.unitPrice} bold={false} /></span>
+                <span style={{ textAlign: "right", fontSize: 13 }}><Money value={line.subtotal ?? (line.quantity * line.unitPrice)} /></span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10, padding: "10px 12px 0", alignItems: "baseline" }}>
+            <span style={{ textAlign: "right", fontSize: 11.5, color: "var(--text-tertiary)" }}>Total</span>
+            <span style={{ textAlign: "right", fontSize: 15 }}><Money value={invoice.totalAmount} /></span>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 22 }}>
+          <EmptyState
+            variant="compact"
+            title="Sin partidas capturadas"
+            description={invoice.description ?? "Esta factura no tiene conceptos desglosados."}
+          />
+        </div>
+      )}
+
+      {/* Pagos: solo aparece cuando hay historial que leer. */}
+      {payments.length > 0 && (
+        <>
+          <BlockHeading
+            title="Pagos"
+            meta={`${payments.length} registrado${payments.length === 1 ? "" : "s"}${invoice.satPaymentMethod === "PPD" ? " · cada uno exige complemento" : ""}`}
+          />
+          <div style={{ border: "1px solid var(--nx-panel-hairline)", borderRadius: 10, background: "var(--surface)", overflow: "hidden", marginBottom: 22 }}>
+            {payments.map((p, i) => (
+              <div
+                key={p.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto auto auto",
+                  gap: 12,
+                  alignItems: "center",
+                  padding: "11px 12px",
+                  borderTop: i === 0 ? undefined : "1px solid var(--nx-panel-hairline-soft, var(--border))",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13 }}>{p.method ?? "Transferencia"}{p.reference ? ` · Ref: ${p.reference}` : ""}</div>
+                  {p.notes && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.notes}</div>}
+                  {p.cfdiPaymentUuid && (
+                    <div style={{ marginTop: 2 }}>
+                      <CopyableRef value={p.cfdiPaymentUuid} display={`comp. ${p.cfdiPaymentUuid.slice(0, 8)}…`} label="el UUID del complemento" />
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{new Date(p.paymentDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+                <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" }}><Money value={p.amount} /></span>
+                {canEdit && invoice.satPaymentMethod === "PPD" && invoice.cfdiUuid && !p.cfdiPaymentUuid ? (
+                  <Button size="sm" variant="secondary" onClick={() => void stampComplement(p.id)}>Timbrar comp.</Button>
+                ) : (
+                  <span />
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* 6 · El documento fiscal: los datos del CFDI y todo lo que actúa sobre él. */}
+      <BlockHeading
+        title="CFDI"
         actions={
           <>
-            <Link href="/erp/invoicing" style={{ textDecoration: "none" }}>
-              <Button size="sm" variant="ghost">← Facturación</Button>
-            </Link>
             {invoice.cfdiUuid && (
-              <>
-                <Button size="sm" variant="ghost" onClick={() => void downloadXml()}>XML</Button>
-                {invoice.pdfUrl && (
-                  <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                    <Button size="sm" variant="ghost">PDF</Button>
-                  </a>
-                )}
-              </>
+              <Button size="sm" variant="ghost" onClick={() => void downloadXml()}>XML</Button>
             )}
-            {canEdit && invoice.status === "DRAFT" && !invoice.cfdiUuid && (
-              <Button size="sm" variant="primary" onClick={() => void stampInvoice()} disabled={stamping}>
-                {stamping ? "Timbrando…" : "Timbrar CFDI"}
-              </Button>
-            )}
-            {canEdit && invoice.cfdiUuid && !invoice.isCancelled && invoice.cfdiRelationType !== "01" && (
-              <Button size="sm" variant="secondary" onClick={() => void createCreditNote()}>Nota de crédito</Button>
-            )}
-            {canEdit && invoice.cfdiUuid && !invoice.isCancelled && (
-              <Button size="sm" variant="ghost" onClick={() => setShowCancel(true)}>Cancelar CFDI</Button>
+            {invoice.cfdiUuid && invoice.pdfUrl && (
+              <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                <Button size="sm" variant="ghost">PDF</Button>
+              </a>
             )}
             {invoice.cfdiUuid && (
               <Button size="sm" variant="ghost" onClick={() => void checkSatStatus()} disabled={checkingSat}>
                 {checkingSat ? "Consultando…" : "Estatus SAT"}
               </Button>
             )}
-            {canEdit && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={!matchAllowsPay}
-                title={!matchAllowsPay ? "Resuelve el 3-way match antes de pagar" : undefined}
-                onClick={() => {
-                  setShowPayment(true);
-                  setPayErr(null);
-                  setPayForm((f) => ({
-                    ...f,
-                    amount: String(pendingAmount),
-                    stampComplement: invoice.satPaymentMethod === "PPD",
-                  }));
-                }}
-              >
-                Registrar pago
-              </Button>
+            {canEdit && invoice.cfdiUuid && !invoice.isCancelled && invoice.cfdiRelationType !== "01" && (
+              <Button size="sm" variant="ghost" onClick={() => void createCreditNote()}>Nota de crédito</Button>
+            )}
+            {canEdit && invoice.cfdiUuid && !invoice.isCancelled && (
+              <Button size="sm" variant="secondary" onClick={() => setShowCancel(true)}>Cancelar CFDI</Button>
             )}
           </>
         }
       />
-
-      {needsThreeWay && (
-        <div
-          style={{
-            marginBottom: 18,
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            background: "var(--surface-2)",
-            fontSize: 13,
-            color: "var(--text-secondary)",
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 10,
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <strong style={{ color: "var(--foreground)" }}>3-way match OC–GR–factura:</strong>
-              <StatusDot
-                label={MATCH_LABELS[invoice.matchStatus ?? "PENDING"] ?? invoice.matchStatus ?? "Pendiente"}
-                tone={MATCH_TONE[invoice.matchStatus ?? "PENDING"] ?? "neutral"}
-              />
-            </span>
-            {invoice.matchNotes && (
-              <div style={{ marginTop: 6 }}>{invoice.matchNotes}</div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+          gap: "16px 22px",
+          marginBottom: 4,
+        }}
+      >
+        {[
+          { label: isIncome ? "Cliente / Receptor" : "Proveedor", value: counterparty },
+          { label: "RFC receptor", value: invoice.receptorRfc },
+          { label: "Método pago SAT", value: invoice.satPaymentMethod ?? "PUE" },
+          { label: "Emisión", value: new Date(invoice.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) },
+          { label: "Vencimiento", value: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
+        ].map(({ label, value }) => (
+          <div key={label}>
+            <FieldLabel>{label}</FieldLabel>
+            <div style={{ fontSize: 13, color: value ? "var(--text-primary)" : "var(--text-tertiary)" }}>{value ?? "—"}</div>
+          </div>
+        ))}
+        {invoice.cfdiUuid && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <FieldLabel>UUID fiscal</FieldLabel>
+            <CopyableRef value={invoice.cfdiUuid} label="el UUID" />
+            {satStatus && (
+              <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-secondary)" }}>
+                SAT: <strong style={{ fontWeight: 600 }}>{satStatus.estado}</strong>
+                {satStatus.esCancelable ? ` · cancelable: ${satStatus.esCancelable}` : ""}
+              </div>
             )}
           </div>
-          {canEdit && (
-            <div style={{ display: "flex", gap: 8 }}>
-              <Button size="sm" variant="ghost" onClick={() => void evaluateMatch()} disabled={matching}>
-                {matching ? "…" : "Reevaluar"}
-              </Button>
-              {invoice.matchStatus === "VARIANCE" || invoice.matchStatus === "PENDING" ? (
-                <Button size="sm" variant="secondary" onClick={() => void waiveMatch()} disabled={matching}>
-                  Eximir match
-                </Button>
-              ) : null}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+        {invoice.description && lines.length > 0 && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <FieldLabel>Concepto</FieldLabel>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{invoice.description}</div>
+          </div>
+        )}
+      </div>
 
-      {actionError && (
-        <div style={{ marginBottom: 12 }}>
-          <InlineAlert
-            variant="danger"
-            message={actionError}
-            onDismiss={() => setActionError(null)}
-          />
-        </div>
-      )}
-
+      {/* 7 · Metadatos de configuración. */}
       {pacInfo && (
-        <>
-          <div style={{ marginBottom: 12, fontSize: 12, color: "var(--text-tertiary)" }}>
-            PAC / timbrado: {pacInfo.provider?.toUpperCase() ?? "—"}
-            {pacInfo.configured ? " · credenciales OK" : " · sin credenciales"}
-            {invoice.satPaymentMethod === "PPD" && " · PPD (complementos de pago requeridos)"}
-          </div>
-          {pacInfo.productionWarning && (
-            <InlineAlert variant="danger" message={pacInfo.productionWarning} />
-          )}
-        </>
-      )}
-
-      {(() => {
-        const metrics: Metric[] = [
-          {
-            label: "Total",
-            value: <Money value={invoice.totalAmount} bold={false} />,
-            hint: isIncome ? "por cobrar al cliente" : "por pagar al proveedor",
-          },
-          {
-            label: "Pagado",
-            value: <Money value={invoice.paidAmount ?? 0} bold={false} />,
-            hint: `${paidPct}% cubierto`,
-            tone: paidPct === 100 ? "success" : "default",
-          },
-          {
-            label: "Pendiente",
-            value: <Money value={pendingAmount} bold={false} />,
-            hint: pendingAmount > 0 ? "saldo abierto" : "sin saldo",
-            tone: pendingAmount > 0 && invoice.status === "OVERDUE" ? "danger" : pendingAmount > 0 ? "warning" : "default",
-          },
-          {
-            label: "Pagos registrados",
-            value: invoice.payments?.length ?? 0,
-            hint: invoice.satPaymentMethod === "PPD" ? "cada uno exige complemento" : "pago en una exhibición",
-          },
-        ];
-        return (
-          <div style={{ marginBottom: 18 }}>
-            <MetricStrip metrics={metrics} ariaLabel="Resumen de la factura" />
-          </div>
-        );
-      })()}
-      <Section title="Datos de la factura">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          {[
-            { label: "Folio", value: invoice.invoiceNumber },
-            { label: isIncome ? "Cliente / Receptor" : "Proveedor", value: counterparty },
-            { label: "RFC receptor", value: invoice.receptorRfc },
-            { label: "Método pago SAT", value: invoice.satPaymentMethod ?? "PUE" },
-            { label: "Tipo", value: isIncome ? "Ingreso (CxC)" : "Egreso (CxP)" },
-            { label: "Fecha de emisión", value: new Date(invoice.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) },
-            { label: "Fecha de vencimiento", value: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: 13, color: value ? "var(--text-primary)" : "var(--text-tertiary)" }}>{value ?? "—"}</div>
-            </div>
-          ))}
-          {invoice.cfdiUuid && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>UUID CFDI</div>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                <code style={{ fontSize: 11.5, color: "var(--text-secondary)", letterSpacing: "0.02em" }}>{invoice.cfdiUuid}</code>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(invoice.cfdiUuid ?? "");
-                    toast.success("UUID copiado");
-                  }}
-                  title="Copiar UUID"
-                  aria-label="Copiar UUID"
-                  style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: 12, color: "var(--text-tertiary)" }}
-                >
-                  ⧉
-                </button>
-              </span>
-              {satStatus && (
-                <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-secondary)" }}>
-                  Estatus SAT: <strong>{satStatus.estado}</strong>
-                  {satStatus.esCancelable ? ` · Cancelable: ${satStatus.esCancelable}` : ""}
-                </div>
-              )}
-            </div>
-          )}
-          {invoice.description && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Concepto</div>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{invoice.description}</div>
-            </div>
-          )}
-        </div>
-      </Section>
-
-      {(invoice.items?.length ?? 0) > 0 && (
-        <Section title="Partidas">
-          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 110px 110px", gap: 8, padding: "6px 10px", fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              <span>Descripción</span><span style={{ textAlign: "right" }}>Cant.</span><span style={{ textAlign: "right" }}>P. unit.</span><span style={{ textAlign: "right" }}>Subtotal</span>
-            </div>
-            {invoice.items!.map((line) => (
-              <div key={line.id} style={{ display: "grid", gridTemplateColumns: "1fr 80px 110px 110px", gap: 8, padding: "10px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 13 }}>{line.description}</span>
-                <span style={{ textAlign: "right", fontSize: 13 }}>{line.quantity}</span>
-                <span style={{ textAlign: "right", fontSize: 13 }}><Money value={line.unitPrice} /></span>
-                <span style={{ textAlign: "right", fontSize: 13, fontWeight: 600 }}><Money value={line.subtotal ?? (line.quantity * line.unitPrice)} /></span>
-              </div>
-            ))}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 110px 110px", gap: 8, padding: "10px", fontWeight: 700, fontSize: 13 }}>
-              <span style={{ gridColumn: "1 / 4", textAlign: "right", color: "var(--text-secondary)" }}>Total:</span>
-              <span style={{ textAlign: "right" }}><Money value={invoice.totalAmount} /></span>
-            </div>
-          </div>
-        </Section>
-      )}
-
-      {(invoice.payments?.length ?? 0) > 0 && (
-        <Section eyebrow="Historial" title="Pagos registrados">
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {invoice.payments!.map((p) => (
-              <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 10, alignItems: "center", padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{p.method ?? "Transferencia"}{p.reference ? ` · Ref: ${p.reference}` : ""}</div>
-                  {p.notes && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.notes}</div>}
-                  {p.cfdiPaymentUuid && <code style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>Comp: {p.cfdiPaymentUuid.slice(0, 8)}…</code>}
-                </div>
-                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{new Date(p.paymentDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
-                <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" }}><Money value={p.amount} /></span>
-                {canEdit && invoice.satPaymentMethod === "PPD" && invoice.cfdiUuid && !p.cfdiPaymentUuid && (
-                  <Button size="sm" variant="ghost" onClick={() => void stampComplement(p.id)}>Timbrar comp.</Button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
+        <FootNote>
+          <span>PAC {pacInfo.provider?.toUpperCase() ?? "—"}</span>
+          <Dot />
+          <span>{pacInfo.configured ? "credenciales OK" : "sin credenciales"}</span>
+          {pacInfo.env ? (<><Dot /><span>{pacInfo.env}</span></>) : null}
+          {invoice.satPaymentMethod === "PPD" ? (<><Dot /><span>PPD: complemento por cada pago</span></>) : null}
+        </FootNote>
       )}
 
       <Modal
@@ -650,7 +701,7 @@ export default function InvoiceDetailPage() {
         title="Cancelar CFDI ante el SAT"
         footer={
           <>
-            <Button size="sm" variant="secondary" onClick={() => setShowCancel(false)}>Cerrar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowCancel(false)}>Cerrar</Button>
             <Button size="sm" variant="primary" onClick={() => void cancelInvoice()} disabled={cancelling}>
               {cancelling ? "Cancelando…" : "Confirmar cancelación"}
             </Button>
@@ -688,7 +739,7 @@ export default function InvoiceDetailPage() {
         title="Registrar pago"
         footer={
           <>
-            <Button size="sm" variant="secondary" onClick={() => setShowPayment(false)}>Cancelar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowPayment(false)}>Cancelar</Button>
             <Button size="sm" variant="primary" onClick={() => void submitPayment()} disabled={paying}>
               {paying ? "Registrando…" : "Registrar pago"}
             </Button>
