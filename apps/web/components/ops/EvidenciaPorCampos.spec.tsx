@@ -142,20 +142,27 @@ describe("EvidenciaPorCampos", () => {
 
   it("quitar un campo con fotos pide confirmación y manda la lista completa", async () => {
     render(<EvidenciaPorCampos activityId={5} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Editar puntos" }));
-    await userEvent.click(screen.getByRole("button", { name: "Quitar Cámara 1" }));
-    await userEvent.click(screen.getByRole("button", { name: "Guardar puntos" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Quitar Cámara 1" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Quitar y guardar" }));
 
     const alerta = await screen.findByRole("alert");
     expect(alerta).toHaveTextContent("Vas a quitar «Cámara 1». Se borran 1 foto");
-    expect(screen.queryByRole("button", { name: "Editar puntos" })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        method: "PUT",
+        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+        body: expect.any(String),
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 
   it("sin permiso de gestión no ofrece editar", async () => {
     useUser.mockReturnValue({ user: { token: "jwt", permissions: ["evidences.view"] }, token: "jwt" });
     render(<EvidenciaPorCampos activityId={5} />);
     await screen.findByText("1 de 3 fotos");
-    expect(screen.queryByRole("button", { name: "Editar puntos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Quitar Cámara 1" })).not.toBeInTheDocument();
   });
 
   it("descarga el ZIP con la sesión y el nombre que manda la API", async () => {
