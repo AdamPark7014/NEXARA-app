@@ -11,16 +11,16 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho
 
-1. Hub Contadora + UX clarity (`e5a3035f`).
-2. Merge hardening: pdf · rbac · tools-ui · act-photos · act-flow · prenomina (en progreso).
+1. Hub Contadora + UX clarity.
+2. Hardening merges en curso (pdf/rbac/tools/act/prenomina).
 
 ## A medias
 
-- Deploy Hetzner (SSH key).
+Deploy Hetzner.
 
 ## Siguiente
 
-Deploy + smoke.
+Completar merges + deploy.
 
 ## No tocar
 

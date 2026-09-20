@@ -32,7 +32,7 @@ import {
   ReportKitEventDto,
   ResolveKitEventDto,
 } from './tool-requests.service.js';
-import { assertCanCreateToolLoan } from './tools-access.js';
+import { assertCanCreateToolLoan, assertCanManageTools, hasToolsManageAccess } from './tools-access.js';
 
 interface MulterFile {
   filename: string;
@@ -464,8 +464,8 @@ export class ToolRequestsController {
       throw new ForbiddenException('Solicitud no encontrada');
     }
     
-    // Usuario solo puede ver sus propias solicitudes, manager puede ver todas
-    const isAdmin = user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || user.permissions?.includes(PERMISSIONS.TOOLS_MANAGE);
+    // Manager = Christian/Iván (email o TOOLS_MANAGE). CONSOLE_ADMIN solo no basta.
+    const isAdmin = hasToolsManageAccess(user?.email, user?.permissions);
     if (!isAdmin && request.usuarioId !== user.id) {
       throw new UnauthorizedException('No tienes permiso para ver esta solicitud');
     }
@@ -492,20 +492,24 @@ export class ToolRequestsController {
     @Param('id') id: string,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.toolRequestsService.approve(parseInt(id, 10), user.id, companyId);
+    assertCanManageTools(user?.email);
+    return this.toolRequestsService.approve(parseInt(id, 10), user.id, companyId, user?.email);
   }
 
   // Entregar herramienta. Con código de recolección hay que teclearlo.
   @Post(':id/deliver')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async deliver(
+    @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() data: { pickupCode?: string; recogidaPorId?: number } | undefined,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    assertCanManageTools(user?.email);
     return this.toolRequestsService.deliver(parseInt(id, 10), companyId, {
       pickupCode: data?.pickupCode,
       recogidaPorId: data?.recogidaPorId ? Number(data.recogidaPorId) : undefined,
+      managerEmail: user?.email,
     });
   }
 
@@ -534,7 +538,14 @@ export class ToolRequestsController {
     @Body() data: { adminNotes: string },
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.toolRequestsService.reject(parseInt(id, 10), user.id, data.adminNotes, companyId);
+    assertCanManageTools(user?.email);
+    return this.toolRequestsService.reject(
+      parseInt(id, 10),
+      user.id,
+      data.adminNotes,
+      companyId,
+      user?.email,
+    );
   }
 
   // Eliminar solicitud
@@ -575,6 +586,7 @@ export class ToolRequestsController {
   ) {
     return this.toolRequestsService.findRenewals(undefined, 'PENDING', {
       id: user.id,
+      email: user.email,
       isSuperAdmin: user.isSuperAdmin,
       permissions: user.permissions,
       departmentId: user.departmentId,
@@ -591,6 +603,7 @@ export class ToolRequestsController {
   ) {
     return this.toolRequestsService.findRenewals(parseInt(toolId, 10), undefined, {
       id: user.id,
+      email: user.email,
       isSuperAdmin: user.isSuperAdmin,
       permissions: user.permissions,
       departmentId: user.departmentId,
@@ -605,10 +618,12 @@ export class ToolRequestsController {
     @Param('renewalId') renewalId: string,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    assertCanManageTools(user?.email);
     return this.toolRequestsService.approveRenewal(
       parseInt(renewalId, 10),
       {
         id: user.id,
+        email: user.email,
         isSuperAdmin: user.isSuperAdmin,
         permissions: user.permissions,
         departmentId: user.departmentId,
@@ -626,10 +641,12 @@ export class ToolRequestsController {
     @Body() data: { reason: string },
     @CurrentCompanyId() companyId: number | null,
   ) {
+    assertCanManageTools(user?.email);
     return this.toolRequestsService.rejectRenewal(
       parseInt(renewalId, 10),
       {
         id: user.id,
+        email: user.email,
         isSuperAdmin: user.isSuperAdmin,
         permissions: user.permissions,
         departmentId: user.departmentId,
