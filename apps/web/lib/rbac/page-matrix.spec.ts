@@ -89,6 +89,16 @@ describe('normalizePathToCanonical', () => {
   });
 
   it('deja intacta una ruta ya canónica', () => {
-    expect(normalizePathToCanonical('/erp/accounting')).toBe('/erp/accounting');
+    expect(normalizePathToCanonical('/erp/dashboard')).toBe('/erp/dashboard');
+    expect(normalizePathToCanonical('/erp/contabilidad/polizas')).toBe(
+      '/erp/contabilidad/polizas',
+    );
+  });
+
+  it('remapea las pólizas a su sitio nuevo bajo el hub', () => {
+    // Pólizas dejó de vivir en /erp/accounting y pasó a ser una sección del
+    // escritorio de contabilidad. La prueba anterior usaba /erp/accounting como
+    // ejemplo de ruta canónica y por eso se rompió: ya no lo es, es la legacy.
+    expect(normalizePathToCanonical('/erp/accounting')).toBe('/erp/contabilidad/polizas');
   });
 });
