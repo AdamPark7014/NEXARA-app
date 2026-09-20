@@ -2553,9 +2553,14 @@ export class AccountingService {
     accountType?: string;
     branch?: string;
     speiEnabled?: boolean;
+    currentBalance?: number;
     companyId?: number | null;
   }) {
     const companyId = requireCompanyId(dto.companyId);
+    // El saldo inicial es el único que se teclea: de aquí en adelante lo mueven
+    // los movimientos importados. Si se ignora, la cuenta nace en cero y la
+    // primera conciliación arrastra el descuadre del saldo de apertura.
+    const saldoInicial = Number(dto.currentBalance);
     return this.prisma.bankAccount.create({
       data: {
         name: dto.name.trim(),
@@ -2563,6 +2568,7 @@ export class AccountingService {
         accountNumber: dto.accountNumber.trim(),
         clabe: dto.clabe?.trim() || null,
         currency: dto.currency || 'MXN',
+        currentBalance: Number.isFinite(saldoInicial) ? saldoInicial : 0,
         bankCode: dto.bankCode?.trim() || null,
         rfc: dto.rfc?.trim() || null,
         accountType: dto.accountType?.trim() || null,
