@@ -19,6 +19,8 @@ import { PeriodCloseController } from './period-close.controller.js';
 import { PeriodCloseService } from './period-close.service.js';
 import { AccountingWorkspaceReportsController } from './workspace-reports.controller.js';
 import { AccountingWorkspaceReportsService } from './workspace-reports.service.js';
+import { WorkspaceArApController } from './workspace-ar-ap.controller.js';
+import { WorkspaceArApService } from './workspace-ar-ap.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule, AuditModule],
@@ -33,6 +35,7 @@ import { AccountingWorkspaceReportsService } from './workspace-reports.service.j
     ReconciliationMatchController,
     PeriodCloseController,
     AccountingWorkspaceReportsController,
+    WorkspaceArApController,
   ],
   providers: [
     AccountingService,
@@ -40,6 +43,7 @@ import { AccountingWorkspaceReportsService } from './workspace-reports.service.j
     ReconciliationMatchService,
     PeriodCloseService,
     AccountingWorkspaceReportsService,
+    WorkspaceArApService,
   ],
   exports: [AccountingService],
 })
