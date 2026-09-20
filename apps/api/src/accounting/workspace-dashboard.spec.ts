@@ -1,3 +1,6 @@
+// `apps/api` corre con jest (ver `jest.config.js`), no con vitest: el `import from 'vitest'`
+// que traía este archivo hacía fallar la suite entera antes de ejecutar un solo caso, así que
+// este contrato de autorización llevaba tiempo sin verificarse. Aquí se usan los globals de jest.
 import 'reflect-metadata';
 import { PERMISSIONS } from '../common/permissions.js';
 import { AccountingWorkspaceController } from './workspace.controller.js';
@@ -7,8 +10,8 @@ import { AccountingWorkspaceController } from './workspace.controller.js';
  *
  * Lee el metadata @RBAC real del controlador en vez de reimplementar la regla
  * aquí: si alguien afloja el decorador, esta prueba lo caza. La versión previa
- * copiaba la lista de permisos dentro del test (y además importaba de vitest,
- * así que nunca llegó a correr bajo Jest).
+ * copiaba la lista de permisos dentro del test, así que habría seguido en verde
+ * aunque el endpoint quedara abierto.
  */
 
 function rbacDe(metodo: keyof AccountingWorkspaceController) {
