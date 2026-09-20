@@ -101,8 +101,25 @@ export default function InvoicingPage() {
   const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceRow | null>(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "", stampComplement: true });
+  const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "", bankAccountId: "", stampComplement: true });
   const [paymentErr, setPaymentErr] = useState<string | null>(null);
+  /**
+   * Sin la cuenta de destino el pago queda colgando: el movimiento del banco
+   * nunca encuentra con qué cruzarse y la conciliación lo deja pendiente para
+   * siempre. Quien solo tiene permiso de facturar no ve bancos: en ese caso la
+   * lista llega vacía y el campo no se pinta, en vez de reventar la pantalla.
+   */
+  const [bankAccounts, setBankAccounts] = useState<Array<{ id: number; name: string; bankName: string; currency: string }>>([]);
+  /**
+   * La contraparte de la factura. Cuentas por pagar y el expediente del
+   * proveedor se agrupan por `Invoice.supplierId`, y cuentas por cobrar por
+   * `clientId`: una factura capturada sin ligar no aparece en ninguno de los
+   * dos, aunque el receptor esté bien escrito. Las listas se cargan aparte
+   * porque viven en otros módulos; si el rol no los ve, llegan vacías y el
+   * campo no estorba.
+   */
+  const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string; rfc?: string | null }>>([]);
+  const [salesClients, setSalesClients] = useState<Array<{ id: number; name: string; taxId?: string | null }>>([]);
   /** Errores de timbrar/cancelar que mueren con el ConfirmDialog si solo hay toast. */
   const [actionError, setActionError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
@@ -112,6 +129,7 @@ export default function InvoicingPage() {
   const [rfcValidation, setRfcValidation] = useState<{ valid?: boolean; message?: string } | null>(null);
   const [form, setForm] = useState({
     type: "INCOME" as "INCOME" | "EXPENSE",
+    counterpartyId: "",
     receptorName: "",
     receptorRfc: "",
     receptorZipCode: "",
@@ -156,6 +174,23 @@ export default function InvoicingPage() {
       .then((data) => setPacInfo(data))
       .catch(() => setPacInfo(null));
   }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    void apiFetch("accounting/banking/accounts", token)
+      .then((data) => setBankAccounts(Array.isArray(data) ? data : []))
+      .catch(() => setBankAccounts([]));
+  }, [token]);
+
+  useEffect(() => {
+    if (!showForm || !token) return;
+    void apiFetch("procurement/purchase-orders/suppliers", token)
+      .then((data) => setSuppliers(Array.isArray(data) ? data : (data?.data ?? [])))
+      .catch(() => setSuppliers([]));
+    void apiFetch("ventas/clientes?limit=200", token)
+      .then((data) => setSalesClients(Array.isArray(data) ? data : (data?.data ?? [])))
+      .catch(() => setSalesClients([]));
+  }, [showForm, token]);
 
   const [searchQ, setSearchQ] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -252,6 +287,7 @@ export default function InvoicingPage() {
       method: "SPEI",
       reference: "",
       notes: "",
+      bankAccountId: bankAccounts.length === 1 ? String(bankAccounts[0].id) : "",
       stampComplement: inv.satPaymentMethod === "PPD",
     });
     setPaymentErr(null);
@@ -274,6 +310,7 @@ export default function InvoicingPage() {
           method: paymentForm.method,
           reference: paymentForm.reference.trim() || undefined,
           notes: paymentForm.notes.trim() || undefined,
+          bankAccountId: paymentForm.bankAccountId ? Number(paymentForm.bankAccountId) : undefined,
           stampComplement: paymentTarget.satPaymentMethod === "PPD" ? paymentForm.stampComplement : undefined,
         }),
       });
@@ -301,6 +338,7 @@ export default function InvoicingPage() {
     setFormErr(null);
     setForm({
       type: "INCOME",
+      counterpartyId: "",
       receptorName: "",
       receptorRfc: "",
       receptorZipCode: "",
@@ -345,6 +383,7 @@ export default function InvoicingPage() {
       const satForm = full.satPaymentForm?.replace(/^FP/, "") ?? "03";
       setForm({
         type: full.type === "ACCOUNTS_PAYABLE" ? "EXPENSE" : "INCOME",
+        counterpartyId: "",
         receptorName: full.receptorName ?? "",
         receptorRfc: full.receptorRfc ?? "",
         receptorZipCode: full.receptorZipCode ?? "",
@@ -423,6 +462,13 @@ export default function InvoicingPage() {
             type: form.type === "INCOME" ? "ACCOUNTS_RECEIVABLE" : "ACCOUNTS_PAYABLE",
             satPaymentForm: form.satPaymentForm,
             satPaymentMethod: form.satPaymentMethod,
+            // Ligar la factura es lo que la hace aparecer en cuentas por cobrar
+            // o por pagar del expediente correcto. Sin esto quedaba suelta.
+            ...(form.counterpartyId
+              ? form.type === "INCOME"
+                ? { clientId: Number(form.counterpartyId) }
+                : { supplierId: Number(form.counterpartyId) }
+              : {}),
             ...body,
           }),
         });
@@ -833,11 +879,51 @@ export default function InvoicingPage() {
         )}
         <FinanceFormGrid>
           <FinanceField label="Tipo" hint="Ingreso emite CFDI a un cliente; egreso registra el de un proveedor.">
-            <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "INCOME" | "EXPENSE" }))} style={inp}>
+            <select
+              value={form.type}
+              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "INCOME" | "EXPENSE", counterpartyId: "" }))}
+              style={inp}
+            >
               <option value="INCOME">Ingreso (cliente)</option>
               <option value="EXPENSE">Egreso (proveedor)</option>
             </select>
           </FinanceField>
+          {!editingInvoice && (form.type === "INCOME" ? salesClients.length > 0 : suppliers.length > 0) && (
+            <FinanceField
+              label={form.type === "INCOME" ? "Cliente" : "Proveedor"}
+              optional
+              hint="Ligarla es lo que la hace aparecer en su expediente y en cuentas por cobrar o por pagar."
+            >
+              <select
+                value={form.counterpartyId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  const cliente = form.type === "INCOME"
+                    ? salesClients.find((c) => String(c.id) === id)
+                    : undefined;
+                  const proveedor = form.type === "EXPENSE"
+                    ? suppliers.find((s) => String(s.id) === id)
+                    : undefined;
+                  const nombre = cliente?.name ?? proveedor?.name ?? null;
+                  const rfc = cliente?.taxId ?? proveedor?.rfc ?? null;
+                  setForm((f) => ({
+                    ...f,
+                    counterpartyId: id,
+                    // Se rellena el receptor con lo que ya está capturado en su
+                    // ficha, en vez de pedir que lo vuelvan a teclear igual.
+                    receptorName: nombre ?? f.receptorName,
+                    receptorRfc: rfc ?? f.receptorRfc,
+                  }));
+                }}
+                style={inp}
+              >
+                <option value="">Sin ligar</option>
+                {(form.type === "INCOME" ? salesClients : suppliers).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </FinanceField>
+          )}
           <FinanceField
             label="RFC receptor"
             optional
@@ -949,6 +1035,20 @@ export default function InvoicingPage() {
               <FinanceField label="Referencia" optional hint="Clave de rastreo del SPEI o folio del cheque.">
                 <input value={paymentForm.reference} onChange={(e) => setPaymentForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Clave de rastreo, folio…" style={inp} />
               </FinanceField>
+              {bankAccounts.length > 0 && (
+                <FinanceField
+                  label="Cuenta de destino"
+                  optional
+                  hint="En qué cuenta entró o salió el dinero. Es lo que permite cruzarlo después con el estado de cuenta."
+                >
+                  <select value={paymentForm.bankAccountId} onChange={(e) => setPaymentForm((f) => ({ ...f, bankAccountId: e.target.value }))} style={inp}>
+                    <option value="">Sin especificar</option>
+                    {bankAccounts.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name} · {b.bankName} ({b.currency})</option>
+                    ))}
+                  </select>
+                </FinanceField>
+              )}
               <FinanceField label="Notas" optional fullWidth>
                 <input value={paymentForm.notes} onChange={(e) => setPaymentForm((f) => ({ ...f, notes: e.target.value }))} style={inp} />
               </FinanceField>
