@@ -3,7 +3,7 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
 - **Rama:** feat/gate-proteccion-spec
-- **HEAD:** test(accounting): gate proteccion.noBloqueado vacío + register payment en bloqueado
+- **HEAD:** test(accounting): proteccion.noBloqueado vacío tras closed-period writes
 
 ## Puente — no cambiar
 
@@ -11,17 +11,14 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-### Gate Jest — checklist `proteccion` alineado con closed-period writes
+### Spec `proteccion.noBloqueado` vacío tras closed-period writes
 
-Worktree: `C:\dev\apps\_worktrees\nexara-gate-proteccion-spec`
-(`feat/gate-proteccion-spec` desde `origin/mejora/calidad-y-web`).
+Worktree: `C:\dev\apps\_worktrees\nexara-gate-proteccion-spec` (`feat/gate-proteccion-spec` desde `origin/mejora/calidad-y-web`).
 
+- HEAD ya tenía `proteccion.noBloqueado: []` y los writes en `bloqueado`.
 - `period-close.spec.ts`: describe `proteccion del cierre` — exige
-  `proteccion.noBloqueado === []` y que `bloqueado` incluya
-  «Registrar el pago de una factura con fecha dentro del periodo»
-  (más conciliación / SAT / import / borrador factura).
-- Copy de servicio (`noBloqueado: []` + pago en `bloqueado`) ya venía
-  en el tip de `origin/mejora/calidad-y-web`.
+  `noBloqueado === []` y que pago/conciliación/SAT/import/borrador
+  factura estén en `bloqueado` (alineado con `closed-period-writes.spec.ts`).
 - Suite: `period-close.spec.ts` — 22/22 PASS
 
 ## A medias / pendiente real
