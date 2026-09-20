@@ -39,8 +39,14 @@ export const appUrls = {
     const qs = params.toString();
     return qs ? `/erp/almacen/herramientas?${qs}` : `/erp/almacen/herramientas`;
   },
-  erpAlmacen: (params?: { productId?: number; movementId?: number }) => {
+  erpAlmacen: (params?: {
+    productId?: number;
+    movementId?: number;
+    /** Pestaña del almacén a la que apunta el aviso. */
+    tab?: "inventario" | "movimientos" | "reabastecimiento" | "herramientas" | "kits";
+  }) => {
     const qs = new URLSearchParams();
+    if (params?.tab) qs.set("tab", params.tab);
     if (params?.productId != null) qs.set("productId", String(params.productId));
     if (params?.movementId != null) qs.set("movementId", String(params.movementId));
     const s = qs.toString();

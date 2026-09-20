@@ -126,6 +126,36 @@ final class CoreRepository {
         if CoreRepository.isQueuedOffline(data) { throw CoreError.queuedOffline }
     }
 
+    // MARK: Checklist de herramientas
+
+    /// `GET me/activities/:id/herramientas`: qué hay que llevar y qué ya se palomeó.
+    /// Solo de quien la tiene asignada (a los demás el API contesta 403).
+    func herramientasChecklist(activityId: Int) async throws -> HerramientasChecklist {
+        let data = try await api.get("me/activities/\(activityId)/herramientas")
+        return try decode(HerramientasChecklist.self, from: data)
+    }
+
+    /// `POST me/activities/:id/herramientas/:requirementId/check`: «lo traigo y sirve»
+    /// (`ok: true`) o «falta o está dañado» (`ok: false`). Devuelve el checklist completo.
+    func palomearHerramienta(
+        activityId: Int,
+        requirementId: Int,
+        ok: Bool,
+        nota: String? = nil,
+        fotoUrl: String? = nil
+    ) async throws -> HerramientasChecklist {
+        struct Body: Encodable {
+            let ok: Bool
+            let nota: String?
+            let fotoUrl: String?
+        }
+        let data = try await api.postJSON(
+            "me/activities/\(activityId)/herramientas/\(requirementId)/check",
+            body: Body(ok: ok, nota: nota, fotoUrl: fotoUrl)
+        )
+        return try decode(HerramientasChecklist.self, from: data)
+    }
+
     /// Quien reparte un despacho lo pasa a su equipo. Devuelve cuántos quedaron asignados.
     func dispatchActivity(activityId: Int, userIds: [Int], indicaciones: String?) async throws -> Int {
         struct Body: Encodable {

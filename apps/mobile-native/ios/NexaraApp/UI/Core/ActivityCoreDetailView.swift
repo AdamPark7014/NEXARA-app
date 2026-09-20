@@ -354,6 +354,13 @@ struct ActivityCoreDetailView: View {
                 }
             }
 
+            // El checklist va antes del trabajo: sin palomearlo, `iniciar` da 400.
+            // Sin encabezado propio: la vista se pinta entera o no se pinta (OT sin
+            // herramientas, o quien mira no la tiene asignada).
+            Section {
+                ActivityToolChecklistView(activityId: activityId, refreshToken: teamRefresh)
+            }
+
             Section {
                 TeamEvidenceCompactView(activityId: activityId, refreshToken: teamRefresh) {
                     tab = .evidencias

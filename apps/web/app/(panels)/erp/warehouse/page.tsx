@@ -45,6 +45,8 @@ import {
   type StockReservationRow,
 } from "@/lib/stock-api";
 import { formatApiError } from "@/lib/erp-api";
+import { crearEmpaque, listarEmpaques, type Empaque } from "@/lib/almacen-api";
+import { etiquetaCantidad, previsualizarConversion } from "@/lib/empaque";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
@@ -68,6 +70,8 @@ const CYCLE_COUNT_STATUS_LABEL: Record<string, string> = {
   CANCELLED: "Cancelado",
 };
 type TabKey = (typeof TABS)[number]["key"];
+/** Las vistas que sabe pintar esta pantalla. La landing de Core (`/erp/almacen`) elige cuáles monta. */
+export type WarehouseView = TabKey;
 
 const MOVEMENT_TYPE_LABEL: Record<string, string> = {
   RECEIPT: "Entrada",
@@ -80,7 +84,16 @@ const MOVEMENT_TYPE_LABEL: Record<string, string> = {
   PRODUCTION_OUT: "Salida producción",
 };
 
-export default function WarehousePage() {
+export default function WarehousePage({
+  embedded,
+}: {
+  /**
+   * Montada dentro de otra pantalla (la landing `/erp/almacen`): en vez de su encabezado
+   * enseña solo su fila de acciones, y se limita a las vistas de `views`. Con una sola
+   * vista tampoco pinta sus pestañas, porque las de arriba ya mandan.
+   */
+  embedded?: { views: readonly WarehouseView[] };
+} = {}) {
   const { user } = useUser();
   const cfg = useMemo(() => getErpInventorySectionConfig(user, "warehouse"), [user]);
   const token = user?.token ?? "";
@@ -112,14 +125,20 @@ export default function WarehousePage() {
     unitCost: "",
     reference: "",
     notes: "",
+    /** Presentación en que se captura («Caja»). Vacío = unidad base. */
+    packagingId: "",
   });
+  // Norma de empaque del producto elegido: se captura en cajas y se guarda en piezas.
+  const [empaques, setEmpaques] = useState<Empaque[]>([]);
+  const [nuevoEmpaque, setNuevoEmpaque] = useState<{ nombre: string; piezas: string } | null>(null);
+  const [guardandoEmpaque, setGuardandoEmpaque] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [savingMovement, setSavingMovement] = useState(false);
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
   const [savingWarehouse, setSavingWarehouse] = useState(false);
 
-  const [tab, setTab] = useState<TabKey>("inventario");
+  const [tab, setTab] = useState<TabKey>(() => embedded?.views?.[0] ?? "inventario");
   const [insights, setInsights] = useState<InventoryInsights | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
@@ -220,13 +239,58 @@ export default function WarehousePage() {
     void listCatalogProducts(token).then(setProducts).catch(() => setProducts([]));
   }, [token]);
 
+  const vistasVisibles = useMemo(
+    () => (embedded?.views ? TABS.filter((t) => embedded.views.includes(t.key)) : [...TABS]),
+    [embedded],
+  );
+
   useEffect(() => {
-    if (movementId) setTab("movimientos");
-  }, [movementId]);
+    // Un aviso apunta a un movimiento: solo salta a esa vista si está montada aquí.
+    if (movementId && vistasVisibles.some((t) => t.key === "movimientos")) setTab("movimientos");
+  }, [movementId, vistasVisibles]);
 
   useEffect(() => {
     if (productFilter) setMovementProductFilter(productFilter);
   }, [productFilter]);
+
+  // Presentaciones del producto elegido en el formulario de movimiento.
+  useEffect(() => {
+    const productId = Number(movement.productId);
+    if (!token || !Number.isFinite(productId) || productId <= 0) {
+      setEmpaques([]);
+      return;
+    }
+    let vigente = true;
+    setNuevoEmpaque(null);
+    void listarEmpaques(token, productId)
+      .then((res) => { if (vigente) setEmpaques(res); })
+      .catch(() => { if (vigente) setEmpaques([]); });
+    return () => { vigente = false; };
+  }, [token, movement.productId]);
+
+  /** Alta rápida de presentación: se descubre aquí, cuando el producto no la tiene. */
+  const guardarEmpaque = async () => {
+    const productId = Number(movement.productId);
+    if (!token || !nuevoEmpaque || !(productId > 0)) return;
+    const nombre = nuevoEmpaque.nombre.trim();
+    const piezas = Number(nuevoEmpaque.piezas);
+    if (!nombre || !Number.isFinite(piezas) || piezas <= 0) {
+      toast.error("Escribe el nombre y cuántas piezas trae");
+      return;
+    }
+    setGuardandoEmpaque(true);
+    try {
+      const creado = await crearEmpaque(token, productId, { nombre, piezasPorUnidad: piezas });
+      setEmpaques((prev) => [...prev, creado]);
+      setMovement((m) => ({ ...m, packagingId: String(creado.id) }));
+      setNuevoEmpaque(null);
+      toast.success(`Presentación «${nombre}» registrada`);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo guardar la presentación"));
+    } finally {
+      setGuardandoEmpaque(false);
+    }
+  };
 
   const visibleMovements = useMemo(() => {
     if (!movementId) return movements;
@@ -290,6 +354,9 @@ export default function WarehousePage() {
         productId: Number(movement.productId),
         quantity: movement.quantity,
         unitCost: movement.unitCost ? Number(movement.unitCost) : undefined,
+        // Con presentación, la API convierte a unidad base y guarda lo tecleado.
+        packagingId: movement.packagingId ? Number(movement.packagingId) : undefined,
+        cantidadCapturada: movement.packagingId ? movement.quantity : undefined,
         reference: movement.reference.trim() || undefined,
         notes: movement.notes.trim() || undefined,
       };
@@ -304,7 +371,7 @@ export default function WarehousePage() {
       await createStockMovement(token, payload);
       const movedProductId = Number(movement.productId);
       setShowMovementForm(false);
-      setMovement({ type: "RECEIPT", productId: "", warehouseId: "", toWarehouseId: "", quantity: 1, unitCost: "", reference: "", notes: "" });
+      setMovement({ type: "RECEIPT", productId: "", warehouseId: "", toWarehouseId: "", quantity: 1, unitCost: "", reference: "", notes: "", packagingId: "" });
       void load();
       if (tab === "movimientos") void loadMovements();
       if (productTrace?.productId === movedProductId) {
@@ -737,7 +804,12 @@ export default function WarehousePage() {
     { key: "route", label: "Almacén", render: (m) => (
       <span style={{ fontSize: 12 }}>{m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}</span>
     ), width: 160 },
-    { key: "quantity", label: "Cant.", render: (m) => <strong style={{ fontSize: 13 }}>{Number(m.quantity)}</strong>, width: 64, numeric: true },
+    // «2 cajas · 24 pz»: lo que se tecleó y lo que de verdad se movió.
+    { key: "quantity", label: "Cant.", render: (m) => (
+      <strong style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+        {etiquetaCantidad(m)}
+      </strong>
+    ), width: 118, numeric: true },
     { key: "balance", label: "Saldo", render: (m) => (
       <span style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums", color: "var(--text-secondary)" }} title="Existencia antes → después">
         {stockMovementBalanceLabel(m)}
@@ -871,27 +943,33 @@ export default function WarehousePage() {
     return days <= 30;
   }).length, [lots]);
 
+  const acciones = (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
+      {cfg.canCreate && (
+        <>
+          <Button variant="secondary" size="sm" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
+          <Button variant="primary" size="sm" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <>
-      <PageHeader
-        eyebrow="ERP · Almacén"
-        title="Inventario y stock"
-        subtitle="Existencias, reorden y valuación por almacén."
-        density="ops"
-        actions={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
-            {cfg.canCreate && (
-              <>
-                <Button variant="secondary" size="sm" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
-                <Button variant="primary" size="sm" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
-              </>
-            )}
-          </div>
-        }
-      />
+      {embedded ? (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>{acciones}</div>
+      ) : (
+        <PageHeader
+          eyebrow="ERP · Almacén"
+          title="Inventario y stock"
+          subtitle="Existencias, reorden y valuación por almacén."
+          density="ops"
+          actions={acciones}
+        />
+      )}
 
-      <ContextRail
+      {!embedded && <ContextRail
         ariaLabel="Catálogos de inventario"
         items={
           enCore
@@ -906,14 +984,16 @@ export default function WarehousePage() {
                 { id: "tools", label: "Herramientas OPS", href: "/ops/tools?tab=inventory" },
               ]
         }
-      />
+      />}
 
-      <PanelTabs
-        ariaLabel="Vistas de almacén"
-        value={tab}
-        onChange={setTab}
-        tabs={TABS.map((t) => ({ key: t.key, label: t.label }))}
-      />
+      {vistasVisibles.length > 1 && (
+        <PanelTabs
+          ariaLabel="Vistas de almacén"
+          value={tab}
+          onChange={setTab}
+          tabs={vistasVisibles.map((t) => ({ key: t.key, label: t.label }))}
+        />
+      )}
 
       {/* ── Nuevo almacén (disponible desde cualquier pestaña) ── */}
       {showWarehouseForm && (
@@ -1004,8 +1084,87 @@ export default function WarehousePage() {
             )}
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad *</span>
-              <input type="number" min={1} value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} style={inp} />
+              <input type="number" min={0} step="any" value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} style={inp} />
             </label>
+            {movement.productId && (
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Presentación</span>
+                  <select
+                    value={movement.packagingId}
+                    onChange={(e) => setMovement((m) => ({ ...m, packagingId: e.target.value }))}
+                    style={inp}
+                    disabled={empaques.length === 0}
+                  >
+                    <option value="">Piezas</option>
+                    {empaques.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nombre} ({Number(e.piezasPorUnidad)} pz)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {(() => {
+                  const elegido = empaques.find((e) => String(e.id) === movement.packagingId);
+                  const previa = previsualizarConversion(
+                    movement.quantity,
+                    elegido ? { ...elegido, piezasPorUnidad: Number(elegido.piezasPorUnidad) } : null,
+                  );
+                  return previa ? (
+                    <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+                      {previa.texto}
+                    </span>
+                  ) : null;
+                })()}
+                {nuevoEmpaque ? (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      value={nuevoEmpaque.nombre}
+                      onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, nombre: e.target.value } : n))}
+                      placeholder="Caja"
+                      aria-label="Nombre de la presentación"
+                      style={{ ...inp, flex: "1 1 96px", minWidth: 0 }}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={nuevoEmpaque.piezas}
+                      onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, piezas: e.target.value } : n))}
+                      placeholder="100"
+                      aria-label="Piezas que trae"
+                      style={{ ...inp, flex: "0 1 88px", minWidth: 0 }}
+                    />
+                    <Button size="sm" variant="secondary" onClick={() => void guardarEmpaque()} loading={guardandoEmpaque}>
+                      Guardar
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setNuevoEmpaque(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : (
+                  cfg.canCreate && (
+                    <button
+                      type="button"
+                      onClick={() => setNuevoEmpaque({ nombre: "", piezas: "" })}
+                      style={{
+                        justifySelf: "start",
+                        appearance: "none",
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        fontSize: 11.5,
+                        fontWeight: 650,
+                        color: "var(--primary)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {empaques.length === 0 ? "Registrar una presentación" : "Nueva presentación"}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Costo unitario</span>
               <input type="number" min={0} step="0.01" value={movement.unitCost} onChange={(e) => setMovement((m) => ({ ...m, unitCost: e.target.value }))} style={inp} />

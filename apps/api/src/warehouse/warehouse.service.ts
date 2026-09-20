@@ -12,6 +12,7 @@ import {
   stockMovementTypeLabel,
   type StockMovementPdfRow,
 } from './stock-movement-pdf.js';
+import { EmpaqueInvalidoError, convertirCaptura, type Empaque } from './empaque.js';
 
 const COGS_MOVEMENT_TYPES = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
 
@@ -182,6 +183,97 @@ export class WarehouseService {
     });
   }
 
+  // ── Norma de empaque ──────────────────────────────────────────────
+  /**
+   * Presentaciones del producto («Caja» = 100 piezas). Devuelve vacío si el producto no
+   * es de esta empresa: sin presentaciones la captura cae al flujo de unidad base y el
+   * movimiento falla más abajo por producto inválido, no por empaque.
+   */
+  private async empaquesDeProducto(productId: number, tenantId: number): Promise<Empaque[]> {
+    const filas = await this.prisma.productPackaging.findMany({
+      where: { productId, ...companyWhere(tenantId) },
+      select: {
+        id: true,
+        nombre: true,
+        piezasPorUnidad: true,
+        esDefaultCompra: true,
+        codigoBarras: true,
+      },
+      orderBy: [{ esDefaultCompra: 'desc' }, { piezasPorUnidad: 'desc' }],
+    });
+    return filas.map((f) => ({
+      id: f.id,
+      nombre: f.nombre,
+      piezasPorUnidad: Number(f.piezasPorUnidad),
+      esDefaultCompra: f.esDefaultCompra,
+      codigoBarras: f.codigoBarras,
+    }));
+  }
+
+  async listPackagings(productId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    return this.prisma.productPackaging.findMany({
+      where: { productId, ...companyWhere(tenantId) },
+      orderBy: [{ esDefaultCompra: 'desc' }, { piezasPorUnidad: 'desc' }],
+    });
+  }
+
+  async createPackaging(
+    productId: number,
+    dto: { nombre: string; piezasPorUnidad: number; codigoBarras?: string; esDefaultCompra?: boolean },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, ...companyWhere(tenantId) },
+      select: { id: true },
+    });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+
+    const nombre = (dto.nombre || '').trim();
+    if (!nombre) throw new BadRequestException('Escribe el nombre de la presentación');
+    const piezas = Number(dto.piezasPorUnidad);
+    if (!Number.isFinite(piezas) || piezas <= 0) {
+      throw new BadRequestException('Indica cuántas piezas trae la presentación');
+    }
+
+    const yaExiste = await this.prisma.productPackaging.findFirst({
+      where: { productId, nombre },
+      select: { id: true },
+    });
+    if (yaExiste) throw new BadRequestException(`El producto ya tiene la presentación «${nombre}»`);
+
+    return this.prisma.$transaction(async (tx) => {
+      if (dto.esDefaultCompra) {
+        await tx.productPackaging.updateMany({
+          where: { productId },
+          data: { esDefaultCompra: false },
+        });
+      }
+      return tx.productPackaging.create({
+        data: {
+          productId,
+          nombre: nombre.slice(0, 60),
+          piezasPorUnidad: new Prisma.Decimal(piezas),
+          codigoBarras: dto.codigoBarras?.trim()?.slice(0, 64) || null,
+          esDefaultCompra: Boolean(dto.esDefaultCompra),
+          companyId: tenantId,
+        },
+      });
+    });
+  }
+
+  async deletePackaging(packagingId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const fila = await this.prisma.productPackaging.findFirst({
+      where: { id: packagingId, ...companyWhere(tenantId) },
+      select: { id: true },
+    });
+    if (!fila) throw new NotFoundException('Presentación no encontrada');
+    await this.prisma.productPackaging.delete({ where: { id: packagingId } });
+    return { ok: true };
+  }
+
   // ── Stock Movements ───────────────────────────────────────────────
   private generateMovementNumber(companyId: number): Promise<string> {
     return this.folio.next('STOCK_MOVEMENT', companyId);
@@ -200,6 +292,10 @@ export class WarehouseService {
     purchaseOrderId?: number;
     productionOrderId?: number;
     activityId?: number;
+    /** Empaque: presentación elegida y lo que tecleó la persona («3 cajas»). */
+    packagingId?: number;
+    unidadCaptura?: string;
+    cantidadCapturada?: number;
   }, userId: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const normalizedType = dto.type === 'IN' ? 'RECEIPT'
@@ -213,10 +309,25 @@ export class WarehouseService {
       throw new BadRequestException('El movimiento requiere almacén de origen y/o destino');
     }
 
-    const quantity = Number(dto.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      throw new BadRequestException('La cantidad debe ser mayor a cero');
+    // Se captura en cajas y se guarda en piezas: `quantity` sale ya en unidad base y
+    // el movimiento conserva lo tecleado para poder enseñar «2 cajas · 24 pz».
+    const empaques = await this.empaquesDeProducto(dto.productId, tenantId);
+    let captura;
+    try {
+      captura = convertirCaptura(
+        {
+          packagingId: dto.packagingId,
+          unidadCaptura: dto.unidadCaptura,
+          cantidadCapturada: dto.cantidadCapturada,
+          quantity: dto.quantity,
+        },
+        empaques,
+      );
+    } catch (err) {
+      if (err instanceof EmpaqueInvalidoError) throw new BadRequestException(err.message);
+      throw err;
     }
+    const quantity = captura.quantity;
 
     if (dto.fromWarehouseId) {
       const fromWh = await this.prisma.warehouse.findFirst({
@@ -284,6 +395,11 @@ export class WarehouseService {
           fromQtyAfter: fromQtyAfter != null ? new Prisma.Decimal(fromQtyAfter) : null,
           toQtyBefore: toQtyBefore != null ? new Prisma.Decimal(toQtyBefore) : null,
           toQtyAfter: toQtyAfter != null ? new Prisma.Decimal(toQtyAfter) : null,
+          unidadCaptura: captura.unidadCaptura,
+          factorConversion:
+            captura.factorConversion != null ? new Prisma.Decimal(captura.factorConversion) : null,
+          cantidadCapturada:
+            captura.cantidadCapturada != null ? new Prisma.Decimal(captura.cantidadCapturada) : null,
           unitCost: new Prisma.Decimal(unitCost),
           totalCost: new Prisma.Decimal(totalCost),
           lotId: dto.lotId ?? null,

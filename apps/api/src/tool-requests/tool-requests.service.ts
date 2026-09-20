@@ -1,9 +1,24 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { assertCompanyAccess, companyWhere, mergeCompanyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import {
+  LARGO_PICKUP_CODE,
+  generarPickupCode,
+  horasRestantesPickup,
+  normalizarPickupCode,
+  validarPickup,
+  vencimientoPickup,
+} from './pickup-code.js';
+import {
+  estadoProgramacion,
+  normalizarCadencia,
+  normalizarEstadoInspeccion,
+  normalizarFotosInspeccion,
+  proximaInspeccion,
+} from './kit-inspecciones.js';
 
 const FIELD_KIT_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
 const BROAD_KIT_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
@@ -23,7 +38,23 @@ export interface CreateToolRequestDto {
   expectedReturnDate: Date;
   generalPhotoUrl?: string;
   specificationsPhotoUrl?: string;
+  /**
+   * OT para la que se pide la herramienta. El dueño la quiere: «con base en las
+   * instalaciones/servicios asignados, hacer el requerimiento de herramientas
+   * particulares». null = préstamo suelto, sin OT.
+   */
+  activityId?: number | null;
 }
+
+/** Una OT del selector «¿para qué actividad?» del formulario de solicitud. */
+export type ActividadSolicitable = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  fechaMaxima: Date | null;
+  client: { id: number; name: string } | null;
+};
 
 export interface UpdateToolRequestDto {
   status?: ToolRequestStatus;
@@ -76,6 +107,14 @@ export interface AssignKitItemDto {
   assignmentType: 'KIT' | 'LOAN';
   dueReturnDate?: Date;
   notes?: string;
+  /** Cada cuántos días se revisa el kit. null / 0 = sin revisión periódica. */
+  inspeccionCadaDias?: number | null;
+}
+
+export interface RegistrarInspeccionDto {
+  estado?: unknown;
+  notas?: string;
+  fotos?: unknown;
 }
 
 export interface ReportKitEventDto {
@@ -152,11 +191,18 @@ export class ToolRequestsService {
       );
     }
 
+    const activityId = await this.resolverActividadDeSolicitud(
+      data.activityId,
+      data.usuarioId,
+      tenantId,
+    );
+
     const toolRequest = await this.prisma.toolRequest.create({
       data: {
         companyId: tenantId,
         usuarioId: data.usuarioId,
         inventoryItemId,
+        activityId,
         toolName,
         model,
         serialNumber,
@@ -175,6 +221,7 @@ export class ToolRequestsService {
             email: true,
           },
         },
+        activity: { select: { id: true, anNumber: true, titulo: true } },
       },
     });
 
@@ -187,6 +234,75 @@ export class ToolRequestsService {
     );
 
     return toolRequest;
+  }
+
+  /**
+   * La OT de la solicitud, verificando que sea del solicitante.
+   *
+   * El dueño pidió que la herramienta se pida «con base en las instalaciones/servicios
+   * asignados»: pedir para una OT ajena es exactamente lo que no debe pasar, porque el
+   * almacén entrega contra esa OT. Sin `activityId` la solicitud sigue siendo válida
+   * (préstamo suelto), que es como funcionaba hasta ahora.
+   */
+  private async resolverActividadDeSolicitud(
+    activityId: number | null | undefined,
+    usuarioId: number,
+    tenantId: number,
+  ): Promise<number | null> {
+    if (activityId == null || activityId === ('' as unknown)) return null;
+    const id = Number(activityId);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException('La actividad seleccionada no es válida');
+    }
+
+    const asignacion = await this.prisma.activityAssignee.findFirst({
+      where: {
+        activityId: id,
+        userId: usuarioId,
+        retiradoAt: null,
+        ...companyWhere(tenantId),
+        activity: { deletedAt: null },
+      },
+      select: { id: true },
+    });
+    if (!asignacion) {
+      throw new BadRequestException(
+        'Solo puedes pedir herramienta para una actividad que tengas asignada.',
+      );
+    }
+    return id;
+  }
+
+  /** Sus actividades abiertas, para el selector del formulario de solicitud. */
+  async actividadesParaSolicitud(usuarioId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const filas = await this.prisma.activityAssignee.findMany({
+      where: {
+        userId: usuarioId,
+        retiradoAt: null,
+        ...companyWhere(tenantId),
+        activity: { deletedAt: null },
+      },
+      select: {
+        activity: {
+          select: {
+            id: true,
+            anNumber: true,
+            titulo: true,
+            estatus: true,
+            fechaMaxima: true,
+            client: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { id: 'desc' },
+      take: 100,
+    });
+
+    return filas
+      .map((f) => (f as { activity?: ActividadSolicitable | null }).activity)
+      .filter((a): a is ActividadSolicitable => Boolean(a))
+      .filter((a) => !/^(finalizada|completada|cancelada|cerrada)/i.test(a.estatus || ''));
   }
 
   async findAll(currentUser?: any, query?: PaginationQueryDto, companyId?: number | null) {
@@ -399,16 +515,34 @@ export class ToolRequestsService {
     return updated;
   }
 
+  /**
+   * Aprobar genera la credencial de recolección.
+   *
+   * El dueño lo pidió así: «una vez aprobada la solicitud se da acceso a almacén para
+   * la recolección». El control de acceso de oficinas no sabe otorgar permisos de puerta
+   * temporales (`AccessControlService.createAccessRule` responde 501 y no hay puerta de
+   * almacén modelada), así que la llave es el código: se lo enseñamos al técnico y al
+   * almacén, y caduca a las `PICKUP_VIGENCIA_HORAS`.
+   */
   async approve(id: number, approvedBy: number, companyId?: number | null) {
     const toolRequest = await this.findById(id, companyId);
     if (!toolRequest) throw new Error('Solicitud no encontrada');
+
+    const ahora = new Date();
+    const pickupCode = generarPickupCode();
+    const pickupExpiresAt = vencimientoPickup(ahora);
 
     const approved = await this.prisma.toolRequest.update({
       where: { id },
       data: {
         status: 'APPROVED',
-        approvalDate: new Date(),
+        approvalDate: ahora,
         approvedBy,
+        pickupCode,
+        pickupExpiresAt,
+        // Reaprobar una solicitud vencida limpia la recolección anterior.
+        pickedUpAt: null,
+        pickedUpById: null,
       },
       include: {
         usuario: {
@@ -418,6 +552,7 @@ export class ToolRequestsService {
             email: true,
           },
         },
+        activity: { select: { id: true, anNumber: true, titulo: true } },
       },
     });
 
@@ -429,15 +564,97 @@ export class ToolRequestsService {
         'approved',
         toolRequest.toolName,
       );
+      await this.notificationHierarchy.notifyToolPickupReady({
+        requesterId: toolRequest.usuarioId,
+        approverId: approvedBy,
+        toolRequestId: id,
+        toolName: toolRequest.toolName,
+        pickupCode,
+        pickupExpiresAt,
+      });
     }
 
     return approved;
   }
 
-  async deliver(id: number, companyId?: number | null) {
+  /** Solicitud por código de recolección: lo que teclea el almacén en su mostrador. */
+  async buscarPorPickupCode(codigo: unknown, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const normalizado = normalizarPickupCode(codigo);
+    if (normalizado.length !== LARGO_PICKUP_CODE) {
+      throw new BadRequestException(`El código tiene ${LARGO_PICKUP_CODE} caracteres`);
+    }
+
+    const solicitud = await this.prisma.toolRequest.findFirst({
+      where: { pickupCode: normalizado, status: 'APPROVED', ...companyWhere(tenantId) },
+      include: {
+        usuario: { select: { id: true, nombre: true, email: true } },
+        activity: { select: { id: true, anNumber: true, titulo: true } },
+        inventoryItem: { select: { id: true, toolName: true, model: true, serialNumber: true } },
+      },
+    });
+    if (!solicitud) {
+      throw new NotFoundException('No hay ninguna solicitud aprobada con ese código');
+    }
+
+    const estado = validarPickup(solicitud, normalizado, new Date());
+    return {
+      solicitud,
+      valido: estado.valido,
+      motivo: estado.valido ? null : estado.motivo,
+      mensaje: estado.valido ? null : estado.mensaje,
+      horasRestantes: horasRestantesPickup(solicitud.pickupExpiresAt, new Date()),
+    };
+  }
+
+  /**
+   * Las solicitudes aprobadas que esperan en el mostrador: lo que el almacén tiene
+   * pendiente de entregar hoy.
+   */
+  async pendientesDeRecoleccion(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const ahora = new Date();
+    const filas = await this.prisma.toolRequest.findMany({
+      where: {
+        status: 'APPROVED',
+        pickedUpAt: null,
+        pickupCode: { not: null },
+        ...companyWhere(tenantId),
+      },
+      include: {
+        usuario: { select: { id: true, nombre: true, email: true } },
+        activity: { select: { id: true, anNumber: true, titulo: true } },
+      },
+      orderBy: { approvalDate: 'desc' },
+      take: 200,
+    });
+
+    return filas.map((f) => ({
+      ...f,
+      vencido: Boolean(f.pickupExpiresAt && f.pickupExpiresAt.getTime() < ahora.getTime()),
+      horasRestantes: horasRestantesPickup(f.pickupExpiresAt, ahora),
+    }));
+  }
+
+  /**
+   * Entrega en almacén. Si la solicitud tiene código de recolección se exige teclearlo:
+   * es lo único que separa a cualquiera de llevarse la herramienta. Quien la recoge
+   * queda registrado en `pickedUpAt`/`pickedUpById`.
+   */
+  async deliver(
+    id: number,
+    companyId?: number | null,
+    opciones?: { pickupCode?: unknown; recogidaPorId?: number },
+  ) {
     const request = await this.findById(id, companyId);
     if (!request) {
       throw new Error('Solicitud no encontrada');
+    }
+
+    const ahora = new Date();
+    if (request.pickupCode) {
+      const estado = validarPickup(request, opciones?.pickupCode, ahora);
+      if (!estado.valido) throw new BadRequestException(estado.mensaje);
     }
 
     return (this.prisma as any).$transaction(async (tx: any) => {
@@ -459,7 +676,9 @@ export class ToolRequestsService {
         where: { id },
         data: {
           status: 'IN_USE',
-          deliveryDate: new Date(),
+          deliveryDate: ahora,
+          pickedUpAt: ahora,
+          pickedUpById: opciones?.recogidaPorId ?? request.usuarioId,
         },
         include: {
           usuario: {
@@ -469,6 +688,7 @@ export class ToolRequestsService {
               email: true,
             },
           },
+          activity: { select: { id: true, anNumber: true, titulo: true } },
         },
       });
 
@@ -921,6 +1141,8 @@ export class ToolRequestsService {
       }
     }
 
+    const cadencia = normalizarCadencia(data.inspeccionCadaDias);
+
     return (this.prisma as any).$transaction(async (tx: any) => {
       const assignment = await tx.toolKitAssignment.create({
         data: {
@@ -931,6 +1153,9 @@ export class ToolRequestsService {
           notes: data.notes,
           assignedById: currentUser.id,
           isActive: true,
+          inspeccionCadaDias: cadencia,
+          // La primera revisión se cuenta desde la entrega.
+          proximaInspeccion: proximaInspeccion(new Date(), cadencia),
           companyId: tenantId,
         },
         include: {
@@ -949,6 +1174,222 @@ export class ToolRequestsService {
 
       return assignment;
     });
+  }
+
+  // ===== REVISIÓN PERIÓDICA DEL KIT =====
+
+  /** La asignación, comprobando que quien la toca puede verla. */
+  private async asignacionParaRevision(
+    assignmentId: number,
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    tenantId: number,
+  ) {
+    const asignacion = await (this.prisma as any).toolKitAssignment.findFirst({
+      where: { id: assignmentId, ...companyWhere(tenantId) },
+      include: {
+        inventoryItem: { select: { id: true, toolName: true, model: true, serialNumber: true } },
+        user: { select: { id: true, nombre: true, email: true, managerId: true } },
+      },
+    });
+    assertCompanyAccess(asignacion, tenantId, 'Asignación de kit');
+
+    const puedeGestionar = Boolean(
+      currentUser.isSuperAdmin ||
+        currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
+        currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
+    );
+    // Su propio kit lo puede mirar; revisarlo de oficio es del supervisor.
+    if (!puedeGestionar && asignacion.userId !== currentUser.id) {
+      throw new BadRequestException('No tienes permiso sobre esta asignación de kit');
+    }
+    return { asignacion, puedeGestionar };
+  }
+
+  /**
+   * Fija (o quita) el ritmo de revisión de una asignación. Cambiar la cadencia recorre
+   * la próxima fecha desde hoy: si se pasa de 90 a 30 días, no tiene sentido seguir
+   * esperando la fecha vieja.
+   */
+  async programarInspeccionKit(
+    assignmentId: number,
+    inspeccionCadaDias: unknown,
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const { puedeGestionar } = await this.asignacionParaRevision(assignmentId, currentUser, tenantId);
+    if (!puedeGestionar) {
+      throw new BadRequestException('Solo quien administra herramientas programa las revisiones');
+    }
+
+    const cadencia = normalizarCadencia(inspeccionCadaDias);
+    return (this.prisma as any).toolKitAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        inspeccionCadaDias: cadencia,
+        proximaInspeccion: proximaInspeccion(new Date(), cadencia),
+      },
+      include: { inventoryItem: true, user: { select: { id: true, nombre: true } } },
+    });
+  }
+
+  /**
+   * «Revisar kit»: deja constancia del estado con notas y fotos, y recorre la próxima
+   * revisión. Un kit observado o dañado se vuelve a mirar antes (ver `kit-inspecciones`).
+   */
+  async registrarInspeccionKit(
+    assignmentId: number,
+    data: RegistrarInspeccionDto,
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const { asignacion, puedeGestionar } = await this.asignacionParaRevision(
+      assignmentId,
+      currentUser,
+      tenantId,
+    );
+    if (!puedeGestionar) {
+      throw new BadRequestException('La revisión del kit la registra el supervisor');
+    }
+
+    const estado = normalizarEstadoInspeccion(data.estado) ?? 'OK';
+    const notas = String(data.notas ?? '').trim().slice(0, 2000) || null;
+    const fotos = normalizarFotosInspeccion(data.fotos);
+    if (estado !== 'OK' && !notas) {
+      throw new BadRequestException('Escribe qué observaste: un kit no queda marcado sin explicación');
+    }
+
+    const ahora = new Date();
+    const inspeccion = await (this.prisma as any).$transaction(async (tx: any) => {
+      const creada = await tx.toolKitInspection.create({
+        data: {
+          assignmentId,
+          inspectorId: currentUser.id,
+          fecha: ahora,
+          estado,
+          notas,
+          fotos: fotos.length ? fotos : undefined,
+          companyId: tenantId,
+        },
+        include: { inspector: { select: { id: true, nombre: true } } },
+      });
+
+      await tx.toolKitAssignment.update({
+        where: { id: assignmentId },
+        data: {
+          proximaInspeccion: proximaInspeccion(ahora, asignacion.inspeccionCadaDias, estado),
+        },
+      });
+
+      return creada;
+    });
+
+    // Un kit dañado o con observaciones no se queda en la pantalla del supervisor:
+    // quien lo trae tiene que enterarse de lo que se le anotó.
+    if (estado !== 'OK' && asignacion.userId !== currentUser.id) {
+      await this.notificationHierarchy
+        .notifyKitInspectionFlagged({
+          userId: asignacion.userId,
+          assignmentId,
+          toolName: asignacion.inventoryItem?.toolName || 'Kit',
+          estado,
+          notas: notas || '',
+        })
+        .catch(() => undefined);
+    }
+
+    return inspeccion;
+  }
+
+  /** Historial de revisiones de una asignación. */
+  async listarInspeccionesKit(
+    assignmentId: number,
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    await this.asignacionParaRevision(assignmentId, currentUser, tenantId);
+    return (this.prisma as any).toolKitInspection.findMany({
+      where: { assignmentId, ...companyWhere(tenantId) },
+      include: { inspector: { select: { id: true, nombre: true } } },
+      orderBy: { fecha: 'desc' },
+      take: 100,
+    });
+  }
+
+  /**
+   * Kits con revisión pendiente. Por defecto solo los vencidos (lo que hay que hacer
+   * hoy); `incluirPorVencer` suma los de la próxima semana.
+   */
+  async kitsPorInspeccionar(
+    companyId?: number | null,
+    opciones?: { incluirPorVencer?: boolean },
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const ahora = new Date();
+    const corte = opciones?.incluirPorVencer
+      ? new Date(ahora.getTime() + 7 * 86_400_000)
+      : ahora;
+
+    const filas = await (this.prisma as any).toolKitAssignment.findMany({
+      where: {
+        isActive: true,
+        proximaInspeccion: { not: null, lte: corte },
+        ...companyWhere(tenantId),
+      },
+      include: {
+        inventoryItem: { select: { id: true, toolName: true, model: true, serialNumber: true } },
+        user: { select: { id: true, nombre: true, email: true } },
+        inspections: { orderBy: { fecha: 'desc' }, take: 1 },
+      },
+      orderBy: { proximaInspeccion: 'asc' },
+      take: 300,
+    });
+
+    return filas.map((fila: any) => ({
+      ...fila,
+      ultimaInspeccion: fila.inspections?.[0] ?? null,
+      ...estadoProgramacion(fila.proximaInspeccion, ahora),
+    }));
+  }
+
+  /**
+   * Aviso diario de kits vencidos. Cada supervisor recibe los suyos; sin supervisor, el
+   * aviso va a quien administra herramientas (lo resuelve la jerarquía).
+   */
+  async avisarKitsPorInspeccionar(companyId?: number | null) {
+    const vencidos = (await this.kitsPorInspeccionar(companyId)).filter(
+      (k: any) => k.vencida,
+    );
+    for (const kit of vencidos) {
+      await this.notificationHierarchy
+        .notifyKitInspectionDue({
+          userId: kit.userId,
+          assignmentId: kit.id,
+          toolName: kit.inventoryItem?.toolName || 'Kit',
+          diasDeAtraso: kit.diasDeAtraso,
+        })
+        .catch(() => undefined);
+    }
+    return vencidos.length;
+  }
+
+  /** Recorre todas las empresas: lo llama el cron. */
+  async avisarKitsPorInspeccionarTodasLasEmpresas() {
+    const empresas = await this.prisma.companyProfile.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    let total = 0;
+    for (const empresa of empresas) {
+      try {
+        total += await this.avisarKitsPorInspeccionar(empresa.id);
+      } catch {
+        // Una empresa mal configurada no debe tumbar el aviso de las demás.
+      }
+    }
+    return total;
   }
 
   async reportKitEvent(

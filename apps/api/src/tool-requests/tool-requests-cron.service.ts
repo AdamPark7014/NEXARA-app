@@ -22,6 +22,24 @@ export class ToolRequestsCronService {
   }
 
   /**
+   * Revisión periódica de kits: cada mañana avisa de los que ya tocaban.
+   *
+   * Media hora después del aviso de vencimientos para no soltar dos notificaciones de
+   * herramientas en el mismo minuto a la misma gente.
+   */
+  @Cron('30 8 * * *')
+  async avisarKitsPorInspeccionar() {
+    try {
+      const total = await this.toolRequestsService.avisarKitsPorInspeccionarTodasLasEmpresas();
+      if (total > 0) {
+        console.log(`🧰 ${total} kits con revisión vencida`);
+      }
+    } catch (error) {
+      console.error('❌ Error al avisar revisiones de kit:', error);
+    }
+  }
+
+  /**
    * Se ejecuta cada hora
    * Verifica herramientas que vencieron hace más de 1 hora
    */

@@ -257,8 +257,11 @@ export class AlertsService {
   @Cron(CronExpression.EVERY_2_HOURS)
   async checkStockAlerts() {
     try {
+      // El mínimo capturado a mano (`minStock`) sigue mandando; desde el frente de
+      // reabastecimiento también alerta el mínimo calculado del consumo real, para el
+      // material circulante que nadie configuró a mano.
       const levels = await this.prisma.stockLevel.findMany({
-        where: { minStock: { gt: 0 } },
+        where: { OR: [{ minStock: { gt: 0 } }, { minCalculado: { gt: 0 } }] },
         include: {
           product: { select: { id: true, sku: true, name: true } },
           warehouse: { select: { id: true, name: true } },
@@ -276,7 +279,8 @@ export class AlertsService {
       let alerted = 0;
       for (const level of levels) {
         const qty = Number(level.quantity || 0);
-        const min = Number(level.minStock || 0);
+        // Manda el más alto de los dos: el que se capturó y el que salió del consumo.
+        const min = Math.max(Number(level.minStock || 0), Number(level.minCalculado || 0));
         if (min <= 0) continue;
         if (qty > min) continue;
 

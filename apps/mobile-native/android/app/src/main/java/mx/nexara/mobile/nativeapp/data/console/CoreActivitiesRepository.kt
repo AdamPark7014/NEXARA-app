@@ -7,6 +7,8 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest
 import mx.nexara.mobile.nativeapp.data.api.AddTeamMemberRequest
 import mx.nexara.mobile.nativeapp.data.api.GeocercaAlertaDto
 import mx.nexara.mobile.nativeapp.data.api.GeocercaDto
+import mx.nexara.mobile.nativeapp.data.api.HerramientasChecklistDto
+import mx.nexara.mobile.nativeapp.data.api.PalomearHerramientaRequest
 import mx.nexara.mobile.nativeapp.data.api.JustificarZonaRequest
 import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.SalesClientDto
@@ -113,6 +115,35 @@ class CoreActivitiesRepository(context: Context) {
     suspend fun iniciarActividad(activityId: Long) {
         api.iniciarActividad(activityId).close()
     }
+
+    /**
+     * Checklist de herramientas de la OT: qué hay que llevar y qué ya se palomeó.
+     * Solo de quien la tiene asignada (a los demás el API contesta 403).
+     */
+    suspend fun herramientasChecklist(activityId: Long): HerramientasChecklistDto =
+        api.herramientasChecklist(activityId)
+
+    /**
+     * Palomear un renglón del checklist. Devuelve el checklist completo, así que
+     * la pantalla no vuelve a pedirlo.
+     *
+     * @param ok true = «lo traigo y sirve»; false = «falta o está dañado» (sigue pendiente).
+     */
+    suspend fun palomearHerramienta(
+        activityId: Long,
+        requirementId: Long,
+        ok: Boolean,
+        nota: String? = null,
+        fotoUrl: String? = null,
+    ): HerramientasChecklistDto = api.palomearHerramienta(
+        activityId,
+        requirementId,
+        PalomearHerramientaRequest(
+            ok = ok,
+            nota = nota?.trim()?.takeIf { it.isNotEmpty() },
+            fotoUrl = fotoUrl?.trim()?.takeIf { it.isNotEmpty() },
+        ),
+    )
 
     /** @param horasPlan «Tiempo estimado» de quien reparte (contrato B). */
     suspend fun dispatch(activityId: Long, userIds: List<Long>, indicaciones: String?, horasPlan: Double? = null) {

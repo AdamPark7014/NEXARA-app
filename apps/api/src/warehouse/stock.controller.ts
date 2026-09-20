@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, Res, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res, UseGuards, ParseIntPipe } from '@nestjs/common';
 import type { Response } from 'express';
 import { WarehouseService } from './warehouse.service.js';
+import { ReabastecimientoService } from './reabastecimiento.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -10,7 +11,75 @@ import { PERMISSIONS } from '../common/permissions.js';
 @Controller('stock')
 @UseGuards(UrlAccessGuard)
 export class StockController {
-  constructor(private readonly service: WarehouseService) {}
+  constructor(
+    private readonly service: WarehouseService,
+    private readonly reabastecimiento: ReabastecimientoService,
+  ) {}
+
+  // ── Reabastecimiento ──────────────────────────────────────────────
+  /**
+   * Qué hay que comprar y cuánto. Por defecto solo lo que tocó el mínimo; `todos=true`
+   * enseña el panorama completo del material circulante.
+   */
+  @Get('reabastecimiento')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
+  reabastecimientoListar(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('todos') todos?: string,
+  ) {
+    return this.reabastecimiento.listar(companyId, {
+      warehouseId: warehouseId ? +warehouseId : undefined,
+      todos: todos === 'true',
+    });
+  }
+
+  /** Botón «Recalcular»: rehace mínimos y máximos sin esperar al job de la madrugada. */
+  @Post('reabastecimiento/recalcular')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  reabastecimientoRecalcular(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto?: { warehouseId?: number; productId?: number },
+  ) {
+    return this.reabastecimiento.recalcular(companyId, {
+      warehouseId: dto?.warehouseId ? Number(dto.warehouseId) : undefined,
+      productId: dto?.productId ? Number(dto.productId) : undefined,
+    });
+  }
+
+  // ── Norma de empaque ──────────────────────────────────────────────
+  @Get('products/:productId/empaques')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
+  listPackagings(
+    @Param('productId', ParseIntPipe) productId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.listPackagings(productId, companyId);
+  }
+
+  @Post('products/:productId/empaques')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  createPackaging(
+    @Param('productId', ParseIntPipe) productId: number,
+    @Body() dto: { nombre: string; piezasPorUnidad: number; codigoBarras?: string; esDefaultCompra?: boolean },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.createPackaging(productId, dto, companyId);
+  }
+
+  @Delete('empaques/:id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
+  deletePackaging(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.deletePackaging(id, companyId);
+  }
 
   @Get('levels')
   @UseGuards(RbacGuard)

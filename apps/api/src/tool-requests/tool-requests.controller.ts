@@ -13,7 +13,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -215,6 +215,82 @@ export class ToolRequestsController {
     );
   }
 
+  // ===== REVISIÓN PERIÓDICA DEL KIT =====
+
+  /** Kits con revisión vencida (o por vencer con `porVencer=true`). */
+  @Get('kits/inspecciones/pendientes')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async kitsPorInspeccionar(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('porVencer') porVencer?: string,
+  ) {
+    return this.toolRequestsService.kitsPorInspeccionar(companyId, {
+      incluirPorVencer: porVencer === 'true',
+    });
+  }
+
+  /** Cada cuántos días se revisa este kit. 0 o vacío = sin revisión periódica. */
+  @Put('kits/:assignmentId/inspeccion-programada')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async programarInspeccion(
+    @CurrentUser() user: any,
+    @Param('assignmentId') assignmentId: string,
+    @Body() data: { inspeccionCadaDias?: number | null },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.toolRequestsService.programarInspeccionKit(
+      parseInt(assignmentId, 10),
+      data?.inspeccionCadaDias,
+      { id: user.id, isSuperAdmin: user.isSuperAdmin, permissions: user.permissions },
+      companyId,
+    );
+  }
+
+  /**
+   * «Revisar kit»: estado, notas y fotos. Recorre la próxima revisión.
+   *
+   * Acepta las fotos como archivos (`multipart/form-data`, campo `fotos`) o como una
+   * lista de URLs ya subidas. Las apps mandan archivos; la web, lo que tenga.
+   */
+  @Post('kits/:assignmentId/inspeccion')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @UseInterceptors(FilesInterceptor('fotos', 8, { dest: 'uploads/kits' }))
+  async registrarInspeccion(
+    @CurrentUser() user: any,
+    @Param('assignmentId') assignmentId: string,
+    @Body() data: { estado?: string; notas?: string; fotos?: unknown },
+    @UploadedFiles() archivos?: MulterFile[],
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    const subidas = (archivos ?? [])
+      .map((f) => f?.filename)
+      .filter(Boolean)
+      .map((filename) => ({ url: `/uploads/kits/${filename}` }));
+    // Con multipart, `fotos` del body llega como texto: se descarta si no es una lista.
+    const delBody = Array.isArray(data?.fotos) ? data.fotos : [];
+
+    return this.toolRequestsService.registrarInspeccionKit(
+      parseInt(assignmentId, 10),
+      { ...data, fotos: [...delBody, ...subidas] },
+      { id: user.id, isSuperAdmin: user.isSuperAdmin, permissions: user.permissions },
+      companyId,
+    );
+  }
+
+  @Get('kits/:assignmentId/inspecciones')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
+  async listarInspecciones(
+    @CurrentUser() user: any,
+    @Param('assignmentId') assignmentId: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.toolRequestsService.listarInspeccionesKit(
+      parseInt(assignmentId, 10),
+      { id: user.id, isSuperAdmin: user.isSuperAdmin, permissions: user.permissions },
+      companyId,
+    );
+  }
+
   @Post('kits/:assignmentId/report')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
   async reportKitEvent(
@@ -253,6 +329,32 @@ export class ToolRequestsController {
       },
       companyId,
     );
+  }
+
+  // ===== RECOLECCIÓN EN ALMACÉN =====
+
+  /** Mis actividades abiertas: el selector «¿para qué OT?» del formulario. */
+  @Get('mis-actividades')
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_REQUEST, PERMISSIONS.TOOLS_VIEW] })
+  async misActividades(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.toolRequestsService.actividadesParaSolicitud(user.id, companyId);
+  }
+
+  /** Lo que el almacén tiene pendiente de entregar. */
+  @Get('pickup/pendientes')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async pickupPendientes(@CurrentCompanyId() companyId: number | null) {
+    return this.toolRequestsService.pendientesDeRecoleccion(companyId);
+  }
+
+  /** El almacén teclea el código y ve qué entregar y a quién. */
+  @Get('pickup/:code')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async pickupPorCodigo(
+    @Param('code') code: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.toolRequestsService.buscarPorPickupCode(code, companyId);
   }
 
   // Crear solicitud de herramienta
@@ -368,11 +470,18 @@ export class ToolRequestsController {
     return this.toolRequestsService.approve(parseInt(id, 10), user.id, companyId);
   }
 
-  // Entregar herramienta
+  // Entregar herramienta. Con código de recolección hay que teclearlo.
   @Post(':id/deliver')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
-  async deliver(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
-    return this.toolRequestsService.deliver(parseInt(id, 10), companyId);
+  async deliver(
+    @Param('id') id: string,
+    @Body() data: { pickupCode?: string; recogidaPorId?: number } | undefined,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.toolRequestsService.deliver(parseInt(id, 10), companyId, {
+      pickupCode: data?.pickupCode,
+      recogidaPorId: data?.recogidaPorId ? Number(data.recogidaPorId) : undefined,
+    });
   }
 
   // Devolver herramienta
