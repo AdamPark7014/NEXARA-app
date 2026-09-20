@@ -7,10 +7,7 @@ import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import FilterToolbar from "@/components/FilterToolbar";
 import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
 import {
-  FinanceField,
-  FinanceFormGrid,
   FinanceModuleShell,
-  financeInputStyle,
 } from "@/components/finance/FinanceModuleShell";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
@@ -90,7 +87,7 @@ export default function PrenominaPage() {
   const teamColumns: Column<PrenominaPreviewRow>[] = [
     {
       key: "sel",
-      header: "",
+      label: "",
       render: (r) => (
         <input
           type="checkbox"
@@ -109,7 +106,7 @@ export default function PrenominaPage() {
     },
     {
       key: "nombre",
-      header: "Persona",
+      label: "Persona",
       render: (r) => (
         <div>
           <div style={{ fontWeight: 600 }}>{r.nombre || `Usuario #${r.userId}`}</div>
@@ -119,22 +116,22 @@ export default function PrenominaPage() {
     },
     {
       key: "minutes",
-      header: "Minutos",
+      label: "Minutos",
       render: (r) => formatMinutes(r.totalMinutes || 0),
     },
     {
       key: "extras",
-      header: "Extras aprobados",
+      label: "Extras aprobados",
       render: (r) => formatMinutes(r.approvedOvertimeMinutes || 0),
     },
     {
       key: "sueldo",
-      header: "Sueldo semanal",
+      label: "Sueldo semanal",
       render: (r) => (r.sueldoSemanal != null ? <Money value={r.sueldoSemanal} /> : "—"),
     },
     {
       key: "suggested",
-      header: "Monto sugerido",
+      label: "Monto sugerido",
       render: (r) =>
         r.suggestedAmount != null ? <Money value={r.suggestedAmount} /> : "Sin sueldo",
     },
@@ -143,27 +140,27 @@ export default function PrenominaPage() {
   const otColumns: Column<OtRow>[] = [
     {
       key: "persona",
-      header: "Persona",
+      label: "Persona",
       render: (r) => r.user?.nombre || `#${r.userId}`,
     },
     {
       key: "fecha",
-      header: "Día",
+      label: "Día",
       render: (r) => String(r.fecha).slice(0, 10),
     },
     {
       key: "minutos",
-      header: "Minutos extra",
+      label: "Minutos extra",
       render: (r) => formatMinutes(r.minutos),
     },
     {
       key: "estado",
-      header: "Estado",
+      label: "Estado",
       render: (r) => r.estado,
     },
     {
       key: "acciones",
-      header: "",
+      label: "",
       render: (r) =>
         r.estado === "PENDIENTE" && token ? (
           <div style={{ display: "flex", gap: 8 }}>
@@ -246,26 +243,12 @@ export default function PrenominaPage() {
           </>
         }
       >
-        <FilterToolbar>
-          <FinanceFormGrid>
-            <FinanceField label="Desde">
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                style={financeInputStyle}
-              />
-            </FinanceField>
-            <FinanceField label="Hasta">
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                style={financeInputStyle}
-              />
-            </FinanceField>
-          </FinanceFormGrid>
-        </FilterToolbar>
+        <FilterToolbar
+          dates={[
+            { label: "Desde", value: from, onChange: setFrom },
+            { label: "Hasta", value: to, onChange: setTo },
+          ]}
+        />
 
         <section style={{ marginTop: 16 }}>
           <h2 style={{ fontSize: 16, marginBottom: 8 }}>Equipo del periodo</h2>
@@ -273,7 +256,8 @@ export default function PrenominaPage() {
             columns={teamColumns}
             rows={rows}
             rowKey={(r) => r.userId}
-            emptyText={loading ? "Cargando…" : "Elige periodo y pulsa Calcular periodo"}
+            emptyTitle={loading ? "Cargando…" : "Sin filas todavía"}
+            emptyDescription="Elige periodo y pulsa Calcular periodo"
           />
         </section>
 
@@ -286,7 +270,8 @@ export default function PrenominaPage() {
             columns={otColumns}
             rows={otRows}
             rowKey={(r) => r.id}
-            emptyText="Sin candidatos de extra en el periodo"
+            emptyTitle="Sin candidatos de extra"
+            emptyDescription="No hay horas extra en el periodo"
           />
         </section>
       </FinanceModuleShell>

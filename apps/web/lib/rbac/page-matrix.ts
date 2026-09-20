@@ -465,6 +465,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/hr/**',
     '/erp/finance/employee-payments',
     '/erp/finance/prenomina',
+    '/erp/hr/prenomina',
     // Viáticos: `resolveViaticsSidebarHome` manda a RH al home de finanzas ERP,
     // así que el módulo se le pintaba y la ruta se le negaba.
     '/erp/finance/viatics',
