@@ -12,6 +12,7 @@
 
 import { workDayAtClock, WORKDAY_TIMEZONE } from '../common/time/workday.js';
 import { isCeoEquivalentEmail } from '../common/platform-accounts.js';
+import { detectDeviceDetails } from '../common/device-detector.js';
 
 /** Estado de una checada: OK, PENDIENTE (sin conexión) o REVISAR (algo no cuadra). */
 export type ValidacionChecada = 'OK' | 'PENDIENTE' | 'REVISAR';
@@ -23,6 +24,8 @@ export const MOTIVO_VALIDACION = {
   ubicacionImprecisa: 'Ubicación imprecisa',
   sinUbicacion: 'Sin ubicación',
   cierreAutomatico: 'Sin salida registrada: cierre automático',
+  ubicacionVieja: 'La ubicación no era del momento',
+  coordenadaRepetida: 'La misma coordenada exacta otra vez',
 } as const;
 
 /** 422 cuando el teléfono reporta ubicación simulada. */
@@ -237,6 +240,169 @@ export function puedeVerGpsDireccion(user?: { email?: string | null } | null): b
 /** El motivo de una corrección de hora es obligatorio y tiene que decir algo (≥ 10). */
 export function motivoCorreccionValido(motivo?: string | null): boolean {
   return (motivo ?? '').trim().length >= 10;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// De dónde vino la checada
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Desde dónde se registró: las dos apps, o un navegador. */
+export type OrigenChecada = 'ANDROID' | 'IOS' | 'WEB';
+
+/**
+ * Origen a partir de lo que manda el cliente.
+ *
+ * Las dos apps se identifican igual (`X-Device-Browser: NEXARA App` y un
+ * `User-Agent` que empieza por `NexaraApp/`), así que basta con mirar el
+ * sistema. Cualquier otra cosa es un navegador, y desde el navegador ya no se
+ * checa: la ubicación de una pestaña no se puede comprobar.
+ */
+export function origenChecada(userAgent?: string | null, headers?: Record<string, unknown>): OrigenChecada {
+  const detalle = detectDeviceDetails(userAgent, headers as never);
+  if (!detalle.isApp) return 'WEB';
+  const so = `${detalle.os} ${userAgent ?? ''}`.toLowerCase();
+  if (/ios|iphone|ipad|ipod/.test(so)) return 'IOS';
+  if (/android/.test(so)) return 'ANDROID';
+  // App NEXARA de un sistema que no reconocemos: es app, no navegador.
+  return 'ANDROID';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Intentos rechazados
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Claves de `AttendanceRejection.motivo`. Cortas y estables: la UI las traduce. */
+export const MOTIVO_RECHAZO = {
+  ubicacionSimulada: 'MOCK_LOCATION',
+  desdeNavegador: 'ORIGEN_WEB',
+  viajeImposible: 'VIAJE_IMPOSIBLE',
+  ubicacionVieja: 'UBICACION_VIEJA',
+} as const;
+
+export type MotivoRechazo = (typeof MOTIVO_RECHAZO)[keyof typeof MOTIVO_RECHAZO];
+
+/** Cómo se lee cada motivo en la web y en las apps. */
+export const ETIQUETA_MOTIVO_RECHAZO: Record<string, string> = {
+  MOCK_LOCATION: 'Ubicación simulada',
+  ORIGEN_WEB: 'Intento desde el navegador',
+  VIAJE_IMPOSIBLE: 'Viaje imposible entre checadas',
+  UBICACION_VIEJA: 'Ubicación guardada, no del momento',
+};
+
+/**
+ * 422 cuando alguien intenta checar desde la web.
+ *
+ * Decisión del dueño: nadie checa desde el navegador. Una pestaña puede decir
+ * que está donde quiera —la API de geolocalización se falsea con dos líneas en
+ * la consola— y de estos registros sale la nómina.
+ */
+export const MENSAJE_SOLO_APP =
+  'Las checadas se registran solo desde la app NEXARA en tu teléfono. Abre la app para checar.';
+
+/** 422 cuando el punto de esta checada está imposiblemente lejos del anterior. */
+export const MENSAJE_VIAJE_IMPOSIBLE =
+  'Tu ubicación no coincide con tu checada anterior: es una distancia imposible en ese tiempo. Avisa a tu jefe.';
+
+/** 422 cuando el teléfono mandó una posición guardada en vez de medir una nueva. */
+export const MENSAJE_UBICACION_VIEJA =
+  'Tu teléfono mandó una ubicación vieja. Sal al aire libre unos segundos y vuelve a intentarlo.';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Comprobaciones del servidor que no necesitan hardware nuevo
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Nadie llega a su siguiente checada a más de esto. Un vuelo tampoco. */
+export const VELOCIDAD_IMPOSIBLE_KMH = 300;
+/** Por debajo de un kilómetro manda el ruido del GPS, no el movimiento. */
+export const VIAJE_MINIMO_M = 1_000;
+/** Y hace falta medio minuto para que dividir distancia entre tiempo signifique algo. */
+export const VIAJE_MINIMO_MS = 30_000;
+/** Una posición de hace más de esto ya no dice dónde estás: se marca para revisión. */
+export const FIX_VIEJO_REVISAR_MS = 5 * 60 * 1000;
+/** Y de hace más de esto no se acepta: es una posición guardada, no una medida. */
+export const FIX_VIEJO_RECHAZO_MS = 30 * 60 * 1000;
+/** Dos puntos a menos de esto son «el mismo punto» para un GPS. */
+export const REPETIDA_TOLERANCIA_M = 1;
+/** Cuántas checadas seguidas con el punto calcado hacen falta para sospechar. */
+export const REPETIDAS_PARA_SOSPECHAR = 3;
+
+export type PuntoChecada = { latitude: number; longitude: number; at: Date };
+
+export type ViajeImposible = {
+  imposible: boolean;
+  /** Velocidad implícita entre las dos checadas, km/h. null si no se pudo calcular. */
+  velocidadKmh: number | null;
+  distanciaM: number | null;
+};
+
+/**
+ * ¿La distancia entre esta checada y la anterior es imposible en ese tiempo?
+ *
+ * Es la comprobación más barata que hay contra un GPS falso que el teléfono no
+ * delató: aunque cada punto por separado sea creíble, la pareja no lo es. Se
+ * exige un kilómetro y medio minuto antes de opinar, porque a distancias cortas
+ * el error del GPS produce velocidades absurdas sin que nadie se haya movido.
+ */
+export function viajeImposible(
+  anterior: PuntoChecada | null | undefined,
+  actual: PuntoChecada,
+  limiteKmh = VELOCIDAD_IMPOSIBLE_KMH,
+): ViajeImposible {
+  const vacio: ViajeImposible = { imposible: false, velocidadKmh: null, distanciaM: null };
+  if (!anterior) return vacio;
+  const ms = actual.at.getTime() - anterior.at.getTime();
+  if (!Number.isFinite(ms) || ms < VIAJE_MINIMO_MS) return vacio;
+  const distanciaM = distanciaMetros(anterior, actual);
+  if (distanciaM < VIAJE_MINIMO_M) return { ...vacio, distanciaM: Math.round(distanciaM) };
+  const velocidadKmh = distanciaM / 1000 / (ms / 3_600_000);
+  return {
+    imposible: velocidadKmh > limiteKmh,
+    velocidadKmh: Math.round(velocidadKmh),
+    distanciaM: Math.round(distanciaM),
+  };
+}
+
+/** Qué hacer con la antigüedad del punto que reportó el teléfono. */
+export type EdadDelPunto = { veredicto: 'ok' | 'revisar' | 'rechazar'; edadMs: number | null };
+
+/**
+ * Antigüedad de la medición, no de la petición.
+ *
+ * El teléfono la calcula con su reloj monótono (`elapsedRealtime` en Android,
+ * la diferencia contra `location.timestamp` en iOS), así que cambiar la hora
+ * del sistema no la altera. Una posición de hace media hora es la última que el
+ * teléfono guardó, no dónde está su dueño.
+ */
+export function edadDelPunto(fixAgeMs?: number | null): EdadDelPunto {
+  if (typeof fixAgeMs !== 'number' || !Number.isFinite(fixAgeMs) || fixAgeMs < 0) {
+    return { veredicto: 'ok', edadMs: null };
+  }
+  if (fixAgeMs >= FIX_VIEJO_RECHAZO_MS) return { veredicto: 'rechazar', edadMs: Math.round(fixAgeMs) };
+  if (fixAgeMs >= FIX_VIEJO_REVISAR_MS) return { veredicto: 'revisar', edadMs: Math.round(fixAgeMs) };
+  return { veredicto: 'ok', edadMs: Math.round(fixAgeMs) };
+}
+
+/**
+ * ¿Las últimas checadas cayeron en el mismo punto exacto?
+ *
+ * Un GPS real nunca repite: entre dos medidas en el mismo escritorio siempre
+ * hay metros de diferencia. Una coordenada calcada varias veces seguidas es una
+ * posición fija puesta a mano. No se rechaza —un teléfono con el GPS averiado
+ * puede clavarse— pero se marca y sus jefes se enteran.
+ */
+export function coordenadaRepetida(
+  actual: { latitude: number; longitude: number } | null | undefined,
+  anteriores: Array<{ latitude: number; longitude: number }>,
+  minimo = REPETIDAS_PARA_SOSPECHAR,
+): boolean {
+  if (!actual) return false;
+  // `minimo` cuenta la de ahora: con 3 hacen falta 2 anteriores idénticas.
+  const necesarias = Math.max(0, minimo - 1);
+  if (necesarias === 0) return true;
+  if (anteriores.length < necesarias) return false;
+  return anteriores
+    .slice(0, necesarias)
+    .every((p) => distanciaMetros(actual, p) <= REPETIDA_TOLERANCIA_M);
 }
 
 function normalizarFecha(valor?: string | Date | null): Date | null {

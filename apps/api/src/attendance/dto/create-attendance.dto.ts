@@ -35,6 +35,18 @@ export class CreateAttendanceDto {
   accuracyM?: number;
 
   /**
+   * Antigüedad de la medición al mandarla, en milisegundos.
+   *
+   * La calcula el teléfono con su reloj monótono —Android `elapsedRealtimeNanos`, iOS la
+   * diferencia contra `CLLocation.timestamp`— así que cambiar la hora del sistema no la
+   * altera. Arriba de 5 min la checada queda a revisión; arriba de 30 min se rechaza: eso
+   * ya no es dónde está la persona, es la última posición que su teléfono tenía guardada.
+   */
+  @IsOptional()
+  @IsNumber({}, { message: 'fixAgeMs debe ser un número' })
+  fixAgeMs?: number;
+
+  /**
    * El teléfono detectó ubicación simulada (Android `isMock`/`isFromMockProvider`,
    * iOS `CLLocation.sourceInformation?.isSimulatedBySoftware`). Se rechaza con 422.
    */
