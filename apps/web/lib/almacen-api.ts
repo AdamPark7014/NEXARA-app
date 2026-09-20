@@ -26,12 +26,15 @@ async function pedir<T>(
   init: RequestInit = {},
   fallback = "No se pudo completar la operación",
 ): Promise<T> {
+  // Con FormData manda el navegador: si le imponemos el Content-Type se queda sin el
+  // boundary y el servidor no encuentra ni los campos ni los archivos.
+  const esFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
   const res = await fetch(buildApiUrl(path), {
     ...init,
     credentials: "include",
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+      ...(esFormData ? {} : { "Content-Type": "application/json" }),
       ...(init.headers as Record<string, string> | undefined),
     },
   });
@@ -272,16 +275,31 @@ export type InspeccionKit = {
   inspector: { id: number; nombre: string } | null;
 };
 
+/**
+ * Registra la revisión. Con archivos va como `multipart/form-data` (el navegador pone
+ * su propio `Content-Type` con el boundary, por eso no se manda el de JSON).
+ */
 export function registrarInspeccionKit(
   token: string,
   assignmentId: number,
-  payload: { estado: EstadoInspeccion; notas?: string; fotos?: Array<{ url: string }> },
+  payload: { estado: EstadoInspeccion; notas?: string; archivos?: File[] },
 ) {
+  const path = `tool-requests/kits/${assignmentId}/inspeccion`;
+  const fallback = "No se pudo registrar la revisión";
+
+  if (payload.archivos?.length) {
+    const form = new FormData();
+    form.append("estado", payload.estado);
+    if (payload.notas) form.append("notas", payload.notas);
+    for (const archivo of payload.archivos) form.append("fotos", archivo);
+    return pedir<InspeccionKit>(path, token, { method: "POST", body: form }, fallback);
+  }
+
   return pedir<InspeccionKit>(
-    `tool-requests/kits/${assignmentId}/inspeccion`,
+    path,
     token,
-    { method: "POST", body: JSON.stringify(payload) },
-    "No se pudo registrar la revisión",
+    { method: "POST", body: JSON.stringify({ estado: payload.estado, notas: payload.notas }) },
+    fallback,
   );
 }
 
