@@ -7,7 +7,8 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
-import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
@@ -104,12 +105,15 @@ const ESTADO_LABEL: Record<Estado, string> = {
   PENDIENTE: "Pendiente",
 };
 
-const ESTADO_VARIANT: Record<
-  Estado,
-  "default" | "positive" | "warning" | "danger" | "accent" | "neutral"
-> = {
-  CONCILIADO: "positive",
-  SUGERENCIA_ALTA: "accent",
+/**
+ * Punto y palabra, no pastilla rellena: con cien movimientos una columna de
+ * pastillas es un semáforo y deja de verse cuál pide trabajo. Color solo donde
+ * hay algo que hacer —revisar varias opciones, resolver una discrepancia—; el
+ * flujo normal se queda neutro.
+ */
+const ESTADO_TONO: Record<Estado, StatusTone> = {
+  CONCILIADO: "success",
+  SUGERENCIA_ALTA: "info",
   SUGERENCIA_MULTIPLE: "warning",
   DISCREPANCIA: "danger",
   PENDIENTE: "neutral",
@@ -122,8 +126,15 @@ function fechaCorta(iso?: string | null) {
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" });
 }
 
+type Tono = "warning" | "danger";
+
+const TONO_CONTADOR: Record<Tono, string> = {
+  warning: "var(--state-warning-text, #b45309)",
+  danger: "var(--state-danger-text, #b91c1c)",
+};
+
 function scoreColor(score: number, alto: number) {
-  if (score >= alto) return "var(--success, #16a34a)";
+  if (score >= alto) return "var(--state-success-text, #15803d)";
   if (score >= alto - 20) return "var(--state-warning-text, #b45309)";
   return "var(--text-secondary)";
 }
@@ -316,18 +327,34 @@ export default function ConciliacionPage() {
       label: "Estado",
       width: 150,
       render: (r) => (
-        <Tag variant={ESTADO_VARIANT[r.estado]} dot>
-          {ESTADO_LABEL[r.estado]}
-        </Tag>
+        <StatusDot
+          label={ESTADO_LABEL[r.estado]}
+          tone={ESTADO_TONO[r.estado]}
+          title={
+            r.candidatos.length > 0
+              ? `${r.candidatos.length} candidato(s) · mejor puntaje ${r.candidatos[0].score}`
+              : "Sin candidatos"
+          }
+        />
       ),
     },
   ];
 
-  const contadores: Array<{ key: Filtro; label: string; valor: number }> = [
+  const contadores: Array<{ key: Filtro; label: string; valor: number; tono?: Tono }> = [
     { key: "TODOS", label: "Todos", valor: resumen?.total ?? 0 },
     { key: "SUGERENCIA_ALTA", label: "Sugerencia alta", valor: resumen?.sugerenciaAlta ?? 0 },
-    { key: "SUGERENCIA_MULTIPLE", label: "Varias opciones", valor: resumen?.sugerenciaMultiple ?? 0 },
-    { key: "DISCREPANCIA", label: "Discrepancias", valor: resumen?.discrepancias ?? 0 },
+    {
+      key: "SUGERENCIA_MULTIPLE",
+      label: "Varias opciones",
+      valor: resumen?.sugerenciaMultiple ?? 0,
+      tono: "warning",
+    },
+    {
+      key: "DISCREPANCIA",
+      label: "Discrepancias",
+      valor: resumen?.discrepancias ?? 0,
+      tono: "danger",
+    },
     { key: "PENDIENTE", label: "Pendientes", valor: resumen?.pendientes ?? 0 },
     { key: "CONCILIADO", label: "Conciliados", valor: resumen?.conciliados ?? 0 },
   ];
@@ -376,7 +403,7 @@ export default function ConciliacionPage() {
             <Link href="/erp/banking" style={linkStyle}>
               Bancos
             </Link>
-            <Button size="sm" variant="secondary" onClick={() => void cargar()} disabled={loading}>
+            <Button size="sm" variant="ghost" onClick={() => void cargar()} disabled={loading}>
               Actualizar
             </Button>
           </div>
@@ -402,10 +429,20 @@ export default function ConciliacionPage() {
           <div
             role="group"
             aria-label="Filtrar por estado"
-            style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(126px, 1fr))",
+              border: "1px solid var(--nx-panel-hairline, var(--border))",
+              borderRadius: 10,
+              overflow: "hidden",
+              background: "var(--surface)",
+              marginBottom: 14,
+            }}
           >
-            {contadores.map((c) => {
+            {contadores.map((c, i) => {
               const activo = filtro === c.key;
+              const color =
+                c.valor > 0 && c.tono ? TONO_CONTADOR[c.tono] : "var(--text-primary)";
               return (
                 <button
                   key={c.key}
@@ -418,30 +455,34 @@ export default function ConciliacionPage() {
                   style={{
                     display: "grid",
                     gap: 2,
-                    padding: "8px 14px",
-                    borderRadius: 10,
+                    padding: "10px 14px",
                     cursor: "pointer",
                     textAlign: "left",
+                    font: "inherit",
+                    border: "none",
+                    borderRight:
+                      i < contadores.length - 1
+                        ? "1px solid var(--nx-panel-hairline, var(--border))"
+                        : undefined,
+                    boxShadow: activo ? "inset 0 -2px 0 var(--primary)" : undefined,
                     background: activo
-                      ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
-                      : "var(--surface)",
-                    border: `1px solid ${
-                      activo ? "color-mix(in srgb, var(--primary) 45%, var(--border))" : "var(--border)"
-                    }`,
+                      ? "color-mix(in srgb, var(--primary) 7%, var(--surface))"
+                      : "transparent",
                     color: "var(--text-primary)",
                   }}
                 >
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{c.label}</span>
                   <span
                     style={{
-                      fontFamily: "var(--nx-font-display)",
-                      fontWeight: 700,
-                      fontSize: 18,
+                      fontWeight: 600,
+                      fontSize: 20,
+                      lineHeight: 1.15,
                       fontVariantNumeric: "tabular-nums",
+                      color,
                     }}
                   >
                     {c.valor}
                   </span>
-                  <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{c.label}</span>
                 </button>
               );
             })}
@@ -486,11 +527,7 @@ export default function ConciliacionPage() {
               )}
             </Section>
 
-            <Section
-              title="Coincidencia en NEXARA"
-              subtitle="↑ ↓ mueven de movimiento · [ ] cambian de candidato · Enter concilia"
-              dense
-            >
+            <Section title="Coincidencia en NEXARA" subtitle={<AyudaTeclado />} dense>
               {!seleccionado ? (
                 <EmptyState
                   variant="compact"
@@ -499,11 +536,20 @@ export default function ConciliacionPage() {
                 />
               ) : (
                 <div style={{ display: "grid", gap: 12 }}>
-                  <div style={{ display: "grid", gap: 4 }}>
-                    <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 3,
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--nx-panel-hairline, var(--border))",
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
                       Movimiento del banco
                     </span>
-                    <strong style={{ fontSize: 14 }}>
+                    <strong style={{ fontSize: 14, lineHeight: 1.3 }}>
                       {seleccionado.descripcion || "Sin descripción"}
                     </strong>
                     <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
@@ -552,30 +598,55 @@ export default function ConciliacionPage() {
                         />
                       )}
                       {candidatos.length > 1 && (
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {candidatos.map((c, i) => (
-                            <button
-                              key={`${c.tipo}-${c.id}`}
-                              type="button"
-                              onClick={() => setCandidatoIdx(i)}
-                              aria-pressed={i === candidatoIdx}
-                              style={{
-                                fontSize: 11.5,
-                                fontWeight: 600,
-                                padding: "4px 10px",
-                                borderRadius: 999,
-                                cursor: "pointer",
-                                background:
-                                  i === candidatoIdx
-                                    ? "color-mix(in srgb, var(--primary) 12%, var(--surface))"
-                                    : "var(--surface)",
-                                border: "1px solid var(--border)",
-                                color: "var(--text-primary)",
-                              }}
-                            >
-                              {c.folio} · {c.score}
-                            </button>
-                          ))}
+                        <div style={{ display: "grid", gap: 5 }}>
+                          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                            Candidato {Math.min(candidatoIdx, candidatos.length - 1) + 1} de{" "}
+                            {candidatos.length} · ordenados por puntaje
+                          </span>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {candidatos.map((c, i) => {
+                              const activo = i === candidatoIdx;
+                              return (
+                                <button
+                                  key={`${c.tipo}-${c.id}`}
+                                  type="button"
+                                  onClick={() => setCandidatoIdx(i)}
+                                  aria-pressed={activo}
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "baseline",
+                                    gap: 6,
+                                    fontSize: 11.5,
+                                    padding: "4px 9px",
+                                    borderRadius: 6,
+                                    cursor: "pointer",
+                                    background: activo
+                                      ? "color-mix(in srgb, var(--primary) 10%, var(--surface))"
+                                      : "transparent",
+                                    border: `1px solid ${
+                                      activo
+                                        ? "color-mix(in srgb, var(--primary) 40%, var(--border))"
+                                        : "var(--border)"
+                                    }`,
+                                    color: "var(--text-primary)",
+                                    fontWeight: activo ? 700 : 500,
+                                  }}
+                                >
+                                  {c.folio}
+                                  <span
+                                    style={{
+                                      fontSize: 10.5,
+                                      fontWeight: 600,
+                                      fontVariantNumeric: "tabular-nums",
+                                      color: scoreColor(c.score, scoreAlto),
+                                    }}
+                                  >
+                                    {c.score}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
 
@@ -617,37 +688,58 @@ export default function ConciliacionPage() {
                                   : ""}
                               </span>
                             </div>
-                            <div style={{ textAlign: "right", display: "grid", gap: 2 }}>
+                            <div style={{ textAlign: "right", display: "grid", gap: 4 }}>
                               <Money value={candidato.monto} />
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  color: scoreColor(candidato.score, scoreAlto),
-                                }}
-                              >
-                                {candidato.score} / 100
-                              </span>
+                              <Puntaje score={candidato.score} alto={scoreAlto} />
                             </div>
                           </div>
 
-                          <ul
-                            style={{
-                              margin: 0,
-                              paddingLeft: 16,
-                              display: "grid",
-                              gap: 3,
-                              fontSize: 12,
-                              color: "var(--text-secondary)",
-                            }}
-                          >
-                            {candidato.razones.map((r) => (
-                              <li key={r}>{r}</li>
-                            ))}
-                          </ul>
+                          <div style={{ display: "grid", gap: 5 }}>
+                            <span
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.06em",
+                                color: "var(--text-tertiary)",
+                              }}
+                            >
+                              Por qué coinciden
+                            </span>
+                            <ul
+                              style={{
+                                margin: 0,
+                                padding: 0,
+                                listStyle: "none",
+                                display: "grid",
+                                gap: 4,
+                                fontSize: 12.5,
+                                lineHeight: 1.4,
+                                color: "var(--text-secondary)",
+                              }}
+                            >
+                              {candidato.razones.map((r) => (
+                                <li
+                                  key={r}
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "10px minmax(0, 1fr)",
+                                    gap: 8,
+                                    alignItems: "baseline",
+                                  }}
+                                >
+                                  <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>
+                                    ·
+                                  </span>
+                                  <span>{r}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
 
                           <Button
                             size="sm"
+                            variant="primary"
                             fullWidth
                             loading={aplicando}
                             disabled={aplicando}
@@ -655,6 +747,15 @@ export default function ConciliacionPage() {
                           >
                             Conciliar con {candidato.folio}
                           </Button>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-tertiary)",
+                              textAlign: "center",
+                            }}
+                          >
+                            o pulsa Enter
+                          </span>
                         </div>
                       )}
                     </>
@@ -666,6 +767,86 @@ export default function ConciliacionPage() {
         </>
       )}
     </>
+  );
+}
+
+/**
+ * El puntaje, con la barra debajo: el número dice cuánto confía el sistema y
+ * la barra lo vuelve comparable entre candidatos sin leer dos cifras.
+ */
+function Puntaje({ score, alto }: { score: number; alto: number }) {
+  const color = scoreColor(score, alto);
+  const ancho = Math.max(0, Math.min(100, score));
+  return (
+    <span style={{ display: "grid", gap: 3, justifyItems: "end" }}>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          fontVariantNumeric: "tabular-nums",
+          color,
+        }}
+        title={score >= alto ? "Coincidencia fuerte" : "Revisa antes de conciliar"}
+      >
+        {score} / 100
+      </span>
+      <span
+        aria-hidden="true"
+        style={{
+          width: 88,
+          height: 3,
+          borderRadius: 2,
+          background: "var(--surface-2)",
+          overflow: "hidden",
+        }}
+      >
+        <span
+          style={{ display: "block", width: `${ancho}%`, height: "100%", background: color }}
+        />
+      </span>
+    </span>
+  );
+}
+
+function Tecla({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd
+      style={{
+        display: "inline-block",
+        minWidth: 16,
+        padding: "0 4px",
+        borderRadius: 4,
+        border: "1px solid var(--border)",
+        background: "var(--surface-2)",
+        fontSize: 10.5,
+        fontFamily: "inherit",
+        fontWeight: 600,
+        lineHeight: "16px",
+        textAlign: "center",
+        color: "var(--text-secondary)",
+      }}
+    >
+      {children}
+    </kbd>
+  );
+}
+
+/** La navegación por teclado existe; aquí se ve, en una línea discreta. */
+function AyudaTeclado() {
+  return (
+    <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+      <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+        <Tecla>↑</Tecla>
+        <Tecla>↓</Tecla> movimiento
+      </span>
+      <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+        <Tecla>[</Tecla>
+        <Tecla>]</Tecla> candidato
+      </span>
+      <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+        <Tecla>Enter</Tecla> concilia
+      </span>
+    </span>
   );
 }
 

@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
-import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import Modal from "@/components/ui/Modal";
 import Section from "@/components/ui/Section";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -165,19 +167,44 @@ const TIPO_TX: Record<string, string> = {
   nomina: "Nómina",
 };
 
-/** Porcentaje del margen: el número que decide si el proyecto sirvió. */
+/**
+ * Porcentaje del margen: el número que decide si el proyecto sirvió.
+ *
+ * El verde se fue: un proyecto sano no necesita felicitarse en cada renglón.
+ * Queda el color donde hay algo que mirar —margen negativo o apretado— y el
+ * resto se lee en el color del texto.
+ */
 function MargenPct({ pct }: { pct: number | null }) {
   if (pct == null) {
-    return (
-      <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Sin facturar</span>
-    );
+    return <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Sin facturar</span>;
   }
-  const color = pct < 0 ? "var(--danger)" : pct < 15 ? "var(--state-warning-text)" : "var(--state-success-text)";
+  const color =
+    pct < 0
+      ? "var(--state-danger-text, #b91c1c)"
+      : pct < 15
+        ? "var(--state-warning-text, #b45309)"
+        : "var(--text-primary)";
   return (
-    <span style={{ color, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+    <span
+      style={{ color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+      title={pct < 0 ? "El proyecto costó más de lo que facturó" : undefined}
+    >
       {pct.toFixed(1)} %
     </span>
   );
+}
+
+/** El estatus que manda el API, como punto y palabra. */
+const TONO_ESTATUS: Record<string, StatusTone> = {
+  positive: "success",
+  warning: "warning",
+  danger: "danger",
+  accent: "info",
+  default: "neutral",
+};
+
+function EstatusDot({ estatus }: { estatus: string }) {
+  return <StatusDot label={estatus} tone={TONO_ESTATUS[financeStatusVariant(estatus)] ?? "neutral"} />;
 }
 
 /** Barra proporcional: el ancho ES el porcentaje, no un adorno. */
@@ -249,46 +276,26 @@ function BarraCategoria({ categoria }: { categoria: CostCategory }) {
   );
 }
 
-function Cifra({
-  label,
-  value,
-  hint,
-  tone = "default",
-}: {
-  label: string;
-  value: number;
-  hint?: string;
-  tone?: "default" | "danger";
-}) {
+/** Una celda de dinero para `MetricStrip`, con su pista de qué la compone. */
+function cifra(
+  label: string,
+  value: number,
+  hint?: string,
+  tone: Metric["tone"] = "default",
+): Metric {
+  return { label, value: <Money value={value} />, hint, tone };
+}
+
+/** Pesos redondeados, para las pistas de la tira. */
+const pesos = (n: number) =>
+  n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
+
+/** Etiqueta arriba, dato abajo. Sin negritas gritando dentro del párrafo. */
+function Dato({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div
-      style={{
-        flex: "1 1 160px",
-        minWidth: 150,
-        padding: "12px 14px",
-        border: "1px solid var(--nx-panel-hairline)",
-        borderRadius: 10,
-        background: "var(--surface)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "var(--text-tertiary)",
-          fontWeight: 700,
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </div>
-      <div style={{ fontSize: 19, color: tone === "danger" ? "var(--danger)" : "inherit" }}>
-        <Money value={value} />
-      </div>
-      {hint && (
-        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>{hint}</div>
-      )}
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 600 }}>{value}</div>
     </div>
   );
 }
@@ -379,9 +386,7 @@ export default function ContabilidadProyectosPage() {
                 {r.cliente ?? "Sin cliente registrado"}
               </span>
               {r.tipo === "obra" && (
-                <Tag size="sm" variant="neutral">
-                  Obra
-                </Tag>
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>· Obra</span>
               )}
             </span>
           </div>
@@ -391,9 +396,7 @@ export default function ContabilidadProyectosPage() {
         key: "estatus",
         label: "Estatus",
         render: (r) => (
-          <Tag size="sm" variant={financeStatusVariant(r.estatus)}>
-            {r.estatus}
-          </Tag>
+          <EstatusDot estatus={r.estatus} />
         ),
       },
       {
@@ -463,19 +466,24 @@ export default function ContabilidadProyectosPage() {
       {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
 
       {totales && !loading && (
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-          <Cifra
-            label="Ingresos facturados"
-            value={totales.ingresos}
-            hint={`${totales.conFacturacion} de ${totales.proyectos} proyectos con factura`}
-          />
-          <Cifra label="Cobrado" value={totales.cobrado} hint="Ya entró al banco" />
-          <Cifra label="Costo total" value={totales.costoTotal} hint="Compras, gastos, viáticos y almacén" />
-          <Cifra
-            label="Margen"
-            value={totales.margen}
-            tone={totales.margen < 0 ? "danger" : "default"}
-            hint="Ingresos menos costo"
+        <div style={{ marginBottom: 14 }}>
+          <MetricStrip
+            ariaLabel="Resumen de proyectos"
+            metrics={[
+              cifra(
+                "Ingresos facturados",
+                totales.ingresos,
+                `${totales.conFacturacion} de ${totales.proyectos} proyectos con factura`,
+              ),
+              cifra("Cobrado", totales.cobrado, "ya entró al banco"),
+              cifra("Costo total", totales.costoTotal, "compras, gastos, viáticos y almacén"),
+              cifra(
+                "Margen",
+                totales.margen,
+                "ingresos menos costo",
+                totales.margen < 0 ? "danger" : "default",
+              ),
+            ]}
           />
         </div>
       )}
@@ -541,60 +549,32 @@ export default function ContabilidadProyectosPage() {
           <InlineAlert message={detalleError} />
         ) : !detalle ? null : (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Cifra
-                label="Ingresos facturados"
-                value={detalle.resumen.ingresos}
-                hint={`Por cobrar ${detalle.resumen.porCobrar.toLocaleString("es-MX", {
-                  style: "currency",
-                  currency: "MXN",
-                  maximumFractionDigits: 0,
-                })}`}
-              />
-              <Cifra
-                label="Costo total"
-                value={detalle.resumen.costoTotal}
-                hint={`Pendiente de pagar ${detalle.resumen.costoPendiente.toLocaleString("es-MX", {
-                  style: "currency",
-                  currency: "MXN",
-                  maximumFractionDigits: 0,
-                })}`}
-              />
-              <Cifra
-                label="Margen"
-                value={detalle.resumen.margen}
-                tone={detalle.resumen.margen < 0 ? "danger" : "default"}
-              />
-              <div
-                style={{
-                  flex: "1 1 160px",
-                  minWidth: 150,
-                  padding: "12px 14px",
-                  border: "1px solid var(--nx-panel-hairline)",
-                  borderRadius: 10,
-                  background: "var(--surface)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: "var(--text-tertiary)",
-                    fontWeight: 700,
-                    marginBottom: 6,
-                  }}
-                >
-                  % de margen
-                </div>
-                <div style={{ fontSize: 19 }}>
-                  <MargenPct pct={detalle.resumen.margenPct} />
-                </div>
-                <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
-                  Sobre lo facturado
-                </div>
-              </div>
-            </div>
+            <MetricStrip
+              ariaLabel="Resumen del proyecto"
+              metrics={[
+                cifra(
+                  "Ingresos facturados",
+                  detalle.resumen.ingresos,
+                  `por cobrar ${pesos(detalle.resumen.porCobrar)}`,
+                ),
+                cifra(
+                  "Costo total",
+                  detalle.resumen.costoTotal,
+                  `pendiente de pagar ${pesos(detalle.resumen.costoPendiente)}`,
+                ),
+                cifra(
+                  "Margen",
+                  detalle.resumen.margen,
+                  "ingresos menos costo",
+                  detalle.resumen.margen < 0 ? "danger" : "default",
+                ),
+                {
+                  label: "% de margen",
+                  value: <MargenPct pct={detalle.resumen.margenPct} />,
+                  hint: "sobre lo facturado",
+                },
+              ]}
+            />
 
             {detalle.proyecto.tipo === "obra" && (
               <InlineAlert
@@ -604,22 +584,21 @@ export default function ContabilidadProyectosPage() {
             )}
 
             <Section title="Ficha" dense>
-              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13 }}>
-                <span>
-                  <strong>Cliente:</strong> {detalle.proyecto.cliente ?? "—"}
-                </span>
-                <span>
-                  <strong>Responsable:</strong> {detalle.proyecto.responsable ?? "—"}
-                </span>
-                <span>
-                  <strong>Inicio:</strong> {fecha(detalle.proyecto.inicioPlaneado)}
-                </span>
-                <span>
-                  <strong>Fin:</strong> {fecha(detalle.proyecto.finPlaneado)}
-                </span>
-                <span>
-                  <strong>Estatus:</strong> {detalle.proyecto.estatus}
-                </span>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <Dato label="Cliente" value={detalle.proyecto.cliente ?? "—"} />
+                <Dato label="Responsable" value={detalle.proyecto.responsable ?? "—"} />
+                <Dato label="Inicio" value={fecha(detalle.proyecto.inicioPlaneado)} />
+                <Dato label="Fin" value={fecha(detalle.proyecto.finPlaneado)} />
+                <Dato
+                  label="Estatus"
+                  value={<EstatusDot estatus={detalle.proyecto.estatus} />}
+                />
               </div>
               {detalle.proyecto.objetivo && (
                 <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 10 }}>
@@ -634,21 +613,22 @@ export default function ContabilidadProyectosPage() {
                 subtitle="Autorizado en el proyecto, contra lo que ya se comprometió y lo que ya salió."
                 dense
               >
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <Cifra label="Autorizado" value={detalle.presupuesto.autorizado} />
-                  <Cifra label="Comprometido" value={detalle.presupuesto.comprometido} />
-                  <Cifra label="Pagado" value={detalle.presupuesto.pagado} />
-                  <Cifra
-                    label="Disponible"
-                    value={detalle.presupuesto.disponible ?? 0}
-                    tone={(detalle.presupuesto.disponible ?? 0) < 0 ? "danger" : "default"}
-                    hint={
+                <MetricStrip
+                  ariaLabel="Presupuesto del proyecto"
+                  metrics={[
+                    cifra("Autorizado", detalle.presupuesto.autorizado, "tope del proyecto"),
+                    cifra("Comprometido", detalle.presupuesto.comprometido, "ya se ordenó"),
+                    cifra("Pagado", detalle.presupuesto.pagado, "ya salió de caja"),
+                    cifra(
+                      "Disponible",
+                      detalle.presupuesto.disponible ?? 0,
                       (detalle.presupuesto.disponible ?? 0) < 0
-                        ? "El costo ya rebasó el presupuesto"
-                        : undefined
-                    }
-                  />
-                </div>
+                        ? "el costo ya rebasó el presupuesto"
+                        : "queda por comprometer",
+                      (detalle.presupuesto.disponible ?? 0) < 0 ? "danger" : "default",
+                    ),
+                  ]}
+                />
               </Section>
             )}
 
@@ -722,9 +702,7 @@ export default function ContabilidadProyectosPage() {
                       key: "estatus",
                       label: "Estatus",
                       render: (f) => (
-                        <Tag size="sm" variant={financeStatusVariant(f.estatus)}>
-                          {f.estatus}
-                        </Tag>
+                        <EstatusDot estatus={f.estatus} />
                       ),
                     },
                   ]}
@@ -761,9 +739,9 @@ export default function ContabilidadProyectosPage() {
                       key: "tipo",
                       label: "Tipo",
                       render: (t) => (
-                        <Tag size="sm" variant="neutral">
+                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                           {TIPO_TX[t.tipo] ?? t.tipo}
-                        </Tag>
+                        </span>
                       ),
                     },
                     { key: "documento", label: "Documento" },
@@ -821,24 +799,25 @@ export default function ContabilidadProyectosPage() {
         maxWidth={520}
       >
         {documento && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13.5 }}>
-            <div>
-              <strong>Concepto:</strong> {documento.concepto}
-            </div>
-            <div>
-              <strong>Fecha:</strong> {fecha(documento.fecha)}
-            </div>
-            <div>
-              <strong>Monto:</strong> <Money value={documento.monto} />
-            </div>
-            <div>
-              <strong>Pagado:</strong> <Money value={documento.pagado} />
-            </div>
-            <div>
-              <strong>Pendiente:</strong> <Money value={documento.monto - documento.pagado} />
-            </div>
-            <div>
-              <strong>Estatus:</strong> {documento.estatus}
+          <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
+            <Dato label="Concepto" value={documento.concepto} />
+            <MetricStrip
+              ariaLabel="Importes del documento"
+              metrics={[
+                cifra("Monto", documento.monto),
+                cifra("Pagado", documento.pagado),
+                cifra("Pendiente", documento.monto - documento.pagado),
+              ]}
+            />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <Dato label="Fecha" value={fecha(documento.fecha)} />
+              <Dato label="Estatus" value={<EstatusDot estatus={documento.estatus} />} />
             </div>
             <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
               Registro #{documento.refId} en {TIPO_TX[documento.tipo] ?? documento.tipo}.
