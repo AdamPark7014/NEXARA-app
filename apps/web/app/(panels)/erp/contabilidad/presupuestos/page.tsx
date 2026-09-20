@@ -8,11 +8,11 @@ import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import ListExportActions from "@/components/ui/ListExportActions";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import {
-  Celda,
   DetalleModal,
   Variacion,
   descargarCsv,
@@ -179,10 +179,30 @@ export default function PresupuestosPage() {
     [],
   );
 
-  const resumen = data
+  /**
+   * Las tres cifras del comparativo en la tira de finanzas. La variación
+   * conserva su color sobrio y su signo: no se convierte en semáforo.
+   */
+  const metricas: Metric[] = data
     ? [
-        { etiqueta: "Presupuestado", valor: data.totales.planeado },
-        { etiqueta: "Real", valor: data.totales.real },
+        {
+          label: "Presupuestado",
+          value: <Money value={data.totales.planeado} />,
+          hint: `${data.lineas.length} ${data.lineas.length === 1 ? "línea" : "líneas"} en el periodo`,
+        },
+        {
+          label: "Real",
+          value: <Money value={data.totales.real} />,
+          hint: "lo que de verdad se gastó",
+        },
+        {
+          label: "Variación",
+          value: <Variacion valor={data.totales.variacion} porcentaje={data.totales.variacionPct} />,
+          hint:
+            data.totales.variacion >= 0
+              ? "dentro de lo presupuestado"
+              : "por encima de lo presupuestado",
+        },
       ]
     : [];
 
@@ -244,47 +264,8 @@ export default function PresupuestosPage() {
         />
       ) : (
         <>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            {resumen.map((k) => (
-              <div
-                key={k.etiqueta}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: "var(--nx-panel-radius)",
-                  border: "1px solid var(--nx-panel-hairline)",
-                  background: "var(--surface)",
-                }}
-              >
-                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)" }}>
-                  {k.etiqueta}
-                </div>
-                <div style={{ marginTop: 4, fontSize: 18 }}>
-                  <Celda valor={k.valor} tipo="moneda" />
-                </div>
-              </div>
-            ))}
-            <div
-              style={{
-                padding: "10px 14px",
-                borderRadius: "var(--nx-panel-radius)",
-                border: "1px solid var(--nx-panel-hairline)",
-                background: "var(--surface)",
-              }}
-            >
-              <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)" }}>
-                Variación
-              </div>
-              <div style={{ marginTop: 4, fontSize: 18 }}>
-                <Variacion valor={data.totales.variacion} porcentaje={data.totales.variacionPct} />
-              </div>
-            </div>
+          <div style={{ marginBottom: 12 }}>
+            <MetricStrip ariaLabel="Presupuesto contra real" metrics={metricas} />
           </div>
 
           {data.porCentro.length > 1 && (

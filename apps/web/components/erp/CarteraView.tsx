@@ -8,10 +8,17 @@ import Modal from "@/components/ui/Modal";
 import InlineAlert from "@/components/ui/InlineAlert";
 import EmptyState from "@/components/ui/EmptyState";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import {
+  FinanceField,
+  FinanceFormGrid,
+  financeInputStyle,
+} from "@/components/finance/FinanceModuleShell";
 import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { erpFetch, erpInputStyle, formatApiError } from "@/lib/erp-api";
+import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 
 /**
@@ -163,11 +170,16 @@ const METODOS: { value: string; label: string }[] = [
   { value: "OTHER", label: "Otro" },
 ];
 
-const TONOS: Record<string, string> = {
-  ok: "var(--success)",
-  warn: "var(--warning)",
-  bad: "var(--danger)",
-  mute: "var(--text-secondary)",
+/**
+ * El tono que manda el API, traducido al vocabulario de `StatusDot`: punto y
+ * palabra. Antes era texto en negritas de color, y con veinte renglones la
+ * columna de estado competía con los montos.
+ */
+const TONO_ESTADO: Record<string, StatusTone> = {
+  ok: "success",
+  warn: "warning",
+  bad: "danger",
+  mute: "neutral",
 };
 
 function fechaCorta(iso: string | null | undefined) {
@@ -450,20 +462,11 @@ export default function CarteraView({
     },
     {
       key: "dias",
-      label: "Días",
+      label: "Vencida",
       align: "right",
       numeric: true,
-      render: (r) => (
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: (r.diasVencido ?? -1) > 0 ? 700 : 500,
-            color: (r.diasVencido ?? -1) > 0 ? "var(--danger)" : "var(--text-secondary)",
-          }}
-        >
-          {r.diasVencido === null ? "—" : r.diasVencido > 0 ? `+${r.diasVencido}` : r.diasVencido}
-        </span>
-      ),
+      width: 92,
+      render: (r) => <DiasVencido dias={r.diasVencido} />,
     },
     {
       key: "monto",
@@ -495,15 +498,70 @@ export default function CarteraView({
       key: "estado",
       label: "Estado",
       render: (r) => (
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: TONOS[r.estadoTono] }}>
-          {r.estadoEtiqueta}
-        </span>
+        <StatusDot
+          label={r.estadoEtiqueta}
+          tone={TONO_ESTADO[r.estadoTono] ?? "neutral"}
+          title={textoDias(r.diasVencido)}
+        />
       ),
     },
   ];
 
   const saldoAbierto = detalle?.saldo.pendiente ?? 0;
   const puedePagar = !!detalle && saldoAbierto > 0.009 && !detalle.factura.cancelada;
+
+  /**
+   * El mismo criterio que ya aplica `registrarPago`, pero bajo el campo
+   * mientras se captura. No bloquea el guardado: solo adelanta la respuesta
+   * que hoy llega en un toast después de intentar.
+   */
+  const errorMonto = (() => {
+    if (!detalle || pago.amount.trim() === "") return null;
+    const monto = Number(pago.amount);
+    if (!Number.isFinite(monto) || monto <= 0) return "Escribe un monto mayor a cero.";
+    if (monto > detalle.saldo.pendiente + 0.01) return "El monto supera el saldo pendiente.";
+    return null;
+  })();
+
+  const totales = data?.totales;
+  const vencido = totales?.vencido ?? 0;
+  const documentosVencidos = data ? (data.aging.vencido?.documentos ?? 0) : 0;
+
+  /** Tres cifras y de qué se componen. El adorno se queda fuera. */
+  const metricas: Metric[] = [
+    {
+      label: esCobrar ? "Por cobrar" : "Por pagar",
+      value: cargando ? "…" : <Money value={totales?.pendiente ?? 0} />,
+      hint: cargando
+        ? "leyendo la cartera"
+        : `de ${(totales?.total ?? 0).toLocaleString("es-MX", {
+            style: "currency",
+            currency: "MXN",
+            maximumFractionDigits: 0,
+          })} facturados`,
+    },
+    {
+      label: "Vencido",
+      value: cargando ? "…" : <Money value={vencido} />,
+      tone: vencido > 0 ? "danger" : "default",
+      hint: cargando
+        ? "…"
+        : vencido > 0
+          ? `${documentosVencidos} ${documentosVencidos === 1 ? "factura pasada" : "facturas pasadas"} de fecha`
+          : "nada pasado de fecha",
+    },
+    {
+      label: "Documentos",
+      value: cargando ? "…" : String(totales?.documentos ?? 0),
+      hint: cargando
+        ? "…"
+        : `${esCobrar ? "cobrado" : "pagado"} ${(totales?.pagado ?? 0).toLocaleString("es-MX", {
+            style: "currency",
+            currency: "MXN",
+            maximumFractionDigits: 0,
+          })}`,
+    },
+  ];
 
   return (
     <>
@@ -519,52 +577,18 @@ export default function CarteraView({
         }
       />
 
-      {/* Totales — tres cifras, no una pared de tarjetas */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: 1,
-          marginBottom: 14,
-          borderRadius: 12,
-          overflow: "hidden",
-          border: "1px solid var(--nx-panel-hairline)",
-          background: "var(--nx-panel-hairline)",
-        }}
-      >
-        <Cifra
-          etiqueta={esCobrar ? "Por cobrar" : "Por pagar"}
-          valor={cargando ? null : <Money value={data?.totales.pendiente ?? 0} />}
-        />
-        <Cifra
-          etiqueta="Vencido"
-          valor={cargando ? null : <Money value={data?.totales.vencido ?? 0} />}
-          alerta={(data?.totales.vencido ?? 0) > 0}
-        />
-        <Cifra etiqueta="Documentos" valor={cargando ? null : String(data?.totales.documentos ?? 0)} />
+      {/* Totales — una tira de cifras, no una pared de tarjetas */}
+      <div style={{ marginBottom: 12 }}>
+        <MetricStrip ariaLabel="Resumen de la cartera" metrics={metricas} />
       </div>
 
-      {/* Antigüedad — cada chip filtra la tabla */}
-      {chips.length > 0 && (
-        <div
-          style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}
-          role="group"
-          aria-label="Antigüedad de saldos"
-        >
-          <Chip activo={aging === ""} onClick={() => setAging("")} etiqueta="Todo" tono="mute" />
-          {chips.map((c) => (
-            <Chip
-              key={c.bucket}
-              activo={aging === c.bucket}
-              onClick={() => setAging(aging === c.bucket ? "" : (c.bucket as AgingBucket))}
-              etiqueta={c.etiqueta}
-              monto={c.monto}
-              documentos={c.documentos}
-              tono={c.tono as "bad" | "warn" | "mute"}
-            />
-          ))}
-        </div>
-      )}
+      {/* Antigüedad — una escala que se lee de izquierda a derecha y filtra */}
+      <EscalaAntiguedad
+        tramos={chips}
+        activo={aging}
+        total={data?.totales.pendiente ?? 0}
+        onElegir={(b) => setAging(b)}
+      />
 
       {!esCobrar && (
         <CalendarioCxP
@@ -735,74 +759,104 @@ export default function CarteraView({
         }
       >
         {detalle && (
-          <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
-            <p style={{ margin: 0, color: "var(--text-secondary)" }}>
-              Saldo pendiente de <strong>{detalle.factura.folio}</strong>:{" "}
+          <div style={{ display: "grid", gap: 14, fontSize: 13 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "var(--surface-2)",
+                border: "1px solid var(--nx-panel-hairline, var(--border))",
+              }}
+            >
+              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                Saldo pendiente de <strong>{detalle.factura.folio}</strong>
+              </span>
               <Money value={detalle.saldo.pendiente} />
-            </p>
-            <Campo etiqueta="Monto">
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={pago.amount}
-                onChange={(e) => setPago((p) => ({ ...p, amount: e.target.value }))}
-                placeholder={detalle.saldo.pendiente.toFixed(2)}
-                style={erpInputStyle}
-              />
-              <button
-                type="button"
-                onClick={() => setPago((p) => ({ ...p, amount: detalle.saldo.pendiente.toFixed(2) }))}
-                style={{
-                  marginTop: 4,
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--primary)",
-                  cursor: "pointer",
-                }}
+            </div>
+
+            <FinanceFormGrid>
+              <FinanceField
+                label="Monto"
+                hint="Pesos, con IVA incluido. No puede pasar del saldo pendiente."
+                error={errorMonto}
               >
-                Usar el saldo completo
-              </button>
-            </Campo>
-            <Campo etiqueta="Fecha">
-              <input
-                type="date"
-                value={pago.paymentDate}
-                onChange={(e) => setPago((p) => ({ ...p, paymentDate: e.target.value }))}
-                style={erpInputStyle}
-              />
-            </Campo>
-            <Campo etiqueta="Forma de pago">
-              <select
-                value={pago.method}
-                onChange={(e) => setPago((p) => ({ ...p, method: e.target.value }))}
-                style={erpInputStyle}
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={pago.amount}
+                  onChange={(e) => setPago((p) => ({ ...p, amount: e.target.value }))}
+                  placeholder={detalle.saldo.pendiente.toFixed(2)}
+                  style={financeInputStyle}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPago((p) => ({ ...p, amount: detalle.saldo.pendiente.toFixed(2) }))
+                  }
+                  style={{
+                    justifySelf: "start",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: "var(--primary)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Usar el saldo completo
+                </button>
+              </FinanceField>
+
+              <FinanceField label="Fecha" hint="El día en que el dinero se movió, no el de captura.">
+                <input
+                  type="date"
+                  value={pago.paymentDate}
+                  onChange={(e) => setPago((p) => ({ ...p, paymentDate: e.target.value }))}
+                  style={financeInputStyle}
+                />
+              </FinanceField>
+
+              <FinanceField label="Forma de pago">
+                <select
+                  value={pago.method}
+                  onChange={(e) => setPago((p) => ({ ...p, method: e.target.value }))}
+                  style={financeInputStyle}
+                >
+                  {METODOS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </FinanceField>
+
+              <FinanceField
+                label="Referencia"
+                optional
+                hint="Folio del banco, clave de rastreo o número de cheque."
               >
-                {METODOS.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </Campo>
-            <Campo etiqueta="Referencia (opcional)">
-              <input
-                value={pago.reference}
-                onChange={(e) => setPago((p) => ({ ...p, reference: e.target.value }))}
-                placeholder="Folio del banco, cheque, etc."
-                style={erpInputStyle}
-              />
-            </Campo>
-            <Campo etiqueta="Nota (opcional)">
-              <input
-                value={pago.notes}
-                onChange={(e) => setPago((p) => ({ ...p, notes: e.target.value }))}
-                style={erpInputStyle}
-              />
-            </Campo>
+                <input
+                  value={pago.reference}
+                  onChange={(e) => setPago((p) => ({ ...p, reference: e.target.value }))}
+                  placeholder="Folio del banco, cheque, etc."
+                  style={financeInputStyle}
+                />
+              </FinanceField>
+
+              <FinanceField label="Nota" optional fullWidth hint="Queda en el historial de la factura.">
+                <input
+                  value={pago.notes}
+                  onChange={(e) => setPago((p) => ({ ...p, notes: e.target.value }))}
+                  style={financeInputStyle}
+                />
+              </FinanceField>
+            </FinanceFormGrid>
           </div>
         )}
       </Modal>
@@ -812,99 +866,182 @@ export default function CarteraView({
 
 // ── Piezas ────────────────────────────────────────────────────────────────
 
-function Cifra({
-  etiqueta,
-  valor,
-  alerta,
-}: {
-  etiqueta: string;
-  valor: React.ReactNode | null;
-  alerta?: boolean;
-}) {
-  return (
-    <div style={{ padding: "12px 16px", background: "var(--surface)" }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", marginBottom: 4 }}>
-        {etiqueta}
-      </div>
-      <div
+/**
+ * Los días vencido son el dato que duele. Mientras la factura está en plazo el
+ * número se queda gris y pequeño; en cuanto se pasa de fecha sube de peso y de
+ * color, para que la columna se lea de un barrido.
+ */
+function DiasVencido({ dias }: { dias: number | null }) {
+  if (dias === null) {
+    return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin plazo</span>;
+  }
+  if (dias > 0) {
+    return (
+      <span
+        title={textoDias(dias)}
         style={{
-          fontSize: 17,
+          fontSize: 13,
           fontWeight: 700,
           fontVariantNumeric: "tabular-nums",
-          color: alerta ? "var(--danger)" : "var(--text-primary)",
+          color: "var(--state-danger-text, #b91c1c)",
+          whiteSpace: "nowrap",
         }}
       >
-        {valor ?? "…"}
-      </div>
-    </div>
-  );
-}
-
-function Chip({
-  etiqueta,
-  monto,
-  documentos,
-  tono,
-  activo,
-  onClick,
-}: {
-  etiqueta: string;
-  monto?: number;
-  documentos?: number;
-  tono: "bad" | "warn" | "mute";
-  activo: boolean;
-  onClick: () => void;
-}) {
-  const color = TONOS[tono];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={activo}
-      style={{
-        display: "inline-flex",
-        alignItems: "baseline",
-        gap: 8,
-        padding: "7px 12px",
-        borderRadius: 999,
-        cursor: "pointer",
-        fontSize: 12.5,
-        border: `1px solid ${activo ? color : "var(--nx-panel-hairline, var(--border))"}`,
-        background: activo
-          ? `color-mix(in srgb, ${color} 12%, var(--surface))`
-          : "var(--surface)",
-        color: "var(--text-primary)",
-      }}
-    >
-      <span style={{ fontWeight: 600, color: tono === "mute" ? undefined : color }}>{etiqueta}</span>
-      {monto !== undefined && (
-        <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>
-          <Money value={monto} compact bold={false} />
-        </span>
-      )}
-      {documentos !== undefined && (
-        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{documentos}</span>
-      )}
-    </button>
-  );
-}
-
-function Campo({ etiqueta, children }: { etiqueta: string; children: React.ReactNode }) {
-  return (
-    <label style={{ display: "block" }}>
-      <span
-        style={{
-          display: "block",
-          fontSize: 11,
-          fontWeight: 600,
-          color: "var(--text-tertiary)",
-          marginBottom: 4,
-        }}
-      >
-        {etiqueta}
+        {dias} {dias === 1 ? "día" : "días"}
       </span>
-      {children}
-    </label>
+    );
+  }
+  if (dias === 0) {
+    return (
+      <span
+        title={textoDias(dias)}
+        style={{ fontSize: 12, fontWeight: 600, color: "var(--state-warning-text, #b45309)" }}
+      >
+        Hoy
+      </span>
+    );
+  }
+  return (
+    <span
+      title={textoDias(dias)}
+      style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: "var(--text-tertiary)" }}
+    >
+      en {-dias} d
+    </span>
+  );
+}
+
+type Tramo = {
+  bucket: AgingBucket;
+  etiqueta: string;
+  monto: number;
+  documentos: number;
+  tono: string;
+};
+
+const TONO_TRAMO: Record<string, string> = {
+  bad: "var(--state-danger-text, #b91c1c)",
+  warn: "var(--state-warning-text, #b45309)",
+  mute: "var(--text-secondary)",
+};
+
+/**
+ * Antigüedad como escala, no como cinco botones sueltos.
+ *
+ * Las celdas van pegadas y en orden —vencido, hoy, 7, 30, +30— con una regla
+ * bajo cada una cuyo ancho es su parte del saldo: así se ve de un vistazo
+ * hacia qué lado carga la cartera. Cada celda filtra la tabla al hacer clic.
+ */
+function EscalaAntiguedad({
+  tramos,
+  activo,
+  total,
+  onElegir,
+}: {
+  tramos: Tramo[];
+  activo: AgingBucket | "";
+  total: number;
+  onElegir: (bucket: AgingBucket | "") => void;
+}) {
+  if (tramos.length === 0) return null;
+  const base = total > 0 ? total : tramos.reduce((s, t) => s + Math.abs(t.monto), 0);
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div
+        role="group"
+        aria-label="Antigüedad de saldos"
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(auto-fit, minmax(128px, 1fr))`,
+          border: "1px solid var(--nx-panel-hairline, var(--border))",
+          borderRadius: 10,
+          overflow: "hidden",
+          background: "var(--surface)",
+        }}
+      >
+        {tramos.map((t, i) => {
+          const esActivo = activo === t.bucket;
+          const color = TONO_TRAMO[t.tono] ?? "var(--text-secondary)";
+          const parte = base > 0 ? Math.min(100, (Math.abs(t.monto) / base) * 100) : 0;
+          return (
+            <button
+              key={t.bucket}
+              type="button"
+              aria-pressed={esActivo}
+              onClick={() => onElegir(esActivo ? "" : t.bucket)}
+              style={{
+                position: "relative",
+                display: "grid",
+                gap: 2,
+                padding: "9px 12px 11px",
+                textAlign: "left",
+                cursor: "pointer",
+                font: "inherit",
+                color: "var(--text-primary)",
+                border: "none",
+                borderRight:
+                  i < tramos.length - 1
+                    ? "1px solid var(--nx-panel-hairline, var(--border))"
+                    : undefined,
+                background: esActivo
+                  ? "color-mix(in srgb, var(--primary) 7%, var(--surface))"
+                  : "transparent",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: esActivo ? 700 : 500,
+                  color: t.tono === "mute" ? "var(--text-tertiary)" : color,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {t.etiqueta}
+              </span>
+              <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                <Money value={t.monto} compact bold={false} />
+              </span>
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                {t.documentos} {t.documentos === 1 ? "factura" : "facturas"}
+              </span>
+              <span
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  bottom: 0,
+                  height: 2,
+                  width: `${parte}%`,
+                  background: t.tono === "mute" ? "var(--text-tertiary)" : color,
+                  opacity: t.tono === "mute" ? 0.35 : 0.7,
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+      {activo !== "" && (
+        <button
+          type="button"
+          onClick={() => onElegir("")}
+          style={{
+            marginTop: 6,
+            background: "none",
+            border: "none",
+            padding: 0,
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: "var(--primary)",
+            cursor: "pointer",
+          }}
+        >
+          Ver toda la cartera
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -980,28 +1117,29 @@ function CalendarioCxP({
         </p>
       ) : (
         <>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <Dato etiqueta="Vencido">
-              <span style={{ color: resumen.vencido > 0 ? "var(--danger)" : undefined }}>
-                <Money value={resumen.vencido} />
-              </span>
-            </Dato>
-            <Dato etiqueta="Hoy">
-              <Money value={resumen.hoy} />
-            </Dato>
-            <Dato etiqueta="Próximos 7 días">
-              <Money value={resumen.proximos7} />
-            </Dato>
-            <Dato etiqueta="Próximos 30 días">
-              <Money value={resumen.proximos30} />
-            </Dato>
+          <div style={{ marginBottom: 12 }}>
+            <MetricStrip
+              ariaLabel="Qué sale de caja"
+              metrics={[
+                {
+                  label: "Vencido",
+                  value: <Money value={resumen.vencido} />,
+                  tone: resumen.vencido > 0 ? "danger" : "default",
+                  hint: resumen.vencido > 0 ? "ya debió salir" : "nada atrasado",
+                },
+                { label: "Hoy", value: <Money value={resumen.hoy} />, hint: "sale hoy" },
+                {
+                  label: "Próximos 7 días",
+                  value: <Money value={resumen.proximos7} />,
+                  hint: "esta semana",
+                },
+                {
+                  label: "Próximos 30 días",
+                  value: <Money value={resumen.proximos30} />,
+                  hint: "el mes",
+                },
+              ]}
+            />
           </div>
 
           {calendario.semanas.length > 0 && (
@@ -1109,7 +1247,10 @@ function DetalleFactura({
           {proyecto ? proyecto.nombre : <span style={{ fontWeight: 400 }}>Sin proyecto ligado</span>}
         </Dato>
         <Dato etiqueta="Estado">
-          <span style={{ color: TONOS[factura.estadoTono] }}>{factura.estadoEtiqueta}</span>
+          <StatusDot
+            label={factura.estadoEtiqueta}
+            tone={TONO_ESTADO[factura.estadoTono] ?? "neutral"}
+          />
         </Dato>
       </div>
 
@@ -1144,7 +1285,11 @@ function DetalleFactura({
               style={{
                 width: `${saldo.porcentajePagado}%`,
                 height: "100%",
-                background: "var(--success)",
+                background:
+                  saldo.pendiente <= 0.009
+                    ? "var(--state-success-text, #15803d)"
+                    : "var(--text-secondary)",
+                opacity: saldo.pendiente <= 0.009 ? 1 : 0.5,
               }}
             />
           </div>

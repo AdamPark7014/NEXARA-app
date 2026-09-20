@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
-import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import Modal from "@/components/ui/Modal";
 import PanelTabs from "@/components/ui/PanelTabs";
 import Section from "@/components/ui/Section";
@@ -193,47 +195,35 @@ function Dato({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function Cifra({
-  label,
-  value,
-  hint,
-  tone = "default",
-}: {
-  label: string;
-  value: number;
-  hint?: string;
-  tone?: "default" | "danger";
-}) {
+/** Una celda de dinero para `MetricStrip`, con su pista de qué la compone. */
+function cifra(
+  label: string,
+  value: number,
+  hint?: string,
+  tone: Metric["tone"] = "default",
+): Metric {
+  return { label, value: <Money value={value} />, hint, tone };
+}
+
+/** Pesos redondeados, para las pistas de la tira. */
+const pesos = (n: number) =>
+  n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
+
+/** El estatus que manda el API, como punto y palabra. */
+const TONO_ESTATUS: Record<string, StatusTone> = {
+  positive: "success",
+  warning: "warning",
+  danger: "danger",
+  accent: "info",
+  default: "neutral",
+};
+
+function EstatusDot({ estatus, tono }: { estatus: string; tono?: StatusTone }) {
   return (
-    <div
-      style={{
-        flex: "1 1 160px",
-        minWidth: 150,
-        padding: "12px 14px",
-        border: "1px solid var(--nx-panel-hairline)",
-        borderRadius: 10,
-        background: "var(--surface)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-          color: "var(--text-tertiary)",
-          fontWeight: 700,
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </div>
-      <div style={{ fontSize: 19, color: tone === "danger" ? "var(--danger)" : "inherit" }}>
-        <Money value={value} />
-      </div>
-      {hint && (
-        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>{hint}</div>
-      )}
-    </div>
+    <StatusDot
+      label={estatus}
+      tone={tono ?? TONO_ESTATUS[financeStatusVariant(estatus)] ?? "neutral"}
+    />
   );
 }
 
@@ -335,15 +325,9 @@ export default function ProveedoresPage() {
                 {r.rfc ? `RFC ${r.rfc}` : "Sin RFC registrado"}
               </span>
               {r.esMayorista && (
-                <Tag size="sm" variant="accent">
-                  Mayorista
-                </Tag>
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>· Mayorista</span>
               )}
-              {!r.activo && (
-                <Tag size="sm" variant="neutral">
-                  Inactivo
-                </Tag>
-              )}
+              {!r.activo && <StatusDot label="Inactivo" tone="neutral" />}
             </span>
           </div>
         ),
@@ -409,9 +393,11 @@ export default function ProveedoresPage() {
           r.limiteCredito != null && r.limiteCredito > 0 ? (
             <span style={{ fontSize: 12.5 }}>
               {r.excedeCredito ? (
-                <Tag size="sm" variant="danger">
-                  Rebasa el tope
-                </Tag>
+                <StatusDot
+                  label="Rebasa el tope"
+                  tone="danger"
+                  title={`Límite de crédito ${pesos(r.limiteCredito)}`}
+                />
               ) : (
                 <span style={{ color: "var(--text-secondary)" }}>
                   {r.creditoDias != null ? `${r.creditoDias} días` : "Con tope"}
@@ -447,24 +433,27 @@ export default function ProveedoresPage() {
       {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
 
       {totales && !loading && (
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-          <Cifra
-            label="Saldo por pagar"
-            value={totales.saldoPorPagar}
-            hint={`${totales.conSaldo} de ${totales.proveedores} proveedores con saldo`}
-          />
-          <Cifra
-            label="Vencido"
-            value={totales.vencido}
-            tone={totales.vencido > 0 ? "danger" : "default"}
-            hint={
-              totales.vencido > 0 ? "Ya pasó la fecha de pago" : "Nada pasado de fecha"
-            }
-          />
-          <Cifra
-            label="Comprado este año"
-            value={totales.totalAnio}
-            hint="Facturas de proveedor del ejercicio"
+        <div style={{ marginBottom: 14 }}>
+          <MetricStrip
+            ariaLabel="Resumen de proveedores"
+            metrics={[
+              cifra(
+                "Saldo por pagar",
+                totales.saldoPorPagar,
+                `${totales.conSaldo} de ${totales.proveedores} proveedores con saldo`,
+              ),
+              cifra(
+                "Vencido",
+                totales.vencido,
+                totales.vencido > 0 ? "ya pasó la fecha de pago" : "nada pasado de fecha",
+                totales.vencido > 0 ? "danger" : "default",
+              ),
+              cifra(
+                "Comprado este año",
+                totales.totalAnio,
+                "facturas de proveedor del ejercicio",
+              ),
+            ]}
           />
         </div>
       )}
@@ -518,31 +507,32 @@ export default function ProveedoresPage() {
           <InlineAlert message={detalleError} />
         ) : !detalle ? null : (
           <>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-              <Cifra
-                label="Saldo por pagar"
-                value={detalle.resumen.saldoPorPagar}
-                hint={`${detalle.resumen.facturasAbiertas} factura(s) abierta(s)`}
-              />
-              <Cifra
-                label="Vencido"
-                value={detalle.resumen.vencido}
-                tone={detalle.resumen.vencido > 0 ? "danger" : "default"}
-                hint={`Por vencer ${detalle.resumen.porVencer.toLocaleString("es-MX", {
-                  style: "currency",
-                  currency: "MXN",
-                  maximumFractionDigits: 0,
-                })}`}
-              />
-              <Cifra
-                label="Comprado (histórico)"
-                value={detalle.resumen.comprado}
-                hint={`${detalle.resumen.facturas} factura(s) registradas`}
-              />
-              <Cifra
-                label="Pagado"
-                value={detalle.resumen.pagado}
-                hint={`${detalle.resumen.ordenesCompra} orden(es) de compra`}
+            <div style={{ marginBottom: 14 }}>
+              <MetricStrip
+                ariaLabel="Expediente del proveedor"
+                metrics={[
+                  cifra(
+                    "Saldo por pagar",
+                    detalle.resumen.saldoPorPagar,
+                    `${detalle.resumen.facturasAbiertas} factura(s) abierta(s)`,
+                  ),
+                  cifra(
+                    "Vencido",
+                    detalle.resumen.vencido,
+                    `por vencer ${pesos(detalle.resumen.porVencer)}`,
+                    detalle.resumen.vencido > 0 ? "danger" : "default",
+                  ),
+                  cifra(
+                    "Comprado (histórico)",
+                    detalle.resumen.comprado,
+                    `${detalle.resumen.facturas} factura(s) registradas`,
+                  ),
+                  cifra(
+                    "Pagado",
+                    detalle.resumen.pagado,
+                    `${detalle.resumen.ordenesCompra} orden(es) de compra`,
+                  ),
+                ]}
               />
             </div>
 
@@ -598,9 +588,10 @@ export default function ProveedoresPage() {
                     <Dato
                       label="Estatus"
                       value={
-                        <Tag size="sm" variant={detalle.proveedor.activo ? "positive" : "neutral"}>
-                          {detalle.proveedor.activo ? "Activo" : "Inactivo"}
-                        </Tag>
+                        <StatusDot
+                          label={detalle.proveedor.activo ? "Activo" : "Inactivo"}
+                          tone={detalle.proveedor.activo ? "success" : "neutral"}
+                        />
                       }
                     />
                     <Dato label="Alta" value={fecha(detalle.proveedor.alta)} />
@@ -749,9 +740,10 @@ export default function ProveedoresPage() {
                     key: "estatus",
                     label: "Estatus",
                     render: (f) => (
-                      <Tag size="sm" variant={f.cancelada ? "danger" : financeStatusVariant(f.estatus)}>
-                        {f.cancelada ? "Cancelada" : f.estatus}
-                      </Tag>
+                      <EstatusDot
+                        estatus={f.cancelada ? "Cancelada" : f.estatus}
+                        tono={f.cancelada ? "danger" : undefined}
+                      />
                     ),
                   },
                   {
@@ -798,9 +790,7 @@ export default function ProveedoresPage() {
                     key: "estatus",
                     label: "Estatus",
                     render: (o) => (
-                      <Tag size="sm" variant={financeStatusVariant(o.estatus)}>
-                        {o.estatus}
-                      </Tag>
+                      <EstatusDot estatus={o.estatus} />
                     ),
                   },
                 ]}
@@ -814,30 +804,18 @@ export default function ProveedoresPage() {
                   subtitle="Cuánto lleva esperando cada peso que se le debe."
                   dense
                 >
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    {detalle.cuentasPorPagar.antiguedad.map((b) => (
-                      <div
-                        key={b.key}
-                        style={{
-                          flex: "1 1 130px",
-                          padding: "10px 12px",
-                          border: "1px solid var(--nx-panel-hairline)",
-                          borderRadius: 9,
-                          background: b.monto > 0 && b.key !== "porVencer" ? "var(--state-warning-bg)" : "var(--surface)",
-                        }}
-                      >
-                        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", fontWeight: 700 }}>
-                          {b.label}
-                        </div>
-                        <div style={{ fontSize: 16, marginTop: 4 }}>
-                          <Money value={b.monto} />
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
-                          {b.conteo} factura(s)
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <MetricStrip
+                    ariaLabel="Antigüedad del saldo"
+                    metrics={detalle.cuentasPorPagar.antiguedad.map((b) => ({
+                      label: b.label,
+                      value: <Money value={b.monto} />,
+                      hint: `${b.conteo} factura(s)`,
+                      tone:
+                        b.monto > 0 && b.key !== "porVencer"
+                          ? ("danger" as const)
+                          : ("default" as const),
+                    }))}
+                  />
                 </Section>
                 <DataTable
                   rows={detalle.cuentasPorPagar.facturas}
@@ -856,11 +834,22 @@ export default function ProveedoresPage() {
                       numeric: true,
                       render: (f) =>
                         f.diasVencido > 0 ? (
-                          <span style={{ color: "var(--danger)", fontWeight: 600 }}>
-                            {f.diasVencido}
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              fontVariantNumeric: "tabular-nums",
+                              color: "var(--state-danger-text, #b91c1c)",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={`Lleva ${f.diasVencido} día(s) pasada de fecha`}
+                          >
+                            {f.diasVencido} {f.diasVencido === 1 ? "día" : "días"}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--text-tertiary)" }}>Al corriente</span>
+                          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                            Al corriente
+                          </span>
                         ),
                     },
                     {
@@ -954,9 +943,9 @@ export default function ProveedoresPage() {
                     key: "tipo",
                     label: "Tipo",
                     render: (h) => (
-                      <Tag size="sm" variant="neutral">
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                         {TIPO_HISTORIAL[h.tipo] ?? h.tipo}
-                      </Tag>
+                      </span>
                     ),
                   },
                   { key: "titulo", label: "Movimiento" },
