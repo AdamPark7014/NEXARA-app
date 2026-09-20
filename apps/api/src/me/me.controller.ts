@@ -24,6 +24,7 @@ import {
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
+import { ActivityToolsService } from '../activities/tools/activity-tools.service.js';
 
 @Controller('me')
 @UseGuards(AuthGuard('jwt'))
@@ -33,6 +34,7 @@ export class MeController {
     private readonly teamBoard: TeamBoardService,
     private readonly myActivities: MyActivitiesService,
     private readonly kpis: KpisEquipoService,
+    private readonly activityTools: ActivityToolsService,
   ) {}
 
   /** Mis actividades: cola personal (todos menos el CEO). */
@@ -96,6 +98,45 @@ export class MeController {
       companyId,
       activityId,
     );
+  }
+
+  /**
+   * Checklist de herramientas de una OT mía: qué tengo que llevar y qué ya palomeé.
+   * Mientras quede algo sin palomear, `iniciar` se niega.
+   */
+  @Get('activities/:id/herramientas')
+  misHerramientasDeActividad(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.activityTools.listarParaAsignado(activityId, Number(user.id), companyId);
+  }
+
+  /** Palomear un renglón del checklist desde la app: «lo traigo y sirve» o «falta». */
+  @Post('activities/:id/herramientas/:requirementId/check')
+  palomearHerramienta(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) activityId: number,
+    @Param('requirementId', ParseIntPipe) requirementId: number,
+    @Body() body: { ok?: boolean; nota?: string; fotoUrl?: string },
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.activityTools.palomear({
+      activityId,
+      requirementId,
+      userId: Number(user.id),
+      ok: body?.ok,
+      nota: body?.nota,
+      fotoUrl: body?.fotoUrl,
+      companyId,
+    });
   }
 
   /** Alias de `iniciar` para las apps ya instaladas (su botón «Comenzar actividad»). */
