@@ -48,7 +48,7 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 }
 
 const LINE = "color-mix(in srgb, var(--primary) 55%, var(--border))";
-const ZOOM_MIN = 0.5;
+const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.1;
 
@@ -491,6 +491,10 @@ export default function OrgChartView({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  /** Ancho natural del arbol, para poder ajustarlo al hueco disponible. */
+  const contentRef = useRef<HTMLDivElement>(null);
+  /** Mientras nadie toque el zoom a mano, el arbol se reajusta solo al cambiar el ancho. */
+  const zoomManual = useRef(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
   const [panning, setPanning] = useState(false);
@@ -555,7 +559,46 @@ export default function OrgChartView({
     return ids;
   }, [allUsers, hasActiveFilter, hasDept, hasSearch, q, selectedDept]);
 
+  /**
+   * Ajusta el arbol al ancho disponible.
+   *
+   * Arrancaba siempre al 100 %, asi que con 16 personas el organigrama salia
+   * cortado y habia que arrastrarlo de lado para verlo entero — justo lo que no
+   * debe pasar en una vista cuyo unico trabajo es enseñar la estructura de un
+   * vistazo. `scale()` no cambia el tamaño de caja, asi que `scrollWidth` del
+   * contenido sigue siendo el ancho natural aunque ya este escalado.
+   *
+   * Nunca amplia por encima del 100 %: un organigrama de tres personas se ve
+   * raro estirado a pantalla completa.
+   */
+  const ajustarAlAncho = useCallback(() => {
+    const caja = canvasRef.current;
+    const contenido = contentRef.current;
+    if (!caja || !contenido) return;
+    const anchoNatural = contenido.scrollWidth;
+    if (anchoNatural <= 0) return;
+    const disponible = caja.clientWidth - 24; // el relleno lateral del lienzo
+    const factor = Math.min(1, disponible / anchoNatural);
+    setZoom(Math.max(ZOOM_MIN, Math.round(factor * 100) / 100));
+    caja.scrollLeft = 0;
+    caja.scrollTop = 0;
+  }, []);
+
+  /** Al entrar y al cambiar el ancho, si nadie toco el zoom a mano. */
+  useEffect(() => {
+    const caja = canvasRef.current;
+    if (!caja || typeof ResizeObserver === "undefined") return;
+    const reajustar = () => {
+      if (!zoomManual.current) ajustarAlAncho();
+    };
+    reajustar();
+    const observador = new ResizeObserver(reajustar);
+    observador.observe(caja);
+    return () => observador.disconnect();
+  }, [ajustarAlAncho, roots, selectedDept, searchQuery]);
+
   const bumpZoom = (delta: number) => {
+    zoomManual.current = true;
     setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + delta) * 10) / 10)));
   };
 
@@ -811,8 +854,11 @@ export default function OrgChartView({
                   <button
                     type="button"
                     style={{ ...zoomBtnStyle, minWidth: 52, fontWeight: 600, fontSize: 12 }}
-                    onClick={() => setZoom(1)}
-                    title="Restablecer zoom"
+                    onClick={() => {
+                      zoomManual.current = false;
+                      ajustarAlAncho();
+                    }}
+                    title="Ajustar el organigrama al ancho de la pantalla"
                     aria-label="Zoom 100%"
                   >
                     {Math.round(zoom * 100)}%
@@ -917,6 +963,7 @@ export default function OrgChartView({
                 }}
               >
                 <div
+                  ref={contentRef}
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
