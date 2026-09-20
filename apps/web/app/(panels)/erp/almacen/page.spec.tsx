@@ -6,9 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 import AlmacenPage from "./page";
 
 /**
- * La portada de almacén: cinco pestañas propias en vez de reexportar entera la pantalla
- * vieja. Aquí se prueba el enrutado de pestañas; lo que pinta cada una tiene su propia
- * prueba (y la de stock es la pantalla de almacén de siempre).
+ * La portada de almacén: pestañas propias (incluye Escáner) en vez de reexportar
+ * entera la pantalla vieja. Aquí se prueba el enrutado de pestañas; lo que pinta
+ * cada una tiene su propia prueba (y la de stock es la pantalla de almacén de siempre).
  */
 
 let searchParams = new URLSearchParams("");
@@ -40,19 +40,26 @@ vi.mock("@/components/almacen/RecoleccionAlmacenPanel", () => ({
 vi.mock("@/components/almacen/KitInspeccionesPanel", () => ({
   default: () => <div data-testid="panel-inspecciones" />,
 }));
+vi.mock("@/components/almacen/ScannerAlmacenPanel", () => ({
+  default: () => <div data-testid="panel-scanner" />,
+}));
+vi.mock("@/components/ToolInventoryPanel", () => ({
+  default: () => <div data-testid="tool-inventory" />,
+}));
 vi.mock("@/components/ToolRequestsTable", () => ({ default: () => <div data-testid="tool-requests" /> }));
 vi.mock("@/components/ToolRequestForm", () => ({ default: () => <div data-testid="tool-form" /> }));
 vi.mock("@/components/ToolUserKitPanel", () => ({ default: () => <div data-testid="kits-equipo" /> }));
 vi.mock("@/components/ToolMyKitPanel", () => ({ default: () => <div data-testid="mi-kit" /> }));
 
 describe("portada de almacén", () => {
-  it("enseña las cinco pestañas del frente", () => {
+  it("enseña las seis pestañas del frente (incluye Escáner)", () => {
     searchParams = new URLSearchParams("");
     render(<AlmacenPage />);
     const pestanas = screen.getAllByRole("tab").map((t) => t.textContent);
     expect(pestanas).toEqual([
       "Inventario",
       "Movimientos",
+      "Escáner",
       "Reabastecimiento",
       "Herramientas",
       "Kits",
@@ -72,6 +79,13 @@ describe("portada de almacén", () => {
     render(<AlmacenPage />);
     await userEvent.click(screen.getByRole("tab", { name: "Movimientos" }));
     expect(screen.getByTestId("almacen-stock").textContent).toBe("movimientos");
+  });
+
+  it("escáner monta el panel HID", async () => {
+    searchParams = new URLSearchParams("");
+    render(<AlmacenPage />);
+    await userEvent.click(screen.getByRole("tab", { name: "Escáner" }));
+    expect(screen.getByTestId("panel-scanner")).toBeInTheDocument();
   });
 
   it("un aviso con ?tab=reabastecimiento cae en esa pestaña", () => {
