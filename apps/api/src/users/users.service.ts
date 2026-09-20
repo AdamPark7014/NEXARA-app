@@ -1150,6 +1150,7 @@ export class UsersService {
         id: true,
         nombre: true,
         managerId: true,
+        puesto: true,
         avatarUrl: true,
         role: { select: { id: true, nombre: true } },
         department: { select: { id: true, nombre: true } },
