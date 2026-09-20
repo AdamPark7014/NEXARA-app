@@ -294,9 +294,27 @@ export default function MovimientosPage() {
           boxShadow: "var(--nx-panel-elev-1)",
         }}
       >
-        <TotalTile label="Ingresos" value={totals.ingresos} tone="in" />
-        <TotalTile label="Egresos" value={totals.egresos} tone="out" />
-        <TotalTile label="Neto" value={totals.neto} tone="net" />
+        {/* Estos tres suman efectivo + devengado: una factura y su cobro cuentan
+            las dos veces, a propósito. Sin decirlo, «Ingresos» se lee como dinero
+            que entró. Para eso está la tarjeta Efectivo. */}
+        <TotalTile
+          label="Ingresos"
+          value={totals.ingresos}
+          tone="in"
+          hint="Facturado y cobrado juntos"
+        />
+        <TotalTile
+          label="Egresos"
+          value={totals.egresos}
+          tone="out"
+          hint="Devengado y pagado juntos"
+        />
+        <TotalTile
+          label="Neto"
+          value={totals.neto}
+          tone="net"
+          hint="Ingresos menos egresos"
+        />
         <TotalTile
           label="Efectivo"
           value={totals.efectivo.neto}
