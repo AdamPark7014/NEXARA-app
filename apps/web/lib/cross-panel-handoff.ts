@@ -262,7 +262,15 @@ export function buildCrossPanelUrl(
 
   if (hasProdSubdomain) {
     const base = `${protocol}//${targetSub}.nexara.com.mx${publicPath}`;
-    if (currentSub === targetSub) return publicPath;
+    // Ya estamos en el subdominio destino: se navega con la ruta INTERNA, con
+    // su prefijo de panel.
+    //
+    // `publicPath` le quita el prefijo (`/erp/contabilidad` -> `/contabilidad`)
+    // porque asumia que cada subdominio servia su panel desde la raiz. Hoy no
+    // es asi: todo vive en `core` bajo `/erp/...`, y la ruta sin prefijo
+    // responde 307 al inicio. Por eso las catorce secciones de contabilidad
+    // acababan en la pizarra en vez de abrir su pantalla.
+    if (currentSub === targetSub) return internalPath;
     if (userJson) {
       const encoded = encodeHandoff(userJson);
       return encoded ? `${base}?${HANDOFF_PARAM}=${encoded}` : base;
@@ -272,7 +280,8 @@ export function buildCrossPanelUrl(
 
   if (isLocalWithSubdomain) {
     const target = `${protocol}//${targetSub}.localhost${portSuffix}${publicPath}`;
-    if (currentSub === targetSub) return publicPath;
+    // Mismo criterio que en produccion: dentro del subdominio, ruta interna.
+    if (currentSub === targetSub) return internalPath;
     if (userJson) {
       const encoded = encodeHandoff(userJson);
       return encoded ? `${target}?${HANDOFF_PARAM}=${encoded}` : target;
