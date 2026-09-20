@@ -33,6 +33,7 @@ import {
   patchEmployeePayment,
   postEmployeePayment,
   type EmployeePaymentsAnalytics,
+  type FinanceAnalyticsBucket,
 } from "@/lib/finance-api";
 import {
   appendDraftApprovalNote,
@@ -54,7 +55,11 @@ interface Payment {
   status?: PaymentStatus | string;
   evidenceUrls?: string[];
   paidAt?: string | null;
+  /** Folio contable: la API lo escribe al generar la póliza. Puede no existir aún. */
+  contabilidadRef?: string | null;
   user?: { id?: number; nombre?: string };
+  /** Quién capturó el registro (la API lo incluye como `createdBy`). */
+  createdBy?: { id?: number; nombre?: string } | null;
 }
 
 interface ApiUserLite {
@@ -107,8 +112,41 @@ const breakdownTitleStyle: CSSProperties = {
   letterSpacing: "0.06em",
   color: "var(--text-tertiary)",
 };
+const statusPanelStyle: CSSProperties = {
+  padding: 24,
+  textAlign: "center",
+  fontSize: 13,
+  color: "var(--text-tertiary)",
+};
+const srOnlyStyle: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+};
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Por debajo de este ancho el periodo deja de ser columna y baja bajo el
+ * nombre (regla 2: si una columna no se lee en móvil se colapsa, no se hace
+ * scroll horizontal). Va con `matchMedia` porque `DataTable` fija las columnas
+ * en JS y no hay forma de ocultarlas con CSS.
+ */
+const NARROW_QUERY = "(max-width: 900px)";
+
+function useNarrowViewport() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_QUERY);
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return narrow;
+}
 
 /**
  * Regla 3: neutral para el flujo normal; color solo cuando el renglón pide
@@ -136,6 +174,25 @@ function formatDay(value?: string) {
   });
 }
 
+function formatFechaHora(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatHoras(totalMinutes?: number) {
+  if (!totalMinutes) return null;
+  const hrs = Math.round((totalMinutes / 60) * 100) / 100;
+  return `${hrs} h`;
+}
+
 function mapPaymentRow(raw: Record<string, unknown>): Payment {
   return {
     id: Number(raw.id),
@@ -149,7 +206,9 @@ function mapPaymentRow(raw: Record<string, unknown>): Payment {
     status: String(raw.status ?? "Borrador"),
     evidenceUrls: Array.isArray(raw.evidenceUrls) ? (raw.evidenceUrls as string[]) : [],
     paidAt: raw.paidAt ? String(raw.paidAt) : null,
+    contabilidadRef: (raw.contabilidadRef as string | null | undefined) ?? null,
     user: raw.user as Payment["user"],
+    createdBy: (raw.createdBy as Payment["createdBy"]) ?? null,
   };
 }
 
@@ -160,16 +219,97 @@ type FormErrors = {
   amount?: string;
 };
 
+const FIELD_LABELS: Record<keyof FormErrors, string> = {
+  userId: "Empleado",
+  periodFrom: "Periodo desde",
+  periodTo: "Periodo hasta",
+  amount: "Monto",
+};
+
+/** Desglose de analytics como tabla real: son datos tabulares, no una lista pintada. */
+function BreakdownTable({
+  title,
+  rows,
+  limit = 12,
+}: {
+  title: string;
+  rows: FinanceAnalyticsBucket[];
+  limit?: number;
+}) {
+  const shown = rows.slice(0, limit);
+  const cellBorder = (i: number) =>
+    i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)";
+  return (
+    <div style={breakdownPanelStyle}>
+      <div style={breakdownTitleStyle}>{title}</div>
+      {shown.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
+      ) : (
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <caption style={srOnlyStyle}>{title}</caption>
+            <thead>
+              <tr>
+                <th scope="col" style={{ textAlign: "left", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
+                  Empleado
+                </th>
+                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
+                  Registros
+                </th>
+                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((r, i) => (
+                <tr key={r.name}>
+                  <th scope="row" style={{ textAlign: "left", fontWeight: 400, padding: "6px 8px 6px 0", borderBottom: cellBorder(i) }}>
+                    {r.name}
+                  </th>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      fontSize: 11,
+                      color: "var(--text-tertiary)",
+                      fontVariantNumeric: "tabular-nums",
+                      padding: "6px 12px",
+                      borderBottom: cellBorder(i),
+                    }}
+                  >
+                    {r.count}
+                  </td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", padding: "6px 0", borderBottom: cellBorder(i) }}>
+                    <Money value={r.total} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length > limit && (
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>
+              Se muestran los {limit} primeros de {rows.length}. El PDF trae el desglose completo.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function EmployeePaymentsPage() {
-  const { user } = useUser();
+  const { user, isContextReady } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "employee-payments"), [user]);
   const token = user?.token ?? "";
+  const narrow = useNarrowViewport();
 
   const [items, setItems] = useState<Payment[]>([]);
   const [users, setUsers] = useState<ApiUserLite[]>([]);
   const [usersErr, setUsersErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Fallo de una acción de fila: sobrevive al diálogo que lo provocó. */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [tab, setTab] = useState<"lista" | "analytics">("lista");
   const [searchQ, setSearchQ] = useState("");
   const [filterUser, setFilterUser] = useState("");
@@ -188,16 +328,29 @@ export default function EmployeePaymentsPage() {
   const [dateTo, setDateTo] = useState("");
   const [analytics, setAnalytics] = useState<EmployeePaymentsAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!isContextReady) return;
+    if (!token) {
+      // Antes salía en silencio y la pantalla se quedaba en «Cargando pagos…»
+      // para siempre. Ahora dice qué pasa y qué hacer.
+      setLoading(false);
+      setItems([]);
+      setError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión para ver los pagos.");
+      return;
+    }
     setLoading(true);
     setError(null);
+    // Se limpia en cada intento: si no, un fallo viejo del catálogo se quedaba
+    // pegado aunque la recarga siguiente hubiera funcionado.
+    setUsersErr(null);
     try {
       const [data, usersData] = await Promise.all([
         financeFetch("employee-payments", token),
         financeFetch("users", token).catch((e) => {
-          setUsersErr(e instanceof Error ? e.message : "No se cargó el catálogo de empleados");
+          setUsersErr(formatApiError(e, "No se pudo cargar el catálogo de empleados"));
           return [];
         }),
       ]);
@@ -211,16 +364,20 @@ export default function EmployeePaymentsPage() {
         })),
       );
     } catch (e) {
-      setError(formatApiError(e, "Error al cargar pagos"));
+      setError(formatApiError(e, "No se pudieron cargar los pagos"));
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, isContextReady]);
 
   const loadAnalytics = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      setAnalyticsError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión.");
+      return;
+    }
     setAnalyticsLoading(true);
+    setAnalyticsError(null);
     try {
       const data = await fetchEmployeePaymentsAnalytics(token, {
         from: dateFrom || undefined,
@@ -228,7 +385,8 @@ export default function EmployeePaymentsPage() {
       });
       setAnalytics(data);
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo cargar analytics"));
+      // Antes solo salía un toast y la pestaña quedaba en blanco sin explicación.
+      setAnalyticsError(formatApiError(e, "No se pudo calcular el resumen del periodo"));
     } finally {
       setAnalyticsLoading(false);
     }
@@ -250,7 +408,8 @@ export default function EmployeePaymentsPage() {
         (p) =>
           (p.user?.nombre ?? "").toLowerCase().includes(q) ||
           (p.concepto ?? "").toLowerCase().includes(q) ||
-          (p.note ?? "").toLowerCase().includes(q),
+          (p.note ?? "").toLowerCase().includes(q) ||
+          (p.contabilidadRef ?? "").toLowerCase().includes(q),
       );
     }
     if (filterUser) result = result.filter((p) => String(p.userId) === filterUser);
@@ -326,10 +485,19 @@ export default function EmployeePaymentsPage() {
     setShowForm(true);
   };
 
+  const closeForm = () => {
+    setShowForm(false);
+    setSaveErr(null);
+    setFormErrors({});
+    setEditing(null);
+    setEvidenceFiles([]);
+  };
+
   const [calculatingAttendance, setCalculatingAttendance] = useState(false);
+  const canCalcAttendance = Boolean(token && form.userId && form.periodFrom && form.periodTo);
 
   const calcularDesdeAsistencia = async () => {
-    if (!token || !form.userId || !form.periodFrom || !form.periodTo) return;
+    if (calculatingAttendance || !canCalcAttendance) return;
     setCalculatingAttendance(true);
     try {
       const result = await financeFetch(
@@ -341,22 +509,32 @@ export default function EmployeePaymentsPage() {
       const hrs = Math.round((totalMinutes / 60) * 100) / 100;
       toast.success(`Asistencia: ${hrs}h en el periodo (${(result as { daysWithAttendance?: number })?.daysWithAttendance ?? 0} día(s) con registro).`);
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo calcular desde asistencia"));
+      setSaveErr(formatApiError(e, "No se pudo calcular desde asistencia"));
     } finally {
       setCalculatingAttendance(false);
     }
   };
 
   const submit = async () => {
-    if (!token) return;
+    if (saving) return;
+    if (!token) {
+      setSaveErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión e inténtalo otra vez.");
+      return;
+    }
     // Regla 5: la validación se contesta bajo el campo, no en un aviso suelto.
     const errors: FormErrors = {};
     if (!form.userId) errors.userId = "Elige a quién se le paga.";
     if (!form.periodFrom) errors.periodFrom = "Indica el primer día del periodo.";
     if (!form.periodTo) errors.periodTo = "Indica el último día del periodo.";
-    if (!form.amount) errors.amount = "Captura el monto; tiene que ser mayor que cero.";
+    if (form.periodFrom && form.periodTo && form.periodTo < form.periodFrom) {
+      errors.periodTo = "El último día del periodo no puede ser anterior al primero.";
+    }
+    if (!form.amount || form.amount <= 0) errors.amount = "Captura el monto; tiene que ser mayor que cero.";
     setFormErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      setSaveErr(null);
+      return;
+    }
 
     setSaving(true);
     setSaveErr(null);
@@ -411,12 +589,15 @@ export default function EmployeePaymentsPage() {
 
   const runMarkPagado = (p: Payment) => {
     const fromDraft = needsDraftApprovalConfirm(p.status);
+    const nombre = p.user?.nombre ?? `empleado #${p.userId}`;
     setConfirmState({
       message: fromDraft
-        ? `${draftGateConfirmCopy.CONFIRM_MESSAGE} (${p.user?.nombre ?? "empleado"})`
-        : `¿Marcar como pagado el registro de ${p.user?.nombre ?? "empleado"}?`,
+        ? `${draftGateConfirmCopy.CONFIRM_MESSAGE} (${nombre})`
+        : `¿Marcar como pagado el registro de ${nombre}?`,
       confirmLabel: fromDraft ? draftGateConfirmCopy.CONFIRM_LABEL : "Marcar pagado",
+      danger: false,
       fn: async () => {
+        setActionError(null);
         try {
           if (fromDraft) {
             const actor =
@@ -431,39 +612,74 @@ export default function EmployeePaymentsPage() {
           );
           toast.success(fromDraft ? "Borrador aprobado y marcado como pagado" : "Marcado como pagado");
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudo marcar pagado"));
+          setActionError(
+            `No se pudo marcar pagado el registro de ${nombre}: ${formatApiError(e, "el servidor no respondió")}`,
+          );
         }
       },
     });
   };
 
   const remove = (p: Payment) => {
+    const nombre = p.user?.nombre ?? `empleado #${p.userId}`;
     setConfirmState({
-      message: `¿Anular / eliminar el pago a ${p.user?.nombre ?? "empleado"}?`,
+      message: `¿Anular el pago a ${nombre}? Deja de contar para el cierre y no se puede deshacer desde aquí.`,
       confirmLabel: "Anular",
       fn: async () => {
+        setActionError(null);
         try {
           await deleteEmployeePayment(token, p.id);
           setItems((prev) => prev.filter((x) => x.id !== p.id));
           toast.success("Pago anulado");
         } catch (e) {
-          toast.error(formatApiError(e, "No se pudo anular"));
+          setActionError(
+            `No se pudo anular el pago a ${nombre}: ${formatApiError(e, "el servidor no respondió")}`,
+          );
         }
       },
     });
   };
 
   const downloadPdf = async () => {
-    if (!token) return;
+    if (pdfBusy) return;
+    if (!token) {
+      setAnalyticsError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión.");
+      return;
+    }
+    setPdfBusy(true);
     try {
       await downloadEmployeePaymentsReportPdf(token, {
         from: dateFrom || undefined,
         to: dateTo || undefined,
       });
+      toast.success("PDF generado");
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo generar el PDF"));
+      setAnalyticsError(formatApiError(e, "No se pudo generar el PDF"));
+    } finally {
+      setPdfBusy(false);
     }
   };
+
+  const exportExcel = () =>
+    exportToExcel(
+      visibleItems,
+      [
+        {
+          key: "user",
+          label: "Empleado",
+          format: (v) => (v as Payment["user"])?.nombre ?? "—",
+        },
+        { key: "concepto", label: "Concepto" },
+        { key: "periodFrom", label: "Desde" },
+        { key: "periodTo", label: "Hasta" },
+        { key: "amount", label: "Monto ($)" },
+        { key: "status", label: "Estado" },
+        { key: "paidAt", label: "Pagado el", format: (v) => (v ? String(v).slice(0, 10) : "") },
+        { key: "contabilidadRef", label: "Ref. contable" },
+        { key: "note", label: "Nota" },
+      ],
+      "pagos-empleados",
+    );
 
   const columns: Column<Payment>[] = [
     {
@@ -471,31 +687,46 @@ export default function EmployeePaymentsPage() {
       label: "Empleado",
       render: (p) => {
         const urls = p.evidenceUrls ?? [];
-        const detalle = [p.concepto, p.note].filter(Boolean).join(" · ");
+        const nombre = p.user?.nombre ?? `#${p.userId}`;
+        const meta: string[] = [];
+        if (p.concepto) meta.push(p.concepto);
+        // El periodo es columna propia salvo en pantallas estrechas.
+        if (narrow) meta.push(`${formatDay(p.periodFrom)} – ${formatDay(p.periodTo)}`);
+        // Horas del periodo: venían de la API y no se mostraban.
+        const horas = formatHoras(p.totalMinutes);
+        if (horas) meta.push(horas);
+        // Cuándo se pagó y con qué folio contable: ambos de la API, nunca inventados.
+        if (p.paidAt) meta.push(`Pagado ${formatFechaHora(p.paidAt)}`);
+        if (p.contabilidadRef) meta.push(`Ref. ${p.contabilidadRef}`);
+        if (p.createdBy?.nombre) meta.push(`Capturó ${p.createdBy.nombre}`);
+        if (p.note) meta.push(p.note);
         return (
           <div style={{ minWidth: 0 }}>
             <Link
               href={`/erp/hr/${p.userId}`}
               style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)", textDecoration: "none" }}
             >
-              {p.user?.nombre ?? `#${p.userId}`}
+              {nombre}
             </Link>
             <div style={rowMetaStyle}>
-              {detalle ? <span>{detalle}</span> : null}
+              {meta.length > 0 ? <span>{meta.join(" · ")}</span> : null}
               {urls.length > 0 ? (
                 <>
                   {urls.slice(0, 3).map((u, i) => {
                     const href = assetUrl(u);
                     return href ? (
-                      <a
-                        key={`${u}-${i}`}
-                        href={href}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: "var(--primary)", textDecoration: "none" }}
-                      >
-                        · Comprobante {i + 1}
-                      </a>
+                      <span key={`${u}-${i}`}>
+                        ·{" "}
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Ver comprobante ${i + 1} del pago a ${nombre}`}
+                          style={{ color: "var(--primary)", textDecoration: "none" }}
+                        >
+                          Comprobante {i + 1}
+                        </a>
+                      </span>
                     ) : null;
                   })}
                   {urls.length > 3 ? <span>· +{urls.length - 3} más</span> : null}
@@ -508,16 +739,20 @@ export default function EmployeePaymentsPage() {
         );
       },
     },
-    {
-      key: "periodFrom",
-      label: "Periodo",
-      render: (p) => (
-        <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-          {formatDay(p.periodFrom)} – {formatDay(p.periodTo)}
-        </span>
-      ),
-      width: 150,
-    },
+    ...(narrow
+      ? []
+      : ([
+          {
+            key: "periodFrom",
+            label: "Periodo",
+            render: (p: Payment) => (
+              <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                {formatDay(p.periodFrom)} – {formatDay(p.periodTo)}
+              </span>
+            ),
+            width: 150,
+          },
+        ] as Column<Payment>[])),
     {
       key: "amount",
       label: "Monto",
@@ -536,28 +771,51 @@ export default function EmployeePaymentsPage() {
       key: "id",
       label: "",
       align: "right",
-      render: (p) => (
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {cfg.canEdit && p.status !== "Anulado" && (
-            <Button size="sm" variant="ghost" style={rowButtonStyle} onClick={() => openEdit(p)}>
-              Editar
-            </Button>
-          )}
-          {cfg.canEdit && p.status === "Borrador" && (
-            <Button size="sm" variant="secondary" style={rowButtonStyle} onClick={() => runMarkPagado(p)}>
-              Aprobar borrador
-            </Button>
-          )}
-          {cfg.canDelete && p.status !== "Anulado" && (
-            <Button size="sm" variant="ghost" style={rowButtonStyle} onClick={() => remove(p)}>
-              Anular
-            </Button>
-          )}
-        </div>
-      ),
+      render: (p) => {
+        const nombre = p.user?.nombre ?? `empleado #${p.userId}`;
+        return (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {cfg.canEdit && p.status !== "Anulado" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                style={rowButtonStyle}
+                aria-label={`Editar el pago a ${nombre}`}
+                onClick={() => openEdit(p)}
+              >
+                Editar
+              </Button>
+            )}
+            {cfg.canEdit && p.status === "Borrador" && (
+              <Button
+                size="sm"
+                variant="secondary"
+                style={rowButtonStyle}
+                aria-label={`Aprobar el borrador de ${nombre}`}
+                onClick={() => runMarkPagado(p)}
+              >
+                Aprobar borrador
+              </Button>
+            )}
+            {cfg.canDelete && p.status !== "Anulado" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                style={rowButtonStyle}
+                aria-label={`Anular el pago a ${nombre}`}
+                onClick={() => remove(p)}
+              >
+                Anular
+              </Button>
+            )}
+          </div>
+        );
+      },
       width: 220,
     },
   ];
+
+  const invalidFields = (Object.keys(formErrors) as (keyof FormErrors)[]).filter((k) => formErrors[k]);
 
   return (
     <>
@@ -567,8 +825,14 @@ export default function EmployeePaymentsPage() {
         subtitle={cfg.subtitle}
         actions={
           <>
-            <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void load()}>
-              Actualizar
+            <Button
+              size="sm"
+              variant="ghost"
+              style={toolbarButtonStyle}
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              {loading ? "Actualizando…" : "Actualizar"}
             </Button>
             {cfg.canCreate && (
               <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
@@ -598,24 +862,52 @@ export default function EmployeePaymentsPage() {
               <FinanceField label="Hasta" optional>
                 <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={financeInputStyle} />
               </FinanceField>
-              <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
-                Aplicar
+              <Button
+                size="sm"
+                variant="secondary"
+                style={toolbarButtonStyle}
+                onClick={() => void loadAnalytics()}
+                disabled={analyticsLoading}
+              >
+                {analyticsLoading ? "Calculando…" : "Aplicar"}
               </Button>
-              <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void downloadPdf()}>
-                Descargar PDF
+              <Button
+                size="sm"
+                variant="ghost"
+                style={toolbarButtonStyle}
+                onClick={() => void downloadPdf()}
+                disabled={pdfBusy}
+              >
+                {pdfBusy ? "Generando…" : "Descargar PDF"}
               </Button>
             </div>
+            {analyticsError && (
+              <InlineAlert
+                message={analyticsError}
+                variant="danger"
+                style={{ marginBottom: 0 }}
+                onDismiss={() => setAnalyticsError(null)}
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
+                    Reintentar
+                  </Button>
+                }
+              />
+            )}
             {analyticsLoading && (
-              <div style={{ padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
-                Calculando…
+              <div style={statusPanelStyle} role="status" aria-live="polite">
+                Calculando el resumen del periodo…
               </div>
+            )}
+            {!analyticsLoading && !analytics && !analyticsError && (
+              <div style={statusPanelStyle}>Elige un rango y pulsa «Aplicar» para calcular el resumen.</div>
             )}
             {!analyticsLoading && analytics && (
               <>
                 <MetricStrip
                   ariaLabel="Resumen del periodo"
                   metrics={[
-                    { label: "Pagado", value: <Money value={analytics.totalPagado} />, hint: "liquidado en el periodo" },
+                    { label: "Pagado", value: <Money value={analytics.totalPagado} />, hint: analytics.periodLabel || "liquidado en el periodo" },
                     {
                       label: "Por aprobar",
                       value: <Money value={analytics.totalBorrador} />,
@@ -626,54 +918,22 @@ export default function EmployeePaymentsPage() {
                     { label: "Registros", value: analytics.count, hint: "en el periodo" },
                   ]}
                 />
-                <div style={breakdownPanelStyle}>
-                  <div style={breakdownTitleStyle}>Por empleado</div>
-                  {!analytics.byEmployee.length && (
-                    <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
-                  )}
-                  {analytics.byEmployee.slice(0, 12).map((r, i) => (
-                    <div
-                      key={r.name}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr auto auto",
-                        alignItems: "baseline",
-                        gap: 12,
-                        padding: "6px 0",
-                        borderBottom:
-                          i === Math.min(analytics.byEmployee.length, 12) - 1
-                            ? "none"
-                            : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-                        fontSize: 12.5,
-                      }}
-                    >
-                      <span>{r.name}</span>
-                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.count} reg.</span>
-                      <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                        <Money value={r.total} />
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <BreakdownTable title="Por empleado" rows={analytics.byEmployee} />
               </>
             )}
           </div>
         ) : (
           <>
             <FilterToolbar
-              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado o concepto…" }}
+              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado, concepto o ref. contable…" }}
               selects={[
-                ...(users.length > 0
-                  ? [
-                      {
-                        label: "Empleado",
-                        value: filterUser,
-                        onChange: setFilterUser,
-                        options: users.map((u) => ({ value: String(u.id), label: u.nombre })),
-                        allowAll: true,
-                      },
-                    ]
-                  : []),
+                {
+                  label: "Empleado",
+                  value: filterUser,
+                  onChange: setFilterUser,
+                  options: users.map((u) => ({ value: String(u.id), label: u.nombre })),
+                  allowAll: true,
+                },
                 {
                   label: "Estado",
                   value: filterStatus,
@@ -690,41 +950,48 @@ export default function EmployeePaymentsPage() {
               resultCount={loading ? null : visibleItems.length}
               rightActions={
                 <ListExportActions
-                  onExcel={
-                    visibleItems.length > 0
-                      ? () =>
-                          exportToExcel(
-                            visibleItems,
-                            [
-                              {
-                                key: "user",
-                                label: "Empleado",
-                                format: (v) => (v as Payment["user"])?.nombre ?? "—",
-                              },
-                              { key: "concepto", label: "Concepto" },
-                              { key: "periodFrom", label: "Desde" },
-                              { key: "periodTo", label: "Hasta" },
-                              { key: "amount", label: "Monto ($)" },
-                              { key: "status", label: "Estado" },
-                              { key: "note", label: "Nota" },
-                            ],
-                            "pagos-empleados",
-                          )
-                      : undefined
-                  }
+                  onExcel={exportExcel}
+                  excelDisabled={visibleItems.length === 0}
                 />
               }
             />
+            {actionError && (
+              <InlineAlert
+                message={actionError}
+                variant="danger"
+                onDismiss={() => setActionError(null)}
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                    Recargar
+                  </Button>
+                }
+              />
+            )}
+            {usersErr && (
+              <InlineAlert
+                message={`${usersErr}. El filtro por empleado saldrá vacío y no podrás registrar un pago nuevo hasta que cargue.`}
+                variant="warning"
+                onDismiss={() => setUsersErr(null)}
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                    Reintentar
+                  </Button>
+                }
+              />
+            )}
             {error && (
-              <div style={{ marginBottom: 12 }}>
-                <InlineAlert message={error} variant="danger" style={{ marginBottom: 8 }} />
-                <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
-                  Reintentar
-                </Button>
-              </div>
+              <InlineAlert
+                message={error}
+                variant="danger"
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                    Reintentar
+                  </Button>
+                }
+              />
             )}
             {loading ? (
-              <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
+              <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
                 Cargando pagos…
               </div>
             ) : !error ? (
@@ -754,39 +1021,50 @@ export default function EmployeePaymentsPage() {
 
       <Modal
         open={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={closeForm}
         title={editing ? "Editar pago" : "Registrar pago"}
         maxWidth={560}
         footer={
           <>
-            <Button
-              variant="ghost"
-              style={toolbarButtonStyle}
-              onClick={() => {
-                setShowForm(false);
-                setSaveErr(null);
-                setFormErrors({});
-                setEditing(null);
-                setEvidenceFiles([]);
-              }}
-            >
+            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeForm} disabled={saving}>
               Cancelar
             </Button>
-            <Button variant="primary" style={toolbarButtonStyle} onClick={() => void submit()} disabled={saving}>
+            <Button
+              variant="primary"
+              style={toolbarButtonStyle}
+              onClick={() => void submit()}
+              disabled={saving}
+              loading={saving}
+            >
               {saving ? "Guardando…" : editing ? "Guardar cambios" : "Registrar pago"}
             </Button>
           </>
         }
       >
         <FinanceFormGrid>
+          {invalidFields.length > 0 && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <InlineAlert
+                variant="warning"
+                style={{ marginBottom: 0 }}
+                message={`Revisa: ${invalidFields.map((k) => FIELD_LABELS[k]).join(", ")}. Cada campo dice abajo qué necesita.`}
+              />
+            </div>
+          )}
           {editing ? (
             <FinanceField label="Empleado" fullWidth hint="El empleado no cambia; registra otro pago si te equivocaste.">
               <input value={editing.user?.nombre ?? `#${editing.userId}`} disabled style={{ ...financeInputStyle, opacity: 0.7 }} />
             </FinanceField>
           ) : (
-            <FinanceField label="Empleado" fullWidth error={formErrors.userId}>
+            <FinanceField
+              label="Empleado"
+              fullWidth
+              error={formErrors.userId}
+              hint={users.length === 0 ? "El catálogo de empleados no cargó; recarga la lista para elegir." : undefined}
+            >
               <select
                 value={form.userId}
+                aria-invalid={Boolean(formErrors.userId)}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, userId: e.target.value }));
                   setFormErrors((prev) => ({ ...prev, userId: undefined }));
@@ -804,7 +1082,16 @@ export default function EmployeePaymentsPage() {
           )}
           {usersErr && !editing && (
             <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert message={usersErr} variant="warning" style={{ marginBottom: 0 }} />
+              <InlineAlert
+                message={usersErr}
+                variant="warning"
+                style={{ marginBottom: 0 }}
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                    Reintentar
+                  </Button>
+                }
+              />
             </div>
           )}
           <FinanceField label="Concepto" fullWidth optional hint="Así se identifica el pago en el reporte y en el PDF.">
@@ -819,9 +1106,10 @@ export default function EmployeePaymentsPage() {
             <input
               type="date"
               value={form.periodFrom}
+              aria-invalid={Boolean(formErrors.periodFrom)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, periodFrom: e.target.value }));
-                setFormErrors((prev) => ({ ...prev, periodFrom: undefined }));
+                setFormErrors((prev) => ({ ...prev, periodFrom: undefined, periodTo: undefined }));
               }}
               style={financeInputStyle}
             />
@@ -830,6 +1118,8 @@ export default function EmployeePaymentsPage() {
             <input
               type="date"
               value={form.periodTo}
+              min={form.periodFrom || undefined}
+              aria-invalid={Boolean(formErrors.periodTo)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, periodTo: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, periodTo: undefined }));
@@ -842,6 +1132,7 @@ export default function EmployeePaymentsPage() {
               type="number"
               min={0}
               value={form.amount}
+              aria-invalid={Boolean(formErrors.amount)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, amount: Number(e.target.value) }));
                 setFormErrors((prev) => ({ ...prev, amount: undefined }));
@@ -852,7 +1143,11 @@ export default function EmployeePaymentsPage() {
           <FinanceField
             label="Horas trabajadas"
             optional
-            hint="«Calcular» las trae de los registros de asistencia del periodo."
+            hint={
+              canCalcAttendance
+                ? "«Calcular» las trae de los registros de asistencia del periodo."
+                : "Elige empleado y periodo para poder calcularlas desde asistencia."
+            }
           >
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
@@ -869,7 +1164,8 @@ export default function EmployeePaymentsPage() {
                 size="sm"
                 style={toolbarButtonStyle}
                 onClick={() => void calcularDesdeAsistencia()}
-                disabled={calculatingAttendance || !form.userId || !form.periodFrom || !form.periodTo}
+                disabled={calculatingAttendance || !canCalcAttendance}
+                loading={calculatingAttendance}
               >
                 {calculatingAttendance ? "Calculando…" : "Calcular"}
               </Button>
@@ -927,6 +1223,7 @@ export default function EmployeePaymentsPage() {
                     <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</span>
                     <button
                       type="button"
+                      aria-label={`Quitar ${f.name}`}
                       onClick={() => setEvidenceFiles((prev) => prev.filter((_, idx) => idx !== i))}
                       style={{
                         background: "none",
@@ -957,9 +1254,25 @@ export default function EmployeePaymentsPage() {
               </div>
             )}
           </div>
+          {editing && (editing.paidAt || editing.contabilidadRef) && (
+            <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "var(--text-tertiary)" }}>
+              {editing.paidAt ? `Pagado el ${formatFechaHora(editing.paidAt)}. ` : ""}
+              {editing.contabilidadRef ? `Folio contable: ${editing.contabilidadRef}.` : ""}
+            </div>
+          )}
           {saveErr && (
             <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert message={saveErr} variant="danger" style={{ marginBottom: 0 }} />
+              <InlineAlert
+                message={saveErr}
+                variant="danger"
+                style={{ marginBottom: 0 }}
+                onDismiss={() => setSaveErr(null)}
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void submit()} disabled={saving}>
+                    Reintentar
+                  </Button>
+                }
+              />
             </div>
           )}
         </FinanceFormGrid>

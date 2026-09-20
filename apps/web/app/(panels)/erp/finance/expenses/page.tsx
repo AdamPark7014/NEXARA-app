@@ -35,6 +35,7 @@ import {
   patchExpenseAdmin,
   postExpenseAdmin,
   type ExpensesAnalytics,
+  type FinanceAnalyticsBucket,
 } from "@/lib/finance-api";
 
 type ExpenseEstado = "Pendiente" | "Aprobado" | "Pagado" | "Rechazado";
@@ -48,7 +49,8 @@ interface Expense {
   fecha?: string;
   esRecurrente?: boolean;
   ticketEvidenciaUrl?: string | null;
-  isAdministrative?: boolean;
+  /** Folio contable: la API lo escribe al generar la póliza. Puede no existir aún. */
+  contabilidadRef?: string | null;
   creadoPor?: { id?: number; nombre?: string };
 }
 
@@ -94,8 +96,34 @@ const breakdownTitleStyle: CSSProperties = {
   letterSpacing: "0.06em",
   color: "var(--text-tertiary)",
 };
+const statusPanelStyle: CSSProperties = {
+  padding: 24,
+  textAlign: "center",
+  fontSize: 13,
+  color: "var(--text-tertiary)",
+};
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Por debajo de este ancho la fecha deja de ser columna y baja bajo el concepto
+ * (regla 2: si una columna no se lee en móvil se colapsa, no se hace scroll
+ * horizontal). Se resuelve con `matchMedia` porque `DataTable` fija las
+ * columnas en JS y no hay forma de ocultarlas con CSS.
+ */
+const NARROW_QUERY = "(max-width: 900px)";
+
+function useNarrowViewport() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_QUERY);
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return narrow;
+}
 
 /**
  * Regla 3: tono neutral para el flujo normal; el color solo entra cuando el
@@ -135,23 +163,118 @@ function mapExpenseRow(raw: Record<string, unknown>): Expense {
     fecha: fechaRaw ? String(fechaRaw).slice(0, 10) : undefined,
     esRecurrente: Boolean(raw.esRecurrente),
     ticketEvidenciaUrl: (raw.ticketEvidenciaUrl as string | null | undefined) ?? null,
-    isAdministrative: Boolean(raw.isAdministrative),
+    contabilidadRef: (raw.contabilidadRef as string | null | undefined) ?? null,
     creadoPor: (raw.usuario ?? raw.creadoPor ?? raw.createdBy) as Expense["creadoPor"],
   };
 }
 
 type FormErrors = { concepto?: string; monto?: string; evidencia?: string };
 
+const FIELD_LABELS: Record<keyof FormErrors, string> = {
+  concepto: "Concepto",
+  monto: "Monto",
+  evidencia: "Comprobante",
+};
+
+/** Desglose de analytics como tabla real: son datos tabulares, no una lista pintada. */
+function BreakdownTable({
+  title,
+  rows,
+  limit = 12,
+}: {
+  title: string;
+  rows: FinanceAnalyticsBucket[];
+  limit?: number;
+}) {
+  const shown = rows.slice(0, limit);
+  return (
+    <div style={breakdownPanelStyle}>
+      <div style={breakdownTitleStyle}>{title}</div>
+      {shown.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
+      ) : (
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <caption style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+              {title}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" style={{ textAlign: "left", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
+                  Concepto
+                </th>
+                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
+                  Registros
+                </th>
+                <th scope="col" style={{ textAlign: "right", fontWeight: 600, color: "var(--text-tertiary)", fontSize: 11, paddingBottom: 4 }}>
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((r, i) => (
+                <tr key={r.name}>
+                  <th
+                    scope="row"
+                    style={{
+                      textAlign: "left",
+                      fontWeight: 400,
+                      padding: "6px 8px 6px 0",
+                      borderBottom: i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
+                    }}
+                  >
+                    {r.name}
+                  </th>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      fontSize: 11,
+                      color: "var(--text-tertiary)",
+                      fontVariantNumeric: "tabular-nums",
+                      padding: "6px 12px",
+                      borderBottom: i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
+                    }}
+                  >
+                    {r.count}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                      padding: "6px 0",
+                      borderBottom: i === shown.length - 1 ? "none" : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
+                    }}
+                  >
+                    <Money value={r.total} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length > limit && (
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 8 }}>
+              Se muestran los {limit} primeros de {rows.length}. El PDF trae el desglose completo.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function ExpensesPage() {
-  const { user } = useUser();
+  const { user, isContextReady } = useUser();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const cfg = useMemo(() => getErpExpensesSectionConfig(user), [user]);
   const token = user?.token ?? "";
+  const narrow = useNarrowViewport();
 
   const [items, setItems] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Fallo de una acción de fila: sobrevive al cierre del diálogo que lo provocó. */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [tab, setTab] = useState<"lista" | "analytics">("lista");
   const [searchQ, setSearchQ] = useState("");
   const [filterCat, setFilterCat] = useState("");
@@ -168,14 +291,26 @@ export default function ExpensesPage() {
 
   const [rejectTarget, setRejectTarget] = useState<Expense | null>(null);
   const [rejectNote, setRejectNote] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectErr, setRejectErr] = useState<string | null>(null);
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [analytics, setAnalytics] = useState<ExpensesAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!isContextReady) return;
+    if (!token) {
+      // Antes salía en silencio y la pantalla se quedaba en «Cargando gastos…»
+      // para siempre. Ahora dice qué pasa y qué hacer.
+      setLoading(false);
+      setItems([]);
+      setError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión para ver los gastos.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -188,11 +323,15 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, isContextReady]);
 
   const loadAnalytics = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      setAnalyticsError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión.");
+      return;
+    }
     setAnalyticsLoading(true);
+    setAnalyticsError(null);
     try {
       const data = await fetchExpensesAnalytics(token, {
         from: dateFrom || undefined,
@@ -200,7 +339,8 @@ export default function ExpensesPage() {
       });
       setAnalytics(data);
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo cargar analytics"));
+      // Antes solo salía un toast y la pestaña quedaba en blanco sin explicación.
+      setAnalyticsError(formatApiError(e, "No se pudo calcular el resumen del periodo"));
     } finally {
       setAnalyticsLoading(false);
     }
@@ -222,7 +362,8 @@ export default function ExpensesPage() {
         (e) =>
           (e.concepto ?? "").toLowerCase().includes(q) ||
           (e.creadoPor?.nombre ?? "").toLowerCase().includes(q) ||
-          (e.categoria ?? "").toLowerCase().includes(q),
+          (e.categoria ?? "").toLowerCase().includes(q) ||
+          (e.contabilidadRef ?? "").toLowerCase().includes(q),
       );
     }
     if (filterCat) result = result.filter((e) => e.categoria === filterCat);
@@ -302,15 +443,29 @@ export default function ExpensesPage() {
     setShowForm(true);
   };
 
+  const closeForm = () => {
+    setShowForm(false);
+    setSaveErr(null);
+    setFormErrors({});
+  };
+
   const save = async () => {
-    if (!token) return;
+    if (saving) return;
+    if (!token) {
+      // Pulsar «Registrar gasto» sin token ya no es un no-op mudo.
+      setSaveErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión e inténtalo otra vez.");
+      return;
+    }
     // Regla 5: la validación se contesta bajo el campo, no en un aviso suelto.
     const errors: FormErrors = {};
     if (!form.concepto.trim()) errors.concepto = "Escribe de qué es el gasto.";
-    if (!form.monto) errors.monto = "Captura el monto; tiene que ser mayor que cero.";
+    if (!form.monto || form.monto <= 0) errors.monto = "Captura el monto; tiene que ser mayor que cero.";
     if (!editing && !evidenceFile) errors.evidencia = "Adjunta el comprobante del gasto.";
     setFormErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      setSaveErr(null);
+      return;
+    }
 
     setSaving(true);
     setSaveErr(null);
@@ -343,7 +498,9 @@ export default function ExpensesPage() {
     setConfirmState({
       message: `¿Autorizar el gasto "${e.concepto}"?`,
       confirmLabel: "Autorizar",
+      danger: false,
       fn: async () => {
+        setActionError(null);
         try {
           const updated = await approveExpense(token, e.id, "approve");
           setItems((prev) =>
@@ -351,15 +508,22 @@ export default function ExpensesPage() {
           );
           toast.success("Gasto autorizado");
         } catch (err) {
-          toast.error(formatApiError(err, "No se pudo autorizar"));
+          setActionError(
+            `No se pudo autorizar "${e.concepto}": ${formatApiError(err, "el servidor no respondió")}`,
+          );
         }
       },
     });
   };
 
   const submitReject = async () => {
-    if (!token || !rejectTarget) return;
-    setSaving(true);
+    if (rejecting) return;
+    if (!token || !rejectTarget) {
+      setRejectErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión e inténtalo otra vez.");
+      return;
+    }
+    setRejecting(true);
+    setRejectErr(null);
     try {
       const updated = await approveExpense(token, rejectTarget.id, "reject", rejectNote.trim() || undefined);
       setItems((prev) =>
@@ -371,17 +535,19 @@ export default function ExpensesPage() {
       setRejectNote("");
       toast.success("Gasto rechazado");
     } catch (err) {
-      toast.error(formatApiError(err, "No se pudo rechazar"));
+      setRejectErr(formatApiError(err, "No se pudo rechazar el gasto"));
     } finally {
-      setSaving(false);
+      setRejecting(false);
     }
   };
 
   const runMarkPagado = (e: Expense) => {
     setConfirmState({
-      message: `¿Marcar como pagado "${e.concepto}"?`,
+      message: `¿Marcar como pagado "${e.concepto}"? Se registra la salida de dinero.`,
       confirmLabel: "Marcar pagado",
+      danger: false,
       fn: async () => {
+        setActionError(null);
         try {
           const updated = await markExpensePagado(token, e.id);
           setItems((prev) =>
@@ -389,7 +555,9 @@ export default function ExpensesPage() {
           );
           toast.success("Marcado como pagado");
         } catch (err) {
-          toast.error(formatApiError(err, "No se pudo marcar pagado"));
+          setActionError(
+            `No se pudo marcar pagado "${e.concepto}": ${formatApiError(err, "el servidor no respondió")}`,
+          );
         }
       },
     });
@@ -400,28 +568,53 @@ export default function ExpensesPage() {
       message: `¿Eliminar el gasto "${e.concepto}"?`,
       confirmLabel: "Eliminar",
       fn: async () => {
+        setActionError(null);
         try {
           await deleteExpense(token, e.id);
           setItems((prev) => prev.filter((x) => x.id !== e.id));
           toast.success("Gasto eliminado");
         } catch (err) {
-          toast.error(formatApiError(err, "No se pudo eliminar"));
+          setActionError(
+            `No se pudo eliminar "${e.concepto}": ${formatApiError(err, "el servidor no respondió")}`,
+          );
         }
       },
     });
   };
 
   const downloadPdf = async () => {
-    if (!token) return;
+    if (pdfBusy) return;
+    if (!token) {
+      setAnalyticsError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión.");
+      return;
+    }
+    setPdfBusy(true);
     try {
       await downloadExpensesReportPdf(token, {
         from: dateFrom || undefined,
         to: dateTo || undefined,
       });
+      toast.success("PDF generado");
     } catch (e) {
-      toast.error(formatApiError(e, "No se pudo generar el PDF"));
+      setAnalyticsError(formatApiError(e, "No se pudo generar el PDF"));
+    } finally {
+      setPdfBusy(false);
     }
   };
+
+  const exportExcel = () =>
+    exportToExcel(
+      visibleItems,
+      [
+        { key: "concepto", label: "Concepto" },
+        { key: "monto", label: "Monto", format: (v) => `${Number(v).toFixed(2)}` },
+        { key: "categoria", label: "Categoría" },
+        { key: "estado", label: "Estado" },
+        { key: "fecha", label: "Fecha" },
+        { key: "contabilidadRef", label: "Ref. contable" },
+      ],
+      "gastos",
+    );
 
   const columns: Column<Expense>[] = [
     {
@@ -432,6 +625,10 @@ export default function ExpensesPage() {
         const meta: string[] = [e.categoria ?? "Sin categoría"];
         if (e.creadoPor?.nombre) meta.push(e.creadoPor.nombre);
         if (e.esRecurrente) meta.push("Recurrente");
+        // La fecha es columna propia salvo en pantallas estrechas, donde baja aquí.
+        if (narrow) meta.push(formatFecha(e.fecha));
+        // Folio contable: solo si la API ya lo asignó; no se inventa.
+        if (e.contabilidadRef) meta.push(`Ref. ${e.contabilidadRef}`);
         return (
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text-primary)" }}>
@@ -440,14 +637,18 @@ export default function ExpensesPage() {
             <div style={rowMetaStyle}>
               <span>{meta.join(" · ")}</span>
               {href ? (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "var(--primary)", textDecoration: "none" }}
-                >
-                  · Ver comprobante
-                </a>
+                <span>
+                  ·{" "}
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Ver comprobante de ${e.concepto ?? "el gasto"}`}
+                    style={{ color: "var(--primary)", textDecoration: "none" }}
+                  >
+                    Ver comprobante
+                  </a>
+                </span>
               ) : (
                 <span style={rowMetaWarnStyle}>· Sin comprobante</span>
               )}
@@ -464,16 +665,20 @@ export default function ExpensesPage() {
       render: (e) => <Money value={e.monto ?? 0} />,
       width: 120,
     },
-    {
-      key: "fecha",
-      label: "Fecha",
-      render: (e) => (
-        <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-          {formatFecha(e.fecha)}
-        </span>
-      ),
-      width: 110,
-    },
+    ...(narrow
+      ? []
+      : ([
+          {
+            key: "fecha",
+            label: "Fecha",
+            render: (e: Expense) => (
+              <span style={{ fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+                {formatFecha(e.fecha)}
+              </span>
+            ),
+            width: 110,
+          },
+        ] as Column<Expense>[])),
     {
       key: "estado",
       label: "Estado",
@@ -484,46 +689,77 @@ export default function ExpensesPage() {
       key: "id",
       label: "",
       align: "right",
-      render: (e) => (
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          {cfg.canEdit && e.estado === "Pendiente" && (
-            <Button size="sm" variant="ghost" style={rowButtonStyle} onClick={() => openEdit(e)}>
-              Editar
-            </Button>
-          )}
-          {cfg.canApprove && e.estado === "Pendiente" && (
-            <>
-              <Button size="sm" variant="secondary" style={rowButtonStyle} onClick={() => runApprove(e)}>
-                Autorizar
-              </Button>
+      render: (e) => {
+        const nombre = e.concepto ?? `gasto #${e.id}`;
+        return (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {cfg.canEdit && e.estado === "Pendiente" && (
               <Button
                 size="sm"
                 variant="ghost"
                 style={rowButtonStyle}
-                onClick={() => {
-                  setRejectTarget(e);
-                  setRejectNote("");
-                }}
+                aria-label={`Editar ${nombre}`}
+                onClick={() => openEdit(e)}
               >
-                Rechazar
+                Editar
               </Button>
-            </>
-          )}
-          {cfg.canApprove && e.estado === "Aprobado" && (
-            <Button size="sm" variant="secondary" style={rowButtonStyle} onClick={() => runMarkPagado(e)}>
-              Marcar pagado
-            </Button>
-          )}
-          {cfg.canDelete && (
-            <Button size="sm" variant="ghost" style={rowButtonStyle} onClick={() => remove(e)}>
-              Eliminar
-            </Button>
-          )}
-        </div>
-      ),
+            )}
+            {cfg.canApprove && e.estado === "Pendiente" && (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  style={rowButtonStyle}
+                  aria-label={`Autorizar ${nombre}`}
+                  onClick={() => runApprove(e)}
+                >
+                  Autorizar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  style={rowButtonStyle}
+                  aria-label={`Rechazar ${nombre}`}
+                  onClick={() => {
+                    setRejectTarget(e);
+                    setRejectNote("");
+                    setRejectErr(null);
+                  }}
+                >
+                  Rechazar
+                </Button>
+              </>
+            )}
+            {cfg.canApprove && e.estado === "Aprobado" && (
+              <Button
+                size="sm"
+                variant="secondary"
+                style={rowButtonStyle}
+                aria-label={`Marcar como pagado ${nombre}`}
+                onClick={() => runMarkPagado(e)}
+              >
+                Marcar pagado
+              </Button>
+            )}
+            {cfg.canDelete && (
+              <Button
+                size="sm"
+                variant="ghost"
+                style={rowButtonStyle}
+                aria-label={`Eliminar ${nombre}`}
+                onClick={() => remove(e)}
+              >
+                Eliminar
+              </Button>
+            )}
+          </div>
+        );
+      },
       width: 260,
     },
   ];
+
+  const invalidFields = (Object.keys(formErrors) as (keyof FormErrors)[]).filter((k) => formErrors[k]);
 
   return (
     <>
@@ -539,8 +775,14 @@ export default function ExpensesPage() {
         subtitle={cfg.subtitle}
         actions={
           <>
-            <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void load()}>
-              Actualizar
+            <Button
+              size="sm"
+              variant="ghost"
+              style={toolbarButtonStyle}
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              {loading ? "Actualizando…" : "Actualizar"}
             </Button>
             {cfg.canCreate && (
               <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
@@ -570,16 +812,46 @@ export default function ExpensesPage() {
               <FinanceField label="Hasta" optional>
                 <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={financeInputStyle} />
               </FinanceField>
-              <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
-                Aplicar
+              <Button
+                size="sm"
+                variant="secondary"
+                style={toolbarButtonStyle}
+                onClick={() => void loadAnalytics()}
+                disabled={analyticsLoading}
+              >
+                {analyticsLoading ? "Calculando…" : "Aplicar"}
               </Button>
-              <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void downloadPdf()}>
-                Descargar PDF
+              <Button
+                size="sm"
+                variant="ghost"
+                style={toolbarButtonStyle}
+                onClick={() => void downloadPdf()}
+                disabled={pdfBusy}
+              >
+                {pdfBusy ? "Generando…" : "Descargar PDF"}
               </Button>
             </div>
+            {analyticsError && (
+              <InlineAlert
+                message={analyticsError}
+                variant="danger"
+                style={{ marginBottom: 0 }}
+                onDismiss={() => setAnalyticsError(null)}
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void loadAnalytics()}>
+                    Reintentar
+                  </Button>
+                }
+              />
+            )}
             {analyticsLoading && (
-              <div style={{ padding: 24, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
-                Calculando…
+              <div style={statusPanelStyle} role="status" aria-live="polite">
+                Calculando el resumen del periodo…
+              </div>
+            )}
+            {!analyticsLoading && !analytics && !analyticsError && (
+              <div style={statusPanelStyle}>
+                Elige un rango y pulsa «Aplicar» para calcular el resumen.
               </div>
             )}
             {!analyticsLoading && analytics && (
@@ -587,60 +859,27 @@ export default function ExpensesPage() {
                 <MetricStrip
                   ariaLabel="Resumen del periodo"
                   metrics={[
-                    { label: "Registros", value: analytics.count, hint: "en el periodo" },
+                    { label: "Registros", value: analytics.count, hint: analytics.periodLabel || "en el periodo" },
                     {
                       label: "Por autorizar",
                       value: analytics.pendientes,
                       hint: plural(analytics.pendientes, "gasto esperando", "gastos esperando"),
                       tone: analytics.pendientes > 0 ? "warning" : "default",
                     },
+                    { label: "Solicitado", value: <Money value={analytics.totalSolicitado} />, hint: "capturado en el periodo" },
                     { label: "Autorizado", value: <Money value={analytics.totalAprobado} />, hint: "sin pagar aún" },
                     { label: "Pagado", value: <Money value={analytics.totalPagado} />, hint: "liquidado en el periodo" },
                   ]}
                 />
-                {(
-                  [
-                    ["Por categoría", analytics.byCategory],
-                    ["Por persona", analytics.byPerson],
-                  ] as const
-                ).map(([title, rows]) => (
-                  <div key={title} style={breakdownPanelStyle}>
-                    <div style={breakdownTitleStyle}>{title}</div>
-                    {!rows.length && (
-                      <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Sin datos en el periodo.</div>
-                    )}
-                    {rows.slice(0, 12).map((r, i) => (
-                      <div
-                        key={r.name}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr auto auto",
-                          alignItems: "baseline",
-                          gap: 12,
-                          padding: "6px 0",
-                          borderBottom:
-                            i === Math.min(rows.length, 12) - 1
-                              ? "none"
-                              : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-                          fontSize: 12.5,
-                        }}
-                      >
-                        <span>{r.name}</span>
-                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.count} reg.</span>
-                        <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                          <Money value={r.total} />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
+                <BreakdownTable title="Por categoría" rows={analytics.byCategory} />
+                <BreakdownTable title="Por persona" rows={analytics.byPerson} />
               </>
             )}
           </div>
         ) : (
           <>
             <FilterToolbar
-              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto…" }}
+              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto, persona o ref. contable…" }}
               selects={[
                 {
                   label: "Categoría",
@@ -665,35 +904,36 @@ export default function ExpensesPage() {
               resultCount={loading ? null : visibleItems.length}
               rightActions={
                 <ListExportActions
-                  onExcel={
-                    visibleItems.length > 0
-                      ? () =>
-                          exportToExcel(
-                            visibleItems,
-                            [
-                              { key: "concepto", label: "Concepto" },
-                              { key: "monto", label: "Monto", format: (v) => `${Number(v).toFixed(2)}` },
-                              { key: "categoria", label: "Categoría" },
-                              { key: "estado", label: "Estado" },
-                              { key: "fecha", label: "Fecha" },
-                            ],
-                            "gastos",
-                          )
-                      : undefined
-                  }
+                  onExcel={exportExcel}
+                  excelDisabled={visibleItems.length === 0}
                 />
               }
             />
+            {actionError && (
+              <InlineAlert
+                message={actionError}
+                variant="danger"
+                onDismiss={() => setActionError(null)}
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                    Recargar
+                  </Button>
+                }
+              />
+            )}
             {error && (
-              <div style={{ marginBottom: 12 }}>
-                <InlineAlert message={error} variant="danger" style={{ marginBottom: 8 }} />
-                <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
-                  Reintentar
-                </Button>
-              </div>
+              <InlineAlert
+                message={error}
+                variant="danger"
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void load()}>
+                    Reintentar
+                  </Button>
+                }
+              />
             )}
             {loading ? (
-              <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "var(--text-tertiary)" }}>
+              <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
                 Cargando gastos…
               </div>
             ) : !error ? (
@@ -723,20 +963,35 @@ export default function ExpensesPage() {
 
       <Modal
         open={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={closeForm}
         title={editing ? "Editar gasto" : "Registrar gasto"}
         footer={
           <>
-            <Button variant="ghost" style={toolbarButtonStyle} onClick={() => setShowForm(false)}>
+            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeForm} disabled={saving}>
               Cancelar
             </Button>
-            <Button variant="primary" style={toolbarButtonStyle} onClick={() => void save()} disabled={saving}>
+            <Button
+              variant="primary"
+              style={toolbarButtonStyle}
+              onClick={() => void save()}
+              disabled={saving}
+              loading={saving}
+            >
               {saving ? "Guardando…" : editing ? "Guardar" : "Registrar gasto"}
             </Button>
           </>
         }
       >
         <FinanceFormGrid>
+          {invalidFields.length > 0 && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <InlineAlert
+                variant="warning"
+                style={{ marginBottom: 0 }}
+                message={`Falta por capturar: ${invalidFields.map((k) => FIELD_LABELS[k]).join(", ")}. Cada campo dice abajo qué necesita.`}
+              />
+            </div>
+          )}
           <FinanceField
             label="Concepto"
             fullWidth
@@ -745,6 +1000,7 @@ export default function ExpensesPage() {
           >
             <input
               value={form.concepto}
+              aria-invalid={Boolean(formErrors.concepto)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, concepto: e.target.value }));
                 setFormErrors((prev) => ({ ...prev, concepto: undefined }));
@@ -771,6 +1027,7 @@ export default function ExpensesPage() {
               type="number"
               min={0}
               value={form.monto}
+              aria-invalid={Boolean(formErrors.monto)}
               onChange={(e) => {
                 setForm((f) => ({ ...f, monto: Number(e.target.value) }));
                 setFormErrors((prev) => ({ ...prev, monto: undefined }));
@@ -815,7 +1072,7 @@ export default function ExpensesPage() {
               hint={editing ? "Opcional · reemplaza el archivo actual" : "PDF o imagen del ticket o la factura"}
             />
             {formErrors.evidencia && (
-              <div style={{ fontSize: 11, color: "var(--state-danger-text, #b91c1c)", marginTop: 6 }}>
+              <div role="alert" style={{ fontSize: 11, color: "var(--state-danger-text, #b91c1c)", marginTop: 6 }}>
                 {formErrors.evidencia}
               </div>
             )}
@@ -828,9 +1085,23 @@ export default function ExpensesPage() {
               </div>
             )}
           </div>
+          {editing?.contabilidadRef && (
+            <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "var(--text-tertiary)" }}>
+              Folio contable: {editing.contabilidadRef}
+            </div>
+          )}
           {saveErr && (
             <div style={{ gridColumn: "1 / -1" }}>
-              <InlineAlert message={saveErr} variant="danger" style={{ marginBottom: 0 }} />
+              <InlineAlert
+                message={saveErr}
+                variant="danger"
+                style={{ marginBottom: 0 }}
+                action={
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => void save()} disabled={saving}>
+                    Reintentar
+                  </Button>
+                }
+              />
             </div>
           )}
         </FinanceFormGrid>
@@ -838,15 +1109,32 @@ export default function ExpensesPage() {
 
       <Modal
         open={Boolean(rejectTarget)}
-        onClose={() => setRejectTarget(null)}
+        onClose={() => {
+          setRejectTarget(null);
+          setRejectErr(null);
+        }}
         title="Rechazar gasto"
         footer={
           <>
-            <Button variant="ghost" style={toolbarButtonStyle} onClick={() => setRejectTarget(null)}>
+            <Button
+              variant="ghost"
+              style={toolbarButtonStyle}
+              onClick={() => {
+                setRejectTarget(null);
+                setRejectErr(null);
+              }}
+              disabled={rejecting}
+            >
               Cancelar
             </Button>
-            <Button variant="danger" style={toolbarButtonStyle} onClick={() => void submitReject()} disabled={saving}>
-              {saving ? "Guardando…" : "Rechazar"}
+            <Button
+              variant="danger"
+              style={toolbarButtonStyle}
+              onClick={() => void submitReject()}
+              disabled={rejecting}
+              loading={rejecting}
+            >
+              {rejecting ? "Rechazando…" : "Rechazar"}
             </Button>
           </>
         }
@@ -884,6 +1172,11 @@ export default function ExpensesPage() {
               style={{ ...financeInputStyle, resize: "vertical" }}
             />
           </FinanceField>
+          {rejectErr && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <InlineAlert message={rejectErr} variant="danger" style={{ marginBottom: 0 }} />
+            </div>
+          )}
         </FinanceFormGrid>
       </Modal>
 
