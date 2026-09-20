@@ -149,6 +149,26 @@ export const registrarFuentesCorporativas = (doc: typeof PDFDocument.prototype):
   return todas;
 };
 
+/** Documentos a los que ya se les registraron las fuentes. */
+const documentosConFuentes = new WeakSet<object>();
+
+/**
+ * Nombre de fuente corporativa listo para `doc.font(...)`, registrando en el
+ * documento la primera vez que se le pide una.
+ *
+ * Existe porque registrar era responsabilidad de cada generador y solo uno de
+ * los veinte se acordaba: el resto salia en Helvetica pese a llevar Montserrat
+ * e Inter embebidas. Pedir la fuente y registrarla son ahora la misma cosa, asi
+ * que no hay forma de olvidarlo.
+ */
+export const fuente = (doc: typeof PDFDocument.prototype, clave: keyof typeof PDF_FUENTES): string => {
+  if (!documentosConFuentes.has(doc)) {
+    documentosConFuentes.add(doc);
+    registrarFuentesCorporativas(doc);
+  }
+  return PDF_FUENTES[clave];
+};
+
 export const loadNexaraLogo = (): Buffer | null =>
   loadPdfAsset('logo-nexara.png') ??
   leerPrimero([
@@ -193,16 +213,16 @@ export const drawNexaraHeader = (doc: typeof PDFDocument.prototype, opts: PdfHea
   }
 
   const nameX = margin + (logo ? 90 : 0);
-  doc.fillColor(PDF_COLORS.navy).fontSize(21).font('Helvetica-Bold').text('NEXARA', nameX, 28, { width: 240 });
-  doc.fillColor(PDF_COLORS.navy).fontSize(13).font('Helvetica-Bold').text(opts.docTitle, nameX, 56, { width: 260 });
+  doc.fillColor(PDF_COLORS.navy).fontSize(21).font(fuente(doc, 'tituloFuerte')).text('NEXARA', nameX, 28, { width: 240 });
+  doc.fillColor(PDF_COLORS.navy).fontSize(13).font(fuente(doc, 'titulo')).text(opts.docTitle, nameX, 56, { width: 260 });
   if (opts.docSubtitle) {
-    doc.fontSize(9).font('Helvetica').fillColor(PDF_COLORS.muted).text(opts.docSubtitle, nameX, 74, { width: 260 });
+    doc.fontSize(9).font(fuente(doc, 'texto')).fillColor(PDF_COLORS.muted).text(opts.docSubtitle, nameX, 74, { width: 260 });
   }
 
   if (opts.meta?.length) {
     const rightX = margin + contentWidth - 200;
     let metaY = 32;
-    doc.fillColor(PDF_COLORS.text).fontSize(10).font('Helvetica');
+    doc.fillColor(PDF_COLORS.text).fontSize(10).font(fuente(doc, 'texto'));
     for (const line of opts.meta.slice(0, 5)) {
       doc.text(`${line.label}: ${line.value}`, rightX, metaY, { width: 200 });
       metaY += 16;
@@ -215,7 +235,7 @@ export const drawNexaraHeader = (doc: typeof PDFDocument.prototype, opts: PdfHea
 export const drawSectionTitle = (doc: typeof PDFDocument.prototype, label: string) => {
   const margin = doc.page.margins.left;
   doc.moveDown(0.6);
-  doc.fillColor(PDF_COLORS.navy).fontSize(12).font('Helvetica-Bold').text(label, margin, doc.y);
+  doc.fillColor(PDF_COLORS.navy).fontSize(12).font(fuente(doc, 'titulo')).text(label, margin, doc.y);
   doc.moveDown(0.2);
 };
 
@@ -234,7 +254,7 @@ export const drawInfoCard = (
   const rowGap = 6;
   const titleHeight = options?.title ? 18 : 0;
 
-  doc.fontSize(10).font('Helvetica');
+  doc.fontSize(10).font(fuente(doc, 'texto'));
   const rowHeights = lines.map((line) => {
     const valueHeight = doc.heightOfString(line.value || '-', { width: valueWidth });
     return Math.max(14, valueHeight);
@@ -248,17 +268,17 @@ export const drawInfoCard = (
 
   let cursorY = y + padding;
   if (options?.title) {
-    doc.fillColor(PDF_COLORS.navy).fontSize(10).font('Helvetica-Bold').text(options.title, x + padding, cursorY, {
+    doc.fillColor(PDF_COLORS.navy).fontSize(10).font(fuente(doc, 'semi')).text(options.title, x + padding, cursorY, {
       width: width - padding * 2,
     });
     cursorY += titleHeight;
   }
   lines.forEach((line, index) => {
     const rowHeight = rowHeights[index];
-    doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica').text(line.label, x + padding, cursorY, {
+    doc.fillColor(PDF_COLORS.muted).fontSize(9).font(fuente(doc, 'texto')).text(line.label, x + padding, cursorY, {
       width: labelWidth,
     });
-    doc.fillColor(PDF_COLORS.text).fontSize(10).font('Helvetica').text(line.value || '-', x + padding + labelWidth + 2, cursorY, {
+    doc.fillColor(PDF_COLORS.text).fontSize(10).font(fuente(doc, 'texto')).text(line.value || '-', x + padding + labelWidth + 2, cursorY, {
       width: valueWidth,
     });
     cursorY += rowHeight + rowGap;
@@ -287,10 +307,10 @@ export const drawKpiCards = (
       doc.rect(x, y, 3, cardHeight).fill(kpi.accent);
     }
     doc.restore();
-    doc.fillColor(PDF_COLORS.muted).fontSize(8).font('Helvetica').text(kpi.label.toUpperCase(), x + 12, y + 10, {
+    doc.fillColor(PDF_COLORS.muted).fontSize(8).font(fuente(doc, 'medio')).text(kpi.label.toUpperCase(), x + 12, y + 10, {
       width: cardWidth - 24,
     });
-    doc.fillColor(PDF_COLORS.navy).fontSize(14).font('Helvetica-Bold').text(kpi.value, x + 12, y + 26, {
+    doc.fillColor(PDF_COLORS.navy).fontSize(14).font(fuente(doc, 'titulo')).text(kpi.value, x + 12, y + 26, {
       width: cardWidth - 24,
     });
   });
@@ -314,11 +334,11 @@ export const drawSummaryBox = (
   doc.roundedRect(x, y, width, height, 8).fill(PDF_COLORS.softGray);
   doc.restore();
 
-  doc.fillColor(PDF_COLORS.navy).fontSize(11).font('Helvetica-Bold').text(title, x + padding, y + padding);
+  doc.fillColor(PDF_COLORS.navy).fontSize(11).font(fuente(doc, 'semi')).text(title, x + padding, y + padding);
   let cursorY = y + padding + 16;
   rows.forEach(([label, value], index) => {
     const highlighted = options?.highlightIndex === index;
-    doc.font(highlighted ? 'Helvetica-Bold' : 'Helvetica');
+    doc.font(fuente(doc, highlighted ? 'semi' : 'texto'));
     doc.fillColor(highlighted ? PDF_COLORS.navy : PDF_COLORS.text);
     doc.fontSize(10);
     doc.text(label, x + padding, cursorY, { width: width - padding * 2, continued: false });
@@ -343,7 +363,7 @@ export const drawTableHeader = (
   doc.rect(margin, y, contentWidth, 24).fill(accent ?? PDF_COLORS.navy);
   doc.restore();
 
-  doc.fillColor(PDF_COLORS.white).fontSize(9).font('Helvetica-Bold');
+  doc.fillColor(PDF_COLORS.white).fontSize(9).font(fuente(doc, 'semi'));
   let x = margin + 6;
   columns.forEach((col) => {
     doc.text(col.label, x, y + 7, { width: col.width - 8, align: col.align ?? 'left' });
@@ -392,7 +412,7 @@ export const drawTableRow = (
   const contentWidth = doc.page.width - margin * 2;
   const fontSize = ctx.fontSize ?? 9;
 
-  doc.fontSize(fontSize).font('Helvetica');
+  doc.fontSize(fontSize).font(fuente(doc, 'texto'));
   const heights = cells.map((cell, i) =>
     doc.heightOfString(cell || '-', { width: ctx.columns[i].width - 8 }),
   );
@@ -410,7 +430,7 @@ export const drawTableRow = (
   doc.fillColor(PDF_COLORS.text).fontSize(fontSize);
   let x = margin + 6;
   cells.forEach((cell, i) => {
-    doc.font(options?.boldColumns?.includes(i) ? 'Helvetica-Bold' : 'Helvetica');
+    doc.font(fuente(doc, options?.boldColumns?.includes(i) ? 'semi' : 'texto'));
     doc.text(cell || '-', x, rowY, { width: ctx.columns[i].width - 8, align: ctx.columns[i].align ?? 'left' });
     x += ctx.columns[i].width;
   });
@@ -425,7 +445,7 @@ export const drawNexaraFooter = (doc: typeof PDFDocument.prototype, note?: strin
   // Dentro del margen inferior y sin salto de línea para no disparar página nueva.
   doc
     .fontSize(8)
-    .font('Helvetica')
+    .font(fuente(doc, 'texto'))
     .fillColor(PDF_COLORS.muted)
     .text(
       note ?? 'NEXARA · Documento generado automáticamente — información confidencial.',

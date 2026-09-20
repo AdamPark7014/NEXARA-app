@@ -79,6 +79,40 @@ Superficies neutras. El acento aparece en un botón primario, un enlace y los
 estados que piden acción. Nada de degradados, sombras marcadas ni bordes de
 colores. Si la pantalla está sana, se ve gris y tranquila.
 
+## Las tres reglas que más se incumplen fuera de contabilidad
+
+Salieron de mirar pantallas reales ya desplegadas. Valen para TODO el ERP, no
+solo para finanzas.
+
+### 7. Una fila de ceros no informa: no se pinta
+
+Cuando no hay ni un registro, la tira de cifras **no se muestra**. Cuatro celdas
+en `$0` encima de un «Sin viáticos» ocupan el sitio de lo único que ayuda ahí:
+el texto que dice de dónde sale el primer renglón y el botón para crearlo.
+
+La condición es el conteo real (`rows.length === 0`, `total === 0`), no que las
+cifras sean cero: un mes que de verdad cerró en cero SÍ se enseña, porque eso es
+información.
+
+### 8. Los filtros son una barra, no un formulario
+
+Búsqueda, selectores y acciones van **en una fila**, sin caja propia y sin
+fondo. Hoy es común ver el buscador dentro de un recuadro y, debajo, el
+selector de estado dentro de otro, los dos a todo lo ancho: dos contenedores y
+tres renglones de alto para dos controles.
+
+Un control ya tiene su propio borde; meterlo en una caja es dibujar el borde dos
+veces. La acción principal va a la derecha de esa misma fila.
+
+### 9. Ni una caja dentro de otra caja
+
+Pestañas dentro de una píldora, dentro de un panel, dentro de una tarjeta. Cada
+nivel añade un borde y un relleno que no aportan jerarquía: la dan el espaciado
+y la tipografía.
+
+Regla práctica: si al quitar un borde no se pierde ninguna información ni se
+confunde qué agrupa con qué, **sobraba**.
+
 ## Lo que no se toca
 
 - **Nada de lógica de negocio.** Esto es una ola visual: no se cambian
