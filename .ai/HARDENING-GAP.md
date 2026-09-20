@@ -186,3 +186,40 @@ del panel contable que nunca corrió). Detalle en `.ai/RELEVO.md`.
 en 7 rutas de escritura (`registerPayment` es la peor: mueve saldo bancario),
 `AuditLog` no guarda estado anterior fuera del cierre, y 3 suites de API siguen
 rojas desde la ola anterior.
+
+---
+
+## Deuda visual medida — 20-09-2026
+
+Adam: «aún le falta muchísima profesionalidad y diseño de UI UX a todo el
+sistema de todos lados». No es una impresión: es medible.
+
+Fuera de actividades, asistencias y pizarra (ámbito de Cursor):
+
+- **81 pantallas** siguen con rejilla de `KpiCard`.
+- **361 tarjetas KPI sueltas** en total.
+- **24 pantallas** usan ya `MetricStrip`.
+
+Las peores por densidad de tarjetas:
+
+| Tarjetas | Archivo |
+|---:|---|
+| 14 | `app/(panels)/crm/reports/page.tsx` (268 líneas) |
+| 12 | `app/(panels)/studio/pages/page.tsx` |
+| 11 | `app/(panels)/erp/hr/page.tsx` |
+| 8 | `app/(panels)/crm/quotes/[id]/page.tsx` |
+| 8 | `app/(panels)/erp/settings/billing/page.tsx` |
+| 8 | `app/(panels)/erp/warehouse/VistaAlmacen.tsx` |
+
+El inventario se reproduce con `scratchpad/inventario.py` (cuenta `<KpiCard`
+por archivo). Se intentó sacarlo con la flota local: los modelos 3B devolvieron
+un plan en vez del inventario, porque clasificar estos defectos exige leer la
+estructura del archivo, no resumirlo.
+
+### Por qué no se arregla de una pasada
+
+Migrar 81 pantallas a mano es el camino que ya falló dos veces en esta sesión:
+se pule donde Adam señala y el resto sigue igual. Lo que converge es que las
+reglas vivan en el contrato (`.ai/DISENO-FINANZAS.md`, reglas 7-9) y que cada
+ola de agentes las aplique a un bloque cerrado de rutas, con `tsc` y `vitest`
+verdes antes de commitear.
