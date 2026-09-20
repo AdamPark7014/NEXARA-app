@@ -18,6 +18,7 @@ import {
   Resumen,
   columnasDesdeApi,
   descargarCsv,
+  fechaLegible,
   hoyIso,
   inicioDeMesIso,
   pedirJson,
@@ -194,10 +195,10 @@ export default function ReportesPage() {
   const periodoCalculado = (() => {
     const p = resultado?.periodo;
     if (!p) return null;
-    if (p.asOf) return `Cifras al corte del ${p.asOf}.`;
-    if (p.from && p.to) return `Cifras del ${p.from} al ${p.to}.`;
-    if (p.from) return `Cifras desde el ${p.from}.`;
-    if (p.to) return `Cifras hasta el ${p.to}.`;
+    if (p.asOf) return `Cifras al corte del ${fechaLegible(p.asOf)}.`;
+    if (p.from && p.to) return `Cifras del ${fechaLegible(p.from)} al ${fechaLegible(p.to)}.`;
+    if (p.from) return `Cifras desde el ${fechaLegible(p.from)}.`;
+    if (p.to) return `Cifras hasta el ${fechaLegible(p.to)}.`;
     return null;
   })();
 
@@ -206,7 +207,7 @@ export default function ReportesPage() {
       <PageHeader
         eyebrow="Contabilidad"
         title="Reportes"
-        subtitle="Elige un reporte, fija el periodo y revisa los números. Haz clic en una línea para ver de dónde salen."
+        subtitle="Elige un reporte, fija el periodo y revisa los números. Abre una línea para ver de dónde salen."
         density="ops"
         actions={
           <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
@@ -224,7 +225,8 @@ export default function ReportesPage() {
 
       {error && (
         <InlineAlert
-          message={error}
+          variant="danger"
+          message={`No se pudo calcular «${reporte?.nombre ?? "el reporte"}». ${error} Reintenta o acota el periodo; si sigue igual, avisa a soporte.`}
           onDismiss={() => setError(null)}
           action={
             reporte ? (
@@ -325,8 +327,9 @@ export default function ReportesPage() {
               {resultado?.comparativo && (
                 <>
                   {" "}
-                  Comparando la columna «{resultado.comparativo.columnaComparada}» contra{" "}
-                  {resultado.comparativo.periodo.from} → {resultado.comparativo.periodo.to}.
+                  Comparando la columna «{resultado.comparativo.columnaComparada}» contra el
+                  periodo del {fechaLegible(resultado.comparativo.periodo.from)} al{" "}
+                  {fechaLegible(resultado.comparativo.periodo.to)}.
                 </>
               )}
             </p>
@@ -338,7 +341,10 @@ export default function ReportesPage() {
             </p>
           ) : !resultado ? (
             error ? null : (
-              <EmptyState title="Sin resultado" description="Ajusta el periodo y vuelve a intentar." />
+              <EmptyState
+                title="Todavía no hay resultado"
+                description="El reporte no se ha calculado. Fija el periodo arriba y pulsa Actualizar."
+              />
             )
           ) : (
             <>
@@ -390,7 +396,7 @@ export default function ReportesPage() {
               )}
               {resultado.drilldown && resultado.filas.length > 0 && (
                 <p style={{ marginTop: 6, fontSize: 12, color: "var(--text-tertiary)" }}>
-                  Haz clic en una línea para ver las transacciones que la forman.
+                  Abre una línea para ver los movimientos que la forman.
                 </p>
               )}
             </>

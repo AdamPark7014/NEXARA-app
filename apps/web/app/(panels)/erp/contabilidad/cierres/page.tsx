@@ -216,7 +216,7 @@ export default function CierresPage() {
     { key: "name", label: "Periodo" },
     {
       key: "range",
-      label: "Rango",
+      label: "Fechas",
       render: (r) => `${fecha(r.startDate)} → ${fecha(r.endDate)}`,
     },
     {
@@ -391,7 +391,11 @@ export default function CierresPage() {
                 />
               ) : bloqueado ? (
                 <InlineAlert
-                  message={`Faltan ${checklist.bloqueantes} punto(s) que bloquean el cierre. Resuélvelos o cierra con una justificación por escrito.`}
+                  message={`${checklist.bloqueantes} ${
+                    checklist.bloqueantes === 1
+                      ? "punto bloquea el cierre"
+                      : "puntos bloquean el cierre"
+                  }. Resuélvelos —cada uno tiene su enlace— o cierra dejando una justificación por escrito.`}
                   variant="danger"
                 />
               ) : pideJustificacion ? (
@@ -533,8 +537,8 @@ export default function CierresPage() {
                 </div>
                 {checklist.proteccion.noBloqueado.length > 0 ? (
                   <div>
-                    <strong style={{ color: "var(--warning, #b45309)" }}>
-                      Hoy el cierre todavía NO bloquea:
+                    <strong style={{ color: "var(--state-warning-text, #b45309)" }}>
+                      Lo que el cierre todavía no bloquea:
                     </strong>
                     <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
                       {checklist.proteccion.noBloqueado.map((l) => (
@@ -603,7 +607,9 @@ export default function CierresPage() {
         <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
           Vas a cerrar <strong>{checklist?.periodo.nombre}</strong>
           {bloqueado
-            ? ` con ${checklist?.bloqueantes ?? 0} punto(s) sin resolver`
+            ? ` con ${checklist?.bloqueantes ?? 0} ${
+                (checklist?.bloqueantes ?? 0) === 1 ? "punto" : "puntos"
+              } sin resolver`
             : ", que exige justificación por escrito"}
           . Escribe por qué; queda en la bitácora de auditoría con tu nombre, la fecha y el estado
           anterior del periodo.
@@ -621,7 +627,7 @@ export default function CierresPage() {
               .filter((i) => i.estado === "bloqueante")
               .map((i) => (
                 <li key={i.id}>
-                  {i.etiqueta}: {i.conteo}
+                  {i.etiqueta}: {i.conteo} {i.conteo === 1 ? "pendiente" : "pendientes"}
                 </li>
               ))}
           </ul>

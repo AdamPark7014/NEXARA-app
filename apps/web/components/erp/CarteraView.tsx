@@ -21,7 +21,14 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { withTenantHeaders } from "@/lib/tenant";
-import { financeStatusLabel } from "@/lib/finance-status-labels";
+import {
+  financeStatusLabel,
+  paymentMethodLabel,
+  satFormaPagoLabel,
+  satMetodoPagoLabel,
+  satMotivoCancelacionLabel,
+  satUsoCfdiLabel,
+} from "@/lib/finance-status-labels";
 import { toast } from "@/components/Toast";
 
 /**
@@ -161,17 +168,27 @@ const ESTADOS: { value: string; label: string }[] = [
   { value: "todas", label: "Todas" },
 ];
 
-const METODOS: { value: string; label: string }[] = [
-  { value: "SPEI", label: "SPEI" },
-  { value: "BANK_TRANSFER", label: "Transferencia" },
-  { value: "CASH", label: "Efectivo" },
-  { value: "CHECK", label: "Cheque" },
-  { value: "CREDIT_CARD", label: "Tarjeta de crédito" },
-  { value: "CARD_DEBIT", label: "Tarjeta de débito" },
-  { value: "DOMICILIACION", label: "Domiciliación" },
-  { value: "COMPENSATION", label: "Compensación" },
-  { value: "OTHER", label: "Otro" },
-];
+/**
+ * Las formas de pago que admite el registro. El valor es el del contrato con
+ * la API; la etiqueta sale del catálogo compartido, para que el desplegable y
+ * la lista de pagos ya aplicados digan lo mismo.
+ */
+const METODOS_VALIDOS = [
+  "SPEI",
+  "BANK_TRANSFER",
+  "CASH",
+  "CHECK",
+  "CREDIT_CARD",
+  "CARD_DEBIT",
+  "DOMICILIACION",
+  "COMPENSATION",
+  "OTHER",
+] as const;
+
+const METODOS: { value: string; label: string }[] = METODOS_VALIDOS.map((value) => ({
+  value,
+  label: paymentMethodLabel(value),
+}));
 
 /**
  * El tono que manda el API, traducido al vocabulario de `StatusDot`: punto y
@@ -221,16 +238,6 @@ const pesos = (n: number, decimales = 0) =>
   });
 
 /**
- * Los CFDI vienen del SAT con su clave; enseñar «PPD» a la contadora está bien,
- * enseñarle «ACCOUNTS_PAYABLE» no. Si la clave no está en la tabla se muestra
- * tal cual llegó: preferimos un dato crudo a inventar una traducción.
- */
-const METODO_CFDI: Record<string, string> = {
-  PUE: "PUE · pago en una sola exhibición",
-  PPD: "PPD · pago en parcialidades o diferido",
-};
-
-/**
  * Un renglón «etiqueta: valor» para el detalle. Cuando el API no manda el dato
  * se escribe «—»: ni se esconde el renglón ni se rellena con una suposición.
  */
@@ -271,6 +278,8 @@ export default function CarteraView({
   const token = user?.token ?? "";
   const esCobrar = kind === "cxc";
   const etiquetaContraparte = esCobrar ? "Cliente" : "Proveedor";
+  /** «Todos los proveedors» salía de pegarle una s al singular. */
+  const etiquetaContrapartePlural = esCobrar ? "clientes" : "proveedores";
 
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -707,7 +716,7 @@ export default function CarteraView({
           : "nada pasado de fecha",
     },
     {
-      label: "Documentos",
+      label: "Facturas",
       value: cargando ? "…" : String(totales?.documentos ?? 0),
       hint: cargando
         ? "…"
@@ -790,7 +799,7 @@ export default function CarteraView({
           search={{
             value: q,
             onChange: setQ,
-            placeholder: `Buscar ${etiquetaContraparte.toLowerCase()}, folio, RFC o UUID…`,
+            placeholder: `Buscar ${etiquetaContraparte.toLowerCase()}, folio, RFC o folio fiscal…`,
           }}
           dates={[
             { label: "Emitidas desde", value: desde, onChange: setDesde },
@@ -813,7 +822,7 @@ export default function CarteraView({
                 label: c.nombre,
               })),
               allowAll: true,
-              allLabel: `Todos los ${etiquetaContraparte.toLowerCase()}s`,
+              allLabel: `Todos los ${etiquetaContrapartePlural}`,
             },
             {
               label: "Proyecto",
@@ -835,7 +844,7 @@ export default function CarteraView({
       {error && (
         <InlineAlert
           variant="danger"
-          message={`No se pudo cargar la cartera. ${error}`}
+          message={`No se pudo cargar la cartera. ${error} Reintenta; si sigue igual, avisa a soporte.`}
         />
       )}
       {error && (
@@ -849,7 +858,7 @@ export default function CarteraView({
       {data?.meta.truncado && (
         <InlineAlert
           variant="warning"
-          message={`Se muestran ${data.rows.length} de ${data.meta.total} documentos: hay más de los que caben en un barrido. Acota el periodo para que los totales sean exactos.`}
+          message={`Se muestran ${data.rows.length} de ${data.meta.total} facturas: no caben todas de una vez, así que los totales de arriba solo cubren lo que se ve. Acota el periodo o filtra para que cuadren.`}
         />
       )}
 
@@ -1149,7 +1158,7 @@ function DiasVencido({ dias }: { dias: number | null }) {
       title={textoDias(dias)}
       style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: "var(--text-tertiary)" }}
     >
-      en {-dias} d
+      en {-dias} {-dias === 1 ? "día" : "días"}
     </span>
   );
 }
@@ -1416,7 +1425,11 @@ function DetalleFactura({
       {factura.cancelada && (
         <InlineAlert
           variant="warning"
-          message={`Factura cancelada${factura.motivoCancelacion ? ` (motivo SAT ${factura.motivoCancelacion})` : ""}. No admite pagos.`}
+          message={`Factura cancelada${
+            satMotivoCancelacionLabel(factura.motivoCancelacion)
+              ? `: ${satMotivoCancelacionLabel(factura.motivoCancelacion)}`
+              : ""
+          }. Ya no admite pagos ni cobros.`}
           style={{ marginBottom: 0 }}
         />
       )}
@@ -1492,7 +1505,7 @@ function DetalleFactura({
       <Bloque titulo="Datos del comprobante">
         <div style={{ display: "grid", gap: 5 }}>
           <Linea
-            etiqueta="UUID fiscal"
+            etiqueta="Folio fiscal"
             valor={
               factura.uuid ? (
                 <span style={{ fontFamily: "var(--nx-font-mono, monospace)", fontSize: 11.5 }}>
@@ -1506,16 +1519,22 @@ function DetalleFactura({
           <Linea etiqueta="Moneda" valor={factura.moneda} />
           <Linea etiqueta="Subtotal" valor={<Money value={factura.subtotal} bold={false} />} />
           <Linea etiqueta="Impuestos" valor={<Money value={factura.impuestos} bold={false} />} />
-          <Linea etiqueta="Forma de pago" valor={factura.formaPago} />
+          {/* Las tres claves del SAT llegaban crudas —«03», «PPD», «G03»— y
+              solo las reconoce quien las escribió. Se pintan con su
+              significado al lado; si la clave no está en el catálogo se deja
+              tal cual, sin inventar. */}
           <Linea
-            etiqueta="Método de pago"
-            valor={
-              factura.metodoPago
-                ? (METODO_CFDI[factura.metodoPago] ?? factura.metodoPago)
-                : null
-            }
+            etiqueta="Cómo se paga"
+            valor={factura.formaPago ? satFormaPagoLabel(factura.formaPago) : null}
           />
-          <Linea etiqueta="Uso del CFDI" valor={factura.usoCfdi} />
+          <Linea
+            etiqueta="Cuándo se paga"
+            valor={factura.metodoPago ? satMetodoPagoLabel(factura.metodoPago) : null}
+          />
+          <Linea
+            etiqueta="Para qué se usa"
+            valor={factura.usoCfdi ? satUsoCfdiLabel(factura.usoCfdi) : null}
+          />
           {factura.match && <Linea etiqueta="Conciliación" valor={financeStatusLabel(factura.match)} />}
           {factura.notas && <Linea etiqueta="Notas" valor={factura.notas} />}
         </div>
@@ -1543,15 +1562,24 @@ function DetalleFactura({
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600 }}>{fechaLarga(p.fecha)}</div>
                   <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                    {[p.metodo, p.referencia, p.banco, p.registradoPor].filter(Boolean).join(" · ")}
+                    {[
+                      paymentMethodLabel(p.metodo),
+                      p.referencia,
+                      p.banco,
+                      p.registradoPor,
+                    ]
+                      .filter((t) => Boolean(t) && t !== "—")
+                      .join(" · ")}
                   </div>
                   {/* Clave de rastreo, complemento y nota: venían en cada pago
                       y no se enseñaban en ningún sitio. */}
                   {(p.claveRastreo || p.complementoUuid || p.notas) && (
                     <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
                       {[
-                        p.claveRastreo ? `clave ${p.claveRastreo}` : null,
-                        p.complementoUuid ? `complemento ${p.complementoUuid.slice(0, 8)}…` : null,
+                        p.claveRastreo ? `clave de rastreo ${p.claveRastreo}` : null,
+                        p.complementoUuid
+                          ? `complemento de pago ${p.complementoUuid.slice(0, 8)}…`
+                          : null,
                         p.notas,
                       ]
                         .filter(Boolean)
@@ -1587,7 +1615,8 @@ function DetalleFactura({
             ))}
             {conceptos.length > 8 && (
               <li style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                y {conceptos.length - 8} concepto(s) más
+                y {conceptos.length - 8}{" "}
+                {conceptos.length - 8 === 1 ? "concepto más" : "conceptos más"}
               </li>
             )}
           </ul>

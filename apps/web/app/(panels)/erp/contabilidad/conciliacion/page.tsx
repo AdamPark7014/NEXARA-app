@@ -358,7 +358,9 @@ export default function ConciliacionPage() {
         if (seleccionado.estado === "CONCILIADO") {
           setAviso("Este movimiento ya está conciliado. Elige otro de la lista.");
         } else if (!candidato) {
-          setAviso("Este movimiento no tiene candidatos: no hay nada con qué conciliarlo.");
+          setAviso(
+            "Este movimiento no se parece a ninguna factura ni pago registrado, así que no hay con qué conciliarlo. Captura el documento que falta y vuelve a esta pantalla.",
+          );
         } else {
           void conciliar(seleccionado, candidato);
         }
@@ -420,8 +422,10 @@ export default function ConciliacionPage() {
           tone={ESTADO_TONO[r.estado]}
           title={
             r.candidatos.length > 0
-              ? `${r.candidatos.length} candidato(s) · mejor puntaje ${r.candidatos[0].score}`
-              : "Sin candidatos"
+              ? `${r.candidatos.length} ${
+                  r.candidatos.length === 1 ? "posible coincidencia" : "posibles coincidencias"
+                } · mejor puntaje ${r.candidatos[0].score} de 100`
+              : "No se parece a ninguna factura ni pago"
           }
         />
       ),
@@ -469,7 +473,7 @@ export default function ConciliacionPage() {
       key: "PENDIENTE",
       label: "Pendientes",
       value: resumen?.pendientes ?? 0,
-      hint: "sin candidato",
+      hint: "sin coincidencia",
       share: parte(resumen?.pendientes ?? 0),
     },
     {
@@ -543,7 +547,18 @@ export default function ConciliacionPage() {
         }
       />
 
-      {error && <InlineAlert message={error} variant="danger" onDismiss={() => setError(null)} />}
+      {error && (
+        <InlineAlert
+          message={`No se pudieron cargar los movimientos del banco. ${error} Reintenta; si sigue igual, avisa a soporte.`}
+          variant="danger"
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+              Reintentar
+            </Button>
+          }
+        />
+      )}
 
       {sinCuentas ? (
         <Section dense>
@@ -640,11 +655,13 @@ export default function ConciliacionPage() {
                     density="compact"
                     ariaLabel="Conciliación bancaria"
                     onRowClick={(r) => setMovimientoId(r.id)}
-                    emptyTitle={filtro === "TODOS" ? "Sin movimientos" : "Nada en este filtro"}
+                    emptyTitle={
+                      filtro === "TODOS" ? "Sin movimientos" : "Sin resultados con este filtro"
+                    }
                     emptyDescription={
                       filtro === "TODOS"
                         ? "No hay movimientos en el rango elegido. Cambia las fechas o importa el estado de cuenta desde Bancos."
-                        : "Ningún movimiento está en ese estado ahora mismo. Prueba con otro contador de arriba."
+                        : "Ningún movimiento está en ese estado ahora mismo. Elige otro de los estados de arriba."
                     }
                   />
                 </div>
@@ -720,7 +737,7 @@ export default function ConciliacionPage() {
                         onDismiss={() => setErrorAplicar(null)}
                         action={
                           <Button size="sm" variant="secondary" onClick={() => void cargar()}>
-                            Recargar
+                            Reintentar
                           </Button>
                         }
                       />
@@ -782,8 +799,8 @@ export default function ConciliacionPage() {
                         {candidatos.length > 1 && (
                           <div style={{ display: "grid", gap: 5 }}>
                             <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                              Candidato {Math.min(candidatoIdx, candidatos.length - 1) + 1} de{" "}
-                              {candidatos.length} · ordenados por puntaje
+                              Coincidencia {Math.min(candidatoIdx, candidatos.length - 1) + 1} de{" "}
+                              {candidatos.length} · ordenadas de más a menos parecida
                             </span>
                             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                               {candidatos.map((c, i) => {
@@ -856,7 +873,7 @@ export default function ConciliacionPage() {
                                   {candidato.tipo === "INVOICE" ? "Factura" : "Pago"} {candidato.folio}
                                 </strong>
                                 <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                                  {candidato.contraparte || "Sin contraparte"}
+                                  {candidato.contraparte || "Sin nombre registrado"}
                                   {candidato.contraparteRfc ? ` · ${candidato.contraparteRfc}` : ""}
                                 </span>
                                 {candidato.proyecto && (
@@ -939,7 +956,8 @@ export default function ConciliacionPage() {
                               >
                                 {candidato.razones.length === 0 ? (
                                   <li style={{ color: "var(--text-tertiary)" }}>
-                                    El emparejador no devolvió motivos para esta coincidencia.
+                                    NEXARA no anotó en qué se parecen. Compara el monto y la
+                                    fecha antes de conciliar.
                                   </li>
                                 ) : (
                                   candidato.razones.map((r) => (
@@ -1002,7 +1020,9 @@ export default function ConciliacionPage() {
             {seleccionado
               ? `Movimiento seleccionado: ${seleccionado.descripcion || "sin descripción"}, ${
                   estadoTexto(seleccionado.estado)
-                }, ${candidatos.length} candidato${candidatos.length === 1 ? "" : "s"}.`
+                }, ${candidatos.length} ${
+                  candidatos.length === 1 ? "coincidencia posible" : "coincidencias posibles"
+                }.`
               : "Ningún movimiento seleccionado."}
           </p>
         </>
@@ -1082,7 +1102,7 @@ function AyudaTeclado() {
       </span>
       <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
         <Tecla>[</Tecla>
-        <Tecla>]</Tecla> candidato
+        <Tecla>]</Tecla> coincidencia
       </span>
       <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
         <Tecla>Enter</Tecla> concilia

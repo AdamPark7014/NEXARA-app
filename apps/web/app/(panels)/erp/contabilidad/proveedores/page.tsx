@@ -15,7 +15,7 @@ import Section from "@/components/ui/Section";
 import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, financeStatusVariant, formatApiError } from "@/lib/erp-api";
-import { financeStatusLabel } from "@/lib/finance-status-labels";
+import { financeStatusLabel, paymentMethodLabel } from "@/lib/finance-status-labels";
 import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 
 /**
@@ -458,7 +458,7 @@ export default function ProveedoresPage() {
 
       {error && (
         <InlineAlert
-          message={`No se pudieron cargar los proveedores. ${error}`}
+          message={`No se pudieron cargar los proveedores. ${error} Reintenta; si sigue igual, avisa a soporte.`}
           onDismiss={() => setError(null)}
           action={
             <Button size="sm" variant="secondary" onClick={() => void load()}>
@@ -567,7 +567,7 @@ export default function ProveedoresPage() {
           </p>
         ) : detalleError ? (
           <InlineAlert
-            message={`No se pudo abrir el expediente. ${detalleError}`}
+            message={`No se pudo abrir el expediente de ${abierto?.nombre ?? "este proveedor"}. ${detalleError} Reintenta; el resto de la lista sigue disponible.`}
             action={
               abierto ? (
                 <Button size="sm" variant="secondary" onClick={() => void abrir(abierto)}>
@@ -585,7 +585,11 @@ export default function ProveedoresPage() {
                   cifra(
                     "Saldo por pagar",
                     detalle.resumen.saldoPorPagar,
-                    `${detalle.resumen.facturasAbiertas} factura(s) abierta(s)`,
+                    `${detalle.resumen.facturasAbiertas} ${
+                      detalle.resumen.facturasAbiertas === 1
+                        ? "factura abierta"
+                        : "facturas abiertas"
+                    }`,
                   ),
                   cifra(
                     "Vencido",
@@ -598,12 +602,20 @@ export default function ProveedoresPage() {
                   cifra(
                     "Comprado (histórico)",
                     detalle.resumen.comprado,
-                    `${detalle.resumen.facturas} factura(s) registradas`,
+                    `${detalle.resumen.facturas} ${
+                      detalle.resumen.facturas === 1
+                        ? "factura registrada"
+                        : "facturas registradas"
+                    }`,
                   ),
                   cifra(
                     "Pagado",
                     detalle.resumen.pagado,
-                    `${detalle.resumen.ordenesCompra} orden(es) de compra`,
+                    `${detalle.resumen.ordenesCompra} ${
+                      detalle.resumen.ordenesCompra === 1
+                        ? "orden de compra"
+                        : "órdenes de compra"
+                    }`,
                   ),
                 ]}
               />
@@ -653,13 +665,13 @@ export default function ProveedoresPage() {
                       value={
                         detalle.proveedor.rfc ?? (
                           <span style={{ color: "var(--text-tertiary)" }}>
-                            Sin RFC — no entra a DIOT
+                            Sin RFC — no entra en la declaración mensual de proveedores
                           </span>
                         )
                       }
                     />
                     <Dato
-                      label="Estatus"
+                      label="Estado"
                       value={
                         <StatusDot
                           label={detalle.proveedor.activo ? "Activo" : "Inactivo"}
@@ -797,8 +809,11 @@ export default function ProveedoresPage() {
                       <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         <span style={{ fontWeight: 600 }}>{f.folio}</span>
                         {f.uuid && (
-                          <span style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>
-                            UUID {f.uuid.slice(0, 8)}…
+                          <span
+                            style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}
+                            title={`Folio fiscal ${f.uuid}`}
+                          >
+                            Folio fiscal {f.uuid.slice(0, 8)}…
                           </span>
                         )}
                       </span>
@@ -850,7 +865,7 @@ export default function ProveedoresPage() {
                   },
                   {
                     key: "estatus",
-                    label: "Estatus",
+                    label: "Estado",
                     render: (f) => (
                       <EstatusDot
                         estatus={f.cancelada ? "CANCELLED" : f.estatus}
@@ -901,7 +916,7 @@ export default function ProveedoresPage() {
                   },
                   {
                     key: "estatus",
-                    label: "Estatus",
+                    label: "Estado",
                     render: (o) => <EstatusDot estatus={o.estatus} />,
                   },
                 ]}
@@ -922,7 +937,7 @@ export default function ProveedoresPage() {
                       key: b.key,
                       label: b.label,
                       value: <Money value={b.monto} />,
-                      hint: `${b.conteo} factura(s)`,
+                      hint: `${b.conteo} ${b.conteo === 1 ? "factura" : "facturas"}`,
                       tone:
                         b.monto > 0 && b.key !== "porVencer"
                           ? ("danger" as const)
@@ -962,7 +977,7 @@ export default function ProveedoresPage() {
                     { key: "vencimiento", label: "Vence", render: (f) => fecha(f.vencimiento) },
                     {
                       key: "diasVencido",
-                      label: "Días vencido",
+                      label: "Vencida",
                       align: "right",
                       numeric: true,
                       render: (f) =>
@@ -975,7 +990,9 @@ export default function ProveedoresPage() {
                               color: "var(--state-danger-text, #b91c1c)",
                               whiteSpace: "nowrap",
                             }}
-                            title={`Lleva ${f.diasVencido} día(s) pasada de fecha`}
+                            title={`Lleva ${f.diasVencido} ${
+                              f.diasVencido === 1 ? "día" : "días"
+                            } pasada de fecha`}
                           >
                             {f.diasVencido} {f.diasVencido === 1 ? "día" : "días"}
                           </span>
@@ -1023,7 +1040,11 @@ export default function ProveedoresPage() {
                 columns={[
                   { key: "fecha", label: "Fecha", render: (p) => fecha(p.fecha) },
                   { key: "factura", label: "Factura", render: (p) => p.factura ?? `#${p.facturaId}` },
-                  { key: "metodo", label: "Método" },
+                  {
+                    key: "metodo",
+                    label: "Forma de pago",
+                    render: (p) => paymentMethodLabel(p.metodo),
+                  },
                   {
                     key: "referencia",
                     label: "Referencia",
@@ -1051,7 +1072,7 @@ export default function ProveedoresPage() {
                 emptyDescription="Ninguna factura de este proveedor está ligada a una actividad de proyecto."
                 columns={[
                   { key: "titulo", label: "Proyecto" },
-                  { key: "estatus", label: "Estatus", render: (p) => <EstatusDot estatus={p.estatus} /> },
+                  { key: "estatus", label: "Estado", render: (p) => <EstatusDot estatus={p.estatus} /> },
                   { key: "facturas", label: "Facturas", align: "right", numeric: true },
                   {
                     key: "monto",
@@ -1102,7 +1123,7 @@ export default function ProveedoresPage() {
                     render: (h) =>
                       h.monto ? <Money value={h.monto} /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>,
                   },
-                  { key: "estatus", label: "Estatus", render: (h) => <EstatusDot estatus={h.estatus} /> },
+                  { key: "estatus", label: "Estado", render: (h) => <EstatusDot estatus={h.estatus} /> },
                 ]}
               />
             )}
