@@ -65,10 +65,44 @@ Workspace de la contadora, 7 worktrees en paralelo, todos integrados:
 - Sin base local levantada no hubo smoke en navegador; todo está cubierto por
   pruebas, no por uso real.
 
+## QA adversarial (agente que no construyó nada)
+
+10 fallos reales, cada uno con prueba en rojo antes del arreglo:
+
+1. **COGS de almacén sin empresa** — el commit `b62d9ce6` arregló gastos,
+   viáticos y pagos, pero dejó fuera `warehouse.service.ts:474`, y ahí el error
+   lo traga un `catch` con `logger.warn`: **cada despacho y merma salía del
+   almacén sin que su costo llegara a los libros, en silencio.**
+2. **Caché offline cruzaba EMPRESAS** — la clave llevaba token y usuario, no
+   empresa, y la empresa viaja en la cabecera, no en la URL. Quien tiene dos
+   empresas veía la cartera de la A creyendo que era de la B. Subida a v3.
+3-6. **Cuatro focos más del bug de zona horaria.** El peor:
+   `getWorkspaceDashboard.agingReceivable.dueToday` era **siempre 0**, y lo que
+   vence hoy se contaba como vencido. Además el rango por fechas **perdía el
+   día 1 del mes**.
+7. **El libro duplicaba páginas:** el desempate de la mezcla ordenaba los ids
+   como texto y ascendente; página 1 y 2 salían idénticas.
+8. **Conciliación emparejaba un cobro con un pago:** la penalización al sentido
+   invertido no bastaba y salía como sugerencia alta, lista para aplicar.
+9. **Doble cierre de periodo concurrente** — ahora compare-and-swap.
+10. **Variación 0 % con presupuesto en cero**, que se lee como "clavado".
+11. **CSV sin neutralizar fórmulas de Excel** en el libro de movimientos.
+
+Sospechas reportadas y NO tocadas (decisión de producto o migración de esquema):
+el total "Ingresos" del libro suma facturado + cobrado a propósito (se aclaró la
+etiqueta en la UI para que no se lea como dinero que entró); `listProjects` sin
+paginar; N+1 acotado en el comparativo de presupuesto; una misma factura puede
+conciliarse contra dos movimientos porque `BankReconciliation` no guarda el id
+del documento.
+
+Revisado y correcto: 25/25 rutas nuevas con guard y `@RBAC` por método; ~50
+consultas Prisma nuevas con filtro de empresa, incluidas las relaciones usadas
+como filtro; ningún controlador acepta la empresa desde el cuerpo o la query.
+
 ## Verificación final
 
 - `tsc --noEmit`: limpio en API y web.
-- API: **2035/2035** en 185 suites. Web: **965/965** en 79 archivos.
+- API: **2059/2059** en 187 suites. Web: **970/970** en 80 archivos.
 - Las 3 suites que la ola anterior dejó rojas quedaron reparadas: dos eran
   simulacros incompletos; la de actividades fijaba el alcance SIN empresa, que
   ya se había retirado, así que verificaba el comportamiento inseguro.
