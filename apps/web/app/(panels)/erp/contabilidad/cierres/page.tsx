@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -99,9 +100,18 @@ export default function CierresPage() {
   const [checkError, setCheckError] = useState<string | null>(null);
 
   const [closing, setClosing] = useState(false);
+  /**
+   * Lo que falló al cerrar. Antes solo salía en un toast: con el modal de
+   * justificación abierto encima, el aviso pasaba por detrás y el periodo
+   * parecía cerrado sin estarlo.
+   */
+  const [errorCierre, setErrorCierre] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [forceOpen, setForceOpen] = useState(false);
   const [justificacion, setJustificacion] = useState("");
+  const [intentado, setIntentado] = useState(false);
+  /** Cerrojo síncrono: cerrar dos veces el mismo periodo no es inocuo. */
+  const cierreEnVueloRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -147,7 +157,14 @@ export default function CierresPage() {
   );
 
   async function cerrar(periodId: number, texto?: string) {
+    if (cierreEnVueloRef.current) return;
+    if (!selected) {
+      setErrorCierre("No hay un periodo seleccionado. Vuelve a elegirlo en la lista.");
+      return;
+    }
+    cierreEnVueloRef.current = true;
     setClosing(true);
+    setErrorCierre(null);
     try {
       await erpFetch(`accounting/workspace/cierres/${periodId}/cerrar`, token, {
         method: "POST",
@@ -156,27 +173,35 @@ export default function CierresPage() {
       toast.success(texto ? "Periodo cerrado con justificación" : "Periodo cerrado");
       setForceOpen(false);
       setJustificacion("");
+      setIntentado(false);
       await load();
-      const actualizado = { ...(selected as Period), isClosed: true };
+      const actualizado = { ...selected, isClosed: true };
       setSelected(actualizado);
       await revisar(actualizado);
     } catch (e) {
-      toast.error(formatApiError(e));
+      // El modal de justificación se queda abierto con el motivo dentro: si se
+      // cerrara, nadie sabría si el periodo quedó cerrado o no.
+      setErrorCierre(`No se pudo cerrar el periodo. ${formatApiError(e)}`);
     } finally {
+      cierreEnVueloRef.current = false;
       setClosing(false);
     }
   }
 
+  /**
+   * El diálogo de confirmación pinta el mensaje en un solo párrafo: los saltos
+   * de línea y las viñetas que llevaba se veían como una frase corrida. El
+   * detalle de qué se bloquea ya está en la pantalla, completo y en lista;
+   * aquí va solo lo que hay que confirmar.
+   */
   function pedirConfirmacion(lista: Checklist) {
-    const protege = lista.proteccion.bloqueado.map((l) => `  · ${l}`).join("\n");
-    const noProtege = lista.proteccion.noBloqueado.map((l) => `  · ${l}`).join("\n");
+    const cuantos = lista.proteccion.bloqueado.length;
     setConfirmState({
       title: `Cerrar ${lista.periodo.nombre}`,
       message:
-        `Del ${fecha(lista.periodo.inicio)} al ${fecha(lista.periodo.fin)}.\n\n` +
-        `Al cerrar, el sistema impedirá:\n${protege}\n\n` +
-        `Ojo: hoy el cierre NO impide todavía:\n${noProtege}\n\n` +
-        `Solo dirección puede reabrir el periodo.`,
+        `Del ${fecha(lista.periodo.inicio)} al ${fecha(lista.periodo.fin)}. ` +
+        `Al cerrar, el sistema impedirá ${cuantos} ${cuantos === 1 ? "operación" : "operaciones"} sobre el periodo ` +
+        `—las tienes listadas en la pantalla— y solo dirección podrá reabrirlo.`,
       confirmLabel: "Cerrar periodo",
       danger: false,
       fn: () => cerrar(lista.periodo.id),
@@ -210,7 +235,7 @@ export default function CierresPage() {
           size="sm"
           variant={selected?.id === r.id ? "secondary" : "ghost"}
           onClick={() => void revisar(r)}
-          disabled={checking && selected?.id === r.id}
+          loading={checking && selected?.id === r.id}
         >
           {r.isClosed ? "Ver verificación" : "Revisar cierre"}
         </Button>
@@ -220,6 +245,13 @@ export default function CierresPage() {
 
   const bloqueado = (checklist?.bloqueantes ?? 0) > 0;
   const yaCerrado = checklist?.periodo.cerrado ?? false;
+  /**
+   * El API dice si este periodo exige justificación por escrito
+   * (`requiereJustificacion`) y la pantalla lo ignoraba: decía «puedes cerrar»
+   * y el servidor lo rechazaba sin que nadie supiera por qué.
+   */
+  const pideJustificacion = checklist?.requiereJustificacion ?? false;
+  const conJustificacion = bloqueado || pideJustificacion;
 
   return (
     <>
@@ -235,7 +267,18 @@ export default function CierresPage() {
         }
       />
 
-      {error && <InlineAlert message={error} variant="danger" onDismiss={() => setError(null)} />}
+      {error && (
+        <InlineAlert
+          message={`No se pudieron cargar los periodos. ${error}`}
+          variant="danger"
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()}>
+              Reintentar
+            </Button>
+          }
+        />
+      )}
 
       <Section
         title="Periodos fiscales"
@@ -243,7 +286,12 @@ export default function CierresPage() {
         flush
       >
         {loading ? (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "16px 18px" }}>Cargando…</p>
+          <p
+            style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "16px 18px" }}
+            aria-busy="true"
+          >
+            {token ? "Cargando periodos…" : "Esperando la sesión para pedir los periodos…"}
+          </p>
         ) : rows.length === 0 ? (
           <EmptyState
             title="Sin periodos"
@@ -265,22 +313,29 @@ export default function CierresPage() {
                 <Button
                   size="sm"
                   variant="primary"
-                  disabled={bloqueado || closing}
+                  disabled={conJustificacion || closing}
+                  loading={closing && !forceOpen}
                   onClick={() => pedirConfirmacion(checklist)}
                   title={
                     bloqueado
                       ? "Resuelve los puntos que bloquean el cierre o ciérralo con justificación"
-                      : undefined
+                      : pideJustificacion
+                        ? "Este periodo exige justificación por escrito"
+                        : undefined
                   }
                 >
                   Cerrar periodo
                 </Button>
-                {bloqueado && (
+                {conJustificacion && (
                   <Button
                     size="sm"
                     variant="secondary"
                     disabled={closing}
-                    onClick={() => setForceOpen(true)}
+                    onClick={() => {
+                      setErrorCierre(null);
+                      setIntentado(false);
+                      setForceOpen(true);
+                    }}
                   >
                     Cerrar con justificación
                   </Button>
@@ -290,9 +345,33 @@ export default function CierresPage() {
           }
         >
           {checking && (
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Calculando pendientes…</p>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+              Calculando pendientes…
+            </p>
           )}
-          {checkError && <InlineAlert message={checkError} variant="danger" />}
+          {checkError && (
+            <InlineAlert
+              message={`No se pudo calcular la verificación. ${checkError}`}
+              variant="danger"
+              action={
+                selected ? (
+                  <Button size="sm" variant="secondary" onClick={() => void revisar(selected)}>
+                    Reintentar
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
+
+          {/* El resultado del último intento de cierre, en la pantalla donde se
+              pulsó y no en un toast que se va. */}
+          {errorCierre && (
+            <InlineAlert
+              message={errorCierre}
+              variant="danger"
+              onDismiss={() => setErrorCierre(null)}
+            />
+          )}
 
           {checklist && (
             <>
@@ -307,6 +386,11 @@ export default function CierresPage() {
                 <InlineAlert
                   message={`Faltan ${checklist.bloqueantes} punto(s) que bloquean el cierre. Resuélvelos o cierra con una justificación por escrito.`}
                   variant="danger"
+                />
+              ) : pideJustificacion ? (
+                <InlineAlert
+                  message="Nada bloquea el cierre, pero este periodo exige una justificación por escrito para cerrarse."
+                  variant="warning"
                 />
               ) : (
                 <InlineAlert
@@ -405,15 +489,17 @@ export default function CierresPage() {
                             {i.descripcion}
                           </p>
                           {i.conteo > 0 && i.href && (
-                            <a
+                            <Link
                               href={i.href}
                               style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}
                             >
                               Ir a resolverlo →
-                            </a>
+                            </Link>
                           )}
                         </div>
-                        <StatusDot label={marca.texto} tone={marca.tono} />
+                        {/* La palabra dice el estado, no el color: con la regla
+                            roja invisible, «Bloquea el cierre» sigue leyéndose. */}
+                        <StatusDot label={marca.texto} tone={marca.tono} wrap />
                       </li>
                     );
                   })}
@@ -456,34 +542,64 @@ export default function CierresPage() {
 
       <Modal
         open={forceOpen}
-        onClose={() => setForceOpen(false)}
-        title="Cerrar con puntos pendientes"
+        onClose={() => {
+          setForceOpen(false);
+          setErrorCierre(null);
+          setIntentado(false);
+        }}
+        title={bloqueado ? "Cerrar con puntos pendientes" : "Cerrar con justificación"}
         dirty={justificacion.trim().length > 0}
         maxWidth={560}
         footer={
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button variant="ghost" onClick={() => setForceOpen(false)} disabled={closing}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setForceOpen(false);
+                setErrorCierre(null);
+                setIntentado(false);
+              }}
+              disabled={closing}
+            >
               Cancelar
             </Button>
+            {/* Habilitado siempre: si se deshabilitara por falta de texto, el
+                botón no reaccionaría y tampoco diría qué falta. Al pulsarlo,
+                el campo lo explica debajo. */}
             <Button
               variant="danger"
               loading={closing}
-              disabled={closing || justificacion.trim().length < MIN_JUSTIFICACION || !checklist}
               onClick={() => {
-                if (checklist) void cerrar(checklist.periodo.id, justificacion.trim());
+                setIntentado(true);
+                if (!checklist) {
+                  setErrorCierre("La verificación ya no está cargada. Vuelve a revisar el periodo.");
+                  return;
+                }
+                if (justificacion.trim().length < MIN_JUSTIFICACION) return;
+                void cerrar(checklist.periodo.id, justificacion.trim());
               }}
             >
-              Cerrar de todos modos
+              {closing ? "Cerrando…" : "Cerrar de todos modos"}
             </Button>
           </div>
         }
       >
+        {errorCierre && (
+          <InlineAlert
+            variant="danger"
+            message={errorCierre}
+            onDismiss={() => setErrorCierre(null)}
+          />
+        )}
         <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-          Vas a cerrar <strong>{checklist?.periodo.nombre}</strong> con{" "}
-          {checklist?.bloqueantes ?? 0} punto(s) sin resolver. Escribe por qué; queda en la bitácora
-          de auditoría con tu nombre, la fecha y el estado anterior del periodo.
+          Vas a cerrar <strong>{checklist?.periodo.nombre}</strong>
+          {bloqueado
+            ? ` con ${checklist?.bloqueantes ?? 0} punto(s) sin resolver`
+            : ", que exige justificación por escrito"}
+          . Escribe por qué; queda en la bitácora de auditoría con tu nombre, la fecha y el estado
+          anterior del periodo.
         </p>
-        {checklist && (
+        {checklist && bloqueado && (
           <ul
             style={{
               margin: "0 0 12px",
@@ -505,8 +621,11 @@ export default function CierresPage() {
           label="Justificación"
           hint={`Mínimo ${MIN_JUSTIFICACION} caracteres · llevas ${justificacion.trim().length}.`}
           error={
-            justificacion.trim().length > 0 && justificacion.trim().length < MIN_JUSTIFICACION
-              ? `Faltan ${MIN_JUSTIFICACION - justificacion.trim().length} caracteres para poder cerrar.`
+            justificacion.trim().length < MIN_JUSTIFICACION &&
+            (intentado || justificacion.trim().length > 0)
+              ? justificacion.trim().length === 0
+                ? "Escribe por qué se cierra así; sin esto no se puede cerrar."
+                : `Faltan ${MIN_JUSTIFICACION - justificacion.trim().length} caracteres para poder cerrar.`
               : null
           }
         >
@@ -515,6 +634,9 @@ export default function CierresPage() {
             value={justificacion}
             onChange={(e) => setJustificacion(e.target.value)}
             rows={4}
+            aria-invalid={
+              intentado && justificacion.trim().length < MIN_JUSTIFICACION ? true : undefined
+            }
             placeholder="Ej. Cierre autorizado por dirección: las pólizas pendientes se reponen en el siguiente periodo."
             style={{ ...financeInputStyle, minHeight: 90, resize: "vertical" }}
           />

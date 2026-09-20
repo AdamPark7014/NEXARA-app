@@ -227,7 +227,17 @@ export default function PresupuestosPage() {
         }
       />
 
-      {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
+      {error && (
+        <InlineAlert
+          message={error}
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void cargar()}>
+              Reintentar
+            </Button>
+          }
+        />
+      )}
 
       <div style={{ marginBottom: 12 }}>
         <FilterToolbar
@@ -254,7 +264,11 @@ export default function PresupuestosPage() {
       </div>
 
       {cargando ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Comparando presupuesto contra real…</p>
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+          {token
+            ? "Comparando presupuesto contra real…"
+            : "Esperando la sesión para pedir el comparativo…"}
+        </p>
       ) : !data ? (
         error ? null : <EmptyState title="Sin datos" description="Ajusta el periodo y vuelve a intentar." />
       ) : data.lineas.length === 0 ? (
@@ -264,6 +278,12 @@ export default function PresupuestosPage() {
         />
       ) : (
         <>
+          {/* El periodo que el API dice haber comparado: cuando acota el rango
+              pedido, la pantalla enseñaba las fechas del filtro y no las suyas. */}
+          <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--text-secondary)" }}>
+            Comparando del {data.periodo.from} al {data.periodo.to}.
+          </p>
+
           <div style={{ marginBottom: 12 }}>
             <MetricStrip ariaLabel="Presupuesto contra real" metrics={metricas} />
           </div>
@@ -295,8 +315,11 @@ export default function PresupuestosPage() {
             style={{
               marginTop: 8,
               display: "flex",
+              // Sin envolver, en pantalla estrecha el pie se salía del panel.
+              flexWrap: "wrap",
+              alignItems: "center",
               justifyContent: "flex-end",
-              gap: 24,
+              gap: "6px 24px",
               padding: "10px 16px",
               borderRadius: "var(--nx-panel-radius)",
               border: "1px solid var(--nx-panel-hairline)",
@@ -304,16 +327,18 @@ export default function PresupuestosPage() {
               fontSize: 12.5,
             }}
           >
-            <span style={{ color: "var(--text-secondary)", fontWeight: 700 }}>Total</span>
-            <span>
+            <span style={{ marginRight: "auto", color: "var(--text-secondary)", fontWeight: 700 }}>
+              Total
+            </span>
+            <span style={{ whiteSpace: "nowrap" }}>
               <span style={{ color: "var(--text-tertiary)", marginRight: 6 }}>Presupuestado</span>
               <Money value={data.totales.planeado} bold={false} />
             </span>
-            <span>
+            <span style={{ whiteSpace: "nowrap" }}>
               <span style={{ color: "var(--text-tertiary)", marginRight: 6 }}>Real</span>
               <Money value={data.totales.real} bold={false} />
             </span>
-            <span>
+            <span style={{ whiteSpace: "nowrap" }}>
               <span style={{ color: "var(--text-tertiary)", marginRight: 6 }}>Variación</span>
               <Variacion valor={data.totales.variacion} porcentaje={data.totales.variacionPct} />
             </span>
