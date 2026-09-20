@@ -1014,6 +1014,7 @@ export default function EmployeePaymentsPage() {
                 rows={visibleItems}
                 rowKey={(p) => p.id}
                 density="compact"
+                ariaLabel="Pagos a empleados"
                 emptyTitle="Sin pagos registrados"
                 emptyDescription={
                   searchQ || filterUser || filterStatus
