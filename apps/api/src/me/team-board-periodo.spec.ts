@@ -68,6 +68,9 @@ function build(filas: unknown[]) {
     attendance: { findMany: jest.fn().mockResolvedValue([]) },
     lunchBreak: { findMany: jest.fn().mockResolvedValue([]) },
     locationTracking: { findMany: jest.fn().mockResolvedValue([]) },
+    // buildWorkflowPipeline cuenta las solicitudes rechazadas entre pares; sin
+    // esta entrada el simulacro revienta antes de evaluar el periodo.
+    activityPeerRequest: { count: jest.fn().mockResolvedValue(0) },
   };
   return new TeamBoardService(prisma as never);
 }
