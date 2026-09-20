@@ -203,8 +203,40 @@ const TONO_ESTATUS: Record<string, StatusTone> = {
   default: "neutral",
 };
 
+/**
+ * Los estatus vienen en la clave del modelo. «PARTIALLY_PAID» en una columna
+ * no es un estado: es una constante de código asomándose a la pantalla. Lo que
+ * no está en la tabla se muestra tal cual llegó —mejor crudo que traducido a
+ * ojo—, así que añadir un estatus nuevo en el API no rompe nada aquí.
+ */
+const ESTATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  PENDING: "Pendiente",
+  IN_PROGRESS: "En curso",
+  ACTIVE: "Activo",
+  ON_HOLD: "En pausa",
+  COMPLETED: "Terminado",
+  CLOSED: "Cerrado",
+  CANCELLED: "Cancelado",
+  PAID: "Pagada",
+  PARTIALLY_PAID: "Pago parcial",
+  OVERDUE: "Vencida",
+  POSTED: "Contabilizada",
+  SENT: "Enviada",
+  APPROVED: "Aprobada",
+  REJECTED: "Rechazada",
+};
+
+const estatusTexto = (estatus: string) =>
+  ESTATUS_LABEL[(estatus || "").toUpperCase()] ?? estatus ?? "—";
+
 function EstatusDot({ estatus }: { estatus: string }) {
-  return <StatusDot label={estatus} tone={TONO_ESTATUS[financeStatusVariant(estatus)] ?? "neutral"} />;
+  return (
+    <StatusDot
+      label={estatusTexto(estatus)}
+      tone={TONO_ESTATUS[financeStatusVariant(estatus)] ?? "neutral"}
+    />
+  );
 }
 
 /** Barra proporcional: el ancho ES el porcentaje, no un adorno. */
@@ -388,6 +420,17 @@ export default function ContabilidadProyectosPage() {
               {r.tipo === "obra" && (
                 <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>· Obra</span>
               )}
+              {/* Avance y presupuesto llegaban en la lista y no se pintaban. */}
+              {r.avance != null && (
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                  · {r.avance} % de avance
+                </span>
+              )}
+              {r.presupuesto != null && (
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                  · presupuesto {pesos(r.presupuesto)}
+                </span>
+              )}
             </span>
           </div>
         ),
@@ -463,7 +506,17 @@ export default function ContabilidadProyectosPage() {
         }
       />
 
-      {error && <InlineAlert message={error} onDismiss={() => setError(null)} />}
+      {error && (
+        <InlineAlert
+          message={`No se pudieron cargar los proyectos. ${error}`}
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()}>
+              Reintentar
+            </Button>
+          }
+        />
+      )}
 
       {totales && !loading && (
         <div style={{ marginBottom: 14 }}>
@@ -517,7 +570,9 @@ export default function ContabilidadProyectosPage() {
       </div>
 
       {loading ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando proyectos…</p>
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+          {token ? "Cargando proyectos…" : "Esperando la sesión para pedir los proyectos…"}
+        </p>
       ) : rows.length === 0 ? (
         <EmptyState
           title={q || tipoFiltro ? "Ningún proyecto coincide" : "Todavía no hay proyectos"}
@@ -544,9 +599,20 @@ export default function ContabilidadProyectosPage() {
         maxWidth={1040}
       >
         {detalleLoading ? (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando desglose…</p>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+            Cargando desglose…
+          </p>
         ) : detalleError ? (
-          <InlineAlert message={detalleError} />
+          <InlineAlert
+            message={`No se pudo abrir el desglose. ${detalleError}`}
+            action={
+              abierto ? (
+                <Button size="sm" variant="secondary" onClick={() => void abrir(abierto)}>
+                  Reintentar
+                </Button>
+              ) : undefined
+            }
+          />
         ) : !detalle ? null : (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <MetricStrip
@@ -576,7 +642,9 @@ export default function ContabilidadProyectosPage() {
               ]}
             />
 
-            {detalle.proyecto.tipo === "obra" && (
+            {/* Solo cuando de verdad no hay facturación: antes el aviso salía
+                en toda obra, incluso con facturas al cliente en la pantalla. */}
+            {detalle.proyecto.tipo === "obra" && detalle.ingresosDetalle.length === 0 && (
               <InlineAlert
                 variant="info"
                 message="Esta obra no tiene facturación ligada en el sistema: solo se muestran sus costos registrados."
@@ -593,8 +661,25 @@ export default function ContabilidadProyectosPage() {
               >
                 <Dato label="Cliente" value={detalle.proyecto.cliente ?? "—"} />
                 <Dato label="Responsable" value={detalle.proyecto.responsable ?? "—"} />
-                <Dato label="Inicio" value={fecha(detalle.proyecto.inicioPlaneado)} />
-                <Dato label="Fin" value={fecha(detalle.proyecto.finPlaneado)} />
+                <Dato label="Inicio planeado" value={fecha(detalle.proyecto.inicioPlaneado)} />
+                <Dato label="Fin planeado" value={fecha(detalle.proyecto.finPlaneado)} />
+                {/* Fechas reales, avance y moneda venían del API y no se
+                    pintaban: el plan sin lo real no dice si se cumplió. */}
+                <Dato label="Inicio real" value={fecha(detalle.proyecto.inicioReal)} />
+                <Dato label="Fin real" value={fecha(detalle.proyecto.finReal)} />
+                <Dato
+                  label="Avance"
+                  value={
+                    detalle.proyecto.avance != null ? (
+                      `${detalle.proyecto.avance} %`
+                    ) : (
+                      <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>
+                        Sin reportar
+                      </span>
+                    )
+                  }
+                />
+                <Dato label="Moneda" value={detalle.proyecto.moneda || "—"} />
                 <Dato
                   label="Estatus"
                   value={<EstatusDot estatus={detalle.proyecto.estatus} />}
@@ -605,12 +690,29 @@ export default function ContabilidadProyectosPage() {
                   {detalle.proyecto.objetivo}
                 </p>
               )}
+              {detalle.proyecto.alcance && (
+                <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 6 }}>
+                  {detalle.proyecto.alcance}
+                </p>
+              )}
             </Section>
 
-            {detalle.presupuesto.autorizado != null && (
+            {detalle.presupuesto.autorizado == null ? (
               <Section
                 title="Presupuesto"
-                subtitle="Autorizado en el proyecto, contra lo que ya se comprometió y lo que ya salió."
+                subtitle={`Sin presupuesto autorizado en ${detalle.presupuesto.origen || "el proyecto"}.`}
+                dense
+              >
+                <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  Este proyecto no tiene tope autorizado, así que no hay «disponible» que calcular.
+                  Ya se comprometieron {pesos(detalle.presupuesto.comprometido)} y salieron de caja{" "}
+                  {pesos(detalle.presupuesto.pagado)}.
+                </p>
+              </Section>
+            ) : (
+              <Section
+                title="Presupuesto"
+                subtitle={`Autorizado en ${detalle.presupuesto.origen || "el proyecto"}, contra lo que ya se comprometió y lo que ya salió.`}
                 dense
               >
                 <MetricStrip
@@ -644,25 +746,98 @@ export default function ContabilidadProyectosPage() {
                 />
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {detalle.categorias.map((c) => (
-                    <button
-                      key={c.key}
-                      type="button"
-                      onClick={() => setCategoriaAbierta(c.key)}
-                      style={{
-                        textAlign: "left",
-                        background: "transparent",
-                        border: "none",
-                        padding: "4px 2px",
-                        cursor: "pointer",
-                        borderRadius: 8,
-                        color: "inherit",
-                        font: "inherit",
-                      }}
-                    >
-                      <BarraCategoria categoria={c} />
-                    </button>
-                  ))}
+                  {detalle.categorias.map((c) => {
+                    const abierta = categoriaAbierta === c.key;
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        aria-expanded={abierta}
+                        // Pulsar la categoría ya abierta la cierra: antes no
+                        // producía nada y parecía que el clic se perdía.
+                        onClick={() => setCategoriaAbierta(abierta ? null : c.key)}
+                        style={{
+                          textAlign: "left",
+                          background: abierta
+                            ? "color-mix(in srgb, var(--primary) 6%, transparent)"
+                            : "transparent",
+                          border: "none",
+                          borderLeft: `2px solid ${abierta ? "var(--primary)" : "transparent"}`,
+                          padding: "4px 2px 4px 8px",
+                          cursor: "pointer",
+                          borderRadius: 8,
+                          color: "inherit",
+                          font: "inherit",
+                        }}
+                      >
+                        <BarraCategoria categoria={c} />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* El desglose, justo debajo de la categoría que se pulsó: antes
+                  aparecía tras la tabla de facturas y el clic no se veía. */}
+              {categoriaAbierta && (
+                <div style={{ marginTop: 14 }}>
+                  <Section
+                    title={
+                      detalle.categorias.find((c) => c.key === categoriaAbierta)?.label ??
+                      "Transacciones"
+                    }
+                    subtitle={`${transaccionesDeCategoria.length} movimiento(s) · haz clic en un renglón para ver el documento.`}
+                    dense
+                    flush
+                    actions={
+                      <Button size="sm" variant="ghost" onClick={() => setCategoriaAbierta(null)}>
+                        Cerrar desglose
+                      </Button>
+                    }
+                  >
+                    <DataTable
+                      rows={transaccionesDeCategoria}
+                      rowKey={(t) => t.key}
+                      density="compact"
+                      stickyHeader={false}
+                      onRowClick={(t) => setDocumento(t)}
+                      emptyTitle="Sin transacciones"
+                      emptyDescription="Esta categoría no tiene movimientos individuales registrados."
+                      columns={[
+                        { key: "fecha", label: "Fecha", render: (t) => fecha(t.fecha) },
+                        {
+                          key: "tipo",
+                          label: "Tipo",
+                          render: (t) => (
+                            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                              {TIPO_TX[t.tipo] ?? t.tipo}
+                            </span>
+                          ),
+                        },
+                        { key: "documento", label: "Documento" },
+                        { key: "concepto", label: "Concepto" },
+                        {
+                          key: "monto",
+                          label: "Monto",
+                          align: "right",
+                          numeric: true,
+                          render: (t) => <Money value={t.monto} />,
+                        },
+                        {
+                          key: "pagado",
+                          label: "Pagado",
+                          align: "right",
+                          numeric: true,
+                          render: (t) => <Money value={t.pagado} />,
+                        },
+                        {
+                          key: "estatus",
+                          label: "Estatus",
+                          render: (t) => <EstatusDot estatus={t.estatus} />,
+                        },
+                      ]}
+                    />
+                  </Section>
                 </div>
               )}
             </Section>
@@ -705,62 +880,6 @@ export default function ContabilidadProyectosPage() {
                         <EstatusDot estatus={f.estatus} />
                       ),
                     },
-                  ]}
-                />
-              </Section>
-            )}
-
-            {categoriaAbierta && (
-              <Section
-                title={
-                  detalle.categorias.find((c) => c.key === categoriaAbierta)?.label ??
-                  "Transacciones"
-                }
-                subtitle="Cada renglón es un documento. Haz clic para verlo completo."
-                dense
-                flush
-                actions={
-                  <Button size="sm" variant="ghost" onClick={() => setCategoriaAbierta(null)}>
-                    Cerrar desglose
-                  </Button>
-                }
-              >
-                <DataTable
-                  rows={transaccionesDeCategoria}
-                  rowKey={(t) => t.key}
-                  density="compact"
-                  stickyHeader={false}
-                  onRowClick={(t) => setDocumento(t)}
-                  emptyTitle="Sin transacciones"
-                  emptyDescription="Esta categoría no tiene movimientos individuales registrados."
-                  columns={[
-                    { key: "fecha", label: "Fecha", render: (t) => fecha(t.fecha) },
-                    {
-                      key: "tipo",
-                      label: "Tipo",
-                      render: (t) => (
-                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                          {TIPO_TX[t.tipo] ?? t.tipo}
-                        </span>
-                      ),
-                    },
-                    { key: "documento", label: "Documento" },
-                    { key: "concepto", label: "Concepto" },
-                    {
-                      key: "monto",
-                      label: "Monto",
-                      align: "right",
-                      numeric: true,
-                      render: (t) => <Money value={t.monto} />,
-                    },
-                    {
-                      key: "pagado",
-                      label: "Pagado",
-                      align: "right",
-                      numeric: true,
-                      render: (t) => <Money value={t.pagado} />,
-                    },
-                    { key: "estatus", label: "Estatus" },
                   ]}
                 />
               </Section>
