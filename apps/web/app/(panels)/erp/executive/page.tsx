@@ -161,7 +161,7 @@ export default function ExecutivePage() {
       : [
           { href: "/erp/approvals", label: "Aprobaciones", desc: "Solicitudes pendientes" },
           { href: "/erp/analytics/bi", label: "Business Intelligence", desc: "Márgenes y ROI" },
-          { href: "/erp/accounting", label: "Contabilidad", desc: "Estados financieros" },
+          { href: "/erp/contabilidad", label: "Contabilidad", desc: "Hub CxC, CxP, facturas y cierres" },
           { href: "/erp/users", label: "Roles y accesos", desc: "Gobierno de usuarios" },
         ];
 

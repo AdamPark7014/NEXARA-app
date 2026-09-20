@@ -46,9 +46,9 @@ const FULL_ACCESS_TREE: AccessTreePanel[] = [
   },
   {
     id: 'finance',
-    label: 'Contabilidad',
+    label: 'Finanzas',
     modules: [
-      toggle('accounting', 'Contabilidad'),
+      toggle('accounting', 'Pólizas y cuentas'),
       toggle('invoicing', 'Facturación CFDI'),
       toggle('banking', 'Bancos'),
       toggle('viatics-admin', 'Viáticos (admin)'),

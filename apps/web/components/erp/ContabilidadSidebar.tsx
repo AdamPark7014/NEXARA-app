@@ -64,6 +64,12 @@ export const GRUPOS_CONTABILIDAD: NavGroup[] = [
         permissions: VER_CONTABILIDAD,
       },
       {
+        id: "polizas",
+        label: "Pólizas y cuentas",
+        href: "/erp/contabilidad/polizas",
+        permissions: VER_CONTABILIDAD,
+      },
+      {
         id: "cxc",
         label: "Por cobrar",
         href: "/erp/contabilidad/cuentas-por-cobrar",

@@ -562,12 +562,11 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   // ── Finanzas ──
   accounting: {
     id: "accounting", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/accounting",
-    // El hub `erp-contabilidad` ya se llama "Contabilidad": dos entradas con el
-    // mismo nombre en Finanzas no dicen cuál es cuál. Esta es la contabilidad
-    // formal (libro diario, catálogo de cuentas, cierre), y así se nombra.
+    // El hub `erp-contabilidad` es la única entrada «Contabilidad» del menú Core.
+    // Las pólizas viven bajo /erp/contabilidad/polizas (ContabilidadSidebar).
     label: "Pólizas y cuentas", description: "Libro diario, catálogo de cuentas y cierre mensual",
     icon: "📒", allowedRoles: FINANCE_TEAM,
-    group: "Finanzas", visible: true,
+    group: "Finanzas", visible: false,
   },
   invoicing: {
     id: "invoicing", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/invoicing",
@@ -1330,7 +1329,7 @@ export const ROLE_HOME_PANEL: Record<OrgRoleKey, PanelId> = {
   [R.FIELD_ENGINEER]: PANELS.OPS,
   [R.DESIGNER]: PANELS.STUDIO,
   [R.ADMIN_STAFF]: PANELS.ERP,
-  [R.ACCOUNTANT]: PANELS.FINANCE,
+  [R.ACCOUNTANT]: PANELS.ERP,
   [R.HR_SPECIALIST]: PANELS.HR,
   [R.WAREHOUSE_MANAGER]: PANELS.ERP,
   [R.PROCUREMENT_OFFICER]: PANELS.ERP,
@@ -1344,6 +1343,7 @@ export const ROLE_HOME_PANEL: Record<OrgRoleKey, PanelId> = {
 const ORG_ROLE_HOME_PATH: Partial<Record<OrgRoleKey, string>> = {
   [R.CEO]: "/erp/executive",
   [R.FIELD_ENGINEER]: "/ops/my-activities",
+  [R.ACCOUNTANT]: "/erp/contabilidad",
 };
 
 export function getHomePanel(role: OrgRoleKey | null, isSuperAdmin = false, isPlatformOwner = false, isDeveloperSuperAdmin = false): PanelId {

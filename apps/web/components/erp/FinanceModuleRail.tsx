@@ -3,8 +3,14 @@
 import { usePathname } from "next/navigation";
 import ContextRail from "@/components/ui/ContextRail";
 
+/**
+ * Rail para pantallas financieras que aún no viven bajo `/erp/contabilidad/*`
+ * (facturación, bancos, viáticos…). La entrada Contabilidad apunta al hub;
+ * las pólizas al ítem del hub — no hay segunda «Contabilidad».
+ */
 const FINANCE_LINKS = [
-  { id: "accounting", label: "Contabilidad", href: "/erp/contabilidad" },
+  { id: "hub", label: "Escritorio Contadora", href: "/erp/contabilidad" },
+  { id: "polizas", label: "Pólizas y cuentas", href: "/erp/contabilidad/polizas" },
   { id: "invoicing", label: "Facturación CFDI", href: "/erp/invoicing" },
   { id: "banking", label: "Bancos", href: "/erp/banking" },
   { id: "viatics", label: "Viáticos", href: "/erp/finance/viatics" },
@@ -25,10 +31,7 @@ export default function FinanceModuleRail() {
         href: l.href,
         active:
           l.href === "/erp/contabilidad"
-            ? pathname === l.href ||
-              pathname.startsWith(`${l.href}/`) ||
-              pathname === "/erp/accounting" ||
-              pathname.startsWith("/erp/accounting/")
+            ? pathname === "/erp/contabilidad"
             : pathname === l.href || pathname.startsWith(`${l.href}/`),
       }))}
     />

@@ -330,6 +330,8 @@ export function shouldShowModuleInSidebar(
     case 'architecture':
       return ERP_ADMIN.has(v2);
     case 'accounting':
+      // Solo vía hub Contadora (/erp/contabilidad/polizas); no duplicar en Finanzas.
+      return false;
     case 'invoicing':
     case 'banking':
     case 'employee-payments':
@@ -1821,8 +1823,8 @@ export function getErpInventorySectionConfig(
 type ErpFinanceModule = 'accounting' | 'banking' | 'invoicing' | 'employee-payments' | 'exports';
 
 const ERP_FINANCE_COPY: Record<ErpFinanceModule, { title: string; subtitle: string }> = {
-  accounting: { title: 'Contabilidad', subtitle: 'Pólizas, catálogo de cuentas y cierre mensual.' },
-  banking: { title: 'Banca y conciliación', subtitle: 'Cuentas bancarias, movimientos y conciliación.' },
+  accounting: { title: 'Pólizas y cuentas', subtitle: 'Libro diario, catálogo de cuentas y cierre mensual.' },
+  banking: { title: 'Bancos', subtitle: 'Cuentas bancarias, movimientos y conciliación.' },
   invoicing: { title: 'Facturación CFDI', subtitle: 'Emisión, timbrado y cancelación de facturas.' },
   'employee-payments': { title: 'Pagos a empleados', subtitle: 'Dispersiones, anticipos y complementos de nómina.' },
   exports: { title: 'Exportaciones contables', subtitle: 'Descarga de layouts para SAT y sistemas externos.' },

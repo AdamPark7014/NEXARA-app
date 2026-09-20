@@ -152,9 +152,9 @@ describe('normalizeLegacyPath · bookmarks viejos → ruta canónica', () => {
     }
   });
 
-  it('manda /erp/accounting al escritorio Contadora', () => {
-    expect(normalizeLegacyPath('/erp/accounting')).toBe('/erp/contabilidad');
-    expect(normalizeLegacyPath('/erp/accounting/')).toBe('/erp/contabilidad');
+  it('manda /erp/accounting al escritorio Contadora (pólizas)', () => {
+    expect(normalizeLegacyPath('/erp/accounting')).toBe('/erp/contabilidad/polizas');
+    expect(normalizeLegacyPath('/erp/accounting/')).toBe('/erp/contabilidad/polizas');
   });
 
   it('remapLegacySlugs no toca paneles ajenos al ERP', () => {
