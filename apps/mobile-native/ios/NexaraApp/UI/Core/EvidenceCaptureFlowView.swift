@@ -792,7 +792,12 @@ struct EvidenceCaptureFlowView: View {
         }
         busy = true
         defer { busy = false }
-        let payload = GeoPhotoPayload(photoUrl: photo.dataUrl, latitude: coords.latitude, longitude: coords.longitude)
+        let payload = GeoPhotoPayload(
+            photoUrl: photo.dataUrl,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            mockLocation: coords.mock
+        )
         let correction = isCorrection
         do {
             let saved: EvidenceFlowState?

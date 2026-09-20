@@ -69,9 +69,17 @@ export class GpsService {
       velocidadKmh: createGpsDto.velocidadKmh ?? null,
       estaActivo: createGpsDto.estaActivo ?? true,
       ultimaActualizacion: createGpsDto.ultimaActualizacion,
+      // null cuando la app no lo informa: «no lo sé» y «no era simulada» no son lo mismo.
+      mockLocation: typeof createGpsDto.mockLocation === 'boolean' ? createGpsDto.mockLocation : null,
       companyId: resolvedCompanyId,
       ...(createGpsDto.actividadId ? { actividadId: createGpsDto.actividadId } : {}),
     };
+    if (createGpsDto.mockLocation === true) {
+      // No se tira el punto (el recorrido no decide nómina), pero que quede dicho.
+      this.logger.warn(
+        `Ping GPS con ubicación simulada (usuarioId=${createGpsDto.usuarioId}); se guarda marcado`,
+      );
+    }
     const creado = await this.prisma['locationTracking'].create({ data });
     // Geocerca de actividades: se mide sin hacer esperar al teléfono.
     void Promise.resolve(

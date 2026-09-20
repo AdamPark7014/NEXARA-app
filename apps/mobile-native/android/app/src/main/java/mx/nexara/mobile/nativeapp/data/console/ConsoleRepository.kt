@@ -269,6 +269,7 @@ class ConsoleRepository(context: Context) {
         lng: Double? = null,
         accuracyM: Float? = null,
         mockLocation: Boolean = false,
+        fixAgeMs: Long? = null,
         photoBase64: String,
         capturedAt: String = java.time.Instant.now().toString(),
     ) =
@@ -280,6 +281,7 @@ class ConsoleRepository(context: Context) {
                 longitude = lng,
                 accuracyM = accuracyM?.takeIf { it.isFinite() && it >= 0f }?.toDouble(),
                 mockLocation = mockLocation,
+                fixAgeMs = fixAgeMs?.takeIf { it >= 0L },
                 photoBase64 = photoBase64,
             )
         )
@@ -329,7 +331,18 @@ class ConsoleRepository(context: Context) {
     suspend fun gpsTrajectory(date: String? = null, userId: Long? = null) =
         api.getGpsTrajectory(date = date, userId = userId)
 
-    suspend fun gpsPost(lat: Double, lng: Double, speedKmh: Double?, activityId: Long? = null) =
+    /**
+     * @param mockLocation el punto viene de una app de GPS falso. Se manda igual: el
+     * servidor lo guarda marcado en vez de tirarlo, para que el recorrido no tenga huecos
+     * que nadie sepa leer.
+     */
+    suspend fun gpsPost(
+        lat: Double,
+        lng: Double,
+        speedKmh: Double?,
+        activityId: Long? = null,
+        mockLocation: Boolean? = null,
+    ) =
         api.postGpsLocation(
             mx.nexara.mobile.nativeapp.data.api.PostGpsLocationRequest(
                 latitud = lat,
@@ -337,6 +350,7 @@ class ConsoleRepository(context: Context) {
                 velocidadKmh = speedKmh,
                 ultimaActualizacion = java.time.Instant.now().toString(),
                 actividadId = activityId,
+                mockLocation = mockLocation,
             )
         )
 

@@ -29,6 +29,18 @@ struct MiJornadaCard: View {
             faltasJustificadas
         }
         .coreCard()
+        .alert(
+            "No se pudo checar",
+            isPresented: Binding(
+                get: { vm.checkInBloqueo != nil },
+                set: { if !$0 { vm.clearBloqueo() } }
+            ),
+            presenting: vm.checkInBloqueo
+        ) { _ in
+            Button("Entendido", role: .cancel) { vm.clearBloqueo() }
+        } message: { mensaje in
+            Text(mensaje + "\n\n" + ChecadaRechazo.ayuda(mensaje))
+        }
     }
 
     // MARK: Faltas justificadas

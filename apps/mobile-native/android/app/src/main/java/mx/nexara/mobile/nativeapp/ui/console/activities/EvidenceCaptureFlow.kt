@@ -301,7 +301,12 @@ fun EvidenceCaptureFlow(
                     isCorrection -> repo.resubmit(
                         activity.id,
                         stepKey,
-                        ActivityEvidencePhotoStepRequest(photo.dataUrl, lat, lng),
+                        ActivityEvidencePhotoStepRequest(
+                            photoUrl = photo.dataUrl,
+                            latitude = lat,
+                            longitude = lng,
+                            mockLocation = photo.mock,
+                        ),
                     )
                     kind == KIND_ENTRY -> repo.entryPhoto(
                         activityId = activity.id,
@@ -309,8 +314,15 @@ fun EvidenceCaptureFlow(
                         lat = lat,
                         lng = lng,
                         justificacionOrden = justificacionOrden,
+                        mockLocation = photo.mock,
                     )
-                    else -> repo.exitPhoto(activity.id, photo.dataUrl, lat, lng)
+                    else -> repo.exitPhoto(
+                        activityId = activity.id,
+                        photoUrl = photo.dataUrl,
+                        lat = lat,
+                        lng = lng,
+                        mockLocation = photo.mock,
+                    )
                 }
             }
             val message = when {

@@ -16,6 +16,42 @@ object AttendanceCheckIn {
             "simulada (Opciones de desarrollador → «Seleccionar app de ubicación simulada» → Ninguna), " +
             "reinicia la app y vuelve a intentarlo."
 
+    /**
+     * Qué hacer según el motivo por el que el servidor no aceptó la checada.
+     *
+     * Son tres rechazos distintos y la salida es distinta en cada uno; decir siempre lo
+     * mismo («desactiva el GPS falso») a quien solo tenía el teléfono en un sótano no
+     * ayuda a nadie a checar. El texto del servidor ya dice qué pasó: esto dice qué hacer.
+     */
+    fun ayudaDelRechazo(mensaje: String?): String {
+        val texto = mensaje?.lowercase().orEmpty()
+        return when {
+            texto.contains("ubicación vieja") || texto.contains("ubicacion vieja") ->
+                "Tu teléfono mandó la última posición que tenía guardada. Sal al aire libre o " +
+                    "asómate a una ventana unos segundos para que el GPS mida de nuevo, y vuelve a intentarlo."
+            texto.contains("distancia imposible") ->
+                "Tu ubicación no cuadra con tu checada anterior. Si de verdad te trasladaste, " +
+                    "avisa a tu jefe para que la registre él; tu checada no se guardó."
+            texto.contains("app nexara") ->
+                "Las checadas solo se registran desde esta app. Si no puedes usar tu teléfono, " +
+                    "tu jefe puede registrarla por ti."
+            else -> MOCK_AYUDA
+        }
+    }
+
+    /**
+     * ¿El error es un rechazo del servidor (422) y no un fallo de red o de datos?
+     *
+     * Todos se ven igual para la persona —«no se registró tu checada»— así que todos van
+     * al mismo diálogo, con la ayuda que corresponda.
+     */
+    fun esRechazoDelServidor(code: Int?, mensaje: String?): Boolean =
+        esUbicacionSimulada(code, mensaje) ||
+            mensaje?.lowercase()?.let { t ->
+                t.contains("ubicación vieja") || t.contains("ubicacion vieja") ||
+                    t.contains("distancia imposible") || t.contains("app nexara")
+            } == true
+
     /** Arriba de 200 m el servidor la acepta pero la deja «Revisar: Ubicación imprecisa». */
     const val PRECISION_A_REVISAR = 200f
 

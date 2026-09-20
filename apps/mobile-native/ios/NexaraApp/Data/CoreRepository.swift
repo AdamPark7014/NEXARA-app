@@ -17,10 +17,24 @@ enum CoreError: LocalizedError {
 }
 
 // Cuerpos de las rutas de evidencia (mismos nombres que la web).
+
+/// Foto de entrada o de salida de una actividad.
+///
+/// `mockLocation` viaja porque de estas dos fotos sale el tiempo productivo: si la
+/// ubicación la produjo software hay que poder saberlo después. No bloquea la foto —eso
+/// dejaría a alguien sin poder entregar su trabajo— pero el servidor la guarda marcada.
 struct GeoPhotoPayload: Encodable {
     let photoUrl: String
     let latitude: Double
     let longitude: Double
+    let mockLocation: Bool?
+
+    init(photoUrl: String, latitude: Double, longitude: Double, mockLocation: Bool? = nil) {
+        self.photoUrl = photoUrl
+        self.latitude = latitude
+        self.longitude = longitude
+        self.mockLocation = mockLocation
+    }
 }
 
 struct PhotoGeoPayload: Encodable {

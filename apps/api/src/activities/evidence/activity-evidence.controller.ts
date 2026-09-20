@@ -193,6 +193,8 @@ export class ActivityEvidenceController {
       longitude: number;
       /** Por qué la empieza antes que otra de más prioridad (opcional, no bloquea). */
       justificacionOrden?: string | null;
+      /** El teléfono marcó la ubicación como simulada; se guarda, no bloquea. */
+      mockLocation?: boolean;
     },
     @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
@@ -212,6 +214,7 @@ export class ActivityEvidenceController {
       body.longitude,
       companyId,
       body.justificacionOrden ?? null,
+      body.mockLocation ?? null,
     );
   }
 
@@ -311,7 +314,14 @@ export class ActivityEvidenceController {
   @Post(':activityId/exit-photo')
   async saveExitPhoto(
     @Param('activityId') activityId: string,
-    @Body() body: { photoUrl: string; latitude: number; longitude: number },
+    @Body()
+    body: {
+      photoUrl: string;
+      latitude: number;
+      longitude: number;
+      /** El teléfono marcó la ubicación como simulada; se guarda, no bloquea. */
+      mockLocation?: boolean;
+    },
     @Req() req: any,
     @CurrentCompanyId() companyId: number | null,
   ) {
@@ -329,6 +339,7 @@ export class ActivityEvidenceController {
       body.latitude,
       body.longitude,
       companyId,
+      body.mockLocation ?? null,
     );
   }
 

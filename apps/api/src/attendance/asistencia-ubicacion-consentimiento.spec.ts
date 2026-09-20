@@ -1,3 +1,4 @@
+import { PETICION_APP } from './peticion-de-app.testing.js';
 import { AttendanceService } from './attendance.service.js';
 
 /**
@@ -62,7 +63,7 @@ describe('coordenadas 0,0: no son un sitio, son la ausencia de GPS', () => {
   it('no se guardan como si fueran una medición', async () => {
     const { service, prisma } = build();
 
-    await service.register(entrada({ latitude: 0, longitude: 0 }) as any, 3, undefined, 7);
+    await service.register(entrada({ latitude: 0, longitude: 0 }) as any, 3, PETICION_APP, 7);
 
     const fila = filaCreada(prisma);
     expect(fila.entryLatitude).toBeNull();
@@ -73,7 +74,7 @@ describe('coordenadas 0,0: no son un sitio, son la ausencia de GPS', () => {
     const { service, prisma } = build();
 
     await expect(
-      service.register(entrada({ latitude: 0, longitude: 0 }) as any, 3, undefined, 7),
+      service.register(entrada({ latitude: 0, longitude: 0 }) as any, 3, PETICION_APP, 7),
     ).resolves.toMatchObject({ message: expect.stringContaining('Entrada') });
     expect(prisma.attendance.create).toHaveBeenCalled();
   });
@@ -81,7 +82,7 @@ describe('coordenadas 0,0: no son un sitio, son la ausencia de GPS', () => {
   it('tampoco generan un punto en el mapa de rastreo', async () => {
     const { service, prisma } = build();
 
-    await service.register(entrada({ latitude: 0, longitude: 0 }) as any, 3, undefined, 7);
+    await service.register(entrada({ latitude: 0, longitude: 0 }) as any, 3, PETICION_APP, 7);
 
     expect(prisma.locationTracking.create).not.toHaveBeenCalled();
   });
@@ -92,7 +93,7 @@ describe('coordenadas 0,0: no son un sitio, son la ausencia de GPS', () => {
     await service.register(
       entrada({ latitude: 19.0414, longitude: -98.2063 }) as any,
       3,
-      undefined,
+      PETICION_APP,
       7,
     );
 
@@ -107,7 +108,7 @@ describe('coordenadas 0,0: no son un sitio, son la ausencia de GPS', () => {
     // (0,0) exacto es el valor por defecto de un teléfono sin permiso.
     const { service, prisma } = build();
 
-    await service.register(entrada({ latitude: 0, longitude: -98.2 }) as any, 3, undefined, 7);
+    await service.register(entrada({ latitude: 0, longitude: -98.2 }) as any, 3, PETICION_APP, 7);
 
     expect(filaCreada(prisma).entryLongitude).toBe(-98.2);
   });
@@ -115,7 +116,7 @@ describe('coordenadas 0,0: no son un sitio, son la ausencia de GPS', () => {
   it('NaN y coordenadas fuera de rango tampoco pasan', async () => {
     const { service, prisma } = build();
 
-    await service.register(entrada({ latitude: 999, longitude: 12 }) as any, 3, undefined, 7);
+    await service.register(entrada({ latitude: 999, longitude: 12 }) as any, 3, PETICION_APP, 7);
 
     expect(filaCreada(prisma).entryLatitude).toBeNull();
   });
@@ -136,7 +137,7 @@ describe('coordenadas 0,0: no son un sitio, son la ausencia de GPS', () => {
     await service.register(
       { type: 'salida', photoBase64: FOTO, latitude: 0, longitude: 0 } as any,
       3,
-      undefined,
+      PETICION_APP,
       7,
     );
 
@@ -153,7 +154,7 @@ describe('el consentimiento de ubicación sólo lo otorga el usuario', () => {
     await service.register(
       entrada({ latitude: 19.0414, longitude: -98.2063 }) as any,
       3,
-      undefined,
+      PETICION_APP,
       7,
     );
 
@@ -166,7 +167,7 @@ describe('el consentimiento de ubicación sólo lo otorga el usuario', () => {
   it('fichar sin GPS tampoco lo enciende', async () => {
     const { service, prisma } = build();
 
-    await service.register(entrada({ latitude: 0, longitude: 0 }) as any, 3, undefined, 7);
+    await service.register(entrada({ latitude: 0, longitude: 0 }) as any, 3, PETICION_APP, 7);
 
     expect(prisma.user.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ data: { locationConsent: true } }),
@@ -179,7 +180,7 @@ describe('el consentimiento de ubicación sólo lo otorga el usuario', () => {
     await service.register(
       entrada({ latitude: 19.0414, longitude: -98.2063 }) as any,
       3,
-      undefined,
+      PETICION_APP,
       7,
     );
 
@@ -203,7 +204,7 @@ describe('el consentimiento de ubicación sólo lo otorga el usuario', () => {
       },
     });
 
-    await service.register({ type: 'salida', photoBase64: FOTO } as any, 3, undefined, 7);
+    await service.register({ type: 'salida', photoBase64: FOTO } as any, 3, PETICION_APP, 7);
 
     expect(prisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { locationConsent: false } }),
@@ -246,11 +247,16 @@ describe('el fichaje dice de qué aparato salió', () => {
     expect(filaCreada(prisma).deviceInfo).toMatch(/NEXARA App/);
   });
 
-  it('sin User-Agent seguía saliendo «Escritorio» — el defecto que había', async () => {
+  it('sin User-Agent no hay app que valga: la checada no se registra', async () => {
+    // Antes, sin `User-Agent`, el fichaje quedaba como «Escritorio · PC» y se
+    // guardaba igual. Ahora eso es justo lo que define un navegador, y desde el
+    // navegador ya no se checa: una petición que no se identifica como la app
+    // no puede afirmar dónde estuvo nadie.
     const { service, prisma } = build();
 
-    await service.register(entrada() as any, 3, { headers: {} }, 7);
-
-    expect(filaCreada(prisma).deviceInfo).toMatch(/Escritorio/);
+    await expect(service.register(entrada() as any, 3, { headers: {} }, 7)).rejects.toThrow(
+      /app NEXARA/i,
+    );
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
   });
 });

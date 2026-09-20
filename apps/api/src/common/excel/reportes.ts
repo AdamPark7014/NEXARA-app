@@ -7,6 +7,7 @@ import {
   ETIQUETA_ENCARGO,
   ETIQUETA_ESTADO_COTIZACION,
   ETIQUETA_ESTADO_ERP,
+  ETIQUETA_ESTADO_EXTRA,
   ETIQUETA_ESTATUS_ACTIVIDAD,
   ETIQUETA_ESTATUS_ACTIVIDAD_CRM,
   ETIQUETA_ESTATUS_FACTURA,
@@ -420,6 +421,20 @@ export const COLUMNAS_KPIS_PERSONAS: ColumnaReporte<any>[] = [
     valor: (p) => p?.totales?.minutosExtra ?? null,
   },
   {
+    clave: 'minutosExtraAprobados',
+    titulo: 'Extra aprobado',
+    tipo: 'duracion',
+    total: 'suma',
+    valor: (p) => p?.totales?.minutosExtraAprobados ?? 0,
+  },
+  {
+    clave: 'minutosExtraPendientes',
+    titulo: 'Extra sin aprobar',
+    tipo: 'duracion',
+    total: 'suma',
+    valor: (p) => p?.totales?.minutosExtraPendientes ?? 0,
+  },
+  {
     clave: 'jornadasSinSalida',
     titulo: 'Jornadas sin salida',
     tipo: 'entero',
@@ -453,6 +468,8 @@ export const COLUMNAS_KPIS_DIAS: ColumnaReporte<any>[] = [
   { clave: 'minutosInactivos', titulo: 'Inactivo', tipo: 'duracion', total: 'suma' },
   { clave: 'productividadPct', titulo: 'Productividad', tipo: 'porcentaje', ancho: 13 },
   { clave: 'minutosExtra', titulo: 'Tiempo extra', tipo: 'duracion', total: 'suma' },
+  { clave: 'extraEstado', titulo: 'Extra', etiquetas: ETIQUETA_ESTADO_EXTRA, ancho: 13 },
+  { clave: 'minutosExtraAprobados', titulo: 'Extra aprobado', tipo: 'duracion', total: 'suma' },
   { clave: 'sinChecada', titulo: 'Sin checar', tipo: 'booleano', ancho: 11 },
   { clave: 'faltaJustificada', titulo: 'Justificada', tipo: 'booleano', ancho: 11 },
   { clave: 'cierreAutomatico', titulo: 'Cierre automático', tipo: 'booleano', ancho: 13 },
@@ -463,6 +480,60 @@ export const COLUMNAS_KPIS_DIAS: ColumnaReporte<any>[] = [
     total: 'suma',
     ancho: 15,
   },
+];
+
+// ───────────────────────────────────────────────────────────────── pre-nómina
+
+/**
+ * Pre-nómina de un periodo: una fila por persona, con las horas que de verdad se
+ * trabajaron y el tiempo extra **aprobado**, que es lo único pagable.
+ *
+ * «Extra calculado» y «Extra aprobado» son columnas distintas a propósito: ver la
+ * diferencia es el punto del reporte. Si alguien trabajó de más y su jefe no lo autorizó,
+ * el número tiene que estar a la vista de quien paga, no escondido en un total.
+ */
+export const COLUMNAS_PRE_NOMINA: ColumnaReporte<any>[] = [
+  { clave: 'numeroEmpleado', titulo: 'No. de empleado', ancho: 14 },
+  { clave: 'nombre', titulo: 'Persona', ancho: 28 },
+  { clave: 'puesto', titulo: 'Puesto', ancho: 24 },
+  { clave: 'horario', titulo: 'Horario', ancho: 24 },
+  { clave: 'diasConJornada', titulo: 'Días trabajados', tipo: 'entero', total: 'suma', ancho: 13 },
+  { clave: 'diasSinChecada', titulo: 'Días sin checar', tipo: 'entero', total: 'suma', ancho: 13 },
+  { clave: 'faltasJustificadas', titulo: 'Faltas justificadas', tipo: 'entero', total: 'suma', ancho: 13 },
+  { clave: 'retardos', titulo: 'Retardos', tipo: 'entero', total: 'suma', ancho: 11 },
+  { clave: 'minutosTarde', titulo: 'Tiempo de retardo', tipo: 'duracion', total: 'suma' },
+  { clave: 'minutosLaborados', titulo: 'Horas laboradas', tipo: 'duracion', total: 'suma' },
+  { clave: 'minutosProductivos', titulo: 'Horas productivas', tipo: 'duracion', total: 'suma' },
+  { clave: 'minutosInactivos', titulo: 'Horas inactivas', tipo: 'duracion', total: 'suma' },
+  { clave: 'productividadPct', titulo: 'Productividad', tipo: 'porcentaje', ancho: 13 },
+  { clave: 'minutosExtraCalculados', titulo: 'Extra calculado', tipo: 'duracion', total: 'suma' },
+  { clave: 'minutosExtraAprobados', titulo: 'Extra aprobado', tipo: 'duracion', total: 'suma' },
+  { clave: 'minutosExtraPendientes', titulo: 'Extra sin aprobar', tipo: 'duracion', total: 'suma' },
+  { clave: 'cierresAutomaticos', titulo: 'Cierres automáticos', tipo: 'entero', total: 'suma', ancho: 13 },
+  { clave: 'jornadasSinSalida', titulo: 'Jornadas sin salida', tipo: 'entero', total: 'suma', ancho: 13 },
+  { clave: 'montoCapturado', titulo: 'Pagos capturados', tipo: 'dinero', total: 'suma' },
+  { clave: 'avisos', titulo: 'Revisar antes de pagar', ancho: 48, valor: (f) => (f?.avisos ?? []).join('; ') },
+];
+
+// ──────────────────────────────────────────────────── intentos de checada rechazados
+
+/** Quién intentó checar y por qué no pasó: lo que RH necesita para hablar con alguien. */
+export const COLUMNAS_CHECADAS_RECHAZADAS: ColumnaReporte<any>[] = [
+  { clave: 'at', titulo: 'Cuándo', tipo: 'fechaHora' },
+  { clave: 'persona', titulo: 'Persona', ancho: 28, valor: (r) => nombreDe(r?.persona) },
+  {
+    clave: 'puesto',
+    titulo: 'Puesto',
+    ancho: 24,
+    valor: (r) => texto((r?.persona as { puesto?: string } | null)?.puesto),
+  },
+  { clave: 'type', titulo: 'Intentó', ancho: 11 },
+  { clave: 'motivoEtiqueta', titulo: 'Motivo', ancho: 26 },
+  { clave: 'detalle', titulo: 'Detalle', ancho: 46 },
+  { clave: 'origen', titulo: 'Desde', ancho: 11 },
+  { clave: 'deviceInfo', titulo: 'Aparato', ancho: 30 },
+  { clave: 'ubicacion', titulo: 'Ubicación', ancho: 24, valor: (r) => coordenadas(r?.lat, r?.lng) },
+  { clave: 'accuracyM', titulo: 'Precisión (m)', tipo: 'entero', ancho: 12 },
 ];
 
 // ─────────────────────────────────────────────── packs del módulo «Exportar»

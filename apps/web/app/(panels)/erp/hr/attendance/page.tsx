@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -22,8 +21,6 @@ import { exportToExcel } from "@/lib/export-excel";
 import ListExportActions from "@/components/ui/ListExportActions";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import { isNonEmployeeEmail } from "@/lib/platform-accounts";
-
-const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -684,8 +681,15 @@ export default function AttendancePage() {
       {canRegister && <EmployeeStatusHero token={token} gpsConsent={gpsConsent} />}
 
       {canRegister && (
-        <Section title="Registrar jornada" subtitle="Captura foto y ubicacion quedan registradas automaticamente.">
-          <AttendanceForm />
+        <Section
+          title="Registrar jornada"
+          subtitle="Se checa desde la app NEXARA en el teléfono"
+        >
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+            Un navegador puede decir que está donde quiera, y de estas checadas sale la nómina: por eso la entrada
+            y la salida se registran solo desde la app, que sabe si el GPS es simulado. Si alguien no puede usar su
+            teléfono, su jefe registra la checada desde <strong>Asistencias</strong>, con el motivo.
+          </p>
         </Section>
       )}
 
