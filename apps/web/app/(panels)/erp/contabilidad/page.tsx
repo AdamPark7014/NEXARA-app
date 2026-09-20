@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -46,6 +45,26 @@ function formatMoney(n: number) {
 }
 
 /**
+ * Qué está mal en el rango, dicho como se corrige. Devuelve el campo culpable
+ * para poder marcarlo: un error al pie de una pantalla larga no se lee.
+ */
+function validarRango(from: string, to: string): { campo: "from" | "to"; mensaje: string } | null {
+  if (!from) {
+    return { campo: "from", mensaje: "Falta la fecha de inicio. Elige un día para poder consultar." };
+  }
+  if (!to) {
+    return { campo: "to", mensaje: "Falta la fecha final. Elige un día para poder consultar." };
+  }
+  if (from > to) {
+    return {
+      campo: "to",
+      mensaje: "La fecha final es anterior a la inicial. Ponla en el mismo día o después.",
+    };
+  }
+  return null;
+}
+
+/**
  * Dashboard Contadora — responde: qué pasa, qué está mal, qué reviso ahora.
  * No es una pared de KPIs.
  *
@@ -56,17 +75,30 @@ function formatMoney(n: number) {
  *   4. el contexto del mes, al margen, para quien lo busque.
  */
 export default function ContabilidadDashboardPage() {
-  const { user } = useUser();
-  const router = useRouter();
+  const { user, isContextReady } = useUser();
   const token = user?.token ?? "";
   const [range, setRange] = useState(defaultRange);
   const [data, setData] = useState<WorkspaceDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPeriod, setShowPeriod] = useState(false);
+  const periodoId = useId();
+
+  // Solo el rango vigente dispara la consulta: el panel de periodo trabaja
+  // sobre un borrador y se aplica a mano, para no lanzar una petición por cada
+  // tecleo en las fechas ni consultar un rango invertido a medio capturar.
+  const [borrador, setBorrador] = useState(range);
+  const [errorRango, setErrorRango] = useState<{ campo: "from" | "to"; mensaje: string } | null>(
+    null,
+  );
+
+  // La última petición gana. Sin esto, dos rangos seguidos podían pintarse en
+  // desorden y dejar en pantalla cifras de un periodo que ya nadie pidió.
+  const peticion = useRef(0);
 
   const load = useCallback(async () => {
     if (!token) return;
+    const turno = ++peticion.current;
     setLoading(true);
     setError(null);
     try {
@@ -75,22 +107,68 @@ export default function ContabilidadDashboardPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(await res.text());
-      setData(await res.json());
+      const json = (await res.json()) as WorkspaceDashboard;
+      if (turno !== peticion.current) return;
+      setData(json);
     } catch (e) {
+      if (turno !== peticion.current) return;
       setError(formatApiError(e));
       setData(null);
     } finally {
-      setLoading(false);
+      if (turno === peticion.current) setLoading(false);
     }
   }, [token, range.from, range.to]);
 
   useEffect(() => {
+    if (!isContextReady) return;
+    // Sin sesión no hay a quién preguntarle: se corta el esqueleto y se dice
+    // por qué, en vez de dejar «Cargando…» girando para siempre.
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [isContextReady, token, load]);
+
+  const aplicarPeriodo = useCallback(() => {
+    const problema = validarRango(borrador.from, borrador.to);
+    setErrorRango(problema);
+    if (problema) return;
+    setRange(borrador);
+    setShowPeriod(false);
+  }, [borrador]);
+
+  const abrirPeriodo = useCallback(() => {
+    setShowPeriod((v) => {
+      if (!v) {
+        setBorrador(range);
+        setErrorRango(null);
+      }
+      return !v;
+    });
+  }, [range]);
+
+  const sinSesion = isContextReady && !token;
+
+  /** Valor de contexto: «…» cargando, «—» sin respuesta, la cifra si la hay. */
+  const ctx = (valor: ReactNode): ReactNode =>
+    loading ? "…" : data ? valor : <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+
+  /**
+   * `href` opcional: la API manda alertas sin destino (`alerts[].href`), y un
+   * renglón que parece enlace y no lleva a ningún lado es de los peores
+   * silencios de una pantalla. Sin destino se pinta como texto, no como enlace.
+   */
+  type Atencion = {
+    label: string;
+    detail: string;
+    href?: string;
+    tone: "danger" | "warning" | "info";
+  };
 
   const attention = useMemo(() => {
-    if (!data) return [] as { label: string; detail: string; href: string; tone: "danger" | "warning" | "info" }[];
-    const items: { label: string; detail: string; href: string; tone: "danger" | "warning" | "info" }[] = [];
+    if (!data) return [] as Atencion[];
+    const items: Atencion[] = [];
     if (data.agingPayable.overdue > 0) {
       items.push({
         label: "Pagos vencidos",
@@ -112,25 +190,31 @@ export default function ContabilidadDashboardPage() {
       items.push({
         label: a.message,
         detail: a.severity === "danger" ? "Urgente" : a.severity === "warning" ? "Revisar" : "Pendiente",
-        href: a.href || "/erp/contabilidad",
+        href: a.href || undefined,
         tone: a.severity,
       });
     }
     return items.slice(0, 5);
   }, [data]);
 
-  const primaryHref = attention[0]?.href ?? "/erp/contabilidad/cuentas-por-cobrar";
-  const primaryLabel =
-    attention.length > 0 ? "Revisar pendientes" : "Ver por cobrar";
+  const primaryHref =
+    attention.find((a) => a.href)?.href ?? "/erp/contabilidad/cuentas-por-cobrar";
+  const primaryLabel = attention.some((a) => a.href) ? "Revisar pendientes" : "Ver por cobrar";
+
+  /**
+   * El periodo que contestó el servidor, no el que se pidió: la API normaliza
+   * el rango (`period` en la respuesta) y si difiere, lo que manda es el suyo.
+   */
+  const periodoVigente = data?.period ?? range;
 
   const monthLabel = useMemo(() => {
-    try {
-      const d = new Date(`${range.from}T12:00:00`);
-      return d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
-    } catch {
-      return `${range.from} → ${range.to}`;
-    }
-  }, [range]);
+    const { from, to } = periodoVigente;
+    const d = new Date(`${from}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return `${from} → ${to}`;
+    const mismoMes = from.slice(0, 7) === to.slice(0, 7);
+    if (!mismoMes) return `${from} → ${to}`;
+    return d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+  }, [periodoVigente]);
 
   /**
    * La tira responde, de izquierda a derecha, las preguntas de la mañana: cuánto
@@ -138,7 +222,10 @@ export default function ContabilidadDashboardPage() {
    * color solo entra cuando algo está vencido o hay algo que resolver.
    */
   const metrics: Metric[] = useMemo(() => {
-    const cargando = loading ? "…" : null;
+    // Tres estados distintos, tres señales distintas: «…» mientras carga, «—»
+    // cuando no hubo respuesta (sin sesión o error) y la cifra cuando la hay.
+    // Pintar «$0» sin datos sería inventarse un saldo.
+    const cargando: ReactNode | null = loading ? "…" : data ? null : "—";
     const cobrosVencidos = data?.agingReceivable.overdue ?? 0;
     const pagosVencidos = data?.agingPayable.overdue ?? 0;
     const tonoAlertas: Metric["tone"] = attention.some((a) => a.tone === "danger")
@@ -148,25 +235,35 @@ export default function ContabilidadDashboardPage() {
         : "default";
 
     return [
+      // `href`, no `onClick`: navegar con un manejador rompe ctrl+clic y «abrir
+      // en pestaña nueva», que es justo lo que se hace para comparar dos cosas.
       {
         label: "Disponible",
         value: cargando ?? <Money value={data?.cashBalance ?? 0} />,
         hint: "En bancos y caja",
-        onClick: () => router.push("/erp/contabilidad/conciliacion"),
+        href: "/erp/contabilidad/conciliacion",
       },
       {
         label: "Por cobrar",
         value: cargando ?? <Money value={data?.accountsReceivablePending ?? 0} />,
-        hint: cobrosVencidos > 0 ? `${formatMoney(cobrosVencidos)} ya vencidos` : "Nada vencido",
+        hint: !data
+          ? "Sin dato"
+          : cobrosVencidos > 0
+            ? `${formatMoney(cobrosVencidos)} ya vencidos`
+            : "Nada vencido",
         tone: cobrosVencidos > 0 ? "warning" : "default",
-        onClick: () => router.push("/erp/contabilidad/cuentas-por-cobrar"),
+        href: "/erp/contabilidad/cuentas-por-cobrar",
       },
       {
         label: "Por pagar",
         value: cargando ?? <Money value={data?.accountsPayablePending ?? 0} />,
-        hint: pagosVencidos > 0 ? `${formatMoney(pagosVencidos)} ya vencidos` : "Nada vencido",
+        hint: !data
+          ? "Sin dato"
+          : pagosVencidos > 0
+            ? `${formatMoney(pagosVencidos)} ya vencidos`
+            : "Nada vencido",
         tone: pagosVencidos > 0 ? "danger" : "default",
-        onClick: () => router.push("/erp/contabilidad/cuentas-por-pagar"),
+        href: "/erp/contabilidad/cuentas-por-pagar",
       },
       {
         label: "Flujo neto",
@@ -175,12 +272,16 @@ export default function ContabilidadDashboardPage() {
       },
       {
         label: "Requiere atención",
-        value: loading ? "…" : attention.length,
-        hint: attention.length === 0 ? "Nada pendiente" : "Con su enlace, aquí abajo",
+        value: cargando ?? attention.length,
+        hint: !data
+          ? "Sin respuesta del servidor"
+          : attention.length === 0
+            ? "Nada pendiente"
+            : "Con su enlace, aquí abajo",
         tone: tonoAlertas,
       },
     ];
-  }, [loading, data, attention, router]);
+  }, [loading, data, attention]);
 
   const agingRows = useMemo(
     () => [
@@ -214,28 +315,26 @@ export default function ContabilidadDashboardPage() {
       <PageHeader
         eyebrow="Contabilidad"
         title="Resumen"
-        subtitle={loading ? "Cargando el periodo…" : `Qué está pasando en ${monthLabel}.`}
+        subtitle={
+          sinSesion
+            ? "Sin sesión activa."
+            : loading
+              ? "Cargando el periodo…"
+              : `Qué está pasando en ${monthLabel}.`
+        }
         density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <Button size="sm" variant="ghost" onClick={() => setShowPeriod((v) => !v)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={abrirPeriodo}
+              aria-expanded={showPeriod}
+              aria-controls={periodoId}
+            >
               Periodo
             </Button>
-            <Link
-              href={primaryHref}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                height: 32,
-                padding: "0 14px",
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                textDecoration: "none",
-                color: "#fff",
-                background: "var(--primary)",
-              }}
-            >
+            <Link href={primaryHref} className="nx-contab-cta">
               {primaryLabel}
             </Link>
           </div>
@@ -243,12 +342,17 @@ export default function ContabilidadDashboardPage() {
       />
 
       {showPeriod && (
-        <div
+        <form
+          id={periodoId}
+          onSubmit={(e) => {
+            e.preventDefault();
+            aplicarPeriodo();
+          }}
           style={{
             display: "flex",
             gap: 10,
             flexWrap: "wrap",
-            alignItems: "flex-end",
+            alignItems: "flex-start",
             marginBottom: 14,
             padding: "10px 12px",
             borderRadius: 10,
@@ -256,57 +360,58 @@ export default function ContabilidadDashboardPage() {
             background: "var(--surface)",
           }}
         >
-          <label style={{ display: "grid", gap: 4, fontSize: 11, color: "var(--text-tertiary)" }}>
-            Desde
-            <input
-              type="date"
-              value={range.from}
-              onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-              style={{
-                fontSize: 13,
-                padding: "6px 8px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--text-primary)",
-              }}
-            />
-          </label>
-          <label style={{ display: "grid", gap: 4, fontSize: 11, color: "var(--text-tertiary)" }}>
-            Hasta
-            <input
-              type="date"
-              value={range.to}
-              onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-              style={{
-                fontSize: 13,
-                padding: "6px 8px",
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--text-primary)",
-              }}
-            />
-          </label>
-          <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
-            Aplicar
-          </Button>
-        </div>
+          <CampoFecha
+            label="Desde"
+            value={borrador.from}
+            onChange={(v) => {
+              setBorrador((b) => ({ ...b, from: v }));
+              setErrorRango(null);
+            }}
+            error={errorRango?.campo === "from" ? errorRango.mensaje : null}
+          />
+          <CampoFecha
+            label="Hasta"
+            value={borrador.to}
+            onChange={(v) => {
+              setBorrador((b) => ({ ...b, to: v }));
+              setErrorRango(null);
+            }}
+            error={errorRango?.campo === "to" ? errorRango.mensaje : null}
+          />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", paddingTop: 17 }}>
+            <Button size="sm" variant="ghost" onClick={() => setShowPeriod(false)}>
+              Cancelar
+            </Button>
+            <Button size="sm" variant="primary" type="submit" disabled={loading}>
+              {loading ? "Consultando…" : "Aplicar"}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {sinSesion && (
+        <InlineAlert
+          variant="warning"
+          message="No hay sesión activa, así que no se puede consultar el resumen. Vuelve a entrar con tu cuenta y la pantalla se llenará sola."
+          action={
+            <Link href="/login" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+              Ir a entrar
+            </Link>
+          }
+        />
       )}
 
       {error && (
-        <>
-          <InlineAlert
-            variant="danger"
-            message={`No se pudo cargar el resumen. ${error}`}
-            onDismiss={() => setError(null)}
-          />
-          <div style={{ marginTop: -4, marginBottom: 14 }}>
-            <Button size="sm" variant="secondary" onClick={() => void load()}>
-              Reintentar
+        <InlineAlert
+          variant="danger"
+          message={`No se pudo cargar el resumen del ${periodoVigente.from} al ${periodoVigente.to}. ${error} Reintenta; si vuelve a fallar, prueba con un rango más corto.`}
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
+              {loading ? "Reintentando…" : "Reintentar"}
             </Button>
-          </div>
-        </>
+          }
+        />
       )}
 
       {/* Nivel 1 — la tira: el estado del dinero en una sola línea. */}
@@ -327,7 +432,11 @@ export default function ContabilidadDashboardPage() {
           {/* Nivel 2 — excepciones: cada una con el enlace a donde se resuelve. */}
           <section aria-labelledby="att-title">
             <BlockTitle id="att-title">Requiere atención</BlockTitle>
-            {loading ? (
+            {sinSesion ? (
+              <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
+                No se pudo revisar: no hay sesión.
+              </p>
+            ) : loading ? (
               <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
                 Revisando pendientes…
               </p>
@@ -357,27 +466,9 @@ export default function ContabilidadDashboardPage() {
                   background: "var(--surface)",
                 }}
               >
-                {attention.map((item, i) => (
-                  <li
-                    key={`${item.href}-${item.label}`}
-                    style={{
-                      borderTop:
-                        i === 0 ? undefined : "1px solid var(--nx-panel-hairline, var(--border))",
-                    }}
-                  >
-                    <Link
-                      href={item.href}
-                      className="nx-attention-row"
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        alignItems: "center",
-                        padding: "10px 14px",
-                        textDecoration: "none",
-                        color: "var(--text-primary)",
-                      }}
-                    >
+                {attention.map((item, i) => {
+                  const cuerpo = (
+                    <>
                       <span style={{ fontSize: 13, fontWeight: 500, minWidth: 0 }}>
                         {item.label}
                       </span>
@@ -394,13 +485,45 @@ export default function ContabilidadDashboardPage() {
                           label={item.detail}
                           tone={item.tone === "info" ? "neutral" : (item.tone as StatusTone)}
                         />
-                        <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>
-                          ›
-                        </span>
+                        {item.href ? (
+                          <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>
+                            ›
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                            sin pantalla asociada
+                          </span>
+                        )}
                       </span>
-                    </Link>
-                  </li>
-                ))}
+                    </>
+                  );
+                  const filaStyle = {
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "center",
+                    padding: "10px 14px",
+                    textDecoration: "none",
+                    color: "var(--text-primary)",
+                  } as const;
+                  return (
+                    <li
+                      key={`${item.href ?? "sin-destino"}-${item.label}`}
+                      style={{
+                        borderTop:
+                          i === 0 ? undefined : "1px solid var(--nx-panel-hairline, var(--border))",
+                      }}
+                    >
+                      {item.href ? (
+                        <Link href={item.href} className="nx-attention-row" style={filaStyle}>
+                          {cuerpo}
+                        </Link>
+                      ) : (
+                        <div style={filaStyle}>{cuerpo}</div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -483,16 +606,22 @@ export default function ContabilidadDashboardPage() {
                         </Link>
                       </th>
                       <AgingCell
-                        value={loading ? null : row.vencido}
+                        value={loading ? null : data ? row.vencido : undefined}
                         alert={!loading && row.vencido > 0}
                         first={i === 0}
                       />
                       <AgingCell
-                        value={loading ? null : row.tieneHoy ? row.hoy : undefined}
+                        value={loading ? null : data && row.tieneHoy ? row.hoy : undefined}
                         first={i === 0}
                       />
-                      <AgingCell value={loading ? null : row.next7} first={i === 0} />
-                      <AgingCell value={loading ? null : row.next30} first={i === 0} />
+                      <AgingCell
+                        value={loading ? null : data ? row.next7 : undefined}
+                        first={i === 0}
+                      />
+                      <AgingCell
+                        value={loading ? null : data ? row.next30 : undefined}
+                        first={i === 0}
+                      />
                     </tr>
                   ))}
                 </tbody>
@@ -516,32 +645,24 @@ export default function ContabilidadDashboardPage() {
           >
             <CtxRow
               label="Ingresos"
-              value={loading ? "…" : <Money value={data?.income ?? 0} bold={false} />}
+              value={ctx(<Money value={data?.income ?? 0} bold={false} />)}
               first
             />
-            <CtxRow
-              label="Egresos"
-              value={loading ? "…" : <Money value={data?.expense ?? 0} bold={false} />}
-            />
-            <CtxRow
-              label="Flujo neto"
-              value={loading ? "…" : <Money value={data?.netCashflow ?? 0} />}
-            />
+            <CtxRow label="Egresos" value={ctx(<Money value={data?.expense ?? 0} bold={false} />)} />
+            <CtxRow label="Flujo neto" value={ctx(<Money value={data?.netCashflow ?? 0} />)} />
             <CtxRow
               label="Facturas"
-              value={
-                loading
-                  ? "…"
-                  : `${data?.invoicesPeriod.total ?? 0} (${data?.invoicesPeriod.issued ?? 0} emit. · ${data?.invoicesPeriod.received ?? 0} rec.)`
-              }
+              value={ctx(
+                `${data?.invoicesPeriod.total ?? 0} (${data?.invoicesPeriod.issued ?? 0} emit. · ${data?.invoicesPeriod.received ?? 0} rec.)`,
+              )}
             />
-            {(data?.prenominaDraftTotal ?? 0) > 0 && (
-              <CtxRow
-                label="Pre-nómina borrador"
-                value={<Money value={data!.prenominaDraftTotal} bold={false} />}
-                href="/erp/contabilidad/pre-nomina"
-              />
-            )}
+            {/* El renglón se queda aunque el borrador esté en cero: si aparece
+                y desaparece solo, deja de poderse consultar «¿cómo va?». */}
+            <CtxRow
+              label="Pre-nómina borrador"
+              value={ctx(<Money value={data?.prenominaDraftTotal ?? 0} bold={false} />)}
+              href="/erp/contabilidad/pre-nomina"
+            />
           </dl>
           <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
             <QuietLink href="/erp/contabilidad/cierres">Cerrar periodo</QuietLink>
@@ -550,15 +671,93 @@ export default function ContabilidadDashboardPage() {
         </section>
       </div>
 
+      {/* A 1024px la columna de contexto ya no cabe junto a la tabla de
+          vencimientos sin estrangular las dos: se apila, que es lo que pide
+          leer, en vez de encoger la tipografía. */}
       <style>{`
-        @media (max-width: 720px) {
+        @media (max-width: 1024px) {
           .nx-contab-dash-grid { grid-template-columns: 1fr !important; }
         }
         .nx-attention-row:hover {
           background: color-mix(in srgb, var(--primary) 5%, transparent);
         }
+        .nx-attention-row:focus-visible,
+        .nx-contab-quiet:focus-visible {
+          outline: 2px solid var(--primary);
+          outline-offset: -2px;
+          border-radius: 6px;
+        }
+        .nx-contab-cta {
+          display: inline-flex;
+          align-items: center;
+          height: 32px;
+          padding: 0 14px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          text-decoration: none;
+          color: #fff;
+          background: var(--primary);
+        }
+        .nx-contab-cta:hover { background: var(--primary-strong, var(--primary)); }
+        .nx-contab-cta:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+        }
       `}</style>
     </>
+  );
+}
+
+/**
+ * Campo de fecha del panel de periodo. El error va pegado al control y ligado
+ * por `aria-describedby`: quien navega con lector de pantalla se entera de qué
+ * pasa en el campo, no al final de la pantalla.
+ */
+function CampoFecha({
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  error?: string | null;
+}) {
+  const id = useId();
+  const errorId = `${id}-error`;
+  return (
+    <div style={{ display: "grid", gap: 4, maxWidth: 220 }}>
+      <label htmlFor={id} style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        style={{
+          fontSize: 13,
+          padding: "6px 8px",
+          borderRadius: 8,
+          border: `1px solid ${error ? "var(--state-danger-text, #b91c1c)" : "var(--border)"}`,
+          background: "var(--surface)",
+          color: "var(--text-primary)",
+        }}
+      />
+      {error ? (
+        <span
+          id={errorId}
+          role="alert"
+          style={{ fontSize: 11, color: "var(--state-danger-text, #b91c1c)", lineHeight: 1.35 }}
+        >
+          {error}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -640,7 +839,11 @@ function CtxRow({
   );
   if (href) {
     return (
-      <Link href={href} style={{ ...rowStyle, textDecoration: "none", color: "inherit" }}>
+      <Link
+        href={href}
+        className="nx-contab-quiet"
+        style={{ ...rowStyle, textDecoration: "none", color: "inherit" }}
+      >
         {inner}
       </Link>
     );
@@ -650,7 +853,11 @@ function CtxRow({
 
 function QuietLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} style={{ fontSize: 12.5, color: "var(--primary)", textDecoration: "none" }}>
+    <Link
+      href={href}
+      className="nx-contab-quiet"
+      style={{ fontSize: 12.5, color: "var(--primary)", textDecoration: "none" }}
+    >
       {children} →
     </Link>
   );
