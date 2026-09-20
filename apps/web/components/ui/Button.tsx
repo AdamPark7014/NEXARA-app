@@ -22,7 +22,10 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const SIZES: Record<Size, { height: number; padX: number; fontSize: number; radius: number; iconSize: number }> = {
-  sm: { height: 30, padX: 11, fontSize: 12, radius: 8, iconSize: 14 },
+  // 32/13, no 30/12: a 12px el texto de un botón se lee barato, y era parte
+  // de por qué las pantallas se sentían poco serias. Es el tamaño que fija
+  // .ai/DISENO-FINANZAS.md para todo lo que no es la acción principal.
+  sm: { height: 32, padX: 12, fontSize: 13, radius: 8, iconSize: 15 },
   md: { height: 36, padX: 14, fontSize: 13, radius: 10, iconSize: 15 },
   lg: { height: 44, padX: 20, fontSize: 14, radius: 12, iconSize: 16 },
 };

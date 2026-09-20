@@ -55,7 +55,9 @@ El primario es la acción que la persona vino a hacer (`Registrar gasto`,
 `Timbrar`, `Conciliar`). Todo lo demás —exportar, actualizar, filtrar— va en
 gris. Hoy compiten varios botones llamativos y ninguno destaca.
 
-Altura 32px, texto de 13px. Nada de botones gigantes.
+Altura 32px, texto de 13px: es exactamente `size="sm"` de `Button`, que se
+subió de 30/12 a 32/13 para que el contrato sea cumplible desde las pantallas.
+Nada de botones gigantes.
 
 ### 5. Formularios con jerarquía
 
