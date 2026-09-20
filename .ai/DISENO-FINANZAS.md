@@ -30,11 +30,20 @@ columnas extra que ensanchan la tabla.
 Usa el `DataTable` que ya existe. Si una columna no se lee en móvil, se colapsa
 bajo el concepto; no se hace scroll horizontal.
 
+`MetricStrip` acepta `onClick` cuando la celda filtra la vista en el sitio, y
+`href` cuando lleva a otra pantalla. Usa `href` para navegar: hacerlo con un
+manejador rompe ctrl+clic y «abrir en pestaña nueva», que es justo lo que hace
+una contadora cuando quiere revisar dos cosas a la vez.
+
 ### 3. El estado es un punto y una palabra
 
 `StatusDot` (`@/components/ui/StatusDot`), no pastillas rellenas. Con veinte
 filas, las pastillas convierten la tabla en un semáforo y deja de distinguirse
 lo que urge.
+
+`StatusDot` no parte el texto de renglón por defecto, porque un estado partido
+en dos se lee mal. Cuando la etiqueta es una frase —el motivo de una
+incidencia, por ejemplo— pásale `wrap`, o la celda ensancha la tabla entera.
 
 Tono `neutral` para los estados normales del flujo. Color **solo** cuando el
 renglón pide acción o algo salió mal: `warning` por autorizar o por vencer,
