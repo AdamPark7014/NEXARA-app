@@ -1208,23 +1208,23 @@ export class AccountingService {
       },
     });
 
-    return this.evaluateThreeWayMatch(invoice.id, userId);
+    return this.evaluateThreeWayMatch(invoice.id, userId, tenantId);
   }
 
   /**
    * 3-way match: cantidad factura ≤ recibida; precio ≈ OC (±2%).
    * Solo aplica a CXP ligadas a OC/GR.
    */
-  async evaluateThreeWayMatch(invoiceId: number, userId?: number) {
+  async evaluateThreeWayMatch(invoiceId: number, userId?: number, companyId?: number | null) {
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id: invoiceId, deletedAt: null },
+      where: { id: invoiceId, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: {
         items: true,
         purchaseOrder: { include: { items: true } },
         goodsReceipt: { include: { items: true } },
       },
     });
-    if (!invoice) throw new NotFoundException('Factura no encontrada');
+    assertCompanyAccess(invoice, companyId, 'Factura');
 
     if (invoice.type !== 'ACCOUNTS_PAYABLE' || (!invoice.purchaseOrderId && !invoice.goodsReceiptId)) {
       return this.prisma.invoice.update({
@@ -1891,6 +1891,7 @@ export class AccountingService {
       include: { items: { include: { product: true } } },
     });
     assertCompanyAccess(invoice, companyId, 'Factura');
+    await this.assertDateNotInClosedPeriod(invoice.issueDate, companyId);
     if (invoice.isCancelled) throw new BadRequestException('La factura está cancelada');
     if (invoice.cfdiUuid) throw new BadRequestException('La factura ya está timbrada');
     if (invoice.status === 'STAMPING') {
@@ -2190,7 +2191,7 @@ export class AccountingService {
     }
 
     if (invoice.type === 'ACCOUNTS_PAYABLE' && (invoice.purchaseOrderId || invoice.goodsReceiptId)) {
-      return this.evaluateThreeWayMatch(id, userId);
+      return this.evaluateThreeWayMatch(id, userId, companyId);
     }
     return this.getInvoice(id, companyId);
   }
@@ -2932,6 +2933,8 @@ export class AccountingService {
       include: { items: true },
     });
     assertCompanyAccess(original, companyId, 'Factura');
+    await this.assertDateNotInClosedPeriod(original.issueDate, companyId);
+    await this.assertDateNotInClosedPeriod(new Date(), companyId);
     if (!original.cfdiUuid) {
       throw new BadRequestException('Solo se pueden emitir notas de crédito contra facturas timbradas');
     }

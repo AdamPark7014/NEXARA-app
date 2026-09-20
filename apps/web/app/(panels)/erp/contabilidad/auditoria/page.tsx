@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -102,12 +103,23 @@ function tonoAccion(action: string): StatusTone {
   return "neutral";
 }
 
+/** Opciones vistas hasta ahora: usuario, entidad y acción. */
+type Catalogos = {
+  usuarios: Record<string, string>;
+  entidades: string[];
+  acciones: string[];
+};
+
+const CATALOGOS_VACIOS: Catalogos = { usuarios: {}, entidades: [], acciones: [] };
+
 export default function AuditoriaPage() {
-  const { user } = useUser();
+  const { user, isContextReady } = useUser();
   const token = user?.token ?? "";
 
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [total, setTotal] = useState(0);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [abierta, setAbierta] = useState<AuditRow | null>(null);
@@ -120,12 +132,22 @@ export default function AuditoriaPage() {
   const [fHasta, setFHasta] = useState("");
   const [busqueda, setBusqueda] = useState("");
 
+  /**
+   * No hay endpoint de catálogos, así que las opciones salen de lo cargado —
+   * pero se ACUMULAN. Derivándolas solo del corte actual, al elegir un usuario
+   * el desplegable se quedaba con ese único usuario y ya no se podía cambiar a
+   * otro sin limpiar los filtros: parecía que la lista se había roto.
+   */
+  const [catalogos, setCatalogos] = useState<Catalogos>(CATALOGOS_VACIOS);
+  const peticion = useRef(0);
+
   const load = useCallback(async () => {
     if (!token) return;
+    const turno = ++peticion.current;
     setLoading(true);
     setError(null);
     try {
-      const qs = new URLSearchParams({ limit: String(LIMITE) });
+      const qs = new URLSearchParams({ limit: String(LIMITE), page: String(pagina) });
       if (fUsuario) qs.set("userId", fUsuario);
       if (fEntidad) qs.set("entityType", fEntidad);
       if (fAccion) qs.set("action", fAccion);
@@ -133,39 +155,91 @@ export default function AuditoriaPage() {
       if (fHasta) qs.set("to", `${fHasta}T23:59:59`);
       const data = await erpFetch<Respuesta | AuditRow[]>(`audit?${qs}`, token);
       const lista = Array.isArray(data) ? data : (data?.data ?? []);
+      if (turno !== peticion.current) return;
       setRows(lista);
-      setTotal(Array.isArray(data) ? lista.length : (data?.total ?? lista.length));
+      const cuantos = Array.isArray(data) ? lista.length : (data?.total ?? lista.length);
+      setTotal(cuantos);
+      setTotalPaginas(
+        Array.isArray(data)
+          ? 1
+          : (data?.totalPages ?? Math.max(1, Math.ceil(cuantos / LIMITE))),
+      );
+      setCatalogos((prev) => {
+        const usuarios = { ...prev.usuarios };
+        for (const r of lista) {
+          if (r.user?.id) usuarios[String(r.user.id)] = r.user.nombre || r.user.email || `#${r.user.id}`;
+          else if (r.userId) usuarios[String(r.userId)] = `#${r.userId}`;
+        }
+        const entidades = [...new Set([...prev.entidades, ...lista.map((r) => r.entityType)])]
+          .filter(Boolean)
+          .sort();
+        const acciones = [...new Set([...prev.acciones, ...lista.map((r) => r.action)])]
+          .filter(Boolean)
+          .sort();
+        return { usuarios, entidades, acciones };
+      });
     } catch (e) {
-      setError(formatApiError(e));
+      if (turno !== peticion.current) return;
+      const crudo = formatApiError(e);
+      // Un 403 es lo único que se resuelve pidiendo permiso; mezclarlo con
+      // cualquier otro fallo mandaba a la gente a dirección por un 500.
+      const sinPermiso = /\b403\b|forbidden|prohibid|permis/i.test(crudo);
+      setError(
+        sinPermiso
+          ? `No se pudo abrir la bitácora: tu cuenta no tiene el permiso audit.view. Pídeselo a dirección y vuelve a entrar. (${crudo})`
+          : `No se pudo cargar la bitácora. ${crudo} Reintenta; si persiste, acota el rango de fechas.`,
+      );
       setRows([]);
       setTotal(0);
+      setTotalPaginas(1);
     } finally {
-      setLoading(false);
+      if (turno === peticion.current) setLoading(false);
     }
-  }, [token, fUsuario, fEntidad, fAccion, fDesde, fHasta]);
+  }, [token, fUsuario, fEntidad, fAccion, fDesde, fHasta, pagina]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
-
-  // Las opciones salen de lo cargado: no hay endpoint de catálogos de auditoría.
-  const opcionesUsuario = useMemo(() => {
-    const mapa = new Map<string, string>();
-    for (const r of rows) {
-      if (r.user?.id) mapa.set(String(r.user.id), r.user.nombre || r.user.email || `#${r.user.id}`);
-      else if (r.userId) mapa.set(String(r.userId), `#${r.userId}`);
+    if (!isContextReady) return;
+    // Sin sesión, el «Cargando…» se quedaba girando sin explicar nada.
+    if (!token) {
+      setLoading(false);
+      return;
     }
-    return [...mapa.entries()].map(([value, label]) => ({ value, label }));
-  }, [rows]);
+    void load();
+  }, [isContextReady, token, load]);
+
+  const [angosto, setAngosto] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1024px)");
+    const sync = () => setAngosto(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const sinSesion = isContextReady && !token;
+
+  /** Al cambiar un filtro se vuelve a la primera página: la 4 de un filtro no
+   *  es la 4 de otro, y quedarse ahí devolvía una página vacía sin motivo. */
+  const filtrar = useCallback((set: (v: string) => void) => {
+    return (v: string) => {
+      set(v);
+      setPagina(1);
+    };
+  }, []);
+
+  const opcionesUsuario = useMemo(
+    () => Object.entries(catalogos.usuarios).map(([value, label]) => ({ value, label })),
+    [catalogos.usuarios],
+  );
 
   const opcionesEntidad = useMemo(
-    () => [...new Set(rows.map((r) => r.entityType).filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
-    [rows],
+    () => catalogos.entidades.map((v) => ({ value: v, label: v })),
+    [catalogos.entidades],
   );
 
   const opcionesAccion = useMemo(
-    () => [...new Set(rows.map((r) => r.action).filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
-    [rows],
+    () => catalogos.acciones.map((v) => ({ value: v, label: v })),
+    [catalogos.acciones],
   );
 
   const filtradas = useMemo(() => {
@@ -199,7 +273,15 @@ export default function AuditoriaPage() {
       label: "Acción",
       render: (r) => <StatusDot label={r.action} tone={tonoAccion(r.action)} />,
     },
-    { key: "entityType", label: "Entidad" },
+    {
+      // Sin `render` la celda salía VACÍA: `DataTable` no cae al valor de la
+      // fila por su `key`, pinta cadena vacía. La columna «Entidad» llevaba
+      // tiempo en blanco y el dato venía en cada evento.
+      key: "entityType",
+      label: "Entidad",
+      render: (r) =>
+        r.entityType || <span style={{ color: "var(--text-tertiary)" }}>—</span>,
+    },
     {
       key: "entityId",
       label: "Registro",
@@ -207,19 +289,25 @@ export default function AuditoriaPage() {
       numeric: true,
       render: (r) => (r.entityId ? `#${r.entityId}` : "—"),
     },
-    {
-      key: "contexto",
-      label: "Contexto",
-      render: (r) => {
-        const ctx = contextoHttp(r);
-        const ruta = ctx?.["path"] ? String(ctx["path"]) : null;
-        return (
-          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-            {[r.source, ruta, r.ipAddress].filter(Boolean).join(" · ") || "—"}
-          </span>
-        );
-      },
-    },
+    // El contexto técnico es la columna más ancha y la menos consultada: por
+    // debajo de 1024px se retira, y sigue completo en el detalle del evento.
+    ...(angosto
+      ? []
+      : [
+          {
+            key: "contexto",
+            label: "Contexto",
+            render: (r: AuditRow) => {
+              const ctx = contextoHttp(r);
+              const ruta = ctx?.["path"] ? String(ctx["path"]) : null;
+              return (
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                  {[r.source, ruta, r.ipAddress].filter(Boolean).join(" · ") || "—"}
+                </span>
+              );
+            },
+          },
+        ]),
   ];
 
   /**
@@ -233,17 +321,17 @@ export default function AuditoriaPage() {
     ).size;
     return [
       {
-        label: "Eventos",
+        label: "Eventos en pantalla",
         value: loading ? "…" : filtradas.length.toLocaleString("es-MX"),
         hint:
           total > rows.length
-            ? `De los ${rows.length} más recientes (hay ${total})`
+            ? `De ${rows.length} en esta página · ${total.toLocaleString("es-MX")} en total`
             : "Todos los del filtro",
       },
       {
         label: "Personas",
         value: loading ? "…" : personas,
-        hint: "Quién tocó algo en este corte",
+        hint: "Quién tocó algo en esta página",
       },
       {
         label: "Entidades",
@@ -272,16 +360,39 @@ export default function AuditoriaPage() {
         subtitle="Quién cambió qué y cuándo. Abre un evento para ver el antes y el después."
         density="ops"
         actions={
-          <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
-            Actualizar
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void load()}
+            disabled={loading || sinSesion}
+          >
+            {loading ? "Actualizando…" : "Actualizar"}
           </Button>
         }
       />
 
+      {sinSesion && (
+        <InlineAlert
+          variant="warning"
+          message="No hay sesión activa, así que la bitácora no se puede consultar. Vuelve a entrar con tu cuenta para verla."
+          action={
+            <Link href="/login" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+              Ir a entrar
+            </Link>
+          }
+        />
+      )}
+
       {error && (
         <InlineAlert
-          message={`${error} — si falta el permiso audit.view, pide acceso a dirección.`}
+          message={error}
           variant="danger"
+          onDismiss={() => setError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
+              {loading ? "Reintentando…" : "Reintentar"}
+            </Button>
+          }
         />
       )}
 
@@ -290,15 +401,39 @@ export default function AuditoriaPage() {
       </div>
 
       <FilterToolbar
-        search={{ value: busqueda, onChange: setBusqueda, placeholder: "Buscar usuario, acción, entidad…" }}
+        search={{
+          value: busqueda,
+          onChange: setBusqueda,
+          // El buscador no va al servidor: la API de auditoría no acepta texto
+          // libre. Decirlo evita concluir «no existe» cuando solo no está aquí.
+          placeholder: "Filtrar esta página por usuario, acción o entidad…",
+        }}
         selects={[
-          { label: "Usuario", value: fUsuario, onChange: setFUsuario, options: opcionesUsuario, allowAll: true },
-          { label: "Entidad", value: fEntidad, onChange: setFEntidad, options: opcionesEntidad, allowAll: true },
-          { label: "Acción", value: fAccion, onChange: setFAccion, options: opcionesAccion, allowAll: true },
+          {
+            label: "Usuario",
+            value: fUsuario,
+            onChange: filtrar(setFUsuario),
+            options: opcionesUsuario,
+            allowAll: true,
+          },
+          {
+            label: "Entidad",
+            value: fEntidad,
+            onChange: filtrar(setFEntidad),
+            options: opcionesEntidad,
+            allowAll: true,
+          },
+          {
+            label: "Acción",
+            value: fAccion,
+            onChange: filtrar(setFAccion),
+            options: opcionesAccion,
+            allowAll: true,
+          },
         ]}
         dates={[
-          { label: "Desde", value: fDesde, onChange: setFDesde },
-          { label: "Hasta", value: fHasta, onChange: setFHasta },
+          { label: "Desde", value: fDesde, onChange: filtrar(setFDesde) },
+          { label: "Hasta", value: fHasta, onChange: filtrar(setFHasta) },
         ]}
         onClear={() => {
           setBusqueda("");
@@ -307,19 +442,49 @@ export default function AuditoriaPage() {
           setFAccion("");
           setFDesde("");
           setFHasta("");
+          setPagina(1);
         }}
         resultCount={loading ? null : filtradas.length}
       />
 
+      <p style={{ margin: "6px 2px 10px", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+        Usuario, entidad, acción y fechas los aplica el servidor sobre toda la bitácora. El cuadro
+        de texto solo filtra los {LIMITE} eventos de esta página; para buscar más atrás, avanza de
+        página o acota con las fechas.
+      </p>
+
       <Section
-        title={loading ? "Cargando…" : `${filtradas.length} evento(s)`}
-        subtitle={total > rows.length ? `Mostrando los ${rows.length} más recientes de ${total}.` : undefined}
+        title={loading ? "Cargando…" : `${filtradas.length} evento(s) en esta página`}
+        subtitle={
+          !sinSesion && total > rows.length
+            ? `${total.toLocaleString("es-MX")} eventos con estos filtros; se traen de ${LIMITE} en ${LIMITE}.`
+            : undefined
+        }
         flush
       >
-        {loading ? (
+        {sinSesion ? (
+          <EmptyState
+            title="Sin sesión"
+            description="Vuelve a entrar con tu cuenta para consultar la bitácora."
+          />
+        ) : loading ? (
           <p style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "16px 18px" }}>Cargando…</p>
         ) : filtradas.length === 0 ? (
-          <EmptyState title="Sin eventos" description="No hay registros de auditoría con estos filtros." />
+          <EmptyState
+            title="Sin eventos"
+            description={
+              busqueda.trim()
+                ? `Ningún evento de esta página contiene «${busqueda.trim()}». Recuerda que el texto solo filtra lo ya cargado: quita la búsqueda o cambia de página.`
+                : "No hay registros de auditoría con estos filtros. Amplía el rango de fechas o quita algún filtro."
+            }
+            action={
+              busqueda.trim() ? (
+                <Button size="sm" variant="secondary" onClick={() => setBusqueda("")}>
+                  Quitar la búsqueda
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <DataTable
             columns={columns}
@@ -333,6 +498,40 @@ export default function AuditoriaPage() {
           />
         )}
       </Section>
+
+      {!sinSesion && totalPaginas > 1 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginTop: -8,
+            marginBottom: 20,
+            fontSize: 12,
+            color: "var(--text-secondary)",
+          }}
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={pagina <= 1 || loading}
+            onClick={() => setPagina((p) => Math.max(1, p - 1))}
+          >
+            Anterior
+          </Button>
+          <span>
+            Página {pagina} de {totalPaginas}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={pagina >= totalPaginas || loading}
+            onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+          >
+            Siguiente
+          </Button>
+        </div>
+      )}
 
       <Modal
         open={!!abierta}
@@ -358,16 +557,35 @@ export default function AuditoriaPage() {
                 fontSize: 12.5,
               }}
             >
+              {/* `userAgent` llegaba en cada evento y no se mostraba en ningún
+                  sitio: en una bitácora, con qué equipo se hizo el cambio es
+                  parte de la respuesta a «quién fue». */}
               {[
                 ["Usuario", abierta.user?.nombre || (abierta.userId ? `#${abierta.userId}` : "Sistema")],
                 ["Correo", abierta.user?.email || "—"],
                 ["Cuándo", fechaHora(abierta.createdAt)],
                 ["Origen", abierta.source || "—"],
                 ["IP", abierta.ipAddress || "—"],
+                ["Equipo", abierta.userAgent || "—"],
               ].map(([k, v]) => (
-                <div key={k as string}>
+                <div key={k as string} style={{ minWidth: 0 }}>
                   <dt style={{ color: "var(--text-tertiary)", fontSize: 11, textTransform: "uppercase" }}>{k}</dt>
-                  <dd style={{ margin: "2px 0 0", fontWeight: 600 }}>{v}</dd>
+                  <dd
+                    style={{
+                      margin: "2px 0 0",
+                      fontWeight: 600,
+                      overflowWrap: "anywhere",
+                      // El `userAgent` puede traer 500 caracteres: se corta a
+                      // dos renglones y el completo queda en el título.
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                    title={typeof v === "string" ? v : undefined}
+                  >
+                    {v}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -424,7 +642,26 @@ export default function AuditoriaPage() {
             )}
 
             {visibles.length === 0 ? (
-              <EmptyState variant="compact" title="Sin datos del registro" description="El evento no guardó campos." />
+              /* Antes decía siempre «el evento no guardó campos», incluso
+                 cuando sí los guardó y lo que pasaba es que ninguno cambió. */
+              filas.length > 0 && soloCambios && antes ? (
+                <EmptyState
+                  variant="compact"
+                  title="Ningún campo cambió"
+                  description={`El evento tocó el registro pero dejó los ${filas.length} campos igual. Desmarca «Mostrar solo lo que cambió» para verlos todos.`}
+                  action={
+                    <Button size="sm" variant="secondary" onClick={() => setSoloCambios(false)}>
+                      Ver todos los campos
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  variant="compact"
+                  title="Sin datos del registro"
+                  description="Este evento quedó anotado en la bitácora, pero no guardó el contenido del registro: no hay nada que comparar."
+                />
+              )
             ) : (
               /* El diff, sin arcoíris: lo que cambió se marca con una barra y
                  se escribe en tinta plena; lo que no cambió se apaga a gris.
