@@ -10,6 +10,7 @@ import { VistaAlmacen } from "../warehouse/VistaAlmacen";
 import ReabastecimientoPanel from "@/components/almacen/ReabastecimientoPanel";
 import RecoleccionAlmacenPanel from "@/components/almacen/RecoleccionAlmacenPanel";
 import KitInspeccionesPanel from "@/components/almacen/KitInspeccionesPanel";
+import ScannerAlmacenPanel from "@/components/almacen/ScannerAlmacenPanel";
 import ToolRequestsTable from "@/components/ToolRequestsTable";
 import ToolRequestForm from "@/components/ToolRequestForm";
 import ToolUserKitPanel from "@/components/ToolUserKitPanel";
@@ -29,6 +30,7 @@ import ToolMyKitPanel from "@/components/ToolMyKitPanel";
 const PESTANAS = [
   { key: "inventario", label: "Inventario" },
   { key: "movimientos", label: "Movimientos" },
+  { key: "scanner", label: "Escáner" },
   { key: "reabastecimiento", label: "Reabastecimiento" },
   { key: "herramientas", label: "Herramientas" },
   { key: "kits", label: "Kits" },
@@ -83,6 +85,8 @@ export default function AlmacenPage() {
 
       {tab === "movimientos" && <VistaAlmacen embedded={{ views: ["movimientos"] }} />}
 
+      {tab === "scanner" && <ScannerAlmacenPanel />}
+
       {tab === "reabastecimiento" && <ReabastecimientoPanel />}
 
       {tab === "herramientas" &&
@@ -98,6 +102,19 @@ export default function AlmacenPage() {
       {tab === "kits" &&
         (gestionaHerramientas ? (
           <div style={{ display: "grid", gap: 16 }}>
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                fontSize: 13,
+                color: "var(--text-secondary)",
+              }}
+            >
+              Kits permanentes: revisiones programadas y asignación por persona. El inventario fotográfico
+              vive en «Herramientas» → pantalla de herramientas.
+            </div>
             <KitInspeccionesPanel />
             <ToolUserKitPanel />
           </div>

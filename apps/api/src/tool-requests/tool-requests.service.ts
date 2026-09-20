@@ -19,6 +19,9 @@ import {
   normalizarFotosInspeccion,
   proximaInspeccion,
 } from './kit-inspecciones.js';
+import { assertCanCreateToolLoan } from './tools-access.js';
+import { buildCodigoInterno } from './tool-nomenclature.js';
+import { buildToolLabelPdf, buildToolLabelZpl } from './tool-label.js';
 
 const FIELD_KIT_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
 const BROAD_KIT_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
@@ -80,6 +83,8 @@ export interface CreateInventoryItemDto {
   serialNumber: string;
   panoramicPhotoUrl: string;
   serialPhotoUrl: string;
+  codigoInterno?: string;
+  barcode?: string;
 }
 
 export interface UpdateInventoryItemDto {
@@ -88,6 +93,8 @@ export interface UpdateInventoryItemDto {
   serialNumber?: string;
   panoramicPhotoUrl?: string;
   serialPhotoUrl?: string;
+  codigoInterno?: string | null;
+  barcode?: string | null;
   status?: 'AVAILABLE' | 'ASSIGNED' | 'IN_REPAIR' | 'RETIRED';
   retiredReason?: string;
 }
@@ -138,7 +145,8 @@ export class ToolRequestsService {
     private notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  async create(data: CreateToolRequestDto, companyId?: number | null) {
+  async create(data: CreateToolRequestDto, companyId?: number | null, requesterEmail?: string | null) {
+    assertCanCreateToolLoan(requesterEmail);
     const inventoryItemId = Number(data.inventoryItemId);
     if (!Number.isFinite(inventoryItemId) || inventoryItemId <= 0) {
       throw new BadRequestException('Debes seleccionar una herramienta del inventario');
@@ -884,18 +892,63 @@ export class ToolRequestsService {
 
   async createInventoryItem(data: CreateInventoryItemDto, currentUserId: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
+    const codigoInterno =
+      (data.codigoInterno || '').trim() ||
+      buildCodigoInterno({ toolName: data.toolName, serialNumber: data.serialNumber });
+    const barcode = (data.barcode || '').trim() || codigoInterno;
     return (this.prisma as any).toolInventoryItem.create({
       data: {
         companyId: tenantId,
         toolName: data.toolName,
         model: data.model,
         serialNumber: data.serialNumber,
+        codigoInterno,
+        barcode,
         panoramicPhotoUrl: data.panoramicPhotoUrl,
         serialPhotoUrl: data.serialPhotoUrl,
         createdById: currentUserId,
         updatedById: currentUserId,
       },
     });
+  }
+
+  /** Etiqueta PDF o ZPL para impresora térmica / PDF. */
+  async getInventoryLabel(
+    id: number,
+    format: 'pdf' | 'zpl',
+    companyId?: number | null,
+  ): Promise<{ body: Buffer | string; contentType: string; filename: string }> {
+    const tenantId = requireCompanyId(companyId);
+    const item = await (this.prisma as any).toolInventoryItem.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(item, tenantId, 'Herramienta de inventario');
+
+    const codigoInterno =
+      item.codigoInterno ||
+      buildCodigoInterno({ toolName: item.toolName, serialNumber: item.serialNumber });
+    const barcode = item.barcode || codigoInterno;
+    const payload = {
+      codigoInterno,
+      barcode,
+      toolName: item.toolName as string,
+      model: item.model as string,
+      serialNumber: item.serialNumber as string,
+    };
+
+    if (format === 'zpl') {
+      return {
+        body: buildToolLabelZpl(payload),
+        contentType: 'text/plain; charset=utf-8',
+        filename: `etiqueta-${codigoInterno}.zpl`,
+      };
+    }
+    const pdf = await buildToolLabelPdf(payload);
+    return {
+      body: pdf,
+      contentType: 'application/pdf',
+      filename: `etiqueta-${codigoInterno}.pdf`,
+    };
   }
 
   async updateInventoryItem(
