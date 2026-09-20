@@ -20,6 +20,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { financeStatusLabel } from "@/lib/finance-status-labels";
 import { toast } from "@/components/Toast";
 
 /**
@@ -1462,7 +1463,7 @@ function DetalleFactura({
             }
           />
           <Linea etiqueta="Uso del CFDI" valor={factura.usoCfdi} />
-          {factura.match && <Linea etiqueta="Conciliación" valor={factura.match} />}
+          {factura.match && <Linea etiqueta="Conciliación" valor={financeStatusLabel(factura.match)} />}
           {factura.notas && <Linea etiqueta="Notas" valor={factura.notas} />}
         </div>
       </Bloque>
@@ -1603,7 +1604,14 @@ function DetalleFactura({
         <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
           {historial.map((h, i) => (
             <li key={`${h.tipo}-${i}`} style={{ display: "grid", gap: 2 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600 }}>{h.titulo}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600 }}>
+                {h.tipo === "match"
+                  ? h.titulo.replace(
+                      /\b(NOT_REQUIRED|PENDING|MATCHED|VARIANCE|WAIVED)\b/g,
+                      (m) => financeStatusLabel(m),
+                    )
+                  : h.titulo}
+              </div>
               <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
                 {[
                   h.fecha ? fechaLarga(h.fecha.slice(0, 10)) : null,
