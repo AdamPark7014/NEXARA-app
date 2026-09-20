@@ -11,6 +11,16 @@ import {
   type DigitalFormFields,
   type EvidenceStep,
 } from '@/lib/evidence-flow-helpers';
+import {
+  MOMENTOS,
+  MOMENTO_LABEL,
+  faltanFotosDeCampos,
+  guardarFotoDeCampo,
+  progresoDeCampos,
+  quitarFotoDeCampo,
+  type CampoEvidencia,
+  type Momento,
+} from '@/lib/evidencia-campos';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useUser } from './UserContext';
@@ -189,11 +199,20 @@ const ActivityEvidenceFlow = () => {
   const [inventoryUploadingKey, setInventoryUploadingKey] = useState<string | null>(null);
   const [pdfDragging, setPdfDragging] = useState(false);
   const [requestedActivityId, setRequestedActivityId] = useState<number | null>(null);
+  /** Campos de evidencia (qué fotografiar × momento). Vacío = flujo viejo de N fotos libres. */
+  const [camposEvidencia, setCamposEvidencia] = useState<CampoEvidencia[]>([]);
+  /** Hueco (campo × momento) al que va la próxima captura de evidencia. */
+  const [campoTarget, setCampoTarget] = useState<{ fieldId: number; momento: Momento } | null>(null);
+  /** Lightbox de la galería de fotos libres (índice); null = cerrado. */
+  const [galleryLightbox, setGalleryLightbox] = useState<number | null>(null);
   const inventoryFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
   const isFlowLocked = Boolean(flowData && isEvidenceLocked(flowData));
   const rejectedList = flowData ? rejectedStepsList(flowData) : [];
+  const porCampos = camposEvidencia.length > 0;
+  const camposFaltan = porCampos ? faltanFotosDeCampos(camposEvidencia) : 0;
+  const camposProgreso = porCampos ? progresoDeCampos(camposEvidencia) : { requeridas: 0, cumplidas: 0 };
 
   // Geocerca: desde la foto de entrada, la persona debe quedarse a ≤ 100 m del punto de inicio.
   const actividadIniciada = Boolean(
@@ -370,6 +389,9 @@ const ActivityEvidenceFlow = () => {
     setInventoryItems([]);
     setInventoryNotes('');
     setInventoryPreviousCount(0);
+    setCamposEvidencia([]);
+    setCampoTarget(null);
+    setGalleryLightbox(null);
 
     try {
       const res = await fetch(buildApiUrl(`activity-evidence/${activityId}`), {
@@ -389,6 +411,7 @@ const ActivityEvidenceFlow = () => {
               data.activity?.evidencePhotoRequired ??
               (currentActivity as { evidencePhotoRequired?: number } | undefined)?.evidencePhotoRequired,
           ) || 4;
+        setCamposEvidencia(Array.isArray(data.campos) ? (data.campos as CampoEvidencia[]) : []);
         setFlowData({
           activityId,
           step: data.status,
@@ -804,6 +827,13 @@ const ActivityEvidenceFlow = () => {
   // Paso 2: Foto de evidencia — abre la cámara en vivo; se agrega al confirmar la vista previa.
   const handleAddEvidencePhoto = async () => {
     if (!flowData) return;
+    setCampoTarget(null);
+    openCamera('evidence');
+  };
+
+  const handleCaptureCampoPhoto = (fieldId: number, momento: Momento) => {
+    if (!flowData) return;
+    setCampoTarget({ fieldId, momento });
     openCamera('evidence');
   };
 
@@ -823,11 +853,55 @@ const ActivityEvidenceFlow = () => {
     setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de ${photoRequired})`);
   };
 
+  const sendCampoPhoto = async (photo: PendingPhoto): Promise<boolean> => {
+    if (!flowData || !campoTarget || !user?.token) return false;
+    setLoading(true);
+    setError(null);
+    try {
+      const lista = await guardarFotoDeCampo(user.token, flowData.activityId, campoTarget.fieldId, {
+        momento: campoTarget.momento,
+        photoUrl: photo.dataUrl,
+        latitude: photo.latitude,
+        longitude: photo.longitude,
+        capturedAt: photo.capturedAt,
+      });
+      setCamposEvidencia(lista);
+      setSuccessMsg(`📷 ${MOMENTO_LABEL[campoTarget.momento]} guardada`);
+      setCampoTarget(null);
+      return true;
+    } catch (err) {
+      setError(photoErrorText(err));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuitarCampoPhoto = async (fieldId: number, momento: Momento) => {
+    if (!flowData || !user?.token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const lista = await quitarFotoDeCampo(user.token, flowData.activityId, fieldId, momento);
+      setCamposEvidencia(lista);
+      setSuccessMsg('Foto del campo quitada');
+    } catch (err) {
+      setError(photoErrorText(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   /** «Enviar/Usar esta foto» en la vista previa. */
   const confirmPendingPhoto = async () => {
     if (!pendingPhoto) return;
     const { kind } = pendingPhoto;
     if (kind === 'evidence') {
+      if (campoTarget) {
+        const ok = await sendCampoPhoto(pendingPhoto);
+        if (ok) setPendingPhoto(null);
+        return;
+      }
       addEvidencePhoto(pendingPhoto);
       setPendingPhoto(null);
       return;
@@ -855,13 +929,22 @@ const ActivityEvidenceFlow = () => {
   // Guardar todas las fotos de evidencia y avanzar
   const handleSaveEvidencePhotos = async () => {
     if (!flowData) return;
-    if (!isInventoryFlow && flowData.evidencePhotos.length < photoRequired) {
+    if (porCampos) {
+      if (camposFaltan > 0) {
+        setError(
+          camposFaltan === 1
+            ? 'Falta 1 foto por campo.'
+            : `Faltan ${camposFaltan} fotos por campo.`,
+        );
+        return;
+      }
+    } else if (!isInventoryFlow && flowData.evidencePhotos.length < photoRequired) {
       setError(
         `Se requieren ${photoRequired} fotos (tienes ${flowData?.evidencePhotos.length || 0})`,
       );
       return;
     }
-    if (isInventoryFlow && flowData.evidencePhotos.length < 1) {
+    if (!porCampos && isInventoryFlow && flowData.evidencePhotos.length < 1) {
       setError('Para mantenimiento e inventario se requiere al menos 1 evidencia visual');
       return;
     }
@@ -918,11 +1001,14 @@ const ActivityEvidenceFlow = () => {
         ? `activity-evidence/${flowData.activityId}/resubmit`
         : `activity-evidence/${flowData.activityId}/evidence-photos`;
 
-      // Cada foto viaja con la ubicación donde se tomó (null si es una foto previa sin GPS).
-      const photoGeo = flowData.evidencePhotos.map((_, i) => evidenceGeo[i] ?? null);
+      // Con campos las fotos ya viajaron una a una: mandar [] evita duplicarlas como libres en el ZIP.
+      const photoUrls = porCampos ? [] : flowData.evidencePhotos;
+      const photoGeo = porCampos
+        ? []
+        : flowData.evidencePhotos.map((_, i) => evidenceGeo[i] ?? null);
       const body = isCorrection
-        ? { step: 'EVIDENCE_PHOTOS', data: { photoUrls: flowData.evidencePhotos, photoGeo } }
-        : { photoUrls: flowData.evidencePhotos, photoGeo };
+        ? { step: 'EVIDENCE_PHOTOS', data: { photoUrls, photoGeo } }
+        : { photoUrls, photoGeo };
 
       const res = await fetch(buildApiUrl(endpoint), {
         method: 'POST',
@@ -1274,7 +1360,9 @@ const ActivityEvidenceFlow = () => {
                   ? 'Tu foto de entrada'
                   : pendingPhoto.kind === 'exit'
                     ? 'Tu foto de salida'
-                    : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
+                    : campoTarget
+                      ? `${MOMENTO_LABEL[campoTarget.momento]} · campo`
+                      : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
                 ¿Se ve bien? Si salió oscura o movida, toma otra.
@@ -1413,7 +1501,9 @@ const ActivityEvidenceFlow = () => {
                       ? 'Foto de entrada'
                       : liveKind === 'exit'
                         ? 'Foto de salida'
-                        : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
+                        : campoTarget
+                          ? `${MOMENTO_LABEL[campoTarget.momento]} · campo`
+                          : `Foto de evidencia ${flowData.evidencePhotos.length + 1} de ${photoRequired}`}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
                     Acomódate o encuadra bien y toca «Tomar foto».
@@ -1667,7 +1757,9 @@ const ActivityEvidenceFlow = () => {
               stepKey === 'ENTRY_PHOTO'
                 ? Boolean(flowData.entryPhotoUrl)
                 : stepKey === 'EVIDENCE_PHOTOS'
-                  ? flowData.evidencePhotos.length > 0
+                  ? porCampos
+                    ? camposFaltan === 0 && camposProgreso.requeridas > 0
+                    : flowData.evidencePhotos.length > 0
                   : stepKey === 'SERVICE_SHEET_PDF'
                     ? Boolean(flowData.serviceSheetPdfUrl)
                     : stepKey === 'SERVICE_SHEET_DATA'
@@ -1727,15 +1819,151 @@ const ActivityEvidenceFlow = () => {
           <h3 className={styles.stepTitle}>
             {isInventoryFlow
               ? `🗂️ Paso 2: Inventario comparativo + evidencias (${flowData.evidencePhotos.length} foto${flowData.evidencePhotos.length === 1 ? '' : 's'})`
-              : `📷 Paso 2: Evidencias (${flowData.evidencePhotos.length}/${photoRequired})`}
+              : porCampos
+                ? `📷 Paso 2: Fotos por campo (${camposProgreso.cumplidas}/${camposProgreso.requeridas})`
+                : `📷 Paso 2: Evidencias (${flowData.evidencePhotos.length}/${photoRequired})`}
           </h3>
           <p className={styles.stepDescription}>
             {isInventoryFlow
               ? 'Actualiza equipos por grupo, serie, modelo y al menos una foto de evidencia/sticker por mantenimiento.'
-              : `Toma ${photoRequired} fotos de evidencia.`}
+              : porCampos
+                ? camposFaltan === 0
+                  ? 'Ya documentaste todos los campos. Continúa al siguiente paso.'
+                  : 'Toca cada hueco para tomar la foto de ese momento (antes / en progreso / después).'
+                : `Toma ${photoRequired} fotos de evidencia.`}
           </p>
 
-          {isInventoryFlow && (
+          {porCampos ? (
+            <div style={{ display: 'grid', gap: 14, marginBottom: 12 }}>
+              {camposEvidencia.map((campo) => {
+                const momentos = MOMENTOS.filter((m) => campo.momentos.includes(m));
+                return (
+                  <div
+                    key={campo.id}
+                    style={{
+                      display: 'grid',
+                      gap: 8,
+                      padding: 12,
+                      borderRadius: 14,
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <strong style={{ fontSize: 14 }}>{campo.nombre}</strong>
+                      {campo.completo ? (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--success)' }}>Listo</span>
+                      ) : (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#d97706' }}>
+                          Faltan {campo.pendientes?.length ?? momentos.filter((m) => !campo.fotos?.[m]).length}
+                        </span>
+                      )}
+                    </div>
+                    {campo.notas ? (
+                      <p style={{ margin: 0, fontSize: 12.5, color: 'var(--text-secondary)' }}>{campo.notas}</p>
+                    ) : null}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${Math.max(momentos.length, 1)}, minmax(0, 1fr))`,
+                        gap: 8,
+                      }}
+                    >
+                      {momentos.map((m) => {
+                        const foto = campo.fotos?.[m] ?? null;
+                        return (
+                          <div key={m} style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700 }}>{MOMENTO_LABEL[m]}</span>
+                            {foto ? (
+                              <div style={{ position: 'relative' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCaptureCampoPhoto(campo.id, m)}
+                                  disabled={loading}
+                                  title="Volver a tomar"
+                                  style={{
+                                    padding: 0,
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 12,
+                                    overflow: 'hidden',
+                                    background: '#111',
+                                    cursor: 'pointer',
+                                    height: 96,
+                                    width: '100%',
+                                    display: 'block',
+                                  }}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={getAssetUrl(foto.photoUrl)}
+                                    alt={`${campo.nombre} ${MOMENTO_LABEL[m]}`}
+                                    style={{ width: '100%', height: 96, objectFit: 'cover', display: 'block' }}
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.removePhotoButton}
+                                  aria-label={`Quitar foto ${MOMENTO_LABEL[m]} de ${campo.nombre}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleQuitarCampoPhoto(campo.id, m);
+                                  }}
+                                  disabled={loading}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleCaptureCampoPhoto(campo.id, m)}
+                                disabled={loading}
+                                style={{
+                                  height: 96,
+                                  borderRadius: 12,
+                                  border: '1px dashed color-mix(in srgb, #d97706 45%, var(--border))',
+                                  background: 'color-mix(in srgb, #d97706 6%, var(--surface))',
+                                  color: '#d97706',
+                                  fontWeight: 700,
+                                  fontSize: 13,
+                                  cursor: 'pointer',
+                                  fontFamily: 'inherit',
+                                }}
+                              >
+                                📷 Tomar
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              <div className={`${styles.actionGrid} ${styles.actionGridBottom}`}>
+                <button
+                  className={`${styles.actionButton} ${styles.actionSecondary}`}
+                  onClick={() =>
+                    setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
+                  }
+                  disabled={loading}
+                >
+                  🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
+                </button>
+                {camposFaltan === 0 ? (
+                  <button
+                    className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionSuccess}`}
+                    onClick={() => void handleSaveEvidencePhotos()}
+                    disabled={loading}
+                  >
+                    {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {!porCampos && isInventoryFlow && (
             <div className={styles.inventorySection}>
               <div className={styles.inventoryHeaderRow}>
                 <strong>Equipos de sucursal ({inventoryItems.length})</strong>
@@ -2003,32 +2231,36 @@ const ActivityEvidenceFlow = () => {
             </div>
           )}
 
-          {/* Grid de fotos */}
-          {flowData.evidencePhotos.length > 0 && (
+          {/* Grid de fotos libres (flujo sin campos) */}
+          {!porCampos && flowData.evidencePhotos.length > 0 && (
             <div className={styles.evidenceGalleryWrap}>
               <div className={styles.evidenceGalleryGrid}>
                 {flowData.evidencePhotos.map((photo, idx) => (
                   <div
                     key={idx}
                     className={styles.evidencePhotoTile}
-                    onClick={() => handleRemoveEvidencePhoto(idx)}
+                    onClick={() => setGalleryLightbox(idx)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
-                        handleRemoveEvidencePhoto(idx);
+                        setGalleryLightbox(idx);
                       }
                     }}
-                    title="Quitar esta evidencia"
+                    title="Ver en grande"
+                    style={{ cursor: 'zoom-in' }}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={getAssetUrl(photo)}
                       alt={`evidencia ${idx + 1}`}
                       className={styles.evidencePhotoImg}
                     />
                     <button
+                      type="button"
                       className={styles.removePhotoButton}
+                      aria-label={`Quitar evidencia ${idx + 1}`}
                       onClick={(event) => {
                         event.stopPropagation();
                         handleRemoveEvidencePhoto(idx);
@@ -2042,35 +2274,37 @@ const ActivityEvidenceFlow = () => {
             </div>
           )}
 
-          <div className={`${styles.actionGrid} ${styles.actionGridBottom}`}>
-            <button
-              className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionEvidence}`}
-              onClick={handleAddEvidencePhoto}
-              disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= photoRequired)}
-            >
-              {loading ? '⏳ Capturando...' : '📷 Agregar'}
-            </button>
-            <button
-              className={`${styles.actionButton} ${styles.actionSecondary}`}
-              onClick={() =>
-                setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
-              }
-              disabled={loading}
-            >
-              🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
-            </button>
-            {(isInventoryFlow
-              ? flowData.evidencePhotos.length >= 1
-              : flowData.evidencePhotos.length >= photoRequired) && (
+          {!porCampos ? (
+            <div className={`${styles.actionGrid} ${styles.actionGridBottom}`}>
               <button
-                className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionSuccess}`}
-                onClick={handleSaveEvidencePhotos}
+                className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionEvidence}`}
+                onClick={handleAddEvidencePhoto}
+                disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= photoRequired)}
+              >
+                {loading ? '⏳ Capturando...' : '📷 Agregar'}
+              </button>
+              <button
+                className={`${styles.actionButton} ${styles.actionSecondary}`}
+                onClick={() =>
+                  setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))
+                }
                 disabled={loading}
               >
-                {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
+                🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
               </button>
-            )}
-          </div>
+              {(isInventoryFlow
+                ? flowData.evidencePhotos.length >= 1
+                : flowData.evidencePhotos.length >= photoRequired) && (
+                <button
+                  className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionSuccess}`}
+                  onClick={() => void handleSaveEvidencePhotos()}
+                  disabled={loading}
+                >
+                  {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
+                </button>
+              )}
+            </div>
+          ) : null}
           {/* El aviso de arriba queda fuera de vista con 4 fotos: se repite junto al botón. */}
           {error ? (
             <div className={styles.alertError} role="alert" style={{ marginTop: 12 }}>
@@ -2079,6 +2313,98 @@ const ActivityEvidenceFlow = () => {
           ) : null}
         </div>
       )}
+
+      {galleryLightbox != null &&
+      flowData?.evidencePhotos[galleryLightbox] &&
+      typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Evidencia ${galleryLightbox + 1}`}
+              onClick={() => setGalleryLightbox(null)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 10000,
+                background: 'rgba(15, 23, 42, 0.72)',
+                display: 'grid',
+                placeItems: 'center',
+                padding: 16,
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '100%',
+                  maxWidth: 640,
+                  display: 'grid',
+                  gap: 12,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 16,
+                  padding: 14,
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getAssetUrl(flowData.evidencePhotos[galleryLightbox])}
+                  alt={`Evidencia ${galleryLightbox + 1}`}
+                  style={{
+                    width: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: 12,
+                    background: '#000',
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => setGalleryLightbox(null)}
+                    style={{ minHeight: 44, flex: '1 1 120px' }}
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => {
+                      const idx = galleryLightbox;
+                      setGalleryLightbox(null);
+                      handleRemoveEvidencePhoto(idx);
+                    }}
+                    style={{ minHeight: 44, flex: '1 1 120px', color: 'var(--danger)' }}
+                  >
+                    Quitar foto
+                  </button>
+                  {galleryLightbox > 0 ? (
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      onClick={() => setGalleryLightbox((i) => (i != null ? i - 1 : i))}
+                      style={{ minHeight: 44 }}
+                    >
+                      ←
+                    </button>
+                  ) : null}
+                  {galleryLightbox < flowData.evidencePhotos.length - 1 ? (
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      onClick={() => setGalleryLightbox((i) => (i != null ? i + 1 : i))}
+                      style={{ minHeight: 44 }}
+                    >
+                      →
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {/* PASO 3: PDF (solo servicio) */}
       {flowData.step === 'SERVICE_SHEET_PDF' && needsServiceSheetPdf && !isFlowLocked && (

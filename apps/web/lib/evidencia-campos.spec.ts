@@ -5,6 +5,7 @@ import {
   camposQueSeBorran,
   claveDeNombre,
   esErrorDePermiso,
+  faltanFotosDeCampos,
   hayErrores,
   MAX_CAMPOS,
   nombreDeContentDisposition,
@@ -202,5 +203,20 @@ describe("esErrorDePermiso", () => {
     expect(esErrorDePermiso(new Error('{"statusCode":403,"message":"Forbidden resource"}'))).toBe(true);
     expect(esErrorDePermiso(new Error('{"statusCode":404,"message":"No existe"}'))).toBe(false);
     expect(esErrorDePermiso(new Error("texto"))).toBe(false);
+  });
+});
+
+describe("faltanFotosDeCampos", () => {
+  it("cuenta huecos pendientes campo × momento", () => {
+    expect(
+      faltanFotosDeCampos([
+        campo({ id: 1, nombre: "Cámara 1", fotos: { ANTES: foto(1, "ANTES") } }),
+        campo({ id: 2, nombre: "NVR", momentos: ["DESPUES"], fotos: { DESPUES: null }, pendientes: ["DESPUES"] }),
+      ]),
+    ).toBe(2);
+  });
+
+  it("sin campos no falta nada", () => {
+    expect(faltanFotosDeCampos([])).toBe(0);
   });
 });
