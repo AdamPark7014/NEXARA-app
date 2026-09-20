@@ -5,6 +5,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import EmptyState from "@/components/ui/EmptyState";
 import InlineAlert from "@/components/ui/InlineAlert";
 import Modal from "@/components/ui/Modal";
@@ -87,6 +89,19 @@ function texto(v: unknown): string {
 const fechaHora = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
 
+/**
+ * La acción es el estado del renglón: neutra mientras sea flujo normal (alta,
+ * edición, consulta) y roja solo cuando alguien borró algo, que es lo que uno
+ * busca al abrir una bitácora.
+ */
+function tonoAccion(action: string): StatusTone {
+  const a = action.toLowerCase();
+  if (/delete|remove|borr|elimin|revoke|revoc/.test(a)) return "danger";
+  if (/fail|error|denied|deneg|reject|rechaz/.test(a)) return "danger";
+  if (/login|logout|export|approve|aprob/.test(a)) return "warning";
+  return "neutral";
+}
+
 export default function AuditoriaPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
@@ -164,13 +179,26 @@ export default function AuditoriaPage() {
   }, [rows, busqueda]);
 
   const columns: Column<AuditRow>[] = [
-    { key: "createdAt", label: "Cuándo", render: (r) => fechaHora(r.createdAt) },
+    {
+      key: "createdAt",
+      label: "Cuándo",
+      width: 140,
+      render: (r) => (
+        <span style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+          {fechaHora(r.createdAt)}
+        </span>
+      ),
+    },
     {
       key: "usuario",
       label: "Usuario",
       render: (r) => r.user?.nombre || (r.userId ? `#${r.userId}` : "Sistema"),
     },
-    { key: "action", label: "Acción" },
+    {
+      key: "action",
+      label: "Acción",
+      render: (r) => <StatusDot label={r.action} tone={tonoAccion(r.action)} />,
+    },
     { key: "entityType", label: "Entidad" },
     {
       key: "entityId",
@@ -193,6 +221,43 @@ export default function AuditoriaPage() {
       },
     },
   ];
+
+  /**
+   * Lectura de lo cargado, no del total del servidor: la bitácora trae los
+   * últimos {LIMITE} eventos y eso es lo que estas cifras describen.
+   */
+  const strip: Metric[] = useMemo(() => {
+    const borrados = filtradas.filter((r) => tonoAccion(r.action) === "danger").length;
+    const personas = new Set(
+      filtradas.map((r) => (r.user?.id ?? r.userId ?? "sistema").toString()),
+    ).size;
+    return [
+      {
+        label: "Eventos",
+        value: loading ? "…" : filtradas.length.toLocaleString("es-MX"),
+        hint:
+          total > rows.length
+            ? `De los ${rows.length} más recientes (hay ${total})`
+            : "Todos los del filtro",
+      },
+      {
+        label: "Personas",
+        value: loading ? "…" : personas,
+        hint: "Quién tocó algo en este corte",
+      },
+      {
+        label: "Entidades",
+        value: loading ? "…" : new Set(filtradas.map((r) => r.entityType)).size,
+        hint: "Tipos de registro afectados",
+      },
+      {
+        label: "Bajas y rechazos",
+        value: loading ? "…" : borrados,
+        hint: borrados === 0 ? "Nada se borró" : "Revisar quién y por qué",
+        tone: borrados > 0 ? "danger" : "default",
+      },
+    ];
+  }, [filtradas, loading, rows.length, total]);
 
   const antes = abierta && esObjeto(abierta.previousData) ? (abierta.previousData as Record<string, unknown>) : null;
   const despues = abierta ? datosDespues(abierta) : null;
@@ -219,6 +284,10 @@ export default function AuditoriaPage() {
           variant="danger"
         />
       )}
+
+      <div style={{ marginBottom: 12 }}>
+        <MetricStrip metrics={strip} ariaLabel="Resumen de la bitácora cargada" />
+      </div>
 
       <FilterToolbar
         search={{ value: busqueda, onChange: setBusqueda, placeholder: "Buscar usuario, acción, entidad…" }}
@@ -311,8 +380,39 @@ export default function AuditoriaPage() {
             )}
 
             {antes && (
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
-                <label style={{ fontSize: 12.5, display: "flex", gap: 6, alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  marginBottom: 8,
+                  paddingBottom: 8,
+                  borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
+                }}
+              >
+                <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  <strong
+                    style={{
+                      fontVariantNumeric: "tabular-nums",
+                      color: "var(--text-primary)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {filas.filter((f) => f.cambio).length}
+                  </strong>{" "}
+                  de {filas.length} campos cambiaron
+                </span>
+                <label
+                  style={{
+                    fontSize: 12.5,
+                    display: "flex",
+                    gap: 6,
+                    alignItems: "center",
+                    color: "var(--text-secondary)",
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={soloCambios}
@@ -320,30 +420,46 @@ export default function AuditoriaPage() {
                   />
                   Mostrar solo lo que cambió
                 </label>
-                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  {filas.filter((f) => f.cambio).length} de {filas.length} campos cambiaron
-                </span>
               </div>
             )}
 
             {visibles.length === 0 ? (
               <EmptyState variant="compact" title="Sin datos del registro" description="El evento no guardó campos." />
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+              /* El diff, sin arcoíris: lo que cambió se marca con una barra y
+                 se escribe en tinta plena; lo que no cambió se apaga a gris.
+                 Dos niveles de gris y un acento bastan para que el ojo caiga
+                 solo en los renglones que importan. */
+              <div
+                style={{
+                  overflowX: "auto",
+                  border: "1px solid var(--nx-panel-hairline, var(--border))",
+                  borderRadius: 10,
+                }}
+              >
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: 12.5,
+                    minWidth: 420,
+                  }}
+                >
                   <thead>
                     <tr>
                       {["Campo", "Antes", "Después"].map((h) => (
                         <th
                           key={h}
+                          scope="col"
                           style={{
                             textAlign: "left",
-                            padding: "6px 8px",
-                            borderBottom: "1px solid var(--border)",
+                            padding: "8px 12px",
+                            borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
                             color: "var(--text-tertiary)",
                             fontSize: 11,
-                            textTransform: "uppercase",
+                            fontWeight: 600,
                             letterSpacing: "0.05em",
+                            width: h === "Campo" ? "22%" : "39%",
                           }}
                         >
                           {h}
@@ -352,41 +468,61 @@ export default function AuditoriaPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibles.map((f) => (
-                      <tr
-                        key={f.campo}
-                        style={{
-                          background: f.cambio && antes ? "color-mix(in srgb, var(--warning, #f59e0b) 8%, transparent)" : undefined,
-                        }}
-                      >
-                        <td style={{ padding: "6px 8px", borderBottom: "1px solid var(--border)", fontWeight: 600 }}>
-                          {f.campo}
-                        </td>
-                        <td
-                          style={{
-                            padding: "6px 8px",
-                            borderBottom: "1px solid var(--border)",
-                            color: f.cambio && antes ? "var(--danger)" : "var(--text-secondary)",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {antes ? texto(f.antes) : "—"}
-                        </td>
-                        <td
-                          style={{
-                            padding: "6px 8px",
-                            borderBottom: "1px solid var(--border)",
-                            color: f.cambio && antes ? "var(--success, #15803d)" : "var(--text-secondary)",
-                            fontWeight: f.cambio && antes ? 600 : 400,
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {texto(f.despues)}
-                        </td>
-                      </tr>
-                    ))}
+                    {visibles.map((f, i) => {
+                      const cambio = f.cambio && !!antes;
+                      const borde =
+                        i === 0
+                          ? undefined
+                          : "1px solid var(--nx-panel-hairline, var(--border))";
+                      return (
+                        <tr key={f.campo}>
+                          <th
+                            scope="row"
+                            style={{
+                              textAlign: "left",
+                              padding: "8px 12px 8px 9px",
+                              borderTop: borde,
+                              borderLeft: cambio
+                                ? "3px solid var(--state-warning-text, #b45309)"
+                                : "3px solid transparent",
+                              fontWeight: cambio ? 600 : 400,
+                              color: cambio ? "var(--text-primary)" : "var(--text-tertiary)",
+                              verticalAlign: "top",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {f.campo}
+                          </th>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              borderTop: borde,
+                              color: cambio ? "var(--text-secondary)" : "var(--text-tertiary)",
+                              textDecoration: cambio ? "line-through" : undefined,
+                              textDecorationColor: "var(--text-tertiary)",
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                              verticalAlign: "top",
+                            }}
+                          >
+                            {antes ? texto(f.antes) : "—"}
+                          </td>
+                          <td
+                            style={{
+                              padding: "8px 12px",
+                              borderTop: borde,
+                              color: cambio ? "var(--text-primary)" : "var(--text-tertiary)",
+                              fontWeight: cambio ? 600 : 400,
+                              whiteSpace: "pre-wrap",
+                              wordBreak: "break-word",
+                              verticalAlign: "top",
+                            }}
+                          >
+                            {texto(f.despues)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

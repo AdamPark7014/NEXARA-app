@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
+import InlineAlert from "@/components/ui/InlineAlert";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
@@ -44,9 +48,16 @@ function formatMoney(n: number) {
 /**
  * Dashboard Contadora — responde: qué pasa, qué está mal, qué reviso ahora.
  * No es una pared de KPIs.
+ *
+ * El orden de lectura es deliberado y se recorre en cinco segundos:
+ *   1. la tira de cifras — cuánto hay, cuánto deben, cuánto se debe;
+ *   2. lo que requiere atención — cada renglón con su enlace a donde se resuelve;
+ *   3. qué vence — una lectura de columnas, no otra rejilla de tarjetas;
+ *   4. el contexto del mes, al margen, para quien lo busque.
  */
 export default function ContabilidadDashboardPage() {
   const { user } = useUser();
+  const router = useRouter();
   const token = user?.token ?? "";
   const [range, setRange] = useState(defaultRange);
   const [data, setData] = useState<WorkspaceDashboard | null>(null);
@@ -121,6 +132,83 @@ export default function ContabilidadDashboardPage() {
     }
   }, [range]);
 
+  /**
+   * La tira responde, de izquierda a derecha, las preguntas de la mañana: cuánto
+   * hay, cuánto deben, cuánto se debe, cómo va el periodo y qué está mal. El
+   * color solo entra cuando algo está vencido o hay algo que resolver.
+   */
+  const metrics: Metric[] = useMemo(() => {
+    const cargando = loading ? "…" : null;
+    const cobrosVencidos = data?.agingReceivable.overdue ?? 0;
+    const pagosVencidos = data?.agingPayable.overdue ?? 0;
+    const tonoAlertas: Metric["tone"] = attention.some((a) => a.tone === "danger")
+      ? "danger"
+      : attention.length > 0
+        ? "warning"
+        : "default";
+
+    return [
+      {
+        label: "Disponible",
+        value: cargando ?? <Money value={data?.cashBalance ?? 0} />,
+        hint: "En bancos y caja",
+        onClick: () => router.push("/erp/contabilidad/conciliacion"),
+      },
+      {
+        label: "Por cobrar",
+        value: cargando ?? <Money value={data?.accountsReceivablePending ?? 0} />,
+        hint: cobrosVencidos > 0 ? `${formatMoney(cobrosVencidos)} ya vencidos` : "Nada vencido",
+        tone: cobrosVencidos > 0 ? "warning" : "default",
+        onClick: () => router.push("/erp/contabilidad/cuentas-por-cobrar"),
+      },
+      {
+        label: "Por pagar",
+        value: cargando ?? <Money value={data?.accountsPayablePending ?? 0} />,
+        hint: pagosVencidos > 0 ? `${formatMoney(pagosVencidos)} ya vencidos` : "Nada vencido",
+        tone: pagosVencidos > 0 ? "danger" : "default",
+        onClick: () => router.push("/erp/contabilidad/cuentas-por-pagar"),
+      },
+      {
+        label: "Flujo neto",
+        value: cargando ?? <Money value={data?.netCashflow ?? 0} />,
+        hint: "Ingresos menos egresos del periodo",
+      },
+      {
+        label: "Requiere atención",
+        value: loading ? "…" : attention.length,
+        hint: attention.length === 0 ? "Nada pendiente" : "Con su enlace, aquí abajo",
+        tone: tonoAlertas,
+      },
+    ];
+  }, [loading, data, attention, router]);
+
+  const agingRows = useMemo(
+    () => [
+      {
+        id: "cobros",
+        label: "Cobros",
+        href: "/erp/contabilidad/cuentas-por-cobrar",
+        vencido: data?.agingReceivable.overdue ?? 0,
+        hoy: data?.agingReceivable.dueToday ?? 0,
+        next7: data?.agingReceivable.next7 ?? 0,
+        next30: data?.agingReceivable.next30 ?? 0,
+        tieneHoy: true,
+      },
+      {
+        id: "pagos",
+        label: "Pagos",
+        href: "/erp/contabilidad/cuentas-por-pagar",
+        vencido: data?.agingPayable.overdue ?? 0,
+        hoy: 0,
+        next7: data?.agingPayable.next7 ?? 0,
+        next30: data?.agingPayable.next30 ?? 0,
+        // La API no desglosa el «hoy» de cuentas por pagar; no se inventa.
+        tieneHoy: false,
+      },
+    ],
+    [data],
+  );
+
   return (
     <>
       <PageHeader
@@ -138,11 +226,11 @@ export default function ContabilidadDashboardPage() {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                minHeight: 30,
-                padding: "0 12px",
+                height: 32,
+                padding: "0 14px",
                 borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 700,
+                fontSize: 13,
+                fontWeight: 600,
                 textDecoration: "none",
                 color: "#fff",
                 background: "var(--primary)",
@@ -158,32 +246,46 @@ export default function ContabilidadDashboardPage() {
         <div
           style={{
             display: "flex",
-            gap: 8,
+            gap: 10,
             flexWrap: "wrap",
-            alignItems: "center",
+            alignItems: "flex-end",
             marginBottom: 14,
             padding: "10px 12px",
             borderRadius: 10,
-            border: "1px solid var(--nx-panel-hairline)",
-            background: "var(--nx-panel-surface-overlay)",
+            border: "1px solid var(--nx-panel-hairline, var(--border))",
+            background: "var(--surface)",
           }}
         >
-          <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            Desde{" "}
+          <label style={{ display: "grid", gap: 4, fontSize: 11, color: "var(--text-tertiary)" }}>
+            Desde
             <input
               type="date"
               value={range.from}
               onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-              style={{ marginLeft: 4, fontSize: 12, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)" }}
+              style={{
+                fontSize: 13,
+                padding: "6px 8px",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                color: "var(--text-primary)",
+              }}
             />
           </label>
-          <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            Hasta{" "}
+          <label style={{ display: "grid", gap: 4, fontSize: 11, color: "var(--text-tertiary)" }}>
+            Hasta
             <input
               type="date"
               value={range.to}
               onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-              style={{ marginLeft: 4, fontSize: 12, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)" }}
+              style={{
+                fontSize: 13,
+                padding: "6px 8px",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                color: "var(--text-primary)",
+              }}
             />
           </label>
           <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
@@ -193,68 +295,23 @@ export default function ContabilidadDashboardPage() {
       )}
 
       {error && (
-        <div
-          role="alert"
-          style={{
-            padding: 12,
-            marginBottom: 14,
-            borderRadius: 10,
-            background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-            color: "var(--danger)",
-            fontSize: 13,
-          }}
-        >
-          No se pudo cargar el resumen.{" "}
-          <button
-            type="button"
-            onClick={() => void load()}
-            style={{
-              appearance: "none",
-              border: "none",
-              background: "transparent",
-              color: "inherit",
-              fontWeight: 700,
-              textDecoration: "underline",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            Reintentar
-          </button>
-          <div style={{ marginTop: 4, opacity: 0.85, fontSize: 12 }}>{error}</div>
-        </div>
+        <>
+          <InlineAlert
+            variant="danger"
+            message={`No se pudo cargar el resumen. ${error}`}
+            onDismiss={() => setError(null)}
+          />
+          <div style={{ marginTop: -4, marginBottom: 14 }}>
+            <Button size="sm" variant="secondary" onClick={() => void load()}>
+              Reintentar
+            </Button>
+          </div>
+        </>
       )}
 
-      {/* Nivel 2 — estado (3 cifras, no 8 cards) */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          gap: 1,
-          marginBottom: 18,
-          borderRadius: 12,
-          overflow: "hidden",
-          border: "1px solid var(--nx-panel-hairline)",
-          background: "var(--nx-panel-hairline)",
-        }}
-      >
-        <StatusCell
-          label="Disponible"
-          value={loading ? "…" : <Money value={data?.cashBalance ?? 0} />}
-          href="/erp/contabilidad/conciliacion"
-        />
-        <StatusCell
-          label="Por cobrar"
-          value={loading ? "…" : <Money value={data?.accountsReceivablePending ?? 0} />}
-          href="/erp/contabilidad/cuentas-por-cobrar"
-          emphasize={!!data && data.agingReceivable.overdue > 0}
-        />
-        <StatusCell
-          label="Por pagar"
-          value={loading ? "…" : <Money value={data?.accountsPayablePending ?? 0} />}
-          href="/erp/contabilidad/cuentas-por-pagar"
-          emphasize={!!data && data.agingPayable.overdue > 0}
-        />
+      {/* Nivel 1 — la tira: el estado del dinero en una sola línea. */}
+      <div style={{ marginBottom: 18 }}>
+        <MetricStrip metrics={metrics} ariaLabel="Estado del periodo" />
       </div>
 
       <div
@@ -262,94 +319,214 @@ export default function ContabilidadDashboardPage() {
           display: "grid",
           gridTemplateColumns: "minmax(0, 1.4fr) minmax(240px, 0.8fr)",
           gap: 16,
+          alignItems: "start",
         }}
         className="nx-contab-dash-grid"
       >
-        {/* Excepciones — lo importante */}
-        <section aria-labelledby="att-title">
-          <h2
-            id="att-title"
-            style={{
-              margin: "0 0 10px",
-              fontSize: 13,
-              fontWeight: 700,
-              color: "var(--text-primary)",
-            }}
-          >
-            Requiere atención
-          </h2>
-          {loading ? (
-            <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>Revisando pendientes…</p>
-          ) : attention.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
-              Nada urgente en este periodo. Puedes seguir con cobros, pagos o conciliación.
-            </p>
-          ) : (
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
-              {attention.map((item) => (
-                <li key={`${item.href}-${item.label}`}>
-                  <Link
-                    href={item.href}
+        <div style={{ display: "grid", gap: 18, minWidth: 0 }}>
+          {/* Nivel 2 — excepciones: cada una con el enlace a donde se resuelve. */}
+          <section aria-labelledby="att-title">
+            <BlockTitle id="att-title">Requiere atención</BlockTitle>
+            {loading ? (
+              <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
+                Revisando pendientes…
+              </p>
+            ) : attention.length === 0 ? (
+              <p
+                style={{
+                  margin: 0,
+                  padding: "12px 14px",
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--nx-panel-hairline, var(--border))",
+                  borderRadius: 10,
+                  background: "var(--surface)",
+                }}
+              >
+                Nada urgente en este periodo. Puedes seguir con cobros, pagos o conciliación.
+              </p>
+            ) : (
+              <ul
+                style={{
+                  listStyle: "none",
+                  margin: 0,
+                  padding: 0,
+                  border: "1px solid var(--nx-panel-hairline, var(--border))",
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  background: "var(--surface)",
+                }}
+              >
+                {attention.map((item, i) => (
+                  <li
+                    key={`${item.href}-${item.label}`}
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      alignItems: "baseline",
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      textDecoration: "none",
-                      border: "1px solid var(--nx-panel-hairline)",
-                      background: "var(--surface)",
-                      color: "var(--text-primary)",
+                      borderTop:
+                        i === 0 ? undefined : "1px solid var(--nx-panel-hairline, var(--border))",
                     }}
                   >
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{item.label}</span>
-                    <span
+                    <Link
+                      href={item.href}
+                      className="nx-attention-row"
                       style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color:
-                          item.tone === "danger"
-                            ? "var(--danger)"
-                            : item.tone === "warning"
-                              ? "var(--warning)"
-                              : "var(--text-tertiary)",
-                        whiteSpace: "nowrap",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        alignItems: "center",
+                        padding: "10px 14px",
+                        textDecoration: "none",
+                        color: "var(--text-primary)",
                       }}
                     >
-                      {item.detail}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                      <span style={{ fontSize: 13, fontWeight: 500, minWidth: 0 }}>
+                        {item.label}
+                      </span>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontVariantNumeric: "tabular-nums",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <StatusDot
+                          label={item.detail}
+                          tone={item.tone === "info" ? "neutral" : (item.tone as StatusTone)}
+                        />
+                        <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>
+                          ›
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* Nivel 3 — qué vence: columnas comparables, no otra rejilla de tarjetas. */}
+          <section aria-labelledby="aging-title">
+            <BlockTitle id="aging-title">Qué vence</BlockTitle>
+            <div
+              style={{
+                border: "1px solid var(--nx-panel-hairline, var(--border))",
+                borderRadius: 10,
+                overflowX: "auto",
+                background: "var(--surface)",
+              }}
+            >
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: 13,
+                  minWidth: 440,
+                }}
+              >
+                <caption
+                  style={{
+                    captionSide: "bottom",
+                    textAlign: "left",
+                    padding: "8px 14px 10px",
+                    fontSize: 11,
+                    color: "var(--text-tertiary)",
+                  }}
+                >
+                  Saldo pendiente por fecha de vencimiento. Los pagos no traen desglose de «hoy».
+                </caption>
+                <thead>
+                  <tr>
+                    {["Vencimientos", "Vencido", "Hoy", "Próx. 7 días", "Próx. 30 días"].map(
+                      (h, i) => (
+                        <th
+                          key={h}
+                          scope="col"
+                          style={{
+                            textAlign: i === 0 ? "left" : "right",
+                            padding: "8px 14px",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: "var(--text-tertiary)",
+                            borderBottom: "1px solid var(--nx-panel-hairline, var(--border))",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ),
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {agingRows.map((row, i) => (
+                    <tr key={row.id}>
+                      <th
+                        scope="row"
+                        style={{
+                          textAlign: "left",
+                          padding: "10px 14px",
+                          fontSize: 13,
+                          fontWeight: 500,
+                          whiteSpace: "nowrap",
+                          borderTop:
+                            i === 0
+                              ? undefined
+                              : "1px solid var(--nx-panel-hairline, var(--border))",
+                        }}
+                      >
+                        <Link
+                          href={row.href}
+                          style={{ color: "var(--text-primary)", textDecoration: "none" }}
+                        >
+                          {row.label}
+                        </Link>
+                      </th>
+                      <AgingCell
+                        value={loading ? null : row.vencido}
+                        alert={!loading && row.vencido > 0}
+                        first={i === 0}
+                      />
+                      <AgingCell
+                        value={loading ? null : row.tieneHoy ? row.hoy : undefined}
+                        first={i === 0}
+                      />
+                      <AgingCell value={loading ? null : row.next7} first={i === 0} />
+                      <AgingCell value={loading ? null : row.next30} first={i === 0} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
 
         {/* Secundario — contexto del mes */}
-        <section aria-labelledby="ctx-title">
-          <h2
-            id="ctx-title"
-            style={{
-              margin: "0 0 10px",
-              fontSize: 13,
-              fontWeight: 700,
-              color: "var(--text-primary)",
-            }}
-          >
-            Este mes
-          </h2>
+        <section aria-labelledby="ctx-title" style={{ minWidth: 0 }}>
+          <BlockTitle id="ctx-title">Este mes</BlockTitle>
           <dl
             style={{
               margin: 0,
-              display: "grid",
-              gap: 8,
               fontSize: 13,
+              border: "1px solid var(--nx-panel-hairline, var(--border))",
+              borderRadius: 10,
+              overflow: "hidden",
+              background: "var(--surface)",
             }}
           >
-            <CtxRow label="Ingresos" value={loading ? "…" : <Money value={data?.income ?? 0} />} />
-            <CtxRow label="Egresos" value={loading ? "…" : <Money value={data?.expense ?? 0} />} />
-            <CtxRow label="Flujo neto" value={loading ? "…" : <Money value={data?.netCashflow ?? 0} />} />
+            <CtxRow
+              label="Ingresos"
+              value={loading ? "…" : <Money value={data?.income ?? 0} bold={false} />}
+              first
+            />
+            <CtxRow
+              label="Egresos"
+              value={loading ? "…" : <Money value={data?.expense ?? 0} bold={false} />}
+            />
+            <CtxRow
+              label="Flujo neto"
+              value={loading ? "…" : <Money value={data?.netCashflow ?? 0} />}
+            />
             <CtxRow
               label="Facturas"
               value={
@@ -361,12 +538,12 @@ export default function ContabilidadDashboardPage() {
             {(data?.prenominaDraftTotal ?? 0) > 0 && (
               <CtxRow
                 label="Pre-nómina borrador"
-                value={<Money value={data!.prenominaDraftTotal} />}
+                value={<Money value={data!.prenominaDraftTotal} bold={false} />}
                 href="/erp/contabilidad/pre-nomina"
               />
             )}
           </dl>
-          <div style={{ marginTop: 14, display: "grid", gap: 6 }}>
+          <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
             <QuietLink href="/erp/contabilidad/cierres">Cerrar periodo</QuietLink>
             <QuietLink href="/erp/contabilidad/reportes">Reportes</QuietLink>
           </div>
@@ -377,47 +554,62 @@ export default function ContabilidadDashboardPage() {
         @media (max-width: 720px) {
           .nx-contab-dash-grid { grid-template-columns: 1fr !important; }
         }
+        .nx-attention-row:hover {
+          background: color-mix(in srgb, var(--primary) 5%, transparent);
+        }
       `}</style>
     </>
   );
 }
 
-function StatusCell({
-  label,
-  value,
-  href,
-  emphasize,
-}: {
-  label: string;
-  value: ReactNode;
-  href: string;
-  emphasize?: boolean;
-}) {
+/** Encabezado de bloque: discreto, para que las cifras manden. */
+function BlockTitle({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <Link
-      href={href}
+    <h2
+      id={id}
       style={{
-        display: "block",
-        padding: "14px 16px",
-        background: "var(--surface)",
-        textDecoration: "none",
-        color: "inherit",
+        margin: "0 0 8px",
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: "var(--text-tertiary)",
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", marginBottom: 4 }}>
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          fontVariantNumeric: "tabular-nums",
-          color: emphasize ? "var(--warning)" : "var(--text-primary)",
-        }}
-      >
-        {value}
-      </div>
-    </Link>
+      {children}
+    </h2>
+  );
+}
+
+/** Celda de vencimientos. `null` = cargando; `undefined` = la API no lo desglosa. */
+function AgingCell({
+  value,
+  alert,
+  first,
+}: {
+  value: number | null | undefined;
+  alert?: boolean;
+  first?: boolean;
+}) {
+  return (
+    <td
+      style={{
+        textAlign: "right",
+        padding: "10px 14px",
+        fontVariantNumeric: "tabular-nums",
+        whiteSpace: "nowrap",
+        borderTop: first ? undefined : "1px solid var(--nx-panel-hairline, var(--border))",
+        color: alert ? "var(--state-danger-text, #b91c1c)" : "var(--text-secondary)",
+      }}
+    >
+      {value === null ? (
+        "…"
+      ) : value === undefined || value === 0 ? (
+        <span style={{ color: "var(--text-tertiary)" }}>—</span>
+      ) : (
+        <Money value={value} bold={false} />
+      )}
+    </td>
   );
 }
 
@@ -425,45 +617,40 @@ function CtxRow({
   label,
   value,
   href,
+  first,
 }: {
   label: string;
   value: ReactNode;
   href?: string;
+  first?: boolean;
 }) {
+  const rowStyle = {
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    gap: 8,
+    alignItems: "baseline",
+    padding: "9px 12px",
+    borderTop: first ? undefined : "1px solid var(--nx-panel-hairline, var(--border))",
+  } as const;
   const inner = (
     <>
-      <dt style={{ margin: 0, color: "var(--text-secondary)" }}>{label}</dt>
-      <dd style={{ margin: 0, fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-        {value}
-      </dd>
+      <dt style={{ margin: 0, color: "var(--text-secondary)", fontSize: 12.5 }}>{label}</dt>
+      <dd style={{ margin: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{value}</dd>
     </>
   );
   if (href) {
     return (
-      <Link
-        href={href}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr auto",
-          gap: 8,
-          textDecoration: "none",
-          color: "inherit",
-        }}
-      >
+      <Link href={href} style={{ ...rowStyle, textDecoration: "none", color: "inherit" }}>
         {inner}
       </Link>
     );
   }
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
-      {inner}
-    </div>
-  );
+  return <div style={rowStyle}>{inner}</div>;
 }
 
 function QuietLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} style={{ fontSize: 12.5, color: "var(--primary)", textDecoration: "none", fontWeight: 600 }}>
+    <Link href={href} style={{ fontSize: 12.5, color: "var(--primary)", textDecoration: "none" }}>
       {children} →
     </Link>
   );
