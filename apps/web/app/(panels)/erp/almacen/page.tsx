@@ -92,7 +92,7 @@ export default function AlmacenPage() {
 
       {tab === "herramientas" &&
         (gestionaHerramientas ? (
-          <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ display: "grid", gap: 10 }}>
             <RecoleccionAlmacenPanel />
             <ToolInventoryPanel />
             <ToolRequestsTable highlightId={highlightId} />
@@ -103,19 +103,18 @@ export default function AlmacenPage() {
 
       {tab === "kits" &&
         (gestionaHerramientas ? (
-          <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ display: "grid", gap: 10 }}>
             <div
               style={{
-                padding: "12px 14px",
-                borderRadius: 12,
+                padding: "8px 12px",
+                borderRadius: 10,
                 border: "1px solid var(--border)",
                 background: "var(--surface)",
-                fontSize: 13,
+                fontSize: 12.5,
                 color: "var(--text-secondary)",
               }}
             >
-              Kits permanentes: revisiones programadas y asignación por persona. El inventario fotográfico
-              vive en «Herramientas» → pantalla de herramientas.
+              Revisiones y kits por persona. Fotos del inventario: pestaña Herramientas.
             </div>
             <KitInspeccionesPanel />
             <ToolUserKitPanel />
