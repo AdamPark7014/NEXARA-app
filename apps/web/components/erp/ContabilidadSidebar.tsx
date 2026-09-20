@@ -276,6 +276,13 @@ export default function ContabilidadSidebar() {
           background: color-mix(in srgb, var(--primary) 14%, transparent);
           color: var(--primary);
         }
+        /* Sin esto, tabular por el menú no dejaba ver dónde estaba el foco:
+           el enlace activo se distingue por color y peso, pero el foco no. */
+        .nx-contab-nav-link:focus-visible {
+          outline: 2px solid var(--primary);
+          outline-offset: 1px;
+          color: var(--text-primary);
+        }
       `}</style>
     </nav>
   );
