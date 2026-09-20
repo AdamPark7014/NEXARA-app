@@ -143,8 +143,15 @@ export default function ContabilidadInvoicesView({
       const qs = new URLSearchParams();
       if (typeParam) qs.set("type", typeParam);
       qs.set("limit", "200");
-      const data = await erpFetch(`accounting/invoices?${qs}`, token);
-      const rows = Array.isArray(data) ? data : data?.items ?? data?.data ?? [];
+      // `erpFetch` devuelve `unknown` si no se le dice qué esperar, y entonces
+      // `data?.items` no compila. La ruta contesta el arreglo pelón o envuelto,
+      // según el endpoint, así que se declaran las tres formas.
+      const data = await erpFetch<
+        InvoiceRow[] | { items?: InvoiceRow[]; data?: InvoiceRow[] } | null
+      >(`accounting/invoices?${qs}`, token);
+      const rows: InvoiceRow[] = Array.isArray(data)
+        ? data
+        : data?.items ?? data?.data ?? [];
       setItems(rows);
     } catch (e) {
       setError(formatApiError(e));
@@ -230,7 +237,10 @@ export default function ContabilidadInvoicesView({
     setPaying(true);
     setPayErr(null);
     try {
-      const result = await erpFetch(`accounting/invoices/${row.id}/payments`, token, {
+      const result = await erpFetch<{
+        complement?: { cfdiPaymentUuid?: string | null } | null;
+        complementStampWarning?: string | null;
+      } | null>(`accounting/invoices/${row.id}/payments`, token, {
         method: "POST",
         body: JSON.stringify({
           amount,
