@@ -958,6 +958,9 @@ model User {
   toolKitInspections    ToolKitInspection[]   @relation("ToolKitInspectionInspector")
   horasExtra            OvertimeApproval[]    @relation("OvertimeApprovalUser")
   horasExtraDecididas   OvertimeApproval[]    @relation("OvertimeApprovalAprobador")
+  horario               WorkSchedule?         @relation("WorkScheduleUser")
+  horariosEditados      WorkSchedule[]        @relation("WorkScheduleEditor")
+  checadasRegistradas   Attendance[]          @relation("AttendanceRegistradaPor")
   @@unique([oidcProvider, oidcSubject])
   @@index([lastLoginAt])
   @@index([isActive, lastLoginAt])
@@ -1486,6 +1489,10 @@ model ActivityEvidence {
   entryLatitude        Decimal?  @db.Decimal(10, 8)
   entryLongitude       Decimal?  @db.Decimal(11, 8)
   entryPhotoUploadedAt DateTime?
+  /// El teléfono marcó como simulada la ubicación de esta foto (Android `isMock`,
+  /// iOS `isSimulatedBySoftware`). De estas fotos sale la hora productiva, así que el dato
+  /// se guarda: null = foto vieja o cliente que no lo informa.
+  entryMockLocation    Boolean?
 
   // Paso 2: Evidencias (N fotos configurables 2–8)
   evidencePhotos           String[]  @default([]) // Array de URLs
@@ -1506,6 +1513,8 @@ model ActivityEvidence {
   exitLatitude        Decimal?  @db.Decimal(10, 8)
   exitLongitude       Decimal?  @db.Decimal(11, 8)
   exitPhotoUploadedAt DateTime?
+  /// Igual que `entryMockLocation`, para la foto de salida.
+  exitMockLocation    Boolean?
 
   // Generales
   status      String    @default("ENTRY_PHOTO") @db.VarChar(50) // ENTRY_PHOTO, EVIDENCE_PHOTOS, SERVICE_SHEET_PDF, SERVICE_SHEET_DATA, EXIT_PHOTO, COMPLETED
@@ -1686,8 +1695,10 @@ model LocationTracking {
   velocidadKmh        Decimal?       @db.Decimal(5, 2)
   estaActivo          Boolean        @default(true)
   ultimaActualizacion DateTime       @default(now())
-  /// El teléfono marcó este punto como ubicación simulada (Android `isMock`,
-  /// iOS `isSimulatedBySoftware`). null = punto viejo o cliente que no lo informa.
+  /// El teléfono marcó este punto como ubicación simulada. Lo informan las dos apps:
+  /// Android con `Location.isMock` / `isFromMockProvider` y iOS con
+  /// `CLLocation.sourceInformation?.isSimulatedBySoftware`. null = punto viejo, o un
+  /// cliente que no lo manda (la web no manda puntos de jornada).
   mockLocation        Boolean?
   companyId           Int
   actividad           Activity?      @relation(fields: [actividadId], references: [id])
@@ -1769,8 +1780,15 @@ model Attendance {
   clientCapturedAt DateTime?
   /// Precisión del GPS en metros que reportó el teléfono.
   accuracyM        Float?
-  /// El teléfono detectó ubicación simulada (Android `isMock`, iOS `isSimulatedBySoftware`).
-  /// El registro se rechaza con 422; la columna existe para los intentos que sí se guarden.
+  /// Antigüedad de la medición al mandarla, en milisegundos, medida por el teléfono con su
+  /// reloj monótono (Android `elapsedRealtimeNanos`, iOS la diferencia contra
+  /// `CLLocation.timestamp`): cambiar la hora del sistema no la altera. Una posición vieja
+  /// es la última guardada, no dónde está su dueño.
+  fixAgeMs         Int?
+  /// El teléfono detectó ubicación simulada. Las dos apps lo informan: Android con
+  /// `Location.isMock` / `isFromMockProvider`, iOS con
+  /// `CLLocation.sourceInformation?.isSimulatedBySoftware`. El registro se rechaza con 422
+  /// y queda en `AttendanceRejection`; la columna existe para los intentos que sí se guarden.
   mockDetected     Boolean      @default(false)
   /// Se capturó sin conexión y se mandó después.
   offline          Boolean      @default(false)
@@ -1791,7 +1809,14 @@ model Attendance {
   uniformeRevisadoAt    DateTime?
   uniformeRevisadoPor   User?     @relation("AttendanceUniformeRevisor", fields: [uniformeRevisadoPorId], references: [id], onDelete: SetNull)
   /// Desde dónde se checó: ANDROID | IOS | WEB. null = registros de antes de guardarlo.
+  /// Desde el 19-09-2026 la web ya no puede checar: WEB solo aparece en registros viejos.
   origen           String?      @db.VarChar(10)
+  /// Salida de emergencia: un jefe registró esta checada por alguien (teléfono roto, sin
+  /// batería, olvidó checar). Queda quién lo hizo y por qué; sin estas dos columnas sería
+  /// indistinguible de una checada real.
+  registradaPorId  Int?
+  motivoRegistro   String?
+  registradaPor    User?        @relation("AttendanceRegistradaPor", fields: [registradaPorId], references: [id], onDelete: SetNull)
   companyId      Int
   user           User           @relation(fields: [userId], references: [id])
   company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -1883,6 +1908,42 @@ model OvertimeApproval {
   @@index([estado, fecha])
   @@index([companyId])
   @@map("overtime_approvals")
+}
+
+/// Horario propio de una persona: a qué hora entra, a qué hora sale y qué días trabaja.
+///
+/// Mientras nadie edite nada, esta tabla está vacía y todo sigue igual: manda la plantilla de
+/// acceso de siempre (oficina 09:00, campo 08:00, 15 min de gracia, L–V, 8 h netas). Cada campo
+/// en null hereda ese mismo valor, así que se puede cambiar solo la hora de entrada de una
+/// persona sin decidir de paso su jornada ni sus días.
+///
+/// De aquí salen el retardo y el tiempo extra que se calculan en `kpis-equipo.ts`, y de ahí la
+/// pre-nómina: por eso queda registrado quién lo editó y cuándo.
+model WorkSchedule {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @unique
+  /// `HH:MM` de entrada. null = la de su plantilla.
+  horaEntrada         String?  @db.VarChar(5)
+  /// `HH:MM` de salida. Informativa: la jornada se mide con las checadas, no con esto.
+  horaSalida          String?  @db.VarChar(5)
+  /// Días laborables (0 = domingo … 6 = sábado). Vacío = los de su plantilla (L–V).
+  dias                Int[]    @default([])
+  /// Minutos de tolerancia antes de contar retardo. null = 15.
+  graciaMin           Int?
+  /// Jornada ordinaria diaria en minutos netos de comida; arriba de esto empieza el extra.
+  /// null = 480 (8 h).
+  jornadaOrdinariaMin Int?
+  actualizadoPorId    Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  companyId           Int
+
+  user           User           @relation("WorkScheduleUser", fields: [userId], references: [id], onDelete: Cascade)
+  actualizadoPor User?          @relation("WorkScheduleEditor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@map("work_schedules")
 }
 
 model AttendanceDay {
@@ -5837,6 +5898,7 @@ model CompanyProfile {
   activityEvidenceFieldPhotos ActivityEvidenceFieldPhoto[]
   attendanceRejections        AttendanceRejection[]
   overtimeApprovals           OvertimeApproval[]
+  workSchedules               WorkSchedule[]
   productPackagings           ProductPackaging[]
   activityToolRequirements    ActivityToolRequirement[]
   activityToolChecks          ActivityToolCheck[]
