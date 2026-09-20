@@ -10,6 +10,7 @@ import { MeService } from './me.service.js';
 import { MyActivitiesService } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
+import { HorasExtraService } from './horas-extra.service.js';
 
 @Module({
   imports: [
@@ -21,6 +22,9 @@ import { KpisEquipoService } from './kpis-equipo.service.js';
     NotificationsModule,
   ],
   controllers: [MeController],
-  providers: [MeService, TeamBoardService, MyActivitiesService, KpisEquipoService],
+  providers: [MeService, TeamBoardService, MyActivitiesService, KpisEquipoService, HorasExtraService],
+  // Nómina calcula las horas del periodo con el mismo módulo que ve el jefe en los
+  // indicadores. Si fueran dos cálculos distintos, tarde o temprano darían distinto.
+  exports: [KpisEquipoService],
 })
 export class MeModule {}

@@ -9,14 +9,17 @@ import { TeamBoardService } from './team-board.service.js';
 import {
   calculaKpisPersona,
   diasDelRango,
+  horarioDePersona,
   horarioDePlantilla,
   semaforoKpi,
   sumaEquipo,
   supuestosKpi,
   type ActividadKpi,
+  type AprobacionExtra,
   type ChecadaKpi,
   type ComidaKpi,
   type DiaKpi,
+  type EstadoExtra,
   type HorarioKpi,
   type SemaforoKpi,
   type TotalesKpi,
@@ -34,8 +37,13 @@ export type KpiHorario = {
   clave: string | null;
   etiqueta: string;
   entrada: string | null;
+  salida: string | null;
   graciaMin: number;
   jornadaOrdinariaMin: number | null;
+  /** Días laborables (0 = domingo … 6 = sábado). */
+  dias: readonly number[];
+  /** Alguien le escribió un horario propio; si no, es el de su plantilla. */
+  personalizado: boolean;
 };
 
 export type KpiPersonaFila = {
@@ -81,6 +89,7 @@ type DatosPersona = {
   comidas: ComidaKpi[];
   actividades: ActividadKpi[];
   justificadas: Array<{ fecha: string; motivo: string }>;
+  aprobacionesExtra: AprobacionExtra[];
 };
 
 /**
@@ -131,6 +140,7 @@ export class KpisEquipoService {
         comidas: d.comidas,
         actividades: d.actividades,
         justificadas: d.justificadas.map((j) => j.fecha),
+        aprobacionesExtra: d.aprobacionesExtra,
         fechaIngreso: d.fechaIngreso,
       });
       return fila(u, d.horario, totales);
@@ -170,6 +180,7 @@ export class KpisEquipoService {
       comidas: d.comidas,
       actividades: d.actividades,
       justificadas: d.justificadas.map((j) => j.fecha),
+      aprobacionesExtra: d.aprobacionesExtra,
       fechaIngreso: d.fechaIngreso,
       detalle: true,
     });
@@ -275,6 +286,14 @@ export class KpisEquipoService {
       }),
     ]);
 
+    // Horario propio y decisiones de horas extra. Van aparte del `Promise.all` de arriba
+    // porque son tablas nuevas: un cliente Prisma sin ellas (pruebas con mock) no debe
+    // tumbar el tablero entero, solo quedarse sin ese dato.
+    const [horarios, aprobaciones] = await Promise.all([
+      this.leerHorarios(userIds, companyId),
+      this.leerAprobacionesExtra(userIds, rango, companyId),
+    ]);
+
     // Una fila por persona y actividad, juntando lo que diga la asignación y la evidencia.
     const clave = (userId: number, activityId: number) => `${userId}:${activityId}`;
     const asignacionPor = new Map(asignaciones.map((a) => [clave(a.userId, a.activityId), a]));
@@ -334,12 +353,14 @@ export class KpisEquipoService {
         tipoContrato: u.tipoContrato,
       });
       out.set(u.id, {
-        horario: horarioDePlantilla(plantilla),
+        // Sin fila propia esto devuelve exactamente la plantilla de siempre.
+        horario: horarioDePersona(plantilla, horarios.get(u.id) ?? null),
         fechaIngreso: u.fechaIngreso ?? null,
         checadas: [],
         comidas: [],
         actividades: [],
         justificadas: [],
+        aprobacionesExtra: aprobaciones.get(u.id) ?? [],
       });
     }
 
@@ -390,6 +411,91 @@ export class KpisEquipoService {
 
     return out;
   }
+
+  /**
+   * Horario propio de cada persona, si alguien se lo escribió.
+   *
+   * El mapa vuelve vacío cuando la tabla no existe todavía o la lectura falla, y eso
+   * significa exactamente «manda su plantilla»: es el comportamiento de siempre, así que
+   * un fallo aquí no le cambia el retardo ni el tiempo extra a nadie.
+   */
+  private async leerHorarios(
+    userIds: number[],
+    companyId: number | null,
+  ): Promise<Map<number, {
+    horaEntrada: string | null;
+    horaSalida: string | null;
+    dias: number[];
+    graciaMin: number | null;
+    jornadaOrdinariaMin: number | null;
+  }>> {
+    const out = new Map<number, any>();
+    const prisma = this.prisma as any;
+    if (typeof prisma?.workSchedule?.findMany !== 'function') return out;
+    try {
+      const filas = await prisma.workSchedule.findMany({
+        where: { userId: { in: userIds }, ...(companyId != null ? { companyId } : {}) },
+        select: {
+          userId: true,
+          horaEntrada: true,
+          horaSalida: true,
+          dias: true,
+          graciaMin: true,
+          jornadaOrdinariaMin: true,
+        },
+      });
+      for (const f of filas ?? []) {
+        out.set(f.userId, {
+          horaEntrada: f.horaEntrada ?? null,
+          horaSalida: f.horaSalida ?? null,
+          dias: Array.isArray(f.dias) ? f.dias : [],
+          graciaMin: f.graciaMin ?? null,
+          jornadaOrdinariaMin: f.jornadaOrdinariaMin ?? null,
+        });
+      }
+    } catch {
+      /* sin horario propio: manda la plantilla */
+    }
+    return out;
+  }
+
+  /** Decisiones de horas extra del rango, por persona y día. */
+  private async leerAprobacionesExtra(
+    userIds: number[],
+    rango: { desde: string; hasta: string },
+    companyId: number | null,
+  ): Promise<Map<number, AprobacionExtra[]>> {
+    const out = new Map<number, AprobacionExtra[]>();
+    const prisma = this.prisma as any;
+    if (typeof prisma?.overtimeApproval?.findMany !== 'function') return out;
+    try {
+      const filas = await prisma.overtimeApproval.findMany({
+        where: {
+          userId: { in: userIds },
+          fecha: {
+            gte: workDateColumn(parseWorkDate(rango.desde)),
+            lte: workDateColumn(parseWorkDate(rango.hasta)),
+          },
+          ...(companyId != null ? { companyId } : {}),
+        },
+        select: { userId: true, fecha: true, minutos: true, estado: true, nota: true },
+      });
+      for (const f of filas ?? []) {
+        const lista = out.get(f.userId) ?? [];
+        // `fecha` es `@db.Date`: llega a medianoche UTC y se lee en UTC.
+        lista.push({
+          fecha: f.fecha.toISOString().slice(0, 10),
+          minutos: f.minutos,
+          estado: f.estado as EstadoExtra,
+          nota: f.nota ?? null,
+        });
+        out.set(f.userId, lista);
+      }
+    } catch {
+      /* sin decisiones: todo el extra queda pendiente, que es lo honesto */
+    }
+    return out;
+  }
 }
 
 function vacio(): DatosPersona {
@@ -400,6 +506,7 @@ function vacio(): DatosPersona {
     comidas: [],
     actividades: [],
     justificadas: [],
+    aprobacionesExtra: [],
   };
 }
 
@@ -412,10 +519,15 @@ function fila(
     persona: { id: u.id, nombre: u.nombre, email: u.email, avatarUrl: u.avatarUrl, puesto: u.puesto },
     horario: {
       clave: horario.clave,
-      etiqueta: ETIQUETA_HORARIO[horario.clave ?? 'none'] ?? 'Sin horario',
+      etiqueta: horario.personalizado
+        ? `Horario propio${horario.entrada ? ` · entra ${horario.entrada}` : ''}`
+        : (ETIQUETA_HORARIO[horario.clave ?? 'none'] ?? 'Sin horario'),
       entrada: horario.entrada,
+      salida: horario.salida,
       graciaMin: horario.graciaMin,
       jornadaOrdinariaMin: horario.jornadaOrdinariaMin,
+      dias: horario.diasLaborables,
+      personalizado: horario.personalizado,
     },
     totales,
     ...semaforoKpi(totales),
