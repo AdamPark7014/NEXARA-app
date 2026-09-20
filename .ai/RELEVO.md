@@ -2,9 +2,9 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** feat/opt-opt-shell
-- **HEAD:** (este commit)
-- **Worktree:** `C:\dev\apps\_worktrees\nexara-opt-shell` — NO tocar `C:\dev\apps\NEXARA-app`
+- **Rama:** feat/opt-opt-org
+- **HEAD:** (este commit) worktree `nexara-opt-org` — no tocar `C:\dev\apps\NEXARA-app`
+- **Migraciones:** sin cambios
 
 ## Puente — no cambiar
 
@@ -12,18 +12,20 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-1. **UI shell density:** padding más compacto en `PageHeader`, `Section`, `PanelTabs`, `KpiCard` (solo spacing; tipografía/colores intactos).
-2. Commit: `opt(ui-shell): reducir padding PageHeader Section PanelTabs`.
+1. **Organigrama UI denser** (`OrgChartView.tsx` only):
+   - KPIs densos (`minmax(100px)`) + «Por departamento» como barra apilada horizontal + leyenda en una sola franja.
+   - Nodos ~204px, padding/avatar/tag más compactos; `Section dense`; menos padding del árbol y bloque huérfanos.
+2. No se tocó API orgchart ni exclusión Christian/Claudia; no se tocó `orgchart-layout.ts`.
 
 ## A medias
 
-Nada en este worktree.
+- Vitest en este worktree no corre (falta `@vitejs/plugin-react` en `node_modules`); helpers no cambiaron.
 
 ## Siguiente
 
-- QA visual en un módulo ERP/OPS con `density="ops"` y Section densa vs default.
-- Merge de `feat/opt-opt-shell` cuando el resto de olas de opt estén listas.
+- QA visual `/erp/organigrama` en el worktree build.
+- Merge de `feat/opt-opt-org` cuando Adam lo pida.
 
 ## No tocar
 
-Puente NAS · `C:\dev\apps\NEXARA-app` desde este worktree.
+Puente NAS · `C:\dev\apps\NEXARA-app` (este turno es solo worktree).
