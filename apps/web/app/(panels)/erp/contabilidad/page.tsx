@@ -10,6 +10,13 @@ import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { Money } from "@/components/ui/DataTable";
+import {
+  DESTINOS,
+  PuestaEnMarcha,
+  VacioConPrimerPaso,
+  usePuedeAbrir,
+  type PasoArranque,
+} from "./_arranque";
 
 type WorkspaceDashboard = {
   period: { from: string; to: string };
@@ -195,9 +202,133 @@ export default function ContabilidadDashboardPage() {
     return items.slice(0, 5);
   }, [data]);
 
-  const primaryHref =
-    attention.find((a) => a.href)?.href ?? "/erp/contabilidad/cuentas-por-cobrar";
-  const primaryLabel = attention.some((a) => a.href) ? "Revisar pendientes" : "Ver por cobrar";
+  /**
+   * ¿Detrás de estas cifras no hay absolutamente nada? No es lo mismo que «dio
+   * cero»: se exige que TODO lo que el resumen sabe mirar esté vacío —el
+   * disponible, la cartera abierta de los dos lados, las facturas del periodo,
+   * la nómina en borrador, el mes y las alertas—. Con eso, pintar cinco ceros
+   * y una tabla de guiones no informa de nada: ocupa el sitio del primer paso.
+   */
+  const sinCifras = useMemo(() => {
+    if (!data) return false;
+    return (
+      data.cashBalance === 0 &&
+      data.accountsReceivablePending === 0 &&
+      data.accountsPayablePending === 0 &&
+      data.invoicesPeriod.total === 0 &&
+      data.prenominaDraftTotal === 0 &&
+      data.income === 0 &&
+      data.expense === 0 &&
+      data.alerts.length === 0
+    );
+  }, [data]);
+
+  /**
+   * Qué falta para poder operar. El dashboard NO lo dice —manda sumas, no si
+   * existen cuentas, periodos o bancos—, así que cuando no hay cifras se
+   * preguntan los tres catálogos que ya sirven al resto del hub. Solo entonces:
+   * en un mes con movimiento no se gasta ni una petición de más.
+   *
+   * Lo que falla o no se puede consultar queda en `desconocido`; adivinar que
+   * «no hay» porque un 403 no contestó sería inventarse el estado de la empresa.
+   */
+  type EstadoPaso = PasoArranque["estado"];
+  const [arranque, setArranque] = useState<{
+    cuentas: EstadoPaso;
+    periodo: EstadoPaso;
+    banco: EstadoPaso;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!sinCifras || !token) return;
+    let vivo = true;
+    const pedirLista = async (path: string): Promise<unknown[] | null> => {
+      try {
+        const res = await erpFetch<unknown>(path, token);
+        if (Array.isArray(res)) return res;
+        const caja = res as { data?: unknown; items?: unknown };
+        if (Array.isArray(caja?.data)) return caja.data;
+        if (Array.isArray(caja?.items)) return caja.items;
+        return null;
+      } catch {
+        return null;
+      }
+    };
+    void (async () => {
+      const [cuentas, periodos, bancos] = await Promise.all([
+        pedirLista("accounting/accounts"),
+        pedirLista("accounting/accounts/fiscal-periods"),
+        pedirLista("accounting/banking/accounts"),
+      ]);
+      if (!vivo) return;
+      const hay = (lista: unknown[] | null): EstadoPaso =>
+        lista === null ? "desconocido" : lista.length > 0 ? "listo" : "pendiente";
+      setArranque({
+        cuentas: hay(cuentas),
+        // Un periodo cerrado no sirve para trabajar el mes: cuenta el abierto.
+        periodo:
+          periodos === null
+            ? "desconocido"
+            : periodos.some((p) => !(p as { isClosed?: boolean })?.isClosed)
+              ? "listo"
+              : "pendiente",
+        banco: hay(bancos),
+      });
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [sinCifras, token]);
+
+  const pasos: PasoArranque[] = useMemo(
+    () => [
+      {
+        id: "cuentas",
+        titulo: "Da de alta el catálogo de cuentas",
+        porque: "Sin cuentas contables no se puede registrar una póliza ni sacar la balanza.",
+        destino: DESTINOS.catalogoCuentas,
+        estado: arranque?.cuentas ?? "desconocido",
+      },
+      {
+        id: "periodo",
+        titulo: "Abre el periodo fiscal",
+        porque: "Es el mes que vas a cuadrar; sin uno abierto, Cierres no tiene qué revisar.",
+        destino: DESTINOS.periodoFiscal,
+        estado: arranque?.periodo ?? "desconocido",
+      },
+      {
+        id: "banco",
+        titulo: "Da de alta la cuenta bancaria",
+        porque: "De ahí salen el disponible de arriba y la conciliación del estado de cuenta.",
+        destino: DESTINOS.cuentaBancaria,
+        estado: arranque?.banco ?? "desconocido",
+      },
+    ],
+    [arranque],
+  );
+
+  const faltaConfigurar = pasos.some((p) => p.estado === "pendiente");
+  /**
+   * Que ningún paso salga «pendiente» no siempre significa que esté todo: si
+   * los tres quedaron en «desconocido» es que no se pudo preguntar. Con al
+   * menos uno comprobado se puede afirmar algo; sin ninguno, no.
+   */
+  const configVerificada = pasos.some((p) => p.estado === "listo");
+  const modoArranque = sinCifras && faltaConfigurar;
+  const puedeAbrir = usePuedeAbrir();
+
+  const primerPasoPendiente = pasos.find(
+    (p) => p.estado === "pendiente" && puedeAbrir(p.destino.href),
+  );
+
+  const primaryHref = modoArranque
+    ? (primerPasoPendiente?.destino.href ?? "/erp/contabilidad/polizas?tab=cuentas")
+    : (attention.find((a) => a.href)?.href ?? "/erp/contabilidad/cuentas-por-cobrar");
+  const primaryLabel = modoArranque
+    ? (primerPasoPendiente?.destino.etiqueta ?? "Configurar contabilidad")
+    : attention.some((a) => a.href)
+      ? "Revisar pendientes"
+      : "Ver por cobrar";
 
   /**
    * El periodo que contestó el servidor, no el que se pidió: la API normaliza
@@ -318,7 +449,9 @@ export default function ContabilidadDashboardPage() {
             ? "Sin sesión activa."
             : loading
               ? "Cargando el periodo…"
-              : `Qué está pasando en ${monthLabel}.`
+              : modoArranque
+                ? "Qué falta para que esta pantalla tenga cifras."
+                : `Qué está pasando en ${monthLabel}.`
         }
         density="ops"
         actions={
@@ -412,20 +545,76 @@ export default function ContabilidadDashboardPage() {
         />
       )}
 
-      {/* Nivel 1 — la tira: el estado del dinero en una sola línea. */}
-      <div style={{ marginBottom: 18 }}>
-        <MetricStrip metrics={metrics} ariaLabel="Estado del periodo" />
-      </div>
+      {/* Sin una sola cifra detrás, la pantalla deja de ser un tablero y pasa a
+          ser la puesta en marcha: qué falta, en qué orden, y a dónde ir. */}
+      {sinCifras ? (
+        <section aria-labelledby="arranque-title" style={{ marginBottom: 18 }}>
+          <BlockTitle id="arranque-title">
+            {modoArranque ? "Puesta en marcha" : "Sin movimiento todavía"}
+          </BlockTitle>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.4fr) minmax(240px, 0.8fr)",
-          gap: 16,
-          alignItems: "start",
-        }}
-        className="nx-contab-dash-grid"
-      >
+          {arranque === null ? (
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }} aria-busy="true">
+              Revisando qué falta para empezar…
+            </p>
+          ) : modoArranque ? (
+            <>
+              <p
+                style={{
+                  margin: "0 0 12px",
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.5,
+                  maxWidth: 640,
+                }}
+              >
+                No hay nada que contar en {monthLabel}: ni saldo en bancos, ni facturas, ni cartera
+                abierta. Antes de que el resumen tenga cifras hay que dejar lista la contabilidad.
+                Estos son los pasos, en orden.
+              </p>
+              <PuestaEnMarcha pasos={pasos} />
+              <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--text-tertiary)" }}>
+                En cuanto exista el primer movimiento, esta pantalla vuelve sola a las cifras del
+                periodo.
+              </p>
+            </>
+          ) : (
+            <VacioConPrimerPaso
+              title={
+                configVerificada
+                  ? "Todo está listo y todavía no pasa nada"
+                  : "Sin nada registrado en este periodo"
+              }
+              description={
+                configVerificada
+                  ? `La contabilidad ya está configurada, pero del ${periodoVigente.from} al ${periodoVigente.to} no hay facturas, cobros, pagos ni saldo en bancos. Emite la primera factura: aparecerá aquí, en Por cobrar y en el libro de movimientos.`
+                  : `Del ${periodoVigente.from} al ${periodoVigente.to} no hay facturas, cobros, pagos ni saldo en bancos. Si falta configurar algo no se pudo comprobar desde tu cuenta, así que empieza por lo que sí es tuyo: la primera factura.`
+              }
+              destino={DESTINOS.factura}
+              extra={
+                <Button size="sm" variant="ghost" onClick={abrirPeriodo}>
+                  Cambiar el periodo
+                </Button>
+              }
+            />
+          )}
+        </section>
+      ) : (
+        <>
+          {/* Nivel 1 — la tira: el estado del dinero en una sola línea. */}
+          <div style={{ marginBottom: 18 }}>
+            <MetricStrip metrics={metrics} ariaLabel="Estado del periodo" />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.4fr) minmax(240px, 0.8fr)",
+              gap: 16,
+              alignItems: "start",
+            }}
+            className="nx-contab-dash-grid"
+          >
         <div style={{ display: "grid", gap: 18, minWidth: 0 }}>
           {/* Nivel 2 — excepciones: cada una con el enlace a donde se resuelve. */}
           <section aria-labelledby="att-title">
@@ -665,12 +854,14 @@ export default function ContabilidadDashboardPage() {
               href="/erp/contabilidad/pre-nomina"
             />
           </dl>
-          <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-            <QuietLink href="/erp/contabilidad/cierres">Cerrar periodo</QuietLink>
-            <QuietLink href="/erp/contabilidad/reportes">Reportes</QuietLink>
+              <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+                <QuietLink href="/erp/contabilidad/cierres">Cerrar periodo</QuietLink>
+                <QuietLink href="/erp/contabilidad/reportes">Reportes</QuietLink>
+              </div>
+            </section>
           </div>
-        </section>
-      </div>
+        </>
+      )}
 
       {/* A 1024px la columna de contexto ya no cabe junto a la tabla de
           vencimientos sin estrangular las dos: se apila, que es lo que pide

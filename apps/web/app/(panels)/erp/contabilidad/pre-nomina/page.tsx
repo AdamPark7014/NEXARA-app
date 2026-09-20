@@ -6,7 +6,6 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
-import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
@@ -19,6 +18,7 @@ import {
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import { fetchPrenominaPreview, type PrenominaPreviewRow } from "@/lib/finance-api";
+import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 
 const MODULO_COMPLETO = "/erp/finance/prenomina";
 
@@ -494,10 +494,14 @@ export default function ContabilidadPrenominaPage() {
       ) : null}
 
       {cargado && !error && !sinSesion && !hayDatos ? (
-        <EmptyState
+        /* La API contesta una lista por persona: vacía no distingue «nadie
+           dado de alta» de «nadie con checadas en estas fechas». Se dice como
+           es, sin elegir una de las dos por la persona que lee. */
+        <VacioConPrimerPaso
           title="Sin gente activa en este periodo"
-          description={`Entre el ${desde} y el ${hasta} no hay personal con alta activa ni checadas. Prueba con otro periodo o revisa las altas del mes.`}
-          action={
+          description={`Entre el ${desde} y el ${hasta} no hay personal con alta activa ni checadas, así que no hay nada que pagar. El alta del personal y sus sueldos los lleva Recursos Humanos; las checadas entran por asistencia. Prueba otro periodo, o revisa las altas del mes.`}
+          destino={DESTINOS.nomina}
+          extra={
             <Button size="sm" variant="secondary" onClick={() => void cargar()} disabled={cargando}>
               {cargando ? "Calculando…" : "Volver a calcular"}
             </Button>

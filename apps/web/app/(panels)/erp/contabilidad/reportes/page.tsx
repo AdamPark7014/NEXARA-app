@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -25,6 +26,7 @@ import {
   type ReporteCatalogo,
   type ResultadoReporte,
 } from "@/components/erp/reportes-contabilidad";
+import { VacioConPrimerPaso } from "../_arranque";
 
 /**
  * Reportes de contabilidad.
@@ -181,6 +183,13 @@ export default function ReportesPage() {
     .filter((f) => f.requerido && f.tipo === "seleccion" && !seleccion[f.clave])
     .map((f) => f.etiqueta);
 
+  /**
+   * ¿El resultado viene vacío porque no hay nada, o porque quien mira eligió un
+   * filtro que lo esconde? Solo cuentan los de selección: las fechas siempre
+   * tienen valor y llamarlas «filtro» mandaría a quitar algo que no se puede.
+   */
+  const hayFiltroElegido = Object.values(seleccion).some((v) => Boolean(v));
+
   /** El periodo que el API dice haber calculado, que no siempre es el pedido. */
   const periodoCalculado = (() => {
     const p = resultado?.periodo;
@@ -333,12 +342,36 @@ export default function ReportesPage() {
             )
           ) : (
             <>
-              <Resumen items={resultado.resumen} />
+              {/* La tira de cifras solo cuando hay renglones que la sostengan:
+                  un reporte vacío devuelve el resumen en ceros, y esa fila de
+                  ceros tapa justo la frase que explica por qué está vacío. */}
+              {resultado.filas.length > 0 && <Resumen items={resultado.resumen} />}
               {resultado.filas.length === 0 ? (
-                <EmptyState
-                  title="Sin movimientos"
-                  description="No hay datos para este reporte en el periodo elegido."
-                />
+                hayFiltroElegido ? (
+                  <EmptyState
+                    title="Nada con estos filtros"
+                    description="Ningún renglón cumple lo que elegiste. Quita el filtro o amplía el periodo."
+                    action={
+                      <Button size="sm" variant="secondary" onClick={() => setSeleccion({})}>
+                        Quitar los filtros
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <VacioConPrimerPaso
+                    variant="default"
+                    title="Sin datos en este periodo"
+                    description={`«${reporte?.nombre ?? "Este reporte"}» no captura nada: se arma con lo que ya está registrado —pólizas, facturas, pagos y gastos— y en este periodo no hay nada de eso. Amplía las fechas, o mira el libro para ver qué sí existe.`}
+                    extra={
+                      <Link
+                        href="/erp/contabilidad/movimientos"
+                        style={{ fontSize: 12.5, fontWeight: 600 }}
+                      >
+                        Ver el libro de movimientos →
+                      </Link>
+                    }
+                  />
+                )
               ) : (
                 <>
                   <DataTable
