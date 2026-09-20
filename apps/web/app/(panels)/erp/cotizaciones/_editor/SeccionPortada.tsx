@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { listSalesClients, type SalesClient } from "@/lib/sales-api";
 import { SEGMENTOS, SEGMENTO_LABEL, type Segmento } from "@/lib/cotizaciones-api";
 import type { DocumentoCotizacion } from "@/lib/cotizacion-documento";
-import { TextoAuto } from "./campos";
+import { Ayuda, Hoja, Segmentado, TextoAuto } from "./campos";
 import styles from "./editor.module.css";
 
 const QUE_CAMBIA: Record<Segmento, string> = {
@@ -103,7 +103,7 @@ export function ClienteCombo({
         value={doc.clientName}
         autoComplete="off"
         autoFocus={autoFocus}
-        placeholder="Busca en tus clientes o escribe uno nuevo"
+        placeholder="Buscar o escribir cliente"
         role="combobox"
         aria-expanded={mostrar}
         aria-controls={listaId}
@@ -147,9 +147,9 @@ export function ClienteCombo({
         </ul>
       ) : null}
       {doc.clientName.trim() && !doc.salesClientId && clientes && !exacto ? (
-        <p className={styles.pista} style={{ color: "inherit", opacity: 0.8 }}>
-          Cliente nuevo: se da de alta en el CRM al guardar.
-        </p>
+        <span className={styles.pastilla} title="Se da de alta en el CRM al guardar">
+          Cliente nuevo
+        </span>
       ) : null}
     </div>
   );
@@ -172,66 +172,67 @@ export default function SeccionPortada({
   esNueva: boolean;
 }) {
   return (
-    <section id="portada" className={styles.portada} aria-label="Portada">
-      <div className={styles.portadaMarca}>
-        <span>NEXARA · Conectando ecosistemas de tecnología</span>
-        <span className={styles.portadaVersion}>Versión {version}</span>
-      </div>
-      <p className={styles.portadaEtiqueta}>Propuesta técnica</p>
-      <label htmlFor="cot-proyecto" className={styles.soloLector}>
-        Título del proyecto
-      </label>
-      <TextoAuto
-        id="cot-proyecto"
-        variante="portada"
-        value={doc.projectName}
-        onValor={(v) => cambiar((d) => ({ ...d, projectName: v.replace(/\n/g, " ") }))}
-        placeholder="Título del proyecto — p. ej. Renovación, mantenimiento y ampliación del sistema de CCTV"
-        disabled={!editable}
-      />
-      <div className={styles.portadaCampos}>
+    <Hoja
+      id="portada"
+      numero=""
+      titulo="Portada"
+      ayuda="Lo primero que ve el cliente: el título del proyecto, para quién es, la fecha y la versión. El folio lo emite el servidor al guardar."
+    >
+      <div className={styles.campos}>
         <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-cliente">
-            Cliente
+          <label htmlFor="cot-proyecto" className={styles.etiqueta}>
+            Título del proyecto
           </label>
-          <ClienteCombo doc={doc} cambiar={cambiar} token={token} editable={editable} id="cot-cliente" autoFocus={esNueva} />
-        </div>
-        <div className={styles.campo}>
-          <label className={styles.etiqueta} htmlFor="cot-fecha-portada">
-            Fecha
-          </label>
-          <input
-            id="cot-fecha-portada"
-            type="date"
-            className={styles.input}
-            value={doc.issueDate}
+          <TextoAuto
+            id="cot-proyecto"
+            variante="portada"
+            value={doc.projectName}
+            onValor={(v) => cambiar((d) => ({ ...d, projectName: v.replace(/\n/g, " ") }))}
+            placeholder="Renovación del sistema de CCTV"
             disabled={!editable}
-            onChange={(e) => cambiar((d) => ({ ...d, issueDate: e.target.value }))}
           />
         </div>
+        <div className={styles.portadaCampos}>
+          <div className={styles.campo}>
+            <label className={styles.etiqueta} htmlFor="cot-cliente">
+              Cliente
+            </label>
+            <ClienteCombo doc={doc} cambiar={cambiar} token={token} editable={editable} id="cot-cliente" autoFocus={esNueva} />
+          </div>
+          <div className={styles.campo}>
+            <label className={styles.etiqueta} htmlFor="cot-fecha-portada">
+              Fecha
+            </label>
+            <input
+              id="cot-fecha-portada"
+              type="date"
+              className={styles.input}
+              value={doc.issueDate}
+              disabled={!editable}
+              onChange={(e) => cambiar((d) => ({ ...d, issueDate: e.target.value }))}
+            />
+          </div>
+          <div className={styles.campo}>
+            <span className={styles.etiqueta}>Versión</span>
+            <span className={`${styles.input} ${styles.inputFijo}`} aria-live="polite">
+              {version}
+            </span>
+          </div>
+        </div>
         <div className={styles.campo}>
-          <span className={styles.etiqueta}>Versión</span>
-          <span className={styles.input} style={{ opacity: 0.85 }} aria-live="polite">
-            {version}
+          <span className={styles.etiquetaConAyuda}>
+            <span className={styles.etiqueta}>Segmento</span>
+            <Ayuda titulo="el segmento">{QUE_CAMBIA[doc.segmento]}</Ayuda>
           </span>
+          <Segmentado
+            etiqueta="Segmento"
+            opciones={SEGMENTOS.map((s) => ({ valor: s, etiqueta: SEGMENTO_LABEL[s] }))}
+            valor={doc.segmento}
+            onValor={(s) => cambiar((d) => ({ ...d, segmento: s }))}
+            deshabilitado={!editable}
+          />
         </div>
       </div>
-      <div className={styles.segmentos} role="radiogroup" aria-label="Segmento">
-        {SEGMENTOS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            role="radio"
-            aria-checked={doc.segmento === s}
-            className={`${styles.segmento} ${doc.segmento === s ? styles.segmentoOn : ""}`}
-            disabled={!editable}
-            onClick={() => cambiar((d) => ({ ...d, segmento: s }))}
-          >
-            {SEGMENTO_LABEL[s]}
-          </button>
-        ))}
-      </div>
-      <p className={styles.segmentoAyuda}>{QUE_CAMBIA[doc.segmento]}</p>
-    </section>
+    </Hoja>
   );
 }

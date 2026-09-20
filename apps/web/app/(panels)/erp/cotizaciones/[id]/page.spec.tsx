@@ -121,7 +121,9 @@ describe("editor de cotización", () => {
     render(<CotizacionDetallePage />);
     expect(await screen.findByRole("heading", { name: /01\. Objetivo del proyecto/ })).toBeInTheDocument();
     const titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(titulos.slice(0, 4)).toEqual([
+    expect(titulos.slice(0, 6)).toEqual([
+      "Portada",
+      "Personalizar",
       "01. Objetivo del proyecto",
       "02. Alcance del proyecto",
       "03. Planos",
@@ -169,6 +171,47 @@ describe("editor de cotización", () => {
     expect(screen.getByTestId("total-cotizacion")).toHaveTextContent("2,552.00");
     // El renglón de captura queda listo para la siguiente.
     expect(screen.getByLabelText("Descripción de la nueva partida")).toHaveValue("");
+  });
+
+  it("partidas como hoja de cálculo: Enter agrega fila debajo, ↑↓ cambian de fila, el grupo va en el menú", async () => {
+    servidor();
+    const user = userEvent.setup();
+    render(<CotizacionDetallePage />);
+    const primera = await screen.findByLabelText("Descripción de la partida 1");
+    await user.click(primera);
+    await user.keyboard("{Enter}");
+    const segunda = screen.getByLabelText("Descripción de la partida 2");
+    expect(segunda).toHaveFocus();
+    expect(segunda).toHaveValue("");
+    await user.keyboard("Balún pasivo{Tab}");
+    expect(screen.getByLabelText("Unidad de la partida 2")).toHaveFocus();
+    await user.click(screen.getByLabelText("Cantidad de la partida 2"));
+    await user.keyboard("{ArrowUp}");
+    expect(screen.getByLabelText("Cantidad de la partida 1")).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Opciones de la partida 2" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Mano de obra" }));
+    await user.click(screen.getByRole("button", { name: "Opciones de la partida 2" }));
+    expect(screen.getByRole("menuitemradio", { name: "Mano de obra" })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("Personalizar: apagar 03 Planos la deja en una línea y se guarda en las opciones", async () => {
+    const llamadas = servidor();
+    const user = userEvent.setup();
+    render(<CotizacionDetallePage />);
+    await user.click(await screen.findByRole("button", { name: "Ajustar" }));
+    await user.click(screen.getByRole("switch", { name: /03 Planos/ }));
+    expect(screen.getByText("No va en el PDF de esta cotización (Personalizar).")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Incluir" })).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "USD · dólares" }));
+
+    await waitFor(
+      () => {
+        const puts = llamadas.filter((l) => l.metodo === "PUT");
+        expect(puts.at(-1)?.cuerpo).toMatchObject({ currency: "USD", opciones: { secciones: { planos: false } } });
+      },
+      { timeout: 4000 },
+    );
   });
 
   it("envía por correo con copia y mensaje", async () => {

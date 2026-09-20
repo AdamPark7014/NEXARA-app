@@ -2,18 +2,20 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   ParseIntPipe,
   Post,
   Put,
   Query,
+  Req,
   Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { CotizacionesService } from './cotizaciones.service.js';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
@@ -26,6 +28,8 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { validarTamanoBorrador } from './propuesta-vista-previa.js';
+import { GuardarPlantillaDto } from './dto/plantilla-cotizacion.dto.js';
 
 @Controller('cotizaciones')
 @UseGuards(UrlAccessGuard)
@@ -75,6 +79,49 @@ export class CotizacionesController {
   @Get('plantillas')
   plantillas() {
     return this.cotizacionesService.plantillas();
+  }
+
+  /**
+   * Plantillas de cotización de la empresa («Nueva desde plantilla»). Van antes de `:id` para que
+   * Nest no tome «plantillas-guardadas» por un id.
+   */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('plantillas-guardadas')
+  listarPlantillasGuardadas(@CurrentCompanyId() companyId: number | null) {
+    return this.cotizacionesService.listarPlantillasGuardadas(companyId);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('plantillas-guardadas/:plantillaId')
+  plantillaGuardada(
+    @Param('plantillaId', ParseIntPipe) plantillaId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.plantillaGuardada(plantillaId, companyId);
+  }
+
+  /** «Guardar como plantilla»: de la cotización guardada, sin cliente ni folio. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post('plantillas-guardadas')
+  guardarPlantilla(
+    @CurrentUser() user: any,
+    @Body() dto: GuardarPlantillaDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.guardarPlantilla(dto, user?.id, companyId);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post('plantillas-guardadas/:plantillaId/archivar')
+  archivarPlantilla(
+    @Param('plantillaId', ParseIntPipe) plantillaId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.archivarPlantilla(plantillaId, companyId);
   }
 
   /** Detalle de Core: estado y segmento en español, términos, partidas agrupadas y participantes. */
@@ -134,6 +181,35 @@ export class CotizacionesController {
     const pdf = await this.cotizacionesService.getPdfBuffer(id, companyId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=cotizacion-${id}.pdf`);
+    res.send(pdf);
+  }
+
+  /**
+   * Vista previa en vivo: el PDF del borrador que está en pantalla, sin guardarlo.
+   *
+   * Cuerpo: lo mismo que `PUT /cotizaciones/:id` (`UpdateCotizacionDto`, con las mismas reglas de
+   * validación); se mezcla en memoria con la guardada. Mismo permiso y mismo candado de empresa que
+   * `GET :id/pdf`. Responde el PDF y, en `X-Propuesta-Secciones`, la página donde empieza cada
+   * sección (`{"portada":1,"objetivo":2,…}`) para que el editor siga al cursor.
+   */
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS] })
+  @Post(':id/pdf/vista-previa')
+  @HttpCode(200)
+  async vistaPreviaPdf(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCotizacionDto,
+    @CurrentCompanyId() companyId: number | null,
+    @Req() req: Request & { rawBody?: Buffer },
+    @Res() res: Response,
+  ) {
+    validarTamanoBorrador(dto, req.rawBody?.length ?? Number(req.headers['content-length'] ?? 0));
+    const { pdf, secciones } = await this.cotizacionesService.vistaPreviaPdf(id, dto, companyId, user?.id ?? null);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=vista-previa-${id}.pdf`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Propuesta-Secciones', JSON.stringify(secciones));
     res.send(pdf);
   }
 

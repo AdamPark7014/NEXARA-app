@@ -6,6 +6,7 @@
  * en cada pantalla.
  */
 import { buildApiUrl } from "@/lib/api-base";
+import type { CondicionesSugeridas, Moneda, OpcionesCotizacion } from "@/lib/cotizacion-personalizacion";
 
 export const SEGMENTOS = ["COMERCIAL", "OBRA", "LICITACION", "SERVICIO"] as const;
 export type Segmento = (typeof SEGMENTOS)[number];
@@ -82,6 +83,10 @@ export type PartidaCotizacion = {
   lineTotal?: number;
   paqueteClave?: string | null;
   paqueteCantidad?: number | null;
+  /** Columnas opcionales del PDF (Personalizar). */
+  brand?: string | null;
+  model?: string | null;
+  imagenUrl?: string | null;
 };
 
 /** 02 Alcance: una subsección numerada (título, párrafo y viñetas). */
@@ -108,7 +113,8 @@ export const TITULO_TERMINO: Record<ClaveTermino, string> = {
 };
 
 export type ParteTermino = {
-  clave: ClaveTermino | "vigencia";
+  /** `entrega` y `garantia` salen de las condiciones comerciales (Personalizar). */
+  clave: ClaveTermino | "vigencia" | "entrega" | "garantia";
   titulo: string;
   texto: string;
   personalizado: boolean;
@@ -222,6 +228,10 @@ export type CotizacionDetalle = {
   items: PartidaCotizacion[];
   participantes: ParticipanteCotizacion[];
   actividades: Array<{ id: number; anNumber?: string | null; titulo?: string | null; estatus?: string | null }>;
+  /** Personalización (completa: sin guardar, los valores de siempre). */
+  opciones?: OpcionesCotizacion | null;
+  /** Condiciones comerciales que sugiere el segmento. */
+  condicionesSugeridas?: CondicionesSugeridas | null;
 };
 
 async function cotFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
@@ -281,6 +291,8 @@ export type GuardarCotizacion = {
   items?: PartidaCotizacion[];
   /** Solo para retomar como borrador una enviada/rechazada/vencida (la API guarda la versión). */
   status?: "BORRADOR";
+  currency?: Moneda;
+  opciones?: OpcionesCotizacion;
 };
 
 export function crearCotizacion(token: string, payload: GuardarCotizacion) {
@@ -426,12 +438,93 @@ export async function pdfDeCotizacion(token: string, id: number, signal?: AbortS
   return res.blob();
 }
 
+/**
+ * Vista previa en vivo: el PDF del borrador que está en pantalla, sin guardarlo.
+ *
+ * `borrador` es lo mismo que guarda el autoguardado (`payloadDeDocumento`). La API responde el PDF y,
+ * en `X-Propuesta-Secciones`, la página donde empieza cada sección.
+ */
+export async function vistaPreviaEnVivo(
+  token: string,
+  id: number,
+  borrador: GuardarCotizacion,
+  signal?: AbortSignal,
+): Promise<{ bytes: Uint8Array; secciones: string | null }> {
+  const res = await fetch(buildApiUrl(`cotizaciones/${id}/pdf/vista-previa`), {
+    method: "POST",
+    credentials: "include",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/pdf" },
+    body: JSON.stringify(borrador),
+    signal,
+  });
+  if (!res.ok) {
+    let mensaje = `No se pudo armar la vista previa (HTTP ${res.status})`;
+    try {
+      const cuerpo = (await res.json()) as { message?: string | string[] };
+      if (cuerpo?.message) mensaje = Array.isArray(cuerpo.message) ? cuerpo.message.join(", ") : cuerpo.message;
+    } catch {
+      /* cuerpo no JSON: se queda el mensaje genérico */
+    }
+    throw new Error(mensaje);
+  }
+  return { bytes: new Uint8Array(await res.arrayBuffer()), secciones: res.headers.get("X-Propuesta-Secciones") };
+}
+
 export type PlantillasSegmento = {
   segmento: Segmento;
   etiqueta: string;
   objetivo: { intro: string; cierre: string };
   bloques: Array<{ clave: string; titulo: string; texto: string | null; vinetas: string[] }>;
+  condiciones?: CondicionesSugeridas;
 };
+
+// ─── Plantillas de cotización de la empresa ──────────────────────────────────
+
+export type PlantillaGuardadaResumen = {
+  id: number;
+  nombre: string;
+  segmento: Segmento;
+  conPartidas: boolean;
+  partidas: number;
+  projectName?: string | null;
+  updatedAt?: string | null;
+};
+
+export type ContenidoPlantilla = {
+  segmento: Segmento;
+  projectName: string;
+  scope: string;
+  objetivo: string;
+  alcanceBloques: BloqueAlcance[];
+  note: string;
+  depositPercent: number;
+  currency: Moneda;
+  opciones: OpcionesCotizacion;
+  items: PartidaCotizacion[];
+};
+
+export function listarPlantillasGuardadas(token: string) {
+  return cotFetch<PlantillaGuardadaResumen[]>("cotizaciones/plantillas-guardadas", token);
+}
+
+export function obtenerPlantillaGuardada(token: string, id: number) {
+  return cotFetch<{ id: number; nombre: string; conPartidas: boolean; contenido: ContenidoPlantilla }>(
+    `cotizaciones/plantillas-guardadas/${id}`,
+    token,
+  );
+}
+
+/** «Guardar como plantilla»: la API toma la cotización guardada (sin cliente ni folio). */
+export function guardarComoPlantilla(token: string, datos: { nombre: string; cotizacionId: number; conPartidas: boolean }) {
+  return cotFetch<{ id: number; nombre: string; conPartidas: boolean; partidas: number }>("cotizaciones/plantillas-guardadas", token, {
+    method: "POST",
+    body: JSON.stringify(datos),
+  });
+}
+
+export function archivarPlantilla(token: string, id: number) {
+  return cotFetch<{ id: number }>(`cotizaciones/plantillas-guardadas/${id}/archivar`, token, { method: "POST" });
+}
 
 /** Puntos de partida del editor por segmento (objetivo y subsecciones de alcance). */
 export function listarPlantillas(token: string) {

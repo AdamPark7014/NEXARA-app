@@ -1292,8 +1292,17 @@ function numerarPaginas(ctx: Ctx) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Documento completo, listo para adjuntar al correo o descargar. */
-export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload): Promise<Buffer> {
+/**
+ * Página (1 = portada) donde arranca cada sección. La vista previa del editor la usa para llevar el
+ * PDF a la sección que se está escribiendo. Una sección que no se imprime no aparece.
+ */
+export type SeccionesPropuesta = Partial<Record<'portada' | 'objetivo' | 'alcance' | 'planos' | 'cotizacion', number>>;
+
+/**
+ * Documento completo, listo para adjuntar al correo o descargar. Si se pasa `secciones`, se llena
+ * con la página donde empieza cada sección (solo se anota: no cambia nada de lo que se dibuja).
+ */
+export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload, secciones?: SeccionesPropuesta): Promise<Buffer> {
   const empresa = datosEmpresaPropuesta(payload.empresa);
   // `bufferPages` solo para escribir «Página n de N» al final: el total no se sabe antes.
   const doc = new PDFDocument({ size: 'LETTER', margins: MARGENES_INTERIOR, autoFirstPage: false, bufferPages: true });
@@ -1338,11 +1347,16 @@ export async function generarPropuestaTecnicaPdf(payload: PropuestaPayload): Pro
           : undefined,
   }));
 
-  portada(ctx, indice);
-  seccionObjetivo(ctx);
-  seccionAlcance(ctx);
-  seccionPlanos(ctx, planos);
-  seccionCotizacion(ctx);
+  const marcar = (clave: keyof SeccionesPropuesta, dibujar: () => void) => {
+    const antes = ctx.paginas.length;
+    dibujar();
+    if (secciones && ctx.paginas.length > antes) secciones[clave] = antes + 1;
+  };
+  marcar('portada', () => portada(ctx, indice));
+  marcar('objetivo', () => seccionObjetivo(ctx));
+  marcar('alcance', () => seccionAlcance(ctx));
+  marcar('planos', () => seccionPlanos(ctx, planos));
+  marcar('cotizacion', () => seccionCotizacion(ctx));
   numerarPaginas(ctx);
 
   doc.end();

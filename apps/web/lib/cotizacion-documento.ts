@@ -16,8 +16,18 @@ import {
   type GuardarCotizacion,
   type ObjetivoPartes,
   type PartidaCotizacion,
+  type ContenidoPlantilla,
   type Segmento,
 } from "@/lib/cotizaciones-api";
+import {
+  conCondicionesSugeridas,
+  opcionesDesdeApi,
+  opcionesParaApi,
+  opcionesPorOmision,
+  type CondicionesComerciales,
+  type Moneda,
+  type OpcionesCotizacion,
+} from "@/lib/cotizacion-personalizacion";
 
 // ─── Claves locales ───────────────────────────────────────────────────────────
 
@@ -231,6 +241,9 @@ export function partidasDesdeApi(items: PartidaCotizacion[] | null | undefined):
     laborRate: Number(p.laborRate || 0),
     paqueteClave: p.paqueteClave ?? null,
     paqueteCantidad: p.paqueteCantidad ?? null,
+    brand: p.brand ?? null,
+    model: p.model ?? null,
+    imagenUrl: p.imagenUrl ?? null,
   }));
 }
 
@@ -302,7 +315,8 @@ export function escribirTerminos(propios: TerminosPropios): string {
 export function terminosPropiosDeDetalle(d: Pick<CotizacionDetalle, "terminos">): TerminosPropios {
   const propios: TerminosPropios = {};
   for (const parte of d.terminos?.partes ?? []) {
-    if (parte.clave === "vigencia" || !parte.personalizado) continue;
+    // Vigencia, entrega y garantía no se reescriben como término: salen de fechas y de Personalizar.
+    if (parte.clave === "vigencia" || parte.clave === "entrega" || parte.clave === "garantia" || !parte.personalizado) continue;
     propios[parte.clave] = parte.texto;
   }
   return propios;
@@ -328,6 +342,9 @@ export type DocumentoCotizacion = {
   partidas: PartidaEditor[];
   /** Términos reescritos (los demás son los del segmento). */
   terminos: TerminosPropios;
+  /** Personalizar: secciones, columnas, carta, condiciones y firmas. */
+  opciones: OpcionesCotizacion;
+  moneda: Moneda;
 };
 
 export const hoyISO = (hoy = new Date()) => {
@@ -362,6 +379,8 @@ export function documentoVacio(segmento: Segmento = "COMERCIAL", hoy = new Date(
     depositPercent: 50,
     partidas: [],
     terminos: {},
+    opciones: opcionesPorOmision(),
+    moneda: "MXN",
   };
 }
 
@@ -387,7 +406,57 @@ export function documentoDesdeDetalle(d: CotizacionDetalle): DocumentoCotizacion
     depositPercent: Number(d.depositPercent ?? 50),
     partidas: partidasDesdeApi(d.items),
     terminos: terminosPropiosDeDetalle(d),
+    opciones: opcionesDesdeApi(d.opciones),
+    moneda: String(d.currency ?? "").toUpperCase() === "USD" ? "USD" : "MXN",
   };
+}
+
+/**
+ * Cotización nueva desde una plantilla de la empresa: sus textos, secciones, columnas, términos y
+ * partidas; el cliente y las fechas los pone quien cotiza (se conservan si ya los escribió).
+ */
+export function documentoDesdePlantilla(
+  contenido: ContenidoPlantilla,
+  actual: DocumentoCotizacion = documentoVacio(),
+  sugeridas?: CondicionesComerciales | null,
+): DocumentoCotizacion {
+  const objetivo = leerObjetivo(contenido.objetivo);
+  return {
+    ...actual,
+    segmento: contenido.segmento,
+    projectName: contenido.projectName || actual.projectName,
+    alcanceIntro: contenido.scope,
+    objetivo: { intro: objetivo.intro, beneficios: itemsDesdeTextos(objetivo.beneficios), cierre: objetivo.cierre },
+    bloques: bloquesDesdeApi(contenido.alcanceBloques),
+    depositPercent: Number(contenido.depositPercent ?? actual.depositPercent),
+    partidas: contenido.items?.length ? partidasDesdeApi(contenido.items) : actual.partidas,
+    terminos: terminosPropiosDeNota(contenido.note),
+    opciones: conCondicionesSugeridas(opcionesDesdeApi(contenido.opciones), sugeridas),
+    moneda: contenido.currency === "USD" ? "USD" : "MXN",
+  };
+}
+
+/** `note` guardado («Título:» y el texto debajo, por término) → términos reescritos del editor. */
+export function terminosPropiosDeNota(nota: string | null | undefined): TerminosPropios {
+  const propios: TerminosPropios = {};
+  let actual: ClaveTermino | null = null;
+  const titulo = new Map(CLAVES_TERMINO.map((c) => [TITULO_TERMINO[c].toLowerCase(), c]));
+  for (const linea of String(nota ?? "").replace(/\r\n?/g, "\n").split("\n")) {
+    const m = linea.match(/^\s*([^:]{2,40}):\s*(.*)$/);
+    const clave = m ? titulo.get(m[1]!.trim().toLowerCase()) : undefined;
+    if (clave) {
+      actual = clave;
+      propios[clave] = m![2]!.trim();
+      continue;
+    }
+    if (actual) propios[actual] = `${propios[actual] ? `${propios[actual]}\n` : ""}${linea}`;
+  }
+  for (const clave of CLAVES_TERMINO) {
+    const texto = propios[clave]?.trim();
+    if (texto) propios[clave] = texto;
+    else delete propios[clave];
+  }
+  return propios;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -414,6 +483,8 @@ export function payloadDeDocumento(doc: DocumentoCotizacion): GuardarCotizacion 
     depositPercent: Math.min(100, Math.max(0, Math.round(Number(doc.depositPercent) || 0))),
     note: escribirTerminos(doc.terminos),
     items: partidasParaApi(doc.partidas),
+    currency: doc.moneda,
+    opciones: opcionesParaApi(doc.opciones),
   };
   if (doc.salesClientId) payload.salesClientId = doc.salesClientId;
   if (esCorreo(doc.clientEmail)) payload.clientEmail = doc.clientEmail.trim();

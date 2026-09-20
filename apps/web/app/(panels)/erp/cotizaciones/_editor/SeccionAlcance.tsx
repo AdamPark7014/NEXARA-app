@@ -32,7 +32,12 @@ export default function SeccionAlcance({
   cambiar,
   editable,
   plantillas,
+  excluida,
+  onIncluir,
 }: {
+  /** Apagada en «Personalizar». */
+  excluida?: boolean;
+  onIncluir?: () => void;
   doc: DocumentoCotizacion;
   cambiar: Cambiar;
   editable: boolean;
@@ -63,7 +68,7 @@ export default function SeccionAlcance({
   const panel = verPlantillas ? (
     <div className={styles.panelPlantillas}>
       <div className={styles.panelPlantillasCabeza}>
-        <span>Subsecciones de la propuesta modelo · se agregan al final y las ajustas</span>
+        <span>Subsecciones del segmento</span>
         <button type="button" className={styles.ghostBtn} onClick={() => setVerPlantillas(false)}>
           Cerrar
         </button>
@@ -93,40 +98,47 @@ export default function SeccionAlcance({
 
   return (
     <Hoja
+      excluida={excluida}
+      onIncluir={onIncluir}
       id="alcance"
-      numero="02."
+      numero="02"
       titulo="Alcance del proyecto"
-      ayuda="Qué se hace, subsección por subsección. Cada una lleva su título, uno o más párrafos y, si hace falta, viñetas."
+      ayuda="Qué se hace, subsección por subsección: título, párrafos y viñetas. El PDF las numera; una subsección sin título sale como párrafo suelto. Sin subsecciones, el documento remite a la sección 04."
       acciones={
         editable ? (
           <button type="button" className={styles.secondaryBtn} onClick={() => setVerPlantillas((v) => !v)} aria-expanded={verPlantillas}>
-            ☰ Plantillas
+            Plantillas
           </button>
         ) : null
       }
     >
-      <label className={styles.soloLector} htmlFor="alc-titulo">
-        Título del proyecto (encabezado del alcance)
-      </label>
-      <TextoAuto
-        id="alc-titulo"
-        variante="titulo"
-        className={styles.encabezadoAlcance}
-        value={doc.projectName}
-        onValor={(v) => cambiar((d) => ({ ...d, projectName: v.replace(/\n/g, " ") }))}
-        placeholder="Título del proyecto (es el mismo de la portada)"
-        disabled={!editable}
-      />
-      <label className={styles.soloLector} htmlFor="alc-intro">
-        Introducción del alcance
-      </label>
-      <TextoAuto
-        id="alc-intro"
-        value={doc.alcanceIntro}
-        onValor={(v) => cambiar((d) => ({ ...d, alcanceIntro: v }))}
-        placeholder="El presente proyecto tiene como objetivo… (párrafo de entrada, opcional)"
-        disabled={!editable}
-      />
+      <div className={styles.campos}>
+        <div className={styles.campo}>
+          <label className={styles.etiqueta} htmlFor="alc-titulo">
+            Título (el mismo de la portada)
+          </label>
+          <TextoAuto
+            id="alc-titulo"
+            variante="titulo"
+            value={doc.projectName}
+            onValor={(v) => cambiar((d) => ({ ...d, projectName: v.replace(/\n/g, " ") }))}
+            placeholder="Título del proyecto"
+            disabled={!editable}
+          />
+        </div>
+        <div className={styles.campo}>
+          <label className={styles.etiqueta} htmlFor="alc-intro">
+            Párrafo de entrada (opcional)
+          </label>
+          <TextoAuto
+            id="alc-intro"
+            value={doc.alcanceIntro}
+            onValor={(v) => cambiar((d) => ({ ...d, alcanceIntro: v }))}
+            placeholder="El presente proyecto tiene como objetivo…"
+            disabled={!editable}
+          />
+        </div>
+      </div>
 
       {panel}
 
@@ -196,7 +208,7 @@ export default function SeccionAlcance({
                 <TextoAuto
                   value={b.texto}
                   onValor={(v) => cambiarBloque(b.key, { texto: v })}
-                  placeholder="Párrafo: qué se hace y con qué alcance. Enter para otro párrafo."
+                  placeholder="Qué se hace y con qué alcance"
                   aria-label={`Párrafo de la subsección ${i + 1}`}
                   disabled={!editable}
                 />
@@ -216,12 +228,12 @@ export default function SeccionAlcance({
           })}
         </ol>
       ) : editable ? (
-        <div style={{ marginTop: 14 }}>
+        <div className={styles.bloque}>
           <Vacio
             titulo="Todavía no hay subsecciones"
             acciones={
               <>
-                <button type="button" className={styles.primaryBtn} onClick={() => setVerPlantillas(true)}>
+                <button type="button" className={styles.secondaryBtn} onClick={() => setVerPlantillas(true)}>
                   Elegir de las plantillas
                 </button>
                 <button type="button" className={styles.ghostBtn} onClick={() => agregar(nuevoBloque())}>
@@ -230,9 +242,7 @@ export default function SeccionAlcance({
               </>
             }
           >
-            La propuesta modelo tiene doce: modernización del grabador, mantenimiento, diagnóstico, ampliación,
-            analíticos, puesta en marcha, almacenamiento, consideraciones, exclusiones y entrega. Agrega las que
-            apliquen y cambia las cifras por las de este proyecto.
+            Elige de las plantillas del segmento y ajusta las cifras.
           </Vacio>
         </div>
       ) : (
@@ -240,7 +250,7 @@ export default function SeccionAlcance({
       )}
 
       {bloques.length && editable ? (
-        <button type="button" className={styles.agregar} style={{ marginLeft: 0 }} onClick={() => agregar(nuevoBloque())}>
+        <button type="button" className={`${styles.agregar} ${styles.agregarSolo}`} onClick={() => agregar(nuevoBloque())}>
           + Subsección
         </button>
       ) : null}
