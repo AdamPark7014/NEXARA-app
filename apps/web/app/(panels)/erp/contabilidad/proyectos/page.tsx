@@ -14,6 +14,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, financeStatusVariant, formatApiError } from "@/lib/erp-api";
 import { financeStatusLabel } from "@/lib/finance-status-labels";
+import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 
 /**
  * Estado financiero por proyecto.
@@ -478,7 +479,8 @@ export default function ContabilidadProyectosPage() {
         />
       )}
 
-      {totales && !loading && (
+      {/* Sin un solo proyecto, las cuatro cifras son cero por definición. */}
+      {totales && !loading && totales.proyectos > 0 && (
         <div style={{ marginBottom: 14 }}>
           <MetricStrip
             ariaLabel="Resumen de proyectos"
@@ -534,14 +536,30 @@ export default function ContabilidadProyectosPage() {
           {token ? "Cargando proyectos…" : "Esperando la sesión para pedir los proyectos…"}
         </p>
       ) : rows.length === 0 ? (
-        <EmptyState
-          title={q || tipoFiltro ? "Ningún proyecto coincide" : "Todavía no hay proyectos"}
-          description={
-            q || tipoFiltro
-              ? "Cambia la búsqueda o el filtro de tipo."
-              : "Los proyectos se dan de alta en Operaciones. Aquí aparecen en cuanto existan, aunque aún no tengan facturas ni costos."
-          }
-        />
+        q || tipoFiltro ? (
+          <EmptyState
+            title="Ningún proyecto coincide"
+            description="Cambia la búsqueda o el filtro de tipo."
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setQ("");
+                  setTipoFiltro("");
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            }
+          />
+        ) : (
+          <VacioConPrimerPaso
+            title="Todavía no hay proyectos"
+            description="Esta pantalla compara, proyecto por proyecto, lo facturado contra lo que costó. Los proyectos y las obras se dan de alta en Operaciones; en cuanto exista uno aparece aquí, aunque aún no tenga facturas ni costos."
+            destino={DESTINOS.proyecto}
+          />
+        )
       ) : (
         <DataTable
           columns={columns}
