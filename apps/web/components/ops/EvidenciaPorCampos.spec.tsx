@@ -176,7 +176,7 @@ describe("EvidenciaPorCampos", () => {
     expect((zip[1].headers as Record<string, string>).Authorization).toBe("Bearer jwt");
     const downloadArgs = triggerBlobDownload.mock.calls[0];
     expect(downloadArgs.length).toBe(3);
-    expect(downloadArgs[0]).toBeInstanceOf(Blob);
+    expect(downloadArgs[0]).toEqual(expect.objectContaining({ type: "application/zip", size: expect.any(Number) }));
     expect(downloadArgs[1]).toBe("AN-0005 Cámaras.zip");
     expect(downloadArgs[2]).toEqual({
       mimeType: "application/zip",

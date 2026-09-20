@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
@@ -393,11 +392,12 @@ export default function ContabilidadDashboardPage() {
                           label={item.detail}
                           tone={item.tone === "info" ? "neutral" : (item.tone as StatusTone)}
                         />
-                        <ChevronRight
-                          size={14}
+                        <span
                           aria-hidden="true"
-                          style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
-                        />
+                          style={{ color: "var(--text-tertiary)", flexShrink: 0, fontSize: 14 }}
+                        >
+                          ›
+                        </span>
                       </span>
                     </Link>
                   </li>
