@@ -10,6 +10,8 @@ import { InvoicesController } from './invoices.controller.js';
 import { BankingController } from './banking.controller.js';
 import { BudgetsController } from './budgets.controller.js';
 import { AccountingWorkspaceController } from './workspace.controller.js';
+import { ReconciliationMatchService } from './reconciliation-match.service.js';
+import { ReconciliationMatchController } from './reconciliation-match.controller.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule],
@@ -20,8 +22,9 @@ import { AccountingWorkspaceController } from './workspace.controller.js';
     BankingController,
     BudgetsController,
     AccountingWorkspaceController,
+    ReconciliationMatchController,
   ],
-  providers: [AccountingService],
+  providers: [AccountingService, ReconciliationMatchService],
   exports: [AccountingService],
 })
 export class AccountingModule {}
