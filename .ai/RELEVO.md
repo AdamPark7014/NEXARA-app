@@ -17,7 +17,7 @@ Flota grande de micro-agentes (explore + writers en worktrees `nexara-gate-*`), 
 
 | Área | Resultado |
 |------|-----------|
-| Periodo cerrado | `assertDateNotInClosedPeriod` en 7 escrituras; Jest 8/8 |
+| Periodo cerrado | `assertDateNotInClosedPeriod` en 9 escrituras (+ stampInvoice, createCreditNote); Jest 10/10 |
 | Copy cierres | `proteccion.noBloqueado: []`; UI oculta sección vacía |
 | Shared UI | FileDropzone focus ring; ConfirmDialog busy+pre-wrap; DataTable `ariaLabel` |
 | Anti doble-submit | ConfirmDialog cerrojo; gastos/viáticos/pagos Marcar pagado |

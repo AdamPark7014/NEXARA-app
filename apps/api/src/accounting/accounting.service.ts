@@ -1899,6 +1899,8 @@ export class AccountingService {
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException('Solo facturas en borrador pueden timbrarse');
     }
+    await this.assertDateNotInClosedPeriod(invoice.issueDate, companyId);
+    await this.assertDateNotInClosedPeriod(new Date(), companyId);
     // Validaciones CFDI 4.0 (SAT). Detectarlas aquí evita errores oscuros del PAC.
     const cfdiErrors: string[] = [];
     if (!invoice.receptorRfc) cfdiErrors.push('RFC del receptor');
@@ -2936,6 +2938,8 @@ export class AccountingService {
       throw new BadRequestException('Solo se pueden emitir notas de crédito contra facturas timbradas');
     }
     if (original.isCancelled) throw new BadRequestException('La factura original está cancelada');
+    await this.assertDateNotInClosedPeriod(original.issueDate, companyId);
+    await this.assertDateNotInClosedPeriod(new Date(), companyId);
 
     const creditAmount = dto.amount ?? Number(original.totalAmount);
     const creditNumber = `NC-${original.invoiceNumber}-${Date.now().toString().slice(-6)}`;
