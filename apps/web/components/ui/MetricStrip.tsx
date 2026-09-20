@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ReactNode } from "react";
 
 /**
@@ -24,8 +25,14 @@ export type Metric = {
   /** De qué se compone, o qué implica. Ej. «7 gastos», «bloquean el cierre». */
   hint?: ReactNode;
   tone?: MetricTone;
-  /** Si se pasa, la celda es un botón: filtra o navega al detalle. */
+  /** Si se pasa, la celda es un botón: filtra la vista en el sitio. */
   onClick?: () => void;
+  /**
+   * Si la celda LLEVA a otra pantalla, usa esto en vez de `onClick`: navegar
+   * con un manejador rompe ctrl+clic y «abrir en pestaña nueva», que es justo
+   * lo que hace una contadora cuando quiere revisar dos cosas a la vez.
+   */
+  href?: string;
 };
 
 const TONE_COLOR: Record<MetricTone, string> = {
@@ -91,20 +98,24 @@ export default function MetricStrip({
           textAlign: "left" as const,
         };
 
-        return m.onClick ? (
-          <button
-            key={i}
-            type="button"
-            onClick={m.onClick}
-            style={{
-              ...cellStyle,
-              background: "transparent",
-              border: "none",
-              borderRight: cellStyle.borderRight,
-              cursor: "pointer",
-              font: "inherit",
-            }}
-          >
+        const interactiveStyle = {
+          ...cellStyle,
+          background: "transparent",
+          border: "none",
+          borderRight: cellStyle.borderRight,
+          cursor: "pointer",
+          font: "inherit",
+          display: "block",
+          textDecoration: "none",
+          color: "inherit",
+        };
+
+        return m.href ? (
+          <Link key={i} href={m.href} style={interactiveStyle}>
+            {inner}
+          </Link>
+        ) : m.onClick ? (
+          <button key={i} type="button" onClick={m.onClick} style={interactiveStyle}>
             {inner}
           </button>
         ) : (

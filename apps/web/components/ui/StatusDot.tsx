@@ -28,11 +28,19 @@ export default function StatusDot({
   label,
   tone = "neutral",
   title,
+  wrap,
 }: {
   label: ReactNode;
   tone?: StatusTone;
   /** Explicación al pasar el ratón, cuando la palabra sola no basta. */
   title?: string;
+  /**
+   * Permite que la etiqueta salte de renglón. Por defecto no lo hace, porque
+   * un estado partido en dos se lee mal; pero cuando la etiqueta es una frase
+   * (el motivo de una incidencia, por ejemplo), sin esto la celda ensancha la
+   * tabla entera.
+   */
+  wrap?: boolean;
 }) {
   const color = TONE_COLOR[tone];
   return (
@@ -40,11 +48,11 @@ export default function StatusDot({
       title={title}
       style={{
         display: "inline-flex",
-        alignItems: "center",
         gap: 6,
         fontSize: 12,
         color,
-        whiteSpace: "nowrap",
+        whiteSpace: wrap ? "normal" : "nowrap",
+        alignItems: wrap ? "flex-start" : "center",
       }}
     >
       <span
@@ -55,6 +63,8 @@ export default function StatusDot({
           borderRadius: "50%",
           background: "currentColor",
           flexShrink: 0,
+          // Al saltar de renglón, el punto se alinea con la primera línea.
+          marginTop: wrap ? 5 : 0,
         }}
       />
       {label}
