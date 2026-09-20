@@ -45,7 +45,7 @@ import {
   type StockReservationRow,
 } from "@/lib/stock-api";
 import { formatApiError } from "@/lib/erp-api";
-import { listarEmpaques, type Empaque } from "@/lib/almacen-api";
+import { crearEmpaque, listarEmpaques, type Empaque } from "@/lib/almacen-api";
 import { etiquetaCantidad, previsualizarConversion } from "@/lib/empaque";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -130,6 +130,8 @@ export default function WarehousePage({
   });
   // Norma de empaque del producto elegido: se captura en cajas y se guarda en piezas.
   const [empaques, setEmpaques] = useState<Empaque[]>([]);
+  const [nuevoEmpaque, setNuevoEmpaque] = useState<{ nombre: string; piezas: string } | null>(null);
+  const [guardandoEmpaque, setGuardandoEmpaque] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [savingMovement, setSavingMovement] = useState(false);
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
@@ -259,11 +261,36 @@ export default function WarehousePage({
       return;
     }
     let vigente = true;
+    setNuevoEmpaque(null);
     void listarEmpaques(token, productId)
       .then((res) => { if (vigente) setEmpaques(res); })
       .catch(() => { if (vigente) setEmpaques([]); });
     return () => { vigente = false; };
   }, [token, movement.productId]);
+
+  /** Alta rápida de presentación: se descubre aquí, cuando el producto no la tiene. */
+  const guardarEmpaque = async () => {
+    const productId = Number(movement.productId);
+    if (!token || !nuevoEmpaque || !(productId > 0)) return;
+    const nombre = nuevoEmpaque.nombre.trim();
+    const piezas = Number(nuevoEmpaque.piezas);
+    if (!nombre || !Number.isFinite(piezas) || piezas <= 0) {
+      toast.error("Escribe el nombre y cuántas piezas trae");
+      return;
+    }
+    setGuardandoEmpaque(true);
+    try {
+      const creado = await crearEmpaque(token, productId, { nombre, piezasPorUnidad: piezas });
+      setEmpaques((prev) => [...prev, creado]);
+      setMovement((m) => ({ ...m, packagingId: String(creado.id) }));
+      setNuevoEmpaque(null);
+      toast.success(`Presentación «${nombre}» registrada`);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo guardar la presentación"));
+    } finally {
+      setGuardandoEmpaque(false);
+    }
+  };
 
   const visibleMovements = useMemo(() => {
     if (!movementId) return movements;
@@ -1059,21 +1086,24 @@ export default function WarehousePage({
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad *</span>
               <input type="number" min={0} step="any" value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} style={inp} />
             </label>
-            {empaques.length > 0 && (
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Presentación</span>
-                <select
-                  value={movement.packagingId}
-                  onChange={(e) => setMovement((m) => ({ ...m, packagingId: e.target.value }))}
-                  style={inp}
-                >
-                  <option value="">Piezas</option>
-                  {empaques.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre} ({Number(e.piezasPorUnidad)} pz)
-                    </option>
-                  ))}
-                </select>
+            {movement.productId && (
+              <div style={{ display: "grid", gap: 4 }}>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Presentación</span>
+                  <select
+                    value={movement.packagingId}
+                    onChange={(e) => setMovement((m) => ({ ...m, packagingId: e.target.value }))}
+                    style={inp}
+                    disabled={empaques.length === 0}
+                  >
+                    <option value="">Piezas</option>
+                    {empaques.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nombre} ({Number(e.piezasPorUnidad)} pz)
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 {(() => {
                   const elegido = empaques.find((e) => String(e.id) === movement.packagingId);
                   const previa = previsualizarConversion(
@@ -1086,7 +1116,54 @@ export default function WarehousePage({
                     </span>
                   ) : null;
                 })()}
-              </label>
+                {nuevoEmpaque ? (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      value={nuevoEmpaque.nombre}
+                      onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, nombre: e.target.value } : n))}
+                      placeholder="Caja"
+                      aria-label="Nombre de la presentación"
+                      style={{ ...inp, flex: "1 1 96px", minWidth: 0 }}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={nuevoEmpaque.piezas}
+                      onChange={(e) => setNuevoEmpaque((n) => (n ? { ...n, piezas: e.target.value } : n))}
+                      placeholder="100"
+                      aria-label="Piezas que trae"
+                      style={{ ...inp, flex: "0 1 88px", minWidth: 0 }}
+                    />
+                    <Button size="sm" variant="secondary" onClick={() => void guardarEmpaque()} loading={guardandoEmpaque}>
+                      Guardar
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setNuevoEmpaque(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : (
+                  cfg.canCreate && (
+                    <button
+                      type="button"
+                      onClick={() => setNuevoEmpaque({ nombre: "", piezas: "" })}
+                      style={{
+                        justifySelf: "start",
+                        appearance: "none",
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        fontSize: 11.5,
+                        fontWeight: 650,
+                        color: "var(--primary)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {empaques.length === 0 ? "Registrar una presentación" : "Nueva presentación"}
+                    </button>
+                  )
+                )}
+              </div>
             )}
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Costo unitario</span>
