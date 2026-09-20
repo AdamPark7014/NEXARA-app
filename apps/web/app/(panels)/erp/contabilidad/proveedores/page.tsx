@@ -14,6 +14,7 @@ import Section from "@/components/ui/Section";
 import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, financeStatusVariant, formatApiError } from "@/lib/erp-api";
+import { financeStatusLabel } from "@/lib/finance-status-labels";
 
 /**
  * Proveedores de Contabilidad.
@@ -218,36 +219,10 @@ const TONO_ESTATUS: Record<string, StatusTone> = {
   default: "neutral",
 };
 
-/**
- * Los estatus llegan con la clave del modelo. «PARTIALLY_PAID» en la columna
- * de estatus no es un estado legible: es una constante de código asomándose.
- * Lo que no esté en esta tabla se muestra tal cual llegó, para no inventar
- * traducciones ni romperse cuando el API añada un estatus nuevo.
- */
-const ESTATUS_LABEL: Record<string, string> = {
-  DRAFT: "Borrador",
-  PENDING: "Pendiente",
-  SENT: "Enviada",
-  PAID: "Pagada",
-  PARTIALLY_PAID: "Pago parcial",
-  OVERDUE: "Vencida",
-  CANCELLED: "Cancelada",
-  POSTED: "Contabilizada",
-  APPROVED: "Aprobada",
-  REJECTED: "Rechazada",
-  RECEIVED: "Recibida",
-  ORDERED: "Ordenada",
-  CLOSED: "Cerrada",
-  OPEN: "Abierta",
-};
-
-const estatusTexto = (estatus: string) =>
-  ESTATUS_LABEL[(estatus || "").toUpperCase()] ?? estatus ?? "—";
-
 function EstatusDot({ estatus, tono }: { estatus: string; tono?: StatusTone }) {
   return (
     <StatusDot
-      label={estatusTexto(estatus)}
+      label={financeStatusLabel(estatus)}
       tone={tono ?? TONO_ESTATUS[financeStatusVariant(estatus)] ?? "neutral"}
     />
   );
