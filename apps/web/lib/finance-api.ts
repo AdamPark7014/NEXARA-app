@@ -258,6 +258,21 @@ export type PrenominaPreviewRow = {
   suggestedAmount: number | null;
   sueldoSemanal: number | null;
   daysWithAttendance: number;
+  /**
+   * Días del periodo con la jornada sin cerrar (checó entrada y no salida). Ya venían en la
+   * respuesta de `preview-period` (`calculateFromAttendance`), solo faltaba declararlos aquí:
+   * son la incidencia que hay que revisar antes de pagar.
+   */
+  openDays?: string[];
+  /** Desglose que calcula la API (`prenomina-amount.ts`). El front no recalcula nada. */
+  suggestedBreakdown?: {
+    sueldoSemanal: number | null;
+    minutoOrdinario: number | null;
+    minutosOrdinarios: number;
+    minutosExtraAprobados: number;
+    suggestedAmount: number | null;
+    formula: string;
+  };
 };
 
 export type PrenominaPreview = {

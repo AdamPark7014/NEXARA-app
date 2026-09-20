@@ -49,6 +49,30 @@ function writeQueue(items: QueuedFetch[]) {
   window.dispatchEvent(new Event("nexara-offline-queue"));
 }
 
+/**
+ * Tira la cola sin enviarla (localStorage + IndexedDB).
+ *
+ * En el navegador la cola no debe existir: la escritura diferida es de la app del teléfono.
+ * Lo que quedó guardado de versiones anteriores lleva el cuerpo de la petición de QUIEN la
+ * encoló, y `flushOfflineQueue` lo reenviaría con el token de quien esté dentro ahora —es decir,
+ * escribiría a nombre de otra persona. Por eso se borra en vez de reenviarse.
+ */
+export async function purgarColaOffline(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(OFFLINE_QUEUE_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    const { idbClear } = await import("./offline-idb");
+    await idbClear();
+  } catch {
+    /* IDB opcional */
+  }
+  window.dispatchEvent(new Event("nexara-offline-queue"));
+}
+
 /** Queue a failed request to retry when the device is back online (call from fetch wrappers). */
 export function enqueueOfflineFetch(input: Omit<QueuedFetch, "id" | "createdAt">): QueuedFetch {
   const item: QueuedFetch = {

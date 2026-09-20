@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import { useUser } from "./UserContext";
-import { flushOfflineQueue, getOfflineQueueLength } from "@/lib/offline-queue";
-import { revalidateHotApiCache } from "@/lib/offline-api-cache";
+import { flushOfflineQueue, getOfflineQueueLength, purgarColaOffline } from "@/lib/offline-queue";
+import { authCacheTag, revalidateHotApiCache } from "@/lib/offline-api-cache";
 import { getNativeFetch } from "@/lib/native-fetch";
+import { isCapacitorNative } from "@/lib/capacitor-env";
 
 function portalSessionBearer(): string | undefined {
   try {
@@ -20,11 +21,23 @@ function portalSessionBearer(): string | undefined {
   }
 }
 
-/** When connectivity returns, replay queued writes (see `enqueueOfflineFetch`). */
+/**
+ * Al volver la conexión, reenvía las escrituras encoladas (ver `enqueueOfflineFetch`).
+ *
+ * Solo en la app del teléfono. En el navegador no se encola nada
+ * (`installOfflineFetchGlobal` se apaga si no es nativo), y reenviar lo que quedó de versiones
+ * anteriores lo mandaría con el token de la sesión abierta ahora, no con el de quien lo escribió:
+ * en un equipo compartido eso es escribir a nombre de otra persona. Ahí se borra la cola.
+ */
 export default function OfflineQueueFlusher() {
   const { user } = useUser();
 
   useEffect(() => {
+    if (!isCapacitorNative()) {
+      void purgarColaOffline().catch(() => undefined);
+      return;
+    }
+
     const resolveAuth = () => {
       if (user?.token) return `Bearer ${user.token}`;
       return portalSessionBearer();
@@ -32,7 +45,9 @@ export default function OfflineQueueFlusher() {
 
     const run = () => {
       void flushOfflineQueue(resolveAuth).then(() => {
-        if (resolveAuth()) void revalidateHotApiCache(getNativeFetch(), resolveAuth, 72);
+        if (!resolveAuth()) return;
+        // La etiqueta de ESTA sesión: sin ella se refrescarían entradas de otra cuenta.
+        void revalidateHotApiCache(getNativeFetch(), resolveAuth, 72, authCacheTag(user?.token, user?.id));
       });
     };
 
@@ -56,7 +71,7 @@ export default function OfflineQueueFlusher() {
       document.removeEventListener("visibilitychange", onVisible);
       window.clearInterval(intervalId);
     };
-  }, [user?.token]);
+  }, [user?.token, user?.id]);
 
   return null;
 }
