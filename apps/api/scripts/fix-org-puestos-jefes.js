@@ -1,6 +1,13 @@
 /**
- * One-shot idempotente: alinea puestos de encargados, el jefe de Josué (Obra)
- * y la raíz del organigrama (Christian DG; Claudia = tester, fuera del chart).
+ * One-shot idempotente: alinea puestos de encargados, jefes y la raíz del organigrama
+ * (Christian DG; Claudia = tester, fuera del chart).
+ *
+ * Encargados que reportan a Christian (gerencia@nexara.com.mx):
+ *   - jose.ramirez@nexara.com.mx (JA / soporte)
+ *   - operaciones@nexara.com.mx (David / instalación)
+ *   - direccion.operaciones@nexara.com.mx (Luis / servicios)
+ *   - daniela.hernandez@nexara.com.mx (Daniela / comercial)
+ *   - infraestructura@nexara.com.mx (Josué / Obra) — ya tenía managerEmail
  *
  *   cd apps/api && node scripts/fix-org-puestos-jefes.js
  *   # o en el contenedor:
@@ -18,10 +25,10 @@ const CLAUDIA = 'claudia.bernal@nexara.com.mx';
 const UPDATES = [
   { email: CHRISTIAN, puesto: 'Director General', managerEmail: null },
   { email: CLAUDIA, puesto: 'Tester de plataforma', managerEmail: null },
-  { email: 'jose.ramirez@nexara.com.mx', puesto: 'Encargado de soporte' },
-  { email: 'operaciones@nexara.com.mx', puesto: 'Encargado de instalación' },
-  { email: 'direccion.operaciones@nexara.com.mx', puesto: 'Encargado de servicios' },
-  { email: 'daniela.hernandez@nexara.com.mx', puesto: 'Encargada comercial' },
+  { email: 'jose.ramirez@nexara.com.mx', puesto: 'Encargado de soporte', managerEmail: CHRISTIAN },
+  { email: 'operaciones@nexara.com.mx', puesto: 'Encargado de instalación', managerEmail: CHRISTIAN },
+  { email: 'direccion.operaciones@nexara.com.mx', puesto: 'Encargado de servicios', managerEmail: CHRISTIAN },
+  { email: 'daniela.hernandez@nexara.com.mx', puesto: 'Encargada comercial', managerEmail: CHRISTIAN },
   {
     email: 'infraestructura@nexara.com.mx',
     puesto: 'Encargado de Obra',
