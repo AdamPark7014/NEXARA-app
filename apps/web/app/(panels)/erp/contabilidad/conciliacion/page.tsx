@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -151,7 +151,8 @@ function fechaCorta(iso?: string | null) {
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" });
 }
 
-const pesos = (n: number) =>
+/** Pesos en texto plano — solo para `message`/atributos string de InlineAlert. */
+const formatPesos = (n: number) =>
   n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
 
 /**
@@ -162,10 +163,14 @@ const pesos = (n: number) =>
  * sin decir por cuánto, que es justo lo que hay que mirar para saber si es una
  * comisión bancaria o un pago equivocado.
  */
-function textoDiferenciaMonto(diferencia: number) {
+function textoDiferenciaMonto(diferencia: number): ReactNode {
   const d = Math.abs(Number(diferencia) || 0);
   if (d < 0.005) return "Coincide al centavo";
-  return `${pesos(d)} de diferencia`;
+  return (
+    <>
+      <Money value={d} bold={false} /> de diferencia
+    </>
+  );
 }
 
 function textoDiferenciaDias(dias: number) {
@@ -567,9 +572,14 @@ export default function ConciliacionPage() {
               }}
             >
               Movimientos del {fechaCorta(rango?.from)} al {fechaCorta(rango?.to)}
-              {parametros
-                ? ` · empareja con ±${pesos(parametros.toleranciaMonto)} o ±${parametros.toleranciaPorcentaje}% dentro de ${parametros.ventanaDias} días`
-                : ""}
+              {parametros ? (
+                <>
+                  {" "}
+                  · empareja con ±
+                  <Money value={parametros.toleranciaMonto} bold={false} /> o ±
+                  {parametros.toleranciaPorcentaje}% dentro de {parametros.ventanaDias} días
+                </>
+              ) : null}
               .
             </p>
           )}
@@ -578,11 +588,17 @@ export default function ConciliacionPage() {
             <Section
               title="Movimientos del banco"
               subtitle={
-                data?.cuenta
-                  ? `${data.cuenta.nombre} · ${data.cuenta.banco} · ${data.cuenta.moneda}${
-                      cuentaActiva ? ` · saldo ${pesos(cuentaActiva.saldo)}` : ""
-                    }`
-                  : undefined
+                data?.cuenta ? (
+                  <>
+                    {data.cuenta.nombre} · {data.cuenta.banco} · {data.cuenta.moneda}
+                    {cuentaActiva ? (
+                      <>
+                        {" "}
+                        · saldo <Money value={cuentaActiva.saldo} bold={false} />
+                      </>
+                    ) : null}
+                  </>
+                ) : undefined
               }
               dense
               flush
@@ -701,7 +717,7 @@ export default function ConciliacionPage() {
                         style={{ marginBottom: 0 }}
                         message={`Conciliado${
                           seleccionado.conciliacion
-                            ? ` por ${pesos(seleccionado.conciliacion.montoConciliado)}`
+                            ? ` por ${formatPesos(seleccionado.conciliacion.montoConciliado)}`
                             : ""
                         }${
                           seleccionado.conciliacion?.conciliadoPor
@@ -717,11 +733,15 @@ export default function ConciliacionPage() {
                       <EmptyState
                         variant="compact"
                         title="Sin coincidencias"
-                        description={`No hay factura ni pago con un monto parecido (±${pesos(
-                          parametros?.toleranciaMonto ?? 0,
-                        )} o ±${parametros?.toleranciaPorcentaje ?? 0}%) dentro de ${
-                          parametros?.ventanaDias ?? 0
-                        } días. Revisa si falta capturar el documento en NEXARA.`}
+                        description={
+                          <>
+                            No hay factura ni pago con un monto parecido (±
+                            <Money value={parametros?.toleranciaMonto ?? 0} bold={false} /> o ±
+                            {parametros?.toleranciaPorcentaje ?? 0}%) dentro de{" "}
+                            {parametros?.ventanaDias ?? 0} días. Revisa si falta capturar el
+                            documento en NEXARA.
+                          </>
+                        }
                       />
                     ) : (
                       <>
@@ -729,9 +749,11 @@ export default function ConciliacionPage() {
                           <InlineAlert
                             variant="warning"
                             style={{ marginBottom: 0 }}
-                            message={`Los montos no son idénticos: ${textoDiferenciaMonto(
-                              candidato.diferenciaMonto,
-                            )} contra ${candidato.folio}. Revisa comisiones o retenciones antes de conciliar.`}
+                            message={`Los montos no son idénticos: ${
+                              Math.abs(Number(candidato.diferenciaMonto) || 0) < 0.005
+                                ? "Coincide al centavo"
+                                : `${formatPesos(Math.abs(Number(candidato.diferenciaMonto) || 0))} de diferencia`
+                            } contra ${candidato.folio}. Revisa comisiones o retenciones antes de conciliar.`}
                           />
                         )}
                         {candidatos.length > 1 && (
