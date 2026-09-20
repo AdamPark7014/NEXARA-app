@@ -500,18 +500,6 @@ export const MODULE_GUIDES: Record<ModuleId, ModuleGuide> = {
     ],
     connects: `mis-actividades`,
   },
-  'erp-contabilidad': {
-    id: 'erp-contabilidad',
-    summary: `Espacio de trabajo de contabilidad: dinero, obligaciones, documentos y cierre del periodo.`,
-    audience: `Contabilidad y dirección.`,
-    how: `El resumen responde en un vistazo cuánto hay, cuánto se debe, cuánto deben y qué vence. De ahí se baja al libro de movimientos, a las cuentas por cobrar y por pagar, a la conciliación con el banco y al cierre del periodo. Los números salen de facturas, pagos, movimientos bancarios y pre-nómina reales; no se capturan aquí.`,
-    steps: [
-      `Abre el resumen y elige el periodo`,
-      `Atiende las alertas: facturas sin XML, saldos vencidos, movimientos por conciliar`,
-      `Concilia el banco y revisa la lista de verificación antes de cerrar el periodo`,
-    ],
-    connects: `erp-cotizaciones, erp-proyectos, finance-prenomina`,
-  },
   'erp-cotizaciones': {
     id: 'erp-cotizaciones',
     summary: `Propuestas técnicas: folio con tu nomenclatura, envío al cliente y seguimiento.`,

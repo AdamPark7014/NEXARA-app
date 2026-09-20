@@ -130,8 +130,12 @@ export class InvoicesController {
   @Get(':id/xml')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  async getXml(@Param('id') id: string, @Res() res: Response) {
-    const xml = await this.service.getInvoiceXml(+id);
+  async getXml(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const xml = await this.service.getInvoiceXml(+id, companyId);
     res.setHeader('Content-Type', xml.contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${xml.filename}"`);
     res.send(xml.body);
@@ -140,8 +144,12 @@ export class InvoicesController {
   @Get(':id/pdf')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  async getPdf(@Param('id') id: string, @Res() res: Response) {
-    const pdf = await this.service.getInvoicePdf(+id);
+  async getPdf(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const pdf = await this.service.getInvoicePdf(+id, companyId);
     res.redirect(pdf.url);
   }
 
