@@ -34,6 +34,7 @@ import {
   type LedgerResponse,
   type LedgerRow,
 } from "./_ledger";
+import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 
 const PAGE_SIZE = 50;
 
@@ -463,19 +464,23 @@ export default function MovimientosPage() {
         />
       )}
 
-      {/* Totales pegados arriba: es lo que la contadora cuadra. */}
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 3,
-          marginBottom: 10,
-          background: "var(--surface)",
-          borderRadius: 10,
-        }}
-      >
-        <MetricStrip metrics={totalesStrip} ariaLabel="Totales del periodo filtrado" />
-      </div>
+      {/* Totales pegados arriba: es lo que la contadora cuadra. Sin un solo
+          movimiento detrás no se pinta: seis ceros no son un total, son ruido
+          encima del renglón que sí explica por qué la pantalla está vacía. */}
+      {data && totals.conteo > 0 && (
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 3,
+            marginBottom: 10,
+            background: "var(--surface)",
+            borderRadius: 10,
+          }}
+        >
+          <MetricStrip metrics={totalesStrip} ariaLabel="Totales del periodo filtrado" />
+        </div>
+      )}
 
       <div style={{ marginBottom: 12 }}>
         <FilterToolbar
@@ -542,15 +547,12 @@ export default function MovimientosPage() {
       {sinSesion ? null : loading ? (
         <SkeletonList rows={8} tableLike />
       ) : rows.length === 0 ? (
-        <EmptyState
-          title={filtrado ? "Ningún movimiento con estos filtros" : "Sin movimientos en el periodo"}
-          description={
-            filtrado
-              ? "Quita algún filtro o amplía el rango de fechas. El libro sólo muestra lo que existe en la base, no estimaciones."
-              : `Entre el ${formatLedgerDate(filters.from)} y el ${formatLedgerDate(filters.to)} no hay cobros, pagos, gastos, nómina, líneas de banco sin conciliar ni facturas registradas.`
-          }
-          action={
-            filtrado ? (
+        /* Dos vacíos distintos, y solo uno es culpa del filtro. */
+        filtrado ? (
+          <EmptyState
+            title="Ningún movimiento con estos filtros"
+            description="Quita algún filtro o amplía el rango de fechas. El libro sólo muestra lo que existe en la base, no estimaciones."
+            action={
               <Button
                 size="sm"
                 onClick={() => {
@@ -560,13 +562,15 @@ export default function MovimientosPage() {
               >
                 Limpiar filtros
               </Button>
-            ) : (
-              <Link href="/erp/invoicing" style={{ fontSize: 12.5, fontWeight: 600 }}>
-                Ir a facturación
-              </Link>
-            )
-          }
-        />
+            }
+          />
+        ) : (
+          <VacioConPrimerPaso
+            title="Sin movimientos en el periodo"
+            description={`Entre el ${formatLedgerDate(filters.from)} y el ${formatLedgerDate(filters.to)} no hay cobros, pagos, gastos, nómina, líneas de banco sin conciliar ni facturas. El libro no se captura: cada renglón entra solo cuando se registra en su módulo. Empieza por una factura y aquí aparece.`}
+            destino={DESTINOS.factura}
+          />
+        )
       ) : (
         <>
           <DataTable

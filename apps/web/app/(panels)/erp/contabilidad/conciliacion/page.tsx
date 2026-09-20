@@ -13,6 +13,7 @@ import FilterScale, { type ScaleItem } from "@/components/ui/FilterScale";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
+import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 import styles from "./conciliacion.module.css";
 
 /**
@@ -482,6 +483,13 @@ export default function ConciliacionPage() {
   ];
 
   const sinCuentas = !loading && !error && (data?.cuentas.length ?? 0) === 0;
+  /**
+   * Hay cuenta, pero ni una línea del banco. No es lo mismo que no tener
+   * cuenta: ya se puede operar y lo que falta es subir el estado de cuenta.
+   * Los seis contadores en cero no lo dicen; una frase sí.
+   */
+  const sinMovimientos =
+    !loading && !error && !sinCuentas && (data?.resumen.total ?? 0) === 0;
   const rango = data?.rango;
   const cuentaActiva = (data?.cuentas ?? []).find((c) => c.id === data?.cuenta?.id) ?? null;
   const parametros = data?.parametros;
@@ -547,6 +555,20 @@ export default function ConciliacionPage() {
                 <Button size="sm">Ir a Bancos</Button>
               </Link>
             }
+          />
+        </Section>
+      ) : sinMovimientos ? (
+        <Section dense>
+          <VacioConPrimerPaso
+            title="La cuenta todavía no tiene movimientos"
+            description={`${
+              data?.cuenta ? `${data.cuenta.nombre} · ${data.cuenta.banco}` : "La cuenta elegida"
+            } no trae ninguna línea${
+              rango?.from || rango?.to
+                ? ` entre el ${fechaCorta(rango?.from)} y el ${fechaCorta(rango?.to)}`
+                : ""
+            }. Sube el estado de cuenta en Bancos —o cambia las fechas de arriba— y aquí aparecerá cada cargo y abono con la factura o el pago que NEXARA cree que le corresponde.`}
+            destino={DESTINOS.bancos}
           />
         </Section>
       ) : (

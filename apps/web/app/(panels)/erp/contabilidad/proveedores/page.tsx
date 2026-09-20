@@ -16,6 +16,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, financeStatusVariant, formatApiError } from "@/lib/erp-api";
 import { financeStatusLabel } from "@/lib/finance-status-labels";
+import { DESTINOS, VacioConPrimerPaso } from "../_arranque";
 
 /**
  * Proveedores de Contabilidad.
@@ -467,7 +468,9 @@ export default function ProveedoresPage() {
         />
       )}
 
-      {totales && !loading && (
+      {/* Sin un solo proveedor dado de alta, los tres importes son cero por
+          definición: la tira no informa y le quita el sitio al primer paso. */}
+      {totales && !loading && totales.proveedores > 0 && (
         <div style={{ marginBottom: 14 }}>
           <MetricStrip
             ariaLabel="Resumen de proveedores"
@@ -514,14 +517,30 @@ export default function ProveedoresPage() {
           {token ? "Cargando proveedores…" : "Esperando la sesión para pedir los proveedores…"}
         </p>
       ) : rows.length === 0 ? (
-        <EmptyState
-          title={q || soloActivos ? "Ningún proveedor coincide" : "Todavía no hay proveedores"}
-          description={
-            q || soloActivos
-              ? "Cambia la búsqueda o quita el filtro de activos."
-              : "Los proveedores se dan de alta en Compras. En cuanto exista uno, aquí aparece con su saldo aunque aún no tenga facturas."
-          }
-        />
+        q || soloActivos ? (
+          <EmptyState
+            title="Ningún proveedor coincide"
+            description="Cambia la búsqueda o quita el filtro de activos."
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setQ("");
+                  setSoloActivos(false);
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            }
+          />
+        ) : (
+          <VacioConPrimerPaso
+            title="Todavía no hay proveedores"
+            description="Aquí vive el expediente de cada proveedor: lo que le debes, lo que ya venció, sus facturas y sus órdenes. Se dan de alta en Compras, al levantar la orden de compra; en cuanto exista uno aparece aquí, aunque todavía no tenga facturas."
+            destino={DESTINOS.proveedor}
+          />
+        )
       ) : (
         <DataTable
           columns={columns}

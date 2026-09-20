@@ -14,6 +14,7 @@ import Modal from "@/components/ui/Modal";
 import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { VacioConPrimerPaso } from "../_arranque";
 
 type AuditRow = {
   id: number;
@@ -311,6 +312,26 @@ export default function AuditoriaPage() {
   ];
 
   /**
+   * ¿Hay algún filtro puesto? Los cinco primeros los aplica el servidor sobre
+   * toda la bitácora; el texto solo recorta la página. Cualquiera de ellos
+   * convierte «no hay nada» en «no hay nada ASÍ», que es otro vacío y se
+   * resuelve de otra manera.
+   */
+  const hayFiltros = Boolean(
+    fUsuario || fEntidad || fAccion || fDesde || fHasta || busqueda.trim(),
+  );
+
+  const limpiarFiltros = useCallback(() => {
+    setBusqueda("");
+    setFUsuario("");
+    setFEntidad("");
+    setFAccion("");
+    setFDesde("");
+    setFHasta("");
+    setPagina(1);
+  }, []);
+
+  /**
    * Lectura de lo cargado, no del total del servidor: la bitácora trae los
    * últimos {LIMITE} eventos y eso es lo que estas cifras describen.
    */
@@ -396,9 +417,14 @@ export default function AuditoriaPage() {
         />
       )}
 
-      <div style={{ marginBottom: 12 }}>
-        <MetricStrip metrics={strip} ariaLabel="Resumen de la bitácora cargada" />
-      </div>
+      {/* Con la bitácora vacía las cuatro celdas dicen cero, cero, cero y
+          «Nada se borró»: parece un informe y es un hueco. La tira aparece
+          cuando hay eventos que resumir. */}
+      {(loading || filtradas.length > 0) && !sinSesion && (
+        <div style={{ marginBottom: 12 }}>
+          <MetricStrip metrics={strip} ariaLabel="Resumen de la bitácora cargada" />
+        </div>
+      )}
 
       <FilterToolbar
         search={{
@@ -435,15 +461,7 @@ export default function AuditoriaPage() {
           { label: "Desde", value: fDesde, onChange: filtrar(setFDesde) },
           { label: "Hasta", value: fHasta, onChange: filtrar(setFHasta) },
         ]}
-        onClear={() => {
-          setBusqueda("");
-          setFUsuario("");
-          setFEntidad("");
-          setFAccion("");
-          setFDesde("");
-          setFHasta("");
-          setPagina(1);
-        }}
+        onClear={limpiarFiltros}
         resultCount={loading ? null : filtradas.length}
       />
 
@@ -470,21 +488,29 @@ export default function AuditoriaPage() {
         ) : loading ? (
           <p style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "16px 18px" }}>Cargando…</p>
         ) : filtradas.length === 0 ? (
-          <EmptyState
-            title="Sin eventos"
-            description={
-              busqueda.trim()
-                ? `Ningún evento de esta página contiene «${busqueda.trim()}». Recuerda que el texto solo filtra lo ya cargado: quita la búsqueda o cambia de página.`
-                : "No hay registros de auditoría con estos filtros. Amplía el rango de fechas o quita algún filtro."
-            }
-            action={
-              busqueda.trim() ? (
-                <Button size="sm" variant="secondary" onClick={() => setBusqueda("")}>
-                  Quitar la búsqueda
+          hayFiltros ? (
+            <EmptyState
+              title="Sin eventos con estos filtros"
+              description={
+                busqueda.trim()
+                  ? `Ningún evento de esta página contiene «${busqueda.trim()}». Recuerda que el texto solo filtra lo ya cargado: quita la búsqueda o cambia de página.`
+                  : "No hay registros de auditoría con estos filtros. Amplía el rango de fechas o quita alguno."
+              }
+              action={
+                <Button size="sm" variant="secondary" onClick={limpiarFiltros}>
+                  Limpiar filtros
                 </Button>
-              ) : undefined
-            }
-          />
+              }
+            />
+          ) : (
+            /* Nada que configurar: la bitácora se escribe sola. Lo único que
+               falta es que alguien haga algo en el sistema. */
+            <VacioConPrimerPaso
+              variant="default"
+              title="La bitácora todavía está en blanco"
+              description="Nadie ha dado de alta, cambiado ni borrado nada que se anote aquí. No hay que encender nada: en cuanto se registre el primer movimiento, queda anotado con quién lo hizo, cuándo y qué cambió exactamente."
+            />
+          )
         ) : (
           <DataTable
             columns={columns}
