@@ -6,7 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import PanelTabs from "@/components/ui/PanelTabs";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig, getOpsTeamSectionConfig } from "@/lib/section-views";
-import WarehousePage from "../warehouse/page";
+import { VistaAlmacen } from "../warehouse/VistaAlmacen";
 import ReabastecimientoPanel from "@/components/almacen/ReabastecimientoPanel";
 import RecoleccionAlmacenPanel from "@/components/almacen/RecoleccionAlmacenPanel";
 import KitInspeccionesPanel from "@/components/almacen/KitInspeccionesPanel";
@@ -76,12 +76,12 @@ export default function AlmacenPage() {
 
       {/* Inventario y sus vistas hermanas: la pantalla de almacén, sin su encabezado. */}
       {tab === "inventario" && (
-        <WarehousePage
+        <VistaAlmacen
           embedded={{ views: ["inventario", "dashboard", "lotes", "valuacion", "conteos"] }}
         />
       )}
 
-      {tab === "movimientos" && <WarehousePage embedded={{ views: ["movimientos"] }} />}
+      {tab === "movimientos" && <VistaAlmacen embedded={{ views: ["movimientos"] }} />}
 
       {tab === "reabastecimiento" && <ReabastecimientoPanel />}
 
