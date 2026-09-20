@@ -1,92 +1,164 @@
 import { BadRequestException } from '@nestjs/common';
 import { AccountingService } from './accounting.service.js';
-import { Prisma } from '@prisma/client';
-import { jest } from '@jest/globals';
 
-describe('AccountingService closed fiscal period guards', () => {
-  let service: AccountingService;
-  let prisma: PrismaClient;
+/**
+ * Periodo fiscal cerrado debe bloquear escrituras que mueven dinero o
+ * alteran facturas/banco — no solo la reversa de pólizas.
+ */
 
-  beforeEach(() => {
-    prisma = {
-      fiscalPeriod: {
-        findFirst: jest.fn(),
-        $transaction: jest.fn(),
-      },
-      invoice: {
-        findFirst: jest.fn(),
-      },
-      bankTransaction: {
-        findFirst: jest.fn(),
-      },
-      bankAccount: {
-        findFirst: jest.fn(),
-      },
-    } as unknown as PrismaClient;
+const EMPRESA = 7;
 
-    service = new AccountingService(prisma, {}, {}, {}, () => '7', {});
-  });
+const PERIODO_CERRADO = {
+  id: 3,
+  name: 'Agosto 2026',
+  startDate: new Date('2026-08-01T00:00:00.000Z'),
+  endDate: new Date('2026-08-31T23:59:59.000Z'),
+  isClosed: true,
+  companyId: EMPRESA,
+};
 
-  const startDate = new Date('2026-08-01');
-  const endDate = new Date('2026-08-31');
+function build(over: Record<string, any> = {}) {
+  const prisma = {
+    fiscalPeriod: {
+      findFirst: jest.fn().mockResolvedValue(PERIODO_CERRADO),
+    },
+    invoice: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 10,
+        issueDate: new Date('2026-08-15T12:00:00.000Z'),
+        companyId: EMPRESA,
+        deletedAt: null,
+        status: 'DRAFT',
+        cfdiUuid: null,
+        isCancelled: false,
+        payments: [],
+        items: [],
+        emisorRfc: 'AAA010101AAA',
+      }),
+    },
+    bankAccount: {
+      findFirst: jest.fn().mockResolvedValue({ id: 5, companyId: EMPRESA }),
+    },
+    bankTransaction: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 20,
+        transactionDate: new Date('2026-08-15T12:00:00.000Z'),
+        amount: 100,
+        bankAccountId: 5,
+        companyId: EMPRESA,
+        reconciliation: null,
+        bankAccount: { id: 5, companyId: EMPRESA },
+      }),
+      createMany: jest.fn(),
+    },
+    $transaction: jest.fn(),
+    companyProfile: { findFirst: jest.fn().mockResolvedValue({ id: EMPRESA }) },
+    ...over,
+  };
 
-  it('registerPayment with paymentDate in closed period → rejects with BadRequestException matching /Periodo fiscal cerrado/', async () => {
-    prisma.fiscalPeriod.findFirst.mockResolvedValue({ id: 3, name: 'Agosto 2026', isClosed: true, startDate, endDate });
-    prisma.$transaction.mockRejectedValue(new Error('Not used'));
+  const service = new AccountingService(
+    prisma as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    { next: jest.fn() } as any,
+    {} as any,
+  );
+  return { service, prisma };
+}
 
-    await expect(service.registerPayment({ invoiceId: 1, amount: 100, paymentDate: '2026-08-15' }, 1, 7)).rejects.toThrow(BadRequestException);
+describe('periodo fiscal cerrado · escrituras', () => {
+  it('registerPayment rechaza paymentDate en periodo cerrado', async () => {
+    const { service, prisma } = build();
+    await expect(
+      service.registerPayment(
+        { invoiceId: 10, amount: 100, paymentDate: '2026-08-15' },
+        1,
+        EMPRESA,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.registerPayment(
+        { invoiceId: 10, amount: 100, paymentDate: '2026-08-15' },
+        1,
+        EMPRESA,
+      ),
+    ).rejects.toThrow(/Periodo fiscal cerrado/);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('registerPayment when no covering period (findFirst null) → should NOT throw from period assert', async () => {
-    prisma.fiscalPeriod.findFirst.mockResolvedValue(null);
-    prisma.$transaction.mockRejectedValue(new Error('Not used'));
-
-    await expect(service.registerPayment({ invoiceId: 1, amount: 100, paymentDate: '2026-09-15' }, 1, 7)).rejects.toThrow(Error);
-    expect(prisma.$transaction).toHaveBeenCalledWith(expect.anything());
+  it('registerPayment pasa el assert si no hay periodo que cubra la fecha', async () => {
+    const { service } = build({
+      fiscalPeriod: { findFirst: jest.fn().mockResolvedValue(null) },
+      $transaction: jest.fn().mockRejectedValue(new Error('llego-a-transaccion')),
+    });
+    await expect(
+      service.registerPayment(
+        { invoiceId: 10, amount: 100, paymentDate: '2026-09-15' },
+        1,
+        EMPRESA,
+      ),
+    ).rejects.toThrow(/llego-a-transaccion/);
   });
 
-  it('createInvoice with issueDate in closed period → BadRequestException /Periodo fiscal cerrado/', async () => {
-    prisma.fiscalPeriod.findFirst.mockResolvedValue({ id: 3, name: 'Agosto 2026', isClosed: true, startDate, endDate });
-    prisma.invoice.findFirst.mockResolvedValue(null);
-
-    await expect(service.createInvoice({ companyId: 7, issueDate: '2026-08-15' }, 1, 7)).rejects.toThrow(BadRequestException);
+  it('createInvoice rechaza issueDate en periodo cerrado', async () => {
+    const { service } = build();
+    await expect(
+      service.createInvoice(
+        {
+          type: 'ACCOUNTS_RECEIVABLE',
+          issueDate: '2026-08-15',
+          dueDate: '2026-09-15',
+          companyId: EMPRESA,
+          items: [{ description: 'x', quantity: 1, unitPrice: 10 }],
+        },
+        1,
+      ),
+    ).rejects.toThrow(/Periodo fiscal cerrado/);
   });
 
-  it('reconcileTransaction: bankTransaction.findFirst returns tx with transactionDate in closed period → BadRequestException', async () => {
-    prisma.fiscalPeriod.findFirst.mockResolvedValue({ id: 3, name: 'Agosto 2026', isClosed: true, startDate, endDate });
-    prisma.bankTransaction.findFirst.mockResolvedValue({ id: 1, transactionDate: '2026-08-15' });
-
-    await expect(service.reconcileTransaction(1, 1, 7)).rejects.toThrow(BadRequestException);
+  it('updateInvoiceDraft rechaza issueDate del borrador en periodo cerrado', async () => {
+    const { service } = build();
+    await expect(
+      service.updateInvoiceDraft(10, { notes: 'x' }, 1, EMPRESA),
+    ).rejects.toThrow(/Periodo fiscal cerrado/);
   });
 
-  it('importBankTransactions: bankAccount found, one tx with closed date → BadRequestException; createMany not called', async () => {
-    prisma.fiscalPeriod.findFirst.mockResolvedValue({ id: 3, name: 'Agosto 2026', isClosed: true, startDate, endDate });
-    prisma.bankAccount.findFirst.mockResolvedValue({ id: 1 });
-    prisma.bankTransaction.findFirst.mockResolvedValue({ id: 1, transactionDate: '2026-08-15' });
+  it('deleteInvoice rechaza issueDate en periodo cerrado', async () => {
+    const { service } = build();
+    await expect(service.deleteInvoice(10, 1, EMPRESA)).rejects.toThrow(/Periodo fiscal cerrado/);
+  });
 
-    await expect(service.importBankTransactions(1, 1, 7)).rejects.toThrow(BadRequestException);
+  it('cancelInvoice rechaza issueDate en periodo cerrado', async () => {
+    const { service } = build();
+    await expect(
+      service.cancelInvoice(10, { cancelReason: '02' }, 1, EMPRESA),
+    ).rejects.toThrow(/Periodo fiscal cerrado/);
+  });
+
+  it('reconcileTransaction rechaza transactionDate en periodo cerrado', async () => {
+    const { service } = build();
+    await expect(
+      service.reconcileTransaction(20, { matchedAmount: 100 }, 1, EMPRESA),
+    ).rejects.toThrow(/Periodo fiscal cerrado/);
+  });
+
+  it('importBankTransactions rechaza transactionDate en periodo cerrado', async () => {
+    const { service, prisma } = build();
+    await expect(
+      service.importBankTransactions(
+        5,
+        [
+          {
+            transactionDate: '2026-08-15',
+            description: 'SPEI',
+            amount: 50,
+            isDebit: false,
+          },
+        ],
+        EMPRESA,
+      ),
+    ).rejects.toThrow(/Periodo fiscal cerrado/);
     expect(prisma.bankTransaction.createMany).not.toHaveBeenCalled();
-  });
-
-  it('cancelInvoice: invoice found with issueDate in closed period → BadRequestException before pac', async () => {
-    prisma.fiscalPeriod.findFirst.mockResolvedValue({ id: 3, name: 'Agosto 2026', isClosed: true, startDate, endDate });
-    prisma.invoice.findFirst.mockResolvedValue({ id: 1, issueDate: '2026-08-15' });
-
-    await expect(service.cancelInvoice(1, 1, 7)).rejects.toThrow(BadRequestException);
-  });
-
-  it('deleteInvoice: invoice found with issueDate closed → BadRequestException', async () => {
-    prisma.fiscalPeriod.findFirst.mockResolvedValue({ id: 3, name: 'Agosto 2026', isClosed: true, startDate, endDate });
-    prisma.invoice.findFirst.mockResolvedValue({ id: 1, issueDate: '2026-08-15' });
-
-    await expect(service.deleteInvoice(1, 1, 7)).rejects.toThrow(BadRequestException);
-  });
-
-  it('updateInvoiceDraft: invoice DRAFT with issueDate closed → BadRequestException', async () => {
-    prisma.fiscalPeriod.findFirst.mockResolvedValue({ id: 3, name: 'Agosto 2026', isClosed: true, startDate, endDate });
-    prisma.invoice.findFirst.mockResolvedValue({ id: 1, issueDate: '2026-08-15', status: 'DRAFT' });
-
-    await expect(service.updateInvoiceDraft(1, 1, 7)).rejects.toThrow(BadRequestException);
   });
 });

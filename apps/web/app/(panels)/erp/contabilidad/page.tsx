@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -57,7 +56,6 @@ function formatMoney(n: number) {
  */
 export default function ContabilidadDashboardPage() {
   const { user } = useUser();
-  const router = useRouter();
   const token = user?.token ?? "";
   const [range, setRange] = useState(defaultRange);
   const [data, setData] = useState<WorkspaceDashboard | null>(null);
@@ -152,21 +150,21 @@ export default function ContabilidadDashboardPage() {
         label: "Disponible",
         value: cargando ?? <Money value={data?.cashBalance ?? 0} />,
         hint: "En bancos y caja",
-        onClick: () => router.push("/erp/contabilidad/conciliacion"),
+        href: "/erp/contabilidad/conciliacion",
       },
       {
         label: "Por cobrar",
         value: cargando ?? <Money value={data?.accountsReceivablePending ?? 0} />,
         hint: cobrosVencidos > 0 ? `${formatMoney(cobrosVencidos)} ya vencidos` : "Nada vencido",
         tone: cobrosVencidos > 0 ? "warning" : "default",
-        onClick: () => router.push("/erp/contabilidad/cuentas-por-cobrar"),
+        href: "/erp/contabilidad/cuentas-por-cobrar",
       },
       {
         label: "Por pagar",
         value: cargando ?? <Money value={data?.accountsPayablePending ?? 0} />,
         hint: pagosVencidos > 0 ? `${formatMoney(pagosVencidos)} ya vencidos` : "Nada vencido",
         tone: pagosVencidos > 0 ? "danger" : "default",
-        onClick: () => router.push("/erp/contabilidad/cuentas-por-pagar"),
+        href: "/erp/contabilidad/cuentas-por-pagar",
       },
       {
         label: "Flujo neto",
@@ -180,7 +178,7 @@ export default function ContabilidadDashboardPage() {
         tone: tonoAlertas,
       },
     ];
-  }, [loading, data, attention, router]);
+  }, [loading, data, attention]);
 
   const agingRows = useMemo(
     () => [
