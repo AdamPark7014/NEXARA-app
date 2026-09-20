@@ -34,4 +34,18 @@ export class CreateGpsDto {
   @Type(() => Date)
   @IsDate({ message: 'ultimaActualizacion debe ser una fecha válida' })
   ultimaActualizacion?: Date;
+
+  /**
+   * El teléfono detectó ubicación simulada en este punto (Android `Location.isMock` /
+   * `isFromMockProvider`, iOS `CLLocation.sourceInformation?.isSimulatedBySoftware`).
+   *
+   * A diferencia de la checada, aquí **no** se rechaza: el recorrido de la jornada no
+   * decide nómina, y tirar el punto solo dejaría un hueco que nadie sabría leer. Se
+   * guarda marcado, que es lo que permite ver después que media jornada de alguien venía
+   * de una app de GPS falso. null = app vieja que todavía no lo manda.
+   */
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean({ message: 'mockLocation debe ser booleano' })
+  mockLocation?: boolean;
 }
