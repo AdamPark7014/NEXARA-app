@@ -12,6 +12,8 @@ import { BudgetsController } from './budgets.controller.js';
 import { AccountingWorkspaceController } from './workspace.controller.js';
 import { AccountingWorkspaceLedgerController } from './workspace-ledger.controller.js';
 import { AccountingWorkspaceLedgerService } from './workspace-ledger.service.js';
+import { ReconciliationMatchService } from './reconciliation-match.service.js';
+import { ReconciliationMatchController } from './reconciliation-match.controller.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule, WebhooksModule],
@@ -23,8 +25,13 @@ import { AccountingWorkspaceLedgerService } from './workspace-ledger.service.js'
     BudgetsController,
     AccountingWorkspaceController,
     AccountingWorkspaceLedgerController,
+    ReconciliationMatchController,
   ],
-  providers: [AccountingService, AccountingWorkspaceLedgerService],
+  providers: [
+    AccountingService,
+    AccountingWorkspaceLedgerService,
+    ReconciliationMatchService,
+  ],
   exports: [AccountingService],
 })
 export class AccountingModule {}
