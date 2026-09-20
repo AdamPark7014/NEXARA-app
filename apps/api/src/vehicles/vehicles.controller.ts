@@ -27,6 +27,7 @@ import { UsersService } from '../users/users.service.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
+import { COLUMNAS_VEHICULOS } from '../common/excel/reportes.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
@@ -421,9 +422,14 @@ export class VehiclesController {
     @Res() res: Response,
     @CurrentCompanyId() companyId: number | null,
   ) {
+    if (format !== 'xlsx') {
+      throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON estan deshabilitados.');
+    }
     let result: any;
+    let alcance: string;
     if (user.isSuperAdmin) {
       result = await this.vehiclesService.findAll(undefined, companyId);
+      alcance = 'Toda la flota de la empresa';
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW)) {
       // Admin consola o manager v2: ve sus propios vehículos + vehículos de usuarios normales
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
@@ -434,17 +440,25 @@ export class VehiclesController {
           .map((u: any) => u.id),
       ];
       result = await this.vehiclesService.findByAllowedUsers(allowedUserIds, companyId);
+      alcance = 'Vehículos propios y del equipo a cargo';
     } else {
       result = await this.vehiclesService.findByResponsible(user.id, companyId);
+      alcance = 'Vehículos que solicité';
     }
     const data: any[] = Array.isArray(result) ? result : result.data;
-    if (format === 'xlsx') {
-      const buffer = await this.excelExport.exportToExcel(data, 'vehicles');
-      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.attachment('vehiculos.xlsx');
-      return res.send(Buffer.from(buffer));
-    }
-    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON estan deshabilitados.');
+    const buffer = await this.excelExport.exportarReporte({
+      titulo: 'Control de vehículos',
+      subtitulo: alcance,
+      hoja: 'Vehículos',
+      columnas: COLUMNAS_VEHICULOS,
+      filas: data ?? [],
+      generadoPor: user?.nombre ?? null,
+      hojaInformacion: true,
+      notas: [`Alcance: ${alcance}`],
+    });
+    res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.attachment('vehiculos.xlsx');
+    return res.send(buffer);
   }
 
   // Importar vehículos desde archivo JSON

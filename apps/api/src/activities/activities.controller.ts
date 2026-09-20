@@ -29,6 +29,7 @@ import { GetActivitiesQueryDto } from './dto/get-activities-query.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
+import { COLUMNAS_ACTIVIDADES } from '../common/excel/reportes.js';
 
 @Controller('activities')
 @UseGuards(UrlAccessGuard) // RBAC v2 — gate por URL/rol antes que RbacGuard legacy
@@ -40,33 +41,52 @@ export class ActivitiesController {
     private readonly excelImport: ExcelImportService,
   ) {}
 
-  // Exportar actividades (CSV o JSON)
+  /**
+   * Excel de actividades / órdenes de trabajo.
+   *
+   * `res` estaba declarado sin `@Res()`, así que Nest nunca lo inyectaba y el endpoint
+   * reventaba con «Cannot read properties of undefined» antes de enviar nada.
+   */
   @Get('export/:format')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_EXPORT] })
   async export(
     @CurrentUser() user: any,
     @Param('format') format: string,
-    res: Response,
+    @Res() res: Response,
   ) {
+    if (format !== 'xlsx') {
+      throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON quedan deshabilitados.');
+    }
     let result: any;
+    let alcance: string;
     if (user.isSuperAdmin) {
       result = await this.activitiesService.findAll();
+      alcance = 'Todas las actividades de la empresa';
     } else if (this.hasTeamActivitiesScope(user)) {
       const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
       const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
       result = await this.activitiesService.findByAllowedUsers(allowedUserIds);
+      alcance = 'Actividades del equipo a cargo';
     } else {
       result = await this.activitiesService.findByResponsible(user.id);
+      alcance = 'Actividades de las que soy responsable';
     }
     const data: any[] = Array.isArray(result) ? result : (result?.data ?? []);
-    if (format === 'xlsx') {
-      const buffer = await this.excelExport.exportToExcel(data, 'activities');
-      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.attachment('actividades.xlsx');
-      return res.send(Buffer.from(buffer));
-    }
-    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON quedan deshabilitados.');
+    const buffer = await this.excelExport.exportarReporte({
+      titulo: 'Actividades y órdenes de trabajo',
+      subtitulo: alcance,
+      hoja: 'Actividades',
+      columnas: COLUMNAS_ACTIVIDADES,
+      filas: data,
+      generadoPor: user?.nombre ?? null,
+      // El alcance ya es el subtítulo: en la banda se repetiría, así que solo va al anexo.
+      hojaInformacion: true,
+      notas: [`Alcance: ${alcance}`],
+    });
+    res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.attachment('actividades.xlsx');
+    return res.send(buffer);
   }
 
   /** PDF agregado de OT (lista operativa). Ruta literal antes de `:id`. */

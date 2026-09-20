@@ -7,9 +7,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { CreateActivityDto } from '../activities/dto/create-activity.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -24,6 +26,18 @@ import {
 } from './my-activities.service.js';
 import { TeamBoardService } from './team-board.service.js';
 import { KpisEquipoService } from './kpis-equipo.service.js';
+import { ExcelExportService } from '../common/excel-export.service.js';
+import { COLUMNAS_KPIS_DIAS, COLUMNAS_KPIS_PERSONAS } from '../common/excel/reportes.js';
+import { ETIQUETA_SEMAFORO } from '../common/excel/etiquetas.js';
+
+/** «Del 01/09/2026 al 30/09/2026» a partir del rango en `AAAA-MM-DD`. */
+function rangoLegible({ desde, hasta }: { desde: string; hasta: string }): string {
+  const bonita = (iso: string) => {
+    const [y, m, d] = iso.split('-');
+    return d && m && y ? `${d}/${m}/${y}` : iso;
+  };
+  return desde === hasta ? `Día ${bonita(desde)}` : `Del ${bonita(desde)} al ${bonita(hasta)}`;
+}
 
 @Controller('me')
 @UseGuards(AuthGuard('jwt'))
@@ -33,6 +47,7 @@ export class MeController {
     private readonly teamBoard: TeamBoardService,
     private readonly myActivities: MyActivitiesService,
     private readonly kpis: KpisEquipoService,
+    private readonly excel: ExcelExportService,
   ) {}
 
   /** Mis actividades: cola personal (todos menos el CEO). */
@@ -324,6 +339,99 @@ export class MeController {
       this.kpis.resolveDias(desde, hasta),
       Number.isInteger(solo) && solo > 0 ? solo : null,
     );
+  }
+
+  /**
+   * Excel de los KPI del equipo: una fila por persona con retardos, uniforme, horas
+   * laboradas contra productivas, inactividad y tiempo extra, y totales con fórmulas.
+   * Ruta literal antes de `:userId` para que Nest no la tome por un id.
+   */
+  @Get('kpis/equipo/export.xlsx')
+  async kpisEquipoExcel(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    const rango = this.kpis.resolveDias(desde, hasta);
+    const datos = await this.kpis.getEquipo(this.viewer(user), companyId, rango, null);
+    const buffer = await this.excel.exportarReporte({
+      titulo: 'KPI del equipo',
+      subtitulo: rangoLegible(rango),
+      hoja: 'KPI por persona',
+      columnas: COLUMNAS_KPIS_PERSONAS,
+      filas: datos.personas,
+      generadoPor: user?.nombre ?? null,
+      generadoEn: new Date(datos.generadoAt),
+      filtros: [
+        { etiqueta: 'Desde', valor: rango.desde },
+        { etiqueta: 'Hasta', valor: rango.hasta },
+        { etiqueta: 'Alcance', valor: datos.scope === 'company' ? 'Toda la empresa' : 'Mi organigrama' },
+        { etiqueta: 'Semáforo del equipo', valor: ETIQUETA_SEMAFORO[datos.equipo.semaforo] ?? datos.equipo.semaforo },
+      ],
+      notas: [...datos.supuestos, ...datos.equipo.motivos],
+    });
+    res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.header('Content-Disposition', `attachment; filename="kpis-equipo-${rango.desde}-${rango.hasta}.xlsx"`);
+    return res.send(buffer);
+  }
+
+  /** Excel de una persona: resumen del periodo más la hoja «Día por día». */
+  @Get('kpis/equipo/:userId/export.xlsx')
+  async kpisPersonaExcel(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Res() res: Response,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    const rango = this.kpis.resolveDias(desde, hasta);
+    const datos = await this.kpis.getPersona(this.viewer(user), companyId, userId, rango);
+    const buffer = await this.excel.exportarReporte({
+      titulo: `KPI · ${datos.persona.nombre}`,
+      subtitulo: rangoLegible(rango),
+      hoja: 'Resumen',
+      columnas: COLUMNAS_KPIS_PERSONAS,
+      filas: [datos],
+      generadoPor: user?.nombre ?? null,
+      generadoEn: new Date(datos.generadoAt),
+      filtros: [
+        { etiqueta: 'Persona', valor: datos.persona.nombre },
+        { etiqueta: 'Desde', valor: rango.desde },
+        { etiqueta: 'Hasta', valor: rango.hasta },
+        { etiqueta: 'Horario', valor: datos.horario.etiqueta },
+        { etiqueta: 'Semáforo', valor: ETIQUETA_SEMAFORO[datos.semaforo] ?? datos.semaforo },
+      ],
+      notas: [
+        ...datos.supuestos,
+        ...datos.motivos,
+        ...datos.justificaciones.map((j) => `Falta justificada ${j.fecha}: ${j.motivo}`),
+      ],
+      hojasExtra: [
+        {
+          hoja: 'Día por día',
+          titulo: `Detalle diario · ${datos.persona.nombre}`,
+          subtitulo: rangoLegible(rango),
+          columnas: COLUMNAS_KPIS_DIAS,
+          // El servicio los devuelve de más reciente a más antiguo; en papel se lee al revés.
+          filas: [...datos.dias].reverse(),
+        },
+      ],
+    });
+    res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.header(
+      'Content-Disposition',
+      `attachment; filename="kpis-${userId}-${rango.desde}-${rango.hasta}.xlsx"`,
+    );
+    return res.send(buffer);
   }
 
   /** Detalle de una persona, día por día, con la línea de tiempo (jornada, comida, productivo, inactivo). */

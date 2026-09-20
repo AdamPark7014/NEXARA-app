@@ -23,6 +23,7 @@ import { ViaticosService } from './viaticos.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
+import { COLUMNAS_VIATICOS } from '../common/excel/reportes.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { CreateViaticoDto } from './dto/create-viatico.dto.js';
 import { AssignViaticoDto } from './dto/assign-viatico.dto.js';
@@ -159,15 +160,23 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_EXPORT] })
   async export(@CurrentUser() user: any, @Param('format') format: string, @Res() res: Response) {
+    if (format !== 'xlsx') {
+      throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON están deshabilitados.');
+    }
     const result = await this.viaticosService.findAll(user);
     const data: any[] = Array.isArray(result) ? result : (result as any).data;
-    if (format === 'xlsx') {
-      const buffer = await this.excelExport.exportToExcel(data, 'viatics');
-      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.attachment('viaticos.xlsx');
-      return res.send(Buffer.from(buffer));
-    }
-    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON están deshabilitados.');
+    const buffer = await this.excelExport.exportarReporte({
+      titulo: 'Viáticos',
+      subtitulo: 'Solicitudes y asignaciones visibles según tu rol',
+      hoja: 'Viáticos',
+      columnas: COLUMNAS_VIATICOS,
+      filas: data ?? [],
+      generadoPor: user?.nombre ?? null,
+      hojaInformacion: true,
+    });
+    res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.attachment('viaticos.xlsx');
+    return res.send(buffer);
   }
 
   @Post('import')
