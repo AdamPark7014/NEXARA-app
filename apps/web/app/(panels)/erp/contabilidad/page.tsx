@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
@@ -95,9 +96,20 @@ export default function ContabilidadDashboardPage() {
             <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
               Actualizar
             </Button>
-            <Button size="sm" variant="secondary" href="/erp/contabilidad/cierres">
+            <Link
+              href="/erp/contabilidad/cierres"
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                textDecoration: "none",
+                color: "var(--text-primary)",
+              }}
+            >
               Cerrar periodo
-            </Button>
+            </Link>
           </div>
         }
       />

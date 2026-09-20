@@ -211,6 +211,7 @@ export type ModuleId =
   | "erp-herramientas"
   | "erp-vehiculos"
   | "erp-organigrama"
+  | "erp-contabilidad"
   | "activities-daily"
   | "activities-projects"
   | "activities-services"
@@ -482,6 +483,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     label: "Organigrama", description: "Quién reporta a quién",
     icon: "🌳", allowedRoles: ANY_INTERNAL,
     group: "Recursos", visible: true,
+  },
+  "erp-contabilidad": {
+    id: "erp-contabilidad", panel: PANELS.ERP, path: "/contabilidad",
+    label: "Contabilidad", description: "Hub financiero: CxC, CxP, facturas, conciliación y cierres",
+    icon: "📒", allowedRoles: FINANCE_TEAM,
+    group: "Finanzas", visible: true,
   },
   "activities-daily": {
     id: "activities-daily", panel: PANELS.ERP, path: "/actividades/tareas",

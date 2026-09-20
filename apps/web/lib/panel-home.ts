@@ -16,9 +16,11 @@
 
 import { hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
 import { PANEL_META, type PanelId } from "@/lib/access-matrix";
-import { CORE_SURFACE_ONLY, CORE_HOME_PATH, CORE_PANEL_ID } from "@/lib/core-surface";
+import { CORE_SURFACE_ONLY, CORE_HOME_PATH, CORE_PANEL_ID, CONTABILIDAD_HOME_PATH } from "@/lib/core-surface";
 import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
 import { getUserHomePanel, getUserHomePath } from "@/lib/user-access";
+import { resolveV2RoleKey } from "@/lib/rbac/role-mapping";
+import { ROLES } from "@/lib/rbac/roles";
 
 export type PanelHome = {
   /** Panel canónico (erp, crm, ops, studio, lab). */
@@ -37,6 +39,10 @@ export function getUserHome(
   if (!user) return { panel: "erp", path: "/login" };
 
   if (CORE_SURFACE_ONLY) {
+    const v2 = resolveV2RoleKey(user);
+    if (v2 === ROLES.CONTABILIDAD) {
+      return { panel: CORE_PANEL_ID, path: CONTABILIDAD_HOME_PATH };
+    }
     return { panel: CORE_PANEL_ID, path: CORE_HOME_PATH };
   }
 

@@ -104,9 +104,9 @@ export const PATH_MODULE_HINTS: PathModuleHint[] = [
   { match: /\/maintenance/, android: ['maintenance', 'maintenance-contracts', 'assets'], web: ['ops-maintenance', 'ops-assets'] },
   { match: /\/documents/, android: ['documents'], web: ['documents'] },
   {
-    match: /\/invoicing|\/accounting/,
+    match: /\/contabilidad|\/invoicing|\/accounting/,
     android: ['invoicing', 'accounting', 'banking'],
-    web: ['invoicing', 'accounting', 'banking'],
+    web: ['erp-contabilidad', 'invoicing', 'accounting', 'banking'],
   },
   { match: /\/procurement/, android: ['procurement'], web: ['procurement'] },
   {

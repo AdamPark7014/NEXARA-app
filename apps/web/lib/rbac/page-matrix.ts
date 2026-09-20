@@ -225,6 +225,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/documents',
     '/erp/accounting',
     '/erp/banking',
+    '/erp/contabilidad',
+    '/erp/contabilidad/**',
     // El detalle de una factura vive en `/erp/invoicing/:id`: sin el comodín se
     // abría el listado y no se podía entrar a ninguna.
     '/erp/invoicing/**',
@@ -488,8 +490,12 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/dashboard',
     '/erp/chat',
     '/erp/reuniones',
+    '/erp/contabilidad',
+    '/erp/contabilidad/**',
     '/erp/accounting',
+    '/erp/accounting/**',
     '/erp/banking',
+    '/erp/banking/**',
     // El detalle de la factura es su trabajo diario; el path desnudo lo impedía.
     '/erp/invoicing/**',
     '/erp/finance/**',

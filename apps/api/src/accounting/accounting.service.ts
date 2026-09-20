@@ -3577,4 +3577,188 @@ export class AccountingService {
       balanceSheet,
     };
   }
+
+  /**
+   * Dashboard del hub Contadora (`/erp/contabilidad`).
+   * Facade sobre facturas, bancos y prenómina — no inventa ledger.
+   */
+  async getWorkspaceDashboard(
+    companyId?: number | null,
+    from?: string,
+    to?: string,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const now = new Date();
+    const fromDate = from ? new Date(`${from}T00:00:00`) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const toDate = to ? new Date(`${to}T23:59:59`) : now;
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      throw new BadRequestException('Rango de fechas inválido');
+    }
+
+    const base = await this.getFinancialDashboard(tenantId);
+    const openStatuses = ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] as const;
+    const dayMs = 86_400_000;
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endToday = new Date(startToday.getTime() + dayMs - 1);
+    const end7 = new Date(startToday.getTime() + 7 * dayMs);
+    const end30 = new Date(startToday.getTime() + 30 * dayMs);
+
+    const sumPending = (rows: { totalAmount: unknown; paidAmount: unknown }[]) =>
+      rows.reduce((acc, r) => acc + Number(r.totalAmount || 0) - Number(r.paidAmount || 0), 0);
+
+    const [
+      issuedCount,
+      receivedCount,
+      prenominaDraft,
+      arOpen,
+      apOpen,
+      missingXml,
+      pendingRecon,
+    ] = await Promise.all([
+      this.prisma.invoice.count({
+        where: {
+          deletedAt: null,
+          type: 'ACCOUNTS_RECEIVABLE',
+          issueDate: { gte: fromDate, lte: toDate },
+          isCancelled: false,
+          ...companyWhere(tenantId),
+        },
+      }),
+      this.prisma.invoice.count({
+        where: {
+          deletedAt: null,
+          type: 'ACCOUNTS_PAYABLE',
+          issueDate: { gte: fromDate, lte: toDate },
+          isCancelled: false,
+          ...companyWhere(tenantId),
+        },
+      }),
+      this.prisma.employeePayment.aggregate({
+        where: {
+          deletedAt: null,
+          status: { in: ['Borrador', 'DRAFT', 'borrador', 'draft'] },
+          ...companyWhere(tenantId),
+        },
+        _sum: { amount: true },
+      }).catch(() => ({ _sum: { amount: 0 } })),
+      this.prisma.invoice.findMany({
+        where: {
+          deletedAt: null,
+          type: 'ACCOUNTS_RECEIVABLE',
+          status: { in: [...openStatuses] },
+          isCancelled: false,
+          ...companyWhere(tenantId),
+        },
+        select: { totalAmount: true, paidAmount: true, dueDate: true },
+      }),
+      this.prisma.invoice.findMany({
+        where: {
+          deletedAt: null,
+          type: 'ACCOUNTS_PAYABLE',
+          status: { in: [...openStatuses] },
+          isCancelled: false,
+          ...companyWhere(tenantId),
+        },
+        select: { totalAmount: true, paidAmount: true, dueDate: true },
+      }),
+      this.prisma.invoice.count({
+        where: {
+          deletedAt: null,
+          type: 'ACCOUNTS_RECEIVABLE',
+          status: { in: ['SENT', 'PARTIALLY_PAID'] },
+          isCancelled: false,
+          OR: [{ cfdiXml: null }, { cfdiXml: '' }],
+          ...companyWhere(tenantId),
+        },
+      }),
+      this.prisma.bankReconciliation.count({
+        where: { status: 'PENDING', ...companyWhere(tenantId) },
+      }).catch(() => 0),
+    ]);
+
+    const bucket = (
+      rows: { totalAmount: unknown; paidAmount: unknown; dueDate: Date | null }[],
+      pred: (due: Date | null) => boolean,
+    ) => sumPending(rows.filter((r) => pred(r.dueDate)));
+
+    const agingReceivable = {
+      overdue: bucket(arOpen, (d) => !!d && d < startToday),
+      dueToday: bucket(arOpen, (d) => !!d && d >= startToday && d <= endToday),
+      next7: bucket(arOpen, (d) => !!d && d > endToday && d <= end7),
+      next30: bucket(arOpen, (d) => !!d && d > end7 && d <= end30),
+    };
+    const agingPayable = {
+      overdue: bucket(apOpen, (d) => !!d && d < startToday),
+      next7: bucket(apOpen, (d) => !!d && d >= startToday && d <= end7),
+      next30: bucket(apOpen, (d) => !!d && d > end7 && d <= end30),
+    };
+
+    const prenominaDraftTotal = Number(prenominaDraft._sum.amount || 0);
+    const income = base.profitAndLoss.month.revenue;
+    const expense = base.profitAndLoss.month.expenses;
+    const alerts: { id: string; severity: 'warning' | 'danger' | 'info'; message: string; href?: string }[] = [];
+
+    if (missingXml > 0) {
+      alerts.push({
+        id: 'missing-xml',
+        severity: 'warning',
+        message: `${missingXml} factura(s) emitida(s) sin XML CFDI`,
+        href: '/erp/contabilidad/facturas',
+      });
+    }
+    if (agingPayable.overdue > 0) {
+      alerts.push({
+        id: 'ap-overdue',
+        severity: 'danger',
+        message: `CxP vencida: $${agingPayable.overdue.toLocaleString('es-MX')}`,
+        href: '/erp/contabilidad/cuentas-por-pagar',
+      });
+    }
+    if (agingReceivable.overdue > 0) {
+      alerts.push({
+        id: 'ar-overdue',
+        severity: 'warning',
+        message: `CxC vencida: $${agingReceivable.overdue.toLocaleString('es-MX')}`,
+        href: '/erp/contabilidad/cuentas-por-cobrar',
+      });
+    }
+    if (pendingRecon > 0) {
+      alerts.push({
+        id: 'bank-pending',
+        severity: 'info',
+        message: `${pendingRecon} movimiento(s) bancario(s) por conciliar`,
+        href: '/erp/contabilidad/conciliacion',
+      });
+    }
+    if (prenominaDraftTotal > 0) {
+      alerts.push({
+        id: 'prenomina-draft',
+        severity: 'info',
+        message: `Pre-nómina en borrador: $${prenominaDraftTotal.toLocaleString('es-MX')}`,
+        href: '/erp/contabilidad/pre-nomina',
+      });
+    }
+
+    return {
+      period: {
+        from: fromDate.toISOString().slice(0, 10),
+        to: toDate.toISOString().slice(0, 10),
+      },
+      cashBalance: base.cash.totalBalance,
+      accountsReceivablePending: base.accountsReceivable.pending,
+      accountsPayablePending: base.accountsPayable.pending,
+      invoicesPeriod: {
+        issued: issuedCount,
+        received: receivedCount,
+        total: issuedCount + receivedCount,
+      },
+      prenominaDraftTotal,
+      income,
+      expense,
+      netCashflow: income - expense,
+      agingReceivable,
+      agingPayable,
+      alerts,
+    };
+  }
 }
