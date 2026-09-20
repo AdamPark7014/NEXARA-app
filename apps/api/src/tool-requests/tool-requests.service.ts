@@ -19,7 +19,11 @@ import {
   normalizarFotosInspeccion,
   proximaInspeccion,
 } from './kit-inspecciones.js';
-import { assertCanCreateToolLoan } from './tools-access.js';
+import {
+  assertCanCreateToolLoan,
+  assertCanManageTools,
+  hasToolsManageAccess,
+} from './tools-access.js';
 import { buildCodigoInterno } from './tool-nomenclature.js';
 import { buildToolLabelPdf, buildToolLabelZpl } from './tool-label.js';
 
@@ -326,8 +330,8 @@ export class ToolRequestsService {
 
     if (currentUser?.isSuperAdmin) {
       // tenant scope only
-    } else if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || currentUser?.permissions?.includes(PERMISSIONS.TOOLS_MANAGE)) {
-      // Admin consola o manager v2 (coord_operaciones, etc.): ve solicitudes de su departamento
+    } else if (hasToolsManageAccess(currentUser?.email, currentUser?.permissions)) {
+      // Solo Christian/Iván (email o TOOLS_MANAGE) — nunca CONSOLE_ADMIN solo.
       where = {
         ...companyWhere(tenantId),
         usuario: {
@@ -532,7 +536,14 @@ export class ToolRequestsService {
    * almacén modelada), así que la llave es el código: se lo enseñamos al técnico y al
    * almacén, y caduca a las `PICKUP_VIGENCIA_HORAS`.
    */
-  async approve(id: number, approvedBy: number, companyId?: number | null) {
+  async approve(
+    id: number,
+    approvedBy: number,
+    companyId?: number | null,
+    managerEmail?: string | null,
+  ) {
+    // Defensa en profundidad: RbacGuard puede dejar pasar isSuperAdmin (developer@).
+    assertCanManageTools(managerEmail);
     const toolRequest = await this.findById(id, companyId);
     if (!toolRequest) throw new Error('Solicitud no encontrada');
 
@@ -652,8 +663,9 @@ export class ToolRequestsService {
   async deliver(
     id: number,
     companyId?: number | null,
-    opciones?: { pickupCode?: unknown; recogidaPorId?: number },
+    opciones?: { pickupCode?: unknown; recogidaPorId?: number; managerEmail?: string | null },
   ) {
+    assertCanManageTools(opciones?.managerEmail);
     const request = await this.findById(id, companyId);
     if (!request) {
       throw new Error('Solicitud no encontrada');
@@ -764,7 +776,14 @@ export class ToolRequestsService {
     });
   }
 
-  async reject(id: number, approvedBy: number, adminNotes: string, companyId?: number | null) {
+  async reject(
+    id: number,
+    approvedBy: number,
+    adminNotes: string,
+    companyId?: number | null,
+    managerEmail?: string | null,
+  ) {
+    assertCanManageTools(managerEmail);
     await this.findById(id, companyId);
     return this.prisma.toolRequest.update({
       where: { id },
@@ -1048,15 +1067,12 @@ export class ToolRequestsService {
   }
 
   private async kitVisibilityUserFilter(
-    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    currentUser: { id: number; email?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
   ) {
     const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
     if (isSuperAdmin) return {};
 
-    const canManage = Boolean(
-      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
-      currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
-    );
+    const canManage = hasToolsManageAccess(currentUser.email, currentUser.permissions);
     if (!canManage) return null;
 
     const dbUser = await (this.prisma as any).user.findUnique({
@@ -1126,7 +1142,7 @@ export class ToolRequestsService {
 
   async assignKitItem(
     data: AssignKitItemDto,
-    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    currentUser: { id: number; email?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
@@ -1153,9 +1169,7 @@ export class ToolRequestsService {
 
     const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
     const canAssign = Boolean(
-      isSuperAdmin ||
-      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
-      currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
+      isSuperAdmin || hasToolsManageAccess(currentUser.email, currentUser.permissions),
     );
 
     if (!canAssign) {
@@ -1234,7 +1248,7 @@ export class ToolRequestsService {
   /** La asignación, comprobando que quien la toca puede verla. */
   private async asignacionParaRevision(
     assignmentId: number,
-    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    currentUser: { id: number; email?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
     tenantId: number,
   ) {
     const asignacion = await (this.prisma as any).toolKitAssignment.findFirst({
@@ -1248,8 +1262,7 @@ export class ToolRequestsService {
 
     const puedeGestionar = Boolean(
       currentUser.isSuperAdmin ||
-        currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
-        currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
+        hasToolsManageAccess(currentUser.email, currentUser.permissions),
     );
     // Su propio kit lo puede mirar; revisarlo de oficio es del supervisor.
     if (!puedeGestionar && asignacion.userId !== currentUser.id) {
@@ -1495,15 +1508,12 @@ export class ToolRequestsService {
   async resolveKitEvent(
     eventId: number,
     data: ResolveKitEventDto,
-    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    currentUser: { id: number; email?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
     const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
-    const isAdmin = Boolean(
-      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
-      currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
-    );
+    const isAdmin = hasToolsManageAccess(currentUser.email, currentUser.permissions);
 
     if (!isSuperAdmin && !isAdmin) {
       throw new Error('No tienes permisos para resolver incidentes de kit');
@@ -1700,7 +1710,13 @@ export class ToolRequestsService {
   async findRenewals(
     toolRequestId?: number,
     status?: RenewalStatus,
-    currentUser?: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number },
+    currentUser?: {
+      id: number;
+      email?: string | null;
+      isSuperAdmin?: boolean;
+      permissions?: string[];
+      departmentId?: number;
+    },
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
@@ -1708,18 +1724,11 @@ export class ToolRequestsService {
     if (toolRequestId) where.toolRequestId = toolRequestId;
     if (status) where.status = status;
 
-    // Si se proporciona usuario, filtrar por jerarquía
     if (currentUser) {
       const isSuperAdmin = currentUser.isSuperAdmin === true;
-      const isConsoleAdmin = currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+      const canManage = hasToolsManageAccess(currentUser.email, currentUser.permissions);
 
-      if (!isSuperAdmin && isConsoleAdmin) {
-        where.toolRequest = {
-          usuario: {
-            departmentId: currentUser.departmentId,
-          },
-        };
-      } else if (!isSuperAdmin && !isConsoleAdmin) {
+      if (!isSuperAdmin && !canManage) {
         return [];
       }
     }
@@ -1760,10 +1769,18 @@ export class ToolRequestsService {
 
   async approveRenewal(
     renewalId: number,
-    approver: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number },
+    approver: {
+      id: number;
+      email?: string | null;
+      isSuperAdmin?: boolean;
+      permissions?: string[];
+      departmentId?: number;
+    },
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
+    // Email allowlist — no CONSOLE_ADMIN ni isSuperAdmin bypass (developer@ no aprueba).
+    assertCanManageTools(approver.email);
     const renewal = await this.prisma.toolRenewal.findFirst({
       where: { id: renewalId, ...companyWhere(tenantId) },
       include: {
@@ -1780,22 +1797,6 @@ export class ToolRequestsService {
       },
     });
     assertCompanyAccess(renewal, tenantId, 'Renovación');
-
-    // Validar permisos
-    const isSuperAdmin = approver.isSuperAdmin === true;
-    const isConsoleAdmin = approver.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
-
-    if (!isSuperAdmin && !isConsoleAdmin) {
-      throw new Error('No tienes permisos para aprobar renovaciones');
-    }
-
-    // Si es admin (no superadmin), validar que el usuario esté en su departamento
-    if (!isSuperAdmin && isConsoleAdmin) {
-      const requesterDeptId = renewal.toolRequest.usuario.department?.id;
-      if (requesterDeptId !== approver.departmentId) {
-        throw new Error('Solo puedes aprobar renovaciones de usuarios en tu departamento');
-      }
-    }
 
     // Actualizar la solicitud de herramienta con la nueva fecha de devolución
     await this.prisma.toolRequest.update({
@@ -1832,11 +1833,18 @@ export class ToolRequestsService {
 
   async rejectRenewal(
     renewalId: number,
-    approver: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number },
+    approver: {
+      id: number;
+      email?: string | null;
+      isSuperAdmin?: boolean;
+      permissions?: string[];
+      departmentId?: number;
+    },
     reason: string,
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
+    assertCanManageTools(approver.email);
     const renewal = await this.prisma.toolRenewal.findFirst({
       where: { id: renewalId, ...companyWhere(tenantId) },
       include: {
@@ -1853,22 +1861,6 @@ export class ToolRequestsService {
       },
     });
     assertCompanyAccess(renewal, tenantId, 'Renovación');
-
-    // Validar permisos
-    const isSuperAdmin = approver.isSuperAdmin === true;
-    const isConsoleAdmin = approver.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
-
-    if (!isSuperAdmin && !isConsoleAdmin) {
-      throw new Error('No tienes permisos para rechazar renovaciones');
-    }
-
-    // Si es admin (no superadmin), validar que el usuario esté en su departamento
-    if (!isSuperAdmin && isConsoleAdmin) {
-      const requesterDeptId = renewal.toolRequest.usuario.department?.id;
-      if (requesterDeptId !== approver.departmentId) {
-        throw new Error('Solo puedes rechazar renovaciones de usuarios en tu departamento');
-      }
-    }
 
     // Actualizar la renovación
     const updated = await this.prisma.toolRenewal.update({
