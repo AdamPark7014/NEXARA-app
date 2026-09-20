@@ -2,8 +2,9 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** fix(accounting): blindar periodo cerrado en escrituras
+- **Rama:** feat/gate-labels-con
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-gate-labels-con`
+- **HEAD:** ui(conciliacion): etiquetas ES para MATCHED/PENDING
 
 ## Puente — no cambiar
 
@@ -11,36 +12,22 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-Blindaje de periodo fiscal cerrado en escrituras financieras críticas:
-
-- `assertDateNotInClosedPeriod` ahora se llama desde:
-  - `registerPayment` → `paymentDate`
-  - `reconcileTransaction` → `transactionDate`
-  - `cancelInvoice` → `issueDate` + hoy
-  - `createInvoice` → `issueDate`
-  - `updateInvoiceDraft` → `dto.issueDate` o `invoice.issueDate`
-  - `deleteInvoice` → `issueDate`
-  - `importBankTransactions` → cada `transactionDate`
-- Ya cubierto antes: `reverseJournalEntry`; crear/postear pólizas vía `resolveOpenFiscalPeriodId`.
-- Suite nueva: `apps/api/src/accounting/closed-period-writes.spec.ts` — **8/8 PASS**.
+- Worktree `nexara-gate-labels-con` desde `origin/mejora/calidad-y-web`, rama `feat/gate-labels-con`.
+- En `apps/web/app/(panels)/erp/contabilidad/conciliacion/page.tsx`:
+  - `RECON_STATUS_LABEL` para enums crudos `MATCHED` / `PENDING` / `UNMATCHED` / `IGNORED` / `PARTIAL` / `VARIANCE`.
+  - Helper `estadoTexto()` (UI states + enums API) en StatusDot y aria-live.
+  - Los filtros (`ESTADO_LABEL` / FilterScale) ya estaban en español; no se tocaron.
 
 ## A medias / pendiente real
 
-- **Deploy bloqueado:** `~/.ssh/config` tiene `hetzner-nexara` con
-  `HostName REEMPLAZA_CON_IP_HETZNER`. Falta IP/llave. En servidor:
-  `./deploy/update.sh --force-all`
-- **AuditLog no guarda el estado anterior** salvo en el cierre de periodo.
-- Bonos/descuentos no existen en pre-nómina (no inventados).
-- Sin smoke de navegador contra datos reales.
-- UI de cierres (`proteccion.noBloqueado`) puede actualizarse a reflejar el
-  blindaje API; no se tocó web en este turno.
+- Merge de `feat/gate-labels-con` → `mejora/calidad-y-web` (otras WTs de labels en paralelo).
+- Deploy Hetzner sigue bloqueado por HostName placeholder.
+- EXEC-PACKET en disco sigue stale (Actividades 13-09); no ejecutado.
 
 ## Siguiente
 
-1. Adam da IP/llave Hetzner o corre deploy.
-2. Smoke contadora contra datos reales.
-3. Opcional: alinear copy de UI cierres con el blindaje API.
-4. AuditLog `previousData` en updates.
+1. Revisar/mergear con otras ramas `feat/gate-labels-*`.
+2. Adam: IP/llave Hetzner o deploy manual.
 
 ## No tocar
 
