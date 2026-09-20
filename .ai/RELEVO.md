@@ -2,14 +2,19 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** PRODUCTION GATE Contabilidad — flota micro + merges (periodo cerrado, a11y, labels, etc.)
+- **Rama:** feat/gate-match-idor-spec → base `mejora/calidad-y-web`
+- **HEAD:** test + gate companyId en `evaluateThreeWayMatch` (gate-match-idor.spec)
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
+
+### IDOR 3-way match
+
+- `evaluateThreeWayMatch`: `companyWhere` + `assertCompanyAccess`; controller pasa `X-Company-Id`.
+- Jest `gate-match-idor.spec.ts`: findFirst null scoped + fila `companyId` ajena → 404 sin `update`.
 
 ### PRODUCTION GATE Contabilidad / Finanzas
 
