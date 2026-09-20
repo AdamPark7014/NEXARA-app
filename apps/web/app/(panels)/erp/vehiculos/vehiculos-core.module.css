@@ -1,0 +1,496 @@
+/* Vehículos Core: flotilla, ficha, mis vehículos, checklist y GPS.
+   Mismo lenguaje visual que Proyectos y Cotizaciones: hairlines, radios suaves
+   y nada de texto explicativo — lo que hay que aclarar va detrás de una ⓘ. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  min-width: 0;
+}
+
+.migas {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.migas:hover {
+  color: var(--primary);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filaVehiculo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nombre {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.placas {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tenue {
+  color: var(--text-secondary);
+}
+
+.mini {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+/* ─── ⓘ: la explicación va en el title, no en la pantalla ─────────────── */
+
+.info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  vertical-align: middle;
+  flex: none;
+  padding: 0;
+  font-family: inherit;
+}
+
+.info:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.demo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--state-warning-bg, #fffbeb);
+  color: var(--state-warning-text, #b45309);
+  border: 1px solid var(--state-warning-border, #f59e0b);
+  white-space: nowrap;
+}
+
+/* ─── Ficha del vehículo ──────────────────────────────────────────────── */
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 16px;
+}
+
+.dato {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.datoLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.datoValor {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.viaje {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  padding: 14px 16px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.viajeTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tiraTitulo {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}
+
+.tira {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.foto {
+  position: relative;
+  flex: none;
+  width: 92px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  padding: 0;
+  cursor: zoom-in;
+  font-family: inherit;
+  display: block;
+}
+
+.foto img {
+  display: block;
+  width: 100%;
+  height: 66px;
+  object-fit: cover;
+}
+
+.fotoPie {
+  display: block;
+  padding: 3px 5px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fotoTablero {
+  width: 132px;
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.fotoTablero img {
+  height: 92px;
+}
+
+.visorImg {
+  display: block;
+  width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+/* ─── Checklist por pasos ─────────────────────────────────────────────── */
+
+.pasos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.paso {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.pasoActivo {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.pasoNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.pasoNumActivo {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.pasoNumHecho {
+  background: var(--success, #16a34a);
+  border-color: var(--success, #16a34a);
+  color: #fff;
+}
+
+.pasoSep {
+  width: 12px;
+  height: 1px;
+  background: var(--border);
+  flex: none;
+}
+
+.notaCaptura {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface);
+  padding: 8px;
+  cursor: pointer;
+  text-align: center;
+  min-height: 84px;
+  font-family: inherit;
+  color: inherit;
+}
+
+.slotLleno {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--success, #16a34a) 55%, var(--border));
+  background: color-mix(in srgb, var(--success, #16a34a) 7%, var(--surface));
+}
+
+.slotGrande {
+  min-height: 132px;
+}
+
+.slotLabel {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.slotEstado {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.slotPrevia {
+  display: block;
+  width: 100%;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.slotGrande .slotPrevia {
+  height: 104px;
+}
+
+.slotInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ─── Km y combustible ────────────────────────────────────────────────── */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.campoLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.segmentado {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.segmento {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  min-width: 46px;
+}
+
+.segmento:last-child {
+  border-right: none;
+}
+
+.segmentoActivo {
+  background: var(--primary);
+  color: #fff;
+}
+
+.resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 16px;
+  margin-bottom: 14px;
+}
+
+.acciones {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* ─── GPS ─────────────────────────────────────────────────────────────── */
+
+.gpsLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 12px;
+  align-items: start;
+}
+
+.mapa {
+  position: relative;
+  width: 100%;
+  height: 460px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.mapaAviso {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.gpsLista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 460px;
+  overflow-y: auto;
+}
+
+.gpsItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 8px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  width: 100%;
+}
+
+.gpsItemActivo {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.gpsBarra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 860px) {
+  .gpsLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mapa {
+    height: 320px;
+  }
+
+  .gpsLista {
+    max-height: none;
+  }
+}
