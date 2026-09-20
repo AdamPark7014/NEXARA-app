@@ -1,63 +1,58 @@
 /**
  * Pre-nómina operativa (sin CFDI N).
  *
- * Monto sugerido =
- *   (sueldoSemanal / 48 h) * (minutosLaborados / 60)
- *   + (sueldoSemanal / 48 h) * (minutosExtraAprobados / 60)
- *
- * Solo minutos de OvertimeApproval en APROBADO deben pasar como extras.
+ * Tasa por minuto = sueldoSemanal / (5 días × 480 min).
+ * Ordinarios = max(0, laborados − extrasAprobados) (extras no pueden superar laborados).
+ * Extra se paga con OT_MULTIPLIER.
  */
+
+export const OT_MULTIPLIER = 2;
+
+export function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 export function calculatePrenominaAmount(input: {
   sueldoSemanal: number | null | undefined;
   minutosLaborados: number;
   minutosExtraAprobados?: number;
 }): {
-  suggestedAmount: number;
-  hourlyRate: number;
-  basePay: number;
-  overtimePay: number;
+  suggestedAmount: number | null;
+  minutosOrdinarios: number;
+  minutosExtraAprobados: number;
+  ratePerMinute: number;
 } {
-  const sueldo = Number(input.sueldoSemanal || 0);
-  const hourlyRate = sueldo > 0 ? Math.round((sueldo / 48) * 100) / 100 : 0;
-  const hours = Math.max(0, Number(input.minutosLaborados || 0)) / 60;
-  const otHours = Math.max(0, Number(input.minutosExtraAprobados || 0)) / 60;
-  const basePay = Math.round(hours * hourlyRate * 100) / 100;
-  const overtimePay = Math.round(otHours * hourlyRate * 100) / 100;
-  return {
-    suggestedAmount: Math.round((basePay + overtimePay) * 100) / 100,
-    hourlyRate,
-    basePay,
-    overtimePay,
-  };
-}
+  const laborados = Math.max(0, Number(input.minutosLaborados) || 0);
+  let extras = Math.max(0, Number(input.minutosExtraAprobados) || 0);
+  extras = Math.min(extras, laborados);
+  const minutosOrdinarios = laborados - extras;
 
-/** Alias usado en pruebas antiguas del mismo módulo. */
-export function suggestPayrollAmount(input: {
-  sueldoSemanal: number | null | undefined;
-  periodFrom: Date;
-  periodTo: Date;
-  approvedOvertimeMinutes?: number;
-}) {
-  const ms = Math.max(0, input.periodTo.getTime() - input.periodFrom.getTime());
-  const days = ms / 86_400_000 + 1;
-  const weeks = Math.max(1, Math.round((days / 7) * 100) / 100);
-  const sueldo = Number(input.sueldoSemanal || 0);
-  const base = Math.round(sueldo * weeks * 100) / 100;
-  const hourlyRate = sueldo > 0 ? Math.round((sueldo / 48) * 100) / 100 : 0;
-  const overtimePay =
-    Math.round(((Number(input.approvedOvertimeMinutes || 0) / 60) * hourlyRate) * 100) / 100;
-  return {
-    amount: Math.round((base + overtimePay) * 100) / 100,
-    base,
-    overtimePay,
-    hourlyRate,
-    weeks,
-  };
-}
+  const sueldo = input.sueldoSemanal == null ? null : Number(input.sueldoSemanal);
+  if (sueldo == null || !Number.isFinite(sueldo) || sueldo <= 0) {
+    return {
+      suggestedAmount: laborados === 0 && extras === 0 ? 0 : null,
+      minutosOrdinarios,
+      minutosExtraAprobados: extras,
+      ratePerMinute: 0,
+    };
+  }
 
-export function weeksInRange(from: Date, to: Date): number {
-  const ms = Math.max(0, to.getTime() - from.getTime());
-  const days = ms / 86_400_000 + 1;
-  return Math.max(1, Math.round((days / 7) * 100) / 100);
+  // Spec: negative minutes → suggestedAmount 0 (not null)
+  if (laborados === 0 && extras === 0 && (Number(input.minutosLaborados) < 0 || Number(input.minutosExtraAprobados) < 0)) {
+    return {
+      suggestedAmount: 0,
+      minutosOrdinarios: 0,
+      minutosExtraAprobados: 0,
+      ratePerMinute: sueldo / (5 * 480),
+    };
+  }
+
+  const rate = sueldo / (5 * 480);
+  const amount = roundMoney(minutosOrdinarios * rate + extras * rate * OT_MULTIPLIER);
+  return {
+    suggestedAmount: amount,
+    minutosOrdinarios,
+    minutosExtraAprobados: extras,
+    ratePerMinute: rate,
+  };
 }
