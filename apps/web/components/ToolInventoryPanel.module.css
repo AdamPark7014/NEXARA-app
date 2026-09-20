@@ -1,35 +1,42 @@
 .wrapper {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .formCard,
 .listCard {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .title {
   color: var(--primary);
   margin-bottom: 0;
+  font-size: 14px;
 }
 
 .fieldsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
+  align-items: end;
 }
 
 .fieldsGridMobile {
   grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.fieldsRow {
+  display: contents;
 }
 
 .dropzone {
   border: 1px dashed var(--muted);
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 8px;
   display: grid;
-  gap: 8px;
+  gap: 4px;
   align-content: start;
   background: var(--surface-light);
   transition: all 0.2s ease;
@@ -50,7 +57,7 @@
 }
 
 .dropzoneHint {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 
@@ -60,24 +67,30 @@
 
 .selectImageBtn {
   justify-self: start;
-  padding: 6px 10px;
+  padding: 5px 8px;
   font-size: 12px;
 }
 
 .previewImage {
   width: 100%;
-  height: 110px;
+  height: 80px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--muted);
 }
 
 .formActions,
 .topBar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.formActionsInline {
+  display: flex;
+  align-items: end;
+  min-height: 36px;
 }
 
 .topBar {
@@ -111,13 +124,13 @@
 
 .centerLoading {
   text-align: center;
-  padding: 16px;
+  padding: 12px;
 }
 
 .centerEmpty {
   text-align: center;
   color: var(--text-secondary);
-  padding: 20px;
+  padding: 14px;
 }
 
 .tableWrap {
@@ -138,24 +151,24 @@
 .thLeft,
 .td {
   text-align: left;
-  padding: 10px;
+  padding: 8px;
 }
 
 .thCenter,
 .tdCenter {
   text-align: center;
-  padding: 10px;
+  padding: 8px;
 }
 
 .gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
 }
 
 .galleryCard {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--surface);
   display: grid;
@@ -170,21 +183,21 @@
 
 .photoLink {
   display: block;
-  min-height: 160px;
+  min-height: 120px;
   text-decoration: none;
   color: inherit;
 }
 
 .galleryPhoto {
   width: 100%;
-  height: 180px;
+  height: 140px;
   object-fit: cover;
   display: block;
 }
 
 .photoPlaceholder {
   width: 100%;
-  height: 180px;
+  height: 140px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -194,18 +207,18 @@
 }
 
 .galleryBody {
-  padding: 12px 14px 14px;
+  padding: 8px 10px 10px;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .galleryTitle {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .galleryMeta {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -213,14 +226,14 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-top: 2px;
 }
 
 .statusBadge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -251,13 +264,13 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .actionBtn {
   width: 100%;
-  min-height: 34px;
+  min-height: 32px;
   justify-content: center;
   font-size: 12px;
-  padding: 6px 8px;
+  padding: 5px 8px;
 }

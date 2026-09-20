@@ -2,9 +2,9 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** `2a2529a6` (Hetzner healthy; script org corrido)
-- **Migraciones:** ya aplicadas `2026092001*`
+- **Rama:** feat/opt-opt-almacen
+- **HEAD:** (este commit)
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-opt-almacen`
 
 ## Puente — no cambiar
 
@@ -12,15 +12,19 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-1. **Organigrama:** Christian (`gerencia@`) vuelve a salir como DG raíz; Claudia (`claudia.bernal@`) excluida del chart (tester).
-2. Seed demo: puesto Claudia → «Tester de plataforma».
-3. Script `fix-org-puestos-jefes.js` actualizado y corrido en prod (1 cambio: puesto Claudia).
+1. **VistaAlmacen `embedded`:** sin barra de acciones duplicada bajo PageHeader; acciones en la misma fila que sub-pestañas (Inventario). En Movimientos solo, Actualizar/Registrar en el Section.
+2. **Herramientas:** gap 10; Recolección densificada; copy acortado.
+3. **ToolInventoryPanel:** wrapper/form gap 8, fotos galería 140px, form denser en desktop (campos + Agregar en una fila), hints cortos.
+
+## A medias
+
+- Nada.
 
 ## Siguiente
 
-- QA: recargar `/erp/organigrama` — raíz = Christian; sin bloque huérfanos por Christian excluido.
-- Rotar Maps key / contraseñas: lado Adam.
+- QA visual `/erp/almacen` Inventario / Movimientos / Herramientas (claro/oscuro, 375px).
+- Merge del worktree a la rama principal cuando Adam lo pida.
 
 ## No tocar
 
-Puente NAS.
+Puente NAS. API / RBAC.
