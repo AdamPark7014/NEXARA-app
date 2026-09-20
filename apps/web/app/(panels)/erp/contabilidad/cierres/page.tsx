@@ -524,16 +524,18 @@ export default function CierresPage() {
                     ))}
                   </ul>
                 </div>
-                <div>
-                  <strong style={{ color: "var(--warning, #b45309)" }}>
-                    Hoy el cierre todavía NO bloquea:
-                  </strong>
-                  <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-                    {checklist.proteccion.noBloqueado.map((l) => (
-                      <li key={l}>{l}</li>
-                    ))}
-                  </ul>
-                </div>
+                {checklist.proteccion.noBloqueado.length > 0 ? (
+                  <div>
+                    <strong style={{ color: "var(--warning, #b45309)" }}>
+                      Hoy el cierre todavía NO bloquea:
+                    </strong>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                      {checklist.proteccion.noBloqueado.map((l) => (
+                        <li key={l}>{l}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
             </>
           )}

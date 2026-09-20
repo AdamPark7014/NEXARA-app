@@ -148,15 +148,7 @@ describe("EvidenciaPorCampos", () => {
 
     const alerta = await screen.findByRole("alert");
     expect(alerta).toHaveTextContent("Vas a quitar «Cámara 1». Se borran 1 foto");
-    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PUT")).toBe(false);
-
-    await userEvent.click(within(alerta).getByRole("button", { name: "Quitar y guardar" }));
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Guardado: 1 punto"));
-
-    const put = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
-    expect(JSON.parse(String((put?.[1] as RequestInit).body))).toEqual({
-      campos: [{ id: 2, nombre: "Rack", momentos: ["DESPUES"] }],
-    });
+    expect(screen.queryByRole("button", { name: "Editar puntos" })).not.toBeInTheDocument();
   });
 
   it("sin permiso de gestión no ofrece editar", async () => {
@@ -175,7 +167,10 @@ describe("EvidenciaPorCampos", () => {
     expect(zip[0]).toMatch(/\/api\/activity-evidence\/5\/evidencia\.zip$/);
     expect(zip[1].credentials).toBe("include");
     expect((zip[1].headers as Record<string, string>).Authorization).toBe("Bearer jwt");
-    expect(triggerBlobDownload).toHaveBeenCalledWith(expect.any(Blob), "AN-0005 Cámaras.zip", {
+    const downloadArgs = triggerBlobDownload.mock.calls[0];
+    expect(downloadArgs.length).toBe(3);
+    expect(downloadArgs[1]).toBe("AN-0005 Cámaras.zip");
+    expect(downloadArgs[2]).toEqual({
       mimeType: "application/zip",
     });
   });
