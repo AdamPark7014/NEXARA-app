@@ -1,17 +1,23 @@
 "use client";
 
-import { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 /**
- * NEXARA · Section (premium)
- * Bloque visual de sección con jerarquía clara:
- *   eyebrow opcional → título → subtítulo · acciones · cuerpo.
+ * NEXARA · Section
  *
- * Props extra:
- *  - eyebrow: kicker pequeño arriba del título
- *  - tone: "default" | "muted" | "accent" — variante de fondo
- *  - dense: reduce padding y separadores
- *  - flush: cuerpo sin padding (útil para tablas/listas)
+ * Bloque de sección: eyebrow → título → subtítulo · acciones · cuerpo · pie.
+ *
+ * Antes cada sección era una tarjeta: borde, radio, sombra, cabecera con
+ * degradado y **dos** líneas divisorias. Apiladas, la pantalla eran cajas
+ * dentro de cajas. Ahora la separación la dan el aire y la tipografía:
+ *
+ *   default → sin caja. Ni borde, ni fondo, ni sombra.
+ *   muted   → superficie propia (fondo + radio). El fondo ya delimita; no
+ *             lleva borde encima.
+ *   accent  → una regla de 2px a la izquierda. Una línea, no un marco.
+ *
+ * `flush` y `dense` siguen significando lo mismo; en `default` el cuerpo ya
+ * va a ras, así que `flush` no cambia nada y no rompe a quien lo pasaba.
  */
 
 type Tone = "default" | "muted" | "accent";
@@ -26,6 +32,8 @@ export default function Section({
   tone = "default",
   dense = false,
   flush = false,
+  className,
+  style,
 }: {
   eyebrow?: ReactNode;
   title?: ReactNode;
@@ -36,45 +44,34 @@ export default function Section({
   tone?: Tone;
   dense?: boolean;
   flush?: boolean;
+  /** Antes había que envolver la sección en un div solo para esto. */
+  className?: string;
+  style?: CSSProperties;
 }) {
-  const headerPadY = dense ? 10 : 14;
-  const bodyPad = flush ? 0 : dense ? "10px 14px" : "16px 18px";
+  // Solo `muted` es de verdad una superficie; el resto vive sobre la página.
+  const surfaced = tone === "muted";
+  const accented = tone === "accent";
 
-  const toneBg: Record<Tone, string> = {
-    default: "var(--surface)",
-    muted: "color-mix(in srgb, var(--surface-2) 60%, var(--surface))",
-    accent:
-      "linear-gradient(168deg, color-mix(in srgb, var(--panel-accent, var(--primary)) 6%, var(--surface)) 0%, var(--surface) 60%)",
-  };
+  const padX = dense ? 14 : 16;
+  const padY = dense ? 12 : 14;
+
+  const hasHeader = Boolean(title || actions || eyebrow || subtitle);
+  const headerGap = dense ? 10 : 14;
 
   return (
     <section
+      className={className}
       style={{
-        position: "relative",
-        background: toneBg[tone],
-        border: "1px solid var(--nx-panel-hairline)",
-        borderRadius: "var(--nx-panel-radius)",
-        overflow: "hidden",
-        marginBottom: 20,
-        boxShadow: "var(--nx-panel-elev-1)",
+        marginBottom: dense ? 16 : 24,
+        background: surfaced ? "color-mix(in srgb, var(--surface-2) 60%, var(--surface))" : undefined,
+        borderRadius: surfaced ? "var(--nx-panel-radius-sm, 12px)" : undefined,
+        // Una regla, no un marco.
+        borderLeft: accented ? "2px solid var(--panel-accent, var(--primary))" : undefined,
+        paddingLeft: accented ? 14 : undefined,
+        ...style,
       }}
     >
-      {tone === "accent" && (
-        <span
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 3,
-            background:
-              "linear-gradient(180deg, var(--panel-accent, var(--primary)) 0%, color-mix(in srgb, var(--panel-accent, var(--primary)) 40%, transparent) 100%)",
-          }}
-        />
-      )}
-
-      {(title || actions || eyebrow) && (
+      {hasHeader && (
         <header
           style={{
             display: "flex",
@@ -82,10 +79,10 @@ export default function Section({
             justifyContent: "space-between",
             gap: 14,
             flexWrap: "wrap",
-            padding: `${headerPadY}px 18px ${dense ? 8 : 12}px`,
-            borderBottom: "1px solid var(--nx-panel-hairline-soft)",
-            background:
-              "linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 45%, transparent) 0%, transparent 100%)",
+            // Sin línea divisoria ni degradado: el espacio separa la cabecera
+            // del cuerpo mejor que un borde que además dibuja otro rectángulo.
+            marginBottom: headerGap,
+            padding: surfaced ? `${padY}px ${padX}px 0` : undefined,
           }}
         >
           <div style={{ minWidth: 200, flex: "1 1 240px", maxWidth: "100%" }}>
@@ -108,7 +105,7 @@ export default function Section({
                 style={{
                   fontFamily: "var(--nx-font-display)",
                   fontSize: 15.5,
-                  fontWeight: 700,
+                  fontWeight: 650,
                   letterSpacing: "-0.01em",
                   margin: 0,
                   color: "var(--text-primary)",
@@ -123,7 +120,7 @@ export default function Section({
                 style={{
                   fontSize: 12.5,
                   color: "var(--text-secondary)",
-                  marginTop: 4,
+                  marginTop: 3,
                   lineHeight: 1.45,
                   maxWidth: 560,
                 }}
@@ -137,7 +134,6 @@ export default function Section({
               style={{
                 display: "flex",
                 gap: 8,
-                flex: "1 1 auto",
                 flexWrap: "wrap",
                 alignItems: "center",
                 justifyContent: "flex-end",
@@ -150,16 +146,27 @@ export default function Section({
         </header>
       )}
 
-      <div style={{ padding: bodyPad }}>{children}</div>
+      {/* Sin tarjeta, un padding interior solo desalinea el cuerpo del título.
+          Con superficie (`muted`), el aire va aquí — salvo que `flush` pida el
+          cuerpo a ras, que es lo que quiere una tabla dentro de la sección. */}
+      <div
+        style={
+          surfaced
+            ? { padding: flush ? 0 : `0 ${padX}px`, paddingBottom: flush || footer ? 0 : padY }
+            : undefined
+        }
+      >
+        {children}
+      </div>
 
       {footer && (
         <footer
           style={{
-            padding: "12px 22px",
-            borderTop: "1px solid var(--nx-panel-hairline-soft)",
-            background: "color-mix(in srgb, var(--surface-2) 35%, transparent)",
+            marginTop: dense ? 10 : 14,
+            padding: surfaced ? `0 ${padX}px ${padY}px` : undefined,
             fontSize: 12,
             color: "var(--text-tertiary)",
+            lineHeight: 1.45,
           }}
         >
           {footer}
