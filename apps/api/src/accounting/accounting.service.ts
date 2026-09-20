@@ -1208,23 +1208,23 @@ export class AccountingService {
       },
     });
 
-    return this.evaluateThreeWayMatch(invoice.id, userId);
+    return this.evaluateThreeWayMatch(invoice.id, userId, tenantId);
   }
 
   /**
    * 3-way match: cantidad factura ≤ recibida; precio ≈ OC (±2%).
    * Solo aplica a CXP ligadas a OC/GR.
    */
-  async evaluateThreeWayMatch(invoiceId: number, userId?: number) {
+  async evaluateThreeWayMatch(invoiceId: number, userId?: number, companyId?: number | null) {
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id: invoiceId, deletedAt: null },
+      where: { id: invoiceId, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: {
         items: true,
         purchaseOrder: { include: { items: true } },
         goodsReceipt: { include: { items: true } },
       },
     });
-    if (!invoice) throw new NotFoundException('Factura no encontrada');
+    assertCompanyAccess(invoice, companyId, 'Factura');
 
     if (invoice.type !== 'ACCOUNTS_PAYABLE' || (!invoice.purchaseOrderId && !invoice.goodsReceiptId)) {
       return this.prisma.invoice.update({
@@ -1234,8 +1234,8 @@ export class AccountingService {
       });
     }
 
-    if (invoice.matchStatus === 'WAIVED') {
-      return this.getInvoice(invoiceId);
+    if (invoice!.matchStatus === 'WAIVED') {
+      return this.getInvoice(invoiceId, companyId);
     }
 
     const PRICE_TOL = 0.02;
@@ -2190,7 +2190,7 @@ export class AccountingService {
     }
 
     if (invoice.type === 'ACCOUNTS_PAYABLE' && (invoice.purchaseOrderId || invoice.goodsReceiptId)) {
-      return this.evaluateThreeWayMatch(id, userId);
+      return this.evaluateThreeWayMatch(id, userId, companyId);
     }
     return this.getInvoice(id, companyId);
   }
