@@ -510,6 +510,9 @@ export class ViaticosService {
         date: viatico.fechaSolicitud,
         description: `Pago viático #${id}: ${viatico.motivo || viatico.categoria || 'Viático'}`,
         userId: actorId,
+        // Sin la empresa, la póliza automática fallaba con 403 al contabilizarse
+        // y "marcar pagado" reventaba entero.
+        companyId: companyId ?? viatico.companyId,
       });
       journalEntryId = entry.id;
       contabilidadRef = entry.entryNumber;

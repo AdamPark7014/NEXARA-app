@@ -1,44 +1,59 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import 'reflect-metadata';
 import { PERMISSIONS } from '../common/permissions.js';
+import { AccountingWorkspaceController } from './workspace.controller.js';
 
 /**
- * Authz contract for Contadora workspace dashboard.
- * Contabilidad / invoicing / console admin: allowed.
- * Field roles without those permissions: denied at RBAC decorator level.
+ * Contrato de autorización del panel de la contadora.
+ *
+ * Lee el metadata @RBAC real del controlador en vez de reimplementar la regla
+ * aquí: si alguien afloja el decorador, esta prueba lo caza. La versión previa
+ * copiaba la lista de permisos dentro del test (y además importaba de vitest,
+ * así que nunca llegó a correr bajo Jest).
  */
 
-describe('accounting workspace dashboard authz', () => {
-  const allowed = new Set([
-    PERMISSIONS.CONTABILIDAD_VIEW,
-    PERMISSIONS.INVOICING_VIEW,
-    PERMISSIONS.CONSOLE_ADMIN,
-  ]);
+function rbacDe(metodo: keyof AccountingWorkspaceController) {
+  return Reflect.getMetadata(
+    'rbac',
+    AccountingWorkspaceController.prototype[metodo] as unknown as object,
+  ) as { anyPermissions?: string[]; permissions?: string[] } | undefined;
+}
 
-  function canAccess(perms: string[]) {
-    return perms.some((p) => allowed.has(p as any));
-  }
+describe('autorización del panel de contabilidad', () => {
+  const rbac = rbacDe('dashboard');
 
-  it('contabilidad.view puede ver el dashboard', () => {
-    expect(canAccess([PERMISSIONS.CONTABILIDAD_VIEW])).toBe(true);
+  it('el endpoint declara permisos explícitos', () => {
+    expect(rbac).toBeDefined();
+    expect(Array.isArray(rbac?.anyPermissions)).toBe(true);
+    expect(rbac?.anyPermissions?.length).toBeGreaterThan(0);
   });
 
-  it('invoicing.view puede ver el dashboard', () => {
-    expect(canAccess([PERMISSIONS.INVOICING_VIEW])).toBe(true);
+  it('contabilidad, facturación y admin de consola pueden verlo', () => {
+    expect(rbac?.anyPermissions).toContain(PERMISSIONS.CONTABILIDAD_VIEW);
+    expect(rbac?.anyPermissions).toContain(PERMISSIONS.INVOICING_VIEW);
+    expect(rbac?.anyPermissions).toContain(PERMISSIONS.CONSOLE_ADMIN);
   });
 
-  it('console.admin puede ver el dashboard', () => {
-    expect(canAccess([PERMISSIONS.CONSOLE_ADMIN])).toBe(true);
-  });
-
-  it('ingeniero de campo sin permisos finance → denegado', () => {
-    expect(canAccess(['ops.view', 'activities.view'])).toBe(false);
-    expect(canAccess([])).toBe(false);
+  it('no se cuela ningún permiso de campo ni de herramientas', () => {
+    const concedidos = rbac?.anyPermissions ?? [];
+    const prohibidos = concedidos.filter((p) =>
+      /^(ops|activities|tools|inventory)\./.test(p),
+    );
+    expect(prohibidos).toEqual([]);
   });
 });
 
-describe('getWorkspaceDashboard shape (unit smoke)', () => {
-  it('exporta el método en AccountingService', async () => {
+describe('contrato de getWorkspaceDashboard', () => {
+  it('el método existe en AccountingService', async () => {
     const mod = await import('./accounting.service.js');
-    expect(typeof mod.AccountingService.prototype.getWorkspaceDashboard).toBe('function');
+    expect(typeof mod.AccountingService.prototype.getWorkspaceDashboard).toBe(
+      'function',
+    );
+  });
+
+  it('acepta empresa y rango de fechas', async () => {
+    const mod = await import('./accounting.service.js');
+    expect(
+      mod.AccountingService.prototype.getWorkspaceDashboard.length,
+    ).toBeGreaterThanOrEqual(3);
   });
 });

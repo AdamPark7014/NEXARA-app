@@ -325,6 +325,9 @@ export class ExpensesService {
         date: existing.fechaGasto || existing.fechaSolicitud,
         description: `Pago gasto administrativo #${id}: ${existing.concepto || existing.razonGasto || 'Gasto'}`,
         userId: actorId,
+        // Sin la empresa, la póliza automática fallaba con 403 al contabilizarse
+        // y "marcar pagado" reventaba entero.
+        companyId: companyId ?? existing.companyId,
       });
       journalEntryId = entry.id;
       contabilidadRef = entry.entryNumber;

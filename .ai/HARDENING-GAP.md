@@ -106,3 +106,65 @@
 | Draft approval gate | PARTIAL | Borrador→Pagado sin firma RH |
 
 **Worktrees:** `feat/hard-org-mgrs` (script managers) · `feat/hard-prenomina` (HR parity + optional draft gate)
+
+---
+
+# OLA CONTADORA — workspace financiero `/erp/contabilidad`
+
+**Base:** `07016b6c` · **Fecha:** 2026-09-20 · **Cabeza:** claude-code
+
+## Auditoría previa (qué NO hay que reconstruir)
+
+El backend contable ya es profundo — `accounting.service.ts` (3,764 líneas) tiene:
+CFDI real (stampInvoice, PAC, complementos de pago, notas de crédito, cancelación),
+DIOT, catálogo XML/balanza SAT, periodos fiscales con cierre/reapertura,
+pólizas con posteo y reversa, three-way match, banca (importar/conciliar),
+presupuestos, centros de costo, estado de resultados / balance / balanza.
+
+Cursor ya dejó el hub funcionando: sidebar por tarea, dashboard con datos reales
+(`getWorkspaceDashboard`: aging CxC/CxP, alertas accionables, flujo del periodo),
+y 13 páginas conectadas a API real. **No es maqueta.**
+
+## Huecos reales detectados
+
+| Vista | Estado previo | Hueco |
+|-------|---------------|-------|
+| Movimientos | Solo facturas | No es libro: faltan Payment, Expense, BankTransaction, EmployeePayment |
+| CxC / CxP | Componente genérico compartido | Sin aging, días vencido, detalle, registrar pago, calendario CxP |
+| Conciliación | Manual | Sin motor de sugerencias ni pantalla dividida |
+| Cierres | Cierra sin verificar | Sin lista de verificación ni garantía de bloqueo |
+| Auditoría | Tabla plana | Sin antes/después |
+| Proveedores | Derivado de facturas | Ignora el modelo `Supplier` que ya existe |
+| Proyectos | Derivado de facturas | Sin desglose de costos ni drill-down |
+| Reportes | Rejilla de enlaces | No es módulo de reportes |
+| Presupuestos | Lista | Sin comparativo contra real |
+| Pre-nómina | `router.replace` | Sin resumen propio en el hub |
+| RBAC contadora | Rutas abiertas por rol | Sin tests de 403 por backend |
+
+## Swarm ola contadora (7 worktrees paralelos)
+
+| Rama | Worktree | Alcance |
+|------|----------|---------|
+| feat/cont-ledger | nexara-cont-ledger | Libro de movimientos unificado + CSV |
+| feat/cont-cxc | nexara-cont-cxc | Aging CxC/CxP, detalle, pagos, calendario |
+| feat/cont-concilia | nexara-cont-concilia | Motor de matching + pantalla dividida |
+| feat/cont-cierre | nexara-cont-cierre | Checklist de cierre, bloqueo real, auditoría antes/después |
+| feat/cont-vendors | nexara-cont-vendors | Proveedor 360° + P&L por proyecto |
+| feat/cont-reportes | nexara-cont-reportes | Catálogo de reportes + presupuesto vs real |
+| feat/cont-rbac | nexara-cont-rbac | 403 por backend, gating de sidebar, pre-nómina en hub |
+
+**Regla anti-conflicto:** cada agente crea archivos NUEVOS en `apps/api/src/accounting/`.
+El único archivo compartido es `accounting.module.ts` (una línea por provider/controller).
+
+## Ramas backlog-* — superadas, NO mergear
+
+`feat/backlog-{actividades,tools,orgchart,prenomina}` quedan 1 commit "adelante"
+pero su contenido ya está en `mejora/calidad-y-web` (verificado archivo por archivo).
+Mergearlas revertiría correcciones posteriores (p. ej. la nitidez de `PDFViewer`).
+Se dejan intactas, sin borrar.
+
+## Bloqueo de despliegue
+
+`~/.ssh/config` tiene `hetzner-nexara` con `HostName REEMPLAZA_CON_IP_HETZNER`.
+Sin la dirección real ni la llave, el deploy no sale de esta máquina.
+Requiere a Adam.
