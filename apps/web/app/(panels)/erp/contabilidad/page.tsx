@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
@@ -394,9 +395,11 @@ export default function ContabilidadDashboardPage() {
                           label={item.detail}
                           tone={item.tone === "info" ? "neutral" : (item.tone as StatusTone)}
                         />
-                        <span aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>
-                          ›
-                        </span>
+                        <ChevronRight
+                          size={14}
+                          aria-hidden="true"
+                          style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
+                        />
                       </span>
                     </Link>
                   </li>
@@ -651,7 +654,7 @@ function CtxRow({
 function QuietLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link href={href} style={{ fontSize: 12.5, color: "var(--primary)", textDecoration: "none" }}>
-      {children} →
+      {children}
     </Link>
   );
 }
