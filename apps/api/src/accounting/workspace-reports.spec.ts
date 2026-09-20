@@ -453,6 +453,22 @@ describe('aislamiento por empresa', () => {
     expect(accounting.getBalanceSheet).toHaveBeenCalledWith('2026-09-30', EMPRESA);
   });
 
+  it('la balanza muestra naturaleza en español, no el enum ASSET/LIABILITY', async () => {
+    const { service } = build(
+      {},
+      {
+        getTrialBalance: jest.fn().mockResolvedValue([
+          { code: '102.01', name: 'Bancos', type: 'ASSET', debit: 1000, credit: 0 },
+          { code: '201.01', name: 'Proveedores', type: 'LIABILITY', debit: 0, credit: 400 },
+          { code: '401.01', name: 'Ingresos', type: 'REVENUE', debit: 0, credit: 600 },
+        ]),
+      },
+    );
+
+    const r = await service.ejecutar('balanza-comprobacion', {}, EMPRESA);
+    expect(r.filas.map((f) => f.tipo)).toEqual(['Activo', 'Pasivo', 'Ingreso']);
+  });
+
   it('el detalle de «Sin categoría» filtra por NULL, no devuelve todos los gastos', async () => {
     const { service, prisma } = build({
       expense: { findMany: jest.fn().mockResolvedValue([]), groupBy: jest.fn().mockResolvedValue([]) },
