@@ -270,6 +270,7 @@ export default function InvoicingPage() {
       fn: async () => {
         try {
           await apiFetch(`accounting/invoices/${inv.id}/stamp`, token, { method: "POST" });
+          toast.success("Factura timbrada ante el PAC");
           void load();
         } catch (e) {
           toast.error(`Error al timbrar: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -326,6 +327,8 @@ export default function InvoicingPage() {
         toast.success(`Complemento de pago timbrado: ${result.complement.cfdiPaymentUuid.slice(0, 8)}…`);
       } else if (result?.complementStampWarning) {
         toast.warning(`Pago registrado, pero el complemento no se timbró: ${result.complementStampWarning}`);
+      } else {
+        toast.success("Pago registrado");
       }
       setPaymentTarget(null);
       void load();
