@@ -3,7 +3,7 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** `8b440291` (merge 4 olas densidad; push/deploy en curso)
+- **HEAD:** `7322717c` (en Hetzner; web+api healthy)
 - **Migraciones:** ya aplicadas `2026092001*`
 
 ## Puente — no cambiar
