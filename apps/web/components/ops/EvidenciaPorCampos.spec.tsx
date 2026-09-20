@@ -142,26 +142,50 @@ describe("EvidenciaPorCampos", () => {
 
   it("quitar un campo con fotos pide confirmación y manda la lista completa", async () => {
     render(<EvidenciaPorCampos activityId={5} />);
+
+    // El componente nace en modo lectura: sin entrar a editar, el botón de
+    // quitar todavía no existe.
+    await userEvent.click(await screen.findByRole("button", { name: "Editar puntos" }));
     await userEvent.click(await screen.findByRole("button", { name: "Quitar Cámara 1" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Quitar y guardar" }));
+
+    // La confirmación no sale al quitar, sino al intentar guardar: es entonces
+    // cuando el componente descubre que el campo retirado ya tenía fotos.
+    await userEvent.click(await screen.findByRole("button", { name: "Guardar puntos" }));
 
     const alerta = await screen.findByRole("alert");
     expect(alerta).toHaveTextContent("Vas a quitar «Cámara 1». Se borran 1 foto");
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        method: "PUT",
-        headers: expect.objectContaining({ "Content-Type": "application/json" }),
-        body: expect.any(String),
-      })
+
+    // Solo al confirmar se manda la lista completa al servidor.
+    await userEvent.click(screen.getByRole("button", { name: "Quitar y guardar" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          method: "PUT",
+          headers: expect.objectContaining({ "Content-Type": "application/json" }),
+          body: expect.any(String),
+        }),
+      ),
     );
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 
   it("sin permiso de gestión no ofrece editar", async () => {
+    // Esta prueba no podía pasar: negaba el permiso y aun así exigía encontrar
+    // y pulsar el botón que ese permiso habilita, para luego afirmar que no
+    // estaba. Se comprueba la ausencia directamente, que es lo que importa.
     useUser.mockReturnValue({ user: { token: "jwt", permissions: ["evidences.view"] }, token: "jwt" });
     render(<EvidenciaPorCampos activityId={5} anNumber="AN-0005" titulo="Cámaras" />);
-    await userEvent.click(await screen.findByRole("button", { name: "Quitar Cámara 1" }));
+
+    // Se espera a que la evidencia cargue para no confundir "aún no pintado"
+    // con "no ofrecido".
+    expect(await screen.findByText("Cámara 1")).toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: "Editar puntos" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Definir qué fotografiar" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Quitar Cámara 1" })).not.toBeInTheDocument();
   });
 

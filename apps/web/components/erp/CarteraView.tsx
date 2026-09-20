@@ -507,13 +507,19 @@ export default function CarteraView({
       setFormPago(false);
       setIntentado(false);
       setPago({ amount: "", paymentDate: hoyIso(), method: "SPEI", reference: "", notes: "" });
-      const refrescado = await erpFetch<Detalle>(
-        `accounting/workspace/${kind}/${detalle.factura.id}`,
-        token,
-      );
-      setDetalle(refrescado);
-      await cargar();
-      if (!esCobrar) await cargarCalendario();
+      try {
+        const refrescado = await erpFetch<Detalle>(
+          `accounting/workspace/${kind}/${detalle.factura.id}`,
+          token,
+        );
+        setDetalle(refrescado);
+        await cargar();
+        if (!esCobrar) await cargarCalendario();
+      } catch (refreshErr) {
+        toast.warning(
+          `El ${esCobrar ? "cobro" : "pago"} quedó registrado, pero no se pudo refrescar la vista. ${formatApiError(refreshErr)} Actualiza la página.`,
+        );
+      }
     } catch (e) {
       // El formulario NO se cierra: si se cerrara, el capturista no sabría si
       // el dinero quedó aplicado y volvería a capturarlo.

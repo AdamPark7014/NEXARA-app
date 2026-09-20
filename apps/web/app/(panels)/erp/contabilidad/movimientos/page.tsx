@@ -15,6 +15,7 @@ import { SkeletonList } from "@/components/PageState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { erpFetch, formatApiError } from "@/lib/erp-api";
+import { withTenantHeaders } from "@/lib/tenant";
 import { financeStatusLabel } from "@/lib/finance-status-labels";
 import {
   METODO_LABELS,
@@ -179,7 +180,10 @@ export default function MovimientosPage() {
       const qs = buildLedgerQuery(filters);
       const res = await fetch(
         buildApiUrl(`accounting/workspace/movimientos/export${qs ? `?${qs}` : ""}`),
-        { credentials: "include", headers: { Authorization: `Bearer ${token}` } },
+        {
+          credentials: "include",
+          headers: withTenantHeaders({ Authorization: `Bearer ${token}` }),
+        },
       );
       if (!res.ok) throw new Error(await res.text().catch(() => "No se pudo generar el CSV"));
       const renglones = Number(res.headers.get("X-Ledger-Rows"));
@@ -302,24 +306,28 @@ export default function MovimientosPage() {
         numeric: true,
         // Sin verde ni rojo: la columna ya dice de qué lado cae el monto, y con
         // cincuenta filas el color convierte el libro en un semáforo.
-        render: (r) =>
-          r.ingreso ? (
-            <Money value={r.ingreso} bold={false} />
-          ) : (
-            <span style={{ color: "var(--text-tertiary)" }}>—</span>
-          ),
+        render: (r) => {
+          const ingreso = Number(r.ingreso) || 0;
+          const egreso = Number(r.egreso) || 0;
+          const monto = Number(r.monto) || 0;
+          // Traspaso/ajuste: API deja ingreso/egreso en 0 y manda el importe en `monto`.
+          if (ingreso > 0) return <Money value={ingreso} bold={false} />;
+          if (egreso === 0 && monto > 0 && (r.tipo === "TRANSFERENCIA" || r.tipo === "AJUSTE")) {
+            return <Money value={monto} bold={false} />;
+          }
+          return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+        },
       },
       {
         key: "egreso",
         label: "Egreso",
         align: "right",
         numeric: true,
-        render: (r) =>
-          r.egreso ? (
-            <Money value={r.egreso} bold={false} />
-          ) : (
-            <span style={{ color: "var(--text-tertiary)" }}>—</span>
-          ),
+        render: (r) => {
+          const egreso = Number(r.egreso) || 0;
+          if (egreso > 0) return <Money value={egreso} bold={false} />;
+          return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+        },
       },
       {
         key: "estado",

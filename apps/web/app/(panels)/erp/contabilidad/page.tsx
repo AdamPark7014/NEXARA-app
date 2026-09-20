@@ -8,8 +8,7 @@ import InlineAlert from "@/components/ui/InlineAlert";
 import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
+import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { Money } from "@/components/ui/DataTable";
 
 type WorkspaceDashboard = {
@@ -103,11 +102,10 @@ export default function ContabilidadDashboardPage() {
     setError(null);
     try {
       const qs = new URLSearchParams({ from: range.from, to: range.to });
-      const res = await fetch(buildApiUrl(`accounting/workspace/dashboard?${qs}`), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const json = (await res.json()) as WorkspaceDashboard;
+      const json = await erpFetch<WorkspaceDashboard>(
+        `accounting/workspace/dashboard?${qs}`,
+        token,
+      );
       if (turno !== peticion.current) return;
       setData(json);
     } catch (e) {

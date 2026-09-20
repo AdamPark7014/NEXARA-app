@@ -17,8 +17,7 @@ import {
 import FilterToolbar from "@/components/FilterToolbar";
 import Modal from "@/components/ui/Modal";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl } from "@/lib/api-base";
-import { formatApiError } from "@/lib/erp-api";
+import { erpFetch, formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import TruncatedId from "@/components/ui/TruncatedId";
 
@@ -36,21 +35,6 @@ type InvoiceRow = {
   cfdiUuid?: string | null;
   cfdiXml?: string | null;
 };
-
-async function apiFetch(path: string, token: string, init: RequestInit = {}) {
-  const res = await fetch(buildApiUrl(path), {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> ?? {}),
-    },
-  });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-  if (res.status === 204) return null;
-  const t = await res.text();
-  return t ? JSON.parse(t) : null;
-}
 
 function pendingOf(row: InvoiceRow) {
   return Number(row.totalAmount || 0) - Number(row.paidAmount || 0);
@@ -91,6 +75,7 @@ function tipoFacturaLabel(type: string): string {
 function statusLabel(row: InvoiceRow): { text: string; tone: "ok" | "warn" | "bad" | "mute" } {
   const pend = pendingOf(row);
   const od = daysOverdue(row.dueDate);
+  if (row.status === "STAMPING") return { text: ESTATUS_FACTURA.STAMPING, tone: "warn" };
   if (row.status === "CANCELLED") return { text: ESTATUS_FACTURA.CANCELLED, tone: "mute" };
   if (row.status === "DRAFT") return { text: ESTATUS_FACTURA.DRAFT, tone: "mute" };
   if (pend <= 0.01 || row.status === "PAID") return { text: ESTATUS_FACTURA.PAID, tone: "ok" };
@@ -158,7 +143,7 @@ export default function ContabilidadInvoicesView({
       const qs = new URLSearchParams();
       if (typeParam) qs.set("type", typeParam);
       qs.set("limit", "200");
-      const data = await apiFetch(`accounting/invoices?${qs}`, token);
+      const data = await erpFetch(`accounting/invoices?${qs}`, token);
       const rows = Array.isArray(data) ? data : data?.items ?? data?.data ?? [];
       setItems(rows);
     } catch (e) {
@@ -245,7 +230,7 @@ export default function ContabilidadInvoicesView({
     setPaying(true);
     setPayErr(null);
     try {
-      const result = await apiFetch(`accounting/invoices/${row.id}/payments`, token, {
+      const result = await erpFetch(`accounting/invoices/${row.id}/payments`, token, {
         method: "POST",
         body: JSON.stringify({
           amount,
