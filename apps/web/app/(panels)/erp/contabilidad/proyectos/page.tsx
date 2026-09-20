@@ -549,6 +549,7 @@ export default function ContabilidadProyectosPage() {
           rowKey={(r) => r.key}
           onRowClick={(r) => void abrir(r)}
           density="compact"
+          ariaLabel="Listado de proyectos"
         />
       )}
 
@@ -764,6 +765,7 @@ export default function ContabilidadProyectosPage() {
                       rowKey={(t) => t.key}
                       density="compact"
                       stickyHeader={false}
+                      ariaLabel="Transacciones por categoría"
                       onRowClick={(t) => setDocumento(t)}
                       emptyTitle="Sin transacciones"
                       emptyDescription="Esta categoría no tiene movimientos individuales registrados."
@@ -813,6 +815,7 @@ export default function ContabilidadProyectosPage() {
                   rowKey={(f) => f.id}
                   density="compact"
                   stickyHeader={false}
+                  ariaLabel="Facturas al cliente"
                   columns={[
                     { key: "folio", label: "Folio" },
                     { key: "fecha", label: "Emisión", render: (f) => fecha(f.fecha) },
@@ -856,6 +859,7 @@ export default function ContabilidadProyectosPage() {
                   rowKey={(b) => b.id}
                   density="compact"
                   stickyHeader={false}
+                  ariaLabel="Bitácora de obra"
                   columns={[
                     { key: "fecha", label: "Fecha", render: (b) => fecha(b.fecha) },
                     { key: "etiqueta", label: "Avance" },

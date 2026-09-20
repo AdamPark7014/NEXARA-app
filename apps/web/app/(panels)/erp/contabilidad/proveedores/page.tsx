@@ -529,6 +529,7 @@ export default function ProveedoresPage() {
           rowKey={(r) => r.id}
           onRowClick={(r) => void abrir(r)}
           density="compact"
+          ariaLabel="Listado de proveedores"
         />
       )}
 
@@ -725,6 +726,7 @@ export default function ProveedoresPage() {
                       rowKey={(e) => e.id}
                       density="compact"
                       stickyHeader={false}
+                      ariaLabel="Evaluaciones del proveedor"
                       columns={[
                         { key: "fecha", label: "Fecha", render: (e) => fecha(e.fecha) },
                         { key: "calidad", label: "Calidad", align: "right", numeric: true },
@@ -765,6 +767,7 @@ export default function ProveedoresPage() {
                 rowKey={(f) => f.id}
                 density="compact"
                 stickyHeader={false}
+                ariaLabel="Facturas del proveedor"
                 emptyTitle="Sin facturas"
                 emptyDescription="Este proveedor todavía no tiene facturas registradas."
                 columns={[
@@ -856,6 +859,7 @@ export default function ProveedoresPage() {
                 rowKey={(o) => o.id}
                 density="compact"
                 stickyHeader={false}
+                ariaLabel="Órdenes de compra del proveedor"
                 emptyTitle="Sin órdenes de compra"
                 emptyDescription="No se le ha emitido ninguna orden de compra a este proveedor."
                 columns={[
@@ -931,6 +935,7 @@ export default function ProveedoresPage() {
                   rowKey={(f) => f.id}
                   density="compact"
                   stickyHeader={false}
+                  ariaLabel="Cuentas por pagar del proveedor"
                   emptyTitle="Nada por pagar"
                   emptyDescription="No hay facturas abiertas de este proveedor."
                   columns={[
@@ -993,6 +998,7 @@ export default function ProveedoresPage() {
                 rowKey={(p) => p.id}
                 density="compact"
                 stickyHeader={false}
+                ariaLabel="Pagos al proveedor"
                 emptyTitle="Sin pagos aplicados"
                 emptyDescription="Todavía no se registra ningún pago a este proveedor."
                 columns={[
@@ -1021,6 +1027,7 @@ export default function ProveedoresPage() {
                 rowKey={(p) => p.id}
                 density="compact"
                 stickyHeader={false}
+                ariaLabel="Proyectos ligados al proveedor"
                 emptyTitle="Sin proyectos ligados"
                 emptyDescription="Ninguna factura de este proveedor está ligada a una actividad de proyecto."
                 columns={[
@@ -1044,6 +1051,7 @@ export default function ProveedoresPage() {
                 rowKey={(h) => h.key}
                 density="compact"
                 stickyHeader={false}
+                ariaLabel="Historial del proveedor"
                 emptyTitle="Sin movimientos"
                 emptyDescription="No hay facturas, órdenes ni pagos registrados con este proveedor."
                 columns={[

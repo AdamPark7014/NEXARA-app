@@ -3,7 +3,7 @@
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
 - **Rama:** mejora/calidad-y-web
-- **HEAD:** merge a11y-dropzone + datatable-aria; CarteraView tenant ya en HEAD
+- **HEAD:** ariaLabel en DataTables presupuestos/proyectos/proveedores
 
 ## Puente — no cambiar
 
@@ -11,31 +11,21 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-### Follow-up flota
-
-- [Audit remaining gate branches] inventarió 27 ramas con código vs origin; 14 ya en HEAD local.
-- Merged: `feat/gate-a11y-dropzone`, `feat/gate-datatable-aria` (RELEVO-ours).
-- Abortados (conflicto real): `feat/gate-factura`, `feat/gate-period-lock` (specs/period ya cubiertos en HEAD).
-- CarteraView P0 toast+refresh + P1 XML `withTenantHeaders`: **ya en HEAD** (limpio).
-
-### Pendiente de merge (conflicto / solape)
-
-`feat/gate-labels-cx`, `feat/gate-labels-all`, `feat/gate-money-align`, `gate/labels-mov`, `feat/gate-uuid-*`, `feat/gate-confirm-ws`, `feat/gate-cierres-*`, `feat/gate-factura`.
-
-### Verificación previa
-
-closed-period 10/10 · match-idor 2/2 · erp-api 3/3 · **MIGRATE REQUIRED: NO**
+- Follow-up [Audit DataTable ariaLabel]: `ariaLabel` explícito en las 14 tablas que usaban el default `"Tabla"`:
+  - presupuestos ×2
+  - proyectos ×4
+  - proveedores ×8
+- Previos merges a11y-dropzone + datatable-aria siguen en la rama.
 
 ## A medias
 
-- Deploy BLOCKED: `HostName REEMPLAZA_CON_IP_HETZNER` (+ Port 2222).
-- Portal CFDI tenant gaps (fuera Contadora staff).
+- Deploy BLOCKED: `HostName REEMPLAZA_CON_IP_HETZNER`.
+- Ramas gate con conflicto real aún fuera (factura, labels-cx, uuid, etc.).
 
 ## Siguiente
 
-1. Adam pone IP Hetzner.
-2. Push + `./deploy/update.sh --force-all`.
-3. Cherry-pick selectivo de labels-cx / uuid si hace falta.
+1. Adam: IP Hetzner + Port 2222.
+2. Push + deploy `--force-all`.
 
 ## No tocar
 
