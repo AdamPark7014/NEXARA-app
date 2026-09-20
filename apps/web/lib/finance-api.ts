@@ -246,3 +246,74 @@ export async function downloadEmployeePaymentsReportPdf(
   a.click();
   URL.revokeObjectURL(url);
 }
+
+export type PrenominaPreviewRow = {
+  userId: number;
+  nombre?: string;
+  email?: string;
+  puesto?: string | null;
+  totalMinutes: number;
+  totalHours: number;
+  approvedOvertimeMinutes: number;
+  suggestedAmount: number | null;
+  sueldoSemanal: number | null;
+  daysWithAttendance: number;
+};
+
+export type PrenominaPreview = {
+  from: string;
+  to: string;
+  count: number;
+  rows: PrenominaPreviewRow[];
+};
+
+export async function fetchPrenominaPreview(
+  token: string,
+  from: string,
+  to: string,
+): Promise<PrenominaPreview> {
+  const qs = new URLSearchParams({ from, to });
+  return financeFetch(`employee-payments/preview-period?${qs}`, token);
+}
+
+export async function upsertOvertimeCandidates(token: string, from: string, to: string) {
+  return financeFetch("overtime-approvals/upsert-candidates", token, {
+    method: "POST",
+    body: JSON.stringify({ from, to }),
+  });
+}
+
+export async function fetchOvertimeApprovals(
+  token: string,
+  filters: { from?: string; to?: string; estado?: string } = {},
+) {
+  const qs = new URLSearchParams();
+  if (filters.from) qs.set("from", filters.from);
+  if (filters.to) qs.set("to", filters.to);
+  if (filters.estado) qs.set("estado", filters.estado);
+  return financeFetch(`overtime-approvals?${qs}`, token);
+}
+
+export async function decideOvertimeApproval(
+  token: string,
+  id: number,
+  decision: "approve" | "reject",
+  nota?: string,
+) {
+  return financeFetch(`overtime-approvals/${id}/${decision}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ nota: nota || undefined }),
+  });
+}
+
+export async function createPrenominaBatch(
+  token: string,
+  from: string,
+  to: string,
+  userIds?: number[],
+) {
+  return financeFetch("employee-payments/prenomina/batch", token, {
+    method: "POST",
+    body: JSON.stringify({ from, to, userIds }),
+  });
+}

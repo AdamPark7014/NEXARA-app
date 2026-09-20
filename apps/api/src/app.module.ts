@@ -37,6 +37,7 @@ import { HeroSlidesModule } from './hero-slides/hero-slides.module';
 import { HeroVideoModule } from './hero-video/hero-video.module.js';
 import { WorkProjectsModule } from './work-projects/work-projects.module';
 import { EmployeePaymentsModule } from './employee-payments/employee-payments.module';
+import { OvertimeModule } from './overtime/overtime.module.js';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
 import { SmartQuoteModule } from './smart-quote/smart-quote.module.js';
 import { ServiceClientsModule } from './service-clients/service-clients.module';
@@ -141,6 +142,7 @@ import { CelebrationsModule } from './celebrations/celebrations.module.js';
     InternalComunicadosModule,
     WorkProjectsModule,
     EmployeePaymentsModule,
+    OvertimeModule,
     CotizacionesModule,
     SmartQuoteModule,
     ServiceClientsModule,
