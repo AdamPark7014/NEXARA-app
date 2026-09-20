@@ -2,16 +2,24 @@
 
 import { useCallback, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import Button from "@/components/ui/Button";
 import Section from "@/components/ui/Section";
 import { useUser } from "@/components/UserContext";
 import EvidenciaCamposEditor from "@/components/ops/EvidenciaCamposEditor";
+import HerramientasChecklistEditor from "@/components/ops/HerramientasChecklistEditor";
 import {
   definirCamposEvidencia,
   hayErrores,
   validarCampos,
   type CampoBorrador,
 } from "@/lib/evidencia-campos";
+import {
+  definirRequisitos,
+  hayErroresRequisitos,
+  validarRequisitos,
+  type RequisitoBorrador,
+} from "@/lib/herramientas-checklist";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import {
@@ -158,6 +166,15 @@ export default function OpsActivityForm({
   const [camposPendiente, setCamposPendiente] = useState<{ id: number; error: string } | null>(null);
   const erroresCampos = useMemo(() => validarCampos(campos), [campos]);
   const camposTituloId = useId();
+
+  // «Herramientas a llevar»: mismo trato que los campos (misma condición, mismo permiso) y
+  // el mismo baile: se juntan al crear y se mandan en cuanto la actividad tiene id.
+  const [herramientas, setHerramientas] = useState<RequisitoBorrador[]>([]);
+  const [herramientasIntentado, setHerramientasIntentado] = useState(false);
+  const [herramientasPendiente, setHerramientasPendiente] = useState<{ id: number; error: string } | null>(null);
+  const erroresHerramientas = useMemo(() => validarRequisitos(herramientas), [herramientas]);
+  const herramientasTituloId = useId();
+
   const periodoId = useId();
 
   const needsClientPicker = coreKind === "servicio" || coreKind === "comercial";
@@ -430,6 +447,13 @@ export default function OpsActivityForm({
         return;
       }
     }
+    if (puedeDefinirCampos && herramientas.length > 0) {
+      setHerramientasIntentado(true);
+      if (hayErroresRequisitos(erroresHerramientas)) {
+        setError("Revisa «Herramientas a llevar»: hay filas incompletas.");
+        return;
+      }
+    }
 
     const project = activeProjects.find((p) => String(p.id) === form.projectId);
     const payload = buildActivityPayload(form, project, {
@@ -468,8 +492,28 @@ export default function OpsActivityForm({
     }
   };
 
+  /** El PUT de herramientas: `false` y deja el aviso cuando falla (la actividad ya existe). */
+  const guardarHerramientas = async (newId: number) => {
+    if (!puedeDefinirCampos || herramientas.length === 0 || !(newId > 0)) return true;
+    try {
+      await definirRequisitos(
+        token,
+        newId,
+        herramientas.map((f) => ({ descripcion: f.descripcion.trim(), cantidad: f.cantidad })),
+      );
+      return true;
+    } catch (e) {
+      setHerramientasPendiente({
+        id: newId,
+        error: apiErrorMessage(e, "No se pudieron guardar las herramientas a llevar"),
+      });
+      return false;
+    }
+  };
+
   /** Lo que sigue a crear la actividad: ligar el ticket, avisar, limpiar y avisar al padre. */
-  const terminarCreacion = async (newId: number) => {
+  const terminarCreacion = async (newId: number, omitirHerramientas = false) => {
+    if (!omitirHerramientas && !(await guardarHerramientas(newId))) return;
     if (pendingRequestId && newId > 0) {
       try {
         await assignTicketRequest(token, pendingRequestId, newId);
@@ -492,6 +536,8 @@ export default function OpsActivityForm({
     setPeriodoAuto(true);
     setCampos([]);
     setCamposIntentado(false);
+    setHerramientas([]);
+    setHerramientasIntentado(false);
     setTareaOtroOpen(false);
     const next = await fetchNextAnNumber(token);
     setNextAn(typeof next?.next === "string" ? next.next : "");
@@ -533,6 +579,41 @@ export default function OpsActivityForm({
     setError(null);
     try {
       await terminarCreacion(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Igual que los campos, pero con el checklist: la actividad ya existe, solo se reintenta. */
+  const reintentarHerramientas = async () => {
+    if (!herramientasPendiente || !token) return;
+    const { id } = herramientasPendiente;
+    if (hayErroresRequisitos(erroresHerramientas)) {
+      setHerramientasIntentado(true);
+      return;
+    }
+    setHerramientasPendiente(null);
+    setSaving(true);
+    setError(null);
+    try {
+      await terminarCreacion(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const seguirSinHerramientas = async () => {
+    if (!herramientasPendiente) return;
+    const { id } = herramientasPendiente;
+    setHerramientasPendiente(null);
+    setSaving(true);
+    setError(null);
+    try {
+      await terminarCreacion(id, true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al guardar");
     } finally {
@@ -1087,6 +1168,40 @@ export default function OpsActivityForm({
         </section>
       ) : null}
 
+      {puedeDefinirCampos ? (
+        <section
+          aria-labelledby={herramientasTituloId}
+          style={{
+            marginTop: 16,
+            padding: 14,
+            borderRadius: 14,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <h3
+            id={herramientasTituloId}
+            style={{ margin: 0, fontSize: 14, fontWeight: 750, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            Herramientas a llevar{" "}
+            <span style={{ fontWeight: 500, fontSize: 12, color: "var(--text-tertiary)" }}>(opcional)</span>
+            <InfoOutlinedIcon
+              aria-label="Quien ejecuta palomea cada herramienta antes de salir; con pendientes la app no deja iniciar."
+              titleAccess="Quien ejecuta palomea cada herramienta antes de salir; con pendientes la app no deja iniciar."
+              sx={{ fontSize: 16, color: "var(--text-tertiary)" }}
+            />
+          </h3>
+          <HerramientasChecklistEditor
+            value={herramientas}
+            onChange={setHerramientas}
+            errores={herramientasIntentado ? erroresHerramientas : null}
+            disabled={saving}
+          />
+        </section>
+      ) : null}
+
       {camposPendiente ? (
         <div
           role="alert"
@@ -1120,11 +1235,44 @@ export default function OpsActivityForm({
         </div>
       ) : null}
 
+      {herramientasPendiente ? (
+        <div
+          role="alert"
+          style={{
+            marginTop: 16,
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "1px solid color-mix(in srgb, #d97706 45%, var(--border))",
+            background: "color-mix(in srgb, #d97706 9%, var(--surface))",
+            display: "grid",
+            gap: 10,
+            fontSize: 13,
+            lineHeight: 1.45,
+          }}
+        >
+          <span>
+            <strong>{tone === "core" ? "La actividad ya se creó" : "La OT ya se creó"}</strong>, pero no se guardaron las
+            herramientas a llevar: {herramientasPendiente.error}
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <Button size="sm" variant="primary" onClick={() => void reintentarHerramientas()} loading={saving}>
+              Reintentar guardar las herramientas
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void seguirSinHerramientas()} disabled={saving}>
+              Seguir sin herramientas
+            </Button>
+          </div>
+          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            Si sigues sin herramientas, puedes definirlas después desde el detalle de la actividad.
+          </span>
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginTop: 16 }}>
-        {onCancel && !camposPendiente && (
+        {onCancel && !camposPendiente && !herramientasPendiente && (
           <Button variant="secondary" size="sm" onClick={onCancel}>Cancelar</Button>
         )}
-        {!camposPendiente ? (
+        {!camposPendiente && !herramientasPendiente ? (
           <Button
             size="sm"
             variant={tone === "core" ? "primary" : undefined}
