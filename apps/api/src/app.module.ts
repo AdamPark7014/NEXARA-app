@@ -23,6 +23,7 @@ import { EvidencesModule } from './evidences/evidences.module';
 import { VehiclesModule } from './vehicles/vehicles.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { GpsModule } from './gps/gps.module';
+import { VehicleGpsModule } from './vehicle-gps/vehicle-gps.module';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { AlertsModule } from './alerts/alerts.module.js';
 import { DevicesModule } from './devices/devices.module.js';
@@ -120,6 +121,7 @@ import { CelebrationsModule } from './celebrations/celebrations.module.js';
     VehiclesModule,
     ExpensesModule,
     GpsModule,
+    VehicleGpsModule,
     ScheduleModule.forRoot(),
     DevicesModule,
     NotificationsModule,
