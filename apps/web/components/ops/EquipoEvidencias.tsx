@@ -492,7 +492,7 @@ function Seccion({
   );
 }
 
-function Miniatura({ foto, onOpen, alto = 132 }: { foto: Foto; onOpen: () => void; alto?: number }) {
+function Miniatura({ foto, onOpen, alto = 300 }: { foto: Foto; onOpen: () => void; alto?: number }) {
   const mapa = foto.lat != null && foto.lng != null ? mapsUrl(foto.lat, foto.lng) : null;
   return (
     <div style={{ display: "grid", gap: 4 }}>
@@ -508,6 +508,7 @@ function Miniatura({ foto, onOpen, alto = 132 }: { foto: Foto; onOpen: () => voi
           background: "color-mix(in srgb, var(--text-secondary) 8%, var(--surface))",
           cursor: "zoom-in",
           height: alto,
+          minHeight: 280,
           display: "block",
           width: "100%",
         }}
@@ -561,6 +562,7 @@ export function Visor({
     color: "#fff",
     border: "1px solid rgba(255,255,255,0.25)",
     minWidth: 44,
+    minHeight: 44,
     justifyContent: "center",
   };
 
@@ -600,8 +602,15 @@ export function Visor({
           key={foto.url}
           url={foto.url}
           alt={foto.titulo}
-          alto={240}
-          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 12 }}
+          alto={560}
+          style={{
+            maxWidth: "100%",
+            maxHeight: "calc(100dvh - 140px)",
+            width: "auto",
+            height: "auto",
+            objectFit: "contain",
+            borderRadius: 12,
+          }}
         />
       </div>
       <div
@@ -754,15 +763,15 @@ function EvidenciaContenido({
       </ol>
 
       {entrada != null || salida != null ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
           {entrada != null ? (
             <Seccion titulo="Entrada" hora={fmt(ev.entryPhotoUploadedAt)} accion={devolver("ENTRY_PHOTO")}>
-              <Miniatura foto={fotos[entrada]} onOpen={() => abrirVisor(fotos, entrada)} alto={180} />
+              <Miniatura foto={fotos[entrada]} onOpen={() => abrirVisor(fotos, entrada)} alto={320} />
             </Seccion>
           ) : null}
           {salida != null ? (
             <Seccion titulo="Salida" hora={fmt(ev.exitPhotoUploadedAt)} accion={devolver("EXIT_PHOTO")}>
-              <Miniatura foto={fotos[salida]} onOpen={() => abrirVisor(fotos, salida)} alto={180} />
+              <Miniatura foto={fotos[salida]} onOpen={() => abrirVisor(fotos, salida)} alto={320} />
             </Seccion>
           ) : null}
         </div>
@@ -774,9 +783,9 @@ function EvidenciaContenido({
           hora={fmt(ev.evidencePhotosUploadedAt)}
           accion={devolver("EVIDENCE_PHOTOS")}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
             {sitio.map((idx) => (
-              <Miniatura key={`${fotos[idx].url}-${idx}`} foto={fotos[idx]} onOpen={() => abrirVisor(fotos, idx)} />
+              <Miniatura key={`${fotos[idx].url}-${idx}`} foto={fotos[idx]} onOpen={() => abrirVisor(fotos, idx)} alto={300} />
             ))}
           </div>
         </Seccion>
@@ -977,8 +986,8 @@ function SalidasDeZona({
                 <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>Todavía no lo justifica.</p>
               )}
               {idxFoto != null && fotos[idxFoto] ? (
-                <div style={{ maxWidth: 180 }}>
-                  <Miniatura foto={fotos[idxFoto]} onOpen={() => abrirVisor(fotos, idxFoto)} alto={120} />
+                <div style={{ maxWidth: 320, width: "100%" }}>
+                  <Miniatura foto={fotos[idxFoto]} onOpen={() => abrirVisor(fotos, idxFoto)} alto={280} />
                 </div>
               ) : null}
             </li>
