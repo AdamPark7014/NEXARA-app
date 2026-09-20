@@ -569,6 +569,12 @@ export class ActivityEvidenceService {
     companyId?: number | null,
     /** Por qué la empieza antes que otra de más prioridad (opcional; no bloquea). */
     justificacionOrden?: string | null,
+    /**
+     * El teléfono marcó como simulada la ubicación de esta foto. No bloquea —de aquí sale
+     * el tiempo productivo, no la nómina— pero queda escrito: sin la columna, una obra
+     * entera «hecha» con GPS falso se ve idéntica a una real.
+     */
+    mockLocation?: boolean | null,
   ) {
     const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
@@ -583,6 +589,7 @@ export class ActivityEvidenceService {
         entryLatitude: latitude,
         entryLongitude: longitude,
         entryPhotoUploadedAt: new Date(),
+        entryMockLocation: typeof mockLocation === 'boolean' ? mockLocation : null,
         status: 'EVIDENCE_PHOTOS',
       },
     });
@@ -863,6 +870,8 @@ export class ActivityEvidenceService {
     latitude: number,
     longitude: number,
     companyId?: number | null,
+    /** Igual que en la foto de entrada: se guarda marcada, no se bloquea. */
+    mockLocation?: boolean | null,
   ) {
     const evidence = await this.getOrCreateActivityEvidence(activityId, userId, companyId);
 
@@ -885,6 +894,7 @@ export class ActivityEvidenceService {
         exitLatitude: punto.latitude,
         exitLongitude: punto.longitude,
         exitPhotoUploadedAt: new Date(),
+        exitMockLocation: typeof mockLocation === 'boolean' ? mockLocation : null,
         status: 'COMPLETED',
         completedAt: new Date(),
       },

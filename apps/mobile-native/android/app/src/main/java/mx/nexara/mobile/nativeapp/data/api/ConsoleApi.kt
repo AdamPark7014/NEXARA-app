@@ -430,6 +430,13 @@ data class AttendanceRegisterRequest(
     val accuracyM: Double? = null,
     /** El teléfono detectó ubicación simulada; el servidor contesta 422 y avisa a sus jefes. */
     val mockLocation: Boolean? = null,
+    /**
+     * De cuándo es la medición, en milisegundos (ver `FixAge`). Se calcula con el reloj
+     * monótono, así que cambiar la hora del sistema no la altera. El servidor marca a
+     * revisión arriba de 5 min y contesta 422 arriba de 30: una posición guardada no dice
+     * dónde está su dueño.
+     */
+    val fixAgeMs: Long? = null,
     val photoBase64: String,
 )
 
@@ -728,6 +735,11 @@ data class ActivityEvidencePhotoStepRequest(
     val latitude: Double,
     val longitude: Double,
     /**
+     * El teléfono marcó como simulada la ubicación de esta foto. De las fotos de entrada y
+     * salida sale el tiempo productivo, así que el servidor lo guarda; no bloquea la foto.
+     */
+    val mockLocation: Boolean? = null,
+    /**
      * Contrato B: por qué empezó esta y no la de más prioridad que sigue
      * pendiente. Es opcional — la foto de entrada nunca se bloquea por esto.
      */
@@ -767,6 +779,14 @@ data class PostGpsLocationRequest(
     val estaActivo: Boolean = true,
     val ultimaActualizacion: String,
     val actividadId: Long? = null,
+    /**
+     * El teléfono marcó este punto como simulado (ver `MockLocation`).
+     *
+     * Aquí el servidor **no** rechaza nada: el recorrido de la jornada no decide nómina, y
+     * tirar el punto solo dejaría un hueco que nadie sabría leer. Se guarda marcado, que es
+     * lo que permite ver después que media jornada venía de una app de GPS falso.
+     */
+    val mockLocation: Boolean? = null,
 )
 
 data class GpsConsentRequest(

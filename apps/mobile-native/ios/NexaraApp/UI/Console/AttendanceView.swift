@@ -60,6 +60,9 @@ final class AttendanceVM: ObservableObject {
     @Published var mineError: String?
     @Published var checkInLoading = false
     @Published var checkInNotice: String?
+    /// 422 del servidor: la checada no se registró. Se enseña en un aviso, no como una
+    /// línea más, porque es lo único que importa en ese momento (igual que en Android).
+    @Published var checkInBloqueo: String?
     /// Mis faltas justificadas de los últimos 30 días (`attendance/range`).
     @Published var myJustifications: [AttendanceJustification] = []
 
@@ -308,6 +311,7 @@ final class AttendanceVM: ObservableObject {
     func checkIn(_ type: String, photo: CapturedGeoPhoto) async -> String? {
         checkInLoading = true
         checkInNotice = nil
+        checkInBloqueo = nil
         defer { checkInLoading = false }
         var coords = photo.coords
         if coords == nil { coords = await DeviceLocation.shared.current() }
@@ -316,6 +320,12 @@ final class AttendanceVM: ObservableObject {
                 type: type,
                 lat: coords?.latitude,
                 lng: coords?.longitude,
+                accuracyM: coords?.accuracyM,
+                // Se manda aunque sea true: el servidor la rechaza y avisa a sus jefes.
+                mockLocation: coords?.mock == true,
+                // De cuándo es la medición: una posición guardada de hace media hora no
+                // dice dónde está su dueño, y el servidor no la acepta.
+                fixAgeMs: coords?.fixAgeMs,
                 photoBase64: photo.dataUrl
             )
             if (result.raw["queued"] as? Bool) == true {
@@ -331,12 +341,24 @@ final class AttendanceVM: ObservableObject {
             await loadTeam(quiet: true)
             return nil
         } catch {
-            return error.toUserMessage(fallback: "No se pudo registrar tu asistencia")
+            let mensaje = error.toUserMessage(fallback: "No se pudo registrar tu asistencia")
+            // Un rechazo del servidor cierra la cámara y se explica en un aviso: volver a
+            // disparar la foto no arregla un GPS falso ni una posición vieja.
+            if ChecadaRechazo.esRechazo(mensaje) {
+                checkInBloqueo = mensaje
+                return nil
+            }
+            return mensaje
         }
+    }
+
+    func clearBloqueo() {
+        checkInBloqueo = nil
     }
 
     private func gpsSuffix(_ coords: DeviceCoords?) -> String {
         guard let coords else { return " Sin GPS: activa la ubicación." }
+        if coords.mock { return " Ubicación simulada detectada." }
         return String(format: " GPS %.5f, %.5f.", coords.latitude, coords.longitude)
     }
 

@@ -9,6 +9,7 @@ import { useUser } from "@/components/UserContext";
 import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import DiasEnLinea from "@/components/kpis/DiasEnLinea";
 import { LeyendaJornada } from "@/components/kpis/RankingPersonas";
+import HorasExtraPorAprobar from "@/components/kpis/HorasExtraPorAprobar";
 import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
 import { KPIS_PATH, fechaCorta, fetchKpisPersona, formatPctKpi, horaMx, rangoDesdeUrl, type KpisPersonaResponse } from "@/lib/kpis-equipo";
@@ -146,6 +147,15 @@ export default function KpisPersonaPage() {
               </div>
             </div>
           </Card>
+
+          {/* Calculado no es autorizado: aquí el jefe decide qué se paga de más. */}
+          <HorasExtraPorAprobar
+            token={token}
+            userId={userId}
+            rango={{ desde: data.desde, hasta: data.hasta }}
+            dias={data.dias.map((d) => ({ fecha: d.fecha, minutosExtra: d.minutosExtra ?? 0 }))}
+            onDecidido={() => void cargar()}
+          />
 
           <Card>
             <CardHead title="Día por día" actions={<LeyendaJornada conComida />} />

@@ -242,6 +242,9 @@ class JornadaGpsService : Service() {
         if (lat == 0.0 && lng == 0.0) return
         if (kotlin.math.abs(lat) > 90.0 || kotlin.math.abs(lng) > 180.0) return
         val speedKmh = if (location.hasSpeed()) (location.speed * 3.6).toDouble() else null
+        // El punto viaja marcado si salió de una app de GPS falso. No se descarta aquí: un
+        // hueco en el recorrido no se puede leer, un punto marcado sí.
+        val mock = location.vieneDeUbicacionSimulada()
         scope.launch {
             try {
                 repo.gpsPost(
@@ -249,6 +252,7 @@ class JornadaGpsService : Service() {
                     lng = lng,
                     speedKmh = speedKmh,
                     activityId = JornadaGps.actividadActual(this@JornadaGpsService),
+                    mockLocation = mock,
                 )
             } catch (e: Exception) {
                 // Sin red la cola offline lo reenvía; aquí solo se anota.
@@ -256,6 +260,18 @@ class JornadaGpsService : Service() {
             }
         }
     }
+
+    /** `Location.isMock` (API 31+) o `isFromMockProvider`; ver [MockLocation]. */
+    @Suppress("DEPRECATION")
+    private fun Location.vieneDeUbicacionSimulada(): Boolean = MockLocation.isSimulated(
+        sdkInt = Build.VERSION.SDK_INT,
+        isMock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching { isMock }.getOrNull()
+        } else {
+            null
+        },
+        isFromMockProvider = runCatching { isFromMockProvider }.getOrNull(),
+    )
 
     private fun buildNotification(): Notification {
         NexaraNotifications.ensureChannels(this)

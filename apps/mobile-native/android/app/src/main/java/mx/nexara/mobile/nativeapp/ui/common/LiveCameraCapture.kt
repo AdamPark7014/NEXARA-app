@@ -82,13 +82,23 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.icon
 import mx.nexara.mobile.nativeapp.util.DeviceCoords
 import mx.nexara.mobile.nativeapp.util.DeviceLocation
 
-/** Foto tomada con la cámara en vivo, lista para mandarse como data URL con su ubicación. */
+/**
+ * Foto tomada con la cámara en vivo, lista para mandarse como data URL con su ubicación.
+ *
+ * `mock` y `accuracyM` viajan con la foto porque se perdían aquí: `DeviceCoords` ya
+ * sabía que la ubicación era simulada y esta clase lo tiraba, así que una obra entera
+ * «hecha» con GPS falso se veía idéntica a una real.
+ */
 class GeoPhoto(
     val dataUrl: String,
     val preview: Bitmap,
     val latitude: Double?,
     val longitude: Double?,
     val capturedAt: String,
+    /** La ubicación de esta foto venía de una app de GPS falso (ver `MockLocation`). */
+    val mock: Boolean = false,
+    /** Precisión del GPS en metros al tomarla. */
+    val accuracyM: Float? = null,
 ) {
     val hasLocation: Boolean get() = latitude != null && longitude != null
 }
@@ -221,6 +231,8 @@ fun LiveCameraCaptureDialog(
                     latitude = geo?.lat,
                     longitude = geo?.lng,
                     capturedAt = Instant.now().toString(),
+                    mock = geo?.mock == true,
+                    accuracyM = geo?.accuracyM,
                 ),
             )
         }
