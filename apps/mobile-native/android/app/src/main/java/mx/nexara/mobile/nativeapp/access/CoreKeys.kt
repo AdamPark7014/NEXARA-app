@@ -22,4 +22,27 @@ object CoreKeys {
 
     /** Clientes (`/erp/clientes`) — `erp-clients` en access-matrix y en `me/navigation`. */
     const val CLIENTS = "erp-clients"
+
+    // ── «Más»: el resto de Core. Mismas claves que `me/navigation` (`moduleKeys`). ──
+
+    /** Cotizaciones (`/erp/cotizaciones`). */
+    const val COTIZACIONES = "erp-cotizaciones"
+
+    /** Proyectos (`/erp/proyectos`). */
+    const val PROYECTOS = "erp-proyectos"
+
+    /** KPIs del equipo (`/erp/asistencias/indicadores`). */
+    const val KPIS_EQUIPO = "kpis-equipo"
+
+    /** Almacén (`/erp/almacen`). */
+    const val ALMACEN = "erp-almacen"
+
+    /** Herramientas (`/erp/almacen/herramientas`). */
+    const val HERRAMIENTAS = "erp-herramientas"
+
+    /** Vehículos (`/erp/vehiculos`). */
+    const val VEHICULOS = "erp-vehiculos"
+
+    /** Organigrama (`/erp/organigrama`). */
+    const val ORGANIGRAMA = "erp-organigrama"
 }

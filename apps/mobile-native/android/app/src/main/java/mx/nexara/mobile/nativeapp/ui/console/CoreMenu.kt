@@ -33,7 +33,69 @@ enum class CoreModule(
     MI_PERFIL(CoreKeys.MY_PROFILE, "Mi perfil", listOf("/erp/my-profile")),
 }
 
+/**
+ * El resto de Core, en «Más»: módulos que la web ya tiene y la app todavía no. Cada uno abre
+ * una pantalla «Disponible pronto en la app» con el botón a su página web; los frentes de
+ * trabajo los irán sustituyendo por pantallas propias.
+ *
+ * [key] es la misma clave que manda `GET me/navigation` en `moduleKeys`
+ * (`apps/api/src/me/navigation-module-map.ts`, `CORE_EXTRA_MODULES`).
+ */
+enum class CoreExtraModule(
+    val key: String,
+    val label: String,
+    /** Página web del módulo (se abre en `https://core.nexara.com.mx`). */
+    val webPath: String,
+    val summary: String,
+) {
+    COTIZACIONES(CoreKeys.COTIZACIONES, "Cotizaciones", "/erp/cotizaciones", "Propuestas técnicas: folio, envío y seguimiento."),
+    PROYECTOS(CoreKeys.PROYECTOS, "Proyectos", "/erp/proyectos", "Cronograma, alcance, equipo y documentos."),
+    KPIS_EQUIPO(CoreKeys.KPIS_EQUIPO, "KPIs del equipo", "/erp/asistencias/indicadores", "Retardos, uniforme y horas del equipo."),
+    ALMACEN(CoreKeys.ALMACEN, "Almacén", "/erp/almacen", "Inventario, entradas y salidas, y reabastecimiento."),
+    HERRAMIENTAS(CoreKeys.HERRAMIENTAS, "Herramientas", "/erp/almacen/herramientas", "Solicita herramienta, revisa tu kit y tus préstamos."),
+    VEHICULOS(CoreKeys.VEHICULOS, "Vehículos", "/erp/vehiculos", "Solicita un vehículo; entrega y recepción con fotos."),
+    ORGANIGRAMA(CoreKeys.ORGANIGRAMA, "Organigrama", "/erp/organigrama", "Quién reporta a quién en NEXARA."),
+    ;
+
+    /** URL completa en la web de Core. */
+    val webUrl: String get() = CoreMenu.CORE_WEB_BASE + webPath
+
+    companion object {
+        fun fromKey(key: String?): CoreExtraModule? =
+            key?.trim()?.lowercase()?.let { k -> entries.firstOrNull { it.key == k } }
+    }
+}
+
 object CoreMenu {
+
+    /** Donde vive la web de Core; «Abrir en la web» arma sus enlaces aquí. */
+    const val CORE_WEB_BASE = "https://core.nexara.com.mx"
+
+    /** Los tres de «Más» que todo el personal tiene (herramientas, vehículos, organigrama). */
+    private val EVERYONE_EXTRAS = listOf(
+        CoreExtraModule.HERRAMIENTAS,
+        CoreExtraModule.VEHICULOS,
+        CoreExtraModule.ORGANIGRAMA,
+    )
+
+    /**
+     * Módulos de «Más» que el rol puede abrir, en el orden de [CoreExtraModule]:
+     *   1. Super admin → todos.
+     *   2. `GET me/navigation` → los de `moduleKeys` (la API ya los deriva de url-matrix:
+     *      las reglas de cada página y el comodín de todo /erp que tiene dirección).
+     *   3. Sin navegación (sin conexión, sesión restaurada) → los que tiene todo el personal.
+     * Cuentas de cliente o sucursal nunca ven Core.
+     */
+    fun extraModulesFor(user: SessionUser?): List<CoreExtraModule> {
+        if (user == null || user.isClient || user.isBranchUser) return emptyList()
+        if (user.isSuperAdmin) return CoreExtraModule.entries.toList()
+        val keys = user.navModuleKeys?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
+        if (keys.isNullOrEmpty()) return EVERYONE_EXTRAS
+        return CoreExtraModule.entries.filter { it.key in keys }
+    }
+
+    fun canOpenExtra(user: SessionUser?, key: String): Boolean =
+        extraModulesFor(user).any { it.key == key }
 
     /** Roles con todo Core en url-matrix (todo /erp o `CORE_OLA1_URL_RULES`). */
     private val FULL_CORE_ROLES = setOf(

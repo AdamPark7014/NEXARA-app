@@ -3,7 +3,7 @@
  * Single source of truth para middleware, page-matrix y redirects cliente.
  */
 
-import { CORE_SURFACE_ONLY, coreSurfaceRedirect } from './core-surface';
+import { CORE_SURFACE_ONLY, coreMovedModulePath, coreSurfaceRedirect } from './core-surface';
 
 const SEGMENT_ALIASES: Record<string, string> = {
   cotizaciones: 'quotes',
@@ -75,8 +75,9 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   // ── /panel/* (portal legacy) ───────────────────────────────────────────
   // (\ /.*)? — NO (\ /?.*) : evita que /asistencias (plural Core) matchee /asistencia + "s"
   [/^\/panel\/asistencia(\/.*)?$/, '/erp/hr/attendance'],
-  [/^\/panel\/vehiculos(\/?.*)$/, '/ops/vehicles'],
-  [/^\/panel\/herramientas(\/?.*)$/, '/ops/tools'],
+  // Vehículos y herramientas viven en Core (`/erp/vehiculos`, `/erp/almacen/herramientas`).
+  [/^\/panel\/vehiculos(\/.*)?$/, '/erp/vehiculos'],
+  [/^\/panel\/herramientas(\/.*)?$/, '/erp/almacen/herramientas'],
   [/^\/panel\/actividades(\/?.*)$/, '/ops/activities'],
   [/^\/panel\/multas(\/?.*)$/, '/erp/hr/fines'],
   [/^\/panel\/ventas(\/.*)?$/, '/crm'],
@@ -100,8 +101,8 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/core\/banca(\/?.*)$/, '/erp/banking'],
   [/^\/core\/gastos(\/?.*)$/, '/erp/finance/expenses'],
   [/^\/core\/compras(\/?.*)$/, '/erp/procurement'],
-  [/^\/core\/inventario(\/?.*)$/, '/erp/warehouse'],
-  [/^\/core\/almacen(\/?.*)$/, '/erp/warehouse'],
+  [/^\/core\/inventario(\/.*)?$/, '/erp/almacen'],
+  [/^\/core\/almacen(\/.*)?$/, '/erp/almacen'],
   [/^\/core\/catalogo(\/?.*)$/, '/crm/products'],
   [/^\/core\/empleados(\/?.*)$/, '/erp/hr'],
   [/^\/core\/nomina(\/?.*)$/, '/erp/finance/employee-payments'],
@@ -164,11 +165,12 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/erp\/lunch-breaks(\/?.*)$/, '/erp/hr/lunch-breaks'],
   [/^\/erp\/my-lunch-breaks(\/?.*)$/, '/erp/hr/lunch-breaks'],
   [/^\/erp\/my-vacation(\/?.*)$/, '/erp/hr/attendance'],
-  [/^\/erp\/team(\/?.*)$/, '/erp/hr/orgchart'],
-  [/^\/erp\/my-area(\/?.*)$/, '/erp/hr/orgchart'],
-  [/^\/erp\/mi-area(\/?.*)$/, '/erp/hr/orgchart'],
-  [/^\/erp\/orgchart(\/?.*)$/, '/erp/hr/orgchart'],
-  [/^\/erp\/organigrama(\/?.*)$/, '/erp/hr/orgchart'],
+  // El organigrama de lectura es de todo el personal (`/erp/organigrama`); el de RH
+  // (`/erp/hr/orgchart`) sigue existiendo para editar jefes fuera de Core.
+  [/^\/erp\/team(\/.*)?$/, '/erp/organigrama'],
+  [/^\/erp\/my-area(\/.*)?$/, '/erp/organigrama'],
+  [/^\/erp\/mi-area(\/.*)?$/, '/erp/organigrama'],
+  [/^\/erp\/orgchart(\/.*)?$/, '/erp/organigrama'],
   [/^\/erp\/kpis(\/?.*)$/, '/erp/hr/kpis'],
   [/^\/erp\/kpis-rh(\/?.*)$/, '/erp/hr/kpis'],
   [/^\/ops\/my-vacation(\/?.*)$/, '/erp/hr/attendance'],
@@ -224,6 +226,12 @@ export function remapLegacySlugs(pathname: string): string {
   }
   // Mis actividades Core: no traducir "mis-actividades"→"my-activities" (eso es OPS).
   if (pathname === '/erp/mis-actividades' || pathname.startsWith('/erp/mis-actividades/')) {
+    return pathname;
+  }
+  // Recursos de Core en español: sin el atajo, los alias `almacen`→`warehouse`,
+  // `herramientas`→`tools`, `vehiculos`→`vehicles` y el remapeo de `organigrama` los sacaban
+  // de su página (308 a rutas de OPS/RH que en Core rebotan).
+  if (/^\/erp\/(almacen|vehiculos|organigrama)(\/|$)/.test(pathname)) {
     return pathname;
   }
 
@@ -305,6 +313,13 @@ export function normalizeLegacyRelatedUrl(fullUrl: string): string {
   new URLSearchParams(originalSearch).forEach((value, key) => {
     params.set(key, value);
   });
+  // Core-only: un módulo que se mudó a /erp (vehículos, herramientas, almacén, organigrama)
+  // abre su página nueva con la misma query (`?highlight=`, `?tab=`, `?productId=`).
+  const moved = CORE_SURFACE_ONLY ? coreMovedModulePath(basePath) : null;
+  if (moved) {
+    const qs = params.toString();
+    return qs ? `${moved}?${qs}` : moved;
+  }
   // Core-only: notificaciones/feeds guardados con rutas de OPS/CRM abren su equivalente /erp.
   const coreTarget = CORE_SURFACE_ONLY ? coreSurfaceRedirect(basePath, params) : null;
   if (coreTarget) return coreTarget;

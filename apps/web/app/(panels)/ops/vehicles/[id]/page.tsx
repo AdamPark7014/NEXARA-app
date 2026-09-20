@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -12,6 +12,7 @@ import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
+import { isCoreMount, vehiclesBasePath } from "@/lib/recursos-core";
 
 interface VehicleDetail {
   id: number;
@@ -63,6 +64,9 @@ export default function VehicleDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const { user } = useUser();
+  // Montada en Core (`/erp/vehiculos/:id`) o en OPS: «← Flotilla» vuelve a la misma.
+  const pathname = usePathname();
+  const base = vehiclesBasePath(pathname);
   const token = user?.token ?? "";
   const canEdit = user?.isSuperAdmin || ["ceo", "super_admin", "dir_admin", "coord_admin", "dir_operaciones", "coord_operaciones"].includes(user?.roleKey ?? "");
 
@@ -141,13 +145,13 @@ export default function VehicleDetailPage() {
   return (
     <>
       <PageHeader
-        eyebrow="OPS · Flotilla"
+        eyebrow={isCoreMount(pathname) ? "Core · Vehículos" : "OPS · Flotilla"}
         title={vehicle.nombre ?? `Vehículo #${id}`}
         subtitle={vehicle.placas ? `Placas: ${vehicle.placas}` : "Sin placas registradas"}
         meta={<Tag variant={statusVariant(vehicle.estatus)} dot>{(vehicle.estatus ?? "Disponible").replace(/_/g, " ")}</Tag>}
         actions={
           <>
-            <Link href="/ops/vehicles" style={{ textDecoration: "none" }}>
+            <Link href={base} style={{ textDecoration: "none" }}>
               <Button variant="ghost">← Flotilla</Button>
             </Link>
             {canEdit && !editing && (

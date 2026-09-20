@@ -70,6 +70,8 @@ export function searchResultUrl(result: GlobalSearchResult): string | null {
       return `/erp/clientes/${id}`;
     case "activity":
       return `/erp/pizarra?highlight=${id}`;
+    case "vehicle":
+      return `/erp/vehiculos/${id}`;
     default:
       // user / sales-project / OPS / finance: sin superficie Core → no conectar
       return null;

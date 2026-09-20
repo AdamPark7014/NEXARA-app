@@ -658,6 +658,25 @@ export class AuthService {
       set.add(PERMISSIONS.PANEL_VENTAS);
     }
 
+    // ── Recursos de Core: herramientas y vehículos para todo el personal ─────
+    // Cualquier persona interna pide herramienta o vehículo y ve lo suyo (`/erp/almacen/herramientas`,
+    // `/erp/vehiculos`). Aprobar, entregar e inventariar sigue siendo TOOLS_MANAGE / VEHICLES_REVIEW.
+    if (roleKey !== 'cliente') {
+      set.add(PERMISSIONS.TOOLS_VIEW);
+      set.add(PERMISSIONS.TOOLS_REQUEST);
+      set.add(PERMISSIONS.VEHICLES_VIEW);
+      set.add(PERMISSIONS.VEHICLES_REQUEST);
+    }
+
+    // ── Almacén de consulta (`/erp/almacen`) ────────────────────────────
+    // Coordinadores de campo y administración consultan existencias; mover stock sigue siendo
+    // de los roles de `V2_ERP_ADMIN_ROLES` (STOCK_MANAGE / WAREHOUSE_MANAGE).
+    const V2_WAREHOUSE_READ_ROLES = new Set(['administrativo', 'coord_operaciones', 'arquitecto']);
+    if (V2_WAREHOUSE_READ_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.WAREHOUSE_VIEW);
+      set.add(PERMISSIONS.STOCK_VIEW);
+    }
+
         return Array.from(set);
   }
 

@@ -71,6 +71,26 @@ export const COTIZACIONES_CORE_PATHS: PageRule[] = ['/erp/cotizaciones', '/erp/c
 export const PROYECTOS_CORE_PATHS: PageRule[] = ['/erp/proyectos', '/erp/proyectos/**'];
 
 /**
+ * Recursos de Core para todo el personal interno (espejo de `CORE_RECURSOS_URL_RULES` en la API):
+ * herramientas (pedir y ver su kit), vehículos (pedir, entregar y recibir) y el organigrama de
+ * lectura. Aprobar lo decide la API; el GPS de vehículos (`/erp/vehiculos/gps`) lo filtra la
+ * página a Dirección General.
+ */
+export const CORE_RECURSOS_PATHS: PageRule[] = [
+  '/erp/almacen/herramientas',
+  '/erp/almacen/herramientas/**',
+  '/erp/vehiculos',
+  '/erp/vehiculos/**',
+  '/erp/organigrama',
+];
+
+/**
+ * Almacén de Core (`/erp/almacen`): almacén y administración lo operan; dirección de operaciones
+ * y coordinadores de campo lo consultan (`getErpInventorySectionConfig` decide qué pueden mover).
+ */
+export const ALMACEN_CORE_PATHS: PageRule[] = ['/erp/almacen', '/erp/almacen/**'];
+
+/**
  * Mapeo legacy documentado en `lib/legacy-path-remap.ts`.
  */
 
@@ -99,6 +119,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ARQUITECTO — OPS supervisor + ERP parcial ────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/ops/**',
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
@@ -125,6 +146,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── DIR. OPERACIONES — visión global, aprobaciones operativas ────────
   [ROLES.DIR_OPERACIONES]: [
+    ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
@@ -190,6 +212,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
@@ -244,6 +267,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ADMINISTRATIVO — operación día a día ─────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/erp',
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
@@ -281,6 +305,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD OPERACIONES — supervisa campo / project manager ────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...CORE_RECURSOS_PATHS, ...ALMACEN_CORE_PATHS,
     '/ops/**',
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
@@ -307,6 +332,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ING. CAMPO — solo lo suyo ────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
+    ...CORE_RECURSOS_PATHS,
     '/ops/**',
     '/ops/chat',
     ...CORE_OLA1_PAGE_PATHS,
@@ -321,6 +347,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── ING. SOPORTE — campo + cuenta ERP operativa ───────────────────────
   [ROLES.ING_SOPORTE]: [
+    ...CORE_RECURSOS_PATHS,
     '/ops/my-activities',
     '/ops/my-activities/**',
     '/ops/activities/**',
@@ -356,6 +383,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── COORD VENTAS — gerente comercial ─────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...CORE_RECURSOS_PATHS,
     '/crm/**',
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
@@ -383,6 +411,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── VENDEDOR — su pipeline ──────────────────────────────────────────
   [ROLES.VENDEDOR]: [
+    ...CORE_RECURSOS_PATHS,
     '/crm/**',
     '/crm/chat',
     '/erp/chat',
@@ -395,6 +424,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── LÍDER DISEÑO — Studio + material comercial (CRM) + cuenta ERP ─────
   [ROLES.LIDER_DISENO]: [
+    ...CORE_RECURSOS_PATHS,
     // Daniela también es personal Core: la API ya le da estas páginas (`CORE_OLA1_URL_RULES`)
     // desde dad8869a; sin ellas aquí, la web Core-only le bloqueaba pizarra y asistencias.
     ...CORE_OLA1_PAGE_PATHS,
@@ -413,6 +443,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── DISEÑADOR — Studio + apoyo en cotizaciones ───────────────────────
   [ROLES.DISENADOR]: [
+    ...CORE_RECURSOS_PATHS,
     '/studio/**',
     '/crm/quotes/**',
     '/crm/products/**',
@@ -426,6 +457,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── RH ───────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    ...CORE_RECURSOS_PATHS,
     '/erp',
     '/erp/dashboard',
     '/erp/chat',
@@ -449,6 +481,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
 
   // ─── CONTABILIDAD ─────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...CORE_RECURSOS_PATHS,
     '/erp',
     '/erp/dashboard',
     '/erp/chat',

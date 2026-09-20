@@ -109,6 +109,14 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'ActivityEvidence',
   'LocationTracking',
   'SalesProjectOrder',
+  // Asistencia confiable, checklist de la OT, empaque, kits, GPS de vehículos y horas extra (migración 20260918150000_modulos_ws0).
+  'AttendanceRejection',
+  'ProductPackaging',
+  'ActivityToolRequirement',
+  'ActivityToolCheck',
+  'ToolKitInspection',
+  'VehiclePosition',
+  'OvertimeApproval',
 ]);
 
 /** Models where missing companyId on create is a hard error (not soft-injected). */
