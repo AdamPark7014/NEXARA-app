@@ -6,6 +6,7 @@ import {
   Post,
   Param,
   Patch,
+  Put,
   Query,
   Res,
   UploadedFile,
@@ -28,6 +29,7 @@ import { getUploadSubdir } from '../common/upload-paths.js';
 import { CreateViaticoDto } from './dto/create-viatico.dto.js';
 import { AssignViaticoDto } from './dto/assign-viatico.dto.js';
 import { UpdateViaticoDto } from './dto/update-viatico.dto.js';
+import { ComprobarViaticoDto, SetViaticoRepartoDto } from './dto/viatico-reparto.dto.js';
 
 @Controller('viatics')
 @UseGuards(UrlAccessGuard)
@@ -49,6 +51,7 @@ export class ViaticosController {
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
   analytics(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('projectId') projectId?: string,
@@ -60,6 +63,7 @@ export class ViaticosController {
         projectId: projectId ? Number(projectId) : undefined,
       },
       user,
+      companyId,
     );
   }
 
@@ -68,6 +72,7 @@ export class ViaticosController {
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.VIATICS_EXPORT] })
   async reportPdf(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('projectId') projectId?: string,
@@ -81,6 +86,7 @@ export class ViaticosController {
       },
       user?.nombre ?? null,
       user,
+      companyId,
     );
     res!.header('Content-Type', 'application/pdf');
     res!.header(
@@ -123,6 +129,7 @@ export class ViaticosController {
         motivo: body.motivo ?? body.concepto,
         ticketEvidenciaUrl,
         estatus: 'Pendiente',
+        partes: body.partes,
       },
       user,
       companyId,
@@ -150,6 +157,54 @@ export class ViaticosController {
         categoria: body.categoria,
         montoSolicitado: Number(body.montoSolicitado),
         motivo: body.motivo ?? body.concepto,
+        partes: body.partes,
+      },
+      user,
+      companyId,
+    );
+  }
+
+  /**
+   * Reparte el costo de un viático entre varias actividades.
+   *
+   * Vive aparte del alta porque el reparto se decide cuando se sabe qué visitas
+   * cubrió el viaje —a veces al volver—, y porque el alta con ticket viaja en
+   * `multipart`, donde una lista anidada no sobrevive.
+   *
+   * Mismos permisos que crear un viático: quien lo pidió sabe entre qué
+   * actividades repartirlo. El servicio impide tocar los de terceros a quien no
+   * administra viáticos.
+   */
+  @Put(':id/reparto')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.VIATICS_CREATE] })
+  setReparto(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: SetViaticoRepartoDto,
+  ) {
+    return this.viaticosService.setReparto(+id, body.partes, user, companyId);
+  }
+
+  /** Comprueba el anticipo con tickets y deja el saldo a favor o en contra. */
+  @Patch(':id/comprobar')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.VIATICS_CREATE] })
+  @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
+  comprobar(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: ComprobarViaticoDto,
+    @UploadedFile() file?: any,
+  ) {
+    return this.viaticosService.comprobar(
+      +id,
+      {
+        montoComprobado: body.montoComprobado,
+        ticketEvidenciaUrl: file ? `/uploads/viatics/${file.filename}` : body.ticketEvidenciaUrl,
+        nota: body.nota,
       },
       user,
       companyId,
@@ -159,11 +214,16 @@ export class ViaticosController {
   @Get('export/:format')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_EXPORT] })
-  async export(@CurrentUser() user: any, @Param('format') format: string, @Res() res: Response) {
+  async export(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Param('format') format: string,
+    @Res() res: Response,
+  ) {
     if (format !== 'xlsx') {
       throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON están deshabilitados.');
     }
-    const result = await this.viaticosService.findAll(user);
+    const result = await this.viaticosService.findAll(user, undefined, companyId);
     const data: any[] = Array.isArray(result) ? result : (result as any).data;
     const buffer = await this.excelExport.exportarReporte({
       titulo: 'Viáticos',
@@ -223,10 +283,17 @@ export class ViaticosController {
     @Param('id') id: string,
     @CurrentUser() user: any,
     @CurrentCompanyId() companyId: number | null,
-    @Body() body: { action?: 'approve' | 'reject'; note?: string },
+    @Body() body: { action?: 'approve' | 'reject'; note?: string; montoAprobado?: number | string },
   ) {
     const action = body.action === 'reject' ? 'reject' : 'approve';
-    return this.viaticosService.approveOrReject(+id, user, action, body.note, companyId);
+    return this.viaticosService.approveOrReject(
+      +id,
+      user,
+      action,
+      body.note,
+      companyId,
+      body.montoAprobado,
+    );
   }
 
   @Patch(':id/pagado')
@@ -270,6 +337,7 @@ export class ViaticosController {
     if (body.vehicleId !== undefined) {
       data.vehicleId = body.vehicleId ? Number(body.vehicleId) : null;
     }
+    if (body.partes !== undefined) data.partes = body.partes;
     return this.viaticosService.update(+id, data, companyId);
   }
 }

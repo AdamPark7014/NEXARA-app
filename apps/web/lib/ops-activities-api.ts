@@ -102,6 +102,16 @@ export type ViaticoRow = {
   fechaSolicitud?: string;
   actividadId?: number | null;
   User?: { nombre?: string };
+  /** Partes del gasto cuando el viaje cubrió varias actividades. */
+  repartos?: { id: number; actividadId: number; monto: number | string; nota?: string | null }[];
+  liquidacion?: {
+    entregado: number;
+    comprobado: number | null;
+    saldo: number | null;
+    estado: "SIN_COMPROBAR" | "CUADRADO" | "POR_DEVOLVER" | "POR_REEMBOLSAR";
+  };
+  /** Lo que carga esta actividad: su parte del reparto, o el total si no hay. */
+  montoEnEstaActividad?: number;
 };
 
 async function apiFetch<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
@@ -125,10 +135,32 @@ export function getActivity(token: string, id: number) {
   return apiFetch<ActivityDetail>(`activities/${id}`, token);
 }
 
+/**
+ * Viáticos que carga esta actividad.
+ *
+ * Además de los que cuelgan de ella, entran los repartidos que le imputan una
+ * parte: un viaje que cubrió dos servicios paga gasolina para los dos, y la
+ * segunda actividad se veía «sin viáticos» aunque estuviera pagando la mitad.
+ */
 export async function listViaticsForActivity(token: string, activityId: number) {
   const data = await apiFetch<ViaticoRow[] | { data: ViaticoRow[] }>("viatics", token);
   const rows = Array.isArray(data) ? data : (data?.data ?? []);
-  return rows.filter((v) => Number(v.actividadId) === activityId);
+  return rows
+    .filter(
+      (v) =>
+        Number(v.actividadId) === activityId ||
+        (v.repartos ?? []).some((p) => Number(p.actividadId) === activityId),
+    )
+    .map((v) => {
+      const parte = (v.repartos ?? []).find((p) => Number(p.actividadId) === activityId);
+      return {
+        ...v,
+        montoEnEstaActividad:
+          (v.repartos?.length ?? 0) > 0
+            ? Number(parte?.monto ?? 0)
+            : Number(v.montoSolicitado) || 0,
+      };
+    });
 }
 
 export type ActivityTeamMember = {

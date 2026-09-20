@@ -791,6 +791,9 @@ export class VendorProjectFinanceService {
             OR: [
               { Activity: { projectId: { in: projectIds } } },
               { projectId: { in: salesProjectIds } },
+              // Un viático repartido puede no colgar de ninguna actividad de
+              // este proyecto y aun así cargarle una parte del viaje.
+              { repartos: { some: { actividad: { projectId: { in: projectIds } } } } },
             ],
           },
           select: {
@@ -800,6 +803,7 @@ export class VendorProjectFinanceService {
             categoria: true,
             montoSolicitado: true,
             estatus: true,
+            repartos: { select: { actividadId: true, monto: true } },
           },
         }),
         this.prisma.stockMovement.groupBy({
@@ -877,18 +881,35 @@ export class VendorProjectFinanceService {
     }
 
     for (const v of viaticos) {
-      const pid =
-        (v.actividadId != null ? actividadAProyecto.get(v.actividadId) : undefined) ??
-        (v.projectId != null ? salesAProyecto.get(v.projectId) : undefined);
-      if (pid == null) continue;
-      const monto = toNumber(v.montoSolicitado);
-      bucket(pid).acc.add({
-        key: `viatico:${String(v.categoria ?? 'otros').toLowerCase()}`,
-        label: viaticoLabel(v.categoria),
-        fuente: 'viaticos',
-        monto,
-        pagado: isPaidLabel(v.estatus) ? monto : 0,
-      });
+      const pagadoTotal = isPaidLabel(v.estatus);
+      // Un viaje que cubre tres servicios de clientes distintos carga a cada
+      // proyecto su parte. Sin reparto, el viático es de una sola actividad y
+      // se atribuye entero, como siempre.
+      const tramos =
+        v.repartos.length > 0
+          ? v.repartos.map((parte) => ({
+              pid: actividadAProyecto.get(parte.actividadId),
+              monto: toNumber(parte.monto),
+            }))
+          : [
+              {
+                pid:
+                  (v.actividadId != null ? actividadAProyecto.get(v.actividadId) : undefined) ??
+                  (v.projectId != null ? salesAProyecto.get(v.projectId) : undefined),
+                monto: toNumber(v.montoSolicitado),
+              },
+            ];
+
+      for (const tramo of tramos) {
+        if (tramo.pid == null) continue;
+        bucket(tramo.pid).acc.add({
+          key: `viatico:${String(v.categoria ?? 'otros').toLowerCase()}`,
+          label: viaticoLabel(v.categoria),
+          fuente: 'viaticos',
+          monto: tramo.monto,
+          pagado: pagadoTotal ? tramo.monto : 0,
+        });
+      }
     }
 
     for (const m of almacen) {
@@ -1106,6 +1127,7 @@ export class VendorProjectFinanceService {
             ...(proyecto.salesProjectId != null
               ? [{ projectId: proyecto.salesProjectId }]
               : []),
+            { repartos: { some: { actividad: { projectId } } } },
           ],
         },
         select: {
@@ -1116,6 +1138,15 @@ export class VendorProjectFinanceService {
           estatus: true,
           fechaSolicitud: true,
           Activity: { select: { anNumber: true } },
+          repartos: {
+            // Solo las partes de ESTE proyecto: lo que cargue a otro no es
+            // gasto de este P&L.
+            where: { actividad: { projectId } },
+            select: {
+              monto: true,
+              actividad: { select: { anNumber: true } },
+            },
+          },
         },
         orderBy: { fechaSolicitud: 'desc' },
         take: 500,
@@ -1193,15 +1224,26 @@ export class VendorProjectFinanceService {
 
     for (const v of viaticos) {
       const key = `viatico:${String(v.categoria ?? 'otros').toLowerCase()}`;
-      const monto = toNumber(v.montoSolicitado);
+      // Repartido: este proyecto solo carga sus partes. Sin repartir: el total,
+      // como siempre.
+      const repartido = v.repartos.length > 0;
+      const monto = repartido
+        ? v.repartos.reduce((s, p) => s + toNumber(p.monto), 0)
+        : toNumber(v.montoSolicitado);
       const pagado = isPaidLabel(v.estatus) ? monto : 0;
       acc.add({ key, label: viaticoLabel(v.categoria), fuente: 'viaticos', monto, pagado });
       transacciones.push({
         key: `viatico-${v.id}`,
         tipo: 'viatico',
-        documento: v.Activity?.anNumber ?? `VIATICO-${v.id}`,
+        documento:
+          (repartido ? v.repartos[0]?.actividad?.anNumber : v.Activity?.anNumber) ??
+          `VIATICO-${v.id}`,
         fecha: toIsoDate(v.fechaSolicitud),
-        concepto: v.motivo ?? viaticoLabel(v.categoria),
+        concepto: repartido
+          ? `${v.motivo ?? viaticoLabel(v.categoria)} · parte de un viático repartido (total ${money(
+              toNumber(v.montoSolicitado),
+            )})`
+          : (v.motivo ?? viaticoLabel(v.categoria)),
         monto: money(monto),
         pagado: money(pagado),
         estatus: v.estatus,

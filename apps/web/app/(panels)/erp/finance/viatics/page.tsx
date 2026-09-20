@@ -13,10 +13,25 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import ListExportActions from "@/components/ui/ListExportActions";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
-import { approveViatico, markViaticoPagado, patchViatico, postViatico, downloadViaticsReportPdf } from "@/lib/viatics-api";
+import {
+  approveViatico,
+  comprobarViatico,
+  markViaticoPagado,
+  patchViatico,
+  postViatico,
+  downloadViaticsReportPdf,
+  type ViaticoLiquidacion,
+  type ViaticoParte,
+} from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import { formatApiError } from "@/lib/erp-api";
+import {
+  centavosViatico as centavos,
+  pesosViatico as dinero,
+  revisarCuadreReparto,
+  type ParteForm,
+} from "@/lib/viatics-display";
 import FileDropzone from "@/components/ui/FileDropzone";
 import Modal from "@/components/ui/Modal";
 import {
@@ -59,6 +74,17 @@ interface Viatico {
   contabilidadRef?: string;
   approvalStep?: number;
   approvalTrail?: unknown;
+  /** Partes del gasto cuando el viaje cubrió varias actividades. */
+  repartos?: {
+    id: number;
+    actividadId: number;
+    monto: number | string;
+    nota?: string | null;
+    actividad?: { id: number; anNumber?: string; titulo?: string } | null;
+  }[];
+  montoAprobado?: number | string | null;
+  montoComprobado?: number | string | null;
+  liquidacion?: ViaticoLiquidacion;
 }
 
 const ESTATUS = ["Pendiente", "Aprobado_Coordinador", "Aprobado", "Rechazado", "Pagado"];
@@ -237,13 +263,20 @@ const emptyForm = {
 };
 
 type FormMode = "create" | "approve" | "edit" | null;
-type FormErrors = { concepto?: string; monto?: string; enlace?: string; comprobante?: string };
+type FormErrors = {
+  concepto?: string;
+  monto?: string;
+  enlace?: string;
+  comprobante?: string;
+  reparto?: string;
+};
 
 const FIELD_LABELS: Record<keyof FormErrors, string> = {
   concepto: "Concepto",
   monto: "Monto solicitado",
   enlace: "Proyecto o actividad",
   comprobante: "Comprobante",
+  reparto: "Reparto entre actividades",
 };
 
 type AnalyticsBucket = { name: string; total: number; count: number };
@@ -331,6 +364,158 @@ function BreakdownTable({
   );
 }
 
+
+const parteVacia = (): ParteForm => ({ actividadId: "", monto: "", nota: "" });
+
+/**
+ * Reparto del gasto entre varias actividades.
+ *
+ * El viaje a Tehuacán cubrió dos servicios de clientes distintos: la gasolina es
+ * una, el costo son dos. Mientras se captura, la pista de abajo dice cuánto
+ * falta o sobra, porque descubrirlo al guardar es descubrirlo tarde. El
+ * servidor vuelve a comprobarlo: esto es ayuda, no la regla.
+ */
+function RepartoEditor({
+  partes,
+  onChange,
+  total,
+  disabled,
+}: {
+  partes: ParteForm[];
+  onChange: (partes: ParteForm[]) => void;
+  total: number;
+  disabled?: boolean;
+}) {
+  const totalCent = centavos(total);
+  const sumaCent = partes.reduce((acc, p) => acc + centavos(p.monto), 0);
+  const diferencia = totalCent - sumaCent;
+
+  const set = (i: number, campo: keyof ParteForm, valor: string) =>
+    onChange(partes.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)));
+
+  const pista =
+    partes.length === 0
+      ? "Sin repartir, el gasto entero carga a la actividad de arriba."
+      : diferencia === 0
+        ? `Cuadra: las ${partes.length} partes suman ${dinero(totalCent)}.`
+        : diferencia > 0
+          ? `Faltan ${dinero(diferencia)} por repartir de ${dinero(totalCent)}.`
+          : `Sobran ${dinero(-diferencia)}: las partes suman más que el viático.`;
+
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {partes.map((parte, i) => (
+        <div
+          key={i}
+          style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) auto", gap: 8, alignItems: "center" }}
+        >
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={parte.actividadId}
+            onChange={(e) => set(i, "actividadId", e.target.value)}
+            placeholder="ID actividad"
+            aria-label={`Actividad de la parte ${i + 1}`}
+            disabled={disabled}
+            style={financeInputStyle}
+          />
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={parte.monto}
+            onChange={(e) => set(i, "monto", e.target.value)}
+            placeholder="0.00"
+            aria-label={`Monto de la parte ${i + 1}`}
+            disabled={disabled}
+            style={{ ...financeInputStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            style={rowButtonStyle}
+            disabled={disabled}
+            aria-label={`Quitar la parte ${i + 1}`}
+            onClick={() => onChange(partes.filter((_, j) => j !== i))}
+          >
+            Quitar
+          </Button>
+        </div>
+      ))}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <Button
+          size="sm"
+          variant="secondary"
+          style={rowButtonStyle}
+          disabled={disabled}
+          onClick={() => {
+            // La primera parte se abre con lo que falta: casi siempre el total.
+            const pendiente = partes.length === 0 ? totalCent : Math.max(diferencia, 0);
+            onChange([
+              ...partes,
+              { ...parteVacia(), monto: pendiente > 0 ? (pendiente / 100).toFixed(2) : "" },
+            ]);
+          }}
+        >
+          Añadir actividad
+        </Button>
+        {partes.length > 0 && (
+          <StatusDot
+            wrap
+            tone={diferencia === 0 ? "success" : "warning"}
+            label={pista}
+          />
+        )}
+      </div>
+      {partes.length === 0 && (
+        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{pista}</span>
+      )}
+    </div>
+  );
+}
+
+/** Lo entregado, lo comprobado y quién le debe a quién. */
+function LiquidacionResumen({ liquidacion }: { liquidacion?: ViaticoLiquidacion }) {
+  if (!liquidacion) return null;
+  const { entregado, comprobado, saldo, estado } = liquidacion;
+  const texto =
+    estado === "SIN_COMPROBAR"
+      ? "Todavía nadie entregó tickets contra este anticipo."
+      : estado === "CUADRADO"
+        ? "Cuadrado: lo comprobado es exactamente lo entregado."
+        : estado === "POR_DEVOLVER"
+          ? `Sobraron ${dinero(centavos(saldo ?? 0))}: quedan por devolver a la empresa.`
+          : `Faltaron ${dinero(centavos(Math.abs(saldo ?? 0)))}: la empresa debe ese reembolso.`;
+  return (
+    <div>
+      <span style={choiceLabelStyle}>Anticipo</span>
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 6 }}>
+        <span style={{ fontSize: 12.5 }}>
+          Entregado <strong style={{ fontVariantNumeric: "tabular-nums" }}><Money value={entregado} /></strong>
+        </span>
+        <span style={{ fontSize: 12.5 }}>
+          Comprobado{" "}
+          <strong style={{ fontVariantNumeric: "tabular-nums" }}>
+            {comprobado == null ? "—" : <Money value={comprobado} />}
+          </strong>
+        </span>
+        {saldo != null && (
+          <span style={{ fontSize: 12.5 }}>
+            Saldo <strong style={{ fontVariantNumeric: "tabular-nums" }}><Money value={Math.abs(saldo)} /></strong>
+          </span>
+        )}
+      </div>
+      <StatusDot
+        wrap
+        tone={estado === "CUADRADO" ? "success" : estado === "SIN_COMPROBAR" ? "neutral" : "warning"}
+        label={texto}
+      />
+    </div>
+  );
+}
+
 /** La cadena de autorización: quién, con qué papel, cuándo y qué escribió. */
 function ApprovalTrail({ trail, step }: { trail: ApprovalTrailEntry[]; step?: number }) {
   return (
@@ -390,7 +575,15 @@ export default function ViaticosPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [saveErr, setSaveErr] = useState<string | null>(null);
-  const [approveForm, setApproveForm] = useState({ estatus: "Aprobado", comentariosAdmin: "" });
+  const [approveForm, setApproveForm] = useState({
+    estatus: "Aprobado",
+    comentariosAdmin: "",
+    /** Recorte al autorizar: vacío = se autoriza lo solicitado. */
+    montoAprobado: "",
+    /** Comprobación de tickets contra el anticipo ya entregado. */
+    montoComprobado: "",
+  });
+  const [partes, setPartes] = useState<ParteForm[]>([]);
   const [saving, setSaving] = useState(false);
   /** Id del renglón con una acción en vuelo: sin esto, doble clic = doble pago. */
   const [rowBusyId, setRowBusyId] = useState<number | null>(null);
@@ -576,11 +769,18 @@ export default function ViaticosPage() {
     setFormErrors({});
     setSaveErr(null);
     setEvidenceFile(null);
+    setPartes([]);
     setMode("create");
   };
   const openApprove = (v: Viatico) => {
     setSelected(v);
-    setApproveForm({ estatus: "Aprobado", comentariosAdmin: "" });
+    setApproveForm({
+      estatus: "Aprobado",
+      comentariosAdmin: "",
+      montoAprobado: "",
+      montoComprobado:
+        v.montoComprobado != null ? String(Number(v.montoComprobado).toFixed(2)) : "",
+    });
     setSaveErr(null);
     setMode("approve");
   };
@@ -598,6 +798,13 @@ export default function ViaticosPage() {
       actividadId: v.actividad?.id ? String(v.actividad.id) : "",
       vehicleId: v.vehicleId ? String(v.vehicleId) : "",
     });
+    setPartes(
+      (v.repartos ?? []).map((p) => ({
+        actividadId: String(p.actividadId),
+        monto: Number(p.monto).toFixed(2),
+        nota: p.nota ?? "",
+      })),
+    );
     setMode("edit");
   };
 
@@ -605,6 +812,49 @@ export default function ViaticosPage() {
     setMode(null);
     setSaveErr(null);
     setFormErrors({});
+  };
+
+  /**
+   * El reparto tiene que sumar el total exacto. Se comprueba aquí para poder
+   * contestar bajo el campo; el servidor lo vuelve a comprobar porque esto es
+   * una ayuda, no la regla.
+   */
+  const revisarReparto = (total: number) => revisarCuadreReparto(partes, total);
+
+  const partesParaApi = (): ViaticoParte[] =>
+    partes.map((p) => ({
+      actividadId: Number(p.actividadId),
+      monto: Number(p.monto),
+      nota: p.nota.trim() || null,
+    }));
+
+  /** Comprobación de tickets contra el anticipo ya entregado. */
+  const runComprobar = async () => {
+    if (saving) return;
+    if (!token || !selected) {
+      setSaveErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión e inténtalo otra vez.");
+      return;
+    }
+    const monto = parseFloat(approveForm.montoComprobado);
+    if (!Number.isFinite(monto) || monto < 0) {
+      setSaveErr("Captura cuánto se comprobó con tickets. Si no se gastó nada, captura 0.");
+      return;
+    }
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      await comprobarViatico(token, selected.id, {
+        montoComprobado: monto,
+        nota: approveForm.comentariosAdmin || undefined,
+      });
+      void load();
+      setMode(null);
+      toast.success("Comprobación registrada");
+    } catch (e) {
+      setSaveErr(formatApiError(e, "No se pudo registrar la comprobación"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const runApprove = async (action: "approve" | "reject" | "pagado") => {
@@ -617,7 +867,16 @@ export default function ViaticosPage() {
     setSaveErr(null);
     try {
       if (action === "pagado") await markViaticoPagado(token, selected.id);
-      else await approveViatico(token, selected.id, action, approveForm.comentariosAdmin || undefined);
+      else
+        await approveViatico(
+          token,
+          selected.id,
+          action,
+          approveForm.comentariosAdmin || undefined,
+          action === "approve" && approveForm.montoAprobado.trim()
+            ? Number(approveForm.montoAprobado)
+            : undefined,
+        );
       void load();
       setMode(null);
       toast.success(action === "reject" ? "Viático rechazado" : action === "pagado" ? "Marcado como pagado" : "Viático aprobado");
@@ -645,6 +904,8 @@ export default function ViaticosPage() {
     if (!form.projectId && !form.actividadId) {
       errors.enlace = "Liga la solicitud a un proyecto o a una actividad.";
     }
+    const reparto = revisarReparto(form.montoSolicitado);
+    if (reparto) errors.reparto = reparto;
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
       setSaveErr(null);
@@ -665,6 +926,8 @@ export default function ViaticosPage() {
           projectId: form.projectId ? Number(form.projectId) : null,
           actividadId: form.actividadId ? Number(form.actividadId) : null,
           vehicleId: form.vehicleId ? Number(form.vehicleId) : null,
+          // Se manda siempre: una lista vacía deshace un reparto anterior.
+          partes: partesParaApi(),
         },
         evidenceFile,
       );
@@ -680,6 +943,9 @@ export default function ViaticosPage() {
             : v,
         ),
       );
+      // El reparto no viene en la respuesta del PATCH: se recarga para que la
+      // lista enseñe las partes que de verdad quedaron guardadas.
+      void load();
       setMode(null);
       setEvidenceFile(null);
       toast.success("Viático actualizado");
@@ -708,6 +974,8 @@ export default function ViaticosPage() {
     if (!evidenceFile && !form.comprobante.trim()) {
       errors.comprobante = "Adjunta el comprobante: un archivo o una liga.";
     }
+    const repartoCreate = revisarReparto(form.montoSolicitado);
+    if (repartoCreate) errors.reparto = repartoCreate;
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
       setSaveErr(null);
@@ -728,6 +996,7 @@ export default function ViaticosPage() {
           projectId: form.projectId ? Number(form.projectId) : null,
           actividadId: form.actividadId ? Number(form.actividadId) : null,
           vehicleId: form.vehicleId ? Number(form.vehicleId) : null,
+          partes: partes.length > 0 ? partesParaApi() : undefined,
         },
         evidenceFile,
       );
@@ -965,7 +1234,12 @@ export default function ViaticosPage() {
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelected(v);
-                    setApproveForm({ estatus: "Rechazado", comentariosAdmin: "" });
+                    setApproveForm({
+                      estatus: "Rechazado",
+                      comentariosAdmin: "",
+                      montoAprobado: "",
+                      montoComprobado: "",
+                    });
                     setSaveErr(null);
                     setMode("approve");
                   }}
@@ -1295,6 +1569,23 @@ export default function ViaticosPage() {
               {vehicles.map((v) => <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>)}
             </select>
           </FinanceField>
+          <FinanceField
+            label="Repartir entre actividades"
+            fullWidth
+            optional
+            hint="Cuando un mismo viaje cubrió varios servicios. Las partes tienen que sumar el monto de arriba."
+            error={formErrors.reparto}
+          >
+            <RepartoEditor
+              partes={partes}
+              onChange={(p) => {
+                setPartes(p);
+                setFormErrors((prev) => ({ ...prev, reparto: undefined }));
+              }}
+              total={form.montoSolicitado}
+              disabled={saving}
+            />
+          </FinanceField>
           <div style={{ gridColumn: "1 / -1" }}>
             <FileDropzone
               file={evidenceFile}
@@ -1422,6 +1713,23 @@ export default function ViaticosPage() {
               {vehicles.map((v) => <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>)}
             </select>
           </FinanceField>
+          <FinanceField
+            label="Repartir entre actividades"
+            fullWidth
+            optional
+            hint="Cuando un mismo viaje cubrió varios servicios. Las partes tienen que sumar el monto de arriba."
+            error={formErrors.reparto}
+          >
+            <RepartoEditor
+              partes={partes}
+              onChange={(p) => {
+                setPartes(p);
+                setFormErrors((prev) => ({ ...prev, reparto: undefined }));
+              }}
+              total={form.montoSolicitado}
+              disabled={saving}
+            />
+          </FinanceField>
           <div style={{ gridColumn: "1 / -1" }}>
             <FileDropzone
               file={evidenceFile}
@@ -1517,6 +1825,30 @@ export default function ViaticosPage() {
               </span>
             </div>
             <FinanceFormGrid>
+              {(selected.repartos?.length ?? 0) > 0 && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <span style={choiceLabelStyle}>Repartido entre actividades</span>
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 4 }}>
+                    {selected.repartos!.map((parte) => (
+                      <li
+                        key={parte.id}
+                        style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}
+                      >
+                        <span style={{ color: "var(--text-secondary)" }}>
+                          {parte.actividad?.anNumber ?? `Act-${parte.actividadId}`}
+                          {parte.actividad?.titulo ? ` · ${parte.actividad.titulo}` : ""}
+                        </span>
+                        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                          <Money value={Number(parte.monto)} />
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <LiquidacionResumen liquidacion={selected.liquidacion} />
+              </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <ApprovalTrail trail={selectedTrail} step={selected.approvalStep} />
               </div>
@@ -1553,6 +1885,51 @@ export default function ViaticosPage() {
                   })}
                 </div>
               </div>
+              {approveForm.estatus === "Aprobado" && (
+                <FinanceField
+                  label="Monto autorizado"
+                  optional
+                  hint={`Vacío autoriza los ${dinero(centavos(Number(selected.montoSolicitado) || 0))} solicitados. Puedes recortar, no subir.`}
+                >
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={approveForm.montoAprobado}
+                    onChange={(e) => setApproveForm((f) => ({ ...f, montoAprobado: e.target.value }))}
+                    placeholder={(Number(selected.montoSolicitado) || 0).toFixed(2)}
+                    style={{ ...inp, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+                  />
+                </FinanceField>
+              )}
+              {["Aprobado", "Pagado"].includes(selected.estatus ?? "") && (
+                <FinanceField
+                  label="Comprobado con tickets"
+                  optional
+                  hint="Lo que de verdad se gastó del anticipo. La diferencia queda como saldo a favor o en contra."
+                >
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={approveForm.montoComprobado}
+                      onChange={(e) => setApproveForm((f) => ({ ...f, montoComprobado: e.target.value }))}
+                      placeholder="0.00"
+                      style={{ ...inp, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      style={{ ...rowButtonStyle, height: 32, whiteSpace: "nowrap" }}
+                      disabled={saving || !approveForm.montoComprobado.trim()}
+                      onClick={() => void runComprobar()}
+                    >
+                      Registrar
+                    </Button>
+                  </div>
+                </FinanceField>
+              )}
               <FinanceField
                 label="Comentarios"
                 fullWidth

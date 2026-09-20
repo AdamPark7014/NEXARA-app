@@ -13,7 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { getViaticsSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
-import { isViaticoPending, normalizeViaticoRow, viaticoEstatusVariant, type ViaticoRow } from "@/lib/viatics-display";
+import { frasesSaldoViatico, isViaticoPending, normalizeViaticoRow, viaticoEstatusVariant, type ViaticoRow } from "@/lib/viatics-display";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import ListExportActions from "@/components/ui/ListExportActions";
@@ -186,7 +186,25 @@ export default function MyViaticsPage() {
 
   const columns: Column<ViaticoRow>[] = [
     { key: "concepto", label: "Concepto", accessor: (v) => v.concepto ?? "—" },
-    { key: "montoSolicitado", label: "Monto", align: "right" as const, render: (v) => <Money value={v.montoSolicitado ?? 0} />, width: 110 },
+    {
+      key: "montoSolicitado",
+      label: "Monto",
+      align: "right" as const,
+      // El saldo va pegado al monto: es la pregunta que trae quien entra aquí
+      // («¿me queda dinero de la empresa?»), no un dato de otra columna.
+      render: (v) => {
+        const saldo = frasesSaldoViatico(v);
+        return (
+          <span>
+            <Money value={v.montoSolicitado ?? 0} />
+            {saldo && (
+              <span style={{ display: "block", fontSize: 11, color: "var(--text-tertiary)" }}>{saldo}</span>
+            )}
+          </span>
+        );
+      },
+      width: 130,
+    },
     { key: "fechaSolicitud", label: "Fecha", render: (v) => <span style={{ fontSize: 12 }}>{v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString("es-MX") : "—"}</span>, width: 100 },
     { key: "estatus", label: "Estado", render: (v) => <Tag variant={viaticoEstatusVariant(v.estatus)}>{(v.estatus ?? "Pendiente").replace(/_/g, " ")}</Tag>, width: 160 },
     {
