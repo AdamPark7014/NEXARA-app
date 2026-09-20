@@ -614,7 +614,7 @@ export default function InvoicingPage() {
     notices.push({
       id: "pac-creds",
       level: "critical",
-      text: "Sin credenciales del PAC: no se puede timbrar ningún CFDI.",
+      text: "No se puede timbrar ninguna factura: falta conectar el servicio de timbrado.",
       action: { label: "Configuración", href: "/erp/settings" },
     });
   }
@@ -622,7 +622,7 @@ export default function InvoicingPage() {
     notices.push({
       id: "csd",
       level: "warning",
-      text: "CSD del emisor no configurado — requerido para el sellado local (Finkok/SW).",
+      text: "Falta el certificado de sello digital. Sin él las facturas no se pueden sellar.",
       action: { label: "Configuración", href: "/erp/settings" },
     });
   }
