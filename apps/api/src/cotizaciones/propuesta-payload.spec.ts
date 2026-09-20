@@ -1,8 +1,8 @@
-import zlib from 'zlib';
 import { payloadDePropuesta, type CotizacionParaPropuesta } from './propuesta-payload.js';
 import { generarPropuestaTecnicaPdf } from './propuesta-tecnica-pdf.js';
 import { escribirObjetivo } from './objetivo-plantilla.js';
 import { escribirTerminosPersonalizados } from './terminos-segmento.js';
+import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
 
 /**
  * Lo que guarda el editor de Core llega al PDF: cada campo de la propuesta modelo, en su lugar.
@@ -10,26 +10,7 @@ import { escribirTerminosPersonalizados } from './terminos-segmento.js';
  * `scope`, bloques con viñetas, términos reescritos en `note`, partidas en el orden del editor).
  */
 
-function textoDelPdf(pdf: Buffer): string {
-  const hojas: string[] = [];
-  for (const [, crudo] of pdf.toString('latin1').matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
-    let contenido: string;
-    try {
-      contenido = zlib.inflateSync(Buffer.from(crudo!, 'latin1')).toString('latin1');
-    } catch {
-      continue;
-    }
-    if (!contenido.includes('TJ')) continue;
-    hojas.push(
-      [...contenido.matchAll(/\[([^\]]*)\] TJ/g)]
-        .map(([, arreglo]) =>
-          [...arreglo!.matchAll(/<([0-9a-fA-F]*)>/g)].map(([, hex]) => Buffer.from(hex!, 'hex').toString('latin1')).join(''),
-        )
-        .join('\n'),
-    );
-  }
-  return hojas.join('\n');
-}
+const textoDelPdf = (pdf: Buffer) => textoPorHoja(pdf).join('\n');
 
 const GUARDADA: CotizacionParaPropuesta = {
   quoteNumber: 'NEX-LJ75100126-0007-JA',
@@ -127,8 +108,9 @@ describe('payload de la propuesta desde lo que guarda el editor', () => {
 
   it('el PDF imprime lo que se capturó', async () => {
     const texto = textoDelPdf(await generarPropuestaTecnicaPdf(payload));
+    // La versión va en la rejilla de la portada: etiqueta y, debajo, el valor.
+    expect(texto).toMatch(/VERSIÓN\n2\.0/);
     for (const esperado of [
-      'VERSIÓN 2.0',
       'Renovación del sistema de CCTV',
       'Mayor cobertura de vigilancia.',
       'Monitoreo remoto.',
@@ -143,7 +125,9 @@ describe('payload de la propuesta desde lo que guarda el editor', () => {
     ]) {
       expect(texto).toContain(esperado);
     }
-    // El párrafo suelto no lleva número: solo hay un «1.» de subsección y ningún «2.» de alcance.
+    // El párrafo suelto no lleva número: solo hay un apartado «2.1» y ningún «2.2».
+    expect(texto).toMatch(/^2\.1$/m);
+    expect(texto).not.toMatch(/^2\.2$/m);
     expect(texto).not.toContain('2. Párrafo suelto');
   });
 });
