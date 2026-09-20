@@ -119,19 +119,46 @@ export default function ActivityDetailShell({
       : `${activity.anNumber} · ${activity.titulo}`
     : `Actividad #${id}`;
 
+  // El enlace decía «Actividades» también en Core, donde vuelve a la pizarra:
+  // una etiqueta que no nombra su destino hace dudar antes de pulsarla.
+  const backLabel = core ? "Pizarra" : "Actividades";
+
   return (
     <ActivityDetailContext.Provider value={ctx}>
       <div style={{ padding: "24px 32px", maxWidth: 1200, margin: "0 auto" }}>
-        <header style={{ marginBottom: 16 }}>
-          <Link href={backHref} style={{ fontSize: 13, color: "var(--text-secondary, #64748b)", textDecoration: "none" }}>
-            ← Actividades
+        <header style={{ marginBottom: 12 }}>
+          <Link
+            href={backHref}
+            style={{
+              display: "inline-block",
+              padding: "2px 0",
+              fontSize: 12.5,
+              color: "var(--text-secondary)",
+              textDecoration: "none",
+            }}
+          >
+            ← {backLabel}
           </Link>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: "6px 0 0" }}>
+          <h1
+            style={{
+              fontSize: "clamp(1.2rem, 1rem + 0.7vw, 1.55rem)",
+              fontWeight: 650,
+              letterSpacing: "-0.015em",
+              lineHeight: 1.25,
+              margin: "4px 0 0",
+              color: "var(--text-primary)",
+            }}
+          >
             {loading ? `Actividad #${id}` : title}
           </h1>
+          {!loading && activity && core && (
+            <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              {activity.anNumber}
+            </p>
+          )}
         </header>
         <TabBar tabs={tabs} />
-        <section style={{ marginTop: 8 }}>
+        <section style={{ marginTop: 12 }}>
           {loading && !activity ? <DetailLoading /> : children}
         </section>
       </div>
