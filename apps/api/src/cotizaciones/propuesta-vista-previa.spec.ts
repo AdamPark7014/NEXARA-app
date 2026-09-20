@@ -1,33 +1,17 @@
-import zlib from 'zlib';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CotizacionesService } from './cotizaciones.service.js';
 import { LIMITES_VISTA_PREVIA, borradorSobreGuardada, validarTamanoBorrador } from './propuesta-vista-previa.js';
 import { generarPropuestaTecnicaPdf, type SeccionesPropuesta } from './propuesta-tecnica-pdf.js';
 import { payloadDePropuesta } from './propuesta-payload.js';
+import { textoPorHoja } from '../common/pdf/texto-de-pdf.js';
 import type { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 
 /**
  * Vista previa en vivo: el borrador del editor encima de la cotización guardada, sin guardar nada.
  */
 
-/** Texto de un PDF de PDFKit (los TJ de cada hoja), para comprobar qué se imprimió. */
-function textoDelPdf(pdf: Buffer): string {
-  const partes: string[] = [];
-  for (const [, crudo] of pdf.toString('latin1').matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
-    let contenido: string;
-    try {
-      contenido = zlib.inflateSync(Buffer.from(crudo!, 'latin1')).toString('latin1');
-    } catch {
-      continue;
-    }
-    for (const [, arreglo] of contenido.matchAll(/\[([^\]]*)\] TJ/g)) {
-      partes.push(
-        [...arreglo!.matchAll(/<([0-9a-fA-F]*)>/g)].map(([, hex]) => Buffer.from(hex!, 'hex').toString('latin1')).join(''),
-      );
-    }
-  }
-  return partes.join('\n');
-}
+/** Texto del PDF: el lector compartido entiende las fuentes corporativas embebidas. */
+const textoDelPdf = (pdf: Buffer): string => textoPorHoja(pdf).join('\n');
 
 const guardada = () => ({
   id: 7,
