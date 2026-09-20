@@ -82,20 +82,20 @@ const OPS_SELF_MODULE: Record<OpsNavPair, ModuleId> = {
 
 const OPS_UNIFIED_COPY: Record<OpsNavPair, { team: { label: string; description: string }; self: { label: string; description: string } }> = {
   activities: {
-    team: { label: 'Actividades', description: 'OT del equipo — asignar, revisar evidencias y cerrar trabajo.' },
-    self: { label: 'Actividades', description: 'Tus OT — iniciar, subir evidencias y cerrar en sitio.' },
+    team: { label: 'Actividades', description: 'Asigna OT, revisa evidencias y cierra.' },
+    self: { label: 'Actividades', description: 'Inicia, evidencia y cierra en sitio.' },
   },
   evidences: {
-    team: { label: 'Actividades', description: 'OT del equipo — revisar evidencias en la pestaña Evidencias.' },
-    self: { label: 'Actividades', description: 'Tus OT — evidencias desde el detalle de cada actividad.' },
+    team: { label: 'Actividades', description: 'Revisa evidencias del equipo.' },
+    self: { label: 'Actividades', description: 'Sube evidencias desde cada actividad.' },
   },
   viatics: {
     team: { label: 'Viáticos', description: 'Revisar y autorizar solicitudes del equipo.' },
     self: { label: 'Viáticos', description: 'Solicitar y comprobar tus gastos de campo.' },
   },
   vehicles: {
-    team: { label: 'Vehículos', description: 'Gestión de flotilla y asignación a cuadrillas.' },
-    self: { label: 'Vehículos', description: 'Unidades asignadas a ti y entregas.' },
+    team: { label: 'Vehículos', description: 'Asigna y controla la flotilla.' },
+    self: { label: 'Vehículos', description: 'Tus unidades — incidentes y entregas.' },
   },
 };
 
@@ -478,18 +478,18 @@ export function adaptModulePresentation(
             ? 'Actividades · Asignación'
             : 'Actividades · Equipo',
       description: isSupportRole(v2)
-        ? 'OT del equipo — revisar y aprobar evidencias en la pestaña Evidencias'
+        ? 'Revisa y aprueba evidencias.'
         : (v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN)
-          ? 'Reportes de campo del equipo — evidencias y avances para facturación'
+          ? 'Reportes de campo para facturar.'
           : EXECUTIVE.has(v2)
-            ? 'Asignar y supervisar OT del equipo (evidencias incluidas)'
-            : 'Vista global — OT, evidencias y seguimiento del equipo',
+            ? 'Asigna y supervisa OT del equipo.'
+            : 'OT, evidencias y seguimiento.',
     },
     'ops-my-activities': {
       label: 'Actividades',
       description: OPS_MANAGERS.has(v2)
-        ? 'Tus OT — ejecutar y subir evidencias desde cada actividad'
-        : 'Tus OT del día — iniciar, evidenciar y cerrar',
+        ? 'Ejecuta y evidencia tus OT.'
+        : 'Inicia, evidencia y cierra hoy.',
     },
     'ops-viatics': {
       label: 'Viáticos',
@@ -501,19 +501,19 @@ export function adaptModulePresentation(
     },
     'ops-vehicles': {
       label: 'Flotilla · Gestión',
-      description: 'Asignar vehículos y control de flotilla',
+      description: 'Asigna y controla la flotilla.',
     },
     'ops-my-vehicles': {
       label: 'Mis vehículos',
-      description: 'Vehículos asignados a ti',
+      description: 'Tus vehículos asignados.',
     },
     'ops-gps': {
       label: 'GPS en vivo',
       description: 'Rastreo de cuadrillas en tiempo real',
     },
     'ops-tools': isFieldRole(v2)
-      ? { label: 'Herramientas', description: 'Solicita y da seguimiento a kits asignados.' }
-      : { label: 'Herramientas', description: 'Inventario, préstamos y solicitudes del equipo.' },
+      ? { label: 'Herramientas', description: 'Solicita y rastrea tu kit.' }
+      : { label: 'Herramientas', description: 'Inventario, préstamos y kits.' },
     'ops-maintenance': canAccessMaintenanceContracts(user)
       ? { label: 'Mantenimiento', description: 'Órdenes de trabajo y contratos de servicio (SLA).' }
       : { label: 'Mantenimiento', description: 'Visitas preventivas, correctivas y OT de activos.' },
@@ -522,8 +522,8 @@ export function adaptModulePresentation(
       description: 'Solicitudes, aprobación y pago de viáticos de campo.',
     },
     warehouse: {
-      label: 'Inventario',
-      description: 'Stock físico, ubicaciones y movimientos (fuente de verdad).',
+      label: 'Almacén',
+      description: 'Stock, ubicaciones y mínimos.',
     },
     procurement: {
       label: 'Compras',
@@ -548,15 +548,15 @@ export function adaptModulePresentation(
     'crm-agenda': SALES_REP.has(v2)
       ? { label: 'Agenda', description: 'Tus llamadas, visitas y seguimientos' }
       : { label: 'Agenda', description: 'Actividades comerciales del equipo' },
-    'crm-clients': { label: 'Clientes', description: 'Cartera de cuentas y contactos' },
+    'crm-clients': { label: 'Clientes', description: 'Cuentas y contactos.' },
     'crm-quotes': DESIGN_TEAM.has(v2)
-      ? { label: 'Cotizaciones', description: 'Propuestas comerciales y diseño de solución' }
+      ? { label: 'Cotizaciones', description: 'Propuestas y diseño.' }
       : SALES_REP.has(v2)
-        ? { label: 'Cotizaciones', description: 'Tus propuestas en curso' }
-        : { label: 'Cotizaciones', description: 'Documentos comerciales del equipo' },
+        ? { label: 'Cotizaciones', description: 'Tus propuestas en curso.' }
+        : { label: 'Cotizaciones', description: 'Propuestas del equipo.' },
     'crm-projects': SALES_REP.has(v2)
-      ? { label: 'Proyectos', description: 'Negocios ganados que tienes asignados' }
-      : { label: 'Proyectos', description: 'Handoff comercial → operaciones' },
+      ? { label: 'Proyectos', description: 'Tus negocios ganados.' }
+      : { label: 'Proyectos', description: 'Handoff a operaciones.' },
     'crm-dashboard': SALES_REP.has(v2)
       ? { label: 'Mi dashboard', description: 'Resumen de tu pipeline y metas' }
       : { label: 'Dashboard comercial', description: 'KPIs del equipo y embudo de ventas' },
@@ -694,7 +694,7 @@ export function adaptModulePresentation(
   }
 
   if (module.id === 'kpis-hr') {
-    return { ...module, label: 'KPIs de personas', description: 'Productividad, rotación y clima laboral.' };
+    return { ...module, label: 'KPIs de personas', description: 'Productividad, rotación y clima.' };
   }
 
   return hit ? { ...module, ...hit } : module;
@@ -712,7 +712,7 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canAssign: true,
       canApprove: true,
       title: 'Órdenes de trabajo · Asignación',
-      subtitle: 'Aquí asignas y das seguimiento. El técnico ejecuta en Mis OT.',
+      subtitle: 'Asigna y da seguimiento. El técnico ejecuta en Mis OT.',
     };
   }
   if (EXECUTIVE.has(v2)) {
@@ -725,7 +725,7 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canAssign: true,
       canApprove: true,
       title: 'Órdenes de trabajo · Asignación',
-      subtitle: 'Supervisa OT del equipo. No tienes OT personales de campo.',
+      subtitle: 'Supervisa OT del equipo.',
     };
   }
   // Admin (DIR_ADMIN / COORD_ADMIN): lectura de reportes para facturación y seguimiento
@@ -739,7 +739,7 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canAssign: false,
       canApprove: false,
       title: 'Órdenes de trabajo · Reportes',
-      subtitle: 'Reportes de campo — evidencias y avances para facturación.',
+      subtitle: 'Evidencias y avances para facturar.',
     };
   }
   if (OPS_MANAGERS.has(v2)) {
@@ -752,7 +752,7 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canAssign: true,
       canApprove: true,
       title: 'Órdenes de trabajo · Equipo',
-      subtitle: 'Asigna OT al equipo. Para ejecutar las tuyas usa Mis OT.',
+      subtitle: 'Asigna OT; ejecuta las tuyas en Mis OT.',
     };
   }
   if (isSupportRole(v2)) {
@@ -887,8 +887,8 @@ export function getAttendanceSectionConfig(
       canRegisterSelf: false,
       canManageTeam: true,
       title: 'Asistencia · Gestión',
-      subtitle: 'Checador del equipo + contraste con puertas Integra (ACS).',
-      visibilityHint: 'Dueño, Dirección y RRHH ven la asistencia de todo el equipo. El panel híbrido contrasta fichajes app vs accesos de puerta; la nómina sigue el checador.',
+      subtitle: 'Checador del equipo y contraste ACS.',
+      visibilityHint: 'Dirección y RRHH ven todo el equipo; el panel contrasta app vs puertas.',
     };
   }
   if (viewMode === 'manage_register') {
@@ -897,8 +897,8 @@ export function getAttendanceSectionConfig(
       canRegisterSelf: true,
       canManageTeam: true,
       title: 'Asistencia',
-      subtitle: 'Tu jornada, el equipo y contraste ACS Integra.',
-      visibilityHint: 'Coordinadores y RRHH ven su equipo y registran su propia jornada. Abajo: híbrido ERP↔puertas.',
+      subtitle: 'Tu jornada, el equipo y ACS.',
+      visibilityHint: 'Coordinadores y RRHH ven su equipo y registran su propia jornada.',
     };
   }
   return {
@@ -906,7 +906,7 @@ export function getAttendanceSectionConfig(
     canRegisterSelf: true,
     canManageTeam: false,
     title: 'Mi asistencia',
-    subtitle: 'Registra tu entrada/salida y mira tu contraste ACS si hay vínculo.',
+    subtitle: 'Registra entrada/salida y contraste ACS.',
     visibilityHint: 'Solo puedes ver y registrar tu propia asistencia. El ACS aparece si tu employeeNumber coincide con el personId del terminal.',
   };
 }
@@ -1076,16 +1076,16 @@ const CRM_SALES_COPY: Record<CrmSalesModule, { manager: { title: string; subtitl
     rep: { title: 'Mi agenda', subtitle: 'Tus llamadas, visitas y seguimientos pendientes.' },
   },
   clients: {
-    manager: { title: 'Clientes comerciales', subtitle: 'Cartera CRM. Al crear se provisiona automáticamente el cliente operativo.' },
-    rep: { title: 'Mis clientes', subtitle: 'Cuentas y contactos que gestionas.' },
+    manager: { title: 'Clientes comerciales', subtitle: 'Cartera CRM y contactos.' },
+    rep: { title: 'Mis clientes', subtitle: 'Tus cuentas y contactos.' },
   },
     quotes: {
-      manager: { title: 'Cotizaciones', subtitle: 'Documentos comerciales del equipo.' },
-      rep: { title: 'Mis cotizaciones', subtitle: 'Tus propuestas y cotizaciones en curso.' },
+      manager: { title: 'Cotizaciones', subtitle: 'Propuestas del equipo.' },
+      rep: { title: 'Mis cotizaciones', subtitle: 'Tus propuestas en curso.' },
     },
     projects: {
-      manager: { title: 'Proyectos de venta', subtitle: 'Negocios ganados y handoff a operaciones.' },
-      rep: { title: 'Mis proyectos', subtitle: 'Proyectos comerciales que tienes asignados.' },
+      manager: { title: 'Proyectos de venta', subtitle: 'Ganados y handoff a operaciones.' },
+      rep: { title: 'Mis proyectos', subtitle: 'Proyectos que tienes asignados.' },
     },
   };
 
@@ -1133,7 +1133,7 @@ export function getCrmSalesSectionConfig(
       canApprove: false,
       title: module === 'quotes' ? 'Cotizaciones · Diseño' : copy.manager.title,
       subtitle: module === 'quotes'
-        ? 'Elabora propuestas visuales y técnicas para el equipo comercial.'
+        ? 'Propuestas visuales y técnicas.'
         : copy.manager.subtitle,
     };
   }
@@ -1147,7 +1147,7 @@ export function getCrmSalesSectionConfig(
       canAssign: false,
       canApprove: false,
       title: 'Proyectos de venta',
-      subtitle: 'Seguimiento de proyectos comerciales en ejecución.',
+      subtitle: 'Seguimiento de proyectos en ejecución.',
     };
   }
   // Coordinador Administrativo: ve clientes, cotizaciones y pipeline con scope de equipo
@@ -1170,13 +1170,13 @@ export function getCrmSalesSectionConfig(
               ? 'Proyectos de venta'
               : copy.manager.title,
       subtitle: module === 'clients'
-        ? 'Clientes activos y seguimiento administrativo.'
+        ? 'Clientes activos y seguimiento admin.'
         : module === 'quotes'
-          ? 'Cotizaciones para revision y gestion administrativa.'
+          ? 'Cotizaciones para revisión administrativa.'
           : module === 'leads'
-            ? 'Prospectos del equipo — califica y da seguimiento administrativo.'
+            ? 'Prospectos del equipo — seguimiento admin.'
             : module === 'projects'
-              ? 'Proyectos cerrados — genera factura borrador desde la orden de cierre.'
+              ? 'Cerrados — factura borrador desde cierre.'
               : copy.manager.subtitle,
     };
   }
@@ -1191,7 +1191,7 @@ export function getCrmSalesSectionConfig(
       canAssign: false,
       canApprove: false,
       title: 'Proyectos de venta',
-      subtitle: 'Proyectos cerrados — genera factura borrador desde la orden de cierre.',
+      subtitle: 'Cerrados — factura borrador desde cierre.',
     };
   }
   // Arquitecto: ve proyectos CRM para planeacion tecnica (solo lectura)
@@ -1205,7 +1205,7 @@ export function getCrmSalesSectionConfig(
       canAssign: false,
       canApprove: false,
       title: 'Proyectos de venta',
-      subtitle: 'Proyectos comerciales para planeacion y diseno tecnico.',
+      subtitle: 'Proyectos para planeación y diseño técnico.',
     };
   }
   return {
@@ -1497,7 +1497,7 @@ const HR_SUB_COPY: Record<HrSubmodule, { title: string; subtitle: string }> = {
   },
   kpis: {
     title: 'KPIs de personas',
-    subtitle: 'Productividad operativa, rotación y capacitación del equipo.',
+    subtitle: 'Productividad, rotación y clima.',
   },
   orgchart: {
     title: 'Organigrama',
@@ -1535,7 +1535,7 @@ export function getOpsDashboardSectionConfig(user: UserAccessInput | null | unde
     return {
       ...activities,
       title: 'Mi día en campo',
-      subtitle: 'Resumen de tus OT y alertas relevantes para hoy.',
+      subtitle: 'Resumen de tus OT y alertas de hoy.',
     };
   }
   if (activities.viewMode === 'manage_execute') {
@@ -1551,7 +1551,7 @@ export function getOpsDashboardSectionConfig(user: UserAccessInput | null | unde
     return {
       ...activities,
       title: 'Reportes de campo',
-      subtitle: 'Actividades del equipo de campo — evidencias y avances para facturación.',
+      subtitle: 'Evidencias y avances para facturar.',
     };
   }
   return {
@@ -1563,7 +1563,7 @@ export function getOpsDashboardSectionConfig(user: UserAccessInput | null | unde
     canAssign: true,
     canApprove: true,
     title: 'Centro de operaciones',
-    subtitle: 'Supervisión global de OT, alertas y desempeño del equipo.',
+    subtitle: 'OT, alertas y desempeño del equipo.',
   };
 }
 
@@ -1583,8 +1583,8 @@ type OpsTeamModule =
   | 'recruiting';
 
 const OPS_TEAM_COPY: Record<OpsTeamModule, { title: string; subtitle: string }> = {
-  vehicles: { title: 'Flotilla · Gestión', subtitle: 'Asignación y control de vehículos del equipo.' },
-  tools: { title: 'Herramientas', subtitle: 'Inventario de herramientas y equipos de campo.' },
+  vehicles: { title: 'Flotilla · Gestión', subtitle: 'Asigna y controla la flotilla.' },
+  tools: { title: 'Herramientas', subtitle: 'Inventario, préstamos y kits de campo.' },
   projects: { title: 'Proyectos OPS', subtitle: 'Proyectos de implementación y entrega en sitio.' },
   maintenance: { title: 'Mantenimiento', subtitle: 'Órdenes de mantenimiento preventivo y correctivo.' },
   'maintenance-contracts': { title: 'Contratos de mantenimiento', subtitle: 'Acuerdos de servicio y SLA con clientes.' },
@@ -1636,7 +1636,43 @@ export function getOpsTeamSectionConfig(
     };
   }
 
-  if (module === 'tools' && v2 && (isFieldRole(v2) || isSupportRole(v2))) {
+  // Tools inventory ≠ OT assignment: warehouse/admin must manage even if
+  // activities viewMode is execute (e.g. ADMINISTRATIVO stocks kits).
+  if (module === 'tools') {
+    if (v2 && (isFieldRole(v2) || isSupportRole(v2))) {
+      return {
+        viewMode: 'execute',
+        defaultScope: 'self',
+        canCreate: true,
+        canEdit: true,
+        canDelete: false,
+        canAssign: false,
+        canApprove: false,
+        title: 'Mis herramientas',
+        subtitle: 'Solicita y rastrea tu kit.',
+      };
+    }
+    if (
+      !v2
+      || user?.isSuperAdmin
+      || (v2
+        && (WAREHOUSE_ROLES.has(v2)
+          || OPS_MANAGERS.has(v2)
+          || EXECUTIVE.has(v2)
+          || v2 === ROLES.ADMINISTRATIVO))
+    ) {
+      return {
+        viewMode: 'manage',
+        defaultScope: 'team',
+        canCreate: true,
+        canEdit: true,
+        canDelete: !v2 || tier(v2) >= 70,
+        canAssign: true,
+        canApprove: true,
+        title: copy.title,
+        subtitle: copy.subtitle,
+      };
+    }
     return {
       viewMode: 'execute',
       defaultScope: 'self',
@@ -1645,8 +1681,8 @@ export function getOpsTeamSectionConfig(
       canDelete: false,
       canAssign: false,
       canApprove: false,
-      title: 'Mis herramientas',
-      subtitle: 'Solicita y da seguimiento a herramientas asignadas.',
+      title: 'Herramientas',
+      subtitle: 'Solicita y rastrea tu kit.',
     };
   }
 
@@ -1660,7 +1696,7 @@ export function getOpsTeamSectionConfig(
       canAssign: false,
       canApprove: false,
       title: 'Mis vehículos',
-      subtitle: 'Unidades asignadas a ti — reporta incidentes y entregas.',
+      subtitle: 'Tus unidades — incidentes y entregas.',
     };
   }
 
@@ -1698,8 +1734,8 @@ export function getVehiclesSectionConfig(user: UserAccessInput | null | undefine
 type ErpInventoryModule = 'warehouse' | 'procurement';
 
 const ERP_INVENTORY_COPY: Record<ErpInventoryModule, { title: string; subtitle: string }> = {
-  warehouse: { title: 'Almacén', subtitle: 'Stock, ubicaciones y mínimos de inventario.' },
-  procurement: { title: 'Compras', subtitle: 'Órdenes de compra y aprobación de adquisiciones.' },
+  warehouse: { title: 'Almacén', subtitle: 'Stock, ubicaciones y mínimos.' },
+  procurement: { title: 'Compras', subtitle: 'Órdenes de compra y aprobaciones.' },
 };
 
 export function getErpInventorySectionConfig(
@@ -1745,8 +1781,8 @@ export function getErpInventorySectionConfig(
       canApprove: false,
       title: module === 'procurement' ? 'Compras · Solicitudes' : 'Almacén · Consulta',
       subtitle: module === 'procurement'
-        ? 'Solicita órdenes de compra — requieren aprobación de dirección.'
-        : 'Consulta existencias y ubicaciones de inventario.',
+        ? 'Solicita OC — requiere aprobación.'
+        : 'Consulta existencias y ubicaciones.',
     };
   }
   return {
