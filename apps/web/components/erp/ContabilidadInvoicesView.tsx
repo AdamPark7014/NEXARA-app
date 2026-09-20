@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
+import Modal from "@/components/ui/Modal";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
@@ -54,6 +55,17 @@ function daysOverdue(due?: string | null) {
   return Math.floor((today.getTime() - d.getTime()) / 86_400_000);
 }
 
+/** Estado para humanos — nunca enums crudos. */
+function statusLabel(row: InvoiceRow): { text: string; tone: "ok" | "warn" | "bad" | "mute" } {
+  const pend = pendingOf(row);
+  const od = daysOverdue(row.dueDate);
+  if (row.status === "CANCELLED" || row.status === "DRAFT") return { text: row.status === "DRAFT" ? "Borrador" : "Cancelada", tone: "mute" };
+  if (pend <= 0.01 || row.status === "PAID") return { text: "Pagada", tone: "ok" };
+  if (od != null && od > 0) return { text: `Vencida · ${od}d`, tone: "bad" };
+  if (Number(row.paidAmount || 0) > 0) return { text: "Parcial", tone: "warn" };
+  return { text: "Pendiente", tone: "mute" };
+}
+
 type Mode = "cxc" | "cxp" | "all";
 
 export default function ContabilidadInvoicesView({
@@ -71,7 +83,8 @@ export default function ContabilidadInvoicesView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [payingId, setPayingId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<InvoiceRow | null>(null);
+  const [paying, setPaying] = useState(false);
 
   const typeParam =
     mode === "cxc" ? "ACCOUNTS_RECEIVABLE" : mode === "cxp" ? "ACCOUNTS_PAYABLE" : "";
@@ -109,7 +122,7 @@ export default function ContabilidadInvoicesView({
     }
     if (!needle) return rows;
     return rows.filter((r) =>
-      [r.invoiceNumber, r.receptorName, r.emisorName, r.status, r.cfdiUuid]
+      [r.invoiceNumber, r.receptorName, r.emisorName, r.cfdiUuid]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(needle)),
     );
@@ -119,7 +132,7 @@ export default function ContabilidadInvoicesView({
     if (mode !== "cxp") return null;
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const buckets = { today: 0, d7: 0, d30: 0, overdue: 0 };
+    const buckets = { today: 0, d7: 0, overdue: 0 };
     for (const r of filtered) {
       const due = r.dueDate ? new Date(r.dueDate) : null;
       const pend = pendingOf(r);
@@ -128,7 +141,6 @@ export default function ContabilidadInvoicesView({
       if (diff < 0) buckets.overdue += pend;
       else if (diff === 0) buckets.today += pend;
       else if (diff <= 7) buckets.d7 += pend;
-      else if (diff <= 30) buckets.d30 += pend;
     }
     return buckets;
   }, [filtered, mode]);
@@ -136,14 +148,17 @@ export default function ContabilidadInvoicesView({
   async function registerPayment(row: InvoiceRow) {
     const pend = pendingOf(row);
     if (pend <= 0) return;
-    const amountStr = window.prompt(`Monto a registrar (saldo ${pend.toFixed(2)})`, String(pend.toFixed(2)));
+    const amountStr = window.prompt(
+      `Monto a registrar (saldo ${pend.toFixed(2)})`,
+      String(pend.toFixed(2)),
+    );
     if (!amountStr) return;
     const amount = Number(amountStr);
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Monto inválido");
+      toast.error("Indica un monto válido");
       return;
     }
-    setPayingId(row.id);
+    setPaying(true);
     try {
       await apiFetch(`accounting/invoices/${row.id}/payments`, token, {
         method: "POST",
@@ -154,129 +169,242 @@ export default function ContabilidadInvoicesView({
         }),
       });
       toast.success("Pago registrado");
+      setSelected(null);
       await load();
     } catch (e) {
       toast.error(formatApiError(e));
     } finally {
-      setPayingId(null);
+      setPaying(false);
     }
   }
 
+  const partyLabel = mode === "cxp" ? "Proveedor" : mode === "cxc" ? "Cliente" : "Contraparte";
+
   const columns: Column<InvoiceRow>[] = [
     {
-      key: "invoiceNumber",
-      label: "Folio",
-      render: (r) => <strong style={{ fontSize: 12 }}>{r.invoiceNumber}</strong>,
-    },
-    {
       key: "party",
-      label: mode === "cxp" ? "Proveedor" : mode === "cxc" ? "Cliente" : "Contraparte",
-      render: (r) => r.receptorName || r.emisorName || "—",
+      label: partyLabel,
+      render: (r) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{r.receptorName || r.emisorName || "Sin nombre"}</div>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.invoiceNumber}</div>
+        </div>
+      ),
     },
     {
-      key: "issueDate",
-      label: "Emisión",
-      render: (r) => (r.issueDate ? new Date(r.issueDate).toLocaleDateString("es-MX") : "—"),
-    },
-    {
-      key: "dueDate",
+      key: "due",
       label: "Vence",
       render: (r) => {
         const od = daysOverdue(r.dueDate);
         return (
           <span style={{ color: od != null && od > 0 ? "var(--danger)" : undefined }}>
             {r.dueDate ? new Date(r.dueDate).toLocaleDateString("es-MX") : "—"}
-            {od != null && od > 0 ? ` (+${od}d)` : ""}
           </span>
         );
       },
     },
     {
-      key: "total",
-      label: "Total",
-      align: "right",
-      numeric: true,
-      render: (r) => <Money value={Number(r.totalAmount || 0)} />,
-    },
-    {
-      key: "pending",
+      key: "saldo",
       label: "Saldo",
       align: "right",
       numeric: true,
       render: (r) => <Money value={pendingOf(r)} />,
     },
     {
-      key: "status",
+      key: "estado",
       label: "Estado",
-      render: (r) => (
-        <Tag variant={r.status === "OVERDUE" ? "danger" : r.status === "PAID" ? "positive" : "neutral"}>
-          {r.status}
-        </Tag>
-      ),
-    },
-    {
-      key: "cfdi",
-      label: "CFDI",
-      render: (r) =>
-        r.cfdiXml || r.cfdiUuid ? <Tag variant="positive">OK</Tag> : <Tag variant="warning">Sin XML</Tag>,
-    },
-    {
-      key: "actions",
-      label: "",
-      render: (r) =>
-        pendingOf(r) > 0.01 ? (
-          <Button size="sm" variant="secondary" disabled={payingId === r.id} onClick={() => void registerPayment(r)}>
-            Registrar pago
-          </Button>
-        ) : null,
+      render: (r) => {
+        const s = statusLabel(r);
+        const color =
+          s.tone === "bad"
+            ? "var(--danger)"
+            : s.tone === "warn"
+              ? "var(--warning)"
+              : s.tone === "ok"
+                ? "var(--success)"
+                : "var(--text-secondary)";
+        return <span style={{ fontSize: 12.5, fontWeight: 600, color }}>{s.text}</span>;
+      },
     },
   ];
 
   const pageTitle =
     title ??
-    (mode === "cxc" ? "Cuentas por cobrar" : mode === "cxp" ? "Cuentas por pagar" : "Facturas");
+    (mode === "cxc" ? "Por cobrar" : mode === "cxp" ? "Por pagar" : "Facturas");
+
+  const pageSubtitle =
+    subtitle ??
+    (mode === "cxc"
+      ? "Quién te debe y qué urge cobrar."
+      : mode === "cxp"
+        ? "Qué debes pagar y cuándo."
+        : "Documentos emitidos y recibidos.");
+
+  const emptyTitle =
+    mode === "cxc"
+      ? "Nada por cobrar"
+      : mode === "cxp"
+        ? "Nada por pagar"
+        : "Sin facturas";
+  const emptyDesc =
+    mode === "all"
+      ? "Cuando registres o recibas una factura, aparecerá aquí."
+      : "No hay saldos abiertos con estos filtros.";
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
+        eyebrow="Contabilidad"
         title={pageTitle}
-        subtitle={subtitle ?? "Vista densa sobre facturas existentes. Sin segundo ledger."}
+        subtitle={pageSubtitle}
         density="ops"
         actions={
-          <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
-            Actualizar
-          </Button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {mode === "all" && (
+              <Link
+                href="/erp/invoicing"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  background: "var(--primary)",
+                  color: "#fff",
+                  textDecoration: "none",
+                }}
+              >
+                Nueva factura
+              </Link>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
+              Actualizar
+            </Button>
+          </div>
         }
       />
 
-      {calendar && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 12 }}>
-          <Section dense title="Vencido"><Money value={calendar.overdue} /></Section>
-          <Section dense title="Hoy"><Money value={calendar.today} /></Section>
-          <Section dense title="7 días"><Money value={calendar.d7} /></Section>
-          <Section dense title="30 días"><Money value={calendar.d30} /></Section>
-        </div>
+      {calendar && (calendar.overdue > 0 || calendar.today > 0 || calendar.d7 > 0) && (
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)" }}>
+          {calendar.overdue > 0 && (
+            <span style={{ color: "var(--danger)", fontWeight: 600, marginRight: 12 }}>
+              Vencido <Money value={calendar.overdue} />
+            </span>
+          )}
+          {calendar.today > 0 && (
+            <span style={{ marginRight: 12 }}>
+              Hoy <strong><Money value={calendar.today} /></strong>
+            </span>
+          )}
+          {calendar.d7 > 0 && (
+            <span>
+              Próx. 7 días <strong><Money value={calendar.d7} /></strong>
+            </span>
+          )}
+        </p>
       )}
 
       <div style={{ marginBottom: 12 }}>
         <FilterToolbar
-          search={{ value: q, onChange: setQ, placeholder: "Buscar folio, cliente, UUID…" }}
+          search={{
+            value: q,
+            onChange: setQ,
+            placeholder: `Buscar ${partyLabel.toLowerCase()} o folio…`,
+          }}
           resultCount={filtered.length}
         />
       </div>
 
       {error && (
-        <div style={{ padding: 12, marginBottom: 12, color: "var(--danger)", fontSize: 13 }}>{error}</div>
+        <div role="alert" style={{ marginBottom: 12, fontSize: 13, color: "var(--danger)" }}>
+          No se pudo cargar la lista.{" "}
+          <button type="button" onClick={() => void load()} style={{ fontWeight: 700, textDecoration: "underline", background: "none", border: "none", color: "inherit", cursor: "pointer" }}>
+            Reintentar
+          </button>
+        </div>
       )}
 
       {loading ? (
         <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando…</p>
       ) : filtered.length === 0 ? (
-        <EmptyState title="Sin registros" description="No hay facturas con estos filtros." />
+        <EmptyState
+          title={emptyTitle}
+          description={emptyDesc}
+          action={
+            mode === "all" ? (
+              <Link href="/erp/invoicing" style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
+                Ir a facturación →
+              </Link>
+            ) : undefined
+          }
+        />
       ) : (
-        <DataTable columns={columns} rows={filtered} rowKey={(r) => r.id} density="compact" />
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(r) => r.id}
+          density="compact"
+          onRowClick={(r) => setSelected(r)}
+        />
       )}
+
+      <Modal
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected?.invoiceNumber || "Factura"}
+        footer={
+          selected && pendingOf(selected) > 0.01 ? (
+            <Button
+              variant="primary"
+              loading={paying}
+              onClick={() => selected && void registerPayment(selected)}
+            >
+              Registrar pago
+            </Button>
+          ) : (
+            <Button variant="ghost" onClick={() => setSelected(null)}>
+              Cerrar
+            </Button>
+          )
+        }
+      >
+        {selected && (
+          <div style={{ display: "grid", gap: 12, fontSize: 13 }}>
+            <div>
+              <div style={{ color: "var(--text-tertiary)", fontSize: 11, marginBottom: 2 }}>{partyLabel}</div>
+              <div style={{ fontWeight: 600 }}>{selected.receptorName || selected.emisorName || "—"}</div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Emisión</div>
+                <div>{selected.issueDate ? new Date(selected.issueDate).toLocaleDateString("es-MX") : "—"}</div>
+              </div>
+              <div>
+                <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Vence</div>
+                <div>{selected.dueDate ? new Date(selected.dueDate).toLocaleDateString("es-MX") : "—"}</div>
+              </div>
+              <div>
+                <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Total</div>
+                <div style={{ fontWeight: 600 }}><Money value={Number(selected.totalAmount || 0)} /></div>
+              </div>
+              <div>
+                <div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>Saldo</div>
+                <div style={{ fontWeight: 700 }}><Money value={pendingOf(selected)} /></div>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+              CFDI:{" "}
+              {selected.cfdiXml || selected.cfdiUuid ? (
+                <span style={{ color: "var(--success)", fontWeight: 600 }}>Con XML</span>
+              ) : (
+                <span style={{ color: "var(--warning)", fontWeight: 600 }}>Sin XML — completar cuando exista</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+              Estado: {statusLabel(selected).text}
+            </div>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

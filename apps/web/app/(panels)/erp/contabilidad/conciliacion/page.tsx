@@ -5,7 +5,7 @@ import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
@@ -139,7 +139,8 @@ export default function ConciliacionPage() {
       label: "Estado",
       render: (r) => {
         const st = r.reconciliationStatus || (r.isReconciled ? "MATCHED" : "PENDING");
-        return <Tag variant={st === "MATCHED" ? "positive" : st === "PENDING" ? "warning" : "neutral"}>{st}</Tag>;
+        const label = st === "MATCHED" ? "Conciliado" : st === "PENDING" ? "Pendiente" : st === "UNMATCHED" ? "Sin match" : "Ajuste";
+        return <span style={{ fontSize: 12.5, fontWeight: 600, color: st === "MATCHED" ? "var(--success)" : st === "PENDING" ? "var(--warning)" : "var(--text-secondary)" }}>{label}</span>;
       },
     },
   ];
@@ -147,9 +148,9 @@ export default function ConciliacionPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
-        title="Conciliación bancaria"
-        subtitle="Split banco ↔ Nexara. Match sugerido por monto±fecha; conciliación manual."
+        eyebrow="Contabilidad"
+        title="Conciliación"
+        subtitle="Elige un movimiento del banco y vincúlalo con Nexara."
         density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -187,7 +188,7 @@ export default function ConciliacionPage() {
       {error && <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)", gap: 14 }}>
-        <Section title="Movimientos banco" dense>
+        <Section title="Banco" dense>
           {loading ? (
             <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando…</p>
           ) : (
@@ -202,10 +203,10 @@ export default function ConciliacionPage() {
             />
           )}
         </Section>
-        <Section title={selectedTx ? "Match Nexara" : "Selecciona un movimiento"} dense>
+        <Section title={selectedTx ? "Sugerencias en Nexara" : "Detalle"} dense>
           {!selectedTx ? (
             <p style={{ margin: 0, fontSize: 13, color: "var(--text-tertiary)" }}>
-              Elige un renglón a la izquierda para ver sugerencias por monto y fecha.
+              Selecciona un movimiento a la izquierda para ver coincidencias por monto y fecha.
             </p>
           ) : (
             <div style={{ display: "grid", gap: 10 }}>

@@ -7,7 +7,7 @@ export default function ContabilidadFacturasPage() {
     <ContabilidadInvoicesView
       mode="all"
       title="Facturas"
-      subtitle="Bandeja emitidas/recibidas. Alerta Sin XML si falta CFDI; sin motor PAC nuevo."
+      subtitle="Documentos emitidos y recibidos. El detalle se abre al elegir una fila."
     />
   );
 }

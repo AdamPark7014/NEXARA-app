@@ -6,8 +6,8 @@ export default function CuentasPorPagarPage() {
   return (
     <ContabilidadInvoicesView
       mode="cxp"
-      title="Cuentas por pagar"
-      subtitle="Aging de proveedores y calendario HOY / 7d / 30d."
+      title="Por pagar"
+      subtitle="Qué debes pagar y cuándo."
     />
   );
 }

@@ -5,9 +5,9 @@ import ContabilidadSidebar from "@/components/erp/ContabilidadSidebar";
 
 export default function ContabilidadLayout({ children }: { children: ReactNode }) {
   return (
-    <div style={{ display: "grid", gap: 4 }}>
+    <div style={{ display: "grid", gap: 12 }}>
       <ContabilidadSidebar />
-      {children}
+      <div>{children}</div>
     </div>
   );
 }

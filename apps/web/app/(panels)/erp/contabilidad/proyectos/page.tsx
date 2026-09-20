@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
-import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -74,8 +74,12 @@ export default function ContabilidadProyectosPage() {
         label: "Proyecto",
         render: (r) => (
           <span>
-            {r.label}{" "}
-            {!r.linked && <Tag variant="warning">sin vínculo</Tag>}
+            {r.label}
+            {!r.linked && (
+              <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-tertiary)", fontWeight: 600 }}>
+                sin vínculo
+              </span>
+            )}
           </span>
         ),
       },
@@ -95,9 +99,9 @@ export default function ContabilidadProyectosPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
-        title="P&L por proyecto"
-        subtitle="Solo métricas con datos reales de facturas. Sin projectId → «sin vínculo»."
+        eyebrow="Contabilidad"
+        title="Proyectos"
+        subtitle="Ingresos menos costos por proyecto. Sin vínculo = aún no asignado."
         density="ops"
         actions={<Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>Actualizar</Button>}
       />

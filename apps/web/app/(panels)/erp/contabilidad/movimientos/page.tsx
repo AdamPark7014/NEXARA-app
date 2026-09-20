@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
-import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import FilterToolbar from "@/components/FilterToolbar";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -85,23 +85,22 @@ export default function MovimientosPage() {
       key: "kind",
       label: "Tipo",
       render: (r) => (
-        <Tag variant={r.kind === "INGRESO" ? "positive" : r.kind === "EGRESO" ? "warning" : "accent"}>
-          {r.kind}
-        </Tag>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: r.kind === "INGRESO" ? "var(--success)" : "var(--text-secondary)" }}>
+          {r.kind === "INGRESO" ? "Ingreso" : r.kind === "EGRESO" ? "Egreso" : "Pago"}
+        </span>
       ),
     },
     { key: "ref", label: "Referencia", render: (r) => r.ref },
     { key: "party", label: "Contraparte", render: (r) => r.party },
     { key: "amount", label: "Monto", align: "right", numeric: true, render: (r) => <Money value={r.amount} /> },
-    { key: "status", label: "Estado", render: (r) => <Tag>{r.status}</Tag> },
   ];
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Contabilidad"
+        eyebrow="Contabilidad"
         title="Movimientos"
-        subtitle="Tabla unificada de ingresos/egresos desde facturas (facade WorkspaceMovement)."
+        subtitle="Ingresos y egresos del periodo. Registra uno nuevo desde facturación."
         density="ops"
         actions={
           <>
@@ -109,15 +108,15 @@ export default function MovimientosPage() {
               href="/erp/invoicing"
               style={{
                 fontSize: 12,
-                fontWeight: 600,
+                fontWeight: 700,
                 padding: "6px 12px",
                 borderRadius: 8,
-                border: "1px solid var(--border)",
+                background: "var(--primary)",
+                color: "#fff",
                 textDecoration: "none",
-                color: "var(--text-primary)",
               }}
             >
-              Nuevo ingreso/egreso
+              Registrar movimiento
             </Link>
             <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>Actualizar</Button>
           </>
@@ -145,7 +144,7 @@ export default function MovimientosPage() {
       {loading ? (
         <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando…</p>
       ) : filtered.length === 0 ? (
-        <EmptyState title="Sin movimientos" description="No hay facturas en el periodo." />
+        <EmptyState title="Sin movimientos" description="Cuando haya facturas, verás ingresos y egresos aquí." />
       ) : (
         <DataTable columns={columns} rows={filtered} rowKey={(r) => r.id} density="compact" />
       )}
