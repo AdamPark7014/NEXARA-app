@@ -84,19 +84,42 @@ export function FinanceFormGrid({ children }: { children: ReactNode }) {
   return <div className={styles.formGrid}>{children}</div>;
 }
 
+/**
+ * Campo de formulario financiero.
+ *
+ * `hint` va DEBAJO del control, no en un asterisco ni en un tooltip: la duda
+ * («¿el monto lleva IVA?») aparece donde se captura, no después del error.
+ * `optional` se marca en la etiqueta porque lo contrario —marcar lo obligatorio
+ * con un asterisco rojo— llena el formulario de alarmas para decir lo normal.
+ * `error` se pinta bajo el campo y reemplaza al hint mientras esté presente.
+ */
 export function FinanceField({
   label,
   children,
   fullWidth,
+  hint,
+  optional,
+  error,
 }: {
   label: string;
   children: ReactNode;
   fullWidth?: boolean;
+  hint?: ReactNode;
+  optional?: boolean;
+  error?: string | null;
 }) {
   return (
     <label className={`${styles.field}${fullWidth ? ` ${styles.fieldFull}` : ""}`}>
-      <span className={styles.fieldLabel}>{label}</span>
+      <span className={styles.fieldLabel}>
+        {label}
+        {optional ? <span className={styles.fieldOptional}> · opcional</span> : null}
+      </span>
       {children}
+      {error ? (
+        <span className={styles.fieldError}>{error}</span>
+      ) : hint ? (
+        <span className={styles.fieldHint}>{hint}</span>
+      ) : null}
     </label>
   );
 }

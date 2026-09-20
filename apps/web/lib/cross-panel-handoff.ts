@@ -96,16 +96,14 @@ export function resolveShellPanelFromPath(pathname?: string | null): PanelId {
   if (p === '/hr' || p.startsWith('/hr/')) return 'hr';
   if (p.startsWith('/erp/hr/attendance') || p.startsWith('/erp/hr/lunch-breaks')) return 'ops';
   if (p === '/erp/hr' || p.startsWith('/erp/hr/')) return 'hr';
-  if (
-    p.startsWith('/erp/accounting')
-    || p.startsWith('/erp/invoicing')
-    || p.startsWith('/erp/banking')
-    || p.startsWith('/erp/finance/')
-    || p === '/erp/exports'
-    || p.startsWith('/erp/exports/')
-  ) {
-    return 'finance';
-  }
+  // Las rutas financieras viven en /erp y se quedan en la cáscara del ERP.
+  //
+  // Antes devolvían 'finance': seguías bajo /erp pero el menú se encogía a solo
+  // Finanzas y la marca cambiaba a «Nexara · Contabilidad», así que entrar a
+  // Gastos se sentía como salir del ERP a otro producto. En NEXARA todo vive
+  // bajo /erp. Los módulos de finanzas siguen apareciendo en el menú porque
+  // `buildUserSidebar` los admite por su `routePanel` (ERP), no solo por su
+  // `panel`.
   return panelIdFromInternalPath(p) ?? 'erp';
 }
 

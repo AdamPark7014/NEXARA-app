@@ -562,7 +562,10 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   // ── Finanzas ──
   accounting: {
     id: "accounting", panel: PANELS.FINANCE, routePanel: PANELS.ERP, path: "/accounting",
-    label: "Contabilidad", description: "Pólizas, períodos y reportes",
+    // El hub `erp-contabilidad` ya se llama "Contabilidad": dos entradas con el
+    // mismo nombre en Finanzas no dicen cuál es cuál. Esta es la contabilidad
+    // formal (libro diario, catálogo de cuentas, cierre), y así se nombra.
+    label: "Pólizas y cuentas", description: "Libro diario, catálogo de cuentas y cierre mensual",
     icon: "📒", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },

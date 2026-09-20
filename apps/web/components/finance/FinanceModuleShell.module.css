@@ -127,3 +127,20 @@
   font-weight: 600;
   color: var(--text-secondary);
 }
+
+.fieldOptional {
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+.fieldHint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.fieldError {
+  font-size: 11px;
+  color: var(--state-danger-text, #b91c1c);
+  line-height: 1.4;
+}
