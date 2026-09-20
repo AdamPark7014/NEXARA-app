@@ -40,9 +40,99 @@ enum CoreModule: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Módulos de Core que no son pestaña: viven en el hub «Más» del shell.
+/// `rawValue` = clave de `GET me/navigation` (`moduleKeys` / `webModuleIds`),
+/// las mismas que la web registra en `apps/web/lib/core-surface.ts`. Mismo
+/// orden, textos y rutas que el hub «Más» de Android.
+enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
+    case cotizaciones = "erp-cotizaciones"
+    case proyectos = "erp-proyectos"
+    case kpisEquipo = "kpis-equipo"
+    case almacen = "erp-almacen"
+    case herramientas = "erp-herramientas"
+    case vehiculos = "erp-vehiculos"
+    case organigrama = "erp-organigrama"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .cotizaciones: return "Cotizaciones"
+        case .proyectos: return "Proyectos"
+        case .kpisEquipo: return "KPIs del equipo"
+        case .almacen: return "Almacén"
+        case .herramientas: return "Herramientas"
+        case .vehiculos: return "Vehículos"
+        case .organigrama: return "Organigrama"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .cotizaciones: return "doc.text"
+        case .proyectos: return "folder"
+        case .kpisEquipo: return "chart.bar"
+        case .almacen: return "shippingbox"
+        case .herramientas: return "wrench.and.screwdriver"
+        case .vehiculos: return "car"
+        case .organigrama: return "person.3"
+        }
+    }
+
+    /// Ruta del módulo en la web de Core.
+    var webPath: String {
+        switch self {
+        case .cotizaciones: return "/erp/cotizaciones"
+        case .proyectos: return "/erp/proyectos"
+        case .kpisEquipo: return "/erp/asistencias/indicadores"
+        case .almacen: return "/erp/almacen"
+        case .herramientas: return "/erp/almacen/herramientas"
+        case .vehiculos: return "/erp/vehiculos"
+        case .organigrama: return "/erp/organigrama"
+        }
+    }
+
+    /// Una línea para la lista del hub «Más».
+    var summary: String {
+        switch self {
+        case .cotizaciones: return "Propuestas técnicas: folio, envío y seguimiento."
+        case .proyectos: return "Cronograma, alcance, equipo y documentos."
+        case .kpisEquipo: return "Retardos, uniforme y horas del equipo."
+        case .almacen: return "Inventario, entradas y salidas, y reabastecimiento."
+        case .herramientas: return "Solicita herramienta, revisa tu kit y tus préstamos."
+        case .vehiculos: return "Solicita un vehículo; entrega y recepción con fotos."
+        case .organigrama: return "Quién reporta a quién en NEXARA."
+        }
+    }
+
+    /// El módulo en la web (`CoreNavigation.coreWebBase` + `webPath`), mientras
+    /// la app no tenga pantalla nativa.
+    var webURL: URL {
+        URL(string: CoreNavigation.coreWebBase + webPath) ?? URL(string: CoreNavigation.coreWebBase)!
+    }
+}
+
 /// Qué ve cada quien en la app: solo ERP (Core) para el personal y el portal
 /// externo para cuentas de cliente o sucursal.
 enum CoreNavigation {
+    /// Origen de la web de Core; los módulos del hub «Más» se abren aquí.
+    static let coreWebBase = "https://core.nexara.com.mx"
+
+    /// Módulos del hub «Más». Salen de `GET me/navigation` (`navModules`), con
+    /// las mismas claves que la web registra en `core-surface.ts`:
+    /// - cliente / sucursal o sin sesión: ninguno;
+    /// - super admin: todos;
+    /// - con navegación: los que ésta concede;
+    /// - sin navegación todavía (primer arranque u offline): Herramientas,
+    ///   Vehículos y Organigrama, los tres que tiene todo el personal.
+    static func extraModules(for user: SessionUser?) -> [CoreExtraModule] {
+        guard let user, !isExternal(user) else { return [] }
+        if user.isSuperAdmin { return CoreExtraModule.allCases }
+        let nav = Set((user.navModules ?? []).map { $0.lowercased() })
+        guard !nav.isEmpty else { return [.herramientas, .vehiculos, .organigrama] }
+        return CoreExtraModule.allCases.filter { nav.contains($0.rawValue) }
+    }
+
     /// Cliente / sucursal: solo el portal de tickets, nunca Core.
     static func isExternal(_ user: SessionUser?) -> Bool {
         guard let user else { return false }

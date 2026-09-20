@@ -1,6 +1,7 @@
 package mx.nexara.mobile.nativeapp.access
 
 import mx.nexara.mobile.nativeapp.ui.console.ConsoleRoutes
+import mx.nexara.mobile.nativeapp.ui.console.CoreExtraModule
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -56,18 +57,27 @@ class AppUrlsParityTest {
         home("crmClient", "/crm/clients/1"),
         home("crmQuote", "/crm/quotes/1"),
         home("opsViatic", "/ops/viatics?highlight=1"),
-        home("opsMyVehicles", "/ops/my-vehicles?highlight=1"),
-        home("opsProject", "/ops/projects/1"),
         home("opsMaintenance", "/ops/maintenance?woId=1"),
-        home("opsTools", "/ops/tools?tab=requests&highlight=1"),
         home("opsSupport", "/ops/support/1"),
         home("erpFines", "/erp/hr/fines?highlight=1"),
         home("erpExpenses", "/erp/finance/expenses?highlight=1"),
         home("erpUsers", "/erp/users?highlight=1"),
         home("erpProcurement", "/erp/procurement?tab=orders&id=1"),
-        home("erpWarehouse", "/erp/warehouse?productId=1"),
         home("erpApprovals", "/erp/approvals?highlight=1"),
         home("integraAccess", "/integra/access"),
+
+        // ── Módulos de «Más»: el aviso abre su ficha, no la casa de Core ─────
+        Case("erpMisVehiculos", "/erp/vehiculos/mis-vehiculos?highlight=1", PanelId.ERP, CoreKeys.VEHICULOS, null),
+        Case("erpVehiculos", "/erp/vehiculos?tab=requests&highlight=1", PanelId.ERP, CoreKeys.VEHICULOS, null),
+        Case("erpHerramientas", "/erp/almacen/herramientas?tab=requests&highlight=1", PanelId.ERP, CoreKeys.HERRAMIENTAS, null),
+        Case("erpAlmacen", "/erp/almacen?productId=1", PanelId.ERP, CoreKeys.ALMACEN, null),
+        Case("erpOrganigrama", "/erp/organigrama", PanelId.ERP, CoreKeys.ORGANIGRAMA, null),
+        Case("erpCotizaciones", "/erp/cotizaciones/1", PanelId.ERP, CoreKeys.COTIZACIONES, 1L),
+        // Enlaces viejos de OPS que la web ya manda a Core.
+        Case("opsProject", "/ops/projects/1", PanelId.ERP, CoreKeys.PROYECTOS, 1L),
+        Case("opsMyVehicles", "/ops/my-vehicles?highlight=1", PanelId.ERP, CoreKeys.VEHICULOS, null),
+        Case("opsTools", "/ops/tools?tab=requests&highlight=1", PanelId.ERP, CoreKeys.HERRAMIENTAS, null),
+        Case("erpWarehouse", "/erp/warehouse?productId=1", PanelId.ERP, CoreKeys.ALMACEN, null),
     )
 
     @Test
@@ -88,12 +98,16 @@ class AppUrlsParityTest {
         }
     }
 
-    /** Toda clave de Core resuelta tiene que tener pantalla en el NavHost. */
+    /**
+     * Toda clave de Core resuelta tiene que tener pantalla en el NavHost: una pestaña
+     * ([ConsoleRoutes.forModuleKey]) o su ficha de «Más» ([CoreExtraModule]).
+     */
     @Test
     fun everyResolvedCoreKeyHasARoute() {
         val problems = cases.mapNotNull { case ->
             val dest = DeepLinkParser.parseWebPath(case.url) as? DeepLinkDestination.Module ?: return@mapNotNull null
-            if (dest.panel == PanelId.ERP && ConsoleRoutes.forModuleKey(dest.key) == null) {
+            val tieneRuta = ConsoleRoutes.forModuleKey(dest.key) != null || CoreExtraModule.fromKey(dest.key) != null
+            if (dest.panel == PanelId.ERP && !tieneRuta) {
                 "${case.source}  ${case.url}  ->  '${dest.key}' no tiene ruta en Core"
             } else {
                 null

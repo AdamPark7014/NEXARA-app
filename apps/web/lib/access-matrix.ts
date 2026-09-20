@@ -207,6 +207,10 @@ export type ModuleId =
   | "erp-clients"
   | "erp-cotizaciones"
   | "erp-proyectos"
+  | "erp-almacen"
+  | "erp-herramientas"
+  | "erp-vehiculos"
+  | "erp-organigrama"
   | "activities-daily"
   | "activities-projects"
   | "activities-services"
@@ -447,6 +451,37 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
       R.ADMIN_STAFF, R.MAINTENANCE_COORDINATOR,
     ],
     group: "Hoy", visible: true,
+  },
+  // ── Recursos de Core ──
+  // Almacén: quien lo opera (almacén y administración), dirección y los coordinadores de campo
+  // en consulta. Lo fino (quién mueve existencias) lo decide `getErpInventorySectionConfig`.
+  "erp-almacen": {
+    id: "erp-almacen", panel: PANELS.ERP, path: "/almacen",
+    label: "Almacén", description: "Inventario, entradas y salidas, y reabastecimiento",
+    icon: "📦",
+    allowedRoles: [...WAREHOUSE_TEAM, R.PROJECT_MANAGER, R.ARQUITECTO, R.COORD_OPERACIONES],
+    group: "Recursos", visible: true,
+  },
+  // Herramientas y vehículos: cualquiera pide y ve lo suyo; aprueba quien ya aprobaba
+  // (`TOOLS_MANAGE` / `VEHICLES_REVIEW` en la API).
+  "erp-herramientas": {
+    id: "erp-herramientas", panel: PANELS.ERP, path: "/almacen/herramientas",
+    label: "Herramientas", description: "Pide herramienta, revisa tu kit y tus préstamos",
+    icon: "🛠️", allowedRoles: ANY_INTERNAL,
+    group: "Recursos", visible: true,
+  },
+  "erp-vehiculos": {
+    id: "erp-vehiculos", panel: PANELS.ERP, path: "/vehiculos",
+    label: "Vehículos", description: "Pide un vehículo; entrega y recepción con fotos",
+    icon: "🚐", allowedRoles: ANY_INTERNAL,
+    group: "Recursos", visible: true,
+  },
+  // Lectura para todo el personal; mover a alguien de jefe sigue siendo de RH y dirección.
+  "erp-organigrama": {
+    id: "erp-organigrama", panel: PANELS.ERP, path: "/organigrama",
+    label: "Organigrama", description: "Quién reporta a quién",
+    icon: "🌳", allowedRoles: ANY_INTERNAL,
+    group: "Recursos", visible: true,
   },
   "activities-daily": {
     id: "activities-daily", panel: PANELS.ERP, path: "/actividades/tareas",

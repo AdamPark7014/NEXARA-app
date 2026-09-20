@@ -15,6 +15,9 @@ struct CoreLink: Equatable {
     var chatMessageId: Int64? = nil
     /// Cliente (`/erp/clientes/:id`).
     var entityId: Int64? = nil
+    /// Módulo del hub «Más» (Almacén, Vehículos…). Con él, `module` se queda en
+    /// `.actividades`: el shell lo abre encima de la pestaña actual.
+    var extra: CoreExtraModule? = nil
 
     /// `CORE_HOME_PATH` = `/erp/pizarra`.
     static let home = CoreLink(module: .actividades)
@@ -91,6 +94,11 @@ enum DeepLinkParser {
         return value
     }
 
+    /// Enlace a un módulo del hub «Más».
+    private static func extraLink(_ module: CoreExtraModule) -> CoreLink {
+        CoreLink(module: .actividades, extra: module)
+    }
+
     private static func parse(segments rawSegments: [String], params: [String: String]) -> DeepLinkDestination? {
         let segments = rawSegments.map { $0.lowercased() }.filter { !$0.isEmpty }
         guard let head = segments.first else { return nil }
@@ -138,12 +146,27 @@ enum DeepLinkParser {
         if head == "ops", rest.count == 1, myActivityHeads.contains(rest[0]) {
             return CoreLink(module: .actividades, vista: "mias")
         }
+        // Vehículos, herramientas y proyectos de Operaciones viven ahora en
+        // /erp (la web ya manda `/ops/projects` a `/erp/proyectos`).
+        if head == "ops", let first = rest.first {
+            switch first {
+            case "vehicles", "vehiculos", "my-vehicles", "mis-vehiculos":
+                return extraLink(.vehiculos)
+            case "tools", "herramientas":
+                return extraLink(.herramientas)
+            case "projects", "proyectos":
+                return extraLink(.proyectos)
+            default:
+                break
+            }
+        }
         return CoreLink.home
     }
 
     /// Rutas de `/erp` que existen en Core; cualquier otra cae en Actividades.
     private static func erpDestination(parts: [String], params: [String: String]) -> DeepLinkDestination {
         guard let first = parts.first else { return .core(CoreLink.home) }
+        let second: String? = parts.count >= 2 ? parts[1] : nil
         let queryActivityId = positiveInt(params["activityId"] ?? params["activityid"])
 
         if activityHeads.contains(first) || myActivityHeads.contains(first) {
@@ -173,7 +196,25 @@ enum DeepLinkParser {
             }
             return .core(link)
         case "asistencias", "asistencia", "attendance":
+            // KPIs del equipo cuelga de Asistencias en la web, pero es otro módulo.
+            if second == "indicadores" {
+                return .core(extraLink(.kpisEquipo))
+            }
             return .core(CoreLink(module: .asistencias, tab: params["tab"]))
+        case "almacen", "warehouse":
+            return .core(extraLink(second == "herramientas" ? .herramientas : .almacen))
+        case "vehiculos":
+            // Incluye `mis-vehiculos`, `:id` y `gps`.
+            return .core(extraLink(.vehiculos))
+        case "organigrama":
+            return .core(extraLink(.organigrama))
+        case "hr":
+            // `/erp/hr/orgchart`; lo demás de RH no existe en Core.
+            return .core(second == "orgchart" ? extraLink(.organigrama) : CoreLink.home)
+        case "cotizaciones":
+            return .core(extraLink(.cotizaciones))
+        case "proyectos":
+            return .core(extraLink(.proyectos))
         case "chat":
             let channel = parts.count >= 2 ? positiveInt64(parts[1]) : nil
             return .core(CoreLink(

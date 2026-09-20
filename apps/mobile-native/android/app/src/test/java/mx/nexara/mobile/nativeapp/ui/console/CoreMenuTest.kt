@@ -18,6 +18,8 @@ class CoreMenuTest {
         roleKey: String? = null,
         isSuperAdmin: Boolean = false,
         navPaths: List<String>? = null,
+        navModuleKeys: List<String>? = null,
+        isClient: Boolean = false,
     ) = SessionUser(
         id = 1L,
         nombre = "Prueba",
@@ -27,7 +29,9 @@ class CoreMenuTest {
         token = "t",
         permissions = emptyList(),
         isSuperAdmin = isSuperAdmin,
+        isClient = isClient,
         roleKey = roleKey,
+        navModuleKeys = navModuleKeys,
         navPaths = navPaths,
     )
 
@@ -105,6 +109,63 @@ class CoreMenuTest {
         assertTrue(CoreMenu.canOpen(ingeniero, "activities"))
         assertFalse(CoreMenu.canOpen(ingeniero, "erp-clients"))
         assertFalse(CoreMenu.canOpen(ingeniero, "dashboard"))
+    }
+
+    // ── «Más»: el resto de Core (`me/navigation.moduleKeys`) ────────────────
+
+    @Test
+    fun masListaLosModulosQueConcedeLaNavegacion() {
+        val ingeniero = user(
+            roleKey = "ing_campo",
+            navModuleKeys = listOf("activities", "attendance", "erp-herramientas", "erp-vehiculos", "erp-organigrama"),
+        )
+        assertEquals(
+            listOf(CoreExtraModule.HERRAMIENTAS, CoreExtraModule.VEHICULOS, CoreExtraModule.ORGANIGRAMA),
+            CoreMenu.extraModulesFor(ingeniero),
+        )
+        assertTrue(CoreMenu.canOpenExtra(ingeniero, "erp-vehiculos"))
+        assertFalse(CoreMenu.canOpenExtra(ingeniero, "erp-almacen"))
+    }
+
+    @Test
+    fun masRespetaElOrdenDelCatalogo() {
+        val almacen = user(
+            roleKey = "coord_admin",
+            navModuleKeys = listOf("erp-vehiculos", "erp-almacen", "erp-cotizaciones", "erp-herramientas", "erp-organigrama"),
+        )
+        assertEquals(
+            listOf(
+                CoreExtraModule.COTIZACIONES,
+                CoreExtraModule.ALMACEN,
+                CoreExtraModule.HERRAMIENTAS,
+                CoreExtraModule.VEHICULOS,
+                CoreExtraModule.ORGANIGRAMA,
+            ),
+            CoreMenu.extraModulesFor(almacen),
+        )
+    }
+
+    @Test
+    fun masSinNavegacionDaLosTresDeTodoElPersonal() {
+        // Sin conexión o con sesión restaurada: herramientas, vehículos y organigrama.
+        assertEquals(
+            listOf(CoreExtraModule.HERRAMIENTAS, CoreExtraModule.VEHICULOS, CoreExtraModule.ORGANIGRAMA),
+            CoreMenu.extraModulesFor(user(roleKey = "ing_campo")),
+        )
+        // El super admin ve todo el catálogo; cliente y sucursal, nada.
+        assertEquals(CoreExtraModule.entries.toList(), CoreMenu.extraModulesFor(user(isSuperAdmin = true)))
+        assertTrue(CoreMenu.extraModulesFor(user(isClient = true)).isEmpty())
+        assertTrue(CoreMenu.extraModulesFor(null).isEmpty())
+    }
+
+    @Test
+    fun cadaModuloDeMasApuntaASuPaginaDeCore() {
+        for (module in CoreExtraModule.entries) {
+            assertTrue(module.webPath.startsWith("/erp/"))
+            assertEquals(CoreMenu.CORE_WEB_BASE + module.webPath, module.webUrl)
+            assertEquals(module, CoreExtraModule.fromKey(module.key))
+        }
+        assertTrue(CoreExtraModule.fromKey("pizarra") == null)
     }
 
     @Test

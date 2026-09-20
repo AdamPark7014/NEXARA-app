@@ -135,10 +135,9 @@ class DeepLinkParserTest {
             "/crm/leads?highlight=15",
             "/ventas/smart-quote",
             "/ops/viatics?highlight=7",
-            "/ops/projects/3",
             "/ops/maintenance?woId=1",
-            "/ops/vehicles",
             "/ops/chat",
+            // Las rutas de «operacion» no son las de «ops»: la web tampoco las lleva a un módulo.
             "/operacion/vehicles",
             "/integra/access",
             "/studio/hero",
@@ -151,6 +150,37 @@ class DeepLinkParserTest {
         ).forEach { url ->
             assertEquals("$url debe abrir la casa de Core", DeepLinkParser.CORE_HOME, DeepLinkParser.parseWebPath(url))
         }
+    }
+
+    // ── «Más»: el resto de Core (`CoreExtraModule`) ────────────────────────
+
+    @Test
+    fun losModulosDeMasResuelvenASuClave() {
+        assertEquals(CoreKeys.COTIZACIONES, module("/erp/cotizaciones").key)
+        assertEquals(17L, module("/erp/cotizaciones/17").entityId)
+        assertEquals(CoreKeys.PROYECTOS, module("/erp/proyectos/42").key)
+        assertEquals(42L, module("/erp/proyectos/42").entityId)
+        assertEquals(CoreKeys.KPIS_EQUIPO, module("/erp/asistencias/indicadores").key)
+        // Asistencias a secas sigue siendo Asistencias.
+        assertEquals(CoreKeys.ATTENDANCE, module("/erp/asistencias").key)
+        assertEquals(CoreKeys.ALMACEN, module("/erp/almacen?productId=3").key)
+        assertEquals(CoreKeys.ALMACEN, module("/erp/warehouse?movementId=9").key)
+        assertEquals(CoreKeys.HERRAMIENTAS, module("/erp/almacen/herramientas?tab=requests").key)
+        assertEquals(CoreKeys.VEHICULOS, module("/erp/vehiculos").key)
+        assertEquals(CoreKeys.VEHICULOS, module("/erp/vehiculos/mis-vehiculos?highlight=4").key)
+        assertEquals(7L, module("/erp/vehiculos/7").entityId)
+        assertEquals(CoreKeys.ORGANIGRAMA, module("/erp/organigrama").key)
+        assertEquals(CoreKeys.ORGANIGRAMA, module("/erp/hr/orgchart").key)
+    }
+
+    @Test
+    fun lasRutasViejasDeOpsAbrenElModuloDeCore() {
+        // Espejo de `MOVED_TO_CORE` en apps/web/lib/core-surface.ts.
+        assertEquals(CoreKeys.VEHICULOS, module("/ops/vehicles").key)
+        assertEquals(5L, module("/ops/vehicles/5").entityId)
+        assertEquals(CoreKeys.VEHICULOS, module("/ops/my-vehicles?highlight=3").key)
+        assertEquals(CoreKeys.HERRAMIENTAS, module("/ops/tools?tab=requests&highlight=8").key)
+        assertEquals(CoreKeys.PROYECTOS, module("/ops/projects/3").key)
     }
 
     @Test
