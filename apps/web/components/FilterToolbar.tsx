@@ -3,31 +3,46 @@
 /**
  * FilterToolbar — barra de filtros reutilizable y consistente.
  *
- * Provee una API simple para listas/tablas del ERP:
  *   <FilterToolbar
  *     search={{ value, onChange, placeholder: "Buscar productos…" }}
- *     selects={[
- *       { label: "Almacén", value: warehouseId, onChange: setWarehouseId, options: warehouses },
- *       { label: "Tipo", value: type, onChange: setType, options: [...] }
- *     ]}
- *     toggles={[{ label: "Solo activos", value: onlyActive, onChange: setOnlyActive }]}
- *     onClear={() => { ... }}
+ *     selects={[{ label: "Almacén", value, onChange, options }]}
+ *     toggles={[{ label: "Solo activos", value, onChange }]}
+ *     rightActions={<Button variant="primary" size="sm">Nuevo</Button>}
+ *     onClear={() => { … }}
  *   />
  *
- * - Persiste un look-and-feel coherente con `PageState.tsx`.
- * - Auto-muestra "Limpiar filtros" cuando algo está aplicado.
- * - Responsive: en mobile las pills se apilan.
+ * Es una herramienta de trabajo, no un formulario. Antes era un panel con
+ * fondo, borde y 10px de padding alrededor de controles que ya tenían su
+ * propio borde —un rectángulo dentro de otro— y cada control media distinto:
+ * 34, 35 y 31 px de alto en la misma fila. Ahora es **una fila**: todos los
+ * controles a 32px (el `size="sm"` del contrato), sin caja alrededor, y la
+ * acción principal a la derecha.
  */
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export type FilterSelectOption = { value: string; label: string };
+
+/** Alto único de la fila: el mismo `sm` (32px) que fija .ai/DISENO-FINANZAS.md. */
+const H = 32;
+
+const CONTROL: CSSProperties = {
+  height: H,
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  background: "var(--surface)",
+  color: "var(--text-primary)",
+  fontSize: 13,
+  fontFamily: "inherit",
+};
 
 export type FilterToolbarProps = {
   search?: {
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
+    /** Nombre accesible. Por defecto, el placeholder. */
+    ariaLabel?: string;
   };
   dates?: Array<{
     label: string;
@@ -56,6 +71,8 @@ export type FilterToolbarProps = {
   onClear?: () => void;
   /** Cuenta de resultados a mostrar (informativo). */
   resultCount?: number | null;
+  className?: string;
+  style?: CSSProperties;
 };
 
 export default function FilterToolbar({
@@ -66,6 +83,8 @@ export default function FilterToolbar({
   rightActions,
   onClear,
   resultCount,
+  className,
+  style,
 }: FilterToolbarProps) {
   const hasAny =
     (search && search.value.trim().length > 0) ||
@@ -73,36 +92,55 @@ export default function FilterToolbar({
     selects.some((s) => s.value !== "" && s.value !== "all") ||
     toggles.some((t) => t.value);
 
+  const searchPlaceholder = search?.placeholder || "Buscar…";
+
   return (
     <div
+      role="group"
+      aria-label="Filtros"
+      className={["nx-ft", className].filter(Boolean).join(" ")}
       style={{
         display: "flex",
         flexWrap: "wrap",
         gap: 8,
         alignItems: "center",
-        padding: "10px 12px",
-        background: "var(--nx-panel-surface-overlay, var(--bg-primary))",
-        border: "1px solid var(--nx-panel-hairline, var(--border))",
-        borderRadius: 10,
+        // Sin caja: los controles ya se agrupan por alineación y cercanía.
+        marginBottom: 12,
+        ...style,
       }}
     >
       {search && (
-        <input
-          type="search"
-          placeholder={search.placeholder || "🔍 Buscar…"}
-          value={search.value}
-          onChange={(e) => search.onChange(e.target.value)}
-          style={{
-            flex: "1 1 220px",
-            minWidth: 180,
-            padding: "8px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg-secondary)",
-            color: "var(--text-primary)",
-            fontSize: 13,
-          }}
-        />
+        <span style={{ position: "relative", display: "inline-flex", flex: "1 1 220px", minWidth: 180, maxWidth: 360 }}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
+            focusable="false"
+            style={{
+              position: "absolute",
+              left: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--text-tertiary)",
+              pointerEvents: "none",
+            }}
+          >
+            <circle cx="7.2" cy="7.2" r="4.6" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M10.6 10.6L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <input
+            type="search"
+            placeholder={searchPlaceholder}
+            // Con texto escrito el placeholder desaparece y el campo se queda
+            // sin nombre. El aria-label no se va.
+            aria-label={search.ariaLabel || searchPlaceholder}
+            value={search.value}
+            onChange={(e) => search.onChange(e.target.value)}
+            style={{ ...CONTROL, width: "100%", padding: "0 10px 0 30px" }}
+          />
+        </span>
       )}
 
       {dates.map((date, i) => (
@@ -113,7 +151,7 @@ export default function FilterToolbar({
             alignItems: "center",
             gap: 6,
             fontSize: 12,
-            color: "var(--text-secondary)",
+            color: "var(--text-tertiary)",
             whiteSpace: "nowrap",
           }}
         >
@@ -123,14 +161,7 @@ export default function FilterToolbar({
             value={date.value}
             onChange={(e) => date.onChange(e.target.value)}
             aria-label={date.label}
-            style={{
-              padding: "7px 9px",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              background: "var(--bg-secondary)",
-              color: "var(--text-primary)",
-              fontSize: 12,
-            }}
+            style={{ ...CONTROL, padding: "0 8px", fontSize: 12.5 }}
           />
         </label>
       ))}
@@ -141,15 +172,8 @@ export default function FilterToolbar({
           value={sel.value}
           onChange={(e) => sel.onChange(e.target.value)}
           title={sel.label}
-          style={{
-            padding: "8px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--bg-secondary)",
-            color: "var(--text-primary)",
-            fontSize: 13,
-            minWidth: 140,
-          }}
+          aria-label={sel.label}
+          style={{ ...CONTROL, padding: "0 8px", minWidth: 140 }}
         >
           {sel.allowAll !== false && (
             <option value="">{sel.allLabel || `Todos · ${sel.label}`}</option>
@@ -166,23 +190,25 @@ export default function FilterToolbar({
         <label
           key={i}
           style={{
+            ...CONTROL,
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            fontSize: 13,
+            padding: "0 10px",
             cursor: "pointer",
-            padding: "6px 10px",
-            background: t.value ? "color-mix(in srgb, var(--primary, #0ea5e9) 15%, var(--bg-secondary))" : "var(--bg-secondary)",
-            border: `1px solid ${t.value ? "var(--primary, #0ea5e9)" : "var(--border)"}`,
-            borderRadius: 8,
-            transition: "background 0.15s, border-color 0.15s",
+            whiteSpace: "nowrap",
+            // Activo: se tiñe y el borde toma color. Sin pastilla extra.
+            background: t.value ? "color-mix(in srgb, var(--primary) 12%, var(--surface))" : "var(--surface)",
+            borderColor: t.value ? "color-mix(in srgb, var(--primary) 45%, var(--border))" : "var(--border)",
+            color: t.value ? "var(--text-primary)" : "var(--text-secondary)",
+            transition: "background 140ms var(--nx-ease-out, ease-out), border-color 140ms var(--nx-ease-out, ease-out)",
           }}
         >
           <input
             type="checkbox"
             checked={t.value}
             onChange={(e) => t.onChange(e.target.checked)}
-            style={{ accentColor: "var(--primary, #0ea5e9)" }}
+            style={{ accentColor: "var(--primary)", width: 13, height: 13, margin: 0 }}
           />
           {t.icon && <span aria-hidden="true">{t.icon}</span>}
           <span>{t.label}</span>
@@ -193,27 +219,68 @@ export default function FilterToolbar({
         <button
           type="button"
           onClick={onClear}
+          // Terciario: quitar filtros no compite con nada. Sin borde.
           style={{
-            padding: "6px 12px",
+            height: H,
+            padding: "0 10px",
             background: "transparent",
-            border: "1px solid var(--border)",
+            border: "1px solid transparent",
             borderRadius: 8,
             cursor: "pointer",
-            fontSize: 12,
+            fontSize: 13,
+            fontFamily: "inherit",
             color: "var(--text-secondary)",
+            transition: "background 140ms var(--nx-ease-out, ease-out), color 140ms var(--nx-ease-out, ease-out)",
           }}
         >
           Limpiar
         </button>
       )}
 
-      {resultCount != null && (
-        <span style={{ fontSize: 11, color: "var(--text-secondary)", marginLeft: "auto", whiteSpace: "nowrap" }}>
-          {resultCount} resultado{resultCount === 1 ? "" : "s"}
-        </span>
+      {(resultCount != null || rightActions) && (
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+          {resultCount != null && (
+            <span
+              role="status"
+              style={{
+                fontSize: 12,
+                color: "var(--text-tertiary)",
+                whiteSpace: "nowrap",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {resultCount} resultado{resultCount === 1 ? "" : "s"}
+            </span>
+          )}
+          {rightActions && <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{rightActions}</div>}
+        </div>
       )}
 
-      {rightActions && <div style={{ marginLeft: resultCount != null ? 8 : "auto", display: "flex", gap: 8 }}>{rightActions}</div>}
+      <style jsx>{`
+        .nx-ft input:focus-visible,
+        .nx-ft select:focus-visible,
+        .nx-ft button:focus-visible,
+        .nx-ft label:focus-within {
+          outline: 2px solid var(--primary);
+          outline-offset: 1px;
+        }
+        .nx-ft input:hover:not(:focus),
+        .nx-ft select:hover:not(:focus) {
+          border-color: var(--border-strong);
+        }
+        .nx-ft button:hover {
+          background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+          color: var(--text-primary);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .nx-ft input,
+          .nx-ft select,
+          .nx-ft label,
+          .nx-ft button {
+            transition: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
