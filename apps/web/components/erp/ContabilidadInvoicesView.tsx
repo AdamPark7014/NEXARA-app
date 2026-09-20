@@ -184,7 +184,7 @@ export default function ContabilidadInvoicesView({
     }
     setPaying(true);
     try {
-      await apiFetch(`accounting/invoices/${row.id}/payments`, token, {
+      const result = await apiFetch(`accounting/invoices/${row.id}/payments`, token, {
         method: "POST",
         body: JSON.stringify({
           amount,
@@ -192,7 +192,17 @@ export default function ContabilidadInvoicesView({
           method: "SPEI",
         }),
       });
-      toast.success("Pago registrado");
+      if (result?.complement?.cfdiPaymentUuid) {
+        toast.success(
+          `Pago y complemento timbrados (${String(result.complement.cfdiPaymentUuid).slice(0, 8)}…)`,
+        );
+      } else if (result?.complementStampWarning) {
+        toast.warning(
+          `Pago registrado; complemento no timbrado: ${result.complementStampWarning}`,
+        );
+      } else {
+        toast.success("Pago registrado");
+      }
       setPayOpen(false);
       setPayAmount("");
       setSelected(null);
