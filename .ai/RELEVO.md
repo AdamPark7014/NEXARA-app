@@ -11,7 +11,8 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-- `DataTable` (`apps/web/components/ui/DataTable.tsx`): prop opcional `ariaLabel` con default `"Tabla"` (mismo patrón que `PanelTabs` / `MetricStrip` / `ContextRail`). La región usa `aria-label={ariaLabel}` en lugar de `?? "Tabla de datos"`.
+- `DataTable`: prop opcional `ariaLabel` con default `"Tabla"` (patrón PanelTabs/MetricStrip/ContextRail).
+- Restauró `apps/web/app/(panels)/erp/finance/viatics/page.tsx` que el commit anterior había dejado como mensaje de rechazo de Ollama (colisión de workers).
 
 ## A medias
 
@@ -19,8 +20,8 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Siguiente
 
-- Integrar `feat/gate-datatable-aria` en la rama de calidad cuando toque el gate de a11y.
-- El EXEC-PACKET del repo sigue siendo el de Core UX Actividades/Asistencias (viejo); no aplica a este worktree.
+- Integrar `feat/gate-datatable-aria` cuando toque el gate de a11y.
+- Evitar más de un writer Ollama sobre el mismo worktree (hubo corrupción cruzada en viatics/CarteraView).
 
 ## No tocar
 
