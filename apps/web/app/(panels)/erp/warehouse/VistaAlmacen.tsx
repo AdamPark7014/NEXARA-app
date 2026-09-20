@@ -117,7 +117,7 @@ export function VistaAlmacen({
   const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
   const [movement, setMovement] = useState({
-    type: "RECEIPT" as "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT",
+    type: "RECEIPT" as "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT" | "RETURN",
     productId: "",
     warehouseId: "",
     toWarehouseId: "",
@@ -360,7 +360,7 @@ export function VistaAlmacen({
         reference: movement.reference.trim() || undefined,
         notes: movement.notes.trim() || undefined,
       };
-      if (movement.type === "RECEIPT" || movement.type === "ADJUSTMENT") {
+      if (movement.type === "RECEIPT" || movement.type === "ADJUSTMENT" || movement.type === "RETURN") {
         payload.toWarehouseId = Number(movement.warehouseId);
       } else if (movement.type === "DISPATCH" || movement.type === "ADJUSTMENT_OUT") {
         payload.fromWarehouseId = Number(movement.warehouseId);
@@ -1057,6 +1057,7 @@ export function VistaAlmacen({
             {movement.type === "RECEIPT" ? "Entrada de inventario"
               : movement.type === "DISPATCH" ? "Salida de inventario"
               : movement.type === "TRANSFER" ? "Traspaso entre almacenes"
+              : movement.type === "RETURN" ? "Devolución a almacén"
               : movement.type === "ADJUSTMENT_OUT" ? "Ajuste de inventario (baja)"
               : "Ajuste de inventario (alta)"}
           </p>
@@ -1071,6 +1072,7 @@ export function VistaAlmacen({
                 <option value="RECEIPT">Entrada (recepción)</option>
                 <option value="DISPATCH">Salida (despacho)</option>
                 <option value="TRANSFER">Traspaso</option>
+                <option value="RETURN">Devolución</option>
                 <option value="ADJUSTMENT">Ajuste (alta)</option>
                 <option value="ADJUSTMENT_OUT">Ajuste (baja)</option>
               </select>
@@ -1085,7 +1087,7 @@ export function VistaAlmacen({
             </label>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
-                {movement.type === "RECEIPT" || movement.type === "ADJUSTMENT"
+                {movement.type === "RECEIPT" || movement.type === "ADJUSTMENT" || movement.type === "RETURN"
                   ? "Almacén destino *"
                   : movement.type === "TRANSFER"
                     ? "Almacén origen *"
