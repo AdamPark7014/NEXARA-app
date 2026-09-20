@@ -31,6 +31,11 @@ import {
   postEmployeePayment,
   type EmployeePaymentsAnalytics,
 } from "@/lib/finance-api";
+import {
+  appendDraftApprovalNote,
+  draftGateConfirmCopy,
+  needsDraftApprovalConfirm,
+} from "@/lib/prenomina-draft-gate";
 
 type PaymentStatus = "Borrador" | "Pagado" | "Anulado";
 
@@ -294,16 +299,26 @@ export default function EmployeePaymentsPage() {
   };
 
   const runMarkPagado = (p: Payment) => {
+    const fromDraft = needsDraftApprovalConfirm(p.status);
     setConfirmState({
-      message: `¿Marcar como pagado el registro de ${p.user?.nombre ?? "empleado"}?`,
-      confirmLabel: "Marcar pagado",
+      message: fromDraft
+        ? `${draftGateConfirmCopy.CONFIRM_MESSAGE} (${p.user?.nombre ?? "empleado"})`
+        : `¿Marcar como pagado el registro de ${p.user?.nombre ?? "empleado"}?`,
+      confirmLabel: fromDraft ? draftGateConfirmCopy.CONFIRM_LABEL : "Marcar pagado",
       fn: async () => {
         try {
+          if (fromDraft) {
+            const actor =
+              user?.nombre?.trim() || user?.email?.trim() || `user#${user?.id ?? 0}`;
+            await patchEmployeePayment(token, p.id, {
+              note: appendDraftApprovalNote(p.note, actor),
+            });
+          }
           const updated = await markEmployeePaymentPagado(token, p.id);
           setItems((prev) =>
             prev.map((x) => (x.id === p.id ? mapPaymentRow(updated as Record<string, unknown>) : x)),
           );
-          toast.success("Marcado como pagado");
+          toast.success(fromDraft ? "Borrador aprobado y marcado como pagado" : "Marcado como pagado");
         } catch (e) {
           toast.error(formatApiError(e, "No se pudo marcar pagado"));
         }
@@ -432,7 +447,7 @@ export default function EmployeePaymentsPage() {
           )}
           {cfg.canEdit && p.status === "Borrador" && (
             <Button size="sm" variant="secondary" onClick={() => runMarkPagado(p)}>
-              Marcar pagado
+              Aprobar borrador
             </Button>
           )}
           {cfg.canDelete && p.status !== "Anulado" && (
