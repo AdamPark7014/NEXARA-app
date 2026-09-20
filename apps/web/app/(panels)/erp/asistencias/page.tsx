@@ -41,14 +41,19 @@ import {
   quitarFaltaJustificada,
   type FaltaJustificada,
 } from "@/lib/attendance-justifications";
+import { InfoPopover } from "@/components/base";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 
-const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
-type TabId = "equipo" | "comidas" | "trayectoria";
+// Tres pantallas pesadas que solo ve quien tiene equipo: se cargan cuando se abren
+// su pestaña, no en cada visita a Asistencias.
+const ChecadasRechazadas = dynamic(() => import("@/components/asistencias/ChecadasRechazadas"), { ssr: false });
+const HorariosEquipo = dynamic(() => import("@/components/asistencias/HorariosEquipo"), { ssr: false });
+const RegistroAsistido = dynamic(() => import("@/components/asistencias/RegistroAsistido"), { ssr: false });
+type TabId = "equipo" | "comidas" | "trayectoria" | "rechazos" | "horarios";
 type Estado = "PRESENTE" | "COMPLETO" | "JUSTIFICADA" | "AUSENTE";
 type FilterEstado = "TODOS" | Estado;
 
@@ -293,8 +298,9 @@ export default function ErpAsistenciasPage() {
   useEffect(() => {
     const inicial = new URLSearchParams(window.location.search).get("tab");
     if (inicial === "comidas" || inicial === "equipo") setTab(inicial);
+    else if ((inicial === "rechazos" || inicial === "horarios") && isManager) setTab(inicial);
     else if (inicial === "trayectoria" && canLiveGps) setTab(inicial);
-  }, [canLiveGps]);
+  }, [canLiveGps, isManager]);
   const [dateFilter, setDateFilter] = useState(todayIso());
   const [filterEstado, setFilterEstado] = useState<FilterEstado>("TODOS");
 
@@ -307,6 +313,8 @@ export default function ErpAsistenciasPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  // Salida de emergencia: a quién le está registrando la checada un jefe.
+  const [registrandoPara, setRegistrandoPara] = useState<{ id: number; nombre: string } | null>(null);
 
   // CEO / plataforma (Christian, Claudia equivalente, Adam): company-wide (sin scope=subtree).
   // Encargados: árbol managerId.
@@ -658,6 +666,13 @@ export default function ErpAsistenciasPage() {
         tabs={[
           { key: "equipo", label: "Equipo del día" },
           { key: "comidas", label: "Comidas" },
+          // Quién intentó checar y no pudo, y el horario de cada quien: quien tiene equipo.
+          ...(isManager
+            ? [
+                { key: "rechazos" as const, label: "Rechazos" },
+                { key: "horarios" as const, label: "Horarios" },
+              ]
+            : []),
           // Mapa del equipo y recorridos: solo dirección.
           ...(canLiveGps ? [{ key: "trayectoria" as const, label: "Trayectoria" }] : []),
         ]}
@@ -686,9 +701,24 @@ export default function ErpAsistenciasPage() {
               dense
               tone="accent"
               title="Mi jornada"
-              subtitle="Entrada o salida · foto + GPS"
+              subtitle="Se checa desde la app NEXARA"
+              actions={
+                <InfoPopover label="¿Por qué ya no puedo checar aquí?" title="Se checa desde la app">
+                  <p style={{ margin: "0 0 8px" }}>
+                    Un navegador puede decir que está donde quiera —la ubicación de una pestaña se cambia desde la
+                    consola en dos líneas— y de estas checadas sale la nómina. Por eso ahora solo se checa desde la
+                    app, que sabe si el GPS es simulado y de cuándo es la medición.
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    ¿Teléfono roto, sin batería u olvidado en casa? Tu jefe puede registrar tu checada desde esta
+                    misma pantalla, con el motivo; queda a su nombre y marcada para revisión.
+                  </p>
+                </InfoPopover>
+              }
             >
-              <AttendanceForm compact />
+              <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+                Abre la app NEXARA en tu teléfono para registrar tu entrada o tu salida.
+              </p>
             </Section>
           ) : null}
 
@@ -1139,16 +1169,29 @@ export default function ErpAsistenciasPage() {
                             </div>
                           ) : null}
 
-                          {m.estado === "AUSENTE" && puedeJustificar ? (
-                            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => abrirJustificar(m.userId, m.nombre)}
-                                iconLeft={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-                              >
-                                Justificar falta
-                              </Button>
+                          {(m.estado === "AUSENTE" && puedeJustificar) ||
+                          (isManager && m.userId !== user?.id) ? (
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+                              {/* Teléfono roto, sin batería u olvidado: que su falta no la pague en la nómina. */}
+                              {isManager && m.userId !== user?.id ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setRegistrandoPara({ id: m.userId, nombre: m.nombre })}
+                                >
+                                  Registrar checada
+                                </Button>
+                              ) : null}
+                              {m.estado === "AUSENTE" && puedeJustificar ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => abrirJustificar(m.userId, m.nombre)}
+                                  iconLeft={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />}
+                                >
+                                  Justificar falta
+                                </Button>
+                              ) : null}
                             </div>
                           ) : null}
 
@@ -1301,6 +1344,27 @@ export default function ErpAsistenciasPage() {
       <ConfirmDialog state={confirmFalta} onClose={() => setConfirmFalta(null)} />
 
       {tab === "comidas" && <ComidasPanel fecha={dateFilter} />}
+
+      {tab === "rechazos" && isManager && (
+        <ChecadasRechazadas token={token} desde={dateFilter} hasta={dateFilter} />
+      )}
+
+      {tab === "horarios" && isManager && (
+        <HorariosEquipo
+          token={token}
+          personas={mapped.map((m) => ({ id: m.userId, nombre: m.nombre, puesto: m.roleName ?? m.department }))}
+        />
+      )}
+
+      {registrandoPara ? (
+        <RegistroAsistido
+          token={token}
+          persona={registrandoPara}
+          fecha={dateFilter}
+          onClose={() => setRegistrandoPara(null)}
+          onRegistrada={() => void loadEquipo()}
+        />
+      ) : null}
 
       {tab === "trayectoria" && canLiveGps && (
         <>

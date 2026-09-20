@@ -33,15 +33,28 @@ import {
   type AttendanceJustificationDto,
 } from './attendance-justifications.service';
 import {
+  ETIQUETA_MOTIVO_RECHAZO,
+  MENSAJE_SOLO_APP,
   MENSAJE_UBICACION_SIMULADA,
+  MENSAJE_UBICACION_VIEJA,
+  MENSAJE_VIAJE_IMPOSIBLE,
+  MOTIVO_RECHAZO,
   MOTIVO_VALIDACION,
   RADIO_SITIO_M,
+  REPETIDAS_PARA_SOSPECHAR,
   combinarValidacion,
+  coordenadaRepetida,
+  edadDelPunto,
   evaluarUbicacion,
   horaCierreAutomatico,
   motivoCorreccionValido,
+  origenChecada,
   resolverHoraChecada,
   sitioOficina,
+  viajeImposible,
+  type MotivoRechazo,
+  type OrigenChecada,
+  type PuntoChecada,
   type SitioPermitido,
   type ValidacionChecada,
 } from './asistencia-confiable.js';
@@ -651,6 +664,180 @@ export class AttendanceService {
   }
 
   /**
+   * Salida de emergencia: un jefe registra la checada de alguien de su equipo.
+   *
+   * Desde que la web no puede checar, el teléfono es el único camino — y los teléfonos se
+   * rompen, se quedan sin batería y se olvidan en casa. Sin esta puerta, el día siguiente
+   * a un teléfono roto es una falta, y la persona la paga en su nómina.
+   *
+   * Lo que la distingue de una checada real: `registradaPorId` y `motivoRegistro` nunca
+   * van vacíos, y queda en `AuditLog`. No lleva foto —quien la registra no estaba ahí— y
+   * por eso nace en REVISAR: es una afirmación de su jefe, no una medición.
+   */
+  async registrarPorJefe(
+    actor: { id: number; email?: string | null; roleKey?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
+    body: { userId?: number; type?: string; timestamp?: string; motivo?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const targetId = Number(body?.userId);
+    if (!Number.isInteger(targetId) || targetId <= 0) {
+      throw new BadRequestException('Falta la persona');
+    }
+    if (targetId === actor.id) {
+      throw new BadRequestException('Tu propia checada se registra desde la app, no desde aquí');
+    }
+    const type = body?.type === 'salida' ? 'salida' : body?.type === 'entrada' ? 'entrada' : null;
+    if (!type) throw new BadRequestException('type debe ser "entrada" o "salida"');
+    if (!motivoCorreccionValido(body?.motivo)) {
+      throw new BadRequestException('El motivo es obligatorio (al menos 10 caracteres)');
+    }
+    if (!(await this.alcanzaAPersona(actor, targetId, tenantId))) {
+      throw new ForbiddenException('Esa persona no está en tu equipo');
+    }
+
+    const at = body?.timestamp ? new Date(body.timestamp) : new Date();
+    if (Number.isNaN(at.getTime())) {
+      throw new BadRequestException('timestamp debe ser una fecha ISO8601 válida');
+    }
+    if (at.getTime() > Date.now() + 60_000) {
+      throw new BadRequestException('No se puede registrar una checada en el futuro');
+    }
+    const motivo = String(body.motivo).trim();
+    const dia = this.getDateOnly(at);
+
+    const yaExiste = await this.findAttendanceOnDate(targetId, type, at, tenantId);
+    if (yaExiste) {
+      throw new BadRequestException(
+        type === 'entrada'
+          ? 'Ya existe una entrada registrada ese día'
+          : 'Ya existe una salida registrada ese día',
+      );
+    }
+
+    const checada = await this.createAttendanceRecord({
+      data: {
+        userId: targetId,
+        type,
+        timestamp: at,
+        workDate: dia,
+        deviceInfo: `Registrada por ${actor.email ?? `usuario #${actor.id}`}`,
+        origen: null,
+        registradaPorId: actor.id,
+        motivoRegistro: motivo,
+        // Sin foto y sin GPS: nadie midió nada. Que se vea así en la bandeja.
+        validacion: 'REVISAR',
+        motivoValidacion: 'Registrada por su jefe',
+        companyId: tenantId,
+      },
+      include: { user: true },
+    });
+
+    // La jornada se recalcula con las checadas que quedaron, igual que tras una corrección.
+    await this.recalcularJornada(targetId, at, tenantId).catch((err) =>
+      this.logger.warn(`No se pudo recalcular la jornada: ${(err as Error).message}`),
+    );
+
+    this.emitAttendanceUpdate(targetId, type, at, checada.user);
+
+    await this.avisarChecadaMarcada({
+      userId: targetId,
+      titulo: `Tu jefe registró tu ${type}`,
+      mensaje: `${horaAviso(at)} · ${motivo.slice(0, 160)}`,
+      attendanceId: checada.id,
+      avisarPersona: true,
+    });
+
+    return { message: `${type === 'entrada' ? 'Entrada' : 'Salida'} registrada`, data: checada };
+  }
+
+  /**
+   * Intentos de checada que el servidor rechazó, del más reciente al más viejo.
+   *
+   * Es la vista que faltaba: quién intentó checar con GPS falso, desde dónde y con qué
+   * teléfono. Cada quien ve lo que alcanza (dirección y RH, todo; un jefe, su equipo).
+   */
+  async listarRechazos(
+    actor: { id: number; email?: string | null; roleKey?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
+    filtros: { from?: string; to?: string; userId?: string; motivo?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const prisma = this.prisma as any;
+    if (typeof prisma?.attendanceRejection?.findMany !== 'function') return { items: [] };
+
+    const desde = filtros.from ? workDayStart(parseWorkDate(filtros.from)) : null;
+    const hasta = filtros.to ? workDayEnd(parseWorkDate(filtros.to)) : null;
+    const pedido = Number(filtros.userId);
+    const soloUno = Number.isInteger(pedido) && pedido > 0 ? pedido : null;
+
+    const todos = this.puedeCorregirChecadas(actor) || esDeTodaLaEmpresa(actor);
+    let visibles: number[] | null = null;
+    if (!todos) {
+      const users = await this.prisma.user.findMany({
+        where: { isActive: true, companyMemberships: { some: { companyId: tenantId } } },
+        select: { id: true, email: true, managerId: true },
+      });
+      visibles = users.filter((u) => alcanzaA(actor, users, u.id)).map((u) => u.id);
+      if (!visibles.includes(actor.id)) visibles.push(actor.id);
+    }
+    if (soloUno && visibles && !visibles.includes(soloUno)) {
+      throw new ForbiddenException('Esa persona no está en tu equipo');
+    }
+
+    const filas = await prisma.attendanceRejection.findMany({
+      where: {
+        ...companyWhere(tenantId),
+        ...(soloUno ? { userId: soloUno } : visibles ? { userId: { in: visibles } } : {}),
+        ...(filtros.motivo ? { motivo: filtros.motivo } : {}),
+        ...(desde || hasta ? { at: { ...(desde ? { gte: desde } : {}), ...(hasta ? { lte: hasta } : {}) } } : {}),
+      },
+      orderBy: { at: 'desc' },
+      take: 300,
+      select: {
+        id: true,
+        type: true,
+        lat: true,
+        lng: true,
+        accuracyM: true,
+        motivo: true,
+        detalle: true,
+        origen: true,
+        deviceInfo: true,
+        clientCapturedAt: true,
+        at: true,
+        user: { select: { id: true, nombre: true, email: true, avatarUrl: true, puesto: true } },
+      },
+    });
+
+    return {
+      items: (filas ?? []).map((f: any) => ({
+        id: f.id,
+        type: f.type,
+        motivo: f.motivo,
+        motivoEtiqueta: ETIQUETA_MOTIVO_RECHAZO[f.motivo] ?? f.motivo,
+        detalle: f.detalle ?? null,
+        origen: f.origen ?? null,
+        deviceInfo: f.deviceInfo ?? null,
+        lat: f.lat ?? null,
+        lng: f.lng ?? null,
+        accuracyM: f.accuracyM ?? null,
+        clientCapturedAt: f.clientCapturedAt ? f.clientCapturedAt.toISOString() : null,
+        at: f.at.toISOString(),
+        persona: f.user
+          ? {
+              id: f.user.id,
+              nombre: f.user.nombre,
+              email: f.user.email,
+              avatarUrl: f.user.avatarUrl,
+              puesto: f.user.puesto,
+            }
+          : null,
+      })),
+    };
+  }
+
+  /**
    * Dónde es legítimo checar hoy: la oficina y las sucursales con coordenadas de
    * las actividades que esa persona tiene ese día.
    *
@@ -769,6 +956,128 @@ export class AttendanceService {
     } catch (err) {
       this.logger.warn(`No se pudo avisar de la checada marcada: ${(err as Error).message}`);
     }
+  }
+
+  /**
+   * Los últimos puntos con coordenadas de esta persona, del más reciente al más viejo.
+   *
+   * Alimenta las dos comprobaciones que no necesitan hardware nuevo —viaje imposible y
+   * coordenada calcada—, así que se leen los pocos que hacen falta y nada más. Si la base
+   * no puede contestar (Prisma simulado en pruebas) se devuelve vacío: no saber no es
+   * motivo para acusar a nadie.
+   */
+  private async puntosAnteriores(
+    userId: number,
+    antesDe: Date,
+    tenantId: number,
+  ): Promise<PuntoChecada[]> {
+    const prisma = this.prisma as any;
+    if (typeof prisma?.attendance?.findMany !== 'function') return [];
+    try {
+      const filas = await prisma.attendance.findMany({
+        where: { userId, timestamp: { lt: antesDe }, ...companyWhere(tenantId) },
+        orderBy: { timestamp: 'desc' },
+        take: REPETIDAS_PARA_SOSPECHAR,
+        select: {
+          timestamp: true,
+          type: true,
+          entryLatitude: true,
+          entryLongitude: true,
+          exitLatitude: true,
+          exitLongitude: true,
+        },
+      });
+      const out: PuntoChecada[] = [];
+      for (const f of filas ?? []) {
+        // Una entrada guarda su punto en `entry*` y una salida en `exit*`.
+        const lat = f.type === 'salida' ? f.exitLatitude : f.entryLatitude;
+        const lng = f.type === 'salida' ? f.exitLongitude : f.entryLongitude;
+        const punto = this.realCoords(lat, lng);
+        if (punto) out.push({ ...punto, at: f.timestamp });
+      }
+      return out;
+    } catch (err) {
+      this.logger.warn(`No se pudieron leer las checadas anteriores: ${(err as Error).message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Deja constancia del intento y corta con 422.
+   *
+   * El registro **no** entra a `Attendance` —de ahí sale la nómina— pero el intento sí
+   * queda: RH necesita poder ver quién quiso checar, desde dónde, con qué teléfono y por
+   * qué no pasó. Antes el rechazo por ubicación simulada no guardaba absolutamente nada,
+   * así que al día siguiente no había forma de demostrar que había ocurrido.
+   *
+   * Nunca lanza por no haber podido escribir la fila: perder el aviso es malo, pero dejar
+   * pasar una checada falsa porque la tabla de auditoría falló sería peor.
+   */
+  private async rechazar(
+    ctx: {
+      userId: number;
+      tipo: string;
+      coords: { latitude: number; longitude: number } | null;
+      accuracyM?: number | null;
+      origen: OrigenChecada;
+      deviceInfo?: string | null;
+      capturedAt?: string | Date | null;
+      tenantId: number;
+    },
+    motivo: MotivoRechazo,
+    mensaje: string,
+    detalle?: string,
+  ): Promise<never> {
+    const at = new Date();
+    const prisma = this.prisma as any;
+    if (typeof prisma?.attendanceRejection?.create === 'function') {
+      try {
+        const capturada = ctx.capturedAt ? new Date(ctx.capturedAt) : null;
+        await prisma.attendanceRejection.create({
+          data: {
+            userId: ctx.userId,
+            type: ctx.tipo,
+            lat: ctx.coords?.latitude ?? null,
+            lng: ctx.coords?.longitude ?? null,
+            accuracyM:
+              typeof ctx.accuracyM === 'number' && Number.isFinite(ctx.accuracyM)
+                ? ctx.accuracyM
+                : null,
+            motivo,
+            detalle: detalle ?? mensaje,
+            origen: ctx.origen,
+            deviceInfo: ctx.deviceInfo ?? null,
+            clientCapturedAt:
+              capturada && !Number.isNaN(capturada.getTime()) ? capturada : null,
+            at,
+            companyId: ctx.tenantId,
+          },
+        });
+      } catch (err) {
+        this.logger.warn(`No se pudo registrar el intento rechazado: ${(err as Error).message}`);
+      }
+    }
+
+    // El intento desde el navegador no es un fraude: es alguien que abrió la web
+    // en vez de la app. No se despierta a sus jefes por eso.
+    if (motivo !== MOTIVO_RECHAZO.desdeNavegador) {
+      await this.avisarChecadaMarcada({
+        userId: ctx.userId,
+        titulo:
+          motivo === MOTIVO_RECHAZO.ubicacionSimulada
+            ? 'Intento de checada con ubicación simulada'
+            : 'Checada rechazada por el servidor',
+        mensaje: [
+          `${ctx.tipo === 'entrada' ? 'Entrada' : 'Salida'} rechazada`,
+          horaAviso(at),
+          detalle,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      });
+    }
+
+    throw new UnprocessableEntityException(mensaje);
   }
 
   /** Lo que se escribe en las columnas de validación de una checada. */
@@ -993,6 +1302,18 @@ export class AttendanceService {
     targetId: number,
     tenantId: number,
   ): Promise<boolean> {
+    return this.alcanzaAPersona(actor, targetId, tenantId);
+  }
+
+  /**
+   * ¿Esta persona está en el alcance del actor? Dirección y RH llegan a todos; un jefe,
+   * a su organigrama hacia abajo. Es el mismo alcance de la pizarra y de los KPI.
+   */
+  private async alcanzaAPersona(
+    actor: { id: number; email?: string | null; roleKey?: string | null; isSuperAdmin?: boolean; permissions?: string[] },
+    targetId: number,
+    tenantId: number,
+  ): Promise<boolean> {
     if (this.puedeCorregirChecadas(actor) || esDeTodaLaEmpresa(actor)) return true;
     const users = await this.prisma.user.findMany({
       where: { isActive: true, companyMemberships: { some: { companyId: tenantId } } },
@@ -1092,15 +1413,45 @@ export class AttendanceService {
     }
     const tenantId = requireCompanyId(companyId);
 
-    // Ubicación simulada: no se guarda nada y sus jefes se enteran. Es el truco
-    // barato para checar desde la cama, y de aquí sale la nómina.
+    const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
+    const deviceInfo = detectDeviceFromUserAgent(userAgent, req?.headers);
+    const origen = origenChecada(userAgent, req?.headers);
+    const coordsIntento = this.realCoords(dto.latitude, dto.longitude);
+    /** Todo lo que necesita un rechazo para quedar registrado. */
+    const contexto = {
+      userId,
+      tipo: dto.type,
+      coords: coordsIntento,
+      accuracyM: dto.accuracyM,
+      origen,
+      deviceInfo,
+      capturedAt: dto.capturedAt ?? dto.timestamp ?? null,
+      tenantId,
+    };
+
+    // Ubicación simulada: no se guarda la checada y sus jefes se enteran. Es el
+    // truco barato para checar desde la cama, y de aquí sale la nómina.
     if (dto.mockLocation === true) {
-      await this.avisarChecadaMarcada({
-        userId,
-        titulo: 'Intento de checada con ubicación simulada',
-        mensaje: `${dto.type === 'entrada' ? 'Entrada' : 'Salida'} rechazada · ${horaAviso(new Date())}`,
-      });
-      throw new UnprocessableEntityException(MENSAJE_UBICACION_SIMULADA);
+      await this.rechazar(contexto, MOTIVO_RECHAZO.ubicacionSimulada, MENSAJE_UBICACION_SIMULADA);
+    }
+
+    // Nadie checa desde el navegador (decisión del dueño). La geolocalización de
+    // una pestaña se falsea desde la consola en dos líneas, así que aquí no se
+    // puede afirmar dónde estuvo nadie. Quien no pueda usar su teléfono, que su
+    // jefe le registre la checada con motivo (`registrarPorJefe`).
+    if (origen === 'WEB') {
+      await this.rechazar(contexto, MOTIVO_RECHAZO.desdeNavegador, MENSAJE_SOLO_APP);
+    }
+
+    // Una posición guardada hace media hora no dice dónde está su dueño.
+    const edad = edadDelPunto(dto.fixAgeMs);
+    if (edad.veredicto === 'rechazar') {
+      await this.rechazar(
+        contexto,
+        MOTIVO_RECHAZO.ubicacionVieja,
+        MENSAJE_UBICACION_VIEJA,
+        `Medición de hace ${Math.round((edad.edadMs ?? 0) / 60000)} min`,
+      );
     }
 
     // La hora la pone el servidor. `timestamp` (campo viejo de la app 1.0.2) se
@@ -1112,8 +1463,6 @@ export class AttendanceService {
     });
     const now = hora.at;
     const today = this.getDateOnly(now);
-    const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
-    const deviceInfo = detectDeviceFromUserAgent(userAgent, req?.headers);
     // Una sola lectura de las coordenadas para todo el registro: lo que se
     // guarda, lo que decide si hay GPS y lo que alimenta el rastreo salen de
     // aquí. Antes cada uno filtraba a su manera y `entryLatitude` acababa con
@@ -1130,11 +1479,38 @@ export class AttendanceService {
       accuracyM: dto.accuracyM,
       sitios: await this.sitiosPermitidos(userId, now, tenantId),
     });
-    const marca = this.marcaValidacion([hora, ubicacion]);
+
+    // Lo que solo se ve mirando las checadas anteriores de esta misma persona.
+    // Las dos comprobaciones son gratis —una consulta, sin hardware nuevo— y
+    // atrapan lo que el teléfono no delató.
+    const anteriores = await this.puntosAnteriores(userId, now, tenantId);
+    if (coords) {
+      const viaje = viajeImposible(anteriores[0] ?? null, { ...coords, at: now });
+      if (viaje.imposible) {
+        await this.rechazar(
+          { ...contexto, coords },
+          MOTIVO_RECHAZO.viajeImposible,
+          MENSAJE_VIAJE_IMPOSIBLE,
+          `${viaje.distanciaM} m desde su checada anterior en ese tiempo (${viaje.velocidadKmh} km/h)`,
+        );
+      }
+    }
+    const repetida = coordenadaRepetida(coords, anteriores);
+    const sospechas: Array<{ validacion: ValidacionChecada; motivo: string | null }> = [];
+    if (edad.veredicto === 'revisar') {
+      sospechas.push({ validacion: 'REVISAR', motivo: MOTIVO_VALIDACION.ubicacionVieja });
+    }
+    if (repetida) {
+      sospechas.push({ validacion: 'REVISAR', motivo: MOTIVO_VALIDACION.coordenadaRepetida });
+    }
+
+    const marca = this.marcaValidacion([hora, ubicacion, ...sospechas]);
     const columnasValidacion = {
       clientCapturedAt: hora.clientCapturedAt,
       accuracyM:
         typeof dto.accuracyM === 'number' && Number.isFinite(dto.accuracyM) ? dto.accuracyM : null,
+      fixAgeMs: edad.edadMs,
+      origen,
       offline: hora.offline,
       mockDetected: false,
       validacion: marca.validacion,
@@ -1223,6 +1599,8 @@ export class AttendanceService {
             velocidadKmh: null,
             estaActivo: true,
             ultimaActualizacion: now,
+            // Una checada con ubicación simulada no llega hasta aquí: se rechazó arriba.
+            mockLocation: false,
             companyId: tenantId,
           },
         });

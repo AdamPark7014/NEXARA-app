@@ -8,6 +8,14 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { generateEmployeePaymentsReportPdf } from './employee-payments-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { KpisEquipoService } from '../me/kpis-equipo.service.js';
+import {
+  avisosDeFila,
+  filaPreNomina,
+  horas,
+  minutosPagables,
+  resumenPreNomina,
+} from './pre-nomina.js';
 import {
   assertCompanyAccess,
   companyWhere,
@@ -28,6 +36,7 @@ export class EmployeePaymentsService {
     private readonly prisma: PrismaService,
     private readonly accounting: AccountingService,
     private readonly audit: AuditService,
+    private readonly kpis: KpisEquipoService,
   ) {}
 
   private toDecimal(value?: string | number | null) {
@@ -45,17 +54,177 @@ export class EmployeePaymentsService {
   }
 
   /**
-   * Suma los minutos de asistencia reales (`AttendanceDay`) de un empleado en
-   * un rango de fechas — insumo para calcular `totalMinutes`/`amount` del pago
-   * en vez de capturarlo a mano. No fuerza el monto: solo sugiere.
+   * Minutos del periodo de un empleado — insumo para `totalMinutes`/`amount` del pago,
+   * en vez de capturarlo a mano. No fuerza el monto: sugiere.
+   *
+   * Antes esto sumaba `AttendanceDay.totalMinutes`, que es entrada → salida en bruto: la
+   * comida iba dentro (una hora al día por persona que nadie trabajó) y una jornada sin
+   * salida arrastraba lo que arrastrara. Ahora manda el mismo cálculo que ve el jefe en
+   * los indicadores: horas netas de comida, y tiempo extra **solo si alguien lo aprobó**.
+   *
+   * `totalMinutes` es lo pagable (neto + extra aprobado). El resto del desglose viaja
+   * aparte para que la pantalla pueda decir de dónde salió cada cosa y qué falta revisar.
    */
-  async calculateFromAttendance(userId: number, from: string, to: string, companyId?: number | null) {
-    const tenantId = requireCompanyId(companyId);
+  async calculateFromAttendance(
+    viewer: { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean },
+    userId: number,
+    from: string,
+    to: string,
+    companyId?: number | null,
+  ) {
     const fromDate = this.toDate(from);
     const toDate = this.toDate(to);
     if (!fromDate || !toDate) throw new BadRequestException('Rango de fechas inválido');
     if (fromDate > toDate) throw new BadRequestException('La fecha "desde" no puede ser posterior a "hasta"');
 
+    const tenantId = requireCompanyId(companyId);
+    const rango = { desde: from.slice(0, 10), hasta: to.slice(0, 10) };
+    const datos = await this.kpis.getEquipo(viewer, tenantId, rango, userId);
+    const fila = datos.personas[0];
+    if (!fila) throw new BadRequestException('Usuario fuera de tu alcance');
+    const t = fila.totales;
+
+    // El día por día se sigue leyendo de `AttendanceDay`: la pantalla de pre-nómina de
+    // contabilidad nombra por su fecha las jornadas que nadie cerró, y un número suelto
+    // no le sirve para eso.
+    const days = await this.prisma.attendanceDay.findMany({
+      where: { userId, date: { gte: fromDate, lte: toDate }, ...companyWhere(tenantId) },
+      orderBy: { date: 'asc' },
+      select: { date: true, totalMinutes: true, isOpen: true },
+    });
+    const openDays = days.filter((d) => d.isOpen).map((d) => d.date);
+
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { sueldoSemanal: true },
+    });
+    // Solo minutos APROBADO cuentan hacia el preview de nómina, y ya vienen sumados del
+    // mismo cálculo que ve el jefe en los indicadores.
+    const approvedOvertimeMinutes = t.minutosExtraAprobados;
+
+    const sueldoSemanal = profile?.sueldoSemanal != null ? Number(profile.sueldoSemanal) : null;
+    // `minutosLaborados` es el tiempo neto de comida y ya lleva dentro el extra: la
+    // función separa la parte ordinaria de la extra, que se paga con multiplicador.
+    const suggested = calculatePrenominaAmount({
+      sueldoSemanal,
+      minutosLaborados: t.minutosLaborados,
+      minutosExtraAprobados: approvedOvertimeMinutes,
+    });
+
+    return {
+      userId,
+      from: rango.desde,
+      to: rango.hasta,
+      daysWithAttendance: t.diasConJornada,
+      /** Lo pagable: laborado neto + extra aprobado (que se paga aparte). */
+      totalMinutes: minutosPagables(t),
+      totalHours: horas(minutosPagables(t)),
+      /** El desglose, para que la pantalla no tenga que adivinar. */
+      minutosLaborados: t.minutosLaborados,
+      minutosProductivos: t.minutosProductivos,
+      minutosInactivos: t.minutosInactivos,
+      productividadPct: t.productividadPct,
+      minutosExtraCalculados: t.minutosExtra,
+      minutosExtraAprobados: t.minutosExtraAprobados,
+      minutosExtraPendientes: t.minutosExtraPendientes,
+      diasExtraPendientes: t.diasExtraPendientes,
+      retardos: t.retardos,
+      minutosTarde: t.minutosTarde,
+      diasSinChecada: t.diasSinChecada,
+      /** Jornadas que nadie cerró: sus horas son una estimación, no una medición. */
+      openDays: openDays.map((d) => d.toISOString().slice(0, 10)),
+      jornadasSinSalida: t.jornadasSinSalida,
+      byDay: days.map((d) => ({
+        date: d.date.toISOString().slice(0, 10),
+        minutes: d.totalMinutes,
+        isOpen: d.isOpen,
+      })),
+      approvedOvertimeMinutes,
+      suggestedAmount: suggested.suggestedAmount,
+      suggestedBreakdown: suggested,
+      sueldoSemanal,
+      avisos: avisosDeFila(t),
+    };
+  }
+
+  /**
+   * Pre-nómina del periodo: una fila por persona con lo que de verdad se trabajó.
+   *
+   * Es el paso que faltaba entre «el jefe mira los indicadores» y «alguien captura los
+   * pagos»: las mismas horas de los KPI, el tiempo extra aprobado aparte del calculado, y
+   * lo que ya esté capturado en `EmployeePayment` para ese periodo.
+   */
+  async preNomina(
+    viewer: { id: number; roleKey?: string | null; email?: string | null; isSuperAdmin?: boolean },
+    rango: { desde: string; hasta: string },
+    companyId?: number | null,
+  ) {
+    const datos = await this.kpis.getEquipo(viewer, companyId ?? null, rango, null);
+    const userIds = datos.personas.map((p) => p.persona.id);
+
+    const [personas, pagos] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: userIds.length ? userIds : [-1] } },
+        select: { id: true, employeeNumber: true },
+      }),
+      this.prisma.employeePayment.findMany({
+        where: {
+          userId: { in: userIds.length ? userIds : [-1] },
+          deletedAt: null,
+          periodFrom: { gte: this.toDate(rango.desde) ?? undefined },
+          periodTo: { lte: this.toDate(rango.hasta) ?? undefined },
+          ...companyWhere(companyId ?? null),
+        },
+        select: { userId: true, amount: true },
+      }),
+    ]);
+
+    const numeroPor = new Map(personas.map((p) => [p.id, p.employeeNumber]));
+    const pagosPor = new Map<number, Array<{ amount: number }>>();
+    for (const p of pagos) {
+      const lista = pagosPor.get(p.userId) ?? [];
+      lista.push({ amount: Number(p.amount) || 0 });
+      pagosPor.set(p.userId, lista);
+    }
+
+    const filas = datos.personas.map((p) =>
+      filaPreNomina({
+        userId: p.persona.id,
+        nombre: p.persona.nombre,
+        puesto: p.persona.puesto,
+        numeroEmpleado: numeroPor.get(p.persona.id) ?? null,
+        horario: p.horario.etiqueta,
+        totales: p.totales,
+        pagos: pagosPor.get(p.persona.id) ?? [],
+      }),
+    );
+
+    return {
+      desde: rango.desde,
+      hasta: rango.hasta,
+      generadoAt: datos.generadoAt,
+      scope: datos.scope,
+      supuestos: datos.supuestos,
+      filas,
+      resumen: resumenPreNomina(filas),
+    };
+  }
+
+  /**
+   * El cálculo crudo de siempre: `AttendanceDay` entrada → salida, con la comida dentro.
+   *
+   * Sigue aquí porque `previewPeriod` recorre a toda la plantilla de la empresa, y el
+   * cálculo bueno (`calculateFromAttendance`) pasa por el organigrama: quien lleva
+   * contabilidad o RH no suele tener gente a su cargo, así que con el alcance de la
+   * pizarra la vista se le quedaría vacía. Unificar los dos cálculos es el siguiente
+   * paso, y toca la pantalla de contabilidad: no se hace a escondidas desde aquí.
+   */
+  private async calculoCrudoDePeriodo(
+    userId: number,
+    fromDate: Date,
+    toDate: Date,
+    tenantId: number,
+  ) {
     const days = await this.prisma.attendanceDay.findMany({
       where: { userId, date: { gte: fromDate, lte: toDate }, ...companyWhere(tenantId) },
       orderBy: { date: 'asc' },
@@ -69,7 +238,7 @@ export class EmployeePaymentsService {
       where: { userId },
       select: { sueldoSemanal: true },
     });
-    const overtime = await (this.prisma as any).overtimeApproval.findMany({
+    const overtime = await this.prisma.overtimeApproval.findMany({
       where: {
         userId,
         estado: 'APROBADO',
@@ -79,10 +248,7 @@ export class EmployeePaymentsService {
       select: { minutos: true },
     });
     // Solo minutos APROBADO cuentan hacia el preview de nómina.
-    const approvedOvertimeMinutes = (overtime as Array<{ minutos: number }>).reduce(
-      (s, r) => s + (r.minutos || 0),
-      0,
-    );
+    const approvedOvertimeMinutes = overtime.reduce((s, r) => s + (r.minutos || 0), 0);
 
     const sueldoSemanal = profile?.sueldoSemanal != null ? Number(profile.sueldoSemanal) : null;
     const suggested = calculatePrenominaAmount({
@@ -135,7 +301,7 @@ export class EmployeePaymentsService {
 
     const rows = [];
     for (const u of users) {
-      const calc = await this.calculateFromAttendance(u.id, from, to, tenantId);
+      const calc = await this.calculoCrudoDePeriodo(u.id, fromDate, toDate, tenantId);
       rows.push({
         ...calc,
         nombre: u.nombre,

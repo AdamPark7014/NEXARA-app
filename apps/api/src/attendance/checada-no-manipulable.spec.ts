@@ -1,3 +1,4 @@
+import { PETICION_APP } from './peticion-de-app.testing.js';
 import { UnprocessableEntityException } from '@nestjs/common';
 import { AttendanceService } from './attendance.service.js';
 import { MENSAJE_UBICACION_SIMULADA, MOTIVO_VALIDACION } from './asistencia-confiable.js';
@@ -58,7 +59,7 @@ describe('la hora del teléfono no decide nada', () => {
     const { service, prisma } = build();
     const mentira = new Date(Date.now() - 45 * 60 * 1000).toISOString();
 
-    await service.register(entrada({ timestamp: mentira }) as any, 3, undefined, 7);
+    await service.register(entrada({ timestamp: mentira }) as any, 3, PETICION_APP, 7);
 
     const guardada = fila(prisma);
     expect(guardada.timestamp.toISOString()).not.toBe(mentira);
@@ -82,7 +83,7 @@ describe('la hora del teléfono no decide nada', () => {
         accuracyM: 15,
       }) as any,
       3,
-      undefined,
+      PETICION_APP,
       7,
     );
 
@@ -96,7 +97,7 @@ describe('la hora del teléfono no decide nada', () => {
   it('la app vieja, que no manda nada nuevo, sigue checando sin marcas de hora', async () => {
     const { service, prisma } = build();
 
-    await service.register(entrada({ latitude: 19.074, longitude: -98.278 }) as any, 3, undefined, 7);
+    await service.register(entrada({ latitude: 19.074, longitude: -98.278 }) as any, 3, PETICION_APP, 7);
 
     const guardada = fila(prisma);
     expect(guardada.validacion).toBe('OK');
@@ -110,7 +111,7 @@ describe('ubicación simulada', () => {
     const { service, prisma } = build();
 
     await expect(
-      service.register(entrada({ mockLocation: true }) as any, 3, undefined, 7),
+      service.register(entrada({ mockLocation: true }) as any, 3, PETICION_APP, 7),
     ).rejects.toThrow(UnprocessableEntityException);
     expect(prisma.attendance.create).not.toHaveBeenCalled();
   });
@@ -119,7 +120,7 @@ describe('ubicación simulada', () => {
     const { service, notifyAttendanceFlagged } = build();
 
     await service
-      .register(entrada({ mockLocation: true }) as any, 3, undefined, 7)
+      .register(entrada({ mockLocation: true }) as any, 3, PETICION_APP, 7)
       .catch((e: Error) => expect(e.message).toBe(MENSAJE_UBICACION_SIMULADA));
 
     expect(notifyAttendanceFlagged).toHaveBeenCalledWith(
@@ -132,7 +133,7 @@ describe('lo que no se puede comprobar se marca, no se rechaza', () => {
   it('sin ubicación: se acepta y queda a revisar', async () => {
     const { service, prisma } = build();
 
-    await service.register(entrada() as any, 3, undefined, 7);
+    await service.register(entrada() as any, 3, PETICION_APP, 7);
 
     const guardada = fila(prisma);
     expect(guardada.validacion).toBe('REVISAR');
@@ -145,7 +146,7 @@ describe('lo que no se puede comprobar se marca, no se rechaza', () => {
     await service.register(
       entrada({ latitude: 19.074, longitude: -98.278, accuracyM: 500 }) as any,
       3,
-      undefined,
+      PETICION_APP,
       7,
     );
 
@@ -161,7 +162,7 @@ describe('lo que no se puede comprobar se marca, no se rechaza', () => {
     await service.register(
       entrada({ latitude: 19.25, longitude: -98.45, accuracyM: 15 }) as any,
       3,
-      undefined,
+      PETICION_APP,
       7,
     );
 
@@ -180,7 +181,7 @@ describe('lo que no se puede comprobar se marca, no se rechaza', () => {
     await service.register(
       entrada({ latitude: 19.0741, longitude: -98.2781, accuracyM: 12 }) as any,
       3,
-      undefined,
+      PETICION_APP,
       7,
     );
 

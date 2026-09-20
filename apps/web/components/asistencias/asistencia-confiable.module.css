@@ -1,0 +1,100 @@
+/*
+ * NEXARA · Asistencia confiable y nómina.
+ *
+ * Tres rejillas que usan los estilos de `tabla` (`components/base/tabla.module.css`):
+ * intentos rechazados, horarios por persona y aprobación de horas extra. Renglón denso,
+ * números a la derecha, y en teléfono cada fila se apila en dos renglones en vez de
+ * obligar a un scroll horizontal.
+ */
+
+/* ─── Intentos rechazados ────────────────────────────────────────────── */
+
+.rechazos {
+  grid-template-columns:
+    8.5rem minmax(10rem, 1.2fr) 5.5rem minmax(11rem, 1.3fr) minmax(8rem, 1fr) minmax(9rem, 0.9fr);
+  column-gap: var(--ui-s4);
+}
+
+/* ─── Horarios por persona ───────────────────────────────────────────── */
+
+.horarios {
+  grid-template-columns:
+    minmax(11rem, 1.4fr) minmax(8rem, 0.9fr) 6rem 6rem minmax(9rem, 1fr) 5.5rem 7.5rem;
+  column-gap: var(--ui-s4);
+}
+
+/* ─── Horas extra por aprobar ────────────────────────────────────────── */
+
+.extra {
+  grid-template-columns:
+    minmax(11rem, 1.4fr) 6.5rem 6.5rem minmax(9rem, 1fr) minmax(11rem, 1.1fr);
+  column-gap: var(--ui-s4);
+}
+
+/* Campo corto dentro de una fila (hora, minutos): tabular y al ancho justo. */
+.campo {
+  width: 100%;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.campoCorto {
+  max-width: 6rem;
+}
+
+/* Los días de la semana: siete casillas cuadradas que se marcan. */
+.dias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.dia {
+  min-width: 1.75rem;
+  padding: 2px 0;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-r1, 6px);
+  background: transparent;
+  color: var(--ui-fg-3);
+  font: inherit;
+  font-size: var(--ui-text-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  cursor: pointer;
+}
+
+.dia[aria-pressed="true"] {
+  border-color: var(--ui-accent, var(--primary));
+  background: var(--ui-accent-soft, rgba(31, 158, 132, 0.12));
+  color: var(--ui-fg);
+}
+
+.dia:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Acciones al final de una fila, pegadas a la derecha. */
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Teléfono y tableta: la fila se apila en vez de encogerse hasta ser ilegible. */
+@media (max-width: 960px) {
+  .rechazos,
+  .horarios,
+  .extra {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .acciones {
+    justify-content: flex-start;
+  }
+}
