@@ -15,6 +15,8 @@ export type UserAccessInput = {
   email?: string | null;
   isSuperAdmin?: boolean;
   isPlatformOwner?: boolean;
+  /** JWT permissions — señal secundaria p.ej. TOOLS_MANAGE si el email no hidrató. */
+  permissions?: string[] | null;
   /** Overrides IAM por módulo (supervise/deliver/both/on/off). */
   moduleAccess?: Record<string, string> | null;
 };
