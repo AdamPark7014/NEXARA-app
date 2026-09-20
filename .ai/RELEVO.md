@@ -61,12 +61,19 @@ Workspace de la contadora, 7 worktrees en paralelo, todos integrados:
 - **AuditLog no guarda el estado anterior** salvo en el cierre de periodo. Para
   antes/después de verdad hace falta que cada `update` lea la fila antes y la
   pase como `previousData`.
-- **3 suites de API rojas desde la ola anterior**, ajenas a este trabajo:
-  `activities.controller`, `tool-requests/entrega-herramienta`,
-  `me/team-board-periodo`.
 - Bonos y descuentos no existen en el modelo de pre-nómina: no se inventaron.
 - Sin base local levantada no hubo smoke en navegador; todo está cubierto por
   pruebas, no por uso real.
+
+## Verificación final
+
+- `tsc --noEmit`: limpio en API y web.
+- API: **2035/2035** en 185 suites. Web: **965/965** en 79 archivos.
+- Las 3 suites que la ola anterior dejó rojas quedaron reparadas: dos eran
+  simulacros incompletos; la de actividades fijaba el alcance SIN empresa, que
+  ya se había retirado, así que verificaba el comportamiento inseguro.
+- `npm run build:server:lowmem`: **éxito, sin ignorar errores**. Las 13 páginas
+  de `/erp/contabilidad` y los 6 controladores nuevos compilan.
 
 ## Siguiente
 
