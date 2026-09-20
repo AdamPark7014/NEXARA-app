@@ -121,13 +121,6 @@ export const SEMAFORO_KPI_LABELS: Record<SemaforoKpi, string> = {
   sin_datos: "Sin datos",
 };
 
-/** Colores de la línea de tiempo (mismos en la leyenda y en la barra). */
-export const COLOR_TRAMO = {
-  productivo: "#16a34a",
-  inactivo: "#f59e0b",
-  comida: "#60a5fa",
-} as const;
-
 export const KPIS_PATH = "/erp/asistencias/indicadores";
 
 /**

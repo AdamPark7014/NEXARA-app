@@ -718,7 +718,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                     title={item.description}
                   >
                     <span className={styles.menuItemIcon} aria-hidden="true">
-                      <ModuleIcon id={item.id} size={18} />
+                      <ModuleIcon id={item.id} size={16} />
                     </span>
                     <span className={styles.menuItemLabel}>{item.label}</span>
                   </Link>
@@ -975,7 +975,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
             title="Buscar (⌘K)"
             aria-label="Abrir paleta de comandos"
           >
-            <SearchIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+            <SearchIcon aria-hidden="true" sx={{ fontSize: 16 }} />
             <span className={styles.paletteBtnLabel}>Buscar…</span>
             <kbd className={styles.paletteBtnKbd}>⌘K</kbd>
           </button>
@@ -988,9 +988,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
             title={darkMode ? "Modo claro" : "Modo oscuro"}
           >
             {darkMode ? (
-              <LightModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+              <LightModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
             ) : (
-              <DarkModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+              <DarkModeOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
             )}
           </button>
 
@@ -1010,7 +1010,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                   if (next) void loadNotifPreview();
                 }}
               >
-                <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 20 }} />
+                <NotificationsNoneOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                 {unreadNotifs > 0 && (
                   <span
                     style={{
@@ -1338,7 +1338,8 @@ function Breadcrumbs({
         const isLast = idx === segments.length - 1;
         const target = `/${panel}/${accumulated.join("/")}`;
         const moduleHit = MODULES_BY_URL.get(target);
-        const label = moduleHit?.label || humanize(seg);
+        // Un id numérico (/indicadores/21, /cotizaciones/7) no dice nada: «Detalle».
+        const label = moduleHit?.label || (/^\d+$/.test(seg) ? "Detalle" : humanize(seg));
         return (
           <span key={target} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             <span className={styles.crumbSep}>/</span>

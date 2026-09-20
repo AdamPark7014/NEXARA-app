@@ -57,15 +57,10 @@ export default function ShellConnectionStatus() {
     label = `Sync ${queued}`;
   }
 
-  const bg =
-    tone === "warn"
-      ? "color-mix(in srgb, var(--warning) 22%, var(--surface))"
-      : tone === "sync"
-        ? "color-mix(in srgb, var(--primary) 18%, var(--surface))"
-        : "color-mix(in srgb, var(--success) 18%, var(--surface))";
-
-  const dot =
-    tone === "warn" ? "var(--warning)" : tone === "sync" ? "var(--primary)" : "var(--success)";
+  // En línea es lo normal: solo un punto y texto gris. Sin conexión o sincronizando sí se tiñe.
+  const bg = tone === "warn" ? "var(--ui-warning-bg)" : tone === "sync" ? "var(--ui-info-bg)" : "transparent";
+  const color = tone === "warn" ? "var(--ui-warning-text)" : tone === "sync" ? "var(--ui-info-text)" : "var(--ui-fg-3)";
+  const dot = tone === "warn" ? "var(--ui-warning)" : tone === "sync" ? "var(--ui-info)" : "var(--ui-success)";
 
   return (
     <span
@@ -81,24 +76,23 @@ export default function ShellConnectionStatus() {
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        padding: "5px 10px",
+        height: 24,
+        padding: "0 8px",
         borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 600,
-        color: "var(--text-secondary)",
+        fontSize: 12,
+        fontWeight: 500,
+        color,
         background: bg,
-        border: "1px solid var(--nx-panel-hairline-soft)",
         whiteSpace: "nowrap",
       }}
     >
       <span
         aria-hidden="true"
         style={{
-          width: 7,
-          height: 7,
+          width: 6,
+          height: 6,
           borderRadius: "50%",
           background: dot,
-          boxShadow: tone === "sync" ? `0 0 0 3px color-mix(in srgb, ${dot} 25%, transparent)` : undefined,
         }}
       />
       {label}

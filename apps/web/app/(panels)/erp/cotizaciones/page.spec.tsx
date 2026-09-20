@@ -86,13 +86,19 @@ describe("lista de cotizaciones", () => {
     const fila = (await screen.findByText("Hotel Centro")).closest("a")!;
     expect(within(fila).getByText("Sin nomenclatura")).toBeInTheDocument();
     expect(within(fila).getByText("AK")).toHaveAttribute("title", expect.stringContaining("Ana Karen Ruiz"));
-    expect(screen.getByText(/1 borrador trae folio viejo/)).toBeInTheDocument();
+    expect(screen.getByText(/1 borrador con folio viejo/)).toBeInTheDocument();
   });
 
-  it("la explicación usa una cotización real", async () => {
+  it("la explicación del folio vive en la ⓘ y usa una cotización real", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json(FILAS)));
+    const user = userEvent.setup();
     render(<CotizacionesPage />);
     await screen.findByText("Plaza Norte");
+    // La página no lleva el texto: solo el icono.
+    expect(
+      screen.queryByText("Luis Joel Aguilar (LJ75100126) · su cotización #7 · intervinieron JA, CE · revisión 2"),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "¿Cómo se lee un folio?" }));
     expect(
       screen.getByText("Luis Joel Aguilar (LJ75100126) · su cotización #7 · intervinieron JA, CE · revisión 2"),
     ).toBeInTheDocument();

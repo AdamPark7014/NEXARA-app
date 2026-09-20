@@ -1,0 +1,268 @@
+/* NEXARA · Base («Minimalista»): barra de filtros, vacío, carga, aviso, avatar y ventanita de ayuda. */
+
+/* ─── Barra de herramientas / buscador ─────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.toolbarEnd {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-s3);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.search {
+  position: relative;
+  flex: 1 1 240px;
+  max-width: 360px;
+  min-width: 0;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ui-fg-3);
+  font-size: 16px !important;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: var(--ui-control-h);
+  padding: 0 34px 0 32px;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--ui-fg-3);
+}
+
+.searchInput:focus {
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-ring);
+}
+
+.searchKbd {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--ui-fg-3);
+}
+
+.field {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 150px;
+  height: var(--ui-control-h);
+  padding: 0 8px;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-ring);
+}
+
+/* ─── Vacío ────────────────────────────────────────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--ui-s2);
+  padding: var(--ui-s6) var(--ui-s4);
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ui-hover);
+  color: var(--ui-fg-3);
+  margin-bottom: var(--ui-s1);
+}
+
+.emptyIcon svg {
+  font-size: 20px !important;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.emptyText {
+  margin: 0;
+  max-width: 30rem;
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+}
+
+.emptyAction {
+  margin-top: var(--ui-s2);
+}
+
+/* ─── Esqueletos de carga ──────────────────────────────────────────────── */
+
+.skeleton {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--ui-hover) 0%, var(--ui-surface-2) 50%, var(--ui-hover) 100%);
+  background-size: 200% 100%;
+  animation: brillo 1.4s ease-in-out infinite;
+}
+
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s4);
+  height: var(--ui-row-h);
+  padding: 0 var(--ui-s4);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.skeletonRow:last-child {
+  border-bottom: none;
+}
+
+@keyframes brillo {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* ─── Aviso en línea ───────────────────────────────────────────────────── */
+
+.alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-s3);
+  flex-wrap: wrap;
+  padding: 10px var(--ui-s4);
+  border-radius: var(--ui-radius);
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+  margin-bottom: var(--ui-s4);
+}
+
+.alertBody {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--ui-s2);
+  min-width: 0;
+}
+
+.alertBody svg {
+  font-size: 18px !important;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+/* ─── Avatar ───────────────────────────────────────────────────────────── */
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ui-hover);
+  color: var(--ui-fg-2);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  object-fit: cover;
+}
+
+/* ─── Ventanita de ayuda («¿Cómo se calcula?») ─────────────────────────── */
+
+.pop {
+  position: relative;
+  display: inline-flex;
+}
+
+.popPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  padding: var(--ui-s4);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-pop);
+  font-size: var(--ui-text-sm);
+  line-height: 1.5;
+  color: var(--ui-fg-2);
+  text-align: left;
+}
+
+.popTitle {
+  margin: 0 0 var(--ui-s2);
+  font-size: var(--ui-text-sm);
+  font-weight: 600;
+  color: var(--ui-fg);
+}
+
+.popPanel ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+@media (max-width: 560px) {
+  .popPanel {
+    position: fixed;
+    top: auto;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    width: auto;
+  }
+}

@@ -2,134 +2,25 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import HourglassTopIcon from "@mui/icons-material/HourglassTop";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import EventBusyOutlinedIcon from "@mui/icons-material/EventBusyOutlined";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import EmptyState from "@/components/ui/EmptyState";
-import InlineAlert from "@/components/ui/InlineAlert";
+import { Alert, Avatar, Badge, Card, CardHead, EmptyState, InfoPopover, PageHead, SkeletonRows, tabla } from "@/components/base";
 import { useUser } from "@/components/UserContext";
-import { Chip, RangoSelector } from "@/components/pizarra/PizarraKpi";
-import KpiResumen, { SemaforoKpiChip } from "@/components/kpis/KpiResumen";
-import KpiLineaDeTiempo, { LeyendaTramos } from "@/components/kpis/KpiLineaDeTiempo";
+import { RangoSelector } from "@/components/pizarra/PizarraKpi";
+import DiasEnLinea from "@/components/kpis/DiasEnLinea";
+import { LeyendaJornada } from "@/components/kpis/RankingPersonas";
 import { formatApiError } from "@/lib/erp-api";
 import { rangoDePreset, type BoardRange, type RangoPreset } from "@/lib/team-board-api";
-import {
-  KPIS_PATH,
-  SEMAFORO_KPI_COLORS,
-  fechaCorta,
-  fetchKpisPersona,
-  formatHoras,
-  formatPctKpi,
-  horaMx,
-  rangoDesdeUrl,
-  type DiaKpi,
-  type KpisPersonaResponse,
-} from "@/lib/kpis-equipo";
+import { KPIS_PATH, fechaCorta, fetchKpisPersona, formatPctKpi, horaMx, rangoDesdeUrl, type KpisPersonaResponse } from "@/lib/kpis-equipo";
+import { actividadesDelRango, horasEnPalabras, porQueCuenta, resumenEnPalabras, tonoProductividad } from "@/lib/kpis-lectura";
+import s from "@/components/kpis/kpis.module.css";
 
-const ROJO = SEMAFORO_KPI_COLORS.rojo;
-const AMBAR = SEMAFORO_KPI_COLORS.amarillo;
-const VERDE = SEMAFORO_KPI_COLORS.verde;
-const GRIS = SEMAFORO_KPI_COLORS.sin_datos;
-
-function Dato({ etiqueta, valor, color }: { etiqueta: string; valor: ReactNode; color?: string }) {
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 10, fontWeight: 650, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>
-        {etiqueta}
-      </div>
-      <div style={{ fontSize: 14, fontWeight: 750, fontVariantNumeric: "tabular-nums", color }}>{valor}</div>
-    </div>
-  );
-}
-
-/** Chips de lo que hay que mirar ese día. */
-function chipsDelDia(d: DiaKpi): ReactNode[] {
-  const out: ReactNode[] = [];
-  if (d.retardo) out.push(<Chip key="r" color={AMBAR}>Retardo · {d.minutosTarde} min</Chip>);
-  if (d.conJornada) {
-    if (d.uniformeOk === true) out.push(<Chip key="u" color={VERDE}>Uniforme ✓</Chip>);
-    else if (d.uniformeOk === false) out.push(<Chip key="u" color={ROJO}>Sin uniforme ✗</Chip>);
-    else out.push(<Chip key="u" color={GRIS} title="Márcalo en Asistencias, en la foto de entrada">Uniforme sin revisar</Chip>);
-  }
-  if (d.abierta) out.push(<Chip key="a" color={VERDE}>En jornada</Chip>);
-  if (d.sinSalida) out.push(<Chip key="s" color={AMBAR} title="Se contó hasta la hora del cierre automático">Sin salida</Chip>);
-  if (d.cierreAutomatico) out.push(<Chip key="c" color="#7c3aed">Salida automática</Chip>);
-  if (d.faltaJustificada) out.push(<Chip key="f" color="#7c3aed">Falta justificada</Chip>);
-  if (d.sinChecada) out.push(<Chip key="n" color={ROJO}>Sin checada</Chip>);
-  if (d.actividadesFueraDeJornada) {
-    out.push(
-      <Chip key="o" color={AMBAR} title="Actividades que empezaron sin estar checado">
-        {d.actividadesFueraDeJornada} actividad(es) sin checar
-      </Chip>,
-    );
-  }
-  if (!d.laborable && d.conJornada) out.push(<Chip key="d" color="#0891b2">Día de descanso</Chip>);
-  return out;
-}
-
-function FilaDia({ d }: { d: DiaKpi }) {
-  const chips = chipsDelDia(d);
-  return (
-    <article
-      style={{
-        display: "grid",
-        gap: 10,
-        padding: "14px 16px",
-        borderBottom: "1px solid color-mix(in srgb, var(--border) 60%, transparent)",
-      }}
-    >
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-          <strong style={{ fontSize: 14 }}>{fechaCorta(d.fecha)}</strong>
-          {d.conJornada ? (
-            <span style={{ fontSize: 12.5, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
-              {horaMx(d.entrada)} → {d.salida ? horaMx(d.salida) : d.abierta ? "ahora" : "sin salida"}
-            </span>
-          ) : null}
-        </div>
-        {chips.length ? <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>{chips}</div> : null}
-      </div>
-
-      {d.conJornada ? (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 10 }}>
-            <Dato etiqueta="Laborado" valor={formatHoras(d.minutosLaborados)} />
-            <Dato etiqueta="Productivo" valor={formatHoras(d.minutosProductivos)} color={VERDE} />
-            <Dato etiqueta="Inactivo" valor={formatHoras(d.minutosInactivos)} color={d.minutosInactivos ? AMBAR : undefined} />
-            <Dato etiqueta="Productividad" valor={formatPctKpi(d.productividadPct)} />
-            <Dato etiqueta="Comida" valor={d.minutosComida ? formatHoras(d.minutosComida) : "—"} />
-            <Dato etiqueta="Extra" valor={d.minutosExtra == null ? "—" : d.minutosExtra ? formatHoras(d.minutosExtra) : "0"} />
-          </div>
-          <KpiLineaDeTiempo dia={d} />
-          {d.actividades?.length ? (
-            <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 4 }}>
-              {d.actividades.map((a) => (
-                <li key={a.activityId} style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "baseline", flexWrap: "wrap" }}>
-                  <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--text-tertiary)" }}>
-                    {horaMx(a.inicio)}–{a.enCurso ? "…" : horaMx(a.fin)}
-                  </span>
-                  {a.anNumber ? (
-                    <Link href={`/erp/actividades/${a.activityId}`} style={{ fontWeight: 650, color: "var(--primary)", textDecoration: "none" }}>
-                      {a.anNumber}
-                    </Link>
-                  ) : null}
-                  <span style={{ minWidth: 0 }}>{a.titulo ?? "Actividad"}</span>
-                  <span style={{ color: "var(--text-tertiary)" }}>· {formatHoras(a.minutosEnJornada)} en jornada</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin actividades con foto de entrada en su jornada.</div>
-          )}
-        </>
-      ) : d.abierta === false && !d.sinChecada && !d.faltaJustificada && !d.actividadesFueraDeJornada ? (
-        <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Aún sin entrada.</div>
-      ) : null}
-    </article>
-  );
-}
+const COLOR_PCT = {
+  ok: "var(--ui-brand-text)",
+  atencion: "var(--ui-warning-text)",
+  critico: "var(--ui-danger-text)",
+  sin_datos: "var(--ui-fg-3)",
+} as const;
 
 export default function KpisPersonaPage() {
   const { user } = useUser();
@@ -176,84 +67,183 @@ export default function KpisPersonaPage() {
   }, [rango, listo, userId]);
 
   const qs = rango.desde && rango.hasta ? `?desde=${rango.desde}&hasta=${rango.hasta}` : "";
+  const actividades = useMemo(() => actividadesDelRango(data?.dias ?? []), [data]);
+  const diasFuera = (data?.dias ?? []).filter((d) => d.actividadesFueraDeJornada > 0);
+  const t = data?.totales;
 
   return (
-    <>
-      <PageHeader
-        eyebrow={
-          <Link href={`${KPIS_PATH}${qs}`} style={{ color: "inherit", textDecoration: "none" }}>
-            ← KPIs del equipo
-          </Link>
-        }
+    <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+      <PageHead
+        back={{ href: `${KPIS_PATH}${qs}`, label: "KPIs del equipo" }}
         title={data?.persona.nombre ?? "Detalle"}
-        subtitle={data ? [data.persona.puesto, data.horario.etiqueta].filter(Boolean).join(" · ") : undefined}
-        meta={data ? <SemaforoKpiChip semaforo={data.semaforo} motivos={data.motivos} /> : undefined}
+        description={data ? [data.persona.puesto, data.horario.etiqueta].filter(Boolean).join(" · ") : undefined}
         actions={
-          <RangoSelector
-            preset={preset}
-            rango={rango}
-            onChange={(p, r) => {
-              setPreset(p);
-              setRango(r);
-            }}
-          />
+          <>
+            <RangoSelector
+              preset={preset}
+              rango={rango}
+              onChange={(p, r) => {
+                setPreset(p);
+                setRango(r);
+              }}
+            />
+            {data ? (
+              <InfoPopover label="¿Cómo se calcula?" title="Cómo se calcula">
+                <ul>
+                  {data.supuestos.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              </InfoPopover>
+            ) : null}
+          </>
         }
       />
 
-      {error ? <InlineAlert message={error} /> : null}
-
-      {cargando && !data ? (
-        <EmptyState icon={<HourglassTopIcon fontSize="inherit" aria-hidden="true" />} title="Calculando…" description="Juntando checadas, comidas y actividades." />
+      {error ? (
+        <Alert tone="danger" role="alert">
+          {error}
+        </Alert>
       ) : null}
 
-      {data ? (
-        <div style={{ display: "grid", gap: 16, opacity: cargando ? 0.6 : 1, transition: "opacity 120ms" }}>
-          {data.motivos.length ? (
-            <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-              <strong style={{ color: SEMAFORO_KPI_COLORS[data.semaforo] }}>Qué mirar:</strong> {data.motivos.join(" · ")}
+      {cargando && !data ? (
+        <Card>
+          <SkeletonRows rows={4} label="Calculando" />
+        </Card>
+      ) : null}
+
+      {data && t ? (
+        <div style={{ display: "grid", gap: 24, opacity: cargando ? 0.6 : 1, transition: "opacity 120ms" }}>
+          <Card pad>
+            <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 180 }}>
+                <Avatar url={data.persona.avatarUrl} name={data.persona.nombre} size={48} />
+                <div>
+                  <div
+                    style={{
+                      fontSize: 40,
+                      fontWeight: 600,
+                      letterSpacing: "-0.03em",
+                      lineHeight: 1,
+                      fontVariantNumeric: "tabular-nums",
+                      color: COLOR_PCT[tonoProductividad(t.productividadPct)],
+                    }}
+                  >
+                    {formatPctKpi(t.productividadPct)}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--ui-fg-3)", marginTop: 4 }}>productividad</div>
+                </div>
+              </div>
+              <div style={{ flex: "1 1 360px", minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: "var(--ui-fg)" }}>
+                  {resumenEnPalabras(t, { conHorario: data.horario.entrada != null })}
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 10, fontSize: 12, color: "var(--ui-fg-3)" }}>
+                  <span>{t.diasConJornada} días con jornada</span>
+                  <span title="Horas en jornada sin ninguna actividad abierta">Sin actividad {horasEnPalabras(t.minutosInactivos)}</span>
+                  {t.minutosExtra ? <span title="Arriba de 8 h netas entre semana, o todo lo del fin de semana">Extra {horasEnPalabras(t.minutosExtra)}</span> : null}
+                </div>
+              </div>
             </div>
-          ) : null}
+          </Card>
 
-          <KpiResumen totales={data.totales} />
-
-          <Section flush title="Día por día" subtitle="Lo más reciente arriba. Pasa el cursor por la barra para ver las horas." actions={<LeyendaTramos />}>
-            {data.dias.length === 0 ? (
-              <EmptyState
-                icon={<EventBusyOutlinedIcon fontSize="inherit" aria-hidden="true" />}
-                title="Sin jornadas en este rango"
-                description="No hay checadas ni actividades registradas en esas fechas."
-              />
+          <Card>
+            <CardHead title="Día por día" actions={<LeyendaJornada conComida />} />
+            {data.dias.length ? (
+              <DiasEnLinea dias={data.dias} />
             ) : (
-              <div>
-                {data.dias.map((d) => (
-                  <FilaDia key={d.fecha} d={d} />
+              <EmptyState icon={<EventBusyOutlinedIcon />} title="Sin jornadas en estas fechas" />
+            )}
+          </Card>
+
+          <Card>
+            <CardHead
+              title="Actividades"
+              actions={
+                <InfoPopover label="Cómo se cuentan las actividades" title="Cómo se cuentan">
+                  <p style={{ margin: 0 }}>
+                    <strong style={{ color: "var(--ui-fg)" }}>Duración</strong> es el tiempo real: de «Iniciar» (o la foto
+                    de entrada) al fin. <strong style={{ color: "var(--ui-fg)" }}>Cuenta</strong> es la parte que cayó
+                    dentro de sus horas laboradas; lo que pasa en la comida o fuera de la jornada no suma. Una actividad
+                    empezada sin checar entrada no cuenta.
+                  </p>
+                </InfoPopover>
+              }
+            />
+            {actividades.length || diasFuera.length ? (
+              <div className={tabla.tabla} role="table" aria-label="Actividades del rango">
+                <div className={`${tabla.cabeza} ${s.actFila} ${s.actCabeza}`} role="row">
+                  <span role="columnheader">Día</span>
+                  <span role="columnheader">Actividad</span>
+                  <span role="columnheader">Horario</span>
+                  <span role="columnheader" className={tabla.num} title="Del inicio real al fin real">
+                    Duración
+                  </span>
+                  <span role="columnheader" className={tabla.num} title="Lo que cayó dentro de sus horas laboradas">
+                    Cuenta
+                  </span>
+                  <span role="columnheader" />
+                </div>
+                {actividades.map((a) => {
+                  const completa = a.minutosEnJornada >= a.minutosReales - 1;
+                  return (
+                    <div key={`${a.fecha}-${a.activityId}`} className={`${tabla.fila} ${s.actFila}`} role="row">
+                      <span role="cell" className={tabla.tenue}>{fechaCorta(a.fecha)}</span>
+                      <span role="cell" className={tabla.celda}>
+                        <span>
+                          {a.anNumber ? (
+                            <Link href={`/erp/actividades/${a.activityId}`} className={s.folio}>
+                              {a.anNumber}
+                            </Link>
+                          ) : null}{" "}
+                          {a.titulo ?? "Actividad"}
+                        </span>
+                      </span>
+                      <span role="cell" className={tabla.tenue} style={{ fontVariantNumeric: "tabular-nums" }}>
+                        {horaMx(a.inicio)}–{a.enCurso ? "ahora" : horaMx(a.fin)}
+                      </span>
+                      <span role="cell" className={tabla.num}>{horasEnPalabras(a.minutosReales)}</span>
+                      <span role="cell" className={`${tabla.num} ${tabla.fuerte}`}>{horasEnPalabras(a.minutosEnJornada)}</span>
+                      <span role="cell">{completa ? null : <Badge tone="warning">{porQueCuenta(a)}</Badge>}</span>
+                    </div>
+                  );
+                })}
+                {diasFuera.map((d) => (
+                  <div key={`fuera-${d.fecha}`} className={`${tabla.fila} ${s.actFila}`} role="row">
+                    <span role="cell" className={tabla.tenue}>{fechaCorta(d.fecha)}</span>
+                    <span role="cell" style={{ color: "var(--ui-fg-2)" }}>
+                      {d.actividadesFueraDeJornada === 1 ? "1 actividad" : `${d.actividadesFueraDeJornada} actividades`} sin checar entrada
+                    </span>
+                    <span role="cell" className={tabla.tenue}>—</span>
+                    <span role="cell" className={tabla.num}>—</span>
+                    <span role="cell" className={`${tabla.num} ${tabla.fuerte}`}>0 min</span>
+                    <span role="cell">
+                      <Badge tone="danger" title="Empezó sin checar entrada, así que no suma productividad">
+                        No cuenta
+                      </Badge>
+                    </span>
+                  </div>
                 ))}
               </div>
+            ) : (
+              <EmptyState title="Sin actividades en estas fechas" />
             )}
-          </Section>
+          </Card>
 
           {data.justificaciones.length ? (
-            <Section dense title="Faltas justificadas">
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, display: "grid", gap: 4 }}>
+            <Card>
+              <CardHead title="Faltas justificadas" />
+              <ul style={{ margin: 0, padding: "12px 16px 12px 32px", fontSize: 13, display: "grid", gap: 4 }}>
                 {data.justificaciones.map((j) => (
                   <li key={j.fecha}>
                     <strong>{fechaCorta(j.fecha)}</strong> · {j.motivo}
                   </li>
                 ))}
               </ul>
-            </Section>
+            </Card>
           ) : null}
-
-          <details style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-            <summary style={{ cursor: "pointer", fontWeight: 650 }}>¿Cómo se calcula?</summary>
-            <ul style={{ margin: "8px 0 0", paddingLeft: 18, display: "grid", gap: 4 }}>
-              {data.supuestos.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
-          </details>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
