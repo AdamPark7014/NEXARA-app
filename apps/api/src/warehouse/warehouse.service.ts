@@ -218,6 +218,47 @@ export class WarehouseService {
     });
   }
 
+  /** Cuña USB / HID: resuelve empaque o producto por código de barras. */
+  async findByBarcode(codigo: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const code = String(codigo || '').trim();
+    if (!code) throw new BadRequestException('Escanea o escribe un código de barras');
+
+    const empaque = await this.prisma.productPackaging.findFirst({
+      where: {
+        codigoBarras: code,
+        product: { ...companyWhere(tenantId) },
+      },
+      include: {
+        product: {
+          select: { id: true, sku: true, name: true, companyId: true },
+        },
+      },
+    });
+    if (empaque?.product) {
+      return {
+        match: 'empaque' as const,
+        codigoBarras: code,
+        packaging: {
+          id: empaque.id,
+          nombre: empaque.nombre,
+          piezasPorUnidad: Number(empaque.piezasPorUnidad),
+        },
+        product: empaque.product,
+      };
+    }
+
+    const product = await this.prisma.product.findFirst({
+      where: {
+        ...companyWhere(tenantId),
+        OR: [{ ean: code }, { upc: code }, { sku: code }],
+      },
+      select: { id: true, sku: true, name: true, ean: true, upc: true },
+    });
+    if (!product) throw new NotFoundException(`No hay producto con código «${code}»`);
+    return { match: 'producto' as const, codigoBarras: code, product };
+  }
+
   async createPackaging(
     productId: number,
     dto: { nombre: string; piezasPorUnidad: number; codigoBarras?: string; esDefaultCompra?: boolean },

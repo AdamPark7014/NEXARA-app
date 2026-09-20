@@ -23,6 +23,7 @@ import KpiCard from "./ui/KpiCard";
 import Section from "./ui/Section";
 import DataTable, { Tag, type Column } from "./ui/DataTable";
 import { useUser } from "./UserContext";
+import ToolLoanTimeline from "./ToolLoanTimeline";
 
 const STATUS_OPTIONS = [
   { value: "PENDING", label: "Pendiente" },
@@ -170,9 +171,21 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
     },
     {
       key: "status",
-      label: "Estado",
-      render: (r) => <Tag variant={toolRequestStatusVariant(r.status)}>{toolRequestStatusLabel(r.status)}</Tag>,
-      width: 110,
+      label: "Estado / timeline",
+      render: (r) => (
+        <div style={{ minWidth: 220 }}>
+          <Tag variant={toolRequestStatusVariant(r.status)}>{toolRequestStatusLabel(r.status)}</Tag>
+          <ToolLoanTimeline
+            status={r.status}
+            requestDate={r.requestDate}
+            approvalDate={r.approvalDate}
+            pickedUpAt={r.pickedUpAt}
+            deliveryDate={r.deliveryDate}
+            returnDate={r.returnDate}
+          />
+        </div>
+      ),
+      width: 240,
     },
     { key: "requestDate", label: "Solicitado", accessor: (r) => fmtDate(r.requestDate), width: 110 },
     {
@@ -241,6 +254,11 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
     });
   }
 
+  const pendingQueue = useMemo(
+    () => items.filter((t) => t.status === "PENDING"),
+    [items],
+  );
+
   return (
     <div>
       <div
@@ -266,6 +284,65 @@ const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = nul
           variant={counts.overdue > 0 ? "danger" : "positive"}
         />
       </div>
+
+      {canManage && pendingQueue.length > 0 && (
+        <Section title={`Cola de aprobación (${pendingQueue.length})`}>
+          <div style={{ display: "grid", gap: 10, marginBottom: 8 }}>
+            {pendingQueue.map((r) => (
+              <div
+                key={r.id}
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 12,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  border: "1px solid color-mix(in srgb, var(--warning) 40%, var(--border))",
+                  background: "color-mix(in srgb, var(--warning) 8%, var(--surface))",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700 }}>{r.toolName}</div>
+                  <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                    {r.requestedByName} · {r.model} / {r.serialNumber}
+                  </div>
+                  <ToolLoanTimeline
+                    status={r.status}
+                    requestDate={r.requestDate}
+                    approvalDate={r.approvalDate}
+                    pickedUpAt={r.pickedUpAt}
+                    deliveryDate={r.deliveryDate}
+                    returnDate={r.returnDate}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button
+                    size="md"
+                    disabled={busyId === r.id}
+                    onClick={() => runAction(r.id, () => approveToolRequest(token, r.id))}
+                  >
+                    Aprobar
+                  </Button>
+                  <Button
+                    size="md"
+                    variant="ghost"
+                    disabled={busyId === r.id}
+                    onClick={() => {
+                      const adminNotes = window.prompt("Motivo del rechazo (obligatorio):");
+                      if (!adminNotes?.trim()) return;
+                      void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes.trim()));
+                    }}
+                  >
+                    Rechazar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section title="Solicitudes de herramientas">
         {error && (

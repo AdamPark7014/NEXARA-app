@@ -3152,6 +3152,10 @@ model ToolInventoryItem {
   toolName          String              @db.VarChar(200)
   model             String              @db.VarChar(200)
   serialNumber      String              @db.VarChar(200)
+  /// Nomenclatura interna categórica (p. ej. MUL-12345).
+  codigoInterno     String?             @db.VarChar(64)
+  /// Código de barras / QR para etiquetadora.
+  barcode           String?             @db.VarChar(64)
   panoramicPhotoUrl String              @db.VarChar(500)
   serialPhotoUrl    String              @db.VarChar(500)
   status            ToolInventoryStatus @default(AVAILABLE)
@@ -3179,6 +3183,8 @@ model ToolInventoryItem {
   @@index([toolName, model])
   @@index([replacementOfId])
   @@index([companyId])
+  @@index([codigoInterno])
+  @@index([barcode])
   @@map("tool_inventory_items")
 }
 

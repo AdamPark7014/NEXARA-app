@@ -60,6 +60,17 @@ export class StockController {
     return this.service.listPackagings(productId, companyId);
   }
 
+  /** Lookup por cuña de código de barras (HID). */
+  @Get('barcode/:code')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
+  findByBarcode(
+    @Param('code') code: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.findByBarcode(code, companyId);
+  }
+
   @Post('products/:productId/empaques')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })

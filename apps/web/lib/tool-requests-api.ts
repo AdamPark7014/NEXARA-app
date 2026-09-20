@@ -18,6 +18,9 @@ export type ToolRequestRow = {
   requestDate: string;
   expectedReturnDate: string | null;
   approvalDate: string | null;
+  deliveryDate: string | null;
+  pickedUpAt: string | null;
+  returnDate: string | null;
   requestedByName: string;
   requestedByEmail: string;
   approvedByName: string | null;
@@ -77,6 +80,9 @@ export function normalizeToolRequestRow(raw: Record<string, unknown>): ToolReque
     requestDate: String(raw.requestDate ?? ""),
     expectedReturnDate: raw.expectedReturnDate ? String(raw.expectedReturnDate) : null,
     approvalDate: raw.approvalDate ? String(raw.approvalDate) : null,
+    deliveryDate: raw.deliveryDate ? String(raw.deliveryDate) : null,
+    pickedUpAt: raw.pickedUpAt ? String(raw.pickedUpAt) : null,
+    returnDate: raw.returnDate ? String(raw.returnDate) : null,
     requestedByName: String(requestedBy.nombre ?? "N/A"),
     requestedByEmail: String(requestedBy.email ?? ""),
     approvedByName: approvedBy ? String(approvedBy.nombre ?? "") : null,
