@@ -13,7 +13,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -246,18 +246,32 @@ export class ToolRequestsController {
     );
   }
 
-  /** «Revisar kit»: estado, notas y fotos. Recorre la próxima revisión. */
+  /**
+   * «Revisar kit»: estado, notas y fotos. Recorre la próxima revisión.
+   *
+   * Acepta las fotos como archivos (`multipart/form-data`, campo `fotos`) o como una
+   * lista de URLs ya subidas. Las apps mandan archivos; la web, lo que tenga.
+   */
   @Post('kits/:assignmentId/inspeccion')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @UseInterceptors(FilesInterceptor('fotos', 8, { dest: 'uploads/kits' }))
   async registrarInspeccion(
     @CurrentUser() user: any,
     @Param('assignmentId') assignmentId: string,
     @Body() data: { estado?: string; notas?: string; fotos?: unknown },
-    @CurrentCompanyId() companyId: number | null,
+    @UploadedFiles() archivos?: MulterFile[],
+    @CurrentCompanyId() companyId?: number | null,
   ) {
+    const subidas = (archivos ?? [])
+      .map((f) => f?.filename)
+      .filter(Boolean)
+      .map((filename) => ({ url: `/uploads/kits/${filename}` }));
+    // Con multipart, `fotos` del body llega como texto: se descarta si no es una lista.
+    const delBody = Array.isArray(data?.fotos) ? data.fotos : [];
+
     return this.toolRequestsService.registrarInspeccionKit(
       parseInt(assignmentId, 10),
-      data,
+      { ...data, fotos: [...delBody, ...subidas] },
       { id: user.id, isSuperAdmin: user.isSuperAdmin, permissions: user.permissions },
       companyId,
     );

@@ -74,6 +74,7 @@ export default function KitInspeccionesPanel() {
   const [revisando, setRevisando] = useState<KitPorInspeccionar | null>(null);
   const [estado, setEstado] = useState<EstadoInspeccion>("OK");
   const [notas, setNotas] = useState("");
+  const [fotos, setFotos] = useState<File[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [historial, setHistorial] = useState<InspeccionKit[]>([]);
 
@@ -99,6 +100,7 @@ export default function KitInspeccionesPanel() {
     setRevisando(kit);
     setEstado("OK");
     setNotas("");
+    setFotos([]);
     setHistorial([]);
     if (!token) return;
     try {
@@ -116,7 +118,11 @@ export default function KitInspeccionesPanel() {
     }
     setGuardando(true);
     try {
-      await registrarInspeccionKit(token, revisando.id, { estado, notas: notas.trim() || undefined });
+      await registrarInspeccionKit(token, revisando.id, {
+        estado,
+        notas: notas.trim() || undefined,
+        archivos: fotos.length ? fotos : undefined,
+      });
       toast.success("Revisión registrada");
       setRevisando(null);
       await cargar();
@@ -279,6 +285,19 @@ export default function KitInspeccionesPanel() {
                 rows={3}
                 placeholder="Qué se revisó, qué falta, qué está dañado…"
                 style={{ ...inp, minHeight: 78, resize: "vertical" }}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+                Fotos {fotos.length > 0 ? `(${fotos.length})` : ""}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => setFotos(Array.from(e.target.files ?? []).slice(0, 8))}
+                style={{ ...inp, padding: "7px 10px", minHeight: 36, fontSize: 12.5 }}
               />
             </label>
 
