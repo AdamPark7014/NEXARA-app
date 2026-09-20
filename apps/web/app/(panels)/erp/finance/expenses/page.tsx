@@ -280,6 +280,8 @@ export default function ExpensesPage() {
   const [filterCat, setFilterCat] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  /** Id del renglón con una acción en vuelo: sin esto, doble clic = doble pago. */
+  const [rowBusyId, setRowBusyId] = useState<number | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -542,11 +544,13 @@ export default function ExpensesPage() {
   };
 
   const runMarkPagado = (e: Expense) => {
+    if (rowBusyId != null) return;
     setConfirmState({
       message: `¿Marcar como pagado "${e.concepto}"? Se registra la salida de dinero.`,
       confirmLabel: "Marcar pagado",
       danger: false,
       fn: async () => {
+        setRowBusyId(e.id);
         setActionError(null);
         try {
           const updated = await markExpensePagado(token, e.id);
@@ -558,16 +562,20 @@ export default function ExpensesPage() {
           setActionError(
             `No se pudo marcar pagado "${e.concepto}": ${formatApiError(err, "el servidor no respondió")}`,
           );
+        } finally {
+          setRowBusyId(null);
         }
       },
     });
   };
 
   const remove = (e: Expense) => {
+    if (rowBusyId != null) return;
     setConfirmState({
       message: `¿Eliminar el gasto "${e.concepto}"?`,
       confirmLabel: "Eliminar",
       fn: async () => {
+        setRowBusyId(e.id);
         setActionError(null);
         try {
           await deleteExpense(token, e.id);
@@ -577,6 +585,8 @@ export default function ExpensesPage() {
           setActionError(
             `No se pudo eliminar "${e.concepto}": ${formatApiError(err, "el servidor no respondió")}`,
           );
+        } finally {
+          setRowBusyId(null);
         }
       },
     });
@@ -736,9 +746,10 @@ export default function ExpensesPage() {
                 variant="secondary"
                 style={rowButtonStyle}
                 aria-label={`Marcar como pagado ${nombre}`}
+                disabled={rowBusyId === e.id}
                 onClick={() => runMarkPagado(e)}
               >
-                Marcar pagado
+                {rowBusyId === e.id ? "Pagando…" : "Marcar pagado"}
               </Button>
             )}
             {cfg.canDelete && (
@@ -747,6 +758,7 @@ export default function ExpensesPage() {
                 variant="ghost"
                 style={rowButtonStyle}
                 aria-label={`Eliminar ${nombre}`}
+                disabled={rowBusyId === e.id}
                 onClick={() => remove(e)}
               >
                 Eliminar

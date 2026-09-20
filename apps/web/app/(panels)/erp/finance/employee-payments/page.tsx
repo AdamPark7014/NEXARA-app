@@ -315,6 +315,8 @@ export default function EmployeePaymentsPage() {
   const [filterUser, setFilterUser] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  /** Id del renglón con una acción en vuelo: sin esto, doble clic = doble pago. */
+  const [rowBusyId, setRowBusyId] = useState<number | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Payment | null>(null);
@@ -588,6 +590,7 @@ export default function EmployeePaymentsPage() {
   };
 
   const runMarkPagado = (p: Payment) => {
+    if (rowBusyId != null) return;
     const fromDraft = needsDraftApprovalConfirm(p.status);
     const nombre = p.user?.nombre ?? `empleado #${p.userId}`;
     setConfirmState({
@@ -597,6 +600,7 @@ export default function EmployeePaymentsPage() {
       confirmLabel: fromDraft ? draftGateConfirmCopy.CONFIRM_LABEL : "Marcar pagado",
       danger: false,
       fn: async () => {
+        setRowBusyId(p.id);
         setActionError(null);
         try {
           if (fromDraft) {
@@ -615,17 +619,21 @@ export default function EmployeePaymentsPage() {
           setActionError(
             `No se pudo marcar pagado el registro de ${nombre}: ${formatApiError(e, "el servidor no respondió")}`,
           );
+        } finally {
+          setRowBusyId(null);
         }
       },
     });
   };
 
   const remove = (p: Payment) => {
+    if (rowBusyId != null) return;
     const nombre = p.user?.nombre ?? `empleado #${p.userId}`;
     setConfirmState({
       message: `¿Anular el pago a ${nombre}? Deja de contar para el cierre y no se puede deshacer desde aquí.`,
       confirmLabel: "Anular",
       fn: async () => {
+        setRowBusyId(p.id);
         setActionError(null);
         try {
           await deleteEmployeePayment(token, p.id);
@@ -635,6 +643,8 @@ export default function EmployeePaymentsPage() {
           setActionError(
             `No se pudo anular el pago a ${nombre}: ${formatApiError(e, "el servidor no respondió")}`,
           );
+        } finally {
+          setRowBusyId(null);
         }
       },
     });
@@ -773,6 +783,7 @@ export default function EmployeePaymentsPage() {
       align: "right",
       render: (p) => {
         const nombre = p.user?.nombre ?? `empleado #${p.userId}`;
+        const busy = rowBusyId === p.id;
         return (
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
             {cfg.canEdit && p.status !== "Anulado" && (
@@ -781,6 +792,7 @@ export default function EmployeePaymentsPage() {
                 variant="ghost"
                 style={rowButtonStyle}
                 aria-label={`Editar el pago a ${nombre}`}
+                disabled={busy}
                 onClick={() => openEdit(p)}
               >
                 Editar
@@ -792,9 +804,10 @@ export default function EmployeePaymentsPage() {
                 variant="secondary"
                 style={rowButtonStyle}
                 aria-label={`Aprobar el borrador de ${nombre}`}
+                disabled={busy}
                 onClick={() => runMarkPagado(p)}
               >
-                Aprobar borrador
+                {busy ? "Pagando…" : "Aprobar borrador"}
               </Button>
             )}
             {cfg.canDelete && p.status !== "Anulado" && (
@@ -803,6 +816,7 @@ export default function EmployeePaymentsPage() {
                 variant="ghost"
                 style={rowButtonStyle}
                 aria-label={`Anular el pago a ${nombre}`}
+                disabled={busy}
                 onClick={() => remove(p)}
               >
                 Anular
