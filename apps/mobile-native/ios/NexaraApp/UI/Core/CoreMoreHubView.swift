@@ -10,7 +10,14 @@ struct CoreMoreHubView: View {
         List {
             ForEach(modules) { module in
                 NavigationLink {
-                    CoreModulePlaceholderView(module: module)
+                    // Vehículos ya tiene pantalla nativa (check list con cámara en
+                    // vivo); el resto sigue abriéndose en la web.
+                    switch module {
+                    case .vehiculos:
+                        VehiculosView()
+                    default:
+                        CoreModulePlaceholderView(module: module)
+                    }
                 } label: {
                     HStack(spacing: 12) {
                         NxIconBadge(systemName: module.systemImage, size: 36)
