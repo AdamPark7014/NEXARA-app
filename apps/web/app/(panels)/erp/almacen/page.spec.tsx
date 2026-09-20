@@ -25,8 +25,8 @@ vi.mock("@/components/UserContext", () => ({
   }),
 }));
 
-vi.mock("../warehouse/page", () => ({
-  default: ({ embedded }: { embedded?: { views: readonly string[] } }) => (
+vi.mock("../warehouse/VistaAlmacen", () => ({
+  VistaAlmacen: ({ embedded }: { embedded?: { views: readonly string[] } }) => (
     <div data-testid="almacen-stock">{(embedded?.views ?? []).join(",")}</div>
   ),
 }));
