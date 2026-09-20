@@ -1,6 +1,7 @@
 "use client";
 
 import CarteraView from "@/components/erp/CarteraView";
+import { AccionPrimerPaso, DESTINOS } from "../_arranque";
 
 /**
  * Cuentas por pagar — además de la cartera, el calendario de lo que sale
@@ -16,6 +17,7 @@ export default function CuentasPorPagarPage() {
       /* Igual que en Por cobrar: esto no se configura, se alimenta. El texto
          nombra el paso que hace aparecer el primer renglón. */
       emptyDescription="Esta pantalla se llena sola: registra en Facturación una factura de proveedor con saldo pendiente y aparecerá aquí, con su fecha de pago y el calendario de lo que sale de caja."
+      emptyAction={<AccionPrimerPaso destino={DESTINOS.proveedor} variante="secondary" />}
     />
   );
 }

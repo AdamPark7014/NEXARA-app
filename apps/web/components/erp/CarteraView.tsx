@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -254,12 +254,18 @@ export default function CarteraView({
   subtitle,
   emptyTitle,
   emptyDescription,
+  emptyAction,
 }: {
   kind: CarteraKind;
   title: string;
   subtitle: string;
   emptyTitle: string;
   emptyDescription: string;
+  /**
+   * Qué hacer cuando no hay ni una factura. Un vacío sin salida obliga a
+   * adivinar de dónde sale el primer renglón; con esto la pantalla lo dice.
+   */
+  emptyAction?: ReactNode;
 }) {
   const { user } = useUser();
   const token = user?.token ?? "";
@@ -727,10 +733,14 @@ export default function CarteraView({
         }
       />
 
-      {/* Totales — una tira de cifras, no una pared de tarjetas */}
-      <div style={{ marginBottom: 12 }}>
-        <MetricStrip ariaLabel="Resumen de la cartera" metrics={metricas} />
-      </div>
+      {/* Totales — una tira de cifras, no una pared de tarjetas.
+          Con cero facturas no se pinta: una fila de ceros no informa y le quita
+          el sitio al vacío, que sí dice de dónde sale el primer renglón. */}
+      {data && data.rows.length > 0 ? (
+        <div style={{ marginBottom: 12 }}>
+          <MetricStrip ariaLabel="Resumen de la cartera" metrics={metricas} />
+        </div>
+      ) : null}
 
       {/* Antigüedad — la escala compartida: se lee de izquierda a derecha y filtra */}
       {tramos.length > 0 && (
@@ -860,7 +870,9 @@ export default function CarteraView({
               <Button size="sm" variant="secondary" onClick={limpiar}>
                 Limpiar filtros
               </Button>
-            ) : undefined
+            ) : (
+              emptyAction
+            )
           }
         />
       ) : (
