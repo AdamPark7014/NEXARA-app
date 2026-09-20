@@ -477,6 +477,10 @@ export class WarehouseService {
           date: movement.createdAt,
           description: `COGS ${normalizedType} ${movement.movementNumber} — ${productLabel}`,
           userId,
+          // Sin la empresa, getAccountByCode cae en resolveRequiredCompanyId:
+          // 403 que el catch de abajo traga (el costo nunca llega a los libros)
+          // o, con TENANT_ALLOW_PRIMARY_FALLBACK=1, el catálogo de otra empresa.
+          companyId: tenantId,
         });
       } catch (err) {
         this.logger.warn(

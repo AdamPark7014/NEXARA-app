@@ -325,11 +325,19 @@ export class WorkspaceArApService {
     return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
   }
 
+  /**
+   * Límite del rango sobre `issueDate`, que es columna `@db.Date`: Prisma la
+   * guarda a medianoche **UTC**. Construirlo con `new Date("2026-09-01T00:00:00")`
+   * daba las 06:00 UTC en un servidor UTC−6, así que la factura emitida ese
+   * mismo día quedaba fuera del mes — y el `lte` de las 23:59:59 locales se
+   * comía el día 1 del mes siguiente. El día se arma siempre en UTC.
+   */
   private fecha(valor: string | undefined, finDelDia: boolean): Date | null {
     if (!valor) return null;
-    const d = new Date(finDelDia ? `${valor}T23:59:59` : `${valor}T00:00:00`);
-    if (Number.isNaN(d.getTime())) throw new BadRequestException('Rango de fechas inválido');
-    return d;
+    const indice = indiceDeDia(valor);
+    if (indice === null) throw new BadRequestException('Rango de fechas inválido');
+    const inicio = fechaDeIndice(indice);
+    return finDelDia ? new Date(inicio.getTime() + DIA_MS - 1) : inicio;
   }
 
   /** Contraparte visible de la fila: cliente en CxC, proveedor en CxP. */

@@ -439,9 +439,20 @@ export class AccountingService {
       select: { id: true, companyId: true },
     });
     assertCompanyAccess(period, companyId, 'Periodo fiscal');
-    return this.prisma.fiscalPeriod.update({
-      where: { id },
+    // Compare-and-swap: la condición «sigue abierto» va DENTRO del `where`.
+    // Con el `if (periodo.isClosed)` de la capa de arriba como única defensa,
+    // dos peticiones simultáneas leían `isClosed: false` a la vez y las dos
+    // cerraban: la segunda pisaba `closedAt`/`closedById` y la bitácora
+    // terminaba con dos cierres del mismo periodo.
+    const cambiados = await this.prisma.fiscalPeriod.updateMany({
+      where: { id, isClosed: false, ...companyWhere(companyId ?? null) },
       data: { isClosed: true, closedAt: new Date(), closedById: userId },
+    });
+    if (cambiados.count === 0) {
+      throw new BadRequestException('El periodo fiscal ya está cerrado');
+    }
+    return this.prisma.fiscalPeriod.findFirstOrThrow({
+      where: { id, ...companyWhere(companyId ?? null) },
     });
   }
 
@@ -3615,16 +3626,34 @@ export class AccountingService {
   ) {
     const tenantId = requireCompanyId(companyId);
     const now = new Date();
-    const fromDate = from ? new Date(`${from}T00:00:00`) : new Date(now.getFullYear(), now.getMonth(), 1);
-    const toDate = to ? new Date(`${to}T23:59:59`) : now;
-    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-      throw new BadRequestException('Rango de fechas inválido');
+    const dayMs = 86_400_000;
+
+    // `issueDate` y `dueDate` son columnas `@db.Date`: Prisma las devuelve a
+    // medianoche **UTC**. Comparándolas contra una medianoche LOCAL, en un
+    // servidor UTC−6 todo se corría un día: `dueToday` salía SIEMPRE en cero,
+    // lo que vencía hoy se contaba como vencido y el conteo de facturas del mes
+    // perdía el día 1. El día se representa siempre como medianoche UTC.
+    const diaUtc = (valor: string): Date | null => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(valor).trim());
+      if (m) return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+      const parsed = new Date(valor);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
+    };
+
+    /** Hoy = el día del calendario del servidor, expresado a medianoche UTC. */
+    const startToday = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const fromDay = from ? diaUtc(from) : new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+    const toDay = to ? diaUtc(to) : startToday;
+    if (!fromDay || !toDay) throw new BadRequestException('Rango de fechas inválido');
+    if (fromDay.getTime() > toDay.getTime()) {
+      throw new BadRequestException('La fecha inicial es posterior a la final');
     }
+    const fromDate = fromDay;
+    const toDate = new Date(toDay.getTime() + dayMs - 1);
 
     const base = await this.getFinancialDashboard(tenantId);
     const openStatuses = ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] as const;
-    const dayMs = 86_400_000;
-    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endToday = new Date(startToday.getTime() + dayMs - 1);
     const end7 = new Date(startToday.getTime() + 7 * dayMs);
     const end30 = new Date(startToday.getTime() + 30 * dayMs);

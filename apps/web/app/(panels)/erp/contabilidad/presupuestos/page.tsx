@@ -33,7 +33,8 @@ type LineaComparativo = {
   planeado: number;
   real: number;
   variacion: number;
-  variacionPct: number;
+  /** null cuando no hay presupuesto contra el que medir — se oculta el %. */
+  variacionPct: number | null;
 };
 
 type FilaCentro = {
@@ -42,7 +43,7 @@ type FilaCentro = {
   planeado: number;
   real: number;
   variacion: number;
-  variacionPct: number;
+  variacionPct: number | null;
 };
 
 type Comparativo = {
@@ -50,7 +51,7 @@ type Comparativo = {
   centros: Array<{ id: number; etiqueta: string }>;
   lineas: LineaComparativo[];
   porCentro: FilaCentro[];
-  totales: { planeado: number; real: number; variacion: number; variacionPct: number };
+  totales: { planeado: number; real: number; variacion: number; variacionPct: number | null };
   nota: string | null;
 };
 

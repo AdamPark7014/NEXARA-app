@@ -198,6 +198,18 @@ const toIsoDate = (value: Date | null | undefined): string | null =>
 const utcMidnight = (value: Date): Date =>
   new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
 
+/**
+ * «Hoy» es el día del calendario del SERVIDOR, expresado como medianoche UTC
+ * para poder compararlo con las columnas `@db.Date`.
+ *
+ * Con `utcMidnight(new Date())` el día era el UTC: en la Ciudad de México
+ * (UTC−6), a partir de las 18:00 «hoy» ya era mañana y la antigüedad de toda
+ * la cartera del proveedor saltaba un día — la misma factura decía «al
+ * corriente» en CxP (que sí usa el día local) y «vencida · 1 día» aquí.
+ */
+const hoyDelServidor = (ahora: Date = new Date()): Date =>
+  new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
+
 /** Días completos de retraso. 0 o menos = todavía no vence. */
 const daysOverdue = (dueDate: Date | null | undefined, today: Date): number => {
   if (!dueDate) return 0;
@@ -241,8 +253,8 @@ export class VendorProjectFinanceService {
     const tenantId = requireCompanyId(companyId);
     const scope = companyWhere(tenantId);
     const now = new Date();
-    const hoy = utcMidnight(now);
-    const yearStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    const hoy = hoyDelServidor(now);
+    const yearStart = new Date(Date.UTC(now.getFullYear(), 0, 1));
 
     const supplierWhere: Record<string, unknown> = { ...scope };
     if (filters?.soloActivos) supplierWhere.isActive = true;
@@ -401,7 +413,7 @@ export class VendorProjectFinanceService {
     });
     if (!supplier) throw new NotFoundException('Proveedor no encontrado');
 
-    const hoy = utcMidnight(new Date());
+    const hoy = hoyDelServidor();
     const [facturas, ordenes, pagos, evaluaciones, productos] = await Promise.all([
       this.prisma.invoice.findMany({
         where: { ...scope, deletedAt: null, supplierId },

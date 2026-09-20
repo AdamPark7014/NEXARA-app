@@ -562,9 +562,14 @@ export class AccountingWorkspaceReportsService {
    */
   private async repFlujoEfectivo(f: { from: string; to: string }, tenantId: number) {
     const { desde, hasta } = this.limites(f.from, f.to);
+    // `paymentDate` es `@db.Date`: su rango va en UTC o se pierde el día 1.
+    const pagoRango = this.limitesUtc(f.from, f.to);
     const [pagosFactura, gastos, nomina] = await Promise.all([
       this.prisma.payment.findMany({
-        where: { paymentDate: { gte: desde, lte: hasta }, ...companyWhere(tenantId) },
+        where: {
+          paymentDate: { gte: pagoRango.desde, lte: pagoRango.hasta },
+          ...companyWhere(tenantId),
+        },
         select: { amount: true, paymentDate: true, invoice: { select: { type: true } } },
       }),
       this.prisma.expense.findMany({
@@ -909,7 +914,8 @@ export class AccountingWorkspaceReportsService {
 
     const whereEntry: Record<string, unknown> = { status: 'POSTED', ...companyWhere(tenantId) };
     if (def.id === 'estado-resultados') {
-      const { desde, hasta } = this.limites(f.from, f.to);
+      // `JournalEntry.date` es `@db.Date`.
+      const { desde, hasta } = this.limitesUtc(f.from, f.to);
       whereEntry['date'] = { gte: desde, lte: hasta };
     } else if (def.id === 'balance-general' && f.asOf) {
       whereEntry['date'] = { lte: this.fechaCorte(f.asOf) };
@@ -957,10 +963,14 @@ export class AccountingWorkspaceReportsService {
     }
     const desde = new Date(anio, mes - 1, 1, 0, 0, 0, 0);
     const hasta = new Date(anio, mes, 0, 23, 59, 59, 999);
+    // `paymentDate` es `@db.Date` → el mes se acota en UTC; `fechaGasto` y
+    // `paidAt` llevan hora real → esos siguen en hora local.
+    const desdeUtc = new Date(Date.UTC(anio, mes - 1, 1));
+    const hastaUtc = new Date(Date.UTC(anio, mes, 0, 23, 59, 59, 999));
 
     const [pagos, gastos, nomina] = await Promise.all([
       this.prisma.payment.findMany({
-        where: { paymentDate: { gte: desde, lte: hasta }, ...companyWhere(tenantId) },
+        where: { paymentDate: { gte: desdeUtc, lte: hastaUtc }, ...companyWhere(tenantId) },
         select: {
           id: true,
           amount: true,
@@ -1231,7 +1241,8 @@ export class AccountingWorkspaceReportsService {
       planeado: number;
       real: number;
       variacion: number;
-      variacionPct: number;
+      /** null cuando no hay presupuesto contra el que medir: «0 %» mentía. */
+      variacionPct: number | null;
     }> = [];
 
     for (const combo of combinaciones) {
@@ -1249,7 +1260,11 @@ export class AccountingWorkspaceReportsService {
           planeado: round2(num(b.plannedAmount)),
           real: round2(num(b.actualAmount)),
           variacion: round2(num(b.variance)),
-          variacionPct: round2(num(b.variancePercent)),
+          // Gastar 50 000 contra un presupuesto de 0 no es «0 % de variación»:
+          // en la tabla se leía como «clavado al presupuesto». Sin base, null,
+          // igual que `computeMargin` hace con el margen sin ingresos. La web
+          // (`<Variacion porcentaje>`) ya oculta el porcentaje cuando es null.
+          variacionPct: num(b.plannedAmount) > 0 ? round2(num(b.variancePercent)) : null,
         });
       }
     }
@@ -1279,7 +1294,7 @@ export class AccountingWorkspaceReportsService {
         planeado: round2(c.planeado),
         real: round2(c.real),
         variacion: round2(c.planeado - c.real),
-        variacionPct: c.planeado > 0 ? round2(((c.planeado - c.real) / c.planeado) * 100) : 0,
+        variacionPct: c.planeado > 0 ? round2(((c.planeado - c.real) / c.planeado) * 100) : null,
       }))
       .sort((a, b) => a.centro.localeCompare(b.centro, 'es'));
 
@@ -1292,7 +1307,7 @@ export class AccountingWorkspaceReportsService {
         planeado,
         real,
         variacion,
-        variacionPct: planeado > 0 ? round2((variacion / planeado) * 100) : 0,
+        variacionPct: planeado > 0 ? round2((variacion / planeado) * 100) : null,
       },
       nota:
         'Variación positiva = por debajo del presupuesto. El «real» lo mantiene el motor contable al contabilizar pólizas con centro de costo.',
@@ -1319,10 +1334,14 @@ export class AccountingWorkspaceReportsService {
     if (!centro) throw new NotFoundException('Centro de costo no encontrado');
 
     const mes = filtros.month ?? null;
-    const desde = mes ? new Date(filtros.year, mes - 1, 1, 0, 0, 0, 0) : new Date(filtros.year, 0, 1, 0, 0, 0, 0);
+    // `JournalEntry.date` es `@db.Date` (medianoche UTC): el rango va en UTC o
+    // el mes se corre un día por cada lado.
+    const desde = mes
+      ? new Date(Date.UTC(filtros.year, mes - 1, 1))
+      : new Date(Date.UTC(filtros.year, 0, 1));
     const hasta = mes
-      ? new Date(filtros.year, mes, 0, 23, 59, 59, 999)
-      : new Date(filtros.year, 11, 31, 23, 59, 59, 999);
+      ? new Date(Date.UTC(filtros.year, mes, 0, 23, 59, 59, 999))
+      : new Date(Date.UTC(filtros.year, 11, 31, 23, 59, 59, 999));
 
     const lineas = await this.prisma.journalEntryLine.findMany({
       where: {
@@ -1368,7 +1387,9 @@ export class AccountingWorkspaceReportsService {
   aCsv(resultado: {
     columnas: ColumnaReporte[];
     filas: FilaReporte[];
-    totales: Record<string, number> | null;
+    // `variacionPct` es null cuando no hay presupuesto base: `csvCampo` lo
+    // escribe como celda vacía, que es justo lo que debe leerse.
+    totales: Record<string, number | null> | null;
   }): string {
     const cab = resultado.columnas.map((c) => c.etiqueta);
     const lineas = [cab.map(csvCampo).join(',')];
@@ -1434,9 +1455,32 @@ export class AccountingWorkspaceReportsService {
     return { from: isoDay(prevDesde), to: isoDay(prevHasta) };
   }
 
+  /**
+   * Fin del día de corte, en UTC.
+   *
+   * `dueDate` y `JournalEntry.date` son columnas `@db.Date`: Prisma las
+   * devuelve a medianoche **UTC**. Con un corte en hora local (UTC−6 son las
+   * 05:59:59Z del día siguiente) una factura que vencía justo el día del corte
+   * salía con 1 día de atraso y saltaba del tramo «por vencer» al de «1 a 30
+   * días», y el balance general arrastraba las pólizas del día siguiente.
+   */
   private fechaCorte(asOf?: string): Date {
     const d = this.parseDia(asOf) ?? new Date();
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999));
+  }
+
+  /**
+   * Límites del rango para columnas `@db.Date` (paymentDate, issueDate,
+   * `JournalEntry.date`), que viven a medianoche UTC. `limites()` sigue siendo
+   * el correcto para columnas con hora real, como `fechaGasto` o `paidAt`.
+   */
+  private limitesUtc(from: string, to: string): { desde: Date; hasta: Date } {
+    const d = this.parseDia(from)!;
+    const h = this.parseDia(to)!;
+    return {
+      desde: new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())),
+      hasta: new Date(Date.UTC(h.getFullYear(), h.getMonth(), h.getDate(), 23, 59, 59, 999)),
+    };
   }
 
   private parseDia(raw?: string): Date | null {
