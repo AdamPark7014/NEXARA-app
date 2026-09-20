@@ -1,13 +1,18 @@
 "use client";
 
-import { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 /**
- * NEXARA · PageHeader (premium)
- * Jerarquía: eyebrow → título grande → subtítulo + acciones.
- * Variantes:
- *  - default: header limpio sin fondo
- *  - hero: card translúcida con glow del panel
+ * NEXARA · PageHeader
+ *
+ * Jerarquía: eyebrow → título → subtítulo → meta · acciones.
+ *
+ * `hero` era una tarjeta translúcida con borde, sombra y un resplandor
+ * radial detrás del título. Ahora `hero` significa **más aire y más
+ * tamaño**, que es lo que de verdad lo hacía importante; la caja, el
+ * degradado y el glow se fueron. Ningún variante dibuja un rectángulo.
+ *
+ * Variantes: default · hero (portada de módulo) — densidad: default · ops.
  */
 
 type Variant = "default" | "hero";
@@ -21,6 +26,8 @@ export default function PageHeader({
   meta,
   variant = "default",
   density = "default",
+  className,
+  style,
 }: {
   eyebrow?: ReactNode;
   title: ReactNode;
@@ -31,45 +38,33 @@ export default function PageHeader({
   variant?: Variant;
   /** ops = título compacto, subtítulo corto, menos aire (ERP/OPS). */
   density?: Density;
+  className?: string;
+  style?: CSSProperties;
 }) {
   const isHero = variant === "hero";
   const isOps = density === "ops";
 
+  const titleSize = isHero
+    ? "clamp(1.7rem, 1.2rem + 1.6vw, 2.4rem)"
+    : isOps
+      ? "clamp(1.2rem, 1rem + 0.7vw, 1.55rem)"
+      : "clamp(1.5rem, 1.1rem + 1.3vw, 2rem)";
+
   return (
     <header
+      className={className}
       style={{
-        position: "relative",
-        marginBottom: isHero ? 28 : isOps ? 12 : 20,
-        padding: isHero ? "24px 26px" : "0",
-        background: isHero ? "var(--nx-panel-surface-overlay)" : "transparent",
-        border: isHero ? "1px solid var(--nx-panel-hairline)" : "none",
-        borderRadius: isHero ? "var(--nx-panel-radius)" : 0,
-        boxShadow: isHero ? "var(--nx-panel-elev-1)" : "none",
-        overflow: isHero ? "hidden" : "visible",
+        // El aire es lo único que separa la cabecera del contenido.
+        marginBottom: isHero ? 32 : isOps ? 12 : 20,
+        ...style,
       }}
     >
-      {isHero && (
-        <span
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            inset: "-40% -10% auto auto",
-            width: "min(360px, 50%)",
-            aspectRatio: "1",
-            background:
-              "radial-gradient(circle, color-mix(in srgb, var(--panel-accent, var(--primary)) 26%, transparent), transparent 60%)",
-            filter: "blur(8px)",
-            opacity: 0.55,
-            pointerEvents: "none",
-          }}
-        />
-      )}
-
       <div
         style={{
-          position: "relative",
           display: "flex",
-          alignItems: "flex-end",
+          // Las acciones se alinean con el título, no con el final del
+          // subtítulo: así la fila superior se lee de un golpe.
+          alignItems: "flex-start",
           justifyContent: "space-between",
           gap: isOps ? 14 : 16,
           flexWrap: "wrap",
@@ -87,7 +82,7 @@ export default function PageHeader({
                 textTransform: "uppercase",
                 letterSpacing: "var(--nx-panel-eyebrow-letter, 0.12em)",
                 color: "var(--text-tertiary)",
-                marginBottom: isOps ? 4 : 8,
+                marginBottom: isOps ? 4 : 6,
               }}
             >
               <span
@@ -106,13 +101,11 @@ export default function PageHeader({
           <h1
             style={{
               fontFamily: "var(--nx-font-display, 'Space Grotesk', sans-serif)",
-              fontSize: isOps
-                ? "clamp(1.2rem, 1rem + 0.7vw, 1.55rem)"
-                : "clamp(1.55rem, 1.1rem + 1.4vw, 2.15rem)",
+              fontSize: titleSize,
               fontWeight: 700,
               letterSpacing: "var(--nx-panel-title-letter, -0.02em)",
               margin: 0,
-              lineHeight: 1.08,
+              lineHeight: 1.1,
               color: "var(--text-primary)",
             }}
           >
@@ -121,11 +114,12 @@ export default function PageHeader({
           {subtitle && (
             <p
               style={{
-                marginTop: isOps ? 4 : 8,
+                marginTop: isOps ? 4 : 6,
                 marginBottom: 0,
-                fontSize: isOps ? "0.8125rem" : "0.95rem",
+                fontSize: isOps ? "0.8125rem" : "0.9rem",
                 color: "var(--text-secondary)",
-                maxWidth: isOps ? 640 : 760,
+                // Una línea que se lee, no un párrafo que se salta.
+                maxWidth: isOps ? 640 : 720,
                 lineHeight: 1.45,
               }}
             >
@@ -156,6 +150,8 @@ export default function PageHeader({
               alignItems: "center",
               flexWrap: "wrap",
               justifyContent: "flex-end",
+              // Compensa la diferencia de línea base contra el título grande.
+              marginTop: isHero ? 6 : 2,
             }}
           >
             {actions}
