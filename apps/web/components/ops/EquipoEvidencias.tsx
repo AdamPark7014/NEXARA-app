@@ -368,7 +368,14 @@ const PDFViewer = dynamic(() => import("@/components/PDFViewer"), {
  * El PDF se descarga con la sesión y se dibuja con pdf.js (visor de la web).
  * `<object>` y el visor de Chrome en iframe los bloquea la CSP (`object-src 'none'`).
  */
-export function VisorPdf({ url, alto = "620px" }: { url: string; alto?: "400px" | "500px" | "620px" }) {
+export function VisorPdf({
+  url,
+  alto = "620px",
+}: {
+  url: string;
+  /** Alturas del visor; 700px para preview de evidencia más alta. */
+  alto?: "400px" | "500px" | "620px" | "700px";
+}) {
   const ruta = resolveAssetUrl(url);
   const [pdf, setPdf] = useState<{ datos: Uint8Array | null; error: boolean }>({ datos: null, error: false });
 

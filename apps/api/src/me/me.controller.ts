@@ -81,7 +81,11 @@ export class MeController {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
       throw new UnauthorizedException('Token de usuario inválido');
     }
-    return this.peerRequests.create({ id: Number(user.id), email: user.email }, companyId, body);
+    return this.peerRequests.create(
+      { id: Number(user.id), email: user.email },
+      companyId,
+      body ?? {},
+    );
   }
 
   @Patch('activity-requests/:id/accept')

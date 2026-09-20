@@ -1,3 +1,5 @@
+import { ForbiddenException } from '@nestjs/common';
+
 /** Quién aprueba/administra herramientas vs quién puede pedir préstamo. */
 export const TOOLS_MANAGE_EMAILS = [
   'gerencia@nexara.com.mx', // Christian
@@ -27,7 +29,7 @@ export function canCreateToolLoan(email: string | null | undefined): boolean {
 
 export function assertCanCreateToolLoan(email: string | null | undefined): void {
   if (!canCreateToolLoan(email)) {
-    throw new Error(
+    throw new ForbiddenException(
       'Solo José Antonio y David (quien va a sitio) pueden solicitar herramientas.',
     );
   }

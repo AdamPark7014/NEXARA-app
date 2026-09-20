@@ -136,6 +136,20 @@ export type TeamBoardResponse = {
   desde?: string;
   hasta?: string;
   users: TeamBoardUser[];
+  /** Pipeline de flujo (Ola C). */
+  workflow?: WorkflowPipeline;
+};
+
+/** Conteo pipeline: asignada → iniciada → evidencia → cerrada + peer rejects + SLA. */
+export type WorkflowPipeline = {
+  assigned: number;
+  started: number;
+  evidence: number;
+  closed: number;
+  peerRejected: number;
+  slaOnTime: number;
+  slaLate: number;
+  slaPct: number | null;
 };
 
 /** Contrato C: lo que repartió quien mira. */

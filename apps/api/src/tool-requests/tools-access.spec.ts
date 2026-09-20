@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { canManageTools, canCreateToolLoan, assertCanCreateToolLoan } from './tools-access.js';
 
 describe('tools-access', () => {
@@ -15,8 +16,8 @@ describe('tools-access', () => {
     expect(canCreateToolLoan('administracion.ventas@nexara.com.mx')).toBe(false);
   });
 
-  it('assertCanCreateToolLoan lanza si no aplica', () => {
-    expect(() => assertCanCreateToolLoan('soporte@nexara.com.mx')).toThrow(/José Antonio/);
+  it('assertCanCreateToolLoan lanza ForbiddenException si no aplica', () => {
+    expect(() => assertCanCreateToolLoan('soporte@nexara.com.mx')).toThrow(ForbiddenException);
     expect(() => assertCanCreateToolLoan('operaciones@nexara.com.mx')).not.toThrow();
   });
 });
