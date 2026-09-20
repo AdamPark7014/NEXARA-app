@@ -23,7 +23,7 @@ import HrModuleRail from "@/components/hr/HrModuleRail";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
-import KpiCard from "@/components/ui/KpiCard";
+import MetricStrip from "@/components/ui/MetricStrip";
 import {
   type OrgChartNode,
   flattenOrgNodes,
@@ -48,6 +48,10 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 }
 
 const LINE = "color-mix(in srgb, var(--primary) 55%, var(--border))";
+/** Ancho de la tarjeta de persona; la maquetacion del arbol depende de el. */
+const ANCHO_TARJETA = 168;
+/** Hermanos por renglon antes de envolver: mas de esto estira el arbol a lo ancho. */
+const MAX_POR_FILA = 4;
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.1;
@@ -351,6 +355,8 @@ function TreeBranch({
 }: TreeBranchProps) {
   const kids = node.children ?? [];
   const hasKids = kids.length > 0;
+  /** Con muchos hermanos se cambia ancho por alto. */
+  const envuelve = kids.length > MAX_POR_FILA;
   const isMatch = !hasActiveFilter || (matchIds?.has(node.id) ?? true);
   const highlighted = hasActiveFilter && (matchIds?.has(node.id) ?? false);
   const dimmed = hasActiveFilter && !isMatch;
@@ -384,8 +390,11 @@ function TreeBranch({
           />
 
           <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
-            {/* Horizontal bar from first sibling center to last */}
-            {kids.length > 1 && (
+            {/* Barra horizontal del primer hermano al ultimo. Solo tiene sentido
+                cuando van en una sola fila: al envolver, cada hijo se enlaza con
+                su propio tramo vertical y una barra larga cruzaria por encima de
+                la segunda fila. */}
+            {kids.length > 1 && !envuelve && (
               <div
                 aria-hidden
                 style={{
@@ -404,9 +413,15 @@ function TreeBranch({
             <div
               style={{
                 display: "flex",
+                flexWrap: envuelve ? "wrap" : "nowrap",
                 justifyContent: "center",
                 alignItems: "flex-start",
                 gap: 16,
+                rowGap: 18,
+                // Con muchos hermanos, una sola fila estira el arbol a lo ancho
+                // y obliga a encogerlo hasta que no se lee. Se cambia ancho por
+                // alto: cuatro por renglon.
+                maxWidth: envuelve ? MAX_POR_FILA * (ANCHO_TARJETA + 16) : undefined,
               }}
             >
               {kids.map((child) => (
@@ -677,28 +692,22 @@ export default function OrgChartView({
         return (
           <div style={{ marginBottom: 10 }}>
             <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
-                gap: 8,
-                marginBottom: allUsers.length > 1 ? 8 : 0,
-              }}
+              style={{ marginBottom: allUsers.length > 1 ? 8 : 0 }}
             >
-              <KpiCard label="Total personas" value={allUsers.length} icon="👥" />
-              <KpiCard
-                label="Con manager"
-                value={withManager}
-                icon="🔗"
-                variant={withManager + withoutManager === allUsers.length ? "positive" : "warning"}
+              <MetricStrip
+                ariaLabel="Resumen del organigrama"
+                metrics={[
+                  { label: "Personas", value: allUsers.length },
+                  { label: "Con jefe", value: withManager },
+                  {
+                    label: "Sin jefe",
+                    value: withoutManager,
+                    hint: orphanRoots > 0 ? `${orphanRoots} con jefe inválido` : "raíces",
+                    tone: orphanRoots > 0 ? "warning" : "default",
+                  },
+                  { label: "Niveles", value: levels },
+                ]}
               />
-              <KpiCard
-                label="Sin manager"
-                value={withoutManager}
-                icon="🏛️"
-                variant="accent"
-                hint={orphanRoots > 0 ? `${orphanRoots} con jefe inválido` : "Raíces del org"}
-              />
-              <KpiCard label="Niveles" value={levels} icon="📊" />
             </div>
 
             {allUsers.length > 1 && (
