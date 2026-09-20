@@ -2,8 +2,9 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-20
-- **Rama:** mejora/calidad-y-web
-- **HEAD:** fix(accounting): blindar periodo cerrado en escrituras
+- **Rama:** gate/ds-gastos
+- **HEAD:** (pendiente commit) cerrojo anti doble-submit Marcar pagado en gastos
+- **Worktree:** `C:\dev\apps\_worktrees\nexara-gate-ds-gastos`
 
 ## Puente — no cambiar
 
@@ -11,36 +12,23 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ## Hecho este turno
 
-Blindaje de periodo fiscal cerrado en escrituras financieras críticas:
+Cerrojo anti doble-submit en ERP Gastos (`expenses/page.tsx`):
 
-- `assertDateNotInClosedPeriod` ahora se llama desde:
-  - `registerPayment` → `paymentDate`
-  - `reconcileTransaction` → `transactionDate`
-  - `cancelInvoice` → `issueDate` + hoy
-  - `createInvoice` → `issueDate`
-  - `updateInvoiceDraft` → `dto.issueDate` o `invoice.issueDate`
-  - `deleteInvoice` → `issueDate`
-  - `importBankTransactions` → cada `transactionDate`
-- Ya cubierto antes: `reverseJournalEntry`; crear/postear pólizas vía `resolveOpenFiscalPeriodId`.
-- Suite nueva: `apps/api/src/accounting/closed-period-writes.spec.ts` — **8/8 PASS**.
+- Estado `rowBusyId` en filas
+- `runMarkPagado` / `remove`: early-return si hay acción en vuelo; `setRowBusyId` + `finally` clear
+- Botón «Marcar pagado» deshabilitado + label «Pagando…» mientras corre
+- Botón «Eliminar» deshabilitado mientras la fila está ocupada
+- `ConfirmDialog` ya tenía `busy` en esta base — no se tocó
 
 ## A medias / pendiente real
 
-- **Deploy bloqueado:** `~/.ssh/config` tiene `hetzner-nexara` con
-  `HostName REEMPLAZA_CON_IP_HETZNER`. Falta IP/llave. En servidor:
-  `./deploy/update.sh --force-all`
-- **AuditLog no guarda el estado anterior** salvo en el cierre de periodo.
-- Bonos/descuentos no existen en pre-nómina (no inventados).
-- Sin smoke de navegador contra datos reales.
-- UI de cierres (`proteccion.noBloqueado`) puede actualizarse a reflejar el
-  blindaje API; no se tocó web en este turno.
+- Rama `gate/ds-gastos` está 12 commits detrás de `origin/mejora/calidad-y-web` (WT creado en 4a268528); merge/rebase a elección de Adam
+- Deploy Hetzner sigue bloqueado por IP placeholder
 
 ## Siguiente
 
-1. Adam da IP/llave Hetzner o corre deploy.
-2. Smoke contadora contra datos reales.
-3. Opcional: alinear copy de UI cierres con el blindaje API.
-4. AuditLog `previousData` en updates.
+1. Merge `gate/ds-gastos` → `mejora/calidad-y-web` cuando convenga
+2. Opcional: mismo patrón en employee-payments si aún no está en mainline
 
 ## No tocar
 
