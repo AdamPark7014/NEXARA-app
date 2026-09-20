@@ -37,8 +37,8 @@ export default function Section({
   dense?: boolean;
   flush?: boolean;
 }) {
-  const headerPadY = dense ? 12 : 16;
-  const bodyPad = flush ? 0 : dense ? "12px 16px" : "20px 22px";
+  const headerPadY = dense ? 10 : 14;
+  const bodyPad = flush ? 0 : dense ? "10px 14px" : "16px 18px";
 
   const toneBg: Record<Tone, string> = {
     default: "var(--surface)",
@@ -82,7 +82,7 @@ export default function Section({
             justifyContent: "space-between",
             gap: 14,
             flexWrap: "wrap",
-            padding: `${headerPadY}px 22px ${dense ? 10 : 14}px`,
+            padding: `${headerPadY}px 18px ${dense ? 8 : 12}px`,
             borderBottom: "1px solid var(--nx-panel-hairline-soft)",
             background:
               "linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 45%, transparent) 0%, transparent 100%)",
