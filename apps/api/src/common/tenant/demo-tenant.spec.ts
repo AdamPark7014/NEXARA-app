@@ -5,7 +5,7 @@
  * module`— al sembrar. La prueba se queda bajo `src` porque el `rootDir` de
  * Jest es `src`.
  */
-import { DEMO_COMPANY_SLUG, DemoTenantGuardError, assertDemoTenant } from '../../../prisma/demo-tenant';
+import { DEMO_COMPANY_SLUG, DemoTenantGuardError, assertDemoTenant } from '../../../prisma/demo-tenant.js';
 import { resolveDemoCompany, seedPlayDemoData } from '../../../prisma/seed-play-demo-data';
 
 const DEMO_OK = { id: 2, slug: DEMO_COMPANY_SLUG, isPrimary: false, isActive: true };
