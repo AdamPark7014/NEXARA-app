@@ -102,8 +102,17 @@ export class CompanyService {
   async listForUser(userId: number, isSuperAdmin?: boolean) {
     if (isSuperAdmin) return this.list();
 
-    const primary = await this.get();
-    await this.ensureMembership(userId, primary.id, true);
+    // Sólo los usuarios heredados de cuando existía una sola empresa llegan
+    // aquí sin ninguna fila en `user_companies`; a esos sí hay que darles la
+    // principal. Hacerlo para todos —como se hacía antes— metía a cualquiera
+    // que abriera la app dentro de la empresa real y encima la dejaba como su
+    // predeterminada: un usuario aislado en otro tenant (el revisor de las
+    // tiendas) terminaba viendo la plantilla de NEXARA en cuanto entraba.
+    const pertenencias = await this.prisma.userCompany.count({ where: { userId } });
+    if (pertenencias === 0) {
+      const primary = await this.get();
+      await this.ensureMembership(userId, primary.id, true);
+    }
 
     const rows = await this.prisma.userCompany.findMany({
       where: { userId, company: { isActive: true } },
