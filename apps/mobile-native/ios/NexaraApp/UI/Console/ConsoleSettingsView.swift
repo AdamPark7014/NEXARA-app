@@ -92,7 +92,7 @@ struct ConsoleSettingsView: View {
     }
 }
 
-private struct SettingRow: Identifiable {
+struct SettingRow: Identifiable {
     let key: String
     let label: String
     let category: String
