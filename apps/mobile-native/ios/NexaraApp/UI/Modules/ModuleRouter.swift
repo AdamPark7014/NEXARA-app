@@ -17,7 +17,7 @@ struct ModuleRouter {
         case (.console, "activities"),
              (.console, "my-activities"):
             ActivitiesView()
-        case (.console, "chat"), (.ventas, "chat"), (.lab, "chat"):
+        case (.console, "chat"), (.ventas, "chat"), (.lab, "chat"), (.studio, "chat"), (.tickets, "chat"), (.contabilidad, "chat"), (.web, "chat"):
             ChatView(
                 initialChannelId: channelId > 0 ? channelId : nil,
                 initialMessageId: messageId > 0 ? messageId : nil
