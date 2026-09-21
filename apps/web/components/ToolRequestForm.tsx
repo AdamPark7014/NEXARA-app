@@ -10,6 +10,7 @@ import {
   listarMisActividadesParaHerramienta,
   type ActividadSolicitable,
 } from '@/lib/almacen-api';
+import { FormField, FormGrid } from '@/components/ui/FormField';
 
 interface ToolRequestFormProps {
   onSuccess?: () => void;
@@ -224,14 +225,21 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   return (
     <form className={`card ${styles.form}`} onSubmit={handleSubmit}>
       <div>
-        <h3 className={styles.headerTitle}>Solicitar Herramienta</h3>
+        <h3 className={styles.headerTitle}>Solicitar herramienta</h3>
         <div className={styles.headerText}>
-          Busca y selecciona una herramienta disponible del inventario. Las fotos se toman del catálogo.
+          Busca y elige una herramienta disponible. Las fotos salen del catálogo.
         </div>
       </div>
 
-      <label className={styles.fieldLabel}>
-        Herramienta del inventario *
+      <FormField
+        label="Herramienta"
+        fullWidth
+        hint={
+          selectedInventoryItem
+            ? `Seleccionada: ${selectedInventoryItem.toolName} · ${selectedInventoryItem.model} · ${selectedInventoryItem.serialNumber}`
+            : 'Escribe al menos 2 letras: nombre, modelo o serie.'
+        }
+      >
         <input
           className="input"
           type="text"
@@ -244,13 +252,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
           }}
           placeholder="Busca por nombre, modelo o serie"
         />
-        <div className={styles.inventoryHint}>
-          {selectedInventoryItem
-            ? `Seleccionada: ${selectedInventoryItem.toolName} · ${selectedInventoryItem.model} · ${selectedInventoryItem.serialNumber}`
-            : 'Empieza a escribir para filtrar herramientas disponibles'}
-        </div>
         {inventoryLoading && (
-          <div className={styles.inventoryLoading}>Buscando herramientas...</div>
+          <div className={styles.inventoryLoading}>Buscando herramientas…</div>
         )}
         {!selectedInventoryItem && inventoryOptions.length > 0 && (
           <div className={styles.inventoryOptions}>
@@ -276,7 +279,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             ))}
           </div>
         )}
-      </label>
+      </FormField>
 
       {selectedInventoryItem && (
         <div className={styles.selectedCard}>
@@ -323,57 +326,55 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
         </div>
       )}
 
-      <label className={styles.fieldLabel}>
-        Actividad asignada
-        <select
-          className="input"
-          value={activityId}
-          onChange={(e) => setActivityId(e.target.value)}
+      <FormGrid>
+        <FormField
+          label="Actividad"
+          optional
+          hint="Vacío = préstamo suelto, sin OT."
         >
-          <option value="">Sin actividad (préstamo suelto)</option>
-          {actividades.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.anNumber} — {a.titulo}
-              {a.client ? ` · ${a.client.name}` : ''}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className={styles.fieldLabel}>
-        Motivo del uso *
-        <textarea
-          className={`input ${styles.reasonInput}`}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Describe el motivo por el cual solicitas esta herramienta..."
-        />
-      </label>
-
-      <div className={styles.dateGrid}>
-        <label className={styles.fieldLabel}>
-          Fecha de inicio *
+          <select
+            className="input"
+            value={activityId}
+            onChange={(e) => setActivityId(e.target.value)}
+          >
+            <option value="">Sin actividad (préstamo suelto)</option>
+            {actividades.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.anNumber} — {a.titulo}
+                {a.client ? ` · ${a.client.name}` : ''}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Motivo del uso" hint="Para qué la necesitas en el periodo.">
+          <textarea
+            className={`input ${styles.reasonInput}`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Describe el motivo…"
+          />
+        </FormField>
+        <FormField label="Inicio" hint="Día en que la recoges.">
           <input
             className="input"
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
           />
-        </label>
-        <label className={styles.fieldLabel}>
-          Fecha de devolución esperada *
+        </FormField>
+        <FormField label="Devolución esperada" hint="Debe ser después del inicio.">
           <input
             className="input"
             type="date"
             value={expectedReturnDate}
             onChange={(e) => setExpectedReturnDate(e.target.value)}
           />
-        </label>
-      </div>
+        </FormField>
+      </FormGrid>
 
       <div className={styles.actionsRow}>
         <button className="button-primary" type="submit" disabled={loading}>
-          {loading ? 'Enviando...' : '✓ Solicitar Herramienta'}
+          {loading ? 'Enviando…' : 'Solicitar herramienta'}
         </button>
         <button
           className="button-secondary"

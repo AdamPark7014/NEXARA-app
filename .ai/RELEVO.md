@@ -6,24 +6,20 @@
 
 ## Hecho
 
-### Alta de vehículos en Flotilla (`/erp/vehiculos`)
-- Botón **Agregar** (gated por `vehicles.inventory` / superadmin) → formulario → `POST vehicles/inventory`.
-- Helper `crearVehiculoInventario` en `vehiculos-api.ts`; permiso `puedeGestionarInventarioVehiculos` en `recursos-core.ts`.
-- Tests verdes: `page.spec.tsx` (5) + `recursos-core.spec.ts` (4).
-- **Pendiente deploy** a `core.nexara.com.mx` para que Adam lo vea en prod. CEO con `accesoVehiculos` ya trae el permiso en API.
+### Pasada UX formularios (tramo 1)
+- Nuevo `FormField` / `FormGrid` en `components/ui/FormField` — mismo contrato que Finanzas (hint bajo el control, opcional en etiqueta, error que reemplaza hint).
+- Finanzas reexporta `FinanceField`/`FinanceFormGrid` desde ahí (`.ai/DISENO-FINANZAS.md` actualizado).
+- Inputs globales (`utilities.scss`): `font-size: 16px` + `min-height` 44px en puntero grueso (anti-zoom iOS).
+- Migrados a FormField: viático, vehículo, herramienta, multas (sin emojis/asteriscos).
+- Tests verdes: viatics lote, ClientCreation, VehicleCheckout, viatics-reparto (27).
 
-### Excel de credenciales corregido (con Google Play)
-- **Ruta canónica:** `C:\Users\adpoz\Downloads\NEXARA-usuarios-v6.xlsx`
-- Copia en repo: `C:\dev\apps\NEXARA-app\NEXARA-usuarios-v6.xlsx`
-- Incluye `play.review@nexara.com.mx` / `NexaraPlayReview2026!`.
-
-### Login API — claves verificadas
-Contra `https://api.nexara.com.mx/api/auth/login`: cuentas del padrón OK (salvo 429 por rate limit en barridos masivos).
+### Alta flotilla + Excel credenciales
+(ver turnos previos; flotilla pendiente deploy).
 
 ## A medias
-- Play Console: Adam sube AAB + capturas + FGS location.
+- **Más formularios** aún con labels sueltos: `ClientCreationForm`, `MyProfileForm`, `BranchesForm`, `OpsActivityForm`, `VehicleCheckoutForm`, proyectos/clientes/procurement, etc. Misma pieza `FormField`.
+- Play Console / deploy web (flotilla + Asignar viático + FormField).
 - Documentos nativos / tope cotizaciones / tools.manage.
-- Deploy web de la alta de flotilla.
 
 ## No tocar
 Puente NAS · keystore Play · `NO TOCAR LIBREMENTE`.
