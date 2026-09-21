@@ -59,15 +59,6 @@ workflows:
           include: true
           source: true
       cancel_previous_builds: true
-    publishing:
-      # Email notifications can be configured if desired by setting CM_USER_EMAIL in Codemagic
-      # email:
-      #   recipients:
-      #     - $CM_USER_EMAIL
-      #   notify:
-      #     success: true
-      #     failure: true
-
   ios-archive-unsigned:
     # Optional workflow to create an unsigned .xcarchive for generic iOS Device (manual/tag only)
     name: iOS Device Archive (unsigned, no export)
