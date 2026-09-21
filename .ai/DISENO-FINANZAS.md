@@ -61,7 +61,8 @@ Nada de botones gigantes.
 
 ### 5. Formularios con jerarquía
 
-Usa `FinanceField` de `@/components/finance/FinanceModuleShell`, que ya acepta:
+Usa `FormField` / `FormGrid` de `@/components/ui/FormField` (Finanzas reexporta
+como `FinanceField` / `FinanceFormGrid` por compatibilidad), que ya acepta:
 
 - `hint` — la duda se resuelve **bajo el control**, al capturar, no después del
   error. Ej. «Pesos, con IVA incluido».

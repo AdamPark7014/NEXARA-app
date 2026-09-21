@@ -63,8 +63,17 @@ body.dark :where(.button-secondary, button.secondary, input[type="button"].secon
   background: color-mix(in srgb, var(--surface) 96%, var(--surface-2));
   padding: var(--control-padding-y) var(--control-padding-x);
   min-height: var(--control-height);
+  /* 16px evita el zoom automático de iOS al enfocar; el contrato de paneles
+     pide controles legibles, no texto de 13–14 en el teclado. */
+  font-size: 16px;
   color: var(--text-primary);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+@media (pointer: coarse) {
+  :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .input) {
+    min-height: max(var(--control-height), 44px);
+  }
 }
 
 :where(input, select, textarea, .input)::placeholder {

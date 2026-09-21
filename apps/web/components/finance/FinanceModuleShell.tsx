@@ -95,58 +95,6 @@ export function FinanceModuleShell({
   );
 }
 
-export function FinanceFormGrid({ children }: { children: ReactNode }) {
-  return <div className={styles.formGrid}>{children}</div>;
-}
-
-/**
- * Campo de formulario financiero.
- *
- * `hint` va DEBAJO del control, no en un asterisco ni en un tooltip: la duda
- * («¿el monto lleva IVA?») aparece donde se captura, no después del error.
- * `optional` se marca en la etiqueta porque lo contrario —marcar lo obligatorio
- * con un asterisco rojo— llena el formulario de alarmas para decir lo normal.
- * `error` se pinta bajo el campo y reemplaza al hint mientras esté presente.
- */
-let campoSeq = 0;
-
-export function FinanceField({
-  label,
-  children,
-  fullWidth,
-  hint,
-  optional,
-  error,
-  describedById,
-}: {
-  label: string;
-  children: ReactNode;
-  fullWidth?: boolean;
-  hint?: ReactNode;
-  optional?: boolean;
-  error?: string | null;
-  /**
-   * Id del mensaje de error, para que el control lo referencie con
-   * `aria-describedby`. Si no se pasa, se genera uno: sin esto, un lector de
-   * pantalla anuncia el campo pero no por qué está mal.
-   */
-  describedById?: string;
-}) {
-  const errorId = describedById ?? `campo-error-${(campoSeq += 1)}`;
-  return (
-    <label className={`${styles.field}${fullWidth ? ` ${styles.fieldFull}` : ""}`}>
-      <span className={styles.fieldLabel}>
-        {label}
-        {optional ? <span className={styles.fieldOptional}> · opcional</span> : null}
-      </span>
-      {children}
-      {error ? (
-        <span id={errorId} role="alert" className={styles.fieldError}>
-          {error}
-        </span>
-      ) : hint ? (
-        <span className={styles.fieldHint}>{hint}</span>
-      ) : null}
-    </label>
-  );
-}
+// Campo y rejilla: mismo contrato que el resto del sistema (`FormField`).
+// Se reexportan con el nombre histórico de Finanzas para no romper imports.
+export { FormField as FinanceField, FormGrid as FinanceFormGrid } from "@/components/ui/FormField";

@@ -1,4 +1,5 @@
 "use client";
+import { FormField, FormGrid } from '@/components/ui/FormField';
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { Socket } from 'socket.io-client';
@@ -6,7 +7,6 @@ import { useUser } from './UserContext';
 import styles from './ViaticRequestForm.module.css';
 import { openExternalUrl } from '@/lib/open-external-url';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
-
 
 const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
   const { user } = useUser();
@@ -104,7 +104,7 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
         throw new Error(data.message || 'Error al solicitar viático');
       }
       setSuccess('Solicitud enviada correctamente');
-      setMonto('');
+      setMonto('0.00');
       setRazon('');
       if (ticketPreview) URL.revokeObjectURL(ticketPreview.url);
       setTicket(null);
@@ -149,15 +149,14 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
   return (
     <form className={`card ${styles.form}`} onSubmit={handleSubmit}>
       <div>
-        <h3 className={styles.title}>Solicitar viatico</h3>
+        <h3 className={styles.title}>Solicitar viático</h3>
         <div className={styles.subtitle}>
           Completa los datos y adjunta el ticket en imagen o PDF.
         </div>
       </div>
 
-      <div className={styles.fieldsGrid}>
-        <label className={styles.fieldLabel}>
-          Monto solicitado
+      <FormGrid>
+        <FormField label="Monto solicitado" hint="Pesos, con IVA incluido.">
           <input
             className="input"
             type="number"
@@ -167,9 +166,8 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
             step="0.01"
             placeholder="0.00"
           />
-        </label>
-        <label className={styles.fieldLabel}>
-          Razon del gasto
+        </FormField>
+        <FormField label="Motivo del gasto" hint="Para qué fue el gasto del viaje.">
           <input
             className="input"
             type="text"
@@ -177,86 +175,81 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
             onChange={(e) => setRazon(e.target.value)}
             placeholder="Ej. Combustible, hospedaje, alimentos"
           />
-        </label>
-      </div>
+        </FormField>
+      </FormGrid>
 
-      <div className={styles.uploadSection}>
-        <div className={styles.uploadTitle}>Adjuntar ticket</div>
-        <div
-          onDragEnter={() => setDragActive(true)}
-          onDragOver={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setDragActive(true);
-          }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={handleDrop}
-          className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
-        >
-          <div className={styles.dropTitle}>Arrastra y suelta tu ticket aquí</div>
-          <div className={styles.dropHint}>
-            Acepta imagenes o PDF.
-          </div>
-          <button
-            className={`button-secondary ${styles.fileBtn}`}
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
+      <FormField label="Comprobante" fullWidth hint="Imagen o PDF del ticket.">
+        <div className={styles.uploadSection}>
+          <div
+            onDragEnter={() => setDragActive(true)}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={handleDrop}
+            className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
           >
-            Seleccionar archivo
-          </button>
-          <input
-            ref={fileInputRef}
-            className={`input ${styles.hiddenInput}`}
-            type="file"
-            accept="image/*,application/pdf"
-            onChange={(e) => handleSelectFile(e.target.files?.[0] || null)}
-          />
-        </div>
-        {ticketPreview ? (
-          <div className={styles.previewWrap}>
-            <div className={styles.previewRow}>
-              {ticketPreview.kind === 'image' ? (
-                <div className={styles.imageFrame}>
-                  <img
-                    src={ticketPreview.url}
-                    alt="Preview"
-                    className={styles.previewImage}
-                  />
+            <div className={styles.dropTitle}>Arrastra y suelta tu ticket aquí</div>
+            <div className={styles.dropHint}>Acepta imágenes o PDF.</div>
+            <button
+              className={`button-secondary ${styles.fileBtn}`}
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Seleccionar archivo
+            </button>
+            <input
+              ref={fileInputRef}
+              className={`input ${styles.hiddenInput}`}
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => handleSelectFile(e.target.files?.[0] || null)}
+            />
+          </div>
+          {ticketPreview ? (
+            <div className={styles.previewWrap}>
+              <div className={styles.previewRow}>
+                {ticketPreview.kind === 'image' ? (
+                  <div className={styles.imageFrame}>
+                    <img src={ticketPreview.url} alt="Vista previa del ticket" className={styles.previewImage} />
+                  </div>
+                ) : (
+                  <div className={styles.pdfFrame}>
+                    <object
+                      data={ticketPreview.url}
+                      type="application/pdf"
+                      width="100%"
+                      height="100%"
+                      aria-label="Vista previa PDF"
+                    >
+                      <embed src={ticketPreview.url} type="application/pdf" />
+                      <button type="button" className="link" onClick={() => void openExternalUrl(ticketPreview.url)}>
+                        Abrir PDF
+                      </button>
+                    </object>
+                  </div>
+                )}
+                <div className={styles.fileInfo}>
+                  <div className={styles.fileMeta}>
+                    {ticket ? `Archivo: ${ticket.name} (${formatBytes(ticket.size)})` : ''}
+                  </div>
+                  <button className="button-secondary" type="button" onClick={clearTicket}>
+                    Quitar archivo
+                  </button>
                 </div>
-              ) : (
-                <div className={styles.pdfFrame}>
-                  <object
-                    data={ticketPreview.url}
-                    type="application/pdf"
-                    width="100%"
-                    height="100%"
-                    aria-label="Vista previa PDF"
-                  >
-                    <embed src={ticketPreview.url} type="application/pdf" />
-                    <button type="button" className="link" onClick={() => void openExternalUrl(ticketPreview.url)}>
-                      Abrir PDF
-                    </button>
-                  </object>
-                </div>
-              )}
-              <div className={styles.fileInfo}>
-                <div className={styles.fileMeta}>
-                  {ticket ? `Archivo: ${ticket.name} (${formatBytes(ticket.size)})` : ''}
-                </div>
-                <button className="button-secondary" type="button" onClick={clearTicket}>
-                  Quitar archivo
-                </button>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className={styles.emptyFile}>No hay archivo seleccionado</div>
-        )}
-      </div>
+          ) : (
+            <div className={styles.emptyFile}>No hay archivo seleccionado</div>
+          )}
+        </div>
+      </FormField>
 
       <div className={styles.actions}>
         <button className="button-primary" type="submit" disabled={loading}>
-          {loading ? 'Enviando...' : 'Solicitar viatico'}
+          {loading ? 'Enviando…' : 'Solicitar viático'}
         </button>
         <button
           className="button-secondary"

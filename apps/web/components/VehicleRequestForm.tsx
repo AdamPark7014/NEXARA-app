@@ -5,6 +5,7 @@ import { useUser } from './UserContext';
 import styles from './VehicleRequestForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { FormField, FormGrid } from '@/components/ui/FormField';
 
 
 
@@ -178,14 +179,13 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
   return (
     <form onSubmit={handleSubmit} className={`card ${styles.form}`}>
       {actividadId && <input type="hidden" name="actividadId" value={actividadId} />}
-      <h3 className={styles.title}>Solicitud de vehiculo</h3>
+      <h3 className={styles.title}>Solicitud de vehículo</h3>
       <p className={styles.subtitle}>
-        Completa los datos para solicitar un vehiculo. La evidencia de entrega se sube al finalizar el uso.
+        Completa los datos para pedir un vehículo. La evidencia de entrega se sube al devolverlo.
       </p>
-      <div className={styles.fieldGrid}>
+      <FormGrid>
         {!actividadId && (
-          <label className={styles.fieldLabel}>
-            Actividad
+          <FormField label="Actividad" hint="La OT o servicio al que se carga el uso.">
             <select
               className="input"
               value={actividadSeleccionada}
@@ -199,14 +199,13 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
               <option value="">Selecciona actividad</option>
               {actividades.map((actividad) => (
                 <option key={actividad.id} value={actividad.id}>
-                  {actividad.anNumber} - {actividad.titulo || 'Sin titulo'}
+                  {actividad.anNumber} - {actividad.titulo || 'Sin título'}
                 </option>
               ))}
             </select>
-          </label>
+          </FormField>
         )}
-        <label className={styles.fieldLabel}>
-          Vehiculo
+        <FormField label="Vehículo" hint="Solo unidades disponibles de la flotilla.">
           <select
             className="input"
             value={vehicleId}
@@ -214,31 +213,28 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
             required
             disabled={loading}
           >
-            <option value="">Selecciona vehiculo</option>
+            <option value="">Selecciona vehículo</option>
             {vehicles.map((vehiculo) => (
               <option key={vehiculo.id} value={vehiculo.id}>
                 {vehiculo.nombre}{vehiculo.placas ? ` (${vehiculo.placas})` : ''}
               </option>
             ))}
           </select>
-        </label>
-        <label className={styles.fieldLabel}>
-          Motivo de uso
+        </FormField>
+        <FormField label="Motivo de uso" fullWidth hint="Para qué lo necesitas en el periodo.">
           <input className="input" type="text" value={motivo} onChange={e => setMotivo(e.target.value)} required disabled={loading} />
-        </label>
-        <label className={styles.fieldLabel}>
-          Fecha inicio de uso
+        </FormField>
+        <FormField label="Inicio de uso" hint="Fecha y hora en que lo recoges.">
           <input className="input" type="datetime-local" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} required disabled={loading} />
-        </label>
-        <label className={styles.fieldLabel}>
-          Fecha fin de uso
+        </FormField>
+        <FormField label="Fin de uso" hint="Fecha y hora en que lo devuelves.">
           <input className="input" type="datetime-local" value={fechaFin} onChange={e => setFechaFin(e.target.value)} required disabled={loading} />
-        </label>
-        <div className={styles.actions}>
-          <button className="button-primary" type="submit" disabled={loading}>
-            {loading ? 'Enviando...' : 'Solicitar vehiculo'}
-          </button>
-        </div>
+        </FormField>
+      </FormGrid>
+      <div className={styles.actions}>
+        <button className="button-primary" type="submit" disabled={loading}>
+          {loading ? 'Enviando…' : 'Solicitar vehículo'}
+        </button>
       </div>
       {error && <p className={styles.errorText}>{error}</p>}
       {success && <p className={styles.successText}>{success}</p>}

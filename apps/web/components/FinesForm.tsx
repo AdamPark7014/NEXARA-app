@@ -6,6 +6,7 @@ import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './FinesForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { FormField, FormGrid } from '@/components/ui/FormField';
 
 const FINE_TYPES = {
   actividad: {
@@ -256,9 +257,9 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   if (!permisoSi) {
     return (
       <div className={`card ${styles.container}`}>
-        <h3 className={styles.title}>Gestión de Multas</h3>
+        <h3 className={styles.title}>Gestión de multas</h3>
         <div className={styles.denied}>
-          ⛔ No tienes permisos para crear multas
+          No tienes permiso para crear multas.
         </div>
       </div>
     );
@@ -266,12 +267,10 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
 
   return (
     <form onSubmit={handleSubmit} className={`card ${styles.container}`}>
-      <h3 className={styles.title}>Nueva Multa</h3>
-      
-      <div className={styles.grid}>
-        {/* Usuario - Selector Directo */}
-        <label className={styles.label}>
-          👤 Usuario
+      <h3 className={styles.title}>Nueva multa</h3>
+
+      <FormGrid>
+        <FormField label="Persona" hint="A quién se aplica la multa.">
           <select
             className="input"
             value={usuarioSeleccionado}
@@ -279,28 +278,23 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
             disabled={loading || usuarios.length === 0}
             required
           >
-            <option value="">Selecciona un usuario</option>
+            <option value="">Selecciona una persona</option>
             {usuarios.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.nombre} {u.role ? `(${u.role.nombre})` : ''}
               </option>
             ))}
           </select>
-        </label>
+        </FormField>
 
-        {/* Información de usuario seleccionado */}
         {usuarioElegido && (
           <div className={styles.selectedUserBox}>
-            <div className={styles.selectedUserName}>✓ {usuarioElegido.nombre}</div>
-            <div className={styles.selectedUserEmail}>
-              {usuarioElegido.email}
-            </div>
+            <div className={styles.selectedUserName}>{usuarioElegido.nombre}</div>
+            <div className={styles.selectedUserEmail}>{usuarioElegido.email}</div>
           </div>
         )}
 
-        {/* Tipo de Multa */}
-        <label className={styles.label}>
-          📋 Tipo de Multa
+        <FormField label="Tipo" hint="Define el catálogo de motivos.">
           <select
             className="input"
             value={tipo}
@@ -316,11 +310,9 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
               </option>
             ))}
           </select>
-        </label>
+        </FormField>
 
-        {/* Razón */}
-        <label className={styles.label}>
-          Razón
+        <FormField label="Motivo" hint="El motivo concreto de esta multa.">
           <select
             className="input"
             value={razon}
@@ -328,18 +320,16 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
             required
             disabled={loading}
           >
-            <option value="">Selecciona una razón</option>
+            <option value="">Selecciona un motivo</option>
             {currentReasons.map((reason) => (
               <option key={reason} value={reason}>
                 {reason}
               </option>
             ))}
           </select>
-        </label>
+        </FormField>
 
-        {/* Monto */}
-        <label className={styles.label}>
-          Monto ($)
+        <FormField label="Monto" hint="Pesos. Puede ser 0 si solo es registro.">
           <input
             className="input"
             type="number"
@@ -351,45 +341,41 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
             required
             disabled={loading}
           />
-        </label>
+        </FormField>
 
-        {/* Descripción */}
-        <label className={styles.label}>
-          Descripción (Opcional)
+        <FormField label="Descripción" optional fullWidth hint="Contexto adicional para quien revise.">
           <textarea
             className={`input ${styles.textarea}`}
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Detalles adicionales..."
+            placeholder="Detalles adicionales…"
             disabled={loading}
           />
-        </label>
+        </FormField>
+      </FormGrid>
 
-        {/* Botón */}
-        <div className={styles.actions}>
-          <button 
-            className="button-primary" 
-            type="submit" 
-            disabled={loading || !usuarioSeleccionado || usuarios.length === 0}
-          >
-            {loading ? 'Registrando...' : '✓ Crear Multa'}
-          </button>
-        </div>
+      <div className={styles.actions}>
+        <button
+          className="button-primary"
+          type="submit"
+          disabled={loading || !usuarioSeleccionado || usuarios.length === 0}
+        >
+          {loading ? 'Registrando…' : 'Crear multa'}
+        </button>
       </div>
 
-      {error && <p className={styles.error}>⚠️ {error}</p>}
-      {success && <p className={styles.success}>✓ {success}</p>}
+      {error && <p className={styles.error}>{error}</p>}
+      {success && <p className={styles.success}>{success}</p>}
 
-      {/* Usuarios disponibles */}
       {usuarios.length > 0 && (
         <div className={styles.usersInfo}>
-          <strong className={styles.usersInfoTitle}>👥 Usuarios disponibles:</strong> {usuarios.length}
+          <strong className={styles.usersInfoTitle}>Personas disponibles:</strong> {usuarios.length}
         </div>
       )}
 
       {usuarios.length === 0 && (
         <div className={styles.usersEmpty}>
-          <strong>⚠️ Sin usuarios disponibles</strong> según tu nivel jerárquico
+          <strong>Sin personas disponibles</strong> según tu nivel jerárquico
         </div>
       )}
     </form>
