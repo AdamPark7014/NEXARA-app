@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.RequestQuote
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -37,7 +38,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import mx.nexara.mobile.nativeapp.ui.console.ConsoleRoutes
 import mx.nexara.mobile.nativeapp.ui.console.CoreExtraModule
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 
 /** Icono de cada módulo de «Más». */
 fun CoreExtraModule.icon(): ImageVector = when (this) {
@@ -48,11 +52,17 @@ fun CoreExtraModule.icon(): ImageVector = when (this) {
     CoreExtraModule.HERRAMIENTAS -> Icons.Default.Build
     CoreExtraModule.VEHICULOS -> Icons.Default.DirectionsCar
     CoreExtraModule.ORGANIGRAMA -> Icons.Default.AccountTree
+    CoreExtraModule.VIATICOS -> Icons.Default.Payments
 }
 
 /**
- * «Más»: el resto de NEXARA Core que el rol puede abrir. Por ahora cada uno lleva a
- * [ModulePlaceholderScreen]; los frentes de trabajo irán poniendo la pantalla de verdad.
+ * «Más»: el resto de NEXARA Core que el rol puede abrir.
+ *
+ * Los que ya tienen pantalla nativa se abren dentro de la app; los que no,
+ * siguen cayendo en [ModulePlaceholderScreen]. La lista lo dice antes de que se
+ * toque, con una etiqueta «En la web» en los que todavía sacan al navegador: de
+ * lo contrario, dos entradas iguales hacen dos cosas muy distintas y no hay
+ * forma de saberlo hasta después.
  */
 @Composable
 fun MoreHubScreen(
@@ -85,6 +95,9 @@ fun MoreHubScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    if (!ConsoleRoutes.tienePantallaNativa(module)) {
+                        NxStatusChip("En la web", NxTone.Neutral)
                     }
                     Icon(
                         Icons.AutoMirrored.Filled.KeyboardArrowRight,

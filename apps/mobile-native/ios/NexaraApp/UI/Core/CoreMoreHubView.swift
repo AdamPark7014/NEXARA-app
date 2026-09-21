@@ -3,6 +3,11 @@ import SwiftUI
 /// Hub «Más»: los módulos de Core que no caben como pestaña (Cotizaciones,
 /// Proyectos, Almacén, Vehículos…), filtrados por `CoreNavigation.extraModules`.
 /// Va dentro del `NavigationStack` de la cubierta del shell.
+///
+/// A dónde va cada uno lo decide `CoreExtraDestination`. La lista avisa con un
+/// «En la web» en los que todavía sacan al navegador: si no, dos entradas
+/// idénticas hacen dos cosas muy distintas y no hay forma de saberlo hasta
+/// después de tocarlas.
 struct CoreMoreHubView: View {
     let modules: [CoreExtraModule]
 
@@ -10,14 +15,9 @@ struct CoreMoreHubView: View {
         List {
             ForEach(modules) { module in
                 NavigationLink {
-                    // Vehículos ya tiene pantalla nativa (check list con cámara en
-                    // vivo); el resto sigue abriéndose en la web.
-                    switch module {
-                    case .vehiculos:
-                        VehiculosView()
-                    default:
-                        CoreModulePlaceholderView(module: module)
-                    }
+                    // Un solo sitio decide a dónde va cada módulo, para que la
+                    // lista y los enlaces entrantes no se contradigan.
+                    CoreExtraDestination(module: module)
                 } label: {
                     HStack(spacing: 12) {
                         NxIconBadge(systemName: module.systemImage, size: 36)
@@ -26,6 +26,12 @@ struct CoreMoreHubView: View {
                                 .font(.body.weight(.semibold))
                             Text(module.summary)
                                 .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if !CoreExtraDestination.tienePantallaNativa(module) {
+                            Spacer(minLength: 4)
+                            Text("En la web")
+                                .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.secondary)
                         }
                     }

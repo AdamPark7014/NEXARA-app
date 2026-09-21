@@ -107,28 +107,65 @@ object NotificationDeepLinkResolver {
 
     /**
      * Tipos que apuntaban a módulos que ya no existen en la app (viáticos,
-     * herramientas, vehículos, CRM, compras, almacén, proyectos, mantenimiento,
-     * usuarios, multas, contabilidad): abren la casa de Core, igual que la web.
+     * herramientas, CRM, compras, mantenimiento, multas, contabilidad): abren la
+     * casa de Core, igual que la web.
+     *
+     * Aquí **solo** puede estar lo que no tiene dónde aterrizar. En cuanto un
+     * módulo de «Más» estrena pantalla, su tipo sale de esta lista y pasa a
+     * [EXTRA_ENTITY_TYPES]; si no, el aviso sigue cayendo en Actividades y quien
+     * lo toca no encuentra de qué le hablaban. Ya salieron vehículos,
+     * proyectos, almacén y viáticos.
      */
     private val NON_CORE_ENTITY_TYPES = setOf(
         "evidence", "evidences", "activityevidence",
-        "viatic", "viatico", "viatics",
         "tool_request", "toolrequest", "toolrenewal", "tool", "tools",
-        "vehicle", "vehicles", "vehiclecontrol",
         "saleslead", "lead", "leads",
         "salesopportunity", "opportunity", "opportunities",
         "cotizacion", "quote", "quotes",
         "clientticketrequest",
         "requisition", "purchase_order", "purchaserequisition", "purchaseorder", "procurement",
-        "stocklevel", "warehouse", "movement",
-        "salesproject", "project", "projects",
         "maintenancecontractvisit", "maintenance",
+        // `user` NO abre el organigrama: un aviso de cuenta bloqueada o de alta
+        // de usuario no es una pregunta de «quién reporta a quién».
         "user", "users", "fine", "fines", "accounting", "entry",
     )
 
+    /**
+     * Tipos que ya tienen pantalla dentro de la app: abren su módulo de «Más»
+     * ([CoreExtraModule]), no la casa de Core. `ConsoleNavHost` comprueba
+     * después si el rol puede verlo; si no, cae en la casa como siempre.
+     *
+     * Vehículos ya estaba resuelto; se le suman almacén y proyectos, que son
+     * los que estrenan pantalla con esta ola.
+     *
+     * Viáticos es el caso que más se nota: el aviso de «tu viático fue
+     * autorizado» trae el id del viático, así que con [extra] abre **ése**, no
+     * el módulo a secas. Antes caía en Actividades y quien lo tocaba acababa
+     * mirando su lista de pendientes sin saber por qué.
+     */
+    private val EXTRA_ENTITY_TYPES: Map<String, String> = buildMap {
+        listOf("vehicle", "vehicles", "vehiclecontrol").forEach { put(it, CoreKeys.VEHICULOS) }
+        listOf("stocklevel", "stock_level", "warehouse", "movement", "stockmovement")
+            .forEach { put(it, CoreKeys.ALMACEN) }
+        listOf("salesproject", "project", "projects", "operationalproject", "projectmilestone")
+            .forEach { put(it, CoreKeys.PROYECTOS) }
+        listOf("viatic", "viatico", "viatics", "viaticos", "viaticoreparto")
+            .forEach { put(it, CoreKeys.VIATICOS) }
+    }
+
     private val NON_CORE_CATEGORIES = setOf(
-        "viatics", "tools", "fines", "vehicles", "quotes", "orders", "projects",
+        "tools", "fines", "quotes", "orders",
         "sales", "crm", "erp", "noc", "approval", "confirmations",
+    )
+
+    /** Categorías con pantalla propia, misma regla que [EXTRA_ENTITY_TYPES]. */
+    private val EXTRA_CATEGORIES: Map<String, String> = mapOf(
+        "vehicles" to CoreKeys.VEHICULOS,
+        "projects" to CoreKeys.PROYECTOS,
+        "warehouse" to CoreKeys.ALMACEN,
+        "stock" to CoreKeys.ALMACEN,
+        "kpis" to CoreKeys.KPIS_EQUIPO,
+        "viatics" to CoreKeys.VIATICOS,
     )
 
     private fun forEntityType(entityType: String, entityId: Long?): DeepLinkDestination? = when (entityType) {
@@ -142,6 +179,8 @@ object NotificationDeepLinkResolver {
         )
         in TICKET_ENTITY_TYPES -> DeepLinkDestination.Module(panel = PanelId.PORTAL, key = "tickets", entityId = entityId)
         "client", "clients", "salesclient" -> DeepLinkDestination.Module(panel = PanelId.ERP, key = CoreKeys.CLIENTS, entityId = entityId)
+        // Antes que la lista de descartes: lo que ya tiene pantalla, a su pantalla.
+        in EXTRA_ENTITY_TYPES -> extra(EXTRA_ENTITY_TYPES.getValue(entityType), entityId)
         in NON_CORE_ENTITY_TYPES -> DeepLinkParser.CORE_HOME
         else -> null
     }
@@ -152,9 +191,21 @@ object NotificationDeepLinkResolver {
         "chat" -> DeepLinkDestination.Module(panel = PanelId.ERP, key = CoreKeys.CHAT)
         "profile" -> DeepLinkDestination.Module(panel = PanelId.ERP, key = CoreKeys.MY_PROFILE)
         "tickets" -> DeepLinkDestination.Module(panel = PanelId.PORTAL, key = "tickets")
+        in EXTRA_CATEGORIES -> extra(EXTRA_CATEGORIES.getValue(category), entityId = null)
         in NON_CORE_CATEGORIES -> DeepLinkParser.CORE_HOME
         else -> null
     }
+
+    /**
+     * Un módulo de «Más». El id viaja por si la pantalla sabe qué hacer con él;
+     * las cuatro de consulta todavía no abren un detalle, así que hoy solo abren
+     * el módulo — que sigue siendo mucho mejor que la casa de Core.
+     */
+    private fun extra(key: String, entityId: Long?) = DeepLinkDestination.Module(
+        panel = PanelId.ERP,
+        key = key,
+        entityId = entityId,
+    )
 
     private fun attendance(comidas: Boolean) = DeepLinkDestination.Module(
         panel = PanelId.ERP,

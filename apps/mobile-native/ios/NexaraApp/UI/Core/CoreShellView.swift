@@ -10,6 +10,8 @@ private enum CoreShellOverlay: Identifiable {
     case more
     /// Un módulo del hub directo (deep link o push).
     case extra(CoreExtraModule)
+    /// Un viático concreto: el aviso trae su id y hay que abrir ÉSE, no la lista.
+    case viatico(id: Int)
 
     var id: String {
         switch self {
@@ -19,6 +21,7 @@ private enum CoreShellOverlay: Identifiable {
         case .comidas: return "comidas"
         case .more: return "more"
         case .extra(let module): return "extra-\(module.rawValue)"
+        case .viatico(let id): return "viatico-\(id)"
         }
     }
 }
@@ -169,7 +172,13 @@ struct CoreShellView: View {
             }
         case .extra(let module):
             NavigationStack {
-                CoreModulePlaceholderView(module: module).toolbar { closeItem }
+                // Mismo destino que en el hub: un enlace o un push a Vehículos,
+                // Almacén o Proyectos abre su pantalla, no la ficha de la web.
+                CoreExtraDestination(module: module).toolbar { closeItem }
+            }
+        case .viatico(let id):
+            NavigationStack {
+                ViaticosView(abrirId: id).toolbar { closeItem }
             }
         }
     }
@@ -218,10 +227,16 @@ struct CoreShellView: View {
         // Módulo del hub «Más»: se abre encima de la pestaña actual; si su rol
         // no lo ve, a casa (misma regla que abajo).
         if let extra = link.extra {
-            if extraModules.contains(extra) {
-                present(.extra(extra))
-            } else {
+            guard extraModules.contains(extra) else {
                 selected = .actividades
+                return
+            }
+            // El aviso de un viático trae su id: abre ESE viático, no la lista.
+            // Es la diferencia entre «te autorizaron algo» y saber qué.
+            if extra == .viaticos, let id = link.entityId, id > 0 {
+                present(.viatico(id: Int(id)))
+            } else {
+                present(.extra(extra))
             }
             return
         }
