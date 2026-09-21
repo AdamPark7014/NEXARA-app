@@ -170,17 +170,25 @@ fun ViaticosScreen(
         }
 
         // Pedir es la acción de esta pantalla: siempre a la mano del pulgar.
-        ExtendedFloatingActionButton(
-            onClick = onNuevoViatico,
-            icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text("Pedir viático", fontWeight = FontWeight.SemiBold) },
-            containerColor = NxColors.Brand,
-            contentColor = Color.White,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .heightIn(min = 56.dp),
-        )
+        //
+        // Salvo cuando la lista está vacía y el propio estado vacío ya ofrece el
+        // mismo botón: ahí eran dos primarios a la vez para una sola acción
+        // (regla 4), uno encima del otro y con distinta etiqueta —«Pedir un
+        // viático» y «Pedir viático»— como si fueran cosas distintas.
+        val vacioYaInvita = !state.loading && lista.isEmpty() && !(hayEquipo && pestana == 1)
+        if (!vacioYaInvita) {
+            ExtendedFloatingActionButton(
+                onClick = onNuevoViatico,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Pedir viático", fontWeight = FontWeight.SemiBold) },
+                containerColor = NxColors.Brand,
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .heightIn(min = 56.dp),
+            )
+        }
 
         NxSnackbarHost(
             snackbar,
