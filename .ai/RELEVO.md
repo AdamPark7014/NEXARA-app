@@ -2,116 +2,122 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-20
-- **Rama:** feat/viaticos-casos (base `mejora/calidad-y-web` @ f6f90df8)
-- **HEAD:** Viáticos repartidos entre actividades y cierre del anticipo
+- **Rama:** `mejora/calidad-y-web`
+- **HEAD:** El suite web deja de fallar a ratos
 
 ## Puente — no cambiar
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Turno anterior (claude-code, f6f90df8)
+## Pendiente de Adam, sin hacer
 
-Ola de lenguaje llano en las pantallas hijas de Contabilidad. Cerró con
-980/980 en web. Quedó pendiente el deploy a Hetzner y la misma pasada en
-`movimientos`, `polizas` y `pre-nomina`.
+1. **Rotar la clave de Google Maps.** Se pegó en el chat más de una vez. Ningún
+   agente la escribe en disco; Adam la pone en el servidor con el comando de
+   `.ai/HARDENING-GAP.md`.
+2. **«Asignar viático» no existe en la interfaz.** `POST viaticos/assign` está
+   completo en la API (sella `origen: ASIGNACION` y `asignadoPorId`, y exige
+   ligar a actividad o proyecto), `getErpViaticsAdminSectionConfig` da
+   `canAssign: true`, y el subtítulo de la pantalla dice literalmente «Autoriza
+   y **asigna** viáticos del equipo». Falta solo el botón y su formulario. No se
+   construyó sin permiso porque crea un gasto a nombre de otra persona.
+3. **Saldo del anticipo de viático:** `POR_DEVOLVER` y `POR_REEMBOLSAR` se ven
+   pero no generan asiento. ¿Se descuenta en nómina o se registra como cuenta
+   por cobrar?
+4. **`minutosPagables` de pre-nómina:** 9 horas netas + 1 aprobada da 10
+   «pagables». ¿Doble conteo, o extra a doble? `pre-nomina.spec.ts:64` lo fija
+   en 10 h, así que hoy parece deliberado.
+5. **El contrato dice 32px y yo pedí 40px.** Los agentes obedecieron el
+   contrato y subieron a 40px solo con puntero grueso. Si Adam quiere 40px
+   también con ratón, se cambia el contrato primero.
 
 ## Hecho este turno
 
-Adam: «en viáticos faltan casos de uso, como que se les puedan agregar viáticos
-por actividad o cosas así, o distribuido en varias actividades».
+Adam pidió dos cosas: que la cotización tuviera el diseño del PDF de viáticos,
+y que se viera «muchísima más profesionalidad y UI/UX en todo el sistema». Y
+mandó una captura de Facturas con un error.
 
-### 1. Repartir un viático entre varias actividades
+### 1. La cotización adopta el tema corporativo
 
-Un viaje cubre varios servicios de clientes distintos; la gasolina es una y el
-costo son varios. Hasta hoy el gasto entero caía sobre `Viatico.actividadId` y
-el P&L por proyecto mentía sin avisar.
+Banda superior, tres tarjetas arriba (total, anticipo, entrega) y fichas para
+cliente y condiciones. Se renderizó y se miró antes de enseñarla, y así
+aparecieron tres defectos viejos: los párrafos se medían sin `lineGap` y se
+recortaba la última línea («pueden cambiar sin previo aviso» no salía);
+Garantías repetía un renglón por partida; y las páginas de continuación metían
+la tabla debajo del logo.
 
-- **`ViaticoReparto`** (tabla `viatico_repartos`): viático, actividad, monto,
-  nota, empresa. `@@unique([viaticoId, actividadId])` para que una actividad no
-  aparezca en dos partes y siga pudiendo leerse «esta actividad carga X».
-- **La suma de las partes es exactamente el total**, comprobado en el servidor
-  en **centavos enteros** — en coma flotante `0.1 + 0.2 !== 0.3` y un reparto
-  legítimo se rechazaría. El error dice la cifra: «faltan $200.00 por repartir».
-- `actividadId` no se toca: el reparto es aditivo y sin partes todo funciona
-  como siempre.
-- El **P&L por proyecto** (`vendor-project-finance.service.ts`) ya reparte: cada
-  proyecto carga su parte, y en el detalle la línea dice que es parte de un
-  viático mayor. El desglose por proyecto de `viatics/analytics` también.
+**Ningún PDF usaba las fuentes corporativas.** El tema registraba Montserrat e
+Inter y dibujaba todo con `'Helvetica'` a pelo, y de los veinte generadores
+solo `propuesta-tecnica` llamaba a `registrarFuentesCorporativas`. Ahora pedir
+la fuente **es** registrarla (`fuente(doc, clave)`), así que los veinte
+cambiaron de golpe. El PDF pasa de ~20 KB a ~133 KB: son las fuentes embebidas.
 
-### 2. Pedir o asignar desde la actividad — **ya existía**
+### 2. Siete pantallas que no habían cargado nunca
 
-`ops/activities/[id]/viatics` ya tenía «Solicitar» y «Asignar» reutilizando
-`postViatico` / `assignViatico`. No se duplicó nada. Lo que sí faltaba: la
-pantalla ahora enseña **la parte que carga esa actividad**, no el viático
-entero, e incluye los repartidos que cuelgan de otra actividad (antes esa OT
-se veía «sin viáticos» aunque pagara la mitad de la gasolina).
+La captura de Adam decía «limit must not be greater than 100». La vista pedía
+`limit=200` y `PaginationQueryDto` topa en 100.
 
-### 3. Cierre del anticipo
+| Pantalla | Qué costaba |
+|---|---|
+| `erp/contabilidad/facturas` | 400 desde el primer día |
+| `erp/invoicing` | el campo Cliente está condicionado a que la lista traiga algo: con `clientId` opcional en la API se podía guardar una factura de ingreso **sin cliente**, y esa no entra en cuentas por cobrar |
+| `studio/leads` | alimentaba `promotedIds`: nunca se marcaba lo ya enviado → leads duplicados |
+| `ops/support/new`, `ops/maintenance/contracts`, `ops/assets` | cliente obligatorio: no se podía abrir ticket, ni dar de alta contrato, ni guardar activo |
+| `integra/settings` | además, `pedirIntegra` cuelga `siteId` de toda URL y `service-clients` es ruta ERP con DTO bajo `forbidNonWhitelisted`: moría por `siteId` con límite o sin él |
 
-Solo había `montoSolicitado`: nadie sabía si el dinero volvió.
+Ninguna recorta en silencio: se piden páginas hasta completar y, donde se topa
+el techo, se dice cuántos de cuántos. `listUsers` pagina por dentro, lo que cura
+de paso `integra/people`, que llamaba sin parámetros y enseñaba 20 usuarios
+como si fueran todos.
 
-- `montoAprobado` — se sella al aprobar. Quien autoriza puede **recortar**
-  («te doy 800, no 1,200»), nunca subir. Queda anotado en la cadena.
-- `montoComprobado` + `fechaComprobacion` + `comprobadoPorId` — `PATCH
-  /viatics/:id/comprobar`.
-- `liquidacion` calculada en la API: entregado / comprobado / saldo y estado
-  `SIN_COMPROBAR · CUADRADO · POR_DEVOLVER · POR_REEMBOLSAR`.
-- La póliza de «marcar pagado» sale por lo **autorizado**, no por lo pedido.
-- En `ops/my-viatics` el saldo va pegado al monto: es la pregunta que trae
-  quien entra ahí.
+### 3. Contrato visual en cotizaciones y finanzas
 
-### Fugas y bugs encontrados de paso
+Tres reglas nuevas en `.ai/DISENO-FINANZAS.md`, sacadas de mirar pantallas ya
+desplegadas: **(7)** una fila de ceros no informa, no se pinta; **(8)** los
+filtros son una barra, no un formulario; **(9)** ni una caja dentro de otra.
 
-- `viatics/analytics`, `report.pdf` y `export/xlsx` **no recibían `companyId`**:
-  `companyWhere(null)` es deny-all, así que la pestaña de resumen y el PDF
-  salían en ceros para todo el mundo. Arreglado pasando la empresa.
-- `findByActivity` y `findByAllowedUsers` del servicio consultaban **sin filtro
-  de empresa**. Sin ruta que las expusiera hoy, pero eran fuga latente: ahora
-  exigen `requireCompanyId` + `companyWhere`.
+Aplicadas a `crm/quotes`, `erp/cotizaciones`, las pestañas de cotización de
+cliente y oportunidad, y `erp/finance/{viatics,expenses,employee-payments}`.
+`FinanceModuleShell` estrena `variant="flat"` opcional; sus otros 14
+consumidores no cambian.
 
-## Migración
+De paso, defectos que no eran de estilo: `quote-supplier.module.css` empezaba
+con una línea suelta que dejaba el panel de pedido a CT **sin ningún estilo**;
+el detalle de cotización guardaba el error de «bajar PDF / enviar correo» y no
+lo pintaba nunca; cuatro pantallas vaciaban la tabla al fallar un refresco; los
+inputs de partida de la oportunidad no tenían **ningún** nombre accesible; y
+`OpportunityDetailShell` se quedaba con el esqueleto puesto para siempre si la
+sesión no llegaba a estar lista.
 
-`20260920140000_viatico_reparto_y_liquidacion` — **aditiva y reversible**. Una
-tabla nueva y cuatro columnas NULL; ningún `NOT NULL` sin default, nada
-borrado ni renombrado. El SQL a mano coincide exactamente (nombres de índices,
-constraints y acciones de FK) con lo que genera `prisma migrate diff`, así que
-no deja drift. El rollback va escrito en la cabecera del archivo.
+### 4. La puerta vuelve a ser puerta
 
-## Puerta de calidad
+- El suite web fallaba dos pruebas al azar. No eran las pruebas: `findBy*`
+  espera 1 s por omisión y el límite por prueba eran 5 s, cuando la más lenta
+  ya gasta 2,6 s sola. Ahora 4 s y 15 s. Dos pasadas seguidas, 1 003/1 003.
+- `workspace-ar-ap.spec.ts` se ponía rojo **todas las tardes**: fabricaba «hoy»
+  con el día UTC y el servicio define «hoy» como el día del servidor. En México
+  coinciden hasta las 18:00.
 
-- `npx tsc --noEmit` limpio en **api** y en **web**.
-- API: **2171/2171 en 195 suites** (eran 2136/194; el spec nuevo suma 35).
-- Web: **991/991 en 83 archivos** (eran 980/82; el spec nuevo suma 11).
-- Correr cada suite **sola**: en paralelo se agotan por CPU y dan rojos falsos.
+## Verificación
 
-## A medias / decisiones para Adam
+- API: **196 suites, 2 176 pruebas**, verde.
+- Web: **86 archivos, 1 003 pruebas**, verde dos pasadas seguidas.
+- `tsc --noEmit` limpio en API y web.
 
-1. **El reparto se captura escribiendo el ID de la actividad.** Es el idioma que
-   ya usaba esa pantalla («ID actividad OPS»), pero un selector de actividades
-   sería mejor. No se metió para no cargar un catálogo de miles de filas.
-2. **Repartir desde la pantalla de la actividad** no está: hoy el reparto se
-   edita desde Finanzas. Lo natural sería «este viático también cubre la OT…»
-   desde la propia actividad.
-3. **El saldo no genera movimiento contable.** `POR_DEVOLVER` y
-   `POR_REEMBOLSAR` se ven, pero nadie cobra ni paga solo. Falta decidir si el
-   sobrante se descuenta en nómina o se registra como cuenta por cobrar.
-4. **Viático de equipo** (un viaje, varias personas) sigue sin existir: el
-   esquema lo dice explícitamente en `ActivityAssignee` («cada asignado solicita
-   los suyos, no se prorratean»). Es una decisión previa, no un olvido.
-5. **Tope por categoría** y **viaje de varios días** no se implementaron: piden
-   política y catálogo, no una tabla.
-6. Un viático **pagado** ya no se re-reparte (el asiento salió). Si Adam quiere
-   corregir imputaciones después del pago, hace falta una póliza de ajuste.
+## Deuda medida, no estimada
 
-## Siguiente
+**81 pantallas** siguen con rejilla de `KpiCard` y **361 tarjetas sueltas**
+fuera del ámbito de Cursor; 24 ya usan `MetricStrip`. Peores: `crm/reports`
+(14), `studio/pages` (12), `erp/hr` (11). Reproducible con el script descrito
+en `.ai/HARDENING-GAP.md`.
 
-1. Enseñarle a Adam el reparto antes de seguir (regla suya: lo visual se acuerda
-   antes de construir).
-2. Deploy + smoke: el módulo de viáticos completo, incluida la pestaña de
-   resumen que hasta hoy salía en ceros.
-3. Pendiente del turno anterior: deploy de Contabilidad a Hetzner.
+## Aviso de relevo
+
+Cuatro agentes escribieron a la vez en esta worktree. Uno hizo `git stash push`
+y se llevó el trabajo sin commitear de otro; lo devolvió y se verificó que no
+se perdió nada (lista de stashes con solo dos viejos de otras ramas). Pero
+pasó, y la regla 5 existe justo para eso: **un writer a la vez**.
 
 ## No tocar
 
-Puente NAS · cotizaciones de prueba · `components/ui/` y el shell (otro agente
-en paralelo).
+Puente NAS · cotizaciones de prueba de clientes reales · `components/ui/` y el
+shell (otro agente) · Actividades y Asistencias (packet de Cursor).
