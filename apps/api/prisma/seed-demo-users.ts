@@ -29,9 +29,8 @@ type DemoUser = {
 };
 
 /**
- * Equipo oficial NEXARA — alineado con migration 20260620120000_seed_nexara_team.
- * soporte@nexara.com.mx usa ing_soporte (no ing_campo).
- * Contraseñas: Nexara! + número de empleado (únicas).
+ * Roster alineado con Excel de credenciales / producción (2026-09).
+ * play.review vive en seed-play-reviewer (tenant demo aislado).
  */
 const DEMO_USERS: DemoUser[] = [
   {
@@ -66,35 +65,26 @@ const DEMO_USERS: DemoUser[] = [
     email: 'infraestructura@nexara.com.mx',
     roleKey: 'arquitecto',
     departmentName: 'Arquitectura',
-    employeeNumber: 'NX-003',
+    employeeNumber: 'JT90072601',
     puesto: 'Encargado de Obra',
     password: 'Nexara!NX003',
   },
   {
-    nombre: 'Karen Elizalde Sarmiento',
-    email: 'ventas@nexara.com.mx',
-    roleKey: 'coord_admin',
-    departmentName: 'Administración',
-    employeeNumber: 'NX-101',
-    puesto: 'Coordinadora Administrativa',
-    password: 'Nexara!NX101',
-  },
-  {
-    nombre: 'Mónica García Guzmán',
-    email: 'soluciones@nexara.com.mx',
+    nombre: 'Paulina Tlapaltotoli Álvarez',
+    email: 'finanzas@nexara.com.mx',
     roleKey: 'administrativo',
     departmentName: 'Administración',
-    employeeNumber: 'NX-102',
-    puesto: 'Ejecutiva Administrativa',
-    password: 'Nexara!NX102',
+    employeeNumber: 'PT81062607',
+    puesto: 'Contador(a) General',
+    password: 'Fosati-Raruke-4213$',
   },
   {
     nombre: 'Daniela Galindo Almazán',
     email: 'redes@nexara.com.mx',
     roleKey: 'lider_diseno',
     departmentName: 'Área Creativa',
-    employeeNumber: 'NX-201',
-    puesto: 'Líder de Área Creativa',
+    employeeNumber: 'DG04082605',
+    puesto: 'Diseñadora',
     password: 'Nexara!NX201',
   },
   {
@@ -102,8 +92,8 @@ const DEMO_USERS: DemoUser[] = [
     email: 'direccion.operaciones@nexara.com.mx',
     roleKey: 'coord_operaciones',
     departmentName: 'Operaciones',
-    employeeNumber: 'NX-301',
-    puesto: 'Coordinador de Operaciones',
+    employeeNumber: 'LJ75100126',
+    puesto: 'Encargado de servicios',
     password: 'Nexara!NX301',
   },
   {
@@ -111,8 +101,8 @@ const DEMO_USERS: DemoUser[] = [
     email: 'operaciones@nexara.com.mx',
     roleKey: 'coord_operaciones',
     departmentName: 'Operaciones',
-    employeeNumber: 'NX-302',
-    puesto: 'Coordinador de Operaciones',
+    employeeNumber: 'DM91030125',
+    puesto: 'Encargado de instalación',
     password: 'Nexara!NX302',
   },
   {
@@ -120,8 +110,8 @@ const DEMO_USERS: DemoUser[] = [
     email: 'administracion.ventas@nexara.com.mx',
     roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-402',
-    puesto: 'Ingeniero de Campo',
+    employeeNumber: 'IC91052710',
+    puesto: 'Técnico Instalador',
     password: 'Nexara!NX402',
   },
   {
@@ -129,8 +119,8 @@ const DEMO_USERS: DemoUser[] = [
     email: 'joan.sanchez@nexara.com.mx',
     roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-404',
-    puesto: 'Ingeniero de Campo',
+    employeeNumber: 'JS03052901',
+    puesto: 'Técnico Instalador',
     password: 'Nexara!NX404',
   },
   {
@@ -138,8 +128,8 @@ const DEMO_USERS: DemoUser[] = [
     email: 'soporte@nexara.com.mx',
     roleKey: 'ing_soporte',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-405',
-    puesto: 'Ingeniera de Soporte',
+    employeeNumber: 'CJ26210822',
+    puesto: 'Ingeniero de Campo / Técnico de Campo',
     password: 'Nexara!NX405',
   },
   {
@@ -147,8 +137,8 @@ const DEMO_USERS: DemoUser[] = [
     email: 'alejandro.gonzalez@nexara.com.mx',
     roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-407',
-    puesto: 'Ingeniero de Campo',
+    employeeNumber: 'AG78051905',
+    puesto: 'Ingeniero de Campo / Técnico de Campo',
     password: 'Nexara!NX407',
   },
   {
@@ -156,9 +146,36 @@ const DEMO_USERS: DemoUser[] = [
     email: 'israel.ramos@nexara.com.mx',
     roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-408',
-    puesto: 'Ingeniero de Campo',
+    employeeNumber: 'IR93050000',
+    puesto: 'Técnico Instalador',
     password: 'Nexara!NX408',
+  },
+  {
+    nombre: 'José Antonio Ramírez Salazar',
+    email: 'jose.ramirez@nexara.com.mx',
+    roleKey: 'ing_soporte',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'JA91091706',
+    puesto: 'Encargado de soporte',
+    password: 'Nokede-Gasulo-1678!',
+  },
+  {
+    nombre: 'Juan José González Rojas',
+    email: 'juan.gonzalez@nexara.com.mx',
+    roleKey: 'ing_campo',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'JJ00092606',
+    puesto: 'Técnico Instalador',
+    password: 'Fogoca-Rezole-7140%',
+  },
+  {
+    nombre: 'Roberto Paul Vivanco López',
+    email: 'roberto.vivanco@nexara.com.mx',
+    roleKey: 'ing_soporte',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'RP95042606',
+    puesto: 'Ingeniero de Campo / Técnico de Campo',
+    password: 'Salave-Gisotu-6905!',
   },
 ];
 
@@ -414,9 +431,9 @@ async function main() {
   await seedDemoUsers();
   console.log('\n📊 Verificación de login demo:');
   const samples = [
-    'soporte@nexara.com.mx',
     'gerencia@nexara.com.mx',
-    'claudia.bernal@nexara.com.mx',
+    'finanzas@nexara.com.mx',
+    'jose.ramirez@nexara.com.mx',
     'operaciones@nexara.com.mx',
   ];
   for (const email of samples) {

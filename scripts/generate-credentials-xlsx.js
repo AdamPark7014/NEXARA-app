@@ -7,23 +7,22 @@ const path = require('path');
 
 /** Misma lista / passwords que apps/api/prisma/seed-demo-users.ts */
 const USERS = [
-  ['Claudia Bernal', 'claudia.bernal@nexara.com.mx', 'Nexara!NX010', 'Director General', 'Dirección General'],
+  ['Claudia Bernal', 'claudia.bernal@nexara.com.mx', 'Nexara!NX010', 'Tester de plataforma', 'Dirección General'],
   ['Christian Eduardo Del Pozo Sánchez', 'gerencia@nexara.com.mx', 'Nexara!NX001', 'Director General', 'Dirección General'],
   ['Adam Del Pozo', 'developer@nexara.com.mx', 'Nexara!NX002', 'Developer / Super Admin', 'Dirección General'],
-  ['Josué Teodulo Cervantes Arellano', 'infraestructura@nexara.com.mx', 'Nexara!NX003', 'Encargado de Obra', 'Obra'],
-  ['Karen Elizalde Sarmiento', 'ventas@nexara.com.mx', 'Nexara!NX101', 'Coordinadora Administrativa', 'Administración'],
-  ['Mónica García Guzmán', 'soluciones@nexara.com.mx', 'Nexara!NX102', 'Ejecutiva Administrativa', 'Administración'],
-  ['Daniela Galindo Almazán', 'redes@nexara.com.mx', 'Nexara!NX201', 'Líder de Área Creativa', 'Área Creativa'],
-  ['Luis Joel Aguilar Castillo', 'direccion.operaciones@nexara.com.mx', 'Nexara!NX301', 'Coordinador de Operaciones', 'Operaciones'],
-  ['David Morales Zenón', 'operaciones@nexara.com.mx', 'Nexara!NX302', 'Coordinador de Operaciones', 'Operaciones'],
-  ['José Iván Tapia Reyes', 'ivan.tapia@nexara.com.mx', 'Nexara!NX401', 'Ingeniero de Campo', 'Ingeniería'],
-  ['Iván Camargo Cañete', 'administracion.ventas@nexara.com.mx', 'Nexara!NX402', 'Ingeniero de Campo', 'Ingeniería'],
-  ['Isaías García Bustamante', 'isaias.garcia@nexara.com.mx', 'Nexara!NX403', 'Ingeniero de Campo', 'Ingeniería'],
-  ['Joan Sebastián Sánchez Espinoza', 'joan.sanchez@nexara.com.mx', 'Nexara!NX404', 'Ingeniero de Campo', 'Ingeniería'],
-  ['Carolina Juárez Álvarez', 'soporte@nexara.com.mx', 'Nexara!NX405', 'Ingeniera de Soporte', 'Ingeniería'],
-  ['Ariadna Sierra Gallardo', 'ariadna.sierra@nexara.com.mx', 'Nexara!NX406', 'Ingeniera de Campo', 'Ingeniería'],
-  ['Alejandro González Bustamante', 'alejandro.gonzalez@nexara.com.mx', 'Nexara!NX407', 'Ingeniero de Campo', 'Ingeniería'],
-  ['Israel Ramos Lima', 'israel.ramos@nexara.com.mx', 'Nexara!NX408', 'Ingeniero de Campo', 'Ingeniería'],
+  ['Josué Teodulo Cervantes Arellano', 'infraestructura@nexara.com.mx', 'Nexara!NX003', 'Encargado de Obra', 'Arquitectura'],
+  ['Paulina Tlapaltotoli Álvarez', 'finanzas@nexara.com.mx', 'Fosati-Raruke-4213$', 'Contador(a) General', 'Administración'],
+  ['Daniela Galindo Almazán', 'redes@nexara.com.mx', 'Nexara!NX201', 'Diseñadora', 'Área Creativa'],
+  ['Luis Joel Aguilar Castillo', 'direccion.operaciones@nexara.com.mx', 'Nexara!NX301', 'Encargado de servicios', 'Operaciones'],
+  ['David Morales Zenón', 'operaciones@nexara.com.mx', 'Nexara!NX302', 'Encargado de instalación', 'Operaciones'],
+  ['Iván Camargo Cañete', 'administracion.ventas@nexara.com.mx', 'Nexara!NX402', 'Técnico Instalador', 'Ingeniería'],
+  ['Joan Sebastián Sánchez Espinoza', 'joan.sanchez@nexara.com.mx', 'Nexara!NX404', 'Técnico Instalador', 'Ingeniería'],
+  ['Carolina Juárez Álvarez', 'soporte@nexara.com.mx', 'Nexara!NX405', 'Ingeniero de Campo / Técnico de Campo', 'Ingeniería'],
+  ['Alejandro González Bustamante', 'alejandro.gonzalez@nexara.com.mx', 'Nexara!NX407', 'Ingeniero de Campo / Técnico de Campo', 'Ingeniería'],
+  ['Israel Ramos Lima', 'israel.ramos@nexara.com.mx', 'Nexara!NX408', 'Técnico Instalador', 'Ingeniería'],
+  ['José Antonio Ramírez Salazar', 'jose.ramirez@nexara.com.mx', 'Nokede-Gasulo-1678!', 'Encargado de soporte', 'Ingeniería'],
+  ['Juan José González Rojas', 'juan.gonzalez@nexara.com.mx', 'Fogoca-Rezole-7140%', 'Técnico Instalador', 'Ingeniería'],
+  ['Roberto Paul Vivanco López', 'roberto.vivanco@nexara.com.mx', 'Salave-Gisotu-6905!', 'Ingeniero de Campo / Técnico de Campo', 'Ingeniería'],
 ];
 
 const GREEN = '1F5F4E';
