@@ -173,7 +173,7 @@ struct PortalBranchEditView: View {
         }
         .navigationTitle(branchId == nil ? "Nueva sucursal" : "Editar sucursal")
         .task { await load() }
-        .onChange(of: logoItem) { _, item in
+        .onChange(of: logoItem) { item in
             Task {
                 if let data = try? await item?.loadTransferable(type: Data.self) { logoData = data }
             }

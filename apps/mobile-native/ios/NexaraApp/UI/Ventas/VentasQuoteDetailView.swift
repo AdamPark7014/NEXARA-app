@@ -167,8 +167,8 @@ struct VentasQuoteDetailView: View {
     private var quoteActionBar: some View {
         HStack(spacing: 10) {
             Menu {
-                Button("PDF cliente") { Task { await downloadPdf(internal: false) } }
-                Button("PDF interno") { Task { await downloadPdf(internal: true) } }
+                Button("PDF cliente") { Task { await downloadPdf(share: false, internal: false) } }
+                Button("PDF interno") { Task { await downloadPdf(share: false, internal: true) } }
             } label: {
                 Label("PDF", systemImage: "doc.richtext")
             }

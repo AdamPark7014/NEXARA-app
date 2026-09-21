@@ -39,7 +39,7 @@ struct ChatView: View {
             .navigationTitle("Chat")
             .navigationBarTitleDisplayMode(.inline)
             .task { await loadChannels() }
-            .onChange(of: messages.count) { _, _ in
+            .onChange(of: messages.count) { _ in
                 Task { await openInitialMessageIfNeeded() }
             }
             .sheet(item: $pdfItem) { (item: ChatPDFItem) in
