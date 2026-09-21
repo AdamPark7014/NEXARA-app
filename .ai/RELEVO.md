@@ -3,8 +3,8 @@
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-20
 - **Rama:** `mejora/calidad-y-web`
-- **HEAD:** El PDF que sí ve el cliente adopta el lenguaje de viáticos
-- **Desplegado:** sí, `8fe3e437` en Hetzner; fuentes corporativas presentes en la imagen
+- **HEAD:** Avisos y rutas muertas corregidos; Actividades con lenguaje visual nuevo
+- **Verificado:** API 198 suites / 2 237 pruebas · web 63 / 569 · build limpio con `.next` borrado
 
 ## Puente — no cambiar
 
@@ -147,6 +147,83 @@ Dos lecciones que valen para el siguiente turno:
 2. **`ssh ... && ./deploy/update.sh` devuelve 0 aunque el build muera.** Hay que
    leer el log buscando `Failed to compile` y `ERROR:`, no mirar el código de
    salida.
+
+## Segunda mitad del turno
+
+### 5. Fuera todo lo que no es /erp — 77 300 líneas
+
+Adam lo confirmó dos veces. Verificado antes de borrar: `integra`,
+`ops` y `sales` .nexara.com.mx devuelven 308 a `core.nexara.com.mx/erp/pizarra`,
+y dentro de core el middleware redirige el resto. Nada era alcanzable.
+
+Borrados en commits separados por panel, revertibles uno a uno: `lab`
+(717b8228), `studio` (fdbc6274), `ops` (f243b4b9), `crm` (5a1b0551) e `integra`
+(dentro de 5e7d729a, ver abajo).
+
+Dos excepciones: **cuatro pantallas de `ops` estaban vivas** —Core las
+reexportaba, no las duplicaba— y se movieron con `git mv` a `/erp` sin tocar
+lógica. E **integra conserva tres archivos** (`_lib`, `_caps`, `_PersonFace`)
+que usa el shell; no generan ninguna ruta.
+
+### 6. Actividades con el lenguaje que Adam aprobó
+
+Dos bandas de cifras —seis de flujo en cero más otras cuatro— fundidas en tres
+celdas. La tarjeta pasa de cuadro blanco de 200px con iniciales a foto redonda
+con aro de estado y el encargo completo. **Centro operativo**: pantalla
+completa para dejarlo en la pared, Esc para salir, refresco cada 60 s, sin
+Christian ni Claudia (excluidos por correo, no por puesto: el cargo cambia, el
+correo no).
+
+### 7. Avisos que no avisaban
+
+Doce tipos se emitían con un valor que no existe en el enum de Postgres, así
+que el INSERT fallaba y el emisor se tragaba el error: **ninguna aprobación de
+flujo ni descuento de cotización avisaba a nadie**, ni en web ni en el
+teléfono. Migración `20260920160000_avisos_workflow_y_descuentos`, aditiva. El
+doceavo (`SALES_PROJECT_MARGIN_ALERT`) lo destapó la prueba nueva, no la
+auditoría.
+
+Y 30 enlaces de aviso apuntaban a paneles borrados; ahora salen de
+`app-urls.ts`. `/ops/my-viatics` se dejó intacta a propósito: no hay pantalla de
+«mis viáticos» en Core y mandar al ingeniero a la de administración cambiaría
+un rebote por un 403.
+
+### 8. App móvil: el rechazo de Play
+
+Leídos en Play Console, los dos motivos: falta `isMonitoringTool` (arreglado,
+`versionCode` a 11, con guardia en el preflight) y **credenciales de revisión
+incorrectas**. La cuenta `play.review@nexara.com.mx` no estaba en el seeder; se
+añade con la contraseña por variable de entorno:
+
+    PLAY_REVIEW_PASSWORD='...' npm run prisma:seed
+
+Tres bloqueos más, de la auditoría y sin resolver:
+
+1. **El `.aab` en disco es el rechazado** (v10, 17-09). Hay que recompilar.
+2. **La declaración de datos de Play dice que la ubicación en segundo plano «no
+   aplica»** y el manifiesto declara `FOREGROUND_SERVICE_LOCATION`. Google
+   compara y bloquea. El vídeo que piden ya existe en `play-releases/`.
+3. **Las instrucciones al revisor describen paneles borrados el 15-09.** El
+   propio documento llama a eso «la causa nº1 de rechazo».
+
+iOS **sí tiene Firebase** (la documentación del repo se contradice); falta la
+llave APNs. Pero los Swift **nunca se han compilado**: sin Mac no hay fecha
+creíble.
+
+## Error propio que conviene no repetir
+
+`git add -- <ruta>` seguido de `git commit` **no commitea esa ruta: commitea
+todo el índice**. Con varios agentes en la misma worktree, mi commit del seeder
+(5e7d729a) se llevó dentro las 114 bajas de integra que otro agente tenía
+preparadas. El contenido es correcto; el mensaje miente. No se reescribió
+porque había un agente escribiendo y rebasar encima destruye trabajo en vuelo.
+
+Para revertir solo ese borrado:
+
+    git checkout 5e7d729a^ -- "apps/web/app/(panels)/integra"
+
+Lo correcto es `git commit -F msg -- <rutas>`, que limita el commit por
+pathspec. Los commits posteriores ya lo usan.
 
 ## Aviso de relevo
 
