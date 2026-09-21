@@ -44,7 +44,12 @@ enum ConsoleHelpers {
     }
 
     static func mapInt(_ m: [String: Any], _ keys: String...) -> Int {
-        Int(mapInt64(m, keys) ?? 0)
+        for k in keys {
+            if let v = m[k] as? Int { return v }
+            if let v = m[k] as? NSNumber { return v.intValue }
+            if let v = m[k] as? String, let i = Int(v) { return i }
+        }
+        return 0
     }
 
     static func mapDouble(_ m: [String: Any], _ keys: String...) -> Double {

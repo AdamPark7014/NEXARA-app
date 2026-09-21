@@ -16,11 +16,23 @@ struct PortalServicesView: View {
                 ProgressView("Cargando mis servicios…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error {
-                ContentUnavailableView("No se pudo cargar", systemImage: "exclamationmark.triangle", description: Text(error))
-                    .overlay(alignment: .bottom) {
-                        Button("Reintentar") { Task { await reload() } }
-                            .padding(.bottom, 40)
-                    }
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.secondary)
+                    Text("No se pudo cargar").font(.headline)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Button("Reintentar") { Task { await reload() } }
+                        .buttonStyle(.bordered)
+                        .padding(.top, 8)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
             } else {
                 List {
                     let stats = summary["summary"] as? [String: Any] ?? [:]
@@ -105,7 +117,19 @@ struct PortalServicesView: View {
 
                     if invoices.isEmpty && quotes.isEmpty && projects.isEmpty && contracts.isEmpty {
                         Section {
-                            ContentUnavailableView("Sin servicios", systemImage: "briefcase", description: Text("Tus proyectos y documentos aparecerán aquí."))
+                            VStack(spacing: 8) {
+                                Image(systemName: "briefcase")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(.secondary)
+                                Text("Sin servicios").font(.headline)
+                                Text("Tus proyectos y documentos aparecerán aquí.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 16)
                         }
                     }
                 }

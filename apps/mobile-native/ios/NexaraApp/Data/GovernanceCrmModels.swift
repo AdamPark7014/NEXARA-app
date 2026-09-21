@@ -71,6 +71,21 @@ struct ExecutiveCLevel: Hashable {
     let topAccounts: [ExecutiveTopAccount]
     let raw: [String: Any]
 
+    static func == (lhs: ExecutiveCLevel, rhs: ExecutiveCLevel) -> Bool {
+        lhs.headline == rhs.headline &&
+        lhs.operations == rhs.operations &&
+        lhs.finance == rhs.finance &&
+        lhs.alerts == rhs.alerts &&
+        lhs.topAccounts == rhs.topAccounts
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(headline)
+        hasher.combine(operations)
+        hasher.combine(finance)
+        hasher.combine(alerts)
+        hasher.combine(topAccounts)
+    }
+
     init(raw: [String: Any]) {
         self.raw = raw
         headline = ExecutiveHeadline(raw: raw["headlineKpis"] as? [String: Any] ?? [:])

@@ -79,7 +79,7 @@ struct StudioContactsView: View {
     private func reload() async {
         isLoading = true; defer { isLoading = false }
         do { items = try await StudioRepository.shared.contactMessages() }
-        catch { error = error.localizedDescription }
+        catch { self.error = error.localizedDescription }
     }
 
     private func save() async {
@@ -91,13 +91,13 @@ struct StudioContactsView: View {
                 responseMessage: responseDraft.isEmpty ? nil : responseDraft
             ))
             selected = nil; await reload()
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 
     private func deleteMsg() async {
         guard let id = selected?.id else { return }
         do { try await StudioRepository.shared.deleteContactMessage(id: id); selected = nil; await reload() }
-        catch { error = error.localizedDescription }
+        catch { self.error = error.localizedDescription }
     }
 }
 
@@ -141,7 +141,7 @@ struct StudioNewsletterView: View {
         do {
             let q = search.trimmingCharacters(in: .whitespaces).isEmpty ? nil : search
             items = try await StudioRepository.shared.newsletter(search: q)
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 }
 
@@ -204,7 +204,7 @@ struct StudioPagesView: View {
     private func reload() async {
         isLoading = true; defer { isLoading = false }
         do { sections = try await StudioRepository.shared.pageSections() }
-        catch { error = error.localizedDescription }
+        catch { self.error = error.localizedDescription }
     }
 
     private func openSection(_ section: String) async {
@@ -219,18 +219,18 @@ struct StudioPagesView: View {
             } else {
                 jsonDraft = "{}"
             }
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 
     private func save(_ section: String) async {
         saving = true; defer { saving = false }
         do {
-            guard let data = jsonDraft.data(using: .utf8),
-                  let obj = try JSONSerialization.jsonObject(with: data) else {
-                error = "JSON inválido"; return
+            guard let data = jsonDraft.data(using: .utf8) else {
+                self.error = "JSON inválido"; return
             }
+            let obj = try JSONSerialization.jsonObject(with: data)
             _ = try await StudioRepository.shared.upsertPageContent(section: section, content: obj)
             selected = nil; jsonDraft = ""
-        } catch { error = error.localizedDescription }
+        } catch { self.error = error.localizedDescription }
     }
 }

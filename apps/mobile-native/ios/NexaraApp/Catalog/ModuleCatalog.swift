@@ -57,6 +57,7 @@ enum ModuleCatalog {
         ModuleEntry("dispatch", "Despacho OT", "🗺️", "/ops/dispatch"),
         ModuleEntry("approvals", "Aprobaciones", "🛡️", "/erp/approvals"),
         ModuleEntry("notifications-center", "Notificaciones", "🔔", "/erp/notifications-center"),
+        ModuleEntry("chat", "Chat", "💬", "/erp/chat"),
         ModuleEntry("bi", "Business Intelligence", "📈", "/erp/analytics/bi"),
         ModuleEntry("analytics", "Analítica", "📈", "/console/analytics"),
         ModuleEntry("audit", "Auditoría", "🔍", "/console/audit"),
@@ -91,22 +92,14 @@ enum ModuleCatalog {
         ModuleEntry("kpis-hr", "KPIs de personas", "📊", "/erp/hr/kpis"),
     ]
 
-    static let tickets: [ModuleEntry] = [
-        ModuleEntry("portal", "Portal", "🏢", "/tickets/portal"),
-        ModuleEntry("tickets", "Tickets", "🎫", "/tickets"),
-        ModuleEntry("requests", "Solicitudes", "📨", "/tickets/requests"),
-        ModuleEntry("request-new", "Nueva solicitud", "➕", "/tickets/requests/new"),
-        ModuleEntry("branches", "Sucursales", "🏬", "/tickets/branches"),
-        ModuleEntry("inventories", "Inventarios", "📦", "/tickets/inventories"),
-        ModuleEntry("feedback-pending", "Feedback pendiente", "💬", "/tickets/feedback-pending"),
-        ModuleEntry("profile", "Perfil", "👤", "/tickets/profile"),
-    ]
+    
 
     static let ventas: [ModuleEntry] = [
         ModuleEntry("dashboard", "Dashboard", "📊", "/ventas/dashboard"),
         ModuleEntry("leads", "Leads", "📥", "/ventas/leads"),
         ModuleEntry("oportunidades", "Oportunidades", "🎯", "/ventas/oportunidades"),
         ModuleEntry("cotizaciones", "Cotizaciones", "🧮", "/ventas/cotizaciones"),
+        ModuleEntry("smart-quote", "Cotizador inteligente", "✨", "/ventas/cotizaciones/nueva"),
         ModuleEntry("productos", "Catálogo IT/CCTV", "📦", "/ventas/productos"),
         ModuleEntry("clientes", "Clientes", "🤝", "/ventas/clientes"),
         ModuleEntry("proyectos", "Proyectos", "🧩", "/ventas/proyectos"),
@@ -120,6 +113,7 @@ enum ModuleCatalog {
         ModuleEntry("crecimiento", "Crecimiento", "📈", "/ventas/crecimiento"),
         ModuleEntry("reportes", "Reportes", "📑", "/ventas/reportes"),
         ModuleEntry("notificaciones", "Notificaciones", "🔔", "/ventas/notificaciones"),
+        ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat"),
         ModuleEntry("my-profile", "Mi perfil", "👤", "/ventas/my-profile"),
     ]
 
@@ -136,6 +130,7 @@ enum ModuleCatalog {
         ModuleEntry("proyectos", "Proyectos", "🧩", "/contabilidad/proyectos"),
         ModuleEntry("work-projects", "Proyectos internos", "🧱", "/contabilidad/work-projects"),
         ModuleEntry("multas", "Multas", "⚠️", "/contabilidad/multas"),
+        ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat"),
     ]
 
     static let studio: [ModuleEntry] = [
@@ -148,6 +143,7 @@ enum ModuleCatalog {
         ModuleEntry("newsletter", "Newsletter", "📬", "/studio/newsletter"),
         ModuleEntry("contacts", "Contactos", "✉️", "/studio/contacts"),
         ModuleEntry("leads", "Leads", "✨", "/studio/leads"),
+        ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat"),
     ]
 
     static let web: [ModuleEntry] = studio
@@ -156,22 +152,37 @@ enum ModuleCatalog {
         ModuleEntry("health", "API Health", "❤️", "/lab/health"),
         ModuleEntry("flags", "Feature flags", "🚩", "/lab/flags"),
         ModuleEntry("ai", "AI Sandbox", "🤖", "/lab/ai"),
+        ModuleEntry("chat", "Chat del equipo", "💬", "/lab/chat"),
+    ]
+
+    static let tickets: [ModuleEntry] = [
+        ModuleEntry("portal", "Portal", "🏢", "/tickets/portal"),
+        ModuleEntry("tickets", "Tickets", "🎫", "/tickets"),
+        ModuleEntry("requests", "Solicitudes", "📨", "/tickets/requests"),
+        ModuleEntry("request-new", "Nueva solicitud", "➕", "/tickets/requests/new"),
+        ModuleEntry("branches", "Sucursales", "🏬", "/tickets/branches"),
+        ModuleEntry("inventories", "Inventarios", "📦", "/tickets/inventories"),
+        ModuleEntry("feedback-pending", "Feedback pendiente", "💬", "/tickets/feedback-pending"),
+        ModuleEntry("profile", "Perfil", "👤", "/tickets/profile"),
+        ModuleEntry("chat", "Chat", "💬", "/tickets/chat"),
     ]
 
     static func modules(for panel: PanelId) -> [ModuleEntry] {
-        let base: [ModuleEntry] = switch panel {
+        switch panel {
         case .erp, .ops:
-            let keys = ModulePanelMap.consoleKeys(for: panel)
-            if let keys {
-                console.filter { keys.contains($0.key) }
+            if let keys = ModulePanelMap.consoleKeys(for: panel) {
+                return console.filter { keys.contains($0.key) }
             } else {
-                console
+                return console
             }
-        case .crm: return ventas
-        case .studio: return studio
-        case .portal: return tickets
-        case .lab: return lab
+        case .crm:
+            return ventas
+        case .studio:
+            return studio
+        case .portal:
+            return tickets
+        case .lab:
+            return lab
         }
-        return base
     }
 }

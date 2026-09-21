@@ -48,7 +48,7 @@ struct OpsNewActivityView: View {
                             TextField("Título", text: $titulo)
                             Picker("Proyecto", selection: Binding(
                                 get: { projectId ?? 0 },
-                                set: { projectId = $0 > 0 ? $0 : nil },
+                                set: { projectId = $0 > 0 ? $0 : nil }
                             )) {
                                 Text("Seleccionar…").tag(0)
                                 ForEach(activeProjects, id: \.id) { p in
@@ -57,7 +57,7 @@ struct OpsNewActivityView: View {
                             }
                             Picker("Responsable", selection: Binding(
                                 get: { responsableId ?? 0 },
-                                set: { responsableId = $0 > 0 ? $0 : nil },
+                                set: { responsableId = $0 > 0 ? $0 : nil }
                             )) {
                                 Text("Seleccionar…").tag(0)
                                 ForEach(users.indices, id: \.self) { idx in
@@ -184,6 +184,4 @@ struct OpsNewActivityView: View {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
+ 

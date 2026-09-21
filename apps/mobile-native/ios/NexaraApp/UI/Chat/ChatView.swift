@@ -39,10 +39,10 @@ struct ChatView: View {
             .navigationTitle("Chat")
             .navigationBarTitleDisplayMode(.inline)
             .task { await loadChannels() }
-            .onChange(of: messages.count) { _, _ in
+            .onChange(of: messages.count) { _ in
                 Task { await openInitialMessageIfNeeded() }
             }
-            .sheet(item: $pdfItem) { item in
+            .sheet(item: $pdfItem) { (item: ChatPDFItem) in
                 NavigationStack { PDFViewerScreen(title: item.title, data: item.data) }
             }
             .sheet(item: Binding(
@@ -54,7 +54,7 @@ struct ChatView: View {
                 set: { item in
                     if item == nil { threadRoot = nil; threadReplies = [] }
                 }
-            )) { item in
+            )) { (item: ChatThreadItem) in
                 threadSheet(root: item.message)
             }
         }

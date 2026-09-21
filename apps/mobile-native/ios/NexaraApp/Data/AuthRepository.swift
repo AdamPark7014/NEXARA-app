@@ -125,7 +125,3 @@ final class AuthRepository {
         SessionStore.shared.clear()
     }
 }
-
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}

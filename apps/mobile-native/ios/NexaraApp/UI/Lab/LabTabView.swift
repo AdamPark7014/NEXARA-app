@@ -16,7 +16,7 @@ struct LabTabView: View {
         }
         .deepLinkModulePresenter(panel: .lab, presentedKey: $deepLinkModuleKey)
         .onAppear { if let k = deepLink.consumeModule(for: .lab) { deepLinkModuleKey = k } }
-        .onChange(of: deepLink.pending) { _, _ in
+        .onChange(of: deepLink.pending) { _ in
             if let k = deepLink.consumeModule(for: .lab) { deepLinkModuleKey = k }
         }
     }

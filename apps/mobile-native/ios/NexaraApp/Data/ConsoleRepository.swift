@@ -58,7 +58,45 @@ final class ConsoleRepository {
     }
 
     func createActivity(body: [String: Any]) async throws -> Int64 {
-        let data = try await api.postJSON("activities", body: body)
+        struct CreateActivityBody: Encodable {
+            let titulo: String
+            let prioridad: String
+            let projectId: Int
+            let responsableId: Int
+            let creadoPorId: Int
+            let estatus: String
+            let activityType: String
+            let ticketType: String
+            let workType: String
+            let clientId: Int?
+            let indicaciones: String?
+            let tiempoEstimadoMin: Int?
+            let fechaInicio: String?
+            let branchName: String?
+        }
+        func asInt(_ v: Any?) -> Int? {
+            if let i = v as? Int { return i }
+            if let i64 = v as? Int64 { return Int(i64) }
+            if let s = v as? String, let i = Int(s) { return i }
+            return nil
+        }
+        let b = CreateActivityBody(
+            titulo: (body["titulo"] as? String) ?? "",
+            prioridad: (body["prioridad"] as? String) ?? "",
+            projectId: asInt(body["projectId"]) ?? 0,
+            responsableId: asInt(body["responsableId"]) ?? 0,
+            creadoPorId: asInt(body["creadoPorId"]) ?? 0,
+            estatus: (body["estatus"] as? String) ?? "",
+            activityType: (body["activityType"] as? String) ?? "",
+            ticketType: (body["ticketType"] as? String) ?? "",
+            workType: (body["workType"] as? String) ?? "",
+            clientId: asInt(body["clientId"]),
+            indicaciones: (body["indicaciones"] as? String),
+            tiempoEstimadoMin: asInt(body["tiempoEstimadoMin"]),
+            fechaInicio: (body["fechaInicio"] as? String),
+            branchName: (body["branchName"] as? String)
+        )
+        let data = try await api.postJSON("activities", body: b)
         let map = ConsoleHelpers.decodeMap(data)
         return Int64(ConsoleHelpers.mapInt(map, "id"))
     }

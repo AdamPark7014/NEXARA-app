@@ -412,7 +412,7 @@ struct WarehouseWmsView: View {
         let q = (vm.skuQuery.isEmpty ? vm.query : vm.skuQuery).lowercased()
         let ranked: [(Int, String, String, Int64?)] = {
             if !vm.products.isEmpty {
-                return vm.products.map { p ->
+                return vm.products.map { p in
                     let sku = p.sku.lowercased()
                     let name = p.name.lowercased()
                     let score: Int
@@ -424,7 +424,7 @@ struct WarehouseWmsView: View {
                     return (score, p.name, p.sku, p.id)
                 }.filter { $0.0 < 9 || q.isEmpty }.sorted { $0.0 < $1.0 }
             }
-            return vm.stock.map { s ->
+            return vm.stock.map { s in
                 let sku = s.sku.lowercased()
                 let name = s.name.lowercased()
                 let score: Int
@@ -648,7 +648,6 @@ private func whIsLow(_ m: [String: Any]) -> Bool {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
     func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }
 

@@ -44,6 +44,21 @@ struct SlaStats: Hashable {
     let recentBreaches: [SlaBreach]
     let raw: [String: Any]
 
+    static func == (lhs: SlaStats, rhs: SlaStats) -> Bool {
+        lhs.total == rhs.total &&
+        lhs.stillOpen == rhs.stillOpen &&
+        lhs.response == rhs.response &&
+        lhs.resolution == rhs.resolution &&
+        lhs.recentBreaches == rhs.recentBreaches
+    }
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(total)
+        hasher.combine(stillOpen)
+        hasher.combine(response)
+        hasher.combine(resolution)
+        hasher.combine(recentBreaches)
+    }
+
     init(raw: [String: Any]) {
         self.raw = raw
         total = Int(StockParse.dbl(raw["total"]) ?? 0)

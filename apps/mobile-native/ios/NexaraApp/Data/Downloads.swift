@@ -12,8 +12,8 @@ enum Downloads {
     static func download(url: String, displayName: String, mimeType: String) async throws -> Saved {
         guard let u = URL(string: url) else { throw NSError(domain: "dl", code: -1) }
         var req = URLRequest(url: u)
-        if !SessionStore.shared.token.isEmpty {
-            req.setValue("Bearer \(SessionStore.shared.token)", forHTTPHeaderField: "Authorization")
+        if let token = SessionStore.shared.token, !token.isEmpty {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         let (data, response) = try await URLSession.shared.data(for: req)
         let http = response as? HTTPURLResponse
@@ -42,6 +42,4 @@ enum Downloads {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
+ 
