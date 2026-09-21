@@ -779,7 +779,7 @@ export class NotificationHierarchyService {
         icon: status === 'approved' ? 'aprobada' : 'devuelta',
         relatedEntityId: activityId,
         entityType: 'Activity',
-        relatedUrl: `/ops/activities/${activityId}`,
+        relatedUrl: appUrls.erpActividad(activityId),
         priority: status === 'rejected' ? 'high' : 'normal',
       });
     } catch (error) {
@@ -1570,7 +1570,7 @@ export class NotificationHierarchyService {
           message: `${requesterName} solicitó un viático de $${amount.toFixed(2)}`,
           relatedEntityId: viaticId,
           entityType: 'Viatico',
-          relatedUrl: `/ops/viatics?highlight=${viaticId}`,
+          relatedUrl: appUrls.erpFinanceViatics(viaticId),
           priority: 'high',
         });
       }
@@ -1597,7 +1597,7 @@ export class NotificationHierarchyService {
         message: `${assignerName} te asignó un viático de $${amount.toFixed(2)}${detail}`,
         relatedEntityId: viaticId,
         entityType: 'Viatico',
-        relatedUrl: `/ops/my-viatics?highlight=${viaticId}`,
+        relatedUrl: appUrls.opsMyViatics(viaticId),
         priority: 'high',
       });
     } catch (error) {
@@ -1629,7 +1629,7 @@ export class NotificationHierarchyService {
         message,
         relatedEntityId: viaticId,
         entityType: 'Viatico',
-        relatedUrl: `/ops/viatics?highlight=${viaticId}`,
+        relatedUrl: appUrls.erpFinanceViatics(viaticId),
         priority: 'high',
       });
     } catch (error) {
@@ -2130,7 +2130,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: clientId,
           entityType: 'SalesClient',
-          relatedUrl: `/crm/clients/${clientId}`,
+          relatedUrl: appUrls.erpClientes(clientId),
         });
       }
       await this.notificationsService.createNotification({
@@ -2141,7 +2141,7 @@ export class NotificationHierarchyService {
         message: `«${clientName}» se guardó correctamente en tu cartera.`,
         relatedEntityId: clientId,
         entityType: 'SalesClient',
-        relatedUrl: `/crm/clients/${clientId}`,
+        relatedUrl: appUrls.erpClientes(clientId),
       });
     } catch (error) {
       this.logger.error('notifySalesClientCreated', error);
@@ -2162,7 +2162,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: leadId,
           entityType: 'SalesLead',
-          relatedUrl: `/crm/leads?highlight=${leadId}`,
+          relatedUrl: appUrls.crmLead(leadId),
         });
       }
       await this.notificationsService.createNotification({
@@ -2173,7 +2173,7 @@ export class NotificationHierarchyService {
         message: `«${label}» quedó registrado.`,
         relatedEntityId: leadId,
         entityType: 'SalesLead',
-        relatedUrl: `/crm/leads?highlight=${leadId}`,
+        relatedUrl: appUrls.crmLead(leadId),
       });
     } catch (error) {
       this.logger.error('notifySalesLeadCreated', error);
@@ -2194,7 +2194,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: opportunityId,
           entityType: 'SalesOpportunity',
-          relatedUrl: `/crm/opportunities/${opportunityId}`,
+          relatedUrl: appUrls.crmOpportunity(opportunityId),
         });
       }
       await this.notificationsService.createNotification({
@@ -2205,7 +2205,7 @@ export class NotificationHierarchyService {
         message: `«${title}» quedó en tu embudo.`,
         relatedEntityId: opportunityId,
         entityType: 'SalesOpportunity',
-        relatedUrl: `/crm/opportunities/${opportunityId}`,
+        relatedUrl: appUrls.crmOpportunity(opportunityId),
       });
     } catch (error) {
       this.logger.error('notifySalesOpportunityCreated', error);
@@ -2234,7 +2234,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: opportunityId,
           entityType: 'SalesOpportunity',
-          relatedUrl: `/crm/opportunities/${opportunityId}`,
+          relatedUrl: appUrls.crmOpportunity(opportunityId),
         });
       }
       await this.notificationsService.createNotification({
@@ -2245,7 +2245,7 @@ export class NotificationHierarchyService {
         message: `«${title}» ahora está en ${newStage}.`,
         relatedEntityId: opportunityId,
         entityType: 'SalesOpportunity',
-        relatedUrl: `/crm/opportunities/${opportunityId}`,
+        relatedUrl: appUrls.crmOpportunity(opportunityId),
       });
     } catch (error) {
       this.logger.error('notifySalesOpportunityStageChanged', error);
@@ -2277,7 +2277,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: activityId,
           entityType: 'Activity',
-          relatedUrl: `/ops/activities/${activityId}`,
+          relatedUrl: appUrls.erpActividad(activityId),
         });
       }
 
@@ -2291,7 +2291,7 @@ export class NotificationHierarchyService {
           icon: 'finalizada',
           relatedEntityId: activityId,
           entityType: 'Activity',
-          relatedUrl: `/ops/my-evidences?activityId=${activityId}`,
+          relatedUrl: appUrls.erpActividadEvidencias(activityId),
         });
       } else {
         await this.notificationsService.createNotification({
@@ -2304,7 +2304,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: activityId,
           entityType: 'Activity',
-          relatedUrl: `/ops/my-evidences?activityId=${activityId}`,
+          relatedUrl: appUrls.erpActividadEvidencias(activityId),
         });
       }
     } catch (error) {
@@ -2756,7 +2756,7 @@ export class NotificationHierarchyService {
           message,
           relatedEntityId: opts.projectId,
           entityType: 'SalesProject',
-          relatedUrl: `/ops/projects/${opts.projectId}`,
+          relatedUrl: appUrls.erpProyectos(opts.projectId),
           priority: 'high',
         });
       }
@@ -2786,7 +2786,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: workOrderId,
           entityType: 'MaintenanceOrder',
-          relatedUrl: `/ops/maintenance?woId=${workOrderId}`,
+          relatedUrl: appUrls.opsMaintenance(workOrderId),
         });
       }
       await this.notificationsService.createNotification({
@@ -2797,7 +2797,7 @@ export class NotificationHierarchyService {
         message: `${orderNumber} registrada.`,
         relatedEntityId: workOrderId,
         entityType: 'MaintenanceOrder',
-        relatedUrl: `/ops/maintenance?woId=${workOrderId}`,
+        relatedUrl: appUrls.opsMaintenance(workOrderId),
       });
       if (assignedToId && assignedToId !== actorId) {
         await this.notificationsService.createNotification({
@@ -2809,7 +2809,7 @@ export class NotificationHierarchyService {
           triggerUserId: actorId,
           relatedEntityId: workOrderId,
           entityType: 'MaintenanceOrder',
-          relatedUrl: `/ops/maintenance?woId=${workOrderId}`,
+          relatedUrl: appUrls.opsMaintenance(workOrderId),
           priority: 'high',
         });
       }

@@ -7,6 +7,7 @@ import { PushDispatchService, type PushPayload } from '../devices/push-dispatch.
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 import { buildCollapseKey, channelForCategory, iconForNotification } from './notification-push-meta.js';
+import { appUrls } from '../common/app-urls.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -538,7 +539,7 @@ export class NotificationsService {
               message: `La cotización ${quote.quoteNumber} para ${quote.clientCompany || quote.clientName || 'cliente'} expirará en ${daysUntilExpiry} día(s).`,
               relatedEntityId: quote.id,
               entityType: 'Cotizacion',
-              relatedUrl: `/crm/quotes/${quote.id}`,
+              relatedUrl: appUrls.erpCotizaciones(quote.id),
             });
           }
 
@@ -553,7 +554,7 @@ export class NotificationsService {
                 message: `La cotización ${quote.quoteNumber} expirará en ${daysUntilExpiry} día(s).`,
                 relatedEntityId: quote.id,
                 entityType: 'Cotizacion',
-                relatedUrl: `/crm/quotes/${quote.id}`,
+                relatedUrl: appUrls.erpCotizaciones(quote.id),
               });
             }
           }
@@ -612,7 +613,7 @@ export class NotificationsService {
             message: `La cotización ${quote.quoteNumber} ha expirado y ya no es válida.`,
             relatedEntityId: quote.id,
             entityType: 'Cotizacion',
-            relatedUrl: `/crm/quotes/${quote.id}`,
+            relatedUrl: appUrls.erpCotizaciones(quote.id),
           });
         }
 
@@ -627,7 +628,7 @@ export class NotificationsService {
               message: `La cotización ${quote.quoteNumber} ha expirado.`,
               relatedEntityId: quote.id,
               entityType: 'Cotizacion',
-              relatedUrl: `/crm/quotes/${quote.id}`,
+              relatedUrl: appUrls.erpCotizaciones(quote.id),
             });
           }
         }
@@ -656,10 +657,7 @@ export class NotificationsService {
 
       if (!quote) return;
 
-      const linkedOpportunityId = quote.salesQuotes[0]?.opportunityId;
-      const quoteUrl = linkedOpportunityId
-        ? `/crm/opportunities/${linkedOpportunityId}/quotes`
-        : `/crm/quotes/${quote.id}`;
+      const quoteUrl = appUrls.erpCotizaciones(quote.id);
 
       if (quote.createdById) {
         await this.createNotification({
@@ -684,7 +682,7 @@ export class NotificationsService {
             message: `${clientName} ha firmado la cotización ${quote.quoteNumber}.`,
             relatedEntityId: quote.id,
             entityType: 'Cotizacion',
-            relatedUrl: `/crm/opportunities/${sq.opportunityId}/quotes`,
+            relatedUrl: appUrls.erpCotizaciones(quote.id),
           });
         }
       }
@@ -709,7 +707,7 @@ export class NotificationsService {
           'El cliente aprobó la cotización. Revisa el borrador de pedido a CT Online y confirma envío.',
         relatedEntityId: quoteId,
         entityType: 'Cotizacion',
-        relatedUrl: `/crm/quotes/${quoteId}`,
+        relatedUrl: appUrls.erpCotizaciones(quoteId),
       });
     } catch (error) {
       this.logger.error('Error notifying CT draft:', error);
@@ -746,7 +744,7 @@ export class NotificationsService {
           message: `Se ha creado la orden ${orderId} para el proyecto "${order.project.name}".`,
           relatedEntityId: projectId,
           entityType: 'SalesProject',
-          relatedUrl: `/crm/projects/${projectId}`,
+          relatedUrl: appUrls.erpProyectos(projectId),
         });
       }
     } catch (error) {
