@@ -145,7 +145,7 @@ class NotificationDeepLinkResolverTest {
     @Test
     fun nonCoreNotificationsOpenCoreHome() {
         listOf(
-            "Viatico", "ToolRequest", "ToolRenewal", "VehicleControl", "SalesProject",
+            "ToolRequest", "ToolRenewal",
             "MaintenanceContractVisit", "evidence", "SalesOpportunity", "quote", "requisition", "fine",
         ).forEach { type ->
             assertEquals(
@@ -154,11 +154,73 @@ class NotificationDeepLinkResolverTest {
                 NotificationDeepLinkResolver.resolve(notification(entityType = type, relatedEntityId = 1L)),
             )
         }
-        listOf("viatics", "tools", "vehicles", "projects", "noc", "crm", "approval", "quotes").forEach { category ->
+        listOf("tools", "noc", "crm", "approval", "quotes").forEach { category ->
             assertEquals(
                 "categoría $category debe abrir la casa de Core",
                 DeepLinkParser.CORE_HOME,
                 NotificationDeepLinkResolver.resolve(notification(category = category)),
+            )
+        }
+    }
+
+    // ── Módulos de «Más» que ya tienen pantalla ─────────────────────────────
+
+    /**
+     * Lo que estrenó pantalla deja de caer en Actividades. Es el fallo que
+     * volvía inútil un aviso: te avisaban de un proyecto retrasado, tocabas, y
+     * aterrizabas en la pizarra sin saber de qué te hablaban.
+     */
+    @Test
+    fun entityTypesWithAScreenOpenTheirModule() {
+        mapOf(
+            "SalesProject" to CoreKeys.PROYECTOS,
+            "project" to CoreKeys.PROYECTOS,
+            "OperationalProject" to CoreKeys.PROYECTOS,
+            "StockLevel" to CoreKeys.ALMACEN,
+            "warehouse" to CoreKeys.ALMACEN,
+            "movement" to CoreKeys.ALMACEN,
+            "VehicleControl" to CoreKeys.VEHICULOS,
+            // El aviso de viático trae el id del viático: con él, `ConsoleNavHost`
+            // abre ESE viático y no la lista. Antes caía en la pizarra.
+            "Viatico" to CoreKeys.VIATICOS,
+            "viatic" to CoreKeys.VIATICOS,
+            "viatics" to CoreKeys.VIATICOS,
+        ).forEach { (type, key) ->
+            val dest = NotificationDeepLinkResolver.resolve(
+                notification(entityType = type, relatedEntityId = 7L),
+            ) as DeepLinkDestination.Module
+            assertEquals("$type debe abrir su módulo", key, dest.key)
+            assertEquals(PanelId.ERP, dest.panel)
+            assertEquals(7L, dest.entityId)
+        }
+    }
+
+    @Test
+    fun categoriesWithAScreenOpenTheirModule() {
+        mapOf(
+            "projects" to CoreKeys.PROYECTOS,
+            "vehicles" to CoreKeys.VEHICULOS,
+            "warehouse" to CoreKeys.ALMACEN,
+            "kpis" to CoreKeys.KPIS_EQUIPO,
+            "viatics" to CoreKeys.VIATICOS,
+        ).forEach { (category, key) ->
+            val dest = NotificationDeepLinkResolver.resolve(
+                notification(category = category),
+            ) as DeepLinkDestination.Module
+            assertEquals("categoría $category debe abrir su módulo", key, dest.key)
+        }
+    }
+
+    /**
+     * El organigrama NO es el destino de un aviso de usuario: una cuenta
+     * bloqueada o un alta no son «quién reporta a quién».
+     */
+    @Test
+    fun userNotificationsStillOpenCoreHome() {
+        listOf("user", "users").forEach { type ->
+            assertEquals(
+                DeepLinkParser.CORE_HOME,
+                NotificationDeepLinkResolver.resolve(notification(entityType = type, relatedEntityId = 3L)),
             )
         }
     }

@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -56,10 +57,18 @@ import mx.nexara.mobile.nativeapp.ui.console.clients.ClientDetailScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.ClientsListScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.NewClientScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
+import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
+import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ModulePlaceholderScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
+import mx.nexara.mobile.nativeapp.ui.console.more.OrgchartScreen
+import mx.nexara.mobile.nativeapp.ui.console.more.ProyectosScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.vehiculos.VehiculosScreen
+import mx.nexara.mobile.nativeapp.ui.console.viaticos.NuevoViaticoScreen
+import mx.nexara.mobile.nativeapp.ui.console.viaticos.RepartoViaticoScreen
+import mx.nexara.mobile.nativeapp.ui.console.viaticos.ViaticoDetalleScreen
+import mx.nexara.mobile.nativeapp.ui.console.viaticos.ViaticosScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
@@ -99,14 +108,60 @@ internal object ConsoleRoutes {
     /** Vehículos: ya tiene pantalla nativa (solicitar, salida y regreso con fotos). */
     const val Vehiculos = "console/vehiculos"
 
+    /** KPIs del equipo (`/erp/asistencias/indicadores`) — consulta del periodo. */
+    const val KpisEquipo = "console/kpis-equipo"
+
+    /** Organigrama (`/erp/organigrama`) — se recorre por niveles, no es el árbol. */
+    const val Organigrama = "console/organigrama"
+
+    /** Proyectos (`/erp/proyectos`) — tarjetas por salud. */
+    const val Proyectos = "console/proyectos"
+
+    /** Almacén (`/erp/almacen`) — existencias y bajo mínimo, solo consulta. */
+    const val Almacen = "console/almacen"
+
+    /** Viáticos: mis anticipos y, para quien autoriza, los de su gente. */
+    const val Viaticos = "console/viaticos"
+
+    /**
+     * Alta de viático con foto del ticket.
+     *
+     * No cuelga de `console/viaticos/` para no competir con [ViaticoDetalle] al
+     * resolver la ruta (mismo motivo que [NewClient]).
+     */
+    const val NuevoViatico = "console/viaticos-nuevo"
+
+    const val ViaticoDetalle = "console/viaticos/{id}"
+
+    /** Repartir el viático entre actividades; la suma cuadra al centavo. */
+    const val RepartoViatico = "console/viaticos/{id}/reparto"
+
+    /** Marca en la lista: un viático cambió (alta, decisión, comprobación) y toca releer. */
+    const val VIATICOS_CHANGED_KEY = "viaticos_cambiaron"
+
+    fun viaticoDetalle(id: Long): String = "console/viaticos/$id"
+
+    fun repartoViatico(id: Long): String = "console/viaticos/$id/reparto"
+
     /**
      * A dónde lleva un módulo de «Más»: su pantalla nativa si ya existe, si no
-     * la ficha «Disponible pronto» con el enlace a la web.
+     * la ficha con el enlace a la web.
+     *
+     * Cotizaciones y Herramientas siguen sin pantalla propia; van en otra ola.
      */
     fun forExtra(module: CoreExtraModule): String = when (module) {
         CoreExtraModule.VEHICULOS -> Vehiculos
+        CoreExtraModule.KPIS_EQUIPO -> KpisEquipo
+        CoreExtraModule.ORGANIGRAMA -> Organigrama
+        CoreExtraModule.PROYECTOS -> Proyectos
+        CoreExtraModule.ALMACEN -> Almacen
+        CoreExtraModule.VIATICOS -> Viaticos
         else -> modulePlaceholder(module.key)
     }
+
+    /** ¿Este módulo de «Más» ya se abre dentro de la app? */
+    fun tienePantallaNativa(module: CoreExtraModule): Boolean =
+        !forExtra(module).startsWith("console/more/")
 
     const val Notifications = "console/notifications"
     const val OfflineQueue = "console/offline-queue"
@@ -232,10 +287,17 @@ fun ConsoleNavHost(
         DeepLinkNavigation.actividadesVista(link)?.let { actividadesVista = it }
         DeepLinkNavigation.attendanceTab(link)?.let { attendanceTab = it }
 
-        // Módulo de «Más» (aún sin pantalla propia): su ficha, si el rol lo tiene.
+        // Módulo de «Más»: su pantalla nativa o su ficha, si el rol lo tiene.
         val extra = CoreExtraModule.fromKey(link.key)
         if (extra != null) {
-            val ruta = if (extra in extras) ConsoleRoutes.forExtra(extra) else startRoute
+            val ruta = when {
+                extra !in extras -> startRoute
+                // El aviso de un viático trae su id: abre ESE viático, no la
+                // lista. Es la diferencia entre «te autorizaron algo» y saber qué.
+                extra == CoreExtraModule.VIATICOS && (link.entityId ?: 0L) > 0L ->
+                    ConsoleRoutes.viaticoDetalle(link.entityId!!)
+                else -> ConsoleRoutes.forExtra(extra)
+            }
             navController.navigate(ruta) { launchSingleTop = true }
             return@LaunchedEffect
         }
@@ -269,6 +331,14 @@ fun ConsoleNavHost(
         ConsoleRoutes.MyProfile -> "Mi perfil"
         ConsoleRoutes.More, ConsoleRoutes.ModulePlaceholder -> "Más"
         ConsoleRoutes.Vehiculos -> "Vehículos"
+        ConsoleRoutes.KpisEquipo -> "KPIs del equipo"
+        ConsoleRoutes.Organigrama -> "Organigrama"
+        ConsoleRoutes.Proyectos -> "Proyectos"
+        ConsoleRoutes.Almacen -> "Almacén"
+        ConsoleRoutes.Viaticos -> "Viáticos"
+        ConsoleRoutes.NuevoViatico -> "Pedir viático"
+        ConsoleRoutes.ViaticoDetalle -> "Viático"
+        ConsoleRoutes.RepartoViatico -> "Repartir viático"
         ConsoleRoutes.Notifications -> "Notificaciones"
         ConsoleRoutes.OfflineQueue -> "Cola offline"
         ConsoleRoutes.ActivityDetail -> "Detalle de actividad"
@@ -486,6 +556,83 @@ fun ConsoleNavHost(
             nxComposable(ConsoleRoutes.Vehiculos, style = NxNavAnimStyle.Push) {
                 VehiculosScreen()
             }
+            // Los cuatro de solo consulta. Cada uno comprueba su permiso igual que
+            // el resto de «Más»: sin el módulo en el rol, de vuelta a la casa.
+            nxComposable(ConsoleRoutes.KpisEquipo, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.KPIS_EQUIPO in extras) KpisEquipoScreen()
+            }
+            nxComposable(ConsoleRoutes.Organigrama, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.ORGANIGRAMA in extras) OrgchartScreen()
+            }
+            nxComposable(ConsoleRoutes.Proyectos, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.PROYECTOS in extras) ProyectosScreen()
+            }
+            nxComposable(ConsoleRoutes.Almacen, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.ALMACEN in extras) AlmacenScreen()
+            }
+            // Viáticos: el técnico pide desde la calle y la dirección resuelve
+            // desde donde esté. La lista se recarga sola cuando el alta, una
+            // decisión o una comprobación la dejan desfasada.
+            nxComposable(ConsoleRoutes.Viaticos, style = NxNavAnimStyle.Push) { entry ->
+                val recargar by entry.savedStateHandle
+                    .getStateFlow(ConsoleRoutes.VIATICOS_CHANGED_KEY, false)
+                    .collectAsState()
+                ViaticosScreen(
+                    onAbrirViatico = { id ->
+                        navController.navigate(ConsoleRoutes.viaticoDetalle(id)) { launchSingleTop = true }
+                    },
+                    onNuevoViatico = {
+                        navController.navigate(ConsoleRoutes.NuevoViatico) { launchSingleTop = true }
+                    },
+                    recargar = recargar,
+                    onRecargaConsumida = {
+                        entry.savedStateHandle[ConsoleRoutes.VIATICOS_CHANGED_KEY] = false
+                    },
+                )
+            }
+            nxComposable(ConsoleRoutes.NuevoViatico, style = NxNavAnimStyle.Modal) {
+                NuevoViaticoScreen(
+                    onCancelar = { navController.popBackStack() },
+                    onCreado = {
+                        marcarViaticosCambiaron(navController)
+                        navController.popBackStack()
+                    },
+                )
+            }
+            nxComposable(ConsoleRoutes.ViaticoDetalle, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                val recargar by entry.savedStateHandle
+                    .getStateFlow(ConsoleRoutes.VIATICOS_CHANGED_KEY, false)
+                    .collectAsState()
+                ViaticoDetalleScreen(
+                    viaticoId = id,
+                    onRepartir = { viaticoId ->
+                        navController.navigate(ConsoleRoutes.repartoViatico(viaticoId)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onCambio = { marcarViaticosCambiaron(navController) },
+                    recargar = recargar,
+                    onRecargaConsumida = {
+                        entry.savedStateHandle[ConsoleRoutes.VIATICOS_CHANGED_KEY] = false
+                    },
+                )
+            }
+            nxComposable(ConsoleRoutes.RepartoViatico, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                RepartoViaticoScreen(
+                    viaticoId = id,
+                    onListo = {
+                        marcarViaticosCambiaron(navController)
+                        // El detalle que quedó debajo tiene el reparto viejo en
+                        // pantalla: se le avisa antes de volver a él.
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set(ConsoleRoutes.VIATICOS_CHANGED_KEY, true)
+                        navController.popBackStack()
+                    },
+                )
+            }
             nxComposable(ConsoleRoutes.ModulePlaceholder, style = NxNavAnimStyle.Push) { entry ->
                 val module = CoreExtraModule.fromKey(entry.arguments?.getString("key"))
                     ?.takeIf { it in extras }
@@ -522,4 +669,22 @@ fun ConsoleNavHost(
             }
         }
     }
+}
+
+/**
+ * Avisa a la lista de Viáticos que quedó desfasada.
+ *
+ * Igual que el padrón de clientes: quien cambia algo (alta, autorización,
+ * comprobación, reparto) marca la pantalla que quedó debajo, y ésta relee al
+ * volver. Sin esto el técnico regresa de pedir un viático y no lo ve, o el jefe
+ * autoriza y la lista le sigue diciendo «Pendiente».
+ *
+ * Si la lista no está en la pila —se llegó por un aviso directo al detalle— no
+ * hay nada que marcar y no pasa nada.
+ */
+private fun marcarViaticosCambiaron(navController: NavHostController) {
+    runCatching { navController.getBackStackEntry(ConsoleRoutes.Viaticos) }
+        .getOrNull()
+        ?.savedStateHandle
+        ?.set(ConsoleRoutes.VIATICOS_CHANGED_KEY, true)
 }
