@@ -59,6 +59,40 @@ jobs:
           echo "Using XcodeGen spec: ${SPEC_FILE}"
           xcodegen generate --spec "${SPEC_FILE}"
           test -d NexaraApp.xcodeproj
+      - name: Disable code signing for non-app targets (patch project.pbxproj)
+        working-directory: apps/mobile-native/ios
+        run: |
+          set -euo pipefail
+          python3 - << 'PY'
+          import re, sys, io, os
+          path = "NexaraApp.xcodeproj/project.pbxproj"
+          with open(path, "r", encoding="utf-8") as f:
+              s = f.read()
+          m = re.search(r'/\\* Build configuration list for PBXNativeTarget "NexaraApp" \\*/.*?buildConfigurations = \\((.*?)\\);', s, re.S)
+          app_cfgs = set()
+          if m:
+              app_cfgs = set(re.findall(r'([A-F0-9]{24})', m.group(1)))
+          def repl(match):
+              uuid = match.group(1)
+              body = match.group(2)
+              if uuid in app_cfgs:
+                  return match.group(0)
+              keys = [
+                  ('CODE_SIGNING_ALLOWED','NO'),
+                  ('CODE_SIGNING_REQUIRED','NO'),
+                  ('CODE_SIGN_IDENTITY',''),
+                  ('PROVISIONING_PROFILE_SPECIFIER',''),
+              ]
+              for k,_ in keys:
+                  body = re.sub(r'\\s*%s\\s*=\\s*[^;]*;' % re.escape(k), '', body)
+              injected = ''.join('\\n\\t\\t\\t\\t%s = %s;' % (k,v) for k,v in keys)
+              new_body = body.rstrip() + injected + '\\n\\t\\t\\t'
+              return match.group(0).replace(body, new_body)
+          s2 = re.sub(r'([A-F0-9]{24}) /\\* .*? \\*/ = \\{\\s*isa = XCBuildConfiguration;\\s*buildSettings = \\{(.*?)\\};\\s*name = .*?;\\s*\\};', repl, s, flags=re.S)
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(s2)
+          print("Patched code signing for non-app targets.")
+          PY
 
       - name: Prepare App Store Connect API key
         run: |
@@ -163,7 +197,6 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="NEXARA App Store" \
             OTHER_CODE_SIGN_FLAGS="--keychain $RUNNER_TEMP/codesign.keychain-db" \
             -derivedDataPath "$DERIVED" \
             -resultBundlePath "$RUNNER_TEMP/BuildResult" \
