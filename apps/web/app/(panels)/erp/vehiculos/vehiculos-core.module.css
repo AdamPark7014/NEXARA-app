@@ -494,3 +494,43 @@
     max-height: none;
   }
 }
+
+/* ─── Alta de unidad en flotilla ─────────────────────────────────────── */
+
+.altaForm {
+  display: grid;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+
+.altaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.altaCampo,
+.altaCampoFull {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.altaCampoFull {
+  grid-column: 1 / -1;
+}
+
+.altaCampo label,
+.altaCampoFull label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.altaAcciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}

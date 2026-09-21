@@ -4,6 +4,7 @@ import {
   VEHICULOS_PATH,
   coreVehiclesHome,
   isCoreMount,
+  puedeGestionarInventarioVehiculos,
   puedeVerGpsDireccion,
   vehiclesBasePath,
 } from './recursos-core';

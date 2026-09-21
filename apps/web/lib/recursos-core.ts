@@ -7,6 +7,7 @@
  */
 import { isCeoEquivalentEmail } from '@/lib/platform-accounts';
 import { resolveOpsPairNav } from '@/lib/section-views';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import type { UserAccessInput } from '@/lib/rbac/role-mapping';
 
 export const ALMACEN_PATH = '/erp/almacen';
@@ -41,4 +42,11 @@ export function vehiclesBasePath(pathname: string | null | undefined): string {
  */
 export function coreVehiclesHome(user: UserAccessInput | null | undefined): string {
   return resolveOpsPairNav(user, 'vehicles') === 'team' ? VEHICULOS_PATH : MIS_VEHICULOS_PATH;
+}
+
+/** ¿Puede dar de alta / editar unidades de la flotilla? Mismo permiso que POST vehicles/inventory. */
+export function puedeGestionarInventarioVehiculos(
+  user?: { isSuperAdmin?: boolean; permissions?: string[] | null } | null,
+): boolean {
+  return hasPermission(user, PERMISSIONS.VEHICLES_INVENTORY);
 }
