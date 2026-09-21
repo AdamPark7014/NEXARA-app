@@ -3,8 +3,41 @@
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-21
 - **Rama:** `mejora/calidad-y-web`
-- **HEAD:** ola móvil completa — Cotizaciones y Herramientas nativas, Actividades y Asistencias rediseñadas, iOS al día, viáticos en lote
+- **HEAD:** bundle de release firmado y capturas de Play rehechas; Gastos, Pagos, Aprobaciones nativos
 - **Verificado:** Android `testDebugUnitTest` 564/564 · web 65 archivos / 594 pruebas · API `company-tenant-pin` 7/7, `viatico-asignacion-lote` 8/8, `viatico-reparto` 41/41, `navigation-module-map` 5/5
+
+## Listo para subir a Google Play (21-09, 12:45)
+
+- **`app-release.aab`, versionCode 11**, firmado con la llave real de NEXARA
+  (`CN=NEXARA, O=NEXARA, Puebla, MX`, SHA256withRSA, válida hasta 2053). **No**
+  con la de depuración: se comprobó con `keytool -printcert -jarfile`.
+  `key.properties` ya existía desde el 15 de julio con sus cuatro entradas; el
+  archivo que hay que llenar **no** se llama `keystore.properties`.
+- **Nunca generar un keystore nuevo.** `nexara-upload.jks` es la llave de subida
+  ya registrada en Play. Una llave nueva hace que Play rechace toda subida
+  futura, y recuperarlo es un trámite de días con Google.
+- **Las ocho capturas** de `play-assets/screenshots/phone/` se rehicieron con la
+  cuenta de revisión dentro de su tenant: gente `@demo.invalid`, folios
+  `AN-DEMO-*`. Las anteriores eran del versionCode 10 y tres navegaban a paneles
+  borrados.
+- **Aislamiento del revisor verificado contra producción**: `company/mine`
+  devuelve sólo `nexara-demo`, `me/board` cinco personas todas `@demo.invalid`,
+  y tiene una actividad asignada.
+- Falta, y es de Adam: la declaración de «Permisos de servicio en primer plano»
+  (tipo `location`, con vídeo) en Play Console. Ver §6.5.1 del checklist — la
+  guía decía que no aplicaba y era falso.
+
+## Lo que quedó a medias
+
+- **Documentos**: su agente construyó el módulo entero contra el repo del
+  29-ago. El árbol aislado salió de `e08c5aa2` y no se dio cuenta (los de
+  Gastos, Pagos y Aprobaciones sí, y se pusieron al día solos). Su rama
+  `worktree-agent-a86c8daa824f28fbb` **no se debe fusionar**: hay que rehacerlo
+  sobre la punta. Su análisis de la API sí sirve: el archivo no tiene endpoint,
+  se sirve por `express.static` fuera de `/api` y con JWT; y `mimeType` y
+  `fileSizeBytes` nunca los manda el formulario web.
+- **Al crear árboles aislados, comprobar la base antes de trabajar.** Salen de
+  bases distintas sin avisar.
 
 ## Estado de la ola móvil (21-09, cinco frentes en paralelo)
 
