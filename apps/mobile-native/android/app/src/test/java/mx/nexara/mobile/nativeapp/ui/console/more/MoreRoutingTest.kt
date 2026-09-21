@@ -57,16 +57,28 @@ class MoreRoutingTest {
     }
 
     /**
-     * Los que siguen sin pantalla sí van a la ficha, y la lista lo dice con la
-     * etiqueta «En la web» antes de que nadie los toque.
+     * Cotizaciones estrenó pantalla nativa: tiene ruta propia, no cae en la
+     * ficha de «ábrelo en la web» y su detalle cuelga de la misma lista.
      */
     @Test
-    fun whatHasNoScreenYetSaysSo() {
-        listOf(CoreExtraModule.COTIZACIONES, CoreExtraModule.HERRAMIENTAS).forEach { module ->
-            assertFalse(ConsoleRoutes.tienePantallaNativa(module))
-            assertEquals(ConsoleRoutes.modulePlaceholder(module.key), ConsoleRoutes.forExtra(module))
-        }
+    fun quotesOpenInsideTheApp() {
+        assertTrue(ConsoleRoutes.tienePantallaNativa(CoreExtraModule.COTIZACIONES))
+        assertEquals(ConsoleRoutes.Cotizaciones, ConsoleRoutes.forExtra(CoreExtraModule.COTIZACIONES))
+        assertFalse(ConsoleRoutes.forExtra(CoreExtraModule.COTIZACIONES).startsWith("console/more/"))
+        assertEquals("console/cotizaciones/482", ConsoleRoutes.cotizacionDetalle(482L))
     }
+
+    /**
+     * Herramientas estrenó pantalla nativa: mi kit, mis préstamos y pedir más
+     * plazo, todo dentro de la app.
+     */
+    @Test
+    fun toolsOpenInsideTheApp() {
+        assertTrue(ConsoleRoutes.tienePantallaNativa(CoreExtraModule.HERRAMIENTAS))
+        assertEquals(ConsoleRoutes.Herramientas, ConsoleRoutes.forExtra(CoreExtraModule.HERRAMIENTAS))
+        assertFalse(ConsoleRoutes.forExtra(CoreExtraModule.HERRAMIENTAS).startsWith("console/more/"))
+    }
+
 
     /** Dos módulos distintos nunca comparten ruta, tengan pantalla o no. */
     @Test
