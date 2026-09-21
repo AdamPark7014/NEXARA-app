@@ -870,6 +870,15 @@
   border-bottom-color: var(--nx-accent);
 }
 
+/*
+ * Sticker: un mensaje que es solo emoji (hasta tres) se pinta en grande. Es lo
+ * que hace que un emoji suelto se lea como sticker sin subir ningún archivo.
+ */
+.msgBodyJumbo {
+  font-size: 40px;
+  line-height: 1.1;
+}
+
 .edited {
   font-size: 11px;
   color: var(--text-tertiary, #98a2b3);
@@ -918,34 +927,24 @@
   color: var(--foreground, #111);
 }
 
-.emojiPicker {
-  position: absolute;
-  top: calc(100% + 4px);
+/*
+ * Colocación de los dos selectores de emoji. La caja, los colores y el teclado
+ * viven en `components/chat/EmojiPicker.module.css`; aquí solo se dice desde
+ * qué esquina cuelga cada uno.
+ */
+.reactionPickerPos {
+  top: calc(100% + var(--ui-s1));
   right: 0;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 2px;
-  padding: 6px;
-  width: 210px;
-  border: 1px solid var(--nx-line);
-  border-radius: 10px;
-  background: var(--surface, #fff);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
-  z-index: 5;
 }
 
-.emojiPickerItem {
-  border: 0;
-  background: transparent;
-  border-radius: 6px;
-  font-size: 17px;
-  line-height: 1;
-  padding: 5px 0;
-  cursor: pointer;
+.emojiAnchor {
+  position: relative;
+  display: inline-flex;
 }
 
-.emojiPickerItem:hover {
-  background: var(--surface-2, #f4f6f8);
+.composerPickerPos {
+  bottom: calc(100% + var(--ui-s2));
+  left: 0;
 }
 
 .reactions {

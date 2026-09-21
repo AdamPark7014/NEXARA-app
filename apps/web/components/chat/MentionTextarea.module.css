@@ -1,0 +1,82 @@
+/*
+ * Compositor con pastillas. El espejo y el textarea comparten caja y métricas
+ * (las copia el componente con getComputedStyle), así que cada carácter del
+ * espejo cae exactamente bajo el mismo carácter del textarea.
+ *
+ * La pastilla NO lleva relleno ni margen: un relleno horizontal ensancharía la
+ * caja en línea y desalinearía todo lo que venga detrás. El aire alrededor se
+ * dibuja con `box-shadow` de extensión, que no ocupa sitio.
+ */
+
+.wrap {
+  position: relative;
+  display: block;
+}
+
+.mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  color: var(--ui-fg);
+  pointer-events: none;
+  user-select: none;
+}
+
+/*
+ * Va con `.wrap` delante a propósito: el compositor del canal y la caja de
+ * edición traen sus propias reglas (`.composerTextarea`, `.editBox textarea`)
+ * que pintan color y fondo. Con dos clases, esto gana sin `!important`.
+ */
+.wrap .input {
+  position: relative;
+  display: block;
+  /* La tinta la pone el espejo; aquí solo queda el cursor y la selección. */
+  color: transparent;
+  caret-color: var(--ui-fg);
+  background: transparent;
+}
+
+.wrap .input::placeholder {
+  color: var(--ui-fg-3);
+  -webkit-text-fill-color: var(--ui-fg-3);
+}
+
+.wrap .input::selection {
+  background: var(--ui-brand-bg);
+}
+
+.pill {
+  border-radius: var(--ui-radius-sm);
+  font-weight: var(--ui-fw-label);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.pillUser {
+  color: var(--ui-brand-text);
+  background: var(--ui-brand-bg);
+  box-shadow: 0 0 0 2px var(--ui-brand-bg);
+}
+
+.pillEntity {
+  color: var(--ui-info-text);
+  background: var(--ui-info-bg);
+  box-shadow: 0 0 0 2px var(--ui-info-bg);
+}
+
+/* Solo para lectores de pantalla: anuncia la mención que se acaba de borrar. */
+.announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

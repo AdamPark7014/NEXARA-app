@@ -18,6 +18,17 @@ import StarBorderIcon from "@mui/icons-material/StarBorder";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import AssignmentOutlinedIcon from "@mui/icons-material/AssignmentOutlined";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
+import SentimentSatisfiedAltOutlinedIcon from "@mui/icons-material/SentimentSatisfiedAltOutlined";
+import AddReactionOutlinedIcon from "@mui/icons-material/AddReactionOutlined";
+import MentionTextarea, { type MentionTextareaHandle } from "./chat/MentionTextarea";
+import EmojiPicker from "./chat/EmojiPicker";
+import { isJumboEmoji } from "@/lib/chat-emoji";
+import {
+  entityMentionToken,
+  insertMentionToken,
+  toDisplay,
+  userMentionToken,
+} from "@/lib/chat-mentions";
 
 type Attachment = { url: string; name: string; mime: string; size: number };
 
@@ -37,11 +48,8 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const EMOJI_PICKER_LIST = [
-  "👍", "👎", "❤️", "🔥", "🎉", "😀", "😂", "😅", "😮", "😢",
-  "😡", "🙏", "👏", "🙌", "💯", "✅", "❌", "👀", "🚀", "🤔",
-  "😍", "🥳", "😴", "🤝", "💡", "⚠️", "📌", "⭐", "🎯", "☕",
-];
+/** Reacciones de un toque, las tres que más se usan. El resto va en el selector. */
+const REACCIONES_RAPIDAS = ["👍", "✅", "👀"];
 
 type ChannelKind = "PUBLIC" | "PRIVATE" | "DIRECT";
 
@@ -253,12 +261,15 @@ function channelPrefixNode(kind: ChannelKind): ReactNode {
 
 /** Preview de canal legible: `[@Nombre](user:2)` → `@Nombre`, `[etiqueta](/ruta)` → `etiqueta`, sin emojis. */
 function readableChatPreview(body: string): string {
-  return body
+  const limpio = body
     .replace(/\[@?([^\]\n]+)\]\(user:\d+\)/g, "@$1")
     .replace(/\[([^\]\n]+)\]\(([^)]+)\)/g, "$1")
     .replace(/\p{Extended_Pictographic}️?\s?/gu, "")
     .replace(/\s+/g, " ")
     .trim();
+  // Un sticker es solo emoji: quitarlos dejaba la fila del canal en blanco.
+  if (!limpio && body.trim()) return body.trim();
+  return limpio;
 }
 
 const MENTION_KIND_ICON: Record<"USER" | "ACTIVITY" | "EVIDENCE", SvgIconComponent> = {
@@ -375,6 +386,8 @@ export default function WorkspaceChat({
   const [threadAttachment, setThreadAttachment] = useState<Attachment | null>(null);
   const [uploading, setUploading] = useState(false);
   const [emojiPickerFor, setEmojiPickerFor] = useState<number | null>(null);
+  /** Selector de emoji del compositor: `"main"` el del canal, `"thread"` el del hilo. */
+  const [composerEmojiFor, setComposerEmojiFor] = useState<"main" | "thread" | null>(null);
   const [hoveredReaction, setHoveredReaction] = useState<{ messageId: number; emoji: string } | null>(null);
   const [reactionsDialog, setReactionsDialog] = useState<{ messageId: number; emoji: string } | null>(null);
   const [showInvite, setShowInvite] = useState(false);
@@ -403,6 +416,10 @@ export default function WorkspaceChat({
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const threadFileInputRef = useRef<HTMLInputElement | null>(null);
+  const composerRef = useRef<MentionTextareaHandle | null>(null);
+  const threadComposerRef = useRef<MentionTextareaHandle | null>(null);
+  const emojiBtnRef = useRef<HTMLButtonElement | null>(null);
+  const threadEmojiBtnRef = useRef<HTMLButtonElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const activeIdRef = useRef<number | null>(null);
   const threadRootRef = useRef<Message | null>(null);
@@ -852,6 +869,7 @@ export default function WorkspaceChat({
         setSearchOpen(false);
         setMentionOpen(false);
         setEmojiPickerFor(null);
+        setComposerEmojiFor(null);
         setEntityPickerOpen(false);
         setShowNewChannel(false);
         setShowDm(false);
@@ -955,10 +973,16 @@ export default function WorkspaceChat({
     else setAttachment(result);
   };
 
-  const send = async (parentId?: number | null) => {
+  /**
+   * `bodyOverride` lo usa el sticker: manda su emoji de una vez sin pasar por el
+   * borrador, así que tampoco lo vacía ni se lleva el adjunto que estuviera
+   * esperando.
+   */
+  const send = async (parentId?: number | null, bodyOverride?: string) => {
     if (!activeId || sending) return;
-    const text = (parentId ? threadDraft : draft).trim();
-    const att = parentId ? threadAttachment : attachment;
+    const suelto = bodyOverride != null;
+    const text = (suelto ? bodyOverride : parentId ? threadDraft : draft).trim();
+    const att = suelto ? null : parentId ? threadAttachment : attachment;
     if (!text && !att) return;
     const clientMsgId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const optimistic: Message = {
@@ -979,16 +1003,20 @@ export default function WorkspaceChat({
     };
     setSending(true);
     if (parentId) {
-      setThreadDraft("");
-      setThreadAttachment(null);
+      if (!suelto) {
+        setThreadDraft("");
+        setThreadAttachment(null);
+      }
       setThreadReplies((prev) => [...prev, optimistic]);
     } else {
-      setDraft("");
-      if (activeId != null) {
-        draftsRef.current[activeId] = "";
-        persistDrafts();
+      if (!suelto) {
+        setDraft("");
+        if (activeId != null) {
+          draftsRef.current[activeId] = "";
+          persistDrafts();
+        }
+        setAttachment(null);
       }
-      setAttachment(null);
       setMentionOpen(false);
       setMessages((prev) => [...prev, optimistic]);
       nearBottomRef.current = true;
@@ -1159,17 +1187,16 @@ export default function WorkspaceChat({
   };
 
   const insertEntityMention = (entity: MentionEntity) => {
-    const cleanLabel = entity.label.replace(/[\[\]\(\)]/g, "").trim();
     const token =
       entity.kind === "USER"
-        ? `[@${cleanLabel}](user:${entity.id})`
-        : `[${cleanLabel}](${entity.href ?? "/"})`;
+        ? userMentionToken(entity.label, entity.id)
+        : entityMentionToken(entity.label, entity.href ?? "/");
 
     if (entityTarget === "thread") {
-      setThreadDraft((prev) => `${prev}${prev && !/\s$/.test(prev) ? " " : ""}${token} `);
+      setThreadDraft((prev) => insertMentionToken(prev, token).markup);
     } else {
       setDraft((prev) => {
-        const next = `${prev}${prev && !/\s$/.test(prev) ? " " : ""}${token} `;
+        const next = insertMentionToken(prev, token).markup;
         if (activeId != null) {
           draftsRef.current[activeId] = next;
           persistDrafts();
@@ -1280,6 +1307,11 @@ export default function WorkspaceChat({
       .slice(0, 6);
   }, [detail?.members, colleagues, mentionQ, currentUserId]);
 
+  /**
+   * El borrador guarda markdown; el disparador `@` se busca sobre el texto
+   * **visible**, que es lo que la persona está tecleando. Sobre el markdown, el
+   * `@` de una pastilla ya puesta (`[@Adam](user:3)`) abriría el menú solo.
+   */
   const onDraftChange = (value: string) => {
     setDraft(value);
     if (activeId != null) {
@@ -1287,9 +1319,11 @@ export default function WorkspaceChat({
       persistDrafts();
     }
     emitTyping();
-    const at = value.lastIndexOf("@");
-    if (at >= 0 && (at === 0 || /\s/.test(value[at - 1] ?? ""))) {
-      const partial = value.slice(at + 1);
+    const { text, mentions } = toDisplay(value);
+    const at = text.lastIndexOf("@");
+    const dentroDePastilla = mentions.some((m) => at >= m.start && at < m.end);
+    if (at >= 0 && !dentroDePastilla && (at === 0 || /\s/.test(text[at - 1] ?? ""))) {
+      const partial = text.slice(at + 1);
       if (!/\s/.test(partial) && partial.length < 40) {
         setMentionOpen(true);
         setMentionQ(partial);
@@ -1301,9 +1335,16 @@ export default function WorkspaceChat({
     setMentionOpen(false);
   };
 
+  /**
+   * Completar con `@` deja una pastilla de verdad, no texto suelto.
+   *
+   * Antes escribía `@Nombre` a pelo, y la API solo avisa a quien viene en un
+   * token `](user:ID)`: la mención se veía pero no notificaba a nadie.
+   */
   const insertMention = (user: ChatUser) => {
-    const at = draft.lastIndexOf("@");
-    const next = `${draft.slice(0, at)}@${user.nombre.split(" ")[0]} `;
+    const next = insertMentionToken(draft, userMentionToken(user.nombre, user.id), {
+      replaceTrigger: true,
+    }).markup;
     setDraft(next);
     if (activeId != null) {
       draftsRef.current[activeId] = next;
@@ -1442,7 +1483,12 @@ export default function WorkspaceChat({
 
               {editingId === m.id ? (
                 <div className={styles.editBox}>
-                  <textarea value={editDraft} onChange={(e) => setEditDraft(e.target.value)} />
+                  <MentionTextarea
+                    value={editDraft}
+                    onChange={setEditDraft}
+                    rows={3}
+                    aria-label="Editar mensaje"
+                  />
                   <div className={styles.editActions}>
                     <button type="button" className={styles.sendBtn} onClick={() => void saveEdit(m.id)}>
                       Guardar
@@ -1454,7 +1500,13 @@ export default function WorkspaceChat({
                 </div>
               ) : (
                 m.body && m.body !== `Archivo: ${m.attachmentName}` && (
-                  <div className={styles.msgBody}>{renderRichText(m.body)}</div>
+                  <div
+                    className={`${styles.msgBody} ${
+                      !m.attachmentUrl && isJumboEmoji(m.body) ? styles.msgBodyJumbo : ""
+                    }`}
+                  >
+                    {renderRichText(m.body)}
+                  </div>
                 )
               )}
 
@@ -1535,38 +1587,40 @@ export default function WorkspaceChat({
 
               {!detail?.readOnly && (
               <div className={styles.msgActions} data-emoji-picker>
-                <button type="button" className={styles.actionBtn} onClick={() => void react(m.id, "👍")}>
-                  👍
-                </button>
-                <button type="button" className={styles.actionBtn} onClick={() => void react(m.id, "✅")}>
-                  ✅
-                </button>
-                <button type="button" className={styles.actionBtn} onClick={() => void react(m.id, "👀")}>
-                  👀
-                </button>
+                {REACCIONES_RAPIDAS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    className={styles.actionBtn}
+                    aria-label={`Reaccionar con ${e}`}
+                    aria-pressed={mineReaction(e)}
+                    onClick={() => void react(m.id, e)}
+                  >
+                    <span aria-hidden="true">{e}</span>
+                  </button>
+                ))}
                 <button
                   type="button"
                   className={styles.actionBtn}
                   title="Más emojis"
+                  aria-label="Elegir otra reacción"
+                  aria-expanded={emojiPickerFor === m.id}
+                  aria-haspopup="dialog"
                   onClick={() => setEmojiPickerFor((cur) => (cur === m.id ? null : m.id))}
                 >
-                  +
+                  <AddReactionOutlinedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
                 </button>
                 {emojiPickerFor === m.id && (
-                  <div className={styles.emojiPicker} data-emoji-picker>
-                    {EMOJI_PICKER_LIST.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        className={styles.emojiPickerItem}
-                        onClick={() => {
-                          void react(m.id, e);
-                          setEmojiPickerFor(null);
-                        }}
-                      >
-                        {e}
-                      </button>
-                    ))}
+                  <div data-emoji-picker>
+                    <EmojiPicker
+                      title="Reaccionar con un emoji"
+                      className={styles.reactionPickerPos}
+                      onSelect={(emoji) => {
+                        void react(m.id, emoji);
+                        setEmojiPickerFor(null);
+                      }}
+                      onClose={() => setEmojiPickerFor(null)}
+                    />
                   </div>
                 )}
                 {!m.parentId && (
@@ -2131,12 +2185,14 @@ export default function WorkspaceChat({
                       ) : null}
                     </div>
                   )}
-                  <textarea
+                  <MentionTextarea
+                    ref={composerRef}
                     className={styles.composerTextarea}
+                    aria-label={`Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`}
                     placeholder={`Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`}
                     value={draft}
                     rows={2}
-                    onChange={(e) => onDraftChange(e.target.value)}
+                    onChange={onDraftChange}
                     onPaste={(e) => {
                       const file = Array.from(e.clipboardData?.files ?? [])[0];
                       if (file) void onPickFile(file, false);
@@ -2217,6 +2273,38 @@ export default function WorkspaceChat({
                       >
                         <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                       </button>
+                      <span className={styles.emojiAnchor}>
+                        <button
+                          ref={emojiBtnRef}
+                          type="button"
+                          className={styles.mentionToolBtn}
+                          title="Emojis y stickers"
+                          aria-label="Emojis y stickers"
+                          aria-haspopup="dialog"
+                          aria-expanded={composerEmojiFor === "main"}
+                          onClick={() =>
+                            setComposerEmojiFor((cur) => (cur === "main" ? null : "main"))
+                          }
+                        >
+                          <SentimentSatisfiedAltOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                        </button>
+                        {composerEmojiFor === "main" && (
+                          <EmojiPicker
+                            title="Emojis y stickers"
+                            className={styles.composerPickerPos}
+                            returnFocusTo={emojiBtnRef}
+                            onSelect={(emoji) => {
+                              composerRef.current?.insertText(emoji);
+                              composerRef.current?.focus();
+                            }}
+                            onSticker={(emoji) => {
+                              setComposerEmojiFor(null);
+                              void send(null, emoji);
+                            }}
+                            onClose={() => setComposerEmojiFor(null)}
+                          />
+                        )}
+                      </span>
                       <span className={styles.composerHint}>Enter envía · @ menciona</span>
                     </div>
                     <button
@@ -2367,12 +2455,14 @@ export default function WorkspaceChat({
                         )}
                       </div>
                     )}
-                    <textarea
+                    <MentionTextarea
+                      ref={threadComposerRef}
                       className={styles.composerTextarea}
+                      aria-label="Responder en el hilo"
                       placeholder="Responder en el hilo…"
                       value={threadDraft}
                       rows={2}
-                      onChange={(e) => setThreadDraft(e.target.value)}
+                      onChange={setThreadDraft}
                       onPaste={(e) => {
                         const file = Array.from(e.clipboardData?.files ?? [])[0];
                         if (file) void onPickFile(file, true);
@@ -2432,6 +2522,38 @@ export default function WorkspaceChat({
                         >
                           <PhotoCameraOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
                         </button>
+                        <span className={styles.emojiAnchor}>
+                          <button
+                            ref={threadEmojiBtnRef}
+                            type="button"
+                            className={styles.mentionToolBtn}
+                            title="Emojis y stickers"
+                            aria-label="Emojis y stickers"
+                            aria-haspopup="dialog"
+                            aria-expanded={composerEmojiFor === "thread"}
+                            onClick={() =>
+                              setComposerEmojiFor((cur) => (cur === "thread" ? null : "thread"))
+                            }
+                          >
+                            <SentimentSatisfiedAltOutlinedIcon aria-hidden="true" sx={{ fontSize: 18 }} />
+                          </button>
+                          {composerEmojiFor === "thread" && (
+                            <EmojiPicker
+                              title="Emojis y stickers del hilo"
+                              className={styles.composerPickerPos}
+                              returnFocusTo={threadEmojiBtnRef}
+                              onSelect={(emoji) => {
+                                threadComposerRef.current?.insertText(emoji);
+                                threadComposerRef.current?.focus();
+                              }}
+                              onSticker={(emoji) => {
+                                setComposerEmojiFor(null);
+                                void send(threadRoot.id, emoji);
+                              }}
+                              onClose={() => setComposerEmojiFor(null)}
+                            />
+                          )}
+                        </span>
                         <span className={styles.composerHint}>Respuesta al hilo</span>
                       </div>
                       <button

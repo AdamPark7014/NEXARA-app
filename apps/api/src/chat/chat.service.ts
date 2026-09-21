@@ -177,6 +177,12 @@ export class ChatService {
       .replace(/\p{Extended_Pictographic}️?\s?/gu, '')
       .replace(/\s+/g, ' ')
       .trim();
+    // Un mensaje que es solo emoji (un sticker) se quedaba sin preview: la fila
+    // del canal salía en blanco. Si no queda nada, vale el cuerpo tal cual.
+    if (!clean && (body ?? '').trim()) {
+      const crudo = body.trim();
+      return crudo.length > 140 ? `${crudo.slice(0, 137)}…` : crudo;
+    }
     return clean.length > 140 ? `${clean.slice(0, 137)}…` : clean;
   }
 
