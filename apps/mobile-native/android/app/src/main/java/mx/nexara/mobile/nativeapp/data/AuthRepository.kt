@@ -9,6 +9,7 @@ import mx.nexara.mobile.nativeapp.data.realtime.RealtimeBus
 import mx.nexara.mobile.nativeapp.data.session.SessionEvents
 import mx.nexara.mobile.nativeapp.data.session.SessionRefreshPolicy
 import mx.nexara.mobile.nativeapp.data.session.SessionRefresher
+import retrofit2.HttpException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -30,7 +31,11 @@ class AuthRepository(
     suspend fun login(email: String, password: String): SessionUser {
         val headers = deviceIdentityProvider.headers().asHeaders()
         val trimmedEmail = email.trim()
-        var lastError: Exception? = null
+        // El primer intento (personal interno) es el que le importa a la
+        // mayoría: si se pisa con el error del portal de clientes, un 404 de
+        // «ese cliente no existe» se le enseña al empleado como «contraseña
+        // incorrecta». Guardamos el primero y ese es el que se reporta.
+        var primerError: Exception? = null
 
         // 1) Internal users (`auth/login`)
         try {
@@ -64,7 +69,8 @@ class AuthRepository(
             user = saveEnriched(enrichSession(user)) ?: user
             return user
         } catch (e: Exception) {
-            lastError = e
+            if (!esOtroTipoDeCuenta(e)) throw e
+            if (primerError == null) primerError = e
         }
 
         // 2) Portal unificado (`portal/login` — cliente o sucursal)
@@ -114,7 +120,8 @@ class AuthRepository(
             RealtimeBus.start(user.token)
             return user
         } catch (e: Exception) {
-            lastError = e
+            if (!esOtroTipoDeCuenta(e)) throw e
+            if (primerError == null) primerError = e
         }
 
         // 3) Legacy client portal (`client-auth/login`)
@@ -142,7 +149,8 @@ class AuthRepository(
             RealtimeBus.start(user.token)
             return user
         } catch (e: Exception) {
-            lastError = e
+            if (!esOtroTipoDeCuenta(e)) throw e
+            if (primerError == null) primerError = e
         }
 
         // 4) Legacy branch portal (`branch-auth/login`)
@@ -169,9 +177,21 @@ class AuthRepository(
             RealtimeBus.start(user.token)
             return user
         } catch (e: Exception) {
-            throw lastError ?: e
+            throw primerError ?: e
         }
     }
+
+    /**
+     * ¿El fallo significa «esta cuenta no vive en esta tabla» y por tanto
+     * toca probar el siguiente portal?
+     *
+     * Solo 401 y 404 lo significan. Un 429, un 5xx o un corte de red son del
+     * transporte, no de la identidad: seguir probando los otros tres
+     * endpoints no encuentra nada y sí gasta cuatro intentos del límite de
+     * `/auth` en lugar de uno.
+     */
+    private fun esOtroTipoDeCuenta(e: Exception): Boolean =
+        e is HttpException && (e.code() == 401 || e.code() == 404)
 
     /** companyId + navegación RBAC desde API (best-effort). */
     private suspend fun enrichSession(user: SessionUser): SessionUser {

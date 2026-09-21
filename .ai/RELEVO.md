@@ -1,10 +1,35 @@
 # RELEVO
 
 - **Último turno:** claude-code
-- **Fecha:** 2026-09-20
+- **Fecha:** 2026-09-21
 - **Rama:** `mejora/calidad-y-web`
-- **HEAD:** Avisos y rutas muertas corregidos; Actividades con lenguaje visual nuevo
-- **Verificado:** API 198 suites / 2 237 pruebas · web 63 / 569 · build limpio con `.next` borrado
+- **HEAD:** `GET /company/mine` dejó de arrastrar a cualquiera a la empresa real; login móvil sin bucle ni cascada
+- **Verificado:** `company-tenant-pin.spec.ts` 7/7 · Android `testDebugUnitTest` verde · login del revisor comprobado contra producción desde el emulador
+
+## Lo que se encontró hoy y hay que entender antes de tocar nada
+
+`CompanyService.listForUser` —lo que responde `GET /company/mine`— llamaba a
+`ensureMembership(userId, primaria, true)` **para todo el que lo llamara**. La
+app móvil pide ese endpoint justo al entrar, así que cada login metía a la
+cuenta en la empresa real de NEXARA y encima la dejaba como su predeterminada.
+
+Consecuencias, las dos del mismo origen:
+
+1. La cuenta de revisión de Google Play (`play.review@nexara.com.mx`, tenant
+   `nexara-demo`) salía de su tenant en su primer login y `GET /me/board` le
+   devolvía empleados reales con nombre y correo.
+2. Sus propias actividades de demo dejaban de aparecer —`GET /me/activities`
+   respondía vacío— porque su empresa activa pasaba a ser la 1 y la demo vive
+   en la 2. Eso es el «Nada por hacer» que se veía en el emulador.
+
+En el turno anterior se «arregló» volviendo a correr el sembrador. Eso sólo
+limpia la fila; el siguiente login la volvía a crear. El arreglo real es el de
+`listForUser`: sólo se auto-inscribe a quien no pertenece a ninguna empresa
+(los usuarios heredados de cuando había una sola).
+
+**La fila mala sigue en producción** y hay que borrarla *después* de desplegar
+este cambio, si no vuelve a nacer. Ver «Pendiente de Adam».
+
 
 ## Puente — no cambiar
 

@@ -178,13 +178,20 @@ class MainActivity : FragmentActivity() {
 
         val uri = intent.data
         if (ScreenshotAutomation.isDebugAutomationUri(uri) && uri != null) {
+            val action = uri.pathSegments.firstOrNull()?.lowercase()
+            val emailExtra = intent.getStringExtra(ScreenshotAutomation.EXTRA_EMAIL)
+            val passwordExtra = intent.getStringExtra(ScreenshotAutomation.EXTRA_PASSWORD)
+            // `recreate()` vuelve a entregar ESTE mismo intent, así que si no lo
+            // consumimos antes, el auto-login se dispara otra vez en onCreate y
+            // la app entra en un bucle de logins que agota el límite de `/auth`
+            // en segundos: a partir de ahí todo login legítimo recibe un 429.
+            setIntent(Intent(this, MainActivity::class.java))
             lifecycleScope.launch {
-                val action = uri.pathSegments.firstOrNull()?.lowercase()
                 ScreenshotAutomation.handle(
                     context = applicationContext,
                     uri = uri,
-                    emailExtra = intent.getStringExtra(ScreenshotAutomation.EXTRA_EMAIL),
-                    passwordExtra = intent.getStringExtra(ScreenshotAutomation.EXTRA_PASSWORD),
+                    emailExtra = emailExtra,
+                    passwordExtra = passwordExtra,
                 )
                 if (action == "auto-login") {
                     recreate()

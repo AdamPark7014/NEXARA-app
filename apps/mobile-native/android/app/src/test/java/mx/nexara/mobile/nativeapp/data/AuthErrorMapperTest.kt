@@ -1,6 +1,8 @@
 package mx.nexara.mobile.nativeapp.data
 
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Protocol
+import okhttp3.Request
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -74,6 +76,56 @@ class AuthErrorMapperTest {
     fun loginMessage_httpMessage_isFiltered() {
         val msg = AuthErrorMapper.loginMessage(IllegalStateException("HTTP 400 Bad Request"))
         assertEquals("No se pudo iniciar sesión. Intenta de nuevo.", msg)
+    }
+
+    @Test
+    fun loginMessage_http404_noSeConfundeConPasswordMal() {
+        val msg = AuthErrorMapper.loginMessage(httpError(404))
+        assertEquals("No encontramos ninguna cuenta con ese correo.", msg)
+    }
+
+    @Test
+    fun loginMessage_http401_conMotivoDelServidor_loMuestra() {
+        val msg = AuthErrorMapper.loginMessage(
+            httpErrorConCuerpo(401, """{"message":"Cuenta bloqueada temporalmente. Reintenta en 12 min."}"""),
+        )
+        assertEquals("Cuenta bloqueada temporalmente. Reintenta en 12 min.", msg)
+    }
+
+    @Test
+    fun loginMessage_http401_motivoGenerico_usaLaCopiaAmable() {
+        val msg = AuthErrorMapper.loginMessage(
+            httpErrorConCuerpo(401, """{"message":"Credenciales inválidas"}"""),
+        )
+        assertEquals(
+            "Correo o contraseña incorrectos. Verifica tus datos e intenta de nuevo.",
+            msg,
+        )
+    }
+
+    @Test
+    fun loginMessage_http429_diceCuantoEsperar() {
+        val msg = AuthErrorMapper.loginMessage(
+            httpErrorConCuerpo(429, """{"message":"Too many requests"}""", retryAfter = "619"),
+        )
+        assertEquals("Demasiados intentos. Espera 11 minutos e intenta de nuevo.", msg)
+    }
+
+    private fun httpErrorConCuerpo(
+        code: Int,
+        body: String,
+        retryAfter: String? = null,
+    ): HttpException {
+        val raw = okhttp3.Response.Builder()
+            .code(code)
+            .message("error")
+            .protocol(Protocol.HTTP_1_1)
+            .request(Request.Builder().url("https://api.nexara.com.mx/api/auth/login").build())
+            .apply { if (retryAfter != null) addHeader("Retry-After", retryAfter) }
+            .build()
+        return HttpException(
+            Response.error<Any>(body.toResponseBody("application/json".toMediaType()), raw),
+        )
     }
 
     private fun httpError(code: Int): HttpException {
