@@ -2,6 +2,10 @@ package mx.nexara.mobile.nativeapp.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -38,6 +42,28 @@ data class QuickProfile(
     val email: String,
     val role: String,
 )
+
+/**
+ * Contador que sube cada vez que la sesión guardada cambia.
+ *
+ * Existe porque la sesión se enriquece **después** del login: `auth/login`
+ * devuelve identidad y token, y sólo entonces se piden `company/mine` y
+ * `me/navigation` para saber qué módulos tiene la persona. Las pantallas que
+ * leían la sesión con un `remember { }` sin clave se quedaban con la versión
+ * de antes del enriquecimiento hasta que el proceso moría.
+ *
+ * Lo que se veía: quien entraba por primera vez tenía el menú de «Más»
+ * recortado a los cuatro módulos que tiene todo el personal —sin Cotizaciones,
+ * Proyectos, Almacén ni KPIs— y sólo aparecían al cerrar y reabrir la app.
+ */
+object SessionRevision {
+    private val _valor = MutableStateFlow(0)
+    val valor: StateFlow<Int> = _valor.asStateFlow()
+
+    internal fun subir() {
+        _valor.update { it + 1 }
+    }
+}
 
 class SessionStore(context: Context) {
     private val prefs: SharedPreferences = openPrefs(context.applicationContext)
@@ -116,6 +142,7 @@ class SessionStore(context: Context) {
             .putString("nav_paths_csv", user.navPaths?.joinToString("\n"))
             .apply()
 
+        SessionRevision.subir()
         saveQuickProfile(user)
     }
 
@@ -186,6 +213,8 @@ class SessionStore(context: Context) {
             .remove("nav_panels_csv")
             .remove("nav_paths_csv")
             .apply()
+
+        SessionRevision.subir()
     }
 
     companion object {
