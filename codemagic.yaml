@@ -1,0 +1,143 @@
+workflows:
+  ios-simulator-build:
+    name: iOS Simulator Build (NEXARA)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: 16.2
+      vars:
+        XCODE_PROJECT_PATH: apps/mobile-native/ios/NexaraApp.xcodeproj
+        XCODE_SCHEME: NexaraApp
+        DERIVED_DATA: $CM_BUILD_DIR/DerivedData
+    scripts:
+      - name: Check Xcode and Homebrew
+        script: |
+          set -euo pipefail
+          xcodebuild -version
+          brew --version
+      - name: Install XcodeGen (brew)
+        script: |
+          set -euo pipefail
+          brew update
+          brew install xcodegen
+      - name: Generate Xcode project from XcodeGen spec
+        script: |
+          set -euo pipefail
+          cd apps/mobile-native/ios
+          if [[ -f project.yml ]]; then
+            SPEC_FILE=project.yml
+          elif [[ -f project.yaml ]]; then
+            SPEC_FILE=project.yaml
+          else
+            echo "XcodeGen spec not found (project.yml or project.yaml) in apps/mobile-native/ios"
+            exit 1
+          fi
+          echo "Using XcodeGen spec: ${SPEC_FILE}"
+          xcodegen generate --spec "${SPEC_FILE}"
+          test -d NexaraApp.xcodeproj
+      - name: Build for iOS Simulator (Debug, no signing)
+        script: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT_PATH" \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            build
+    artifacts:
+      - DerivedData/Build/Products/Debug-iphonesimulator/*.app
+      - DerivedData/Logs/Build/*.xcactivitylog
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+      cancel_previous_builds: true
+    publishing:
+      # Email notifications can be configured if desired by setting CM_USER_EMAIL in Codemagic
+      # email:
+      #   recipients:
+      #     - $CM_USER_EMAIL
+      #   notify:
+      #     success: true
+      #     failure: true
+
+  ios-archive-unsigned:
+    # Optional workflow to create an unsigned .xcarchive for generic iOS Device (manual/tag only)
+    name: iOS Device Archive (unsigned, no export)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: 16.2
+      vars:
+        XCODE_PROJECT_PATH: apps/mobile-native/ios/NexaraApp.xcodeproj
+        XCODE_SCHEME: NexaraApp
+        ARCHIVE_PATH: $CM_BUILD_DIR/build/NexaraApp-Unsigned.xcarchive
+    scripts:
+      - name: Install XcodeGen (brew)
+        script: |
+          set -euo pipefail
+          brew update
+          brew install xcodegen
+      - name: Generate Xcode project from XcodeGen spec
+        script: |
+          set -euo pipefail
+          cd apps/mobile-native/ios
+          xcodegen generate --spec project.yml
+          test -d NexaraApp.xcodeproj
+      - name: Archive for generic iOS Device (no signing)
+        script: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT_PATH" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            archive -archivePath "$ARCHIVE_PATH"
+    artifacts:
+      - build/NexaraApp-Unsigned.xcarchive
+      - ~/Library/Logs/gym/*.log
+    triggering:
+      events:
+        - tag
+      # Manual runs are always available from Codemagic UI
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    # NOTE: App Store Connect/TestFlight publishing requires secrets and signing.
+    # Leave this disabled until credentials are added. Example configuration below:
+    #
+    # environment:
+    #   groups:
+    #     - app_store_connect   # define in Codemagic UI
+    #   vars:
+    #     APP_STORE_CONNECT_ISSUER_ID: Encrypted(...)
+    #     APP_STORE_CONNECT_KEY_IDENTIFIER: Encrypted(...)
+    #     APP_STORE_CONNECT_PRIVATE_KEY: Encrypted(...) # base64
+    #     CERTIFICATE_PRIVATE_KEY: Encrypted(...)
+    #
+    # publishing:
+    #   app_store_connect:
+    #     auth: integration      # or api_key
+    #     submit_to_testflight: true
+    #     beta_groups:
+    #       - Internal Testers
+    #   scripts:
+    #     - name: Export signed IPA for TestFlight
+    #       script: |
+    #         # Requires provisioning profiles and certificates supplied via Codemagic
+    #         xcodebuild -exportArchive \
+    #           -archivePath "$ARCHIVE_PATH" \
+    #           -exportOptionsPlist ExportOptions.plist \
+    #           -exportPath "$CM_BUILD_DIR/build/export"
+    #   artifacts:
+    #     - build/export/*.ipa
+
