@@ -52,6 +52,7 @@ import mx.nexara.mobile.nativeapp.ui.console.activities.ActividadesScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.BoardPersonScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.ConsoleActivityDetailByIdScreen
 import mx.nexara.mobile.nativeapp.ui.console.activities.CoreActivityFormScreen
+import mx.nexara.mobile.nativeapp.ui.console.aprobaciones.AprobacionesScreen
 import mx.nexara.mobile.nativeapp.access.ClientSector
 import mx.nexara.mobile.nativeapp.ui.console.clients.ClientDetailScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.ClientsListScreen
@@ -154,6 +155,15 @@ internal object ConsoleRoutes {
      */
     const val Gastos = "console/gastos"
 
+    /**
+     * Aprobaciones (`/erp/approvals`) — el único módulo de «Más» que **decide**.
+     *
+     * Aquí sí se escribe: aprobar o rechazar lo que está detenido esperando tu
+     * firma. Es lo que más gana al salir de la computadora, porque quien
+     * autoriza casi nunca está sentado y cada solicitud parada bloquea a alguien.
+     */
+    const val Aprobaciones = "console/aprobaciones"
+
     /** Viáticos: mis anticipos y, para quien autoriza, los de su gente. */
     const val Viaticos = "console/viaticos"
 
@@ -181,7 +191,7 @@ internal object ConsoleRoutes {
      * A dónde lleva un módulo de «Más»: su pantalla nativa si ya existe, si no
      * la ficha con el enlace a la web.
      *
-     * En la ficha quedan Aprobaciones y Documentos, que entraron al menú
+     * En la ficha queda Documentos, que entró al menú
      * con la segunda ola y todavía no tienen pantalla. El `else` también protege
      * el día que se añada un módulo nuevo a [CoreExtraModule]: cae ahí y no
      * rompe la compilación de una pantalla que todavía no existe.
@@ -197,6 +207,7 @@ internal object ConsoleRoutes {
         CoreExtraModule.COTIZACIONES -> Cotizaciones
         CoreExtraModule.PAGOS_EMPLEADOS -> PagosEmpleados
         CoreExtraModule.GASTOS -> Gastos
+        CoreExtraModule.APROBACIONES -> Aprobaciones
         else -> modulePlaceholder(module.key)
     }
 
@@ -385,6 +396,7 @@ fun ConsoleNavHost(
         ConsoleRoutes.Cotizaciones -> "Cotizaciones"
         ConsoleRoutes.CotizacionDetalle -> "Cotización"
         ConsoleRoutes.PagosEmpleados -> "Pagos a empleados"
+        ConsoleRoutes.Aprobaciones -> "Aprobaciones"
         ConsoleRoutes.Viaticos -> "Viáticos"
         ConsoleRoutes.NuevoViatico -> "Pedir viático"
         ConsoleRoutes.ViaticoDetalle -> "Viático"
@@ -660,6 +672,13 @@ fun ConsoleNavHost(
             // decide el API, y su 403 se enseña tal cual.
             nxComposable(ConsoleRoutes.PagosEmpleados, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.PAGOS_EMPLEADOS in extras) PagosEmpleadosScreen()
+            }
+            // Aprobaciones: aquí sí se decide. Comprueba el módulo igual que el
+            // resto de «Más»; quién puede firmar **qué paso** lo decide el API
+            // (`workflow.service.ts` exige ser el aprobador de ese paso, por
+            // usuario o por rol), y su 403 se enseña tal cual.
+            nxComposable(ConsoleRoutes.Aprobaciones, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.APROBACIONES in extras) AprobacionesScreen()
             }
             // Viáticos: el técnico pide desde la calle y la dirección resuelve
             // desde donde esté. La lista se recarga sola cuando el alta, una
