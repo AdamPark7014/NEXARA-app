@@ -184,12 +184,18 @@ jobs:
           grep -E "PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_ENTITLEMENTS" "$RUNNER_TEMP/buildsettings.txt" || true
           echo "::endgroup::"
           ENT_PATH=$(grep -E "CODE_SIGN_ENTITLEMENTS =" "$RUNNER_TEMP/buildsettings.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
-          if [ -n "$ENT_PATH" ] && [ -f "$ENT_PATH" ]; then
-            echo "Entitlements file: $ENT_PATH"
-            /usr/libexec/PlistBuddy -c 'Print aps-environment' "$ENT_PATH" || true
-          else
-            echo "Entitlements file not found or not set"
+          PROJ_DIR="$(cd "$(dirname "$XCODE_PROJECT_PATH")" && pwd)"
+          if [ -z "$ENT_PATH" ]; then
+            echo "ERROR: CODE_SIGN_ENTITLEMENTS is not set in build settings"; exit 1
           fi
+          case "$ENT_PATH" in
+            /*) ENT_ABS="$ENT_PATH" ;;
+            *)  ENT_ABS="$PROJ_DIR/$ENT_PATH" ;;
+          esac
+          echo "Resolved entitlements path: $ENT_ABS"
+          test -f "$ENT_ABS" || { echo "ERROR: Entitlements file missing at $ENT_ABS"; exit 1; }
+          echo "aps-environment in entitlements:"
+          /usr/libexec/PlistBuddy -c 'Print aps-environment' "$ENT_ABS" || true
 
       - name: Bind provisioning profile to NexaraApp target (patch project.pbxproj)
         working-directory: apps/mobile-native/ios
