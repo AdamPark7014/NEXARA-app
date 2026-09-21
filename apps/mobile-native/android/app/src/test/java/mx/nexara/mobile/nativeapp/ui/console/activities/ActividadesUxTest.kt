@@ -134,4 +134,78 @@ class ActividadesUxTest {
         assertEquals("3 por hacer · 1 urgente · 2 hechas hoy", ActividadesUx.resumenDia(3, 1, 2, 0))
         assertEquals("1 por hacer · 2 urgentes · 1 hecha hoy · 4 en seguimiento", ActividadesUx.resumenDia(1, 2, 1, 4))
     }
+
+    // ── La tira de cifras del encabezado ────────────────────────────────────
+
+    @Test
+    fun regla7SinNadaQueContarNoSePintanCeros() {
+        assertTrue(ActividadesUx.metricas(porHacer = 0, urgentes = 0, hechasHoy = 0, seguimiento = 0).isEmpty())
+    }
+
+    @Test
+    fun unDiaQueYaCerroSiEnsenaSusCifras() {
+        // Cero por hacer pero dos hechas es información, no una fila de ceros.
+        val metricas = ActividadesUx.metricas(porHacer = 0, urgentes = 0, hechasHoy = 2, seguimiento = 0)
+        assertEquals(listOf(ActividadesUx.METRICA_POR_HACER, ActividadesUx.METRICA_HECHAS), metricas.map { it.clave })
+        assertEquals("2", metricas.last().valor)
+    }
+
+    @Test
+    fun seguimientoSoloApareceSiRepartioAlgo() {
+        val sin = ActividadesUx.metricas(porHacer = 3, urgentes = 0, hechasHoy = 0, seguimiento = 0)
+        assertFalse(sin.any { it.clave == ActividadesUx.METRICA_SEGUIMIENTO })
+        val con = ActividadesUx.metricas(porHacer = 3, urgentes = 0, hechasHoy = 0, seguimiento = 2)
+        assertEquals("2", con.first { it.clave == ActividadesUx.METRICA_SEGUIMIENTO }.valor)
+    }
+
+    @Test
+    fun loUrgenteEsLoUnicoQueSeTine() {
+        val tranquilo = ActividadesUx.metricas(porHacer = 4, urgentes = 0, hechasHoy = 1, seguimiento = 0)
+        assertTrue(tranquilo.all { it.color == null })
+        assertEquals("en tu cola", tranquilo.first().pista)
+
+        val urgente = ActividadesUx.metricas(porHacer = 4, urgentes = 2, hechasHoy = 0, seguimiento = 0)
+        assertEquals(CoreActivityRules.ROJO, urgente.first().color)
+        assertEquals("2 urgentes", urgente.first().pista)
+    }
+
+    @Test
+    fun elEncabezadoDiceQueHacer() {
+        assertEquals("Cargando tus actividades…", ActividadesUx.instruccionDia(0, cargando = true))
+        assertEquals("Nada pendiente por ahora.", ActividadesUx.instruccionDia(0, cargando = false))
+        assertEquals("Tienes 1 actividad. Empieza por ella.", ActividadesUx.instruccionDia(1, cargando = false))
+        assertEquals("Tienes 5 por hacer. Empieza por la #1.", ActividadesUx.instruccionDia(5, cargando = false))
+    }
+
+    // ── Color con significado (reglas 3 y 6) ────────────────────────────────
+
+    @Test
+    fun elFlujoNormalVaEnGris() {
+        assertNull(ActividadesUx.colorEstatus("En Proceso"))
+        assertNull(ActividadesUx.colorEstatus("Por Validar"))
+        assertNull(ActividadesUx.colorEstatus("Pendiente"))
+        assertNull(ActividadesUx.colorEstatus(null))
+    }
+
+    @Test
+    fun loQuePideAccionOCierraSiLlevaColor() {
+        assertEquals(CoreActivityRules.ROJO, ActividadesUx.colorEstatus("RECHAZADA"))
+        assertEquals(CoreActivityRules.VERDE, ActividadesUx.colorEstatus("Finalizada"))
+    }
+
+    @Test
+    fun elSemaforoEnVerdeNoSePinta() {
+        assertEquals(CoreActivityRules.ROJO, ActividadesUx.colorSemaforo("rojo"))
+        assertEquals(CoreActivityRules.NARANJA, ActividadesUx.colorSemaforo("amarillo"))
+        assertNull(ActividadesUx.colorSemaforo("verde"))
+        assertNull(ActividadesUx.colorSemaforo(null))
+    }
+
+    @Test
+    fun soloLaPrioridadUrgenteSeTine() {
+        assertEquals(CoreActivityRules.ROJO, ActividadesUx.colorPrioridad("alta"))
+        assertNull(ActividadesUx.colorPrioridad("media"))
+        assertNull(ActividadesUx.colorPrioridad("baja"))
+        assertNull(ActividadesUx.colorPrioridad(null))
+    }
 }

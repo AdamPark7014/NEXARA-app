@@ -1,27 +1,22 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
-import android.Manifest
 import android.app.Application
-import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.GpsFixed
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -33,11 +28,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -65,14 +60,23 @@ import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.ImageDataUrl
 import mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner
 import mx.nexara.mobile.nativeapp.ui.common.ProtectedImage
+import mx.nexara.mobile.nativeapp.ui.common.rememberCameraCapture
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDenseSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEstadoPantalla
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterBar
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterPill
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIcons
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxMetricStrip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusDot
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxUi
 import mx.nexara.mobile.nativeapp.ui.enterprise.icon
-import mx.nexara.mobile.nativeapp.ui.common.rememberCameraCapture
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.nxEstadoPantalla
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 import mx.nexara.mobile.nativeapp.util.DeviceLocation
 import mx.nexara.mobile.nativeapp.util.JornadaGps
@@ -85,11 +89,14 @@ import java.util.Locale
 /*
  * Asistencias — espejo de apps/web/app/(panels)/erp/asistencias/page.tsx.
  *
- * Tres pestañas sobre un mismo día: equipo, comidas y trayectoria. Antes esta
- * pantalla era otra cosa: rangos de semana/mes, ranking de horas y export CSV
- * que la web no tiene, el equipo decidido por `console.admin` en vez del rol, y
- * la consulta sin `scope`, así que cualquiera con `attendance.manage` veía a la
- * empresa entera.
+ * Tres pestañas sobre un mismo día: equipo, comidas y trayectoria.
+ *
+ * La pantalla sigue el contrato de `.ai/DISENO-FINANZAS.md`: una tira de cifras
+ * en lugar de tarjetas KPI, el estado como punto y palabra, una sola barra de
+ * filtros, un botón primario (checar) y ninguna caja dentro de otra. La lista
+ * del equipo es densa —una fila por persona, separadas por una línea— y el
+ * detalle de cada quien se abre al tocarla, para que quepan diez personas en
+ * una pantalla en vez de dos.
  */
 
 // ── Estado ───────────────────────────────────────────────────────────────────
@@ -153,6 +160,7 @@ data class AttendanceUiState(
 // ── Fechas y formato ─────────────────────────────────────────────────────────
 
 private val HORA_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+private val HORA_CORTA_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val ISO_FECHA: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
 fun hoyIso(): String = LocalDate.now().format(ISO_FECHA)
@@ -171,6 +179,10 @@ internal fun parseInstante(iso: String?): Instant? {
 
 private fun fmtHora(iso: String?): String =
     parseInstante(iso)?.atZone(ZoneId.systemDefault())?.toLocalTime()?.format(HORA_FMT) ?: "—"
+
+/** `08:15` — la que va en la fila de la lista, donde los segundos solo estorban. */
+private fun fmtHoraCorta(iso: String?): String =
+    parseInstante(iso)?.atZone(ZoneId.systemDefault())?.toLocalTime()?.format(HORA_CORTA_FMT) ?: "—"
 
 private fun pad2(n: Long): String = n.coerceAtLeast(0).toString().padStart(2, '0')
 
@@ -554,21 +566,38 @@ fun ConsoleAttendanceScreen(
     }
 
     Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
-        SelectorFecha(
-            fecha = state.fecha,
-            onFecha = vm::setFecha,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-
-        TabRow(selectedTabIndex = indice) {
+        // Las pestañas primero: son la navegación. El día es un filtro y vive con los filtros.
+        TabRow(
+            selectedTabIndex = indice,
+            containerColor = NxColors.Surface,
+            contentColor = NxColors.Brand,
+        ) {
             pestanas.forEach { (key, label) ->
                 Tab(
                     selected = tab == key,
                     onClick = { tab = key },
-                    text = { Text(label) },
+                    text = {
+                        Text(
+                            label,
+                            fontSize = 13.5.sp,
+                            fontWeight = if (tab == key) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                        )
+                    },
+                    selectedContentColor = NxColors.Brand,
+                    unselectedContentColor = NxUi.Fg2,
                 )
             }
         }
+
+        // El día vale para las tres pestañas, así que vive una sola vez y fuera
+        // de la lista: si viviera dentro, al desplazarse se llevaría por delante
+        // el calendario abierto.
+        SelectorFecha(
+            fecha = state.fecha,
+            onFecha = vm::setFecha,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
 
         when (tab) {
             TAB_COMIDAS -> mx.nexara.mobile.nativeapp.ui.console.comidas.ComidasPanel(
@@ -652,6 +681,11 @@ internal fun etiquetaDia(fecha: String, esHoy: Boolean): String {
     return if (esHoy) "Hoy, $dia" else dia.replaceFirstChar { it.uppercase() }
 }
 
+/**
+ * El día que se está viendo. Es un control, no una cabecera: va en la misma fila
+ * que los filtros, sin caja ni título repetido (la barra de arriba ya dice
+ * «Asistencias»).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SelectorFecha(
@@ -663,26 +697,30 @@ private fun SelectorFecha(
     val hoy = remember { LocalDate.now() }
     val esHoy = fecha == hoy.format(ISO_FECHA)
 
-    // Sin título repetido: la barra ya dice «Asistencias». Solo el día que se está viendo.
     Row(
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         OutlinedButton(
             onClick = { abierto = true },
-            modifier = Modifier.heightIn(min = 48.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.heightIn(min = 40.dp),
         ) {
-            Icon(NxIcons.Calendar, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(NxIcons.Calendar, contentDescription = null, modifier = Modifier.size(17.dp))
             Spacer(Modifier.width(8.dp))
-            Text(etiquetaDia(fecha, esHoy), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                etiquetaDia(fecha, esHoy),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        Spacer(Modifier.weight(1f))
         if (!esHoy) {
-            TextButton(
-                onClick = { onFecha(hoy.format(ISO_FECHA)) },
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) { Text("Ir a hoy") }
+            TextButton(onClick = { onFecha(hoy.format(ISO_FECHA)) }) {
+                Text("Ir a hoy", fontSize = 13.sp, color = NxColors.Brand)
+            }
         }
     }
 
@@ -729,31 +767,26 @@ private fun EquipoTab(
     var ahoraMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     /** Persona a la que Christian le está justificando la falta. */
     var justificando by remember { mutableStateOf<AttendancePersona?>(null) }
-    val hayJornadaAbierta = state.presentes > 0 || state.current?.isOpen == true
+    /** Fila abierta: el detalle se ve a petición, para que la lista siga siendo lista. */
+    var expandida by rememberSaveable { mutableStateOf<Long?>(null) }
+    val hayJornadaAbierta = AttendanceUx.hayJornadaAbierta(state.personas, state.current?.isOpen == true)
     LaunchedEffect(hayJornadaAbierta) {
         while (hayJornadaAbierta) {
             ahoraMs = System.currentTimeMillis()
             delay(1_000)
         }
     }
+    val estadoEquipo = nxEstadoPantalla(
+        cargando = state.isLoading,
+        error = state.error,
+        hayDatos = state.personas.isNotEmpty(),
+    )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        state.error?.let { msg ->
-            item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(msg, fontSize = 13.sp, color = NxColors.Danger, modifier = Modifier.weight(1f))
-                    OutlinedButton(onClick = { vm.refresh() }) { Text("Reintentar") }
-                }
-            }
-        }
-
         if (vm.viewMode.canRegisterSelf) {
             item {
                 LocationPermissionBanner(
@@ -780,66 +813,99 @@ private fun EquipoTab(
             return@LazyColumn
         }
 
-        if (state.isLoading) {
-            item { NxLoadingBlock("Cargando asistencia…") }
-            return@LazyColumn
-        }
-
-        // Una sola fila de filtros con conteo (antes: tarjetas KPI y chips que hacían lo mismo).
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ChipEstado("Todos", state.personas.size, null, state.filtro == null) { vm.setFiltro(null) }
-                AttendanceEstado.entries.forEach { estado ->
-                    val n = state.personas.count { it.estado == estado }
-                    ChipEstado(estado.etiqueta, n, estado.color, state.filtro == estado) {
-                        // Tocar el filtro activo vuelve a «Todos».
-                        vm.setFiltro(if (state.filtro == estado) null else estado)
+        // Carga, error, vacío y contenido: cuatro caminos que no se cruzan.
+        when (estadoEquipo) {
+            NxEstadoPantalla.CARGANDO -> item { NxSkeletonList(itemCount = 5, itemHeight = 64.dp) }
+            NxEstadoPantalla.ERROR -> item { NxErrorBlock(state.error.orEmpty()) { vm.refresh() } }
+            NxEstadoPantalla.VACIO -> item {
+                NxEmptyState(
+                    title = "Sin registros",
+                    subtitle = "Nadie en tu alcance para ${etiquetaDia(state.fecha, esHoy).replaceFirstChar { it.lowercase() }}.",
+                    actionLabel = "Actualizar",
+                    onAction = { vm.refresh() },
+                )
+            }
+            NxEstadoPantalla.CONTENIDO -> {
+                // Regla 7: la tira solo aparece cuando hay gente que contar.
+                item {
+                    NxMetricStrip(
+                        items = AttendanceUx.metricas(state.personas),
+                        seleccion = AttendanceUx.metricaDeEstado(state.filtro),
+                        onSelect = { clave ->
+                            val estado = AttendanceUx.estadoDeMetrica(clave)
+                            vm.setFiltro(if (estado == null || state.filtro == estado) null else estado)
+                        },
+                    )
+                }
+                // Regla 8: una sola fila de filtros, sin caja y sin fondo.
+                item {
+                    NxFilterBar(contentPadding = PaddingValues(horizontal = 0.dp)) {
+                        AttendanceUx.filtros(state.personas).forEach { f ->
+                            NxFilterPill(
+                                label = f.etiqueta,
+                                count = f.conteo,
+                                color = f.color,
+                                selected = state.filtro == f.estado,
+                                onClick = { vm.setFiltro(if (state.filtro == f.estado) null else f.estado) },
+                            )
+                        }
+                    }
+                }
+                item {
+                    NxDenseSectionHeader(
+                        title = AttendanceUx.tituloLista(state.filtro, state.visibles.size),
+                        hint = "Toca una fila para ver fotos, mapa y avisos.",
+                    )
+                }
+                if (state.visibles.isEmpty()) {
+                    item {
+                        NxEmptyState(
+                            title = "Nadie en este filtro",
+                            subtitle = "Nadie de tu equipo está en «${state.filtro?.etiqueta.orEmpty()}».",
+                            actionLabel = "Ver a todos",
+                            onAction = { vm.setFiltro(null) },
+                        )
+                    }
+                } else {
+                    // Una superficie con filas separadas por una línea, no una tarjeta por persona.
+                    item {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(NxUi.RadiusLg))
+                                .background(NxColors.Card)
+                                .border(1.dp, NxUi.Border, RoundedCornerShape(NxUi.RadiusLg)),
+                        ) {
+                            state.visibles.forEachIndexed { i, persona ->
+                                if (i > 0) HorizontalDivider(color = NxUi.BorderSubtle)
+                                PersonaRow(
+                                    persona = persona,
+                                    ahoraMs = ahoraMs,
+                                    expandida = expandida == persona.userId,
+                                    onToggle = {
+                                        expandida = if (expandida == persona.userId) null else persona.userId
+                                    },
+                                    onAbrir = onAbrir,
+                                    // Solo Christian, en un día sin entrada que no sea futuro.
+                                    onJustificar = if (
+                                        FaltasJustificadas.ofrecerJustificar(
+                                            puede = vm.puedeJustificar,
+                                            hayEntrada = persona.entradaIso != null,
+                                            yaJustificada = persona.justificacion != null,
+                                            fecha = state.fecha,
+                                            hoy = hoyIso(),
+                                        ) && persona.estado == AttendanceEstado.AUSENTE
+                                    ) {
+                                        { justificando = persona }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
-
-        if (state.visibles.isEmpty()) {
-            item {
-                if (state.personas.isEmpty()) {
-                    NxEmptyState(
-                        title = "Sin registros",
-                        subtitle = "Nadie en tu alcance para ${etiquetaDia(state.fecha, esHoy).replaceFirstChar { it.lowercase() }}.",
-                    )
-                } else {
-                    NxEmptyState(
-                        title = "Nadie en este filtro",
-                        subtitle = "Nadie de tu equipo está en «${state.filtro?.etiqueta.orEmpty()}».",
-                        actionLabel = "Ver a todos",
-                        onAction = { vm.setFiltro(null) },
-                    )
-                }
-            }
-        }
-
-        items(state.visibles, key = { "asis-${it.userId}" }) { persona ->
-            PersonaCard(
-                persona = persona,
-                ahoraMs = ahoraMs,
-                onAbrir = onAbrir,
-                // Solo Christian, en un día sin entrada que no sea futuro.
-                onJustificar = if (
-                    FaltasJustificadas.ofrecerJustificar(
-                        puede = vm.puedeJustificar,
-                        hayEntrada = persona.entradaIso != null,
-                        yaJustificada = persona.justificacion != null,
-                        fecha = state.fecha,
-                        hoy = hoyIso(),
-                    ) && persona.estado == AttendanceEstado.AUSENTE
-                ) {
-                    { justificando = persona }
-                } else {
-                    null
-                },
-            )
         }
 
         item { Spacer(Modifier.height(24.dp)) }
@@ -889,18 +955,19 @@ private fun JustificarFaltaDialog(
                 OutlinedTextField(
                     value = motivo,
                     onValueChange = { motivo = it.take(1000) },
-                    label = { Text("Motivo *") },
+                    label = { Text("Motivo") },
                     placeholder = { Text("Ej. Incapacidad del IMSS por tres días.") },
                     minLines = 3,
                     enabled = !saving,
+                    isError = error != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // La ayuda vive bajo el campo y el error la reemplaza mientras dure (regla 5).
                 Text(
-                    "${FaltasJustificadas.motivoLimpio(motivo).length}/$min caracteres mínimo",
+                    error ?: "Mínimo $min caracteres: queda en el expediente del día.",
                     fontSize = 11.5.sp,
-                    color = if (ok) NxColors.Muted else NxColors.Danger,
+                    color = if (error != null) NxColors.Danger else NxColors.Muted,
                 )
-                error?.let { Text(it, fontSize = 13.sp, color = NxColors.Danger) }
             }
         },
         confirmButton = {
@@ -925,28 +992,36 @@ private fun JustificarFaltaDialog(
             ) { Text(if (saving) "Guardando…" else "Justificar falta") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancelar") }
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancelar", color = NxUi.Fg2) }
         },
     )
 }
 
-/** «Falta justificada · motivo», con quién la justificó. */
+/** «Falta justificada · motivo», con quién la justificó. Sin caja: una línea de color basta. */
 @Composable
 private fun FaltaJustificadaNota(j: AttendanceJustificacionDto, modifier: Modifier = Modifier) {
     val color = AttendanceEstado.JUSTIFICADA.color
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(color.copy(alpha = 0.08f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+    Row(
+        modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(FaltasJustificadas.texto(j), fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = color)
-        FaltasJustificadas.quien(j)?.let { Text(it, fontSize = 11.5.sp, color = NxColors.Muted) }
+        Box(Modifier.width(2.dp).fillMaxHeight().background(color))
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(FaltasJustificadas.texto(j), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = color)
+            FaltasJustificadas.quien(j)?.let { Text(it, fontSize = 11.5.sp, color = NxColors.Muted) }
+        }
     }
 }
 
+/**
+ * Mi jornada, en una tarjeta que cabe en un pulgar.
+ *
+ * Antes era un bloque centrado de más de un tercio de pantalla: un círculo de
+ * 72 dp, el rótulo «MI JORNADA», el estado, el cronómetro y el botón, todo
+ * apilado. Ahora el estado y el cronómetro comparten un renglón —el cronómetro
+ * en cifras de ancho fijo, a la derecha, donde se compara— y el botón de checar
+ * es lo único grande, porque es lo único que se pulsa.
+ */
 @Composable
 private fun MiJornadaCard(
     vm: ConsoleAttendanceViewModel,
@@ -976,156 +1051,131 @@ private fun MiJornadaCard(
     val puedeSalida = esHoy && abierta
     val inicioIso = state.current?.lastEntryAt
         ?: state.misChecadas.filter { it.type.equals("entrada", true) }.maxByOrNull { it.timestamp }?.timestamp
+    val miFalta = state.miJustificacion?.takeIf { !abierta && !hayEntrada }
+    val shape = RoundedCornerShape(NxUi.RadiusLg)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (abierta) NxColors.SuccessSoft else Color(0xFFF8FAFC),
-        ),
-        elevation = CardDefaults.cardElevation(2.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(NxColors.Card)
+            .border(1.dp, if (abierta) AttendanceEstado.PRESENTE.color.copy(alpha = 0.45f) else NxUi.Border, shape)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                "MI JORNADA",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = NxColors.Muted,
-            )
-            Box(
-                modifier = Modifier.size(72.dp).clip(CircleShape)
-                    .background(if (abierta) AttendanceEstado.PRESENTE.color else Color(0xFFE2E8F0)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = if (abierta) NxGlyph.APPROVED.icon else Icons.Outlined.Schedule,
-                    contentDescription = null,
-                    tint = if (abierta) Color.White else NxColors.Muted,
-                    modifier = Modifier.size(32.dp),
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                NxStatusDot(
+                    text = when {
+                        abierta -> "Jornada en curso"
+                        haySalida && hayEntrada -> "Jornada completada"
+                        miFalta != null -> FaltasJustificadas.ETIQUETA
+                        else -> "Sin entrada registrada"
+                    },
+                    color = when {
+                        abierta -> AttendanceUx.VERDE
+                        haySalida && hayEntrada -> AttendanceUx.AZUL
+                        miFalta != null -> AttendanceUx.MORADO
+                        else -> null
+                    },
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                 )
-            }
-            // Sin entrada pero justificada: no es «sin entrada registrada».
-            val miFalta = state.miJustificacion?.takeIf { !abierta && !hayEntrada }
-            Text(
-                when {
-                    abierta -> "Jornada en curso"
-                    haySalida && hayEntrada -> "Jornada completada"
-                    miFalta != null -> FaltasJustificadas.ETIQUETA
-                    else -> "Sin entrada registrada"
-                },
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = when {
-                    abierta -> AttendanceEstado.PRESENTE.color
-                    miFalta != null -> AttendanceEstado.JUSTIFICADA.color
-                    else -> NxColors.Slate
-                },
-            )
-            miFalta?.let { FaltaJustificadaNota(it) }
-            if (abierta && inicioIso != null) {
                 Text(
-                    fmtHms(transcurridoMs(inicioIso, null, ahoraMs)),
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = AttendanceEstado.PRESENTE.color,
-                )
-                Text("Desde las ${fmtHora(inicioIso)}", fontSize = 12.sp, color = NxColors.Muted)
-            }
-
-            if (!esHoy) {
-                Text(
-                    "Estás viendo el ${state.fecha}: solo se puede checar en el día de hoy.",
+                    when {
+                        abierta && inicioIso != null -> "Desde las ${fmtHora(inicioIso)}"
+                        !esHoy -> "Solo se puede checar en el día de hoy."
+                        else -> "Se toma una foto y tu ubicación."
+                    },
                     fontSize = 12.sp,
                     color = NxColors.Muted,
-                    textAlign = TextAlign.Center,
                 )
             }
-
-            // Un solo botón con el siguiente paso; la cámara se abre directo (sin botonera intermedia).
-            val siguiente = when {
-                puedeEntrada -> "entrada"
-                puedeSalida -> "salida"
-                else -> null
-            }
-            if (siguiente != null || state.checkInLoading) {
-                Button(
-                    onClick = {
-                        pendiente = siguiente
-                        tomarFoto()
-                    },
-                    enabled = siguiente != null && !state.checkInLoading,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    if (state.checkInLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = NxColors.Brand,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Registrando…", fontWeight = FontWeight.Bold)
-                    } else {
-                        Icon(
-                            if (siguiente == "salida") NxGlyph.EXIT.icon else NxGlyph.ENTRY.icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            if (siguiente == "salida") "Registrar salida" else "Registrar entrada",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                        )
-                    }
-                }
-                if (!state.checkInLoading) {
-                    Text(
-                        "Se toma una foto y tu ubicación.",
-                        fontSize = 12.sp,
-                        color = NxColors.Muted,
-                    )
-                }
-            } else if (esHoy && hayEntrada && !haySalida) {
-                Text("Ya registraste tu entrada de hoy.", fontSize = 12.sp, color = NxColors.Muted)
-            }
-
-            state.checkInMessage?.takeIf { it.isNotBlank() }?.let { msg ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    NxIconText(
-                        text = msg,
-                        icon = if (state.checkInError) Icons.Outlined.ErrorOutline else NxGlyph.APPROVED.icon,
-                        fontSize = 12.sp,
-                        color = if (state.checkInError) NxColors.Danger else AttendanceEstado.PRESENTE.color,
-                    )
-                }
-            }
-
-            if (state.misChecadas.isNotEmpty()) {
-                HorizontalDivider()
+            if (abierta && inicioIso != null) {
+                // Cifras de ancho fijo: el reloj no baila mientras corre.
                 Text(
-                    "Checadas del ${state.fecha}",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = NxColors.Slate,
+                    fmtHms(transcurridoMs(inicioIso, null, ahoraMs)),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = AttendanceEstado.PRESENTE.color,
                 )
-                state.misChecadas.sortedBy { it.timestamp }.forEach { ev ->
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
+            }
+        }
+
+        miFalta?.let { FaltaJustificadaNota(it) }
+
+        // El único botón primario de la pantalla: lo que la persona vino a hacer.
+        val siguiente = when {
+            puedeEntrada -> "entrada"
+            puedeSalida -> "salida"
+            else -> null
+        }
+        if (siguiente != null || state.checkInLoading) {
+            Button(
+                onClick = {
+                    pendiente = siguiente
+                    tomarFoto()
+                },
+                enabled = siguiente != null && !state.checkInLoading,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+                shape = RoundedCornerShape(NxUi.Radius),
+            ) {
+                if (state.checkInLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Registrando…", fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(
+                        if (siguiente == "salida") NxGlyph.EXIT.icon else NxGlyph.ENTRY.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (siguiente == "salida") "Registrar salida" else "Registrar entrada",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                    )
+                }
+            }
+        } else if (esHoy && hayEntrada && !haySalida) {
+            Text("Ya registraste tu entrada de hoy.", fontSize = 12.sp, color = NxColors.Muted)
+        }
+
+        state.checkInMessage?.takeIf { it.isNotBlank() }?.let { msg ->
+            NxIconText(
+                text = msg,
+                icon = if (state.checkInError) Icons.Outlined.ErrorOutline else NxGlyph.APPROVED.icon,
+                fontSize = 12.sp,
+                color = if (state.checkInError) NxColors.Danger else AttendanceEstado.PRESENTE.color,
+                iconSize = 15.dp,
+            )
+        }
+
+        if (state.misChecadas.isNotEmpty()) {
+            HorizontalDivider(color = NxUi.BorderSubtle)
+            state.misChecadas.sortedBy { it.timestamp }.forEach { ev ->
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         NxIconText(
                             text = if (ev.type.equals("entrada", true)) "Entrada" else "Salida",
                             icon = if (ev.type.equals("entrada", true)) NxGlyph.ENTRY.icon else NxGlyph.EXIT.icon,
                             fontSize = 12.5.sp,
+                            color = NxUi.Fg2,
+                            iconSize = 15.dp,
+                        )
+                        Text(
+                            fmtHora(ev.timestamp),
+                            fontSize = 12.5.sp,
+                            fontFamily = FontFamily.Monospace,
                             color = NxColors.Slate,
                         )
-                        Text(fmtHora(ev.timestamp), fontSize = 12.5.sp, color = NxColors.Muted)
                     }
                     val avisos = AttendanceBadges.de(ev)
                     if (avisos.isNotEmpty()) AvisosChecada(avisos)
@@ -1148,195 +1198,227 @@ private fun MiJornadaCard(
  */
 @Composable
 private fun GpsJornadaAviso(onDetener: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = NxColors.InfoSoft),
-        shape = RoundedCornerShape(14.dp),
+    val shape = RoundedCornerShape(NxUi.Radius)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(NxColors.InfoSoft)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             NxIconText(
-                text = "Jornada en curso · compartiendo ubicación",
+                text = "Compartiendo ubicación de jornada",
                 icon = Icons.Outlined.GpsFixed,
-                fontSize = 13.5.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = NxColors.Slate,
+                iconSize = 16.dp,
             )
             Text(
-                "Tu ubicación se envía cada pocos minutos para dibujar el trayecto del día. " +
-                    "Se apaga sola al registrar tu salida.",
-                fontSize = 12.sp,
+                "Se apaga sola al registrar tu salida.",
+                fontSize = 11.5.sp,
                 color = NxColors.Muted,
             )
-            TextButton(onClick = onDetener) { Text("Dejar de compartir", fontSize = 13.sp) }
         }
+        TextButton(onClick = onDetener) { Text("Dejar de compartir", fontSize = 12.5.sp) }
     }
 }
 
+/**
+ * Una persona en la lista del día: nombre, estado, horas y cronómetro en una
+ * fila que se lee de un vistazo. Lo demás —fotos, mapas, avisos, correcciones y
+ * el botón de justificar— se despliega al tocarla, porque son cosas que se
+ * miran de una en una, no de diez en diez.
+ */
 @Composable
-private fun PersonaCard(
+private fun PersonaRow(
     persona: AttendancePersona,
     ahoraMs: Long,
+    expandida: Boolean,
+    onToggle: () -> Unit,
     onAbrir: (String) -> Unit,
     /** «Justificar falta» (solo Christian, día sin entrada). */
     onJustificar: (() -> Unit)? = null,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = NxColors.Card),
-        elevation = CardDefaults.cardElevation(2.dp),
-    ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    val color = persona.estado.color
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box {
                 Box(
-                    modifier = Modifier.size(44.dp).clip(CircleShape).background(NxColors.BrandSoft),
+                    modifier = Modifier.size(38.dp).clip(CircleShape).background(NxColors.BrandSoft),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         iniciales(persona.nombre),
-                        fontSize = 13.sp,
+                        fontSize = 12.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = NxColors.Brand,
                     )
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        persona.nombre,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NxColors.Slate,
-                        maxLines = 1,
-                    )
-                    Text(persona.subtitulo, fontSize = 11.5.sp, color = NxColors.Muted, maxLines = 1)
-                }
+                // El estado va pegado a la foto: un punto, no una pastilla más en la fila.
                 Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(persona.estado.color.copy(alpha = 0.12f))
-                        .padding(horizontal = 9.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        persona.estado.etiqueta,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = persona.estado.color,
-                    )
-                }
-            }
-
-            val justificacion = persona.justificacion
-            if (persona.estado == AttendanceEstado.JUSTIFICADA && justificacion != null) {
-                // Ni «sin checada» ni horas en cero: el día está justificado.
-                FaltaJustificadaNota(justificacion)
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFF8FAFC))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("ENTRADA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
-                        Text(fmtHora(persona.entradaIso), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
-                    }
-                    Column(Modifier.weight(1f)) {
-                        Text("SALIDA", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Muted)
-                        Text(fmtHora(persona.salidaIso), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            if (persona.estado == AttendanceEstado.PRESENTE) "EN VIVO" else "JORNADA",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = NxColors.Muted,
-                        )
-                        Text(
-                            if (persona.estado == AttendanceEstado.AUSENTE) {
-                                "—"
-                            } else {
-                                fmtHms(
-                                    transcurridoMs(
-                                        persona.entradaIso,
-                                        if (persona.estado == AttendanceEstado.PRESENTE) null else persona.salidaIso,
-                                        ahoraMs,
-                                    ),
-                                )
-                            },
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = persona.estado.color,
-                        )
-                    }
-                }
-            }
-
-            val avisos = (persona.avisosEntrada + persona.avisosSalida).distinctBy { it.texto }
-            if (avisos.isNotEmpty()) {
-                AvisosChecada(avisos)
-            }
-            persona.correcciones.forEach { c ->
-                Text(
-                    AttendanceBadges.correccionTexto(c),
-                    fontSize = 12.sp,
-                    color = Color(AttendanceBadges.MORADO),
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(13.dp)
+                        .clip(CircleShape)
+                        .background(NxColors.Card)
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                        .background(color),
                 )
             }
-
-            onJustificar?.let { justificar ->
-                OutlinedButton(
-                    onClick = justificar,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AttendanceEstado.JUSTIFICADA.color),
-                ) { Text("Justificar falta", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    persona.nombre,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NxColors.Slate,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${persona.estado.etiqueta} · ${persona.subtitulo}",
+                    fontSize = 11.5.sp,
+                    color = NxColors.Muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-
-            if (persona.fotoEntrada != null || persona.fotoSalida != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    persona.fotoEntrada?.let { FotoChecada("Entrada", it, NxGlyph.ENTRY.icon) }
-                    persona.fotoSalida?.let { FotoChecada("Salida", it, NxGlyph.EXIT.icon) }
-                }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    "${fmtHoraCorta(persona.entradaIso)} → ${fmtHoraCorta(persona.salidaIso)}",
+                    fontSize = 11.5.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = NxColors.Muted,
+                )
+                Text(
+                    if (persona.estado == AttendanceEstado.AUSENTE || persona.estado == AttendanceEstado.JUSTIFICADA) {
+                        "—"
+                    } else {
+                        fmtHms(
+                            transcurridoMs(
+                                persona.entradaIso,
+                                if (persona.estado == AttendanceEstado.PRESENTE) null else persona.salidaIso,
+                                ahoraMs,
+                            ),
+                        )
+                    },
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = color,
+                )
             }
+            Icon(
+                if (expandida) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = if (expandida) "Ocultar detalle" else "Ver detalle",
+                tint = NxColors.Muted,
+                modifier = Modifier.size(20.dp),
+            )
+        }
 
-            if (persona.mapaEntrada != null || persona.mapaSalida != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    persona.mapaEntrada?.let { url ->
-                        TextButton(onClick = { onAbrir(url) }) {
-                            Text("Mapa entrada", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Brand)
-                        }
+        if (expandida) {
+            Column(
+                Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val justificacion = persona.justificacion
+                if (persona.estado == AttendanceEstado.JUSTIFICADA && justificacion != null) {
+                    // Ni «sin checada» ni horas en cero: el día está justificado.
+                    FaltaJustificadaNota(justificacion)
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        HoraDetalle("Entrada", persona.entradaIso)
+                        HoraDetalle("Salida", persona.salidaIso)
                     }
-                    persona.mapaSalida?.let { url ->
-                        TextButton(onClick = { onAbrir(url) }) {
-                            Text("Mapa salida", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Brand)
+                }
+
+                val avisos = (persona.avisosEntrada + persona.avisosSalida).distinctBy { it.texto }
+                if (avisos.isNotEmpty()) AvisosChecada(avisos)
+                persona.correcciones.forEach { c ->
+                    Text(
+                        AttendanceBadges.correccionTexto(c),
+                        fontSize = 12.sp,
+                        color = Color(AttendanceBadges.MORADO),
+                    )
+                }
+
+                if (persona.fotoEntrada != null || persona.fotoSalida != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        persona.fotoEntrada?.let { FotoChecada("Entrada", it, NxGlyph.ENTRY.icon) }
+                        persona.fotoSalida?.let { FotoChecada("Salida", it, NxGlyph.EXIT.icon) }
+                    }
+                }
+
+                if (persona.mapaEntrada != null || persona.mapaSalida != null || onJustificar != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        persona.mapaEntrada?.let { url ->
+                            TextButton(onClick = { onAbrir(url) }) {
+                                Text("Mapa entrada", fontSize = 12.5.sp, color = NxColors.Brand)
+                            }
+                        }
+                        persona.mapaSalida?.let { url ->
+                            TextButton(onClick = { onAbrir(url) }) {
+                                Text("Mapa salida", fontSize = 12.5.sp, color = NxColors.Brand)
+                            }
+                        }
+                        onJustificar?.let { justificar ->
+                            TextButton(onClick = justificar) {
+                                Text(
+                                    "Justificar falta",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AttendanceEstado.JUSTIFICADA.color,
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** «ENTRADA · 08:15:03» dentro del detalle desplegado. */
+@Composable
+private fun HoraDetalle(etiqueta: String, iso: String?) {
+    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Text(etiqueta.uppercase(), fontSize = 10.sp, fontWeight = FontWeight.Medium, color = NxColors.Muted)
+        Text(
+            fmtHora(iso),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            color = NxColors.Slate,
+        )
     }
 }
 
 /**
  * Insignias de lo que le pasó a la checada: por qué está para revisar, si se
- * capturó sin conexión, si se cerró sola o si alguien la corrigió.
+ * capturó sin conexión, si se cerró sola o si alguien la corrigió. Van como
+ * punto y palabra: son avisos, no un semáforo.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AvisosChecada(avisos: List<AttendanceBadge>, modifier: Modifier = Modifier) {
     FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         avisos.forEach { aviso ->
-            val color = Color(aviso.color)
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(color.copy(alpha = 0.12f))
-                    .padding(horizontal = 9.dp, vertical = 4.dp),
-            ) {
-                Text(aviso.texto, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
-            }
+            NxStatusDot(aviso.texto, color = aviso.color, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -1349,34 +1431,8 @@ private fun FotoChecada(etiqueta: String, url: String, icon: ImageVector) {
             contentDescription = etiqueta,
             modifier = Modifier.size(62.dp).clip(RoundedCornerShape(10.dp)),
         )
-        NxIconText(text = etiqueta, icon = icon, fontSize = 10.sp, color = NxColors.Muted)
+        NxIconText(text = etiqueta, icon = icon, fontSize = 10.sp, color = NxColors.Muted, iconSize = 13.dp)
     }
-}
-
-/** Chip de filtro Material (48 dp de área táctil) con el punto de color del estado. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ChipEstado(
-    label: String,
-    count: Int,
-    color: Color?,
-    activo: Boolean,
-    onClick: () -> Unit,
-) {
-    FilterChip(
-        selected = activo,
-        onClick = onClick,
-        label = { Text("$label $count", maxLines = 1) },
-        leadingIcon = color?.let { c ->
-            { Box(Modifier.size(8.dp).clip(CircleShape).background(c)) }
-        },
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = Color.White,
-            selectedContainerColor = NxColors.BrandSoft,
-            selectedLabelColor = NxColors.BrandDark,
-            labelColor = NxColors.Slate,
-        ),
-    )
 }
 
 // ── Pestaña «Trayectoria» ────────────────────────────────────────────────────
@@ -1394,52 +1450,64 @@ private fun TrayectoriaTab(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (state.trayectoCargando) {
-            item { NxLoadingBlock("Cargando trayectoria…") }
+            item { NxSkeletonList(itemCount = 4, itemHeight = 56.dp) }
             return@LazyColumn
         }
 
         item {
-            Text(
-                "GPS del equipo",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = NxColors.Slate,
+            NxDenseSectionHeader(
+                title = "GPS del equipo",
+                hint = "Unidades con jornada abierta.",
             )
-            Text("Unidades con jornada abierta.", fontSize = 12.sp, color = NxColors.Muted)
         }
 
         if (state.equipoGps.isEmpty()) {
             item { NxEmptyState(title = "Sin ubicaciones", subtitle = "Nadie comparte GPS ahora.") }
-        }
-
-        items(state.equipoGps, key = { "gps-${it.id}" }) { punto ->
-            val lat = attendanceCoord(punto.latitud)
-            val lng = attendanceCoord(punto.longitud)
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = NxColors.Card),
-                elevation = CardDefaults.cardElevation(1.dp),
-            ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        punto.usuario?.nombre ?: "Usuario #${punto.usuarioId}",
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = NxColors.Slate,
-                    )
-                    Text(
-                        if (lat != null && lng != null) {
-                            "${"%.5f".format(lat)}, ${"%.5f".format(lng)}"
-                        } else {
-                            "Sin coordenadas"
-                        },
-                        fontSize = 12.sp,
-                        color = NxColors.Muted,
-                    )
-                    mapaUrl(lat, lng)?.let { url ->
-                        TextButton(onClick = { onAbrir(url) }) {
-                            Text("Ver en mapa", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = NxColors.Brand)
+        } else {
+            item {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(NxUi.RadiusLg))
+                        .background(NxColors.Card)
+                        .border(1.dp, NxUi.Border, RoundedCornerShape(NxUi.RadiusLg)),
+                ) {
+                    state.equipoGps.forEachIndexed { i, punto ->
+                        if (i > 0) HorizontalDivider(color = NxUi.BorderSubtle)
+                        val lat = attendanceCoord(punto.latitud)
+                        val lng = attendanceCoord(punto.longitud)
+                        val url = mapaUrl(lat, lng)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(if (url != null) Modifier.clickable { onAbrir(url) } else Modifier)
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Text(
+                                    punto.usuario?.nombre ?: "Usuario #${punto.usuarioId}",
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = NxColors.Slate,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    if (lat != null && lng != null) {
+                                        "${"%.5f".format(lat)}, ${"%.5f".format(lng)}"
+                                    } else {
+                                        "Sin coordenadas"
+                                    },
+                                    fontSize = 11.5.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = NxColors.Muted,
+                                )
+                            }
+                            if (url != null) {
+                                Text("Ver en mapa", fontSize = 12.5.sp, color = NxColors.Brand)
+                            }
                         }
                     }
                 }
@@ -1447,13 +1515,11 @@ private fun TrayectoriaTab(
         }
 
         item {
-            Text(
-                "Mi trayecto · ${state.trayecto.size} puntos",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = NxColors.Slate,
+            NxDenseSectionHeader(
+                title = "Mi trayecto · ${state.trayecto.size} puntos",
+                hint = "Entrada, GPS y salida del día que estás viendo.",
+                modifier = Modifier.padding(top = 6.dp),
             )
-            Text("Entrada, GPS y salida del ${state.fecha}.", fontSize = 12.sp, color = NxColors.Muted)
         }
 
         if (state.trayecto.isEmpty()) {
@@ -1471,7 +1537,9 @@ private fun TrayectoriaTab(
                     if (lat != null && lng != null) "${"%.6f".format(lat)},${"%.6f".format(lng)}" else null
                 }
                 if (ruta.isNotEmpty()) {
-                    val muestra = if (ruta.size <= 18) ruta else {
+                    val muestra = if (ruta.size <= 18) {
+                        ruta
+                    } else {
                         val paso = (ruta.size - 1).toDouble() / 17
                         (0..17).map { ruta[Math.round(it * paso).toInt()] }
                     }
