@@ -145,4 +145,130 @@ workflows:
     #           -exportPath "$CM_BUILD_DIR/build/export"
     #   artifacts:
     #     - build/export/*.ipa
+  ios-app-store:
+    name: iOS App Store (Archive + IPA export)
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      xcode: 16.2
+      groups:
+        # Define these groups in Codemagic UI and add secrets/variables there
+        - ios_signing          # certificates/provisioning profiles
+        - app_store_connect    # ASC API key variables
+      vars:
+        XCODE_PROJECT_PATH: apps/mobile-native/ios/NexaraApp.xcodeproj
+        XCODE_SCHEME: NexaraApp
+        ARCHIVE_PATH: $CM_BUILD_DIR/build/NexaraApp.xcarchive
+        EXPORT_DIR: $CM_BUILD_DIR/build/export
+        EXPORT_PLIST: $CM_BUILD_DIR/build/ExportOptions.plist
+        DERIVED_DATA: $CM_BUILD_DIR/DerivedData
+        # App Store Connect API key (set these in `app_store_connect` group):
+        # - APP_STORE_CONNECT_ISSUER_ID:        <Issuer ID from App Store Connect>
+        # - APP_STORE_CONNECT_KEY_IDENTIFIER:   <Key ID (e.g., ABCDE12345)>
+        # - APP_STORE_CONNECT_PRIVATE_KEY:      <Private key PEM contents or base64-encoded PEM>
+        #
+        # iOS signing (set in `ios_signing` group or via Codemagic UI):
+        # - CERTIFICATE_PRIVATE_KEY:            <PKCS#12 .p12 password or raw PEM private key>
+        # - PROVISIONING_PROFILE_NAME:          <App Store provisioning profile name>
+        # - BUNDLE_ID:                          <App bundle identifier, e.g., mx.nexara.app>
+    scripts:
+      - name: Check Xcode and Homebrew
+        script: |
+          set -euo pipefail
+          xcodebuild -version
+          brew --version
+      - name: Install XcodeGen (brew)
+        script: |
+          set -euo pipefail
+          if command -v xcodegen >/dev/null 2>&1; then
+            xcodegen --version
+          else
+            export HOMEBREW_NO_AUTO_UPDATE=1
+            export HOMEBREW_NO_INSTALL_CLEANUP=1
+            export HOMEBREW_NO_ENV_HINTS=1
+            brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+            xcodegen --version
+          fi
+      - name: Generate Xcode project from XcodeGen spec
+        script: |
+          set -euo pipefail
+          cd apps/mobile-native/ios
+          if [[ -f project.yml ]]; then
+            SPEC_FILE=project.yml
+          elif [[ -f project.yaml ]]; then
+            SPEC_FILE=project.yaml
+          else
+            echo "XcodeGen spec not found (project.yml or project.yaml) in apps/mobile-native/ios"
+            exit 1
+          fi
+          echo "Using XcodeGen spec: ${SPEC_FILE}"
+          xcodegen generate --spec "${SPEC_FILE}"
+          test -d NexaraApp.xcodeproj
+      - name: Archive (Release, iOS Device)
+        script: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$XCODE_PROJECT_PATH" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$DERIVED_DATA" \
+            archive -archivePath "$ARCHIVE_PATH"
+      - name: Create ExportOptions.plist (App Store)
+        script: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$EXPORT_PLIST")"
+          cat > "$EXPORT_PLIST" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+          cat "$EXPORT_PLIST"
+      - name: Export signed IPA (App Store)
+        script: |
+          set -euo pipefail
+          rm -rf "$EXPORT_DIR"
+          mkdir -p "$EXPORT_DIR"
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$EXPORT_PLIST" \
+            -exportPath "$EXPORT_DIR"
+    artifacts:
+      - build/export/*.ipa
+      - build/*.xcarchive
+      - DerivedData/Logs/Build/*.xcactivitylog
+    publishing:
+      app_store_connect:
+        auth: api_key
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        submit_to_testflight: true
+        # No enviar automáticamente a App Review; TestFlight primero:
+        submit_to_app_store: false
+        # Opcional: grupos de TestFlight
+        # beta_groups:
+        #   - Internal Testers
+    triggering:
+      events:
+        - push
+        - tag
+      branch_patterns:
+        - pattern: cursor/codemagic-ios-setup-c22c
+          include: true
+          source: true
+      cancel_previous_builds: true
 
