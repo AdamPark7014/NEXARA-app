@@ -10,6 +10,8 @@ import {
   calcularTotales,
   diasVencido,
   estadoDe,
+  fechaDeIndice,
+  indiceDeHoy,
   pendienteDe,
 } from './workspace-ar-ap.service.js';
 
@@ -465,8 +467,13 @@ describe('calendario de obligaciones', () => {
   }
 
   it('aparta lo vencido y agrupa lo próximo por día y por semana', async () => {
-    const hoyIdx = Math.floor(Date.now() / 86_400_000);
-    const enDias = (n: number) => new Date((hoyIdx + n) * 86_400_000);
+    // `indiceDeHoy` y no `Date.now() / 86_400_000`: el servicio define "hoy"
+    // como el día del calendario del servidor, y ese atajo da el día UTC. En
+    // México (UTC-6) los dos coinciden hasta las 18:00 y se separan después,
+    // así que la prueba se ponía roja cada tarde: fabricaba un vencimiento de
+    // mañana y lo esperaba en el tramo de hoy.
+    const hoyIdx = indiceDeHoy();
+    const enDias = (n: number) => fechaDeIndice(hoyIdx + n);
 
     const res = await calendarioCon([
       cuenta({ id: 1, totalAmount: 900, dueDate: enDias(-5), supplier: proveedor('Cables SA') }),
@@ -493,9 +500,9 @@ describe('calendario de obligaciones', () => {
   });
 
   it('lo ya pagado y lo que no tiene fecha no ensucian el calendario', async () => {
-    const hoyIdx = Math.floor(Date.now() / 86_400_000);
+    const hoyIdx = indiceDeHoy();
     const res = await calendarioCon([
-      cuenta({ id: 1, totalAmount: 500, paidAmount: 500, dueDate: new Date(hoyIdx * 86_400_000) }),
+      cuenta({ id: 1, totalAmount: 500, paidAmount: 500, dueDate: fechaDeIndice(hoyIdx) }),
       cuenta({ id: 2, totalAmount: 300, dueDate: null, supplier: proveedor('Sin plazo SA') }),
     ]);
     expect(res.dias).toHaveLength(0);
