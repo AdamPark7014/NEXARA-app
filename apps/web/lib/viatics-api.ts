@@ -141,6 +141,76 @@ export async function assignViatico(token: string, fields: ViaticoCreateFields) 
 }
 
 /**
+ * Campos de la asignación en lote.
+ *
+ * `montoPorPersona` es lo que recibe CADA beneficiario, no el total del lote:
+ * es la confusión que más caro sale, porque capturar el total creyendo que es
+ * por cabeza multiplica el gasto por cuantos sean.
+ */
+export type AsignacionLoteFields = {
+  /** 1..50 beneficiarios. Un viático por cabeza. */
+  usuarioIds: number[];
+  /** Con varias, el servidor reparte el costo entre ellas en partes iguales. */
+  actividadIds?: number[];
+  projectId?: number | null;
+  vehicleId?: number | null;
+  categoria?: string;
+  montoPorPersona: number;
+  motivo?: string;
+  /** Periodo que cubre el viático (ISO-8601). Es el caso del viático semanal. */
+  desde?: string;
+  hasta?: string;
+};
+
+/** Lo que contesta `POST viatics/assign/lote`. */
+export type AsignacionLoteResultado = {
+  creados: number;
+  montoPorPersona: number;
+  montoTotal: number;
+  actividadesCubiertas: number;
+  viaticos: unknown[];
+};
+
+/**
+ * Asigna el mismo viático a varias personas de una sola captura.
+ *
+ * El lote es todo o nada en el servidor: si un beneficiario está inactivo o una
+ * actividad es de otra empresa no se crea ninguno, y el error dice por nombre
+ * quién o cuál. Aquí no se repite esa validación —sería otra verdad que
+ * mantener—: el mensaje del servidor se deja pasar tal cual para que la
+ * pantalla lo enseñe con `formatApiError`.
+ */
+export async function assignViaticoLote(
+  token: string,
+  fields: AsignacionLoteFields,
+): Promise<AsignacionLoteResultado | null> {
+  if (!fields.usuarioIds?.length) {
+    throw new Error("Elige al menos un beneficiario.");
+  }
+  const res = await fetch(buildApiUrl("viatics/assign/lote"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      usuarioIds: fields.usuarioIds,
+      actividadIds: fields.actividadIds,
+      projectId: fields.projectId,
+      vehicleId: fields.vehicleId,
+      categoria: fields.categoria,
+      montoPorPersona: fields.montoPorPersona,
+      motivo: fields.motivo,
+      desde: fields.desde,
+      hasta: fields.hasta,
+    }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
+
+/**
  * Sustituye el reparto de un viático. Lista vacía = deshacerlo.
  *
  * La suma de las partes tiene que ser el total exacto; si no, la API contesta

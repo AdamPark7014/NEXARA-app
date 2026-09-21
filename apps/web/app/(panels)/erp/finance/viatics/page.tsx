@@ -15,6 +15,7 @@ import ListExportActions from "@/components/ui/ListExportActions";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import {
   approveViatico,
+  assignViaticoLote,
   comprobarViatico,
   markViaticoPagado,
   patchViatico,
@@ -151,6 +152,50 @@ const srOnlyStyle: CSSProperties = {
   overflow: "hidden",
   clip: "rect(0 0 0 0)",
 };
+/** La cuenta del lote, en el tamaño de una cifra que se lee sin buscarla. */
+const resumenFraseStyle: CSSProperties = {
+  margin: "0 0 8px",
+  fontSize: 14,
+  lineHeight: 1.4,
+  color: "var(--text-primary)",
+  fontVariantNumeric: "tabular-nums",
+};
+/** Ficha de lo ya elegido. Baja para que ocho seguidas no sean un muro. */
+const chipStyle: CSSProperties = { height: 24, fontSize: 11.5, padding: "0 8px" };
+/**
+ * La lista de opciones de un selector múltiple.
+ *
+ * Un solo borde, el de un control —igual que el buscador que lleva encima—, no
+ * una tarjeta con su relleno: regla 9, ni una caja dentro de otra caja.
+ */
+const listaOpcionesStyle: CSSProperties = {
+  maxHeight: 176,
+  overflowY: "auto",
+  border: "1px solid var(--border)",
+  borderRadius: 8,
+  background: "var(--surface)",
+};
+/**
+ * Fila de opción. Lo elegido se marca con la paloma y con la superficie
+ * hundida, nunca con color: un renglón seleccionado no es un estado que pida
+ * acción (regla 6).
+ */
+const opcionStyle = (elegida: boolean, conLinea: boolean): CSSProperties => ({
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 8,
+  width: "100%",
+  textAlign: "left",
+  padding: "7px 10px",
+  border: "none",
+  borderTop: conLinea ? "1px solid color-mix(in srgb, var(--border) 55%, transparent)" : "none",
+  background: elegida ? "var(--surface-2, var(--surface))" : "transparent",
+  color: "var(--text-primary)",
+  font: "inherit",
+  fontSize: 12.5,
+  lineHeight: 1.35,
+  cursor: "pointer",
+});
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -262,7 +307,50 @@ const emptyForm = {
   vehicleId: "",
 };
 
-type FormMode = "create" | "approve" | "edit" | null;
+/** Una persona del catálogo `users/assignable`: quien puede recibir un viático. */
+type PersonaAsignable = { id: number; nombre: string; email?: string; puesto?: string };
+/** Una actividad del catálogo `activities`, con su folio real (`anNumber`). */
+type ActividadAsignable = { id: number; anNumber?: string; titulo?: string };
+
+/**
+ * La captura de la asignación en lote. Todo texto salvo las dos listas de ids,
+ * porque un `<input type="number">` a medio teclear («8», camino de «800») no
+ * es un número todavía y convertirlo a cada pulsación borra lo que se escribe.
+ */
+const emptyAssignForm = {
+  usuarioIds: [] as number[],
+  actividadIds: [] as number[],
+  projectId: "",
+  vehicleId: "",
+  categoria: "OTROS",
+  montoPorPersona: "",
+  motivo: "",
+  desde: "",
+  hasta: "",
+};
+
+const fechaCampo = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/**
+ * Lunes a domingo de la semana en curso.
+ *
+ * Es el caso que pidió el CEO: la cuadrilla sale el lunes y el viático cubre
+ * hasta el domingo. Se calcula en hora **local**, no en UTC, porque quien
+ * captura piensa en su lunes; a las 18:00 de un domingo en México el UTC ya es
+ * lunes y la semana saldría corrida siete días.
+ */
+function semanaEnCurso(hoy: Date = new Date()): { desde: string; hasta: string } {
+  const lunes = new Date(hoy);
+  // getDay(): 0 domingo … 6 sábado. `(d + 6) % 7` da cuántos días han pasado
+  // desde el lunes, contando el domingo como el sexto y no como el cero.
+  lunes.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));
+  const domingo = new Date(lunes);
+  domingo.setDate(lunes.getDate() + 6);
+  return { desde: fechaCampo(lunes), hasta: fechaCampo(domingo) };
+}
+
+type FormMode = "create" | "approve" | "edit" | "assign" | null;
 type FormErrors = {
   concepto?: string;
   monto?: string;
@@ -476,6 +564,133 @@ function RepartoEditor({
   );
 }
 
+/**
+ * Elegir varios de una lista larga, buscando por nombre.
+ *
+ * Un `<select multiple>` obliga a mantener pulsado ctrl y esconde lo elegido en
+ * cuanto la lista hace scroll: con treinta personas se termina asignando
+ * dinero a quien no era y nadie lo nota hasta que alguien reclama. Aquí lo
+ * elegido se queda arriba, a la vista, en fichas que se quitan con un clic, y
+ * buscar solo filtra lo que se muestra — nunca desmarca lo ya elegido.
+ *
+ * Las opciones son botones y no casillas porque este bloque vive dentro del
+ * `<label>` de un `FinanceField`: un `<input type="checkbox">` ahí dentro
+ * competiría con el buscador por ser el control de esa etiqueta.
+ */
+function SelectorMultiple<T extends { id: number }>({
+  opciones,
+  elegidos,
+  onChange,
+  textoDe,
+  detalleDe,
+  placeholder,
+  etiqueta,
+  vacio,
+  disabled,
+  maxVisibles = 40,
+}: {
+  opciones: T[];
+  elegidos: number[];
+  onChange: (ids: number[]) => void;
+  textoDe: (o: T) => string;
+  /** Segunda línea en 11px: el puesto, el folio de la actividad, el cliente. */
+  detalleDe?: (o: T) => string | null;
+  placeholder: string;
+  /** Sustantivo en plural («beneficiarios»): de ahí salen los dos nombres
+   *  accesibles, «Buscar beneficiarios» y «Lista de beneficiarios». */
+  etiqueta: string;
+  /** Qué decir cuando el catálogo llegó vacío. */
+  vacio: string;
+  disabled?: boolean;
+  /** Tope de filas pintadas: la lista es para elegir, no para leerla entera. */
+  maxVisibles?: number;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const q = busqueda.trim().toLowerCase();
+  const filtradas = q
+    ? opciones.filter((o) => `${textoDe(o)} ${detalleDe?.(o) ?? ""}`.toLowerCase().includes(q))
+    : opciones;
+  const visibles = filtradas.slice(0, maxVisibles);
+  const porId = new Map(opciones.map((o) => [o.id, o]));
+  const alternar = (id: number) =>
+    onChange(elegidos.includes(id) ? elegidos.filter((x) => x !== id) : [...elegidos, id]);
+
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {/* Lo elegido va ARRIBA y siempre visible: responde a «¿a quién le estoy
+          dando dinero?», que abajo ya se lo tragó el scroll de la lista. */}
+      {elegidos.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {elegidos.map((id) => {
+            const elegido = porId.get(id);
+            const texto = elegido ? textoDe(elegido) : `#${id}`;
+            return (
+              <Button
+                key={id}
+                size="sm"
+                variant="secondary"
+                style={chipStyle}
+                disabled={disabled}
+                aria-label={`Quitar ${texto}`}
+                onClick={() => alternar(id)}
+              >
+                {texto} ×
+              </Button>
+            );
+          })}
+        </div>
+      )}
+      <input
+        value={busqueda}
+        onChange={(e) => setBusqueda(e.target.value)}
+        placeholder={placeholder}
+        aria-label={`Buscar ${etiqueta}`}
+        disabled={disabled}
+        style={financeInputStyle}
+      />
+      <div style={listaOpcionesStyle} role="group" aria-label={`Lista de ${etiqueta}`}>
+        {visibles.length === 0 ? (
+          <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--text-tertiary)" }}>
+            {q ? "Nada coincide con lo que buscaste." : vacio}
+          </div>
+        ) : (
+          visibles.map((o, i) => {
+            const elegida = elegidos.includes(o.id);
+            const detalle = detalleDe?.(o);
+            return (
+              <button
+                key={o.id}
+                type="button"
+                aria-pressed={elegida}
+                disabled={disabled}
+                onClick={() => alternar(o.id)}
+                style={opcionStyle(elegida, i > 0)}
+              >
+                <span aria-hidden="true" style={{ width: 11, flexShrink: 0 }}>
+                  {elegida ? "✓" : ""}
+                </span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block" }}>{textoDe(o)}</span>
+                  {detalle ? (
+                    <span style={{ display: "block", fontSize: 11, color: "var(--text-tertiary)" }}>
+                      {detalle}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })
+        )}
+      </div>
+      {filtradas.length > visibles.length && (
+        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+          Se ven {visibles.length} de {filtradas.length}. Escribe arriba para acotar.
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** Lo entregado, lo comprobado y quién le debe a quién. */
 function LiquidacionResumen({ liquidacion }: { liquidacion?: ViaticoLiquidacion }) {
   if (!liquidacion) return null;
@@ -604,6 +819,12 @@ export default function ViaticosPage() {
   const [catalogErr, setCatalogErr] = useState<string | null>(null);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
+  /* ── Asignación en lote ─────────────────────────────────────────────────── */
+  const [assignForm, setAssignForm] = useState({ ...emptyAssignForm });
+  const [personas, setPersonas] = useState<PersonaAsignable[]>([]);
+  const [actividades, setActividades] = useState<ActividadAsignable[]>([]);
+  const [assignCatalogLoading, setAssignCatalogLoading] = useState(false);
+  const [assignCatalogErr, setAssignCatalogErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!isContextReady) return;
@@ -693,6 +914,51 @@ export default function ViaticosPage() {
       .catch(() => setVehicles([]));
   }, [token]);
 
+  /**
+   * Catálogos de la asignación: personas y actividades.
+   *
+   * Se piden al abrir el modal y no con la pantalla, por dos razones: quien
+   * solo entra a autorizar no paga esa espera, y los dos endpoints exigen
+   * permisos que no todo el que ve viáticos tiene —pedirlos siempre sería un
+   * 403 en cada visita—. Con `allSettled`, que falle un catálogo no deja sin
+   * el otro: se puede asignar por proyecto aunque las actividades no carguen.
+   */
+  const cargarCatalogosAsignacion = useCallback(async () => {
+    if (!token) return;
+    setAssignCatalogLoading(true);
+    setAssignCatalogErr(null);
+    const [gente, actos] = await Promise.allSettled([
+      apiFetch("users/assignable", token),
+      apiFetch("activities", token),
+    ]);
+    const fallos: string[] = [];
+    if (gente.status === "fulfilled") {
+      const rows = Array.isArray(gente.value) ? gente.value : (gente.value?.data ?? []);
+      setPersonas(
+        rows.map((u: PersonaAsignable) => ({
+          id: u.id,
+          nombre: u.nombre || `Persona #${u.id}`,
+          email: u.email,
+          puesto: u.puesto,
+        })),
+      );
+    } else {
+      setPersonas([]);
+      fallos.push(formatApiError(gente.reason, "no se pudo cargar la lista de personas"));
+    }
+    if (actos.status === "fulfilled") {
+      const rows = Array.isArray(actos.value) ? actos.value : (actos.value?.data ?? []);
+      setActividades(
+        rows.map((a: ActividadAsignable) => ({ id: a.id, anNumber: a.anNumber, titulo: a.titulo })),
+      );
+    } else {
+      setActividades([]);
+      fallos.push(formatApiError(actos.reason, "no se pudo cargar la lista de actividades"));
+    }
+    setAssignCatalogErr(fallos.length > 0 ? fallos.join(" · ") : null);
+    setAssignCatalogLoading(false);
+  }, [token]);
+
   const visibleItems = useMemo(
     () => filterRowsByScope(items, user, cfg.defaultScope),
     [items, user, cfg.defaultScope],
@@ -776,6 +1042,56 @@ export default function ViaticosPage() {
       },
     ];
   }, [visibleItems]);
+
+  /**
+   * El resumen en vivo de la asignación — y la única defensa contra el error
+   * que de verdad cuesta dinero: capturar el TOTAL del lote creyendo que el
+   * campo es por cabeza. Aquí se ve multiplicado antes de confirmar.
+   *
+   * La cuenta va en centavos enteros porque `800.10 * 3` en coma flotante da
+   * 2400.2999999999997, y un total que no cuadra con el del servidor siembra
+   * la duda de cuál de los dos miente.
+   */
+  const resumenAsignacion = useMemo(() => {
+    const personasElegidas = assignForm.usuarioIds.length;
+    const porPersonaCent = centavos(assignForm.montoPorPersona);
+    const totalCent = porPersonaCent * personasElegidas;
+    const cuantasActividades = assignForm.actividadIds.length;
+
+    // Lo que impide confirmar, dicho como una lista de cosas por hacer y no
+    // como un «formulario inválido»: son las tres reglas del servidor.
+    const faltan: string[] = [];
+    if (personasElegidas === 0) faltan.push("elige al menos un beneficiario");
+    if (porPersonaCent <= 0) faltan.push("captura el monto por persona");
+    if (cuantasActividades === 0 && !assignForm.projectId) {
+      faltan.push("liga el viático a una actividad o a un proyecto");
+    }
+
+    const cobertura =
+      cuantasActividades > 1
+        ? `, repartido entre ${cuantasActividades} actividades`
+        : cuantasActividades === 1
+          ? ", sobre 1 actividad"
+          : "";
+
+    return {
+      personas: personasElegidas,
+      porPersonaCent,
+      totalCent,
+      actividades: cuantasActividades,
+      cobertura,
+      faltan,
+      listo: faltan.length === 0,
+      frase: `${plural(personasElegidas, "persona", "personas")} × ${dinero(porPersonaCent)} = ${dinero(totalCent)}${cobertura}`,
+    };
+  }, [assignForm]);
+
+  const openAssign = () => {
+    setAssignForm({ ...emptyAssignForm });
+    setSaveErr(null);
+    setMode("assign");
+    void cargarCatalogosAsignacion();
+  };
 
   const openCreate = () => {
     setForm({ ...emptyForm });
@@ -1026,6 +1342,56 @@ export default function ViaticosPage() {
     } catch (e) {
       setSaveErr(formatApiError(e, "No se pudo enviar la solicitud"));
     } finally { setSaving(false); }
+  };
+
+  /**
+   * Manda el lote. Las tres reglas duras —al menos un beneficiario, monto
+   * mayor que cero y vínculo a actividad o proyecto— las vuelve a aplicar el
+   * servidor; aquí solo se adelantan para no gastar un viaje de red. Lo que
+   * NO se duplica es el reparto entre actividades ni la comprobación de que
+   * la gente esté activa: eso lo sabe el servidor y su mensaje se enseña tal
+   * cual, con nombres, en vez de un «revisa los datos».
+   */
+  const submitAssign = async () => {
+    if (saving) return;
+    if (!token) {
+      setSaveErr("Tu sesión no tiene un token válido. Vuelve a iniciar sesión e inténtalo otra vez.");
+      return;
+    }
+    // El botón ya sale deshabilitado sin esto, pero un Enter dentro de un campo
+    // no pasa por el botón: sin esta guarda llegaría un lote vacío a la API.
+    if (!resumenAsignacion.listo) {
+      setSaveErr(`Antes de asignar: ${resumenAsignacion.faltan.join("; ")}.`);
+      return;
+    }
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      const res = await assignViaticoLote(token, {
+        usuarioIds: assignForm.usuarioIds,
+        actividadIds: assignForm.actividadIds.length > 0 ? assignForm.actividadIds : undefined,
+        projectId: assignForm.projectId ? Number(assignForm.projectId) : null,
+        vehicleId: assignForm.vehicleId ? Number(assignForm.vehicleId) : null,
+        categoria: assignForm.categoria,
+        montoPorPersona: Number(assignForm.montoPorPersona),
+        motivo: assignForm.motivo.trim() || undefined,
+        desde: assignForm.desde || undefined,
+        hasta: assignForm.hasta || undefined,
+      });
+      // Las cifras del aviso son las del servidor, no las de la pantalla: si
+      // alguna vez no coincidieran, la que vale es la que quedó guardada.
+      const creados = res?.creados ?? assignForm.usuarioIds.length;
+      const totalCent = res ? centavos(res.montoTotal) : resumenAsignacion.totalCent;
+      void load();
+      setMode(null);
+      toast.success(
+        `${plural(creados, "viático asignado", "viáticos asignados")} · ${dinero(totalCent)} en total`,
+      );
+    } catch (e) {
+      setSaveErr(formatApiError(e, "No se pudieron asignar los viáticos"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const downloadPdf = async () => {
@@ -1337,9 +1703,27 @@ export default function ViaticosPage() {
     setFilterEstatus("");
   };
 
-  /** Regla 4: un solo primario por pantalla, y es la acción a la que se vino. */
+  /**
+   * Regla 4: un solo primario por pantalla, y es la acción a la que se vino.
+   *
+   * Quien puede asignar vino a asignar —el CEO ni siquiera solicita viáticos,
+   * lo dice su propio subtítulo—, así que ese es el primario y «Solicitar»
+   * baja a gris en vez de competir con él. Quien no puede asignar sigue viendo
+   * «Solicitar» como primario, igual que antes.
+   */
+  const assignAction = cfg.canAssign ? (
+    <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openAssign}>
+      Asignar viático
+    </Button>
+  ) : null;
+
   const primaryAction = cfg.canCreate ? (
-    <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openCreate}>
+    <Button
+      size="sm"
+      variant={cfg.canAssign ? "secondary" : "primary"}
+      style={toolbarButtonStyle}
+      onClick={openCreate}
+    >
       Solicitar viático
     </Button>
   ) : null;
@@ -1396,6 +1780,7 @@ export default function ViaticosPage() {
                 </Button>
                 <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
                 {primaryAction}
+                {assignAction}
               </>
             }
           />
@@ -1485,6 +1870,7 @@ export default function ViaticosPage() {
                     pdfBusy={pdfBusy}
                   />
                   {primaryAction}
+                  {assignAction}
                 </>
               }
             />
@@ -1567,6 +1953,10 @@ export default function ViaticosPage() {
                     ) : (
                       primaryAction
                     )}
+                    {/* Sin filas la barra de filtros no se pinta (regla 8), así
+                        que este es el único sitio desde donde se puede crear el
+                        primer viático: asignar tiene que estar aquí también. */}
+                    {assignAction}
                     {refreshAction}
                   </div>
                 )
@@ -1575,6 +1965,246 @@ export default function ViaticosPage() {
           )}
         </>
       )}
+
+      {/* ── Asignar viático a varias personas de una sola captura ───────────
+          Lo que el CEO llevaba tiempo pidiendo: la cuadrilla que sale el lunes
+          recibe gasolina y casetas de golpe, en vez de repetir el mismo
+          formulario cuatro veces —y cada repetición es una ocasión de teclear
+          mal el monto—. */}
+      <Modal
+        open={mode === "assign"}
+        onClose={closeModal}
+        title="Asignar viático"
+        maxWidth={640}
+        footer={
+          <>
+            <Button variant="ghost" style={toolbarButtonStyle} onClick={closeModal} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              style={toolbarButtonStyle}
+              onClick={() => void submitAssign()}
+              disabled={saving || !resumenAsignacion.listo}
+              loading={saving}
+            >
+              {/* La cifra va en el botón: es la última oportunidad de ver que
+                  se está repartiendo el triple de lo que se creía. */}
+              {saving
+                ? "Asignando…"
+                : resumenAsignacion.listo
+                  ? `Confirmar ${dinero(resumenAsignacion.totalCent)}`
+                  : "Confirmar asignación"}
+            </Button>
+          </>
+        }
+      >
+        <FinanceFormGrid>
+          {assignCatalogErr && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <InlineAlert
+                variant="warning"
+                style={{ marginBottom: 0 }}
+                message={`${assignCatalogErr}. Puedes seguir con lo que sí cargó.`}
+                onDismiss={() => setAssignCatalogErr(null)}
+              />
+            </div>
+          )}
+          <FinanceField
+            label="Beneficiarios"
+            fullWidth
+            hint={
+              assignCatalogLoading
+                ? "Cargando el equipo…"
+                : "Cada persona elegida recibe su propio viático por el monto de abajo."
+            }
+          >
+            <SelectorMultiple
+              opciones={personas}
+              elegidos={assignForm.usuarioIds}
+              onChange={(ids) => setAssignForm((f) => ({ ...f, usuarioIds: ids }))}
+              textoDe={(p) => p.nombre}
+              detalleDe={(p) => p.puesto || p.email || null}
+              placeholder="Buscar por nombre, puesto o correo…"
+              etiqueta="beneficiarios"
+              vacio="No hay personas a las que puedas asignarles un viático."
+              disabled={saving}
+            />
+          </FinanceField>
+          <FinanceField
+            label="Actividades que cubre"
+            fullWidth
+            optional
+            hint="Con varias, el costo de cada persona se reparte entre ellas en partes iguales. Lo calcula el servidor: aquí no hay que capturar cuánto va a cada una."
+          >
+            <SelectorMultiple
+              opciones={actividades}
+              elegidos={assignForm.actividadIds}
+              onChange={(ids) => setAssignForm((f) => ({ ...f, actividadIds: ids }))}
+              textoDe={(a) => a.anNumber || `Act-${a.id}`}
+              detalleDe={(a) => a.titulo || null}
+              placeholder="Buscar por folio o título…"
+              etiqueta="actividades"
+              vacio="No hay actividades a la vista para ligar el viático."
+              disabled={saving}
+            />
+          </FinanceField>
+          <FinanceField
+            label="Proyecto"
+            hint="Hace falta al menos una actividad o un proyecto; puedes poner los dos."
+          >
+            <select
+              value={assignForm.projectId}
+              onChange={(e) => setAssignForm((f) => ({ ...f, projectId: e.target.value }))}
+              disabled={saving}
+              style={inp}
+            >
+              <option value="">— Sin proyecto —</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </FinanceField>
+          <FinanceField label="Vehículo" optional hint="Solo si el gasto es de combustible o casetas.">
+            <select
+              value={assignForm.vehicleId}
+              onChange={(e) => setAssignForm((f) => ({ ...f, vehicleId: e.target.value }))}
+              disabled={saving}
+              style={inp}
+            >
+              <option value="">— Sin vehículo —</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nombre}{v.placas ? ` · ${v.placas}` : ""}
+                </option>
+              ))}
+            </select>
+          </FinanceField>
+          <FinanceField label="Categoría" hint="Determina en qué rubro suma el reporte.">
+            <select
+              value={assignForm.categoria}
+              onChange={(e) => setAssignForm((f) => ({ ...f, categoria: e.target.value }))}
+              disabled={saving}
+              style={inp}
+            >
+              {CATEGORIAS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </FinanceField>
+          <FinanceField
+            label="Monto por persona"
+            hint="Lo que recibe CADA beneficiario, no el total del lote. Pesos, con IVA incluido."
+          >
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={assignForm.montoPorPersona}
+              onChange={(e) => setAssignForm((f) => ({ ...f, montoPorPersona: e.target.value }))}
+              placeholder="0.00"
+              disabled={saving}
+              style={{ ...inp, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+            />
+          </FinanceField>
+          <FinanceField
+            label="Periodo que cubre"
+            fullWidth
+            optional
+            hint="Se añade al motivo: un viático semanal sin decir de qué semana es imposible de conciliar tres meses después."
+          >
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <input
+                type="date"
+                aria-label="Desde"
+                value={assignForm.desde}
+                onChange={(e) => setAssignForm((f) => ({ ...f, desde: e.target.value }))}
+                disabled={saving}
+                style={{ ...inp, width: "auto", flex: "1 1 150px" }}
+              />
+              <input
+                type="date"
+                aria-label="Hasta"
+                value={assignForm.hasta}
+                onChange={(e) => setAssignForm((f) => ({ ...f, hasta: e.target.value }))}
+                disabled={saving}
+                style={{ ...inp, width: "auto", flex: "1 1 150px" }}
+              />
+              {/* El atajo del caso real: la cuadrilla sale el lunes y el viático
+                  cubre hasta el domingo. Teclear dos fechas para eso cada
+                  semana es trabajo que la pantalla puede hacer sola. */}
+              <Button
+                size="sm"
+                variant="secondary"
+                style={rowButtonStyle}
+                disabled={saving}
+                onClick={() => setAssignForm((f) => ({ ...f, ...semanaEnCurso() }))}
+              >
+                Esta semana
+              </Button>
+            </div>
+          </FinanceField>
+          <FinanceField
+            label="Motivo"
+            fullWidth
+            optional
+            hint="Lo que leerá quien lo recibe y quien lo autoriza. El periodo y el número de actividades se añaden solos."
+          >
+            <textarea
+              value={assignForm.motivo}
+              onChange={(e) => setAssignForm((f) => ({ ...f, motivo: e.target.value }))}
+              rows={2}
+              disabled={saving}
+              placeholder="Ej. Gasolina y casetas de la ruta Puebla–Tehuacán"
+              style={{ ...inp, resize: "vertical" }}
+            />
+          </FinanceField>
+          {/* El resumen que evita el error caro. Sin caja propia (regla 9):
+              una línea sobre el pie del modal basta para separarlo. */}
+          <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+            <span style={choiceLabelStyle}>Lo que se va a crear</span>
+            <p style={resumenFraseStyle} role="status" aria-live="polite">
+              {plural(resumenAsignacion.personas, "persona", "personas")} ×{" "}
+              {dinero(resumenAsignacion.porPersonaCent)} ={" "}
+              <strong style={{ fontWeight: 700 }}>{dinero(resumenAsignacion.totalCent)}</strong>
+              {resumenAsignacion.cobertura}
+            </p>
+            {resumenAsignacion.listo ? (
+              <StatusDot
+                wrap
+                tone="neutral"
+                label="El lote es todo o nada: si alguien está inactivo o una actividad no es de tu empresa, no se crea ninguno y el aviso dirá cuál."
+              />
+            ) : (
+              <StatusDot
+                wrap
+                tone="warning"
+                label={`Para poder asignar: ${resumenAsignacion.faltan.join("; ")}.`}
+              />
+            )}
+          </div>
+          {saveErr && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <InlineAlert
+                message={saveErr}
+                variant="danger"
+                style={{ marginBottom: 0 }}
+                action={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    style={toolbarButtonStyle}
+                    onClick={() => void submitAssign()}
+                    disabled={saving || !resumenAsignacion.listo}
+                  >
+                    Reintentar
+                  </Button>
+                }
+              />
+            </div>
+          )}
+        </FinanceFormGrid>
+      </Modal>
 
       <Modal
         open={mode === "create"}
