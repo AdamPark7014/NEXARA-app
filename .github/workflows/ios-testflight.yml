@@ -147,14 +147,19 @@ jobs:
           fi
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
           TMP_PROFILE="$RUNNER_TEMP/profile.mobileprovision"
           echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$TMP_PROFILE"
           PLIST_OUT="$RUNNER_TEMP/profile.plist"
           security cms -D -i "$TMP_PROFILE" > "$PLIST_OUT"
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PLIST_OUT")
-          FINAL_PROFILE="$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
-          mv "$TMP_PROFILE" "$FINAL_PROFILE"
-          echo "Installed provisioning profile UUID=$PROFILE_UUID at $FINAL_PROFILE"
+          DEST_MOBILE="$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          DEST_USERDATA="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          cp "$TMP_PROFILE" "$DEST_MOBILE"
+          cp "$TMP_PROFILE" "$DEST_USERDATA"
+          echo "Installed provisioning profile UUID=$PROFILE_UUID at:"
+          echo " - $DEST_MOBILE"
+          echo " - $DEST_USERDATA"
           # Expose UUID for subsequent steps
           echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
 
@@ -167,6 +172,24 @@ jobs:
           echo "Profile UUID: $(/usr/libexec/PlistBuddy -c 'Print UUID' "$PLIST_OUT" || true)"
           echo "Team ID(s): $(/usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' "$PLIST_OUT" || true)"
           echo "Entitlements aps-environment: $(/usr/libexec/PlistBuddy -c 'Print Entitlements:aps-environment' "$PLIST_OUT" || true)"
+          echo "Listing profiles directories:"
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" || true
+          ls -la "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/" || true
+
+      - name: Verify entitlements and bundle id in build settings
+        run: |
+          set -euo pipefail
+          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -scheme "$XCODE_SCHEME" -configuration Release > "$RUNNER_TEMP/buildsettings.txt"
+          echo "::group::Build Settings (filtered)"
+          grep -E "PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_ENTITLEMENTS" "$RUNNER_TEMP/buildsettings.txt" || true
+          echo "::endgroup::"
+          ENT_PATH=$(grep -E "CODE_SIGN_ENTITLEMENTS =" "$RUNNER_TEMP/buildsettings.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
+          if [ -n "$ENT_PATH" ] && [ -f "$ENT_PATH" ]; then
+            echo "Entitlements file: $ENT_PATH"
+            /usr/libexec/PlistBuddy -c 'Print aps-environment' "$ENT_PATH" || true
+          else
+            echo "Entitlements file not found or not set"
+          fi
 
       - name: Bind provisioning profile to NexaraApp target (patch project.pbxproj)
         working-directory: apps/mobile-native/ios
