@@ -43,6 +43,18 @@ object CoreKeys {
     /** Vehículos (`/erp/vehiculos`). */
     const val VEHICULOS = "erp-vehiculos"
 
+    /** Gastos (`/erp/finance/expenses`). */
+    const val GASTOS = "erp-gastos"
+
+    /** Aprobaciones (`/erp/approvals`). */
+    const val APROBACIONES = "erp-aprobaciones"
+
+    /** Pagos a empleados (`/erp/finance/employee-payments`). */
+    const val PAGOS_EMPLEADOS = "erp-pagos-empleados"
+
+    /** Documentos (`/erp/documents`). */
+    const val DOCUMENTOS = "erp-documentos"
+
     /** Organigrama (`/erp/organigrama`). */
     const val ORGANIGRAMA = "erp-organigrama"
 

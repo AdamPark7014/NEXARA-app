@@ -67,6 +67,15 @@ enum class CoreExtraModule(
     HERRAMIENTAS(CoreKeys.HERRAMIENTAS, "Herramientas", "/erp/almacen/herramientas", "Solicita herramienta, revisa tu kit y tus préstamos."),
     VEHICULOS(CoreKeys.VEHICULOS, "Vehículos", "/erp/vehiculos", "Solicita un vehículo; entrega y recepción con fotos."),
     ORGANIGRAMA(CoreKeys.ORGANIGRAMA, "Organigrama", "/erp/organigrama", "Quién reporta a quién en NEXARA."),
+    GASTOS(CoreKeys.GASTOS, "Gastos", "/erp/finance/expenses", "Gastos de la operación: captura, comprobación y estado."),
+    APROBACIONES(CoreKeys.APROBACIONES, "Aprobaciones", "/erp/approvals", "Lo que espera tu visto bueno, en un solo sitio."),
+    PAGOS_EMPLEADOS(
+        CoreKeys.PAGOS_EMPLEADOS,
+        "Pagos a empleados",
+        "/erp/finance/employee-payments",
+        "Pagos y anticipos al personal, con su comprobante.",
+    ),
+    DOCUMENTOS(CoreKeys.DOCUMENTOS, "Documentos", "/erp/documents", "Manuales, planos y papeles de la operación."),
     VIATICOS(
         CoreKeys.VIATICOS,
         "Viáticos",
