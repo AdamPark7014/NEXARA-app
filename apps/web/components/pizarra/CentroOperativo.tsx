@@ -19,6 +19,65 @@ const REFRESCO_MS = 60_000;
 /** El reloj se mueve antes que los datos para que no se vea congelado. */
 const RELOJ_MS = 30_000;
 
+/**
+ * Reparto que hace que TODOS quepan en una pantalla.
+ *
+ * La primera versión fijaba el avatar en 132px y la rejilla en `minmax(220px)`:
+ * con 15 personas salían seis columnas y tres filas, y la tercera se cortaba
+ * contra el borde. En una pantalla de pared no hay quien desplace, así que el
+ * tamaño no puede ser una constante — se calcula.
+ *
+ * Se prueban todos los repartos posibles y gana el que deja el avatar más
+ * grande sin salirse. El bloque de texto bajo la foto mide algo fijo (nombre,
+ * puesto, actividad, contexto y barra), y de ahí sale el alto disponible para
+ * la foto en cada reparto.
+ */
+export function repartoQueCabe(
+  cuantos: number,
+  ancho: number,
+  alto: number,
+): { columnas: number; avatar: number } {
+  if (cuantos <= 0 || ancho <= 0 || alto <= 0) return { columnas: 1, avatar: AVATAR_MAX };
+
+  const HUECO = 24;
+  const TEXTO = 168; // nombre + puesto + actividad + contexto + barra
+  let mejor = { columnas: 1, avatar: AVATAR_MIN };
+
+  for (let columnas = 1; columnas <= cuantos; columnas += 1) {
+    const filas = Math.ceil(cuantos / columnas);
+    const anchoCelda = (ancho - HUECO * (columnas - 1)) / columnas;
+    const altoCelda = (alto - HUECO * (filas - 1)) / filas;
+    // La foto no puede ser más ancha que su celda ni más alta que lo que sobra
+    // tras el texto.
+    const avatar = Math.floor(Math.min(anchoCelda * 0.78, altoCelda - TEXTO));
+    if (avatar >= mejor.avatar) mejor = { columnas, avatar };
+  }
+
+  return {
+    columnas: mejor.columnas,
+    avatar: Math.max(AVATAR_MIN, Math.min(AVATAR_MAX, mejor.avatar)),
+  };
+}
+
+/** Por debajo de esto los nombres dejan de leerse desde lejos. */
+const AVATAR_MIN = 56;
+/** Por encima de esto una sola persona ocuparía media pared. */
+const AVATAR_MAX = 132;
+
+/**
+ * Cuánto lleva cerrado del día: cerradas sobre asignadas.
+ *
+ * Es lo que Adam pidió ver de un vistazo. Sin nada asignado no hay avance que
+ * enseñar —una barra al 0 % de cero actividades diría algo falso—, así que
+ * devuelve `null` y no se pinta.
+ */
+export function avanceDelDia(u: TeamBoardUser): { pct: number; cerradas: number; asignadas: number } | null {
+  const asignadas = u.kpis?.asignadas ?? 0;
+  if (asignadas <= 0) return null;
+  const cerradas = Math.min(u.kpis?.cerradas ?? 0, asignadas);
+  return { pct: Math.round((cerradas / asignadas) * 100), cerradas, asignadas };
+}
+
 function horaLarga(t: number): string {
   return new Date(t).toLocaleTimeString("es-MX", {
     hour: "2-digit",
@@ -46,6 +105,8 @@ export default function CentroOperativo({
   onRefrescar?: () => void;
 }) {
   const capaRef = useRef<HTMLDivElement | null>(null);
+  const rejillaRef = useRef<HTMLDivElement | null>(null);
+  const [zona, setZona] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const refrescarRef = useRef(onRefrescar);
   const nativoRef = useRef(false);
   const [montado, setMontado] = useState(false);
@@ -54,6 +115,18 @@ export default function CentroOperativo({
   refrescarRef.current = onRefrescar;
 
   useEffect(() => setMontado(true), []);
+
+  // La rejilla se vuelve a repartir cuando cambia el tamaño de la ventana o el
+  // número de personas: entrar en pantalla completa cambia el alto disponible.
+  useEffect(() => {
+    const caja = rejillaRef.current;
+    if (!caja || typeof ResizeObserver === "undefined") return;
+    const medir = () => setZona({ w: caja.clientWidth, h: caja.clientHeight });
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(caja);
+    return () => observador.disconnect();
+  }, [montado]);
 
   const cerrar = useCallback(() => {
     if (typeof document !== "undefined" && document.fullscreenElement && document.exitFullscreen) {
@@ -125,6 +198,11 @@ export default function CentroOperativo({
   const gente = useMemo(() => filtrarCentroOperativo(users), [users]);
   const r = useMemo(() => resumenEquipo(gente), [gente]);
 
+  const reparto = useMemo(
+    () => repartoQueCabe(gente.length, zona.w, zona.h),
+    [gente.length, zona.w, zona.h],
+  );
+
   if (!montado || typeof document === "undefined") return null;
 
   return createPortal(
@@ -162,7 +240,16 @@ export default function CentroOperativo({
       {gente.length === 0 ? (
         <p className={s.vacio}>Nadie en el tablero ahora mismo.</p>
       ) : (
-        <div className={s.rejilla}>
+        <div
+          ref={rejillaRef}
+          className={s.rejilla}
+          style={
+            {
+              "--columnas": reparto.columnas,
+              "--avatar": `${reparto.avatar}px`,
+            } as React.CSSProperties
+          }
+        >
           {gente.map((u) => {
             const actividad = queHace(u);
             const contexto = contextoActividad(u, ahora);
@@ -172,12 +259,31 @@ export default function CentroOperativo({
                   nombre={u.nombre}
                   avatarUrl={u.avatarUrl}
                   estado={ARO_DE_ESTADO[u.status] ?? "retraso"}
-                  size={132}
+                  size={reparto.avatar}
                 />
                 <span className={s.nombre}>{u.nombre}</span>
                 {u.puesto ? <span className={s.puesto}>{u.puesto}</span> : null}
                 <span className={s.actividad}>{actividad}</span>
                 {contexto ? <span className={s.contexto}>{contexto}</span> : null}
+                {(() => {
+                  const avance = avanceDelDia(u);
+                  if (!avance) return null;
+                  return (
+                    <div
+                      className={s.avance}
+                      role="img"
+                      aria-label={`${avance.cerradas} de ${avance.asignadas} actividades cerradas`}
+                      title={`${avance.cerradas} de ${avance.asignadas} cerradas`}
+                    >
+                      <div className={s.avanceCarril}>
+                        <div className={s.avanceRelleno} style={{ width: `${avance.pct}%` }} />
+                      </div>
+                      <span className={s.avanceCifra}>
+                        {avance.cerradas}/{avance.asignadas}
+                      </span>
+                    </div>
+                  );
+                })()}
               </article>
             );
           })}
