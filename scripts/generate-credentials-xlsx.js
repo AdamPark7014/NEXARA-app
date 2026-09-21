@@ -5,13 +5,15 @@
 const ExcelJS = require('exceljs');
 const path = require('path');
 
-/** Misma lista / passwords que apps/api/prisma/seed-demo-users.ts */
+/** Padrón verificado contra api.nexara.com.mx (mismas claves que NEXARA-usuarios-v5/v6). */
 const USERS = [
   ['Claudia Bernal', 'claudia.bernal@nexara.com.mx', 'Nexara!NX010', 'Tester de plataforma', 'Dirección General'],
   ['Christian Eduardo Del Pozo Sánchez', 'gerencia@nexara.com.mx', 'Nexara!NX001', 'Director General', 'Dirección General'],
   ['Adam Del Pozo', 'developer@nexara.com.mx', 'Nexara!NX002', 'Developer / Super Admin', 'Dirección General'],
   ['Josué Teodulo Cervantes Arellano', 'infraestructura@nexara.com.mx', 'Nexara!NX003', 'Encargado de Obra', 'Arquitectura'],
+  ['Mónica García Guzmán', 'soluciones@nexara.com.mx', 'Nexara!NX102', 'Administrativo', 'Administración'],
   ['Paulina Tlapaltotoli Álvarez', 'finanzas@nexara.com.mx', 'Fosati-Raruke-4213$', 'Contador(a) General', 'Administración'],
+  ['Daniela Hernández Cruz', 'daniela.hernandez@nexara.com.mx', 'Pemijo-Sopogi-4354%', 'Encargada comercial', 'Administración'],
   ['Daniela Galindo Almazán', 'redes@nexara.com.mx', 'Nexara!NX201', 'Diseñadora', 'Área Creativa'],
   ['Luis Joel Aguilar Castillo', 'direccion.operaciones@nexara.com.mx', 'Nexara!NX301', 'Encargado de servicios', 'Operaciones'],
   ['David Morales Zenón', 'operaciones@nexara.com.mx', 'Nexara!NX302', 'Encargado de instalación', 'Operaciones'],
@@ -23,6 +25,7 @@ const USERS = [
   ['José Antonio Ramírez Salazar', 'jose.ramirez@nexara.com.mx', 'Nokede-Gasulo-1678!', 'Encargado de soporte', 'Ingeniería'],
   ['Juan José González Rojas', 'juan.gonzalez@nexara.com.mx', 'Fogoca-Rezole-7140%', 'Técnico Instalador', 'Ingeniería'],
   ['Roberto Paul Vivanco López', 'roberto.vivanco@nexara.com.mx', 'Salave-Gisotu-6905!', 'Ingeniero de Campo / Técnico de Campo', 'Ingeniería'],
+  ['Play Review Demo Account', 'play.review@nexara.com.mx', 'NexaraPlayReview2026!', 'Cuenta de demostración', 'Demostración'],
 ];
 
 const GREEN = '1F5F4E';
@@ -106,14 +109,18 @@ const MUTED = '5A6F6A';
     { width: 5 },
     { width: 38 },
     { width: 36 },
-    { width: 16 },
-    { width: 30 },
+    { width: 28 },
+    { width: 36 },
     { width: 20 },
   ];
 
-  const out = path.join(__dirname, '..', 'NEXARA-credenciales-usuarios-v4.xlsx');
+  const out = path.join(__dirname, '..', 'NEXARA-usuarios-v6.xlsx');
   await wb.xlsx.writeFile(out);
+  // Copia a Downloads para que Adam la abra sin buscar en el repo
+  const downloads = path.join(process.env.USERPROFILE || '', 'Downloads', 'NEXARA-usuarios-v6.xlsx');
+  await wb.xlsx.writeFile(downloads);
   console.log(out);
+  console.log(downloads);
 })().catch((e) => {
   console.error(e);
   process.exit(1);
