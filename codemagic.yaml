@@ -146,8 +146,6 @@ workflows:
     #   artifacts:
     #     - build/export/*.ipa
   ios-app-store:
-    integrations:
-      app_store_connect: NEXARA App Store Connect
     name: iOS App Store (Archive + IPA export)
     max_build_duration: 90
     instance_type: mac_mini_m2
