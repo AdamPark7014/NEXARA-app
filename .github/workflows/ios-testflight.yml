@@ -104,6 +104,9 @@ jobs:
       - name: Archive (Release, iOS Device) with automatic signing via ASC API key
         run: |
           set -euo pipefail
+          DERIVED="$RUNNER_TEMP/DerivedData"
+          mkdir -p "$DERIVED"
+          set +e
           xcodebuild \
             -project "$XCODE_PROJECT_PATH" \
             -scheme "$XCODE_SCHEME" \
@@ -116,8 +119,22 @@ jobs:
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            archive -archivePath "$ARCHIVE_PATH" \
-            | xcpretty
+            -derivedDataPath "$DERIVED" \
+            -resultBundlePath "$RUNNER_TEMP/BuildResult" \
+            archive -archivePath "$ARCHIVE_PATH"
+          STATUS=$?
+          if [ $STATUS -ne 0 ]; then
+            echo "::group::Last 200 lines of latest xcactivitylog"
+            LATEST_LOG=$(ls -t "$DERIVED/Logs/Build"/*.xcactivitylog 2>/dev/null | head -n 1 || true)
+            if [ -n "$LATEST_LOG" ] && [ -f "$LATEST_LOG" ]; then
+              echo "Log file: $LATEST_LOG"
+              strings "$LATEST_LOG" | tail -n 200 || true
+            else
+              echo "No xcactivitylog found under $DERIVED/Logs/Build"
+            fi
+            echo "::endgroup::"
+            exit $STATUS
+          fi
 
       - name: Export signed IPA (App Store)
         run: |
@@ -130,8 +147,7 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            | xcpretty
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
           ls -lah "$EXPORT_DIR"
 
       - name: Upload to TestFlight (Transporter API key)
