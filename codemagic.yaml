@@ -18,8 +18,15 @@ workflows:
       - name: Install XcodeGen (brew)
         script: |
           set -euo pipefail
-          brew update
-          brew install xcodegen
+          if command -v xcodegen >/dev/null 2>&1; then
+            xcodegen --version
+          else
+            export HOMEBREW_NO_AUTO_UPDATE=1
+            export HOMEBREW_NO_INSTALL_CLEANUP=1
+            export HOMEBREW_NO_ENV_HINTS=1
+            brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+            xcodegen --version
+          fi
       - name: Generate Xcode project from XcodeGen spec
         script: |
           set -euo pipefail
@@ -74,8 +81,15 @@ workflows:
       - name: Install XcodeGen (brew)
         script: |
           set -euo pipefail
-          brew update
-          brew install xcodegen
+          if command -v xcodegen >/dev/null 2>&1; then
+            xcodegen --version
+          else
+            export HOMEBREW_NO_AUTO_UPDATE=1
+            export HOMEBREW_NO_INSTALL_CLEANUP=1
+            export HOMEBREW_NO_ENV_HINTS=1
+            brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+            xcodegen --version
+          fi
       - name: Generate Xcode project from XcodeGen spec
         script: |
           set -euo pipefail
