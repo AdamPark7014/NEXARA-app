@@ -3,7 +3,8 @@
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-20
 - **Rama:** `mejora/calidad-y-web`
-- **HEAD:** El suite web deja de fallar a ratos
+- **HEAD:** El PDF que sí ve el cliente adopta el lenguaje de viáticos
+- **Desplegado:** sí, `8fe3e437` en Hetzner; fuentes corporativas presentes en la imagen
 
 ## Puente — no cambiar
 
@@ -50,6 +51,27 @@ Inter y dibujaba todo con `'Helvetica'` a pelo, y de los veinte generadores
 solo `propuesta-tecnica` llamaba a `registrarFuentesCorporativas`. Ahora pedir
 la fuente **es** registrarla (`fuente(doc, clave)`), así que los veinte
 cambiaron de golpe. El PDF pasa de ~20 KB a ~133 KB: son las fuentes embebidas.
+
+### 1 bis. El PDF de cotización tiene DOS generadores — ojo
+
+`buildPdf(quote, internal)` en `cotizaciones.service.ts`: con `internal = false`
+va a `buildPropuesta` → **`propuesta-tecnica-pdf.ts`**, que es lo que descarga
+el cliente. `cotizacion-pdf.ts` es el formato interno, el único con costo de
+proveedor y margen, y se usa además como respaldo si la propuesta revienta.
+
+En este turno se pulió primero el equivocado. Adam lo vio enseguida: «el PDF de
+cotizaciones sigue sin tener las estilizaciones». Los dos quedaron con el tema
+corporativo, pero si alguien toca «el PDF de la cotización», el que se ve es el
+de la propuesta técnica.
+
+Del reporte de viáticos —la referencia que dio Adam— se trajeron: barra de
+acento en portada, banda tintada con logo en cada hoja, tira de tres tarjetas
+(total, anticipo, vigencia) sobre la tabla, cabecera de tabla en azul marino y
+fichas con relleno gris. El anticipo llega nuevo al documento: `depositPercent`
+existía pero solo alimentaba los términos.
+
+Pendiente de decidir: si la portada lleva también la banda tintada. Se dejó
+solo con la barra de acento.
 
 ### 2. Siete pantallas que no habían cargado nunca
 
@@ -99,7 +121,7 @@ sesión no llegaba a estar lista.
 
 ## Verificación
 
-- API: **196 suites, 2 176 pruebas**, verde.
+- API: **196 suites, 2 179 pruebas**, verde.
 - Web: **86 archivos, 1 003 pruebas**, verde dos pasadas seguidas.
 - `tsc --noEmit` limpio en API y web.
 
@@ -109,6 +131,22 @@ sesión no llegaba a estar lista.
 fuera del ámbito de Cursor; 24 ya usan `MetricStrip`. Peores: `crm/reports`
 (14), `studio/pages` (12), `erp/hr` (11). Reproducible con el script descrito
 en `.ai/HARDENING-GAP.md`.
+
+## Lo que hizo fallar el primer deploy
+
+`configure({ asyncUtilTimeout })` se importaba de `@testing-library/react`,
+cuyo `configure` acepta su propia Config; `asyncUtilTimeout` vive en la de DOM.
+El `tsc` local lo daba por bueno y el build de Docker no, porque
+`@testing-library/dom` es peer sin declarar y cada instalación resuelve la
+suya. Ya está en `package.json`.
+
+Dos lecciones que valen para el siguiente turno:
+
+1. **El build local miente si reusa `.next/cache`**: se salta la revisión de
+   tipos. Para reproducir lo del servidor hay que borrar `.next` antes.
+2. **`ssh ... && ./deploy/update.sh` devuelve 0 aunque el build muera.** Hay que
+   leer el log buscando `Failed to compile` y `ERROR:`, no mirar el código de
+   salida.
 
 ## Aviso de relevo
 
