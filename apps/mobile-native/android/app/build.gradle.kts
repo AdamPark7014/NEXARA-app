@@ -269,6 +269,21 @@ gradle.taskGraph.whenReady {
         problems += "VERSION_NAME sin declarar en gradle.properties."
     }
 
+    // La app rastrea la jornada, así que Play la trata como herramienta de
+    // monitorización. Sin la marca en el manifiesto la revisión se rechaza —
+    // pasó con el App bundle 10— y el rechazo llega días después de subir,
+    // cuando ya nadie recuerda qué cambió. Se comprueba antes de generar el AAB.
+    val manifiestoPrincipal = file("src/main/AndroidManifest.xml")
+    if (!manifiestoPrincipal.exists() || !manifiestoPrincipal.readText().contains("isMonitoringTool")) {
+        problems += """
+            |Falta la marca "isMonitoringTool" en src/main/AndroidManifest.xml.
+            |  Google Play rechaza la revisión por la política de stalkerware y
+            |  monitorización porque la app envía la ubicación durante la jornada.
+            |  Declárala dentro de <application>:
+            |      <meta-data android:name="isMonitoringTool" android:value="true" />
+        """.trimMargin()
+    }
+
     if (problems.isNotEmpty()) {
         throw GradleException(
             buildString {
