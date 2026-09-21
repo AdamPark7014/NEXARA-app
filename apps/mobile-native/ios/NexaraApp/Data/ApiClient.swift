@@ -209,9 +209,14 @@ final class ApiClient {
         guard !Self.noRefreshPaths.contains(where: { path.hasSuffix($0) || path.contains($0 + "/") || path.contains($0 + "-") }) else {
             return nil
         }
+        guard let user = SessionStore.shared.currentUser else { return nil }
         // El API solo renueva tokens de personal; a un token de portal un 401 en
-        // la renovación lo sacaría sin que el servidor lo haya revocado.
-        guard let user = SessionStore.shared.currentUser, !user.isClient, !user.isBranchUser else {
+        // la renovación lo sacaría sin que el servidor lo haya revocado. Como las
+        // cuentas de portal no tienen segunda oportunidad, para ellas este 401 ya
+        // es la palabra final: se avisa, igual que el `On401.NotifyExpired` de
+        // Android, en vez de dejarlas mirando una pantalla que no carga.
+        guard !user.isClient, !user.isBranchUser else {
+            SessionExpiredNotice.shared.notify()
             return nil
         }
         let usedToken = String(header.dropFirst("Bearer ".count))

@@ -225,7 +225,10 @@ final class AuthRepository {
         if current.isClient || current.isBranchUser { return }
 
         if Self.needsRefresh(expiresAt: current.expiresAt) {
-            _ = await refreshSession()
+            // Revocada: `SessionRefresher` ya cerró sesión y ya avisó. Seguir
+            // pidiendo permisos y navegación con un token muerto solo suma 401 a la
+            // bitácora (Android corta igual en `refreshSessionIfNeeded`).
+            if case .revoked = await refreshSession() { return }
         }
 
         // Los permisos se refrescan aquí y no sólo al iniciar sesión: es el
@@ -315,6 +318,10 @@ actor SessionRefresher {
                 await MainActor.run {
                     if let now = SessionStore.shared.currentUser, now.id == userId, now.token == usedToken {
                         AuthRepository.shared.logout()
+                        // Y se dice por qué. Sin esto, quien está en campo aparece
+                        // de golpe en el login sin saber si fue la red o un error
+                        // suyo (paridad con `SessionEvents` de Android).
+                        SessionExpiredNotice.shared.notify()
                     }
                 }
                 return .revoked

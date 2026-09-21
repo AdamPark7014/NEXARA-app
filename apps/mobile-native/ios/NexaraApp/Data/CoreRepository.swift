@@ -37,6 +37,21 @@ struct GeoPhotoPayload: Encodable {
     }
 }
 
+/// Foto de entrada. Es `GeoPhotoPayload` más la justificación del salto de
+/// prioridad, que solo entiende `POST activity-evidence/:id/entry-photo`.
+///
+/// Va en su propio cuerpo y no en `GeoPhotoPayload` para no colar un campo que la
+/// salida y la corrección no leen.
+struct EntryPhotoPayload: Encodable {
+    let photoUrl: String
+    let latitude: Double
+    let longitude: Double
+    let mockLocation: Bool?
+    /// Por qué empieza ésta teniendo otra de más prioridad sin terminar. Opcional:
+    /// el API no bloquea, solo marca `saltoPrioridad` y avisa a los jefes.
+    let justificacionOrden: String?
+}
+
 struct PhotoGeoPayload: Encodable {
     let latitude: Double
     let longitude: Double
@@ -299,14 +314,33 @@ final class CoreRepository {
         return try decode(EvidenceFlowState.self, from: data)
     }
 
-    func submitEntryPhoto(activityId: Int, photo: GeoPhotoPayload, correction: Bool) async throws -> EvidenceFlowState? {
+    /// - Parameter justificacionOrden: por qué empezó ésta y no la de más prioridad
+    ///   (contrato B). Solo aplica al alta; una corrección rehace el paso y el salto
+    ///   ya quedó registrado la primera vez.
+    func submitEntryPhoto(
+        activityId: Int,
+        photo: GeoPhotoPayload,
+        correction: Bool,
+        justificacionOrden: String? = nil
+    ) async throws -> EvidenceFlowState? {
         if correction {
             return try await postEvidence(
                 "activity-evidence/\(activityId)/resubmit",
                 body: ResubmitPayload(step: CoreEvidence.entryPhoto, data: photo)
             )
         }
-        return try await postEvidence("activity-evidence/\(activityId)/entry-photo", body: photo)
+        let motivo = justificacionOrden?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return try await postEvidence(
+            "activity-evidence/\(activityId)/entry-photo",
+            body: EntryPhotoPayload(
+                photoUrl: photo.photoUrl,
+                latitude: photo.latitude,
+                longitude: photo.longitude,
+                mockLocation: photo.mockLocation,
+                // Vacío es lo mismo que no haber contestado: no se manda.
+                justificacionOrden: (motivo?.isEmpty == false) ? motivo : nil
+            )
+        )
     }
 
     func submitEvidencePhotos(activityId: Int, photos: EvidencePhotosPayload, correction: Bool) async throws -> EvidenceFlowState? {

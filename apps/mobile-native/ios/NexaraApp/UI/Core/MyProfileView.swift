@@ -40,7 +40,16 @@ struct MyProfileView: View {
                 saveSection
             }
 
+            permisosSection
+
             deviceSections
+
+            // Versión y aviso de privacidad al final, como en Android.
+            Section {
+                NxAppMetaFooter()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
         }
         .navigationTitle("Mi perfil")
         .refreshable { await load() }
@@ -238,6 +247,20 @@ struct MyProfileView: View {
             if let saveError {
                 Text(saveError).font(.footnote).foregroundColor(.red)
             }
+        }
+    }
+
+    // MARK: Lo que puedes hacer
+
+    /// Permisos del rol traducidos (paridad con Android). No depende de la carga del
+    /// perfil: viene de la sesión, así que sale aunque el API esté caído.
+    @ViewBuilder
+    private var permisosSection: some View {
+        if let user = session.currentUser, !PermissionLabels.agrupar(user.permissions).isEmpty {
+            MyProfilePermisosSection(
+                permisos: user.permissions,
+                accesoTotal: user.isSuperAdmin || CoreOrg.isCeo(user.email)
+            )
         }
     }
 

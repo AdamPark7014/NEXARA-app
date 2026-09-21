@@ -36,7 +36,7 @@ struct NexaraApp: App {
 /// Ruta raíz. Solo existe ERP (Core): el personal entra directo a Actividades y
 /// las cuentas de cliente o sucursal, directo al portal externo. No hay menú de paneles.
 final class AppState: ObservableObject {
-    enum Route: Equatable { case login, core, portal }
+    enum Route: Equatable { case login, onboarding, core, portal }
     @Published var route: Route
 
     init() {
@@ -47,7 +47,21 @@ final class AppState: ObservableObject {
 
     static func landing(for user: SessionUser?) -> Route {
         guard let user else { return .login }
-        return CoreNavigation.isExternal(user) ? .portal : .core
+        // La bienvenida va entre el acceso y la casa, como en Android: con sesión ya
+        // iniciada, porque habla de «tus actividades» y «tu jornada». Se ve una sola
+        // vez por teléfono (ver `OnboardingStore`).
+        //
+        // A las cuentas de portal NO se les enseña, aunque Android sí lo haga: sus
+        // tres láminas hablan de checar jornada, subir evidencias y del chat del
+        // equipo, y un cliente o una sucursal no hacen nada de eso. Es la única
+        // diferencia deliberada con Android en este flujo.
+        if !CoreNavigation.isExternal(user), !OnboardingStore.isCompleted { return .onboarding }
+        return home(for: user)
+    }
+
+    /// Dónde vive esta cuenta una vez pasada la bienvenida.
+    static func home(for user: SessionUser) -> Route {
+        CoreNavigation.isExternal(user) ? .portal : .core
     }
 }
 
@@ -64,6 +78,15 @@ struct RootView: View {
                     LoginView(onLoggedIn: {
                         app.route = AppState.landing(for: session.currentUser)
                     })
+                case .onboarding:
+                    OnboardingView(onFinish: {
+                        OnboardingStore.markCompleted()
+                        guard let user = session.currentUser else {
+                            app.route = .login
+                            return
+                        }
+                        app.route = AppState.home(for: user)
+                    })
                 case .core:
                     CoreShellView()
                 case .portal:
@@ -71,6 +94,10 @@ struct RootView: View {
                 }
             }
         }
+        // El aviso de sesión expirada envuelve la app entera, como el
+        // `SessionExpiredHost` de Android: la expiración se confirma en cualquier
+        // petición y hay que explicarla esté donde esté la persona.
+        .sessionExpiredAlert()
         // Sesión cerrada (botón, 401 o token vencido): de vuelta al login.
         .onChange(of: session.currentUser?.id) { _, newId in
             if newId == nil {

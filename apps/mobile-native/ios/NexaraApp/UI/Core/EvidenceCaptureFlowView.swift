@@ -16,6 +16,14 @@ private struct CameraRequest: Identifiable {
     var momento: String? = nil
 }
 
+/// Foto de entrada ya tomada, a la espera de que la persona conteste lo del salto
+/// de prioridad (contrato B). La foto se guarda aquí para no obligarla a repetirla.
+private struct JustificacionOrdenPendiente: Identifiable {
+    let id = UUID()
+    let aviso: String
+    let photo: CapturedGeoPhoto
+}
+
 /// Captura de evidencias del ejecutor, paridad con `ActivityEvidenceFlow` web:
 /// ENTRY_PHOTO → EVIDENCE_PHOTOS → SERVICE_SHEET_PDF (solo servicio) →
 /// SERVICE_SHEET_DATA (formulario real por tipo) → EXIT_PHOTO. Cámara en vivo
@@ -60,6 +68,12 @@ struct EvidenceCaptureFlowView: View {
     @State private var campos: [EvidenceCampo] = []
     /// Miniatura local del hueco recién tomado, mientras no vuelve el GET.
     @State private var campoThumbs: [String: UIImage] = [:]
+    /// Contrato B: hay otra de más prioridad sin empezar. `nil` = no hay salto.
+    @State private var avisoOrden: String?
+    /// Ya se preguntó una vez; no se vuelve a preguntar aunque se repita la foto.
+    @State private var ordenResuelto = false
+    /// Foto de entrada esperando a que conteste lo del salto de prioridad.
+    @State private var preguntaOrden: JustificacionOrdenPendiente?
 
     // MARK: Derivados
 
@@ -120,8 +134,31 @@ struct EvidenceCaptureFlowView: View {
             }
         }
         .task { await load() }
+        // Se revisa cada vez que cambia el paso: solo aplica a la foto de entrada
+        // de un alta, nunca a una corrección.
+        .task(id: "\(currentStep)|\(isCorrection)") { await revisarOrdenDePrioridad() }
         .fullScreenCover(item: $camera) { request in
             cameraView(for: request)
+        }
+        .sheet(item: $preguntaOrden) { pendiente in
+            JustificarOrdenSheet(
+                aviso: pendiente.aviso,
+                onCancelar: { preguntaOrden = nil },
+                onContinuar: { justificacion in
+                    preguntaOrden = nil
+                    // Contestada una vez, no se vuelve a preguntar por esta actividad.
+                    ordenResuelto = true
+                    Task { @MainActor in
+                        if let fallo = await sendGeoPhoto(
+                            step: CoreEvidence.entryPhoto,
+                            photo: pendiente.photo,
+                            justificacionOrden: justificacion
+                        ) {
+                            errorText = fallo
+                        }
+                    }
+                }
+            )
         }
         .fileImporter(isPresented: $showPdfImporter, allowedContentTypes: [.pdf]) { result in
             handlePdf(result)
@@ -658,7 +695,24 @@ struct EvidenceCaptureFlowView: View {
                 title: "Tu foto de entrada",
                 confirmLabel: "Enviar esta foto",
                 requireLocation: true,
-                onConfirm: { photo in await sendGeoPhoto(step: CoreEvidence.entryPhoto, photo: photo) },
+                onConfirm: { photo in
+                    // Hay otra de más prioridad sin empezar: se pregunta ANTES de
+                    // mandar la foto, igual que Android. La foto no se pierde.
+                    if let aviso = avisoOrden, !ordenResuelto {
+                        await MainActor.run { camera = nil }
+                        // Cerrar la cámara y abrir la hoja en el mismo instante no
+                        // la presenta; se le deja un respiro (mismo truco que
+                        // `CoreShellView.present`). Tras el `await` ya no se está en
+                        // el hilo principal, así que el estado se toca dentro de
+                        // `MainActor.run`.
+                        try? await Task.sleep(nanoseconds: 450_000_000)
+                        await MainActor.run {
+                            preguntaOrden = JustificacionOrdenPendiente(aviso: aviso, photo: photo)
+                        }
+                        return nil
+                    }
+                    return await sendGeoPhoto(step: CoreEvidence.entryPhoto, photo: photo)
+                },
                 onCancel: { camera = nil }
             )
         case CoreEvidence.exitPhoto:
@@ -706,6 +760,49 @@ struct EvidenceCaptureFlowView: View {
         }
         loaded = true
         prefillForm()
+    }
+
+    /// Contrato B: empezar ésta teniendo otra de más prioridad sin terminar no
+    /// bloquea nada; solo se pregunta (una vez) si quiere decir por qué.
+    ///
+    /// Se calcula con `GET me/activities`, que es la misma lista que ve en «Mis
+    /// actividades»: si el API falla, `avisoOrden` se queda como estaba y la foto
+    /// sale sin preguntar. Nunca se le impide entregar su trabajo por esto.
+    @MainActor
+    private func revisarOrdenDePrioridad() async {
+        guard currentStep == CoreEvidence.entryPhoto, !isCorrection else {
+            avisoOrden = nil
+            return
+        }
+        guard let datos = try? await CoreRepository.shared.myActivities() else { return }
+        let abiertas = datos.open
+        let pendientes = abiertas
+            // Lo de mañana no cuenta como salto: nadie se salta el orden por adelantarse.
+            .filter { ActivityPriorityJump.esDelDiaOAntes($0.fechaInicio ?? $0.fechaMaxima) }
+            .map {
+                ActivityPriorityJump.Pendiente(
+                    id: $0.id,
+                    prioridad: $0.prioridad,
+                    iniciada: $0.inicioRealAt != nil || !($0.evidenceStatus ?? "").isEmpty,
+                    terminada: $0.fechaFinalizacion != nil
+                )
+            }
+        // La prioridad de la que se va a empezar solo la trae `me/activities`:
+        // `EvidenceFlowActivityInfo` no la manda. Sin ella cuenta como media, que es
+        // el mismo valor por omisión de la regla.
+        let mia = abiertas.first { $0.id == activityId }
+        guard let mayor = ActivityPriorityJump.mayorPendiente(
+            actualId: activityId,
+            actualPrioridad: mia?.prioridad,
+            otras: pendientes
+        ) else {
+            avisoOrden = nil
+            return
+        }
+        avisoOrden = ActivityPriorityJump.aviso(
+            titulo: abiertas.first { $0.id == mayor.id }?.titulo,
+            prioridad: mayor.prioridad
+        )
     }
 
     /// Precarga el formulario con lo ya guardado (corrección) una sola vez.
@@ -780,8 +877,14 @@ struct EvidenceCaptureFlowView: View {
         camera = CameraRequest(step: CoreEvidence.exitPhoto)
     }
 
+    /// - Parameter justificacionOrden: solo la foto de entrada, y solo cuando hubo
+    ///   salto de prioridad y la persona quiso explicarlo (contrato B).
     @MainActor
-    private func sendGeoPhoto(step: String, photo: CapturedGeoPhoto) async -> String? {
+    private func sendGeoPhoto(
+        step: String,
+        photo: CapturedGeoPhoto,
+        justificacionOrden: String? = nil
+    ) async -> String? {
         guard let coords = photo.coords else { return GeoPhotoCaptureView.locationError }
         let isExit = step == CoreEvidence.exitPhoto
         // La salida se mide con la misma ubicación que viaja en la foto, como el API.
@@ -802,7 +905,12 @@ struct EvidenceCaptureFlowView: View {
         do {
             let saved: EvidenceFlowState?
             if step == CoreEvidence.entryPhoto {
-                saved = try await CoreRepository.shared.submitEntryPhoto(activityId: activityId, photo: payload, correction: correction)
+                saved = try await CoreRepository.shared.submitEntryPhoto(
+                    activityId: activityId,
+                    photo: payload,
+                    correction: correction,
+                    justificacionOrden: justificacionOrden
+                )
                 // Los puntos del GPS de jornada viajan ligados a esta actividad hasta la salida.
                 if !correction { ShiftGpsTracker.currentActivityId = activityId }
             } else {
