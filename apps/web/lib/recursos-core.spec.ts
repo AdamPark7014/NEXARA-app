@@ -52,4 +52,11 @@ describe('recursos de Core', () => {
     expect(vehiclesBasePath('/erp/vehiculos')).toBe('/erp/vehiculos');
     expect(vehiclesBasePath('/ops/vehicles')).toBe('/ops/vehicles');
   });
+
+  it('alta de flotilla solo con vehicles.inventory o superadmin', () => {
+    expect(puedeGestionarInventarioVehiculos({ permissions: ['vehicles.inventory'] })).toBe(true);
+    expect(puedeGestionarInventarioVehiculos({ permissions: [], isSuperAdmin: true })).toBe(true);
+    expect(puedeGestionarInventarioVehiculos({ permissions: [] })).toBe(false);
+    expect(puedeGestionarInventarioVehiculos(null)).toBe(false);
+  });
 });
