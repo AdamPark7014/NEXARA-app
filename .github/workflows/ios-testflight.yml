@@ -21,7 +21,10 @@ jobs:
       EXPORT_DIR: ${{ github.workspace }}/build/export
       EXPORT_PLIST: ${{ github.workspace }}/build/ExportOptions.plist
       BUNDLE_ID: mx.nexara.mobile.NexaraApp
-      TEAM_ID: 49J96Q3WQ3
+      TEAM_ID: AHNW9K8745
+      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+      BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
       ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
@@ -66,21 +69,28 @@ jobs:
           echo "ASC key written to ${KEY_PATH}"
           echo "ASC_KEY_PATH=${KEY_PATH}" >> $GITHUB_ENV
 
-      - name: Optional — import provided private key into keychain
+      - name: Install signing cert and provisioning profile (manual signing)
         run: |
           set -euo pipefail
-          if [ -n "${CERTIFICATE_PRIVATE_KEY}" ]; then
-            echo "Importing CERTIFICATE_PRIVATE_KEY into keychain (no password)"
-            KEY_PEM="$RUNNER_TEMP/codesign.key.pem"
-            umask 177
-            printf "%s" "${CERTIFICATE_PRIVATE_KEY}" > "${KEY_PEM}"
-            # Try to import as a key (may not be linked to a cert; xcodebuild may still create a new certificate)
-            security import "${KEY_PEM}" -A -T /usr/bin/codesign -T /usr/bin/security || true
-          else
-            echo "No CERTIFICATE_PRIVATE_KEY provided; relying on Xcode automatic signing with ASC API key."
+          if [ -z "${BUILD_CERTIFICATE_BASE64}" ] || [ -z "${P12_PASSWORD}" ] || [ -z "${BUILD_PROVISION_PROFILE_BASE64}" ]; then
+            echo "Missing manual signing secrets (BUILD_CERTIFICATE_BASE64, P12_PASSWORD, BUILD_PROVISION_PROFILE_BASE64)"; exit 1
           fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/codesign.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 12)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -s "$KEYCHAIN_PATH"
+          P12_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$P12_PATH"
+          security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$P12_PASSWORD" -A -T /usr/bin/codesign -T /usr/bin/security
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_PATH="$HOME/Library/MobileDevice/Provisioning Profiles/NEXARA-App-Store.mobileprovision"
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+          echo "Installed provisioning profile at $PROFILE_PATH"
 
-      - name: Create ExportOptions.plist (App Store)
+      - name: Create ExportOptions.plist (App Store, manual)
         run: |
           mkdir -p "$(dirname "$EXPORT_PLIST")"
           cat > "$EXPORT_PLIST" <<'PLIST'
@@ -91,7 +101,12 @@ jobs:
               <key>method</key>
               <string>app-store</string>
               <key>signingStyle</key>
-              <string>automatic</string>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                <key>mx.nexara.mobile.NexaraApp</key>
+                <string>NEXARA App Store</string>
+              </dict>
               <key>stripSwiftSymbols</key>
               <true/>
               <key>uploadSymbols</key>
@@ -101,7 +116,7 @@ jobs:
           PLIST
           cat "$EXPORT_PLIST"
 
-      - name: Archive (Release, iOS Device) with automatic signing via ASC API key
+      - name: Archive (Release, iOS Device) — manual signing
         run: |
           set -euo pipefail
           DERIVED="$RUNNER_TEMP/DerivedData"
@@ -112,13 +127,12 @@ jobs:
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="NEXARA App Store" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $RUNNER_TEMP/codesign.keychain-db" \
             -derivedDataPath "$DERIVED" \
             -resultBundlePath "$RUNNER_TEMP/BuildResult" \
             archive -archivePath "$ARCHIVE_PATH"
@@ -143,11 +157,7 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
             -exportOptionsPlist "$EXPORT_PLIST" \
-            -exportPath "$EXPORT_DIR" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -exportPath "$EXPORT_DIR"
           ls -lah "$EXPORT_DIR"
 
       - name: Upload to TestFlight (Transporter API key)
