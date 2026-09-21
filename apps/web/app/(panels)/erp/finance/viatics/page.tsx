@@ -116,7 +116,7 @@ const rowMetaStyle: CSSProperties = {
   color: "var(--text-tertiary)",
   lineHeight: 1.35,
 };
-const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text, #b91c1c)" };
+const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text)" };
 const breakdownPanelStyle: CSSProperties = {
   padding: 14,
   border: "1px solid var(--nx-panel-hairline, var(--border))",
@@ -611,7 +611,6 @@ export default function ViaticosPage() {
       // Antes salía en silencio y la pantalla se quedaba en «Cargando viáticos…»
       // para siempre. Ahora dice qué pasa y qué hacer.
       setLoading(false);
-      setItems([]);
       setError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión para ver los viáticos.");
       return;
     }
@@ -627,8 +626,10 @@ export default function ViaticosPage() {
         comprobante: (v.ticketEvidenciaUrl as string | undefined) ?? (v.comprobante as string | undefined),
       })) as Viatico[]);
     } catch (e) {
+      // Un fallo al refrescar NO borra lo que ya estaba en pantalla: se avisa
+      // arriba y la tabla sigue mostrando la última lista buena. Vaciarla
+      // convertía un timeout en «no hay viáticos», que es mentira.
       setError(formatApiError(e, "No se pudieron cargar los viáticos"));
-      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -697,11 +698,23 @@ export default function ViaticosPage() {
     [items, user, cfg.defaultScope],
   );
 
-  const filtered = useMemo(() => {
+  /**
+   * Lo que cae en la pestaña abierta antes de buscar. Separado de `filtered`
+   * porque la regla 7 distingue «aquí todavía no hay nada» de «los filtros no
+   * dejaron pasar ninguno», y son dos pantallas distintas.
+   */
+  const tabRows = useMemo(() => {
     if (tab === "analytics") return [];
-    let rows = tab === "contabilidad"
+    return tab === "contabilidad"
       ? visibleItems.filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado")
       : visibleItems;
+  }, [visibleItems, tab]);
+
+  const hasFilters = Boolean(filter.trim() || filterEstatus);
+
+  const filtered = useMemo(() => {
+    if (tab === "analytics") return [];
+    let rows = tabRows;
     if (highlightId) {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
@@ -720,7 +733,7 @@ export default function ViaticosPage() {
         (v.estatus ?? "").toLowerCase().includes(q) ||
         (v.contabilidadRef ?? "").toLowerCase().includes(q),
     );
-  }, [visibleItems, filter, filterEstatus, highlightId, tab]);
+  }, [tabRows, filter, filterEstatus, highlightId, tab]);
 
   /**
    * Regla 1: lo que la persona viene a saber — cuánto espera autorización,
@@ -1140,6 +1153,14 @@ export default function ViaticosPage() {
               {v.concepto ?? "—"}
             </div>
             <div style={rowMetaStyle}>
+              {/* En móvil el estado deja de ser columna y baja aquí: antes
+                  empujaba la tabla más allá del ancho de la pantalla. */}
+              {narrow ? (
+                <StatusDot
+                  label={(v.estatus ?? "Pendiente").replace(/_/g, " ")}
+                  tone={estatusTone(v.estatus)}
+                />
+              ) : null}
               <span>{meta.join(" · ")}</span>
               {href ? (
                 <span>
@@ -1184,17 +1205,21 @@ export default function ViaticosPage() {
             width: 110,
           },
         ] as Column<Viatico>[])),
-    {
-      key: "estatus",
-      label: "Estado",
-      render: (v) => (
-        <StatusDot
-          label={(v.estatus ?? "Pendiente").replace(/_/g, " ")}
-          tone={estatusTone(v.estatus)}
-        />
-      ),
-      width: 150,
-    },
+    ...(narrow
+      ? []
+      : ([
+          {
+            key: "estatus",
+            label: "Estado",
+            render: (v: Viatico) => (
+              <StatusDot
+                label={(v.estatus ?? "Pendiente").replace(/_/g, " ")}
+                tone={estatusTone(v.estatus)}
+              />
+            ),
+            width: 150,
+          },
+        ] as Column<Viatico>[])),
     {
       key: "acciones",
       label: "",
@@ -1275,7 +1300,9 @@ export default function ViaticosPage() {
           </div>
         );
       },
-      width: 240,
+      // En móvil la columna se estrecha a lo que ocupen los botones: fijarla en
+      // 240px era lo que obligaba a hacer scroll lateral a 375px.
+      width: narrow ? undefined : 240,
     },
   ];
 
@@ -1293,29 +1320,48 @@ export default function ViaticosPage() {
 
   const selectedTrail = readTrail(selected?.approvalTrail);
 
+  /**
+   * Regla 7: cuatro celdas en `$0` encima de un «Sin viáticos» no informan de
+   * nada y le quitan el sitio a lo único que ayuda ahí —de dónde sale el
+   * primer viático y el botón que lo pide—. La condición es el conteo de
+   * filas, no que el importe sea cero.
+   */
+  const showMetrics = tab !== "analytics" && visibleItems.length > 0;
+  /** Sin un solo viático en la pestaña y sin filtros no hay nada que buscar. */
+  const showToolbar = tabRows.length > 0 || hasFilters;
+  /** La primera carga sí tapa la pantalla; un refresco posterior, no. */
+  const firstLoad = loading && items.length === 0;
+
+  const clearFilters = () => {
+    setFilter("");
+    setFilterEstatus("");
+  };
+
+  /** Regla 4: un solo primario por pantalla, y es la acción a la que se vino. */
+  const primaryAction = cfg.canCreate ? (
+    <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openCreate}>
+      Solicitar viático
+    </Button>
+  ) : null;
+
+  const refreshAction = (
+    <Button
+      size="sm"
+      variant="ghost"
+      style={toolbarButtonStyle}
+      disabled={loading}
+      onClick={() => void load()}
+    >
+      {loading ? "Actualizando…" : "Actualizar"}
+    </Button>
+  );
+
   return (
     <FinanceModuleShell
-      eyebrow="ERP · Finanzas"
+      variant="flat"
       title={cfg.title}
       subtitle={cfg.subtitle}
-      actions={
-        <>
-          <Button size="sm" variant="ghost" style={toolbarButtonStyle} disabled={pdfBusy} onClick={() => void downloadPdf()}>
-            {pdfBusy ? "Generando…" : "Exportar PDF"}
-          </Button>
-          <Button size="sm" variant="ghost" style={toolbarButtonStyle} disabled={loading} onClick={() => void load()}>
-            {loading ? "Actualizando…" : "Actualizar"}
-          </Button>
-          {cfg.canCreate && (
-            <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openCreate}>Solicitar viático</Button>
-          )}
-        </>
-      }
-      kpis={
-        <div style={{ gridColumn: "1 / -1" }}>
-          <MetricStrip metrics={metrics} ariaLabel="Resumen de viáticos" />
-        </div>
-      }
+      kpis={showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de viáticos" /> : undefined}
       tabs={[
         { id: "contabilidad", label: "Contabilidad" },
         { id: "todos", label: "Todos" },
@@ -1326,26 +1372,33 @@ export default function ViaticosPage() {
     >
       {tab === "analytics" ? (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "end" }}>
-            <FinanceField label="Desde" hint="Deja vacío para incluir todo el histórico." optional>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inp} />
-            </FinanceField>
-            <FinanceField label="Hasta" optional>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inp} />
-            </FinanceField>
-            <Button
-              size="sm"
-              variant="secondary"
-              style={toolbarButtonStyle}
-              onClick={() => void loadAnalytics()}
-              disabled={analyticsLoading}
-            >
-              {analyticsLoading ? "Calculando…" : "Aplicar"}
-            </Button>
-            <Button size="sm" variant="ghost" style={toolbarButtonStyle} onClick={() => void downloadPdf()} disabled={pdfBusy}>
-              {pdfBusy ? "Generando…" : "Exportar PDF"}
-            </Button>
-          </div>
+          {/* Regla 8: rango, acción y exportación en una sola fila, sin caja. */}
+          <FilterToolbar
+            dates={[
+              { label: "Desde", value: dateFrom, onChange: setDateFrom },
+              { label: "Hasta", value: dateTo, onChange: setDateTo },
+            ]}
+            onClear={() => {
+              setDateFrom("");
+              setDateTo("");
+            }}
+            style={{ marginBottom: 0 }}
+            rightActions={
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  style={toolbarButtonStyle}
+                  onClick={() => void loadAnalytics()}
+                  disabled={analyticsLoading}
+                >
+                  {analyticsLoading ? "Calculando…" : "Aplicar"}
+                </Button>
+                <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
+                {primaryAction}
+              </>
+            }
+          />
           {analyticsError && (
             <InlineAlert
               message={analyticsError}
@@ -1365,9 +1418,19 @@ export default function ViaticosPage() {
             </div>
           )}
           {!analyticsLoading && !analytics && !analyticsError && (
-            <div style={statusPanelStyle}>Elige un rango y pulsa «Aplicar» para calcular el resumen.</div>
+            <div style={statusPanelStyle}>
+              Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.
+            </div>
           )}
-          {!analyticsLoading && analytics && (
+          {/* Regla 7 en el periodo: si no hubo ni un viático, la tira de ceros
+              no dice nada; la frase sí. Con filas, aunque sumen cero, se
+              enseña: un periodo que cerró en cero es información. */}
+          {!analyticsLoading && analytics && analytics.totals.count === 0 && (
+            <div style={statusPanelStyle}>
+              En el periodo elegido no hay ningún viático registrado.
+            </div>
+          )}
+          {!analyticsLoading && analytics && analytics.totals.count > 0 && (
             <>
               <MetricStrip
                 ariaLabel="Resumen del periodo"
@@ -1392,29 +1455,40 @@ export default function ViaticosPage() {
         </div>
       ) : (
         <>
-          <FilterToolbar
-            search={{ value: filter, onChange: setFilter, placeholder: "Buscar por concepto, solicitante, folio o ref…" }}
-            selects={[{
-              label: "Estatus",
-              value: filterEstatus,
-              onChange: setFilterEstatus,
-              options: (tab === "contabilidad" ? ESTATUS_CONTABILIDAD : ESTATUS).map((s) => ({
-                value: s,
-                label: s.replace("_", " "),
-              })),
-              allowAll: true,
-            }]}
-            onClear={() => { setFilter(""); setFilterEstatus(""); }}
-            resultCount={loading ? null : filtered.length}
-            rightActions={
-              <ListExportActions
-                onExcel={exportExcel}
-                excelDisabled={filtered.length === 0}
-                onPdf={() => void downloadPdf()}
-                pdfBusy={pdfBusy}
-              />
-            }
-          />
+          {/* Regla 8: buscador, selector, exportación y la acción principal en
+              una sola fila. Sin recuadro propio: cada control ya trae su borde
+              y meterlos en una caja es dibujarlo dos veces. Exportar vive aquí
+              y solo aquí — antes estaba también en la cabecera. */}
+          {showToolbar && (
+            <FilterToolbar
+              search={{ value: filter, onChange: setFilter, placeholder: "Buscar por concepto, solicitante, folio o ref…" }}
+              selects={[{
+                label: "Estatus",
+                value: filterEstatus,
+                onChange: setFilterEstatus,
+                options: (tab === "contabilidad" ? ESTATUS_CONTABILIDAD : ESTATUS).map((s) => ({
+                  value: s,
+                  label: s.replace("_", " "),
+                })),
+                allowAll: true,
+              }]}
+              onClear={clearFilters}
+              style={{ marginBottom: 0 }}
+              resultCount={firstLoad ? null : filtered.length}
+              rightActions={
+                <>
+                  {refreshAction}
+                  <ListExportActions
+                    onExcel={exportExcel}
+                    excelDisabled={filtered.length === 0}
+                    onPdf={() => void downloadPdf()}
+                    pdfBusy={pdfBusy}
+                  />
+                  {primaryAction}
+                </>
+              }
+            />
+          )}
 
           {actionError && (
             <InlineAlert
@@ -1452,36 +1526,53 @@ export default function ViaticosPage() {
               }
             />
           )}
-          {loading ? (
+          {firstLoad ? (
             <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
               Cargando viáticos…
             </div>
-          ) : !error ? (
+          ) : error && items.length === 0 ? null : (
             <DataTable
               columns={columns}
               rows={filtered}
               rowKey={(v) => v.id}
               density="compact"
               ariaLabel="Solicitudes de viáticos"
-              emptyTitle="Sin viáticos"
+              emptyTitle={
+                hasFilters
+                  ? "Ningún viático coincide"
+                  : tab === "contabilidad"
+                    ? "Todavía no hay viáticos autorizados"
+                    : "Todavía no hay viáticos"
+              }
               emptyDescription={
-                filter || filterEstatus
+                hasFilters
                   ? "Ninguna solicitud coincide con los filtros aplicados."
                   : tab === "contabilidad"
-                    ? "Aquí aparecen las solicitudes ya autorizadas y las pagadas."
+                    ? "Un viático llega aquí cuando alguien lo autoriza. Los que siguen esperando resolución están en «Todos»."
                     : cfg.canCreate
-                      ? "Solicita el primer viático con el botón de arriba."
-                      : "No hay viáticos registrados."
+                      ? "Un viático es el dinero de un viaje de trabajo —gasolina, casetas, hospedaje o alimentos— ligado a una actividad o a un proyecto. Pide el primero y queda aquí para autorizar."
+                      : "Un viático es el dinero de un viaje de trabajo —gasolina, casetas, hospedaje o alimentos—. Los pide el equipo desde su panel y aquí llegan para que los autorices."
               }
               emptyAction={
-                cfg.canCreate && !filter && !filterEstatus && tab === "todos" ? (
-                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={openCreate}>
-                    Solicitar viático
+                hasFilters ? (
+                  <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
+                    Limpiar filtros
                   </Button>
-                ) : undefined
+                ) : (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                    {tab === "contabilidad" ? (
+                      <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={() => setTab("todos")}>
+                        Ver todos
+                      </Button>
+                    ) : (
+                      primaryAction
+                    )}
+                    {refreshAction}
+                  </div>
+                )
               }
             />
-          ) : null}
+          )}
         </>
       )}
 
@@ -1598,7 +1689,7 @@ export default function ViaticosPage() {
               hint="PDF o imagen. Si no lo tienes a la mano, pega la liga abajo."
             />
             {formErrors.comprobante && (
-              <div role="alert" style={{ fontSize: 11, color: "var(--state-danger-text, #b91c1c)", marginTop: 6 }}>
+              <div role="alert" style={{ fontSize: 11, color: "var(--state-danger-text)", marginTop: 6 }}>
                 {formErrors.comprobante}
               </div>
             )}

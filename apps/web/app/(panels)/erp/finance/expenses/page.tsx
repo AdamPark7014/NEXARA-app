@@ -81,7 +81,7 @@ const rowMetaStyle: CSSProperties = {
   color: "var(--text-tertiary)",
   lineHeight: 1.35,
 };
-const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text, #b91c1c)" };
+const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text)" };
 const breakdownPanelStyle: CSSProperties = {
   padding: 14,
   border: "1px solid var(--nx-panel-hairline, var(--border))",
@@ -309,7 +309,6 @@ export default function ExpensesPage() {
       // Antes salía en silencio y la pantalla se quedaba en «Cargando gastos…»
       // para siempre. Ahora dice qué pasa y qué hacer.
       setLoading(false);
-      setItems([]);
       setError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión para ver los gastos.");
       return;
     }
@@ -320,8 +319,10 @@ export default function ExpensesPage() {
       const rows = Array.isArray(data) ? data : (data?.data ?? []);
       setItems(rows.map((r: Record<string, unknown>) => mapExpenseRow(r)));
     } catch (e) {
+      // Un fallo al refrescar NO borra lo que ya estaba en pantalla: se avisa
+      // arriba y la tabla sigue mostrando la última lista buena. Vaciarla
+      // convertía un timeout en «no tienes gastos», que es mentira.
       setError(formatApiError(e, "No se pudieron cargar los gastos"));
-      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -356,8 +357,19 @@ export default function ExpensesPage() {
     if (tab === "analytics") void loadAnalytics();
   }, [tab, loadAnalytics]);
 
+  /**
+   * Lo que la persona tiene derecho a ver, antes de filtrar. Separado de
+   * `visibleItems` porque la regla 7 distingue «no hay ni un gasto» de «los
+   * filtros no dejaron pasar ninguno», y son dos pantallas distintas.
+   */
+  const scopedItems = useMemo(
+    () => filterRowsByScope(items, user, cfg.defaultScope),
+    [items, user, cfg.defaultScope],
+  );
+  const hasFilters = Boolean(searchQ.trim() || filterCat || filterEstado);
+
   const visibleItems = useMemo(() => {
-    let result = filterRowsByScope(items, user, cfg.defaultScope);
+    let result = scopedItems;
     if (searchQ.trim()) {
       const q = searchQ.toLowerCase();
       result = result.filter(
@@ -375,7 +387,7 @@ export default function ExpensesPage() {
       if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return result;
-  }, [items, user, cfg.defaultScope, searchQ, filterCat, filterEstado, highlightId]);
+  }, [scopedItems, searchQ, filterCat, filterEstado, highlightId]);
 
   /**
    * Regla 1: la tira responde a lo que la persona viene a saber — cuánto falta
@@ -645,6 +657,9 @@ export default function ExpensesPage() {
               {e.concepto ?? "—"}
             </div>
             <div style={rowMetaStyle}>
+              {/* En móvil el estado deja de ser columna y baja aquí: antes
+                  empujaba la tabla más allá del ancho de la pantalla. */}
+              {narrow ? <StatusDot label={e.estado ?? "—"} tone={estadoTone(e.estado)} /> : null}
               <span>{meta.join(" · ")}</span>
               {href ? (
                 <span>
@@ -689,12 +704,16 @@ export default function ExpensesPage() {
             width: 110,
           },
         ] as Column<Expense>[])),
-    {
-      key: "estado",
-      label: "Estado",
-      render: (e) => <StatusDot label={e.estado ?? "—"} tone={estadoTone(e.estado)} />,
-      width: 110,
-    },
+    ...(narrow
+      ? []
+      : ([
+          {
+            key: "estado",
+            label: "Estado",
+            render: (e: Expense) => <StatusDot label={e.estado ?? "—"} tone={estadoTone(e.estado)} />,
+            width: 110,
+          },
+        ] as Column<Expense>[])),
     {
       key: "id",
       label: "",
@@ -767,11 +786,51 @@ export default function ExpensesPage() {
           </div>
         );
       },
-      width: 260,
+      // En móvil la columna se estrecha a lo que ocupen los botones: fijarla en
+      // 260px era lo que obligaba a hacer scroll lateral a 375px.
+      width: narrow ? undefined : 260,
     },
   ];
 
   const invalidFields = (Object.keys(formErrors) as (keyof FormErrors)[]).filter((k) => formErrors[k]);
+
+  /**
+   * Regla 7: cuatro celdas en `$0` encima de un «Sin gastos» no informan de
+   * nada y le quitan el sitio a lo único que ayuda ahí —de dónde sale el
+   * primer gasto y el botón que lo crea—. La condición es el conteo de filas,
+   * no que el importe sea cero: un periodo que de verdad cerró en cero tiene
+   * filas y sí se enseña.
+   */
+  const showMetrics = tab === "lista" && visibleItems.length > 0;
+  /** Sin un solo gasto y sin filtros puestos no hay nada que buscar ni exportar. */
+  const showToolbar = scopedItems.length > 0 || hasFilters;
+  /** La primera carga sí tapa la pantalla; un refresco posterior, no. */
+  const firstLoad = loading && items.length === 0;
+
+  const clearFilters = () => {
+    setSearchQ("");
+    setFilterCat("");
+    setFilterEstado("");
+  };
+
+  /** Regla 4: un solo primario por pantalla, y es la acción a la que se vino. */
+  const primaryAction = cfg.canCreate ? (
+    <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
+      Registrar gasto
+    </Button>
+  ) : null;
+
+  const refreshAction = (
+    <Button
+      size="sm"
+      variant="ghost"
+      style={toolbarButtonStyle}
+      onClick={() => void load()}
+      disabled={loading}
+    >
+      {loading ? "Actualizando…" : "Actualizar"}
+    </Button>
+  );
 
   return (
     <>
@@ -782,32 +841,10 @@ export default function ExpensesPage() {
         />
       )}
       <FinanceModuleShell
-        eyebrow="ERP · Finanzas"
+        variant="flat"
         title={cfg.title || "Gastos · Admin"}
         subtitle={cfg.subtitle}
-        actions={
-          <>
-            <Button
-              size="sm"
-              variant="ghost"
-              style={toolbarButtonStyle}
-              onClick={() => void load()}
-              disabled={loading}
-            >
-              {loading ? "Actualizando…" : "Actualizar"}
-            </Button>
-            {cfg.canCreate && (
-              <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
-                Registrar gasto
-              </Button>
-            )}
-          </>
-        }
-        kpis={
-          <div style={{ gridColumn: "1 / -1" }}>
-            <MetricStrip metrics={metrics} ariaLabel="Resumen de gastos" />
-          </div>
-        }
+        kpis={showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de gastos" /> : undefined}
         tabs={[
           { id: "lista", label: "Lista" },
           { id: "analytics", label: "Analytics" },
@@ -817,32 +854,33 @@ export default function ExpensesPage() {
       >
         {tab === "analytics" ? (
           <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "end" }}>
-              <FinanceField label="Desde" hint="Deja vacío para incluir todo el histórico." optional>
-                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={financeInputStyle} />
-              </FinanceField>
-              <FinanceField label="Hasta" optional>
-                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={financeInputStyle} />
-              </FinanceField>
-              <Button
-                size="sm"
-                variant="secondary"
-                style={toolbarButtonStyle}
-                onClick={() => void loadAnalytics()}
-                disabled={analyticsLoading}
-              >
-                {analyticsLoading ? "Calculando…" : "Aplicar"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                style={toolbarButtonStyle}
-                onClick={() => void downloadPdf()}
-                disabled={pdfBusy}
-              >
-                {pdfBusy ? "Generando…" : "Descargar PDF"}
-              </Button>
-            </div>
+            {/* Regla 8: rango, acción y exportación en una sola fila, sin caja. */}
+            <FilterToolbar
+              dates={[
+                { label: "Desde", value: dateFrom, onChange: setDateFrom },
+                { label: "Hasta", value: dateTo, onChange: setDateTo },
+              ]}
+              onClear={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+              style={{ marginBottom: 0 }}
+              rightActions={
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    style={toolbarButtonStyle}
+                    onClick={() => void loadAnalytics()}
+                    disabled={analyticsLoading}
+                  >
+                    {analyticsLoading ? "Calculando…" : "Aplicar"}
+                  </Button>
+                  <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
+                  {primaryAction}
+                </>
+              }
+            />
             {analyticsError && (
               <InlineAlert
                 message={analyticsError}
@@ -863,10 +901,18 @@ export default function ExpensesPage() {
             )}
             {!analyticsLoading && !analytics && !analyticsError && (
               <div style={statusPanelStyle}>
-                Elige un rango y pulsa «Aplicar» para calcular el resumen.
+                Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.
               </div>
             )}
-            {!analyticsLoading && analytics && (
+            {/* Regla 7 en el periodo: si no hubo ni un gasto, la tira de ceros
+                no dice nada; la frase sí. Con filas, aunque sumen cero, se
+                enseña: un periodo que cerró en cero es información. */}
+            {!analyticsLoading && analytics && analytics.count === 0 && (
+              <div style={statusPanelStyle}>
+                En el periodo elegido no hay ningún gasto registrado.
+              </div>
+            )}
+            {!analyticsLoading && analytics && analytics.count > 0 && (
               <>
                 <MetricStrip
                   ariaLabel="Resumen del periodo"
@@ -890,37 +936,40 @@ export default function ExpensesPage() {
           </div>
         ) : (
           <>
-            <FilterToolbar
-              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto, persona o ref. contable…" }}
-              selects={[
-                {
-                  label: "Categoría",
-                  value: filterCat,
-                  onChange: setFilterCat,
-                  options: EXPENSE_CATEGORIES.map((c) => ({ value: c, label: c })),
-                  allowAll: true,
-                },
-                {
-                  label: "Estado",
-                  value: filterEstado,
-                  onChange: setFilterEstado,
-                  options: ESTADOS.map((s) => ({ value: s, label: s })),
-                  allowAll: true,
-                },
-              ]}
-              onClear={() => {
-                setSearchQ("");
-                setFilterCat("");
-                setFilterEstado("");
-              }}
-              resultCount={loading ? null : visibleItems.length}
-              rightActions={
-                <ListExportActions
-                  onExcel={exportExcel}
-                  excelDisabled={visibleItems.length === 0}
-                />
-              }
-            />
+            {/* Regla 8: buscador, selectores, exportación y la acción principal
+                en una sola fila. Sin recuadro propio: cada control ya trae su
+                borde y meterlos en una caja es dibujarlo dos veces. */}
+            {showToolbar && (
+              <FilterToolbar
+                search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto, persona o ref. contable…" }}
+                selects={[
+                  {
+                    label: "Categoría",
+                    value: filterCat,
+                    onChange: setFilterCat,
+                    options: EXPENSE_CATEGORIES.map((c) => ({ value: c, label: c })),
+                    allowAll: true,
+                  },
+                  {
+                    label: "Estado",
+                    value: filterEstado,
+                    onChange: setFilterEstado,
+                    options: ESTADOS.map((s) => ({ value: s, label: s })),
+                    allowAll: true,
+                  },
+                ]}
+                onClear={clearFilters}
+                style={{ marginBottom: 0 }}
+                resultCount={firstLoad ? null : visibleItems.length}
+                rightActions={
+                  <>
+                    {refreshAction}
+                    <ListExportActions onExcel={exportExcel} excelDisabled={visibleItems.length === 0} />
+                    {primaryAction}
+                  </>
+                }
+              />
+            )}
             {actionError && (
               <InlineAlert
                 message={actionError}
@@ -944,32 +993,39 @@ export default function ExpensesPage() {
                 }
               />
             )}
-            {loading ? (
+            {firstLoad ? (
               <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
                 Cargando gastos…
               </div>
-            ) : !error ? (
+            ) : error && items.length === 0 ? null : (
               <DataTable
                 columns={columns}
                 rows={visibleItems}
                 rowKey={(e) => e.id}
                 density="compact"
                 ariaLabel="Gastos administrativos"
-                emptyTitle="Sin gastos"
+                emptyTitle={hasFilters ? "Ningún gasto coincide" : "Todavía no hay gastos"}
                 emptyDescription={
-                  searchQ || filterCat || filterEstado
+                  hasFilters
                     ? "Ningún gasto coincide con los filtros aplicados."
-                    : "Registra el primer gasto administrativo."
+                    : cfg.canCreate
+                      ? "Aquí van los pagos de la operación que no se cargan a un cliente: renta, internet, licencias, papelería. Registra el primero y queda listo para autorizar."
+                      : "Aquí van los pagos de la operación que no se cargan a un cliente: renta, internet, licencias, papelería. Los captura el equipo administrativo."
                 }
                 emptyAction={
-                  cfg.canCreate && !searchQ && !filterCat && !filterEstado ? (
-                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={openNew}>
-                      Registrar gasto
+                  hasFilters ? (
+                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
+                      Limpiar filtros
                     </Button>
-                  ) : undefined
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                      {primaryAction}
+                      {refreshAction}
+                    </div>
+                  )
                 }
               />
-            ) : null}
+            )}
           </>
         )}
       </FinanceModuleShell>
@@ -1085,7 +1141,7 @@ export default function ExpensesPage() {
               hint={editing ? "Opcional · reemplaza el archivo actual" : "PDF o imagen del ticket o la factura"}
             />
             {formErrors.evidencia && (
-              <div role="alert" style={{ fontSize: 11, color: "var(--state-danger-text, #b91c1c)", marginTop: 6 }}>
+              <div role="alert" style={{ fontSize: 11, color: "var(--state-danger-text)", marginTop: 6 }}>
                 {formErrors.evidencia}
               </div>
             )}
