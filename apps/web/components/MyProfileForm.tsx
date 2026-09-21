@@ -6,6 +6,7 @@ import styles from './MyProfileForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import PhoneField from '@/components/PhoneField';
+import { FormField, FormGrid } from '@/components/ui/FormField';
 
 const requiredDocuments = [
   {
@@ -349,105 +350,117 @@ const MyProfileForm: React.FC = () => {
       </div>
       <div className={`card ${styles.sectionCard}`}>
         <h3 className={styles.sectionTitle}>Datos personales</h3>
-        <div className={styles.grid}>
-          <div>
-            <label className={styles.label}>Teléfono</label>
+        <FormGrid>
+          <FormField label="Teléfono" optional>
             <PhoneField value={form.telefono} onChange={(v) => handleChange('telefono', v)} />
-          </div>
-          <div>
-            <label className={styles.label}>Fecha nacimiento</label>
+          </FormField>
+          <FormField label="Fecha de nacimiento" optional>
             <input className="input" type="date" value={form.fechaNacimiento} onChange={(e) => handleChange('fechaNacimiento', e.target.value)} />
-          </div>
-          <div>
-            <label className={styles.label}>CURP</label>
+          </FormField>
+          <FormField label="CURP" optional>
             <input className="input" value={form.curp} onChange={(e) => handleChange('curp', e.target.value)} />
-          </div>
-          <div>
-            <label className={styles.label}>RFC</label>
+          </FormField>
+          <FormField label="RFC" optional>
             <input className="input" value={form.rfc} onChange={(e) => handleChange('rfc', e.target.value)} />
-          </div>
-          <div>
-            <label className={styles.label}>INE (número)</label>
+          </FormField>
+          <FormField label="INE (número)" optional>
             <input className="input" value={form.ineNumero} onChange={(e) => handleChange('ineNumero', e.target.value)} />
-          </div>
-          <div>
-            <label className={styles.label}>NSS</label>
+          </FormField>
+          <FormField label="NSS" optional>
             <input className="input" value={form.nss} onChange={(e) => handleChange('nss', e.target.value)} />
-          </div>
-        </div>
+          </FormField>
+        </FormGrid>
       </div>
 
       <div className={`card ${styles.sectionCard}`}>
         <h3 className={styles.sectionTitle}>Dirección</h3>
-        <div className={styles.grid}>
-          <input className="input" placeholder="Dirección" value={form.direccion} onChange={(e) => handleChange('direccion', e.target.value)} />
-          <input className="input" placeholder="Colonia" value={form.colonia} onChange={(e) => handleChange('colonia', e.target.value)} />
-          <input className="input" placeholder="Ciudad" value={form.ciudad} onChange={(e) => handleChange('ciudad', e.target.value)} />
-          <input className="input" placeholder="Estado" value={form.estado} onChange={(e) => handleChange('estado', e.target.value)} />
-          <input className="input" placeholder="Código postal" value={form.codigoPostal} onChange={(e) => handleChange('codigoPostal', e.target.value)} />
-          <input className="input" placeholder="País" value={form.pais} onChange={(e) => handleChange('pais', e.target.value)} />
-        </div>
+        <FormGrid>
+          <FormField label="Calle y número" optional fullWidth>
+            <input className="input" placeholder="Dirección" value={form.direccion} onChange={(e) => handleChange('direccion', e.target.value)} />
+          </FormField>
+          <FormField label="Colonia" optional>
+            <input className="input" placeholder="Colonia" value={form.colonia} onChange={(e) => handleChange('colonia', e.target.value)} />
+          </FormField>
+          <FormField label="Ciudad" optional>
+            <input className="input" placeholder="Ciudad" value={form.ciudad} onChange={(e) => handleChange('ciudad', e.target.value)} />
+          </FormField>
+          <FormField label="Estado" optional>
+            <input className="input" placeholder="Estado" value={form.estado} onChange={(e) => handleChange('estado', e.target.value)} />
+          </FormField>
+          <FormField label="Código postal" optional>
+            <input className="input" placeholder="Código postal" value={form.codigoPostal} onChange={(e) => handleChange('codigoPostal', e.target.value)} />
+          </FormField>
+          <FormField label="País" optional>
+            <input className="input" placeholder="País" value={form.pais} onChange={(e) => handleChange('pais', e.target.value)} />
+          </FormField>
+        </FormGrid>
       </div>
 
       <div className={`card ${styles.sectionCard}`}>
         <h3 className={styles.sectionTitle}>Contacto de emergencia</h3>
-        <div className={styles.grid}>
-          <input className="input" placeholder="Nombre" value={form.contactoEmergenciaNombre} onChange={(e) => handleChange('contactoEmergenciaNombre', e.target.value)} />
-          <PhoneField
-            value={form.contactoEmergenciaTelefono}
-            onChange={(v) => handleChange('contactoEmergenciaTelefono', v)}
-            placeholder="Teléfono de emergencia"
-          />
-        </div>
+        <FormGrid>
+          <FormField label="Nombre" optional>
+            <input className="input" placeholder="Nombre" value={form.contactoEmergenciaNombre} onChange={(e) => handleChange('contactoEmergenciaNombre', e.target.value)} />
+          </FormField>
+          <FormField label="Teléfono" optional>
+            <PhoneField
+              value={form.contactoEmergenciaTelefono}
+              onChange={(v) => handleChange('contactoEmergenciaTelefono', v)}
+              placeholder="Teléfono de emergencia"
+            />
+          </FormField>
+        </FormGrid>
       </div>
 
       <div className={`card ${styles.sectionCard}`}>
-        <h3 className={styles.sectionTitleCompact}>Documentacion del perfil</h3>
+        <h3 className={styles.sectionTitleCompact}>Documentación del perfil</h3>
         <p className={styles.docIntro}>
-          Sube tus documentos y consulta su estatus de revision en un solo panel.
+          Sube tus documentos y consulta su estatus de revisión en un solo panel.
         </p>
         <div className={styles.docWrap}>
-          <div className={styles.grid}>
-            <select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>
-              {requiredDocuments.map((doc) => (
-                <option key={doc.key} value={doc.key}>{doc.key}</option>
-              ))}
-            </select>
-            <div
-              onDragEnter={() => setDragActive(true)}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={handleDrop}
-              className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
-            >
-              <div className={styles.dropTitle}>Arrastra y suelta el documento aquí</div>
-              <div className={styles.dropHint}>
-                O selecciona el archivo manualmente.
-              </div>
-              <button
-                className="button-secondary"
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
+          <FormGrid>
+            <FormField label="Tipo de documento" hint="Elige el documento que vas a subir.">
+              <select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>
+                {requiredDocuments.map((doc) => (
+                  <option key={doc.key} value={doc.key}>{doc.key}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Archivo" fullWidth hint="PDF o imagen. Puedes arrastrar varios.">
+              <div
+                onDragEnter={() => setDragActive(true)}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setDragActive(true);
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={handleDrop}
+                className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
               >
-                Seleccionar archivo
-              </button>
-              <input
-                ref={fileInputRef}
-                className={styles.hiddenInput}
-                type="file"
-                accept="application/pdf,image/*"
-                multiple
-                onChange={(e) => handleSelectFiles(e.target.files || [])}
-              />
-            </div>
-            <button className="button-primary" type="button" onClick={handleUploadDocs} disabled={saving || docFiles.length === 0}>
-              Subir documentos
-            </button>
-          </div>
+                <div className={styles.dropTitle}>Arrastra y suelta el documento aquí</div>
+                <div className={styles.dropHint}>O selecciónalo manualmente.</div>
+                <button
+                  className="button-secondary"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Seleccionar archivo
+                </button>
+                <input
+                  ref={fileInputRef}
+                  className={styles.hiddenInput}
+                  type="file"
+                  accept="application/pdf,image/*"
+                  multiple
+                  onChange={(e) => handleSelectFiles(e.target.files || [])}
+                />
+              </div>
+            </FormField>
+          </FormGrid>
+          <button className="button-primary" type="button" onClick={handleUploadDocs} disabled={saving || docFiles.length === 0}>
+            Subir documentos
+          </button>
           {docPreviews.length > 0 && (
             <div className={styles.previewsWrap}>
               <div className={styles.filesLabel}>Archivos listos para subir</div>
