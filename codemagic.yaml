@@ -157,7 +157,8 @@ workflows:
       xcode: 16.2
       groups:
         # Define these groups in Codemagic UI and add secrets/variables there
-        - ios_signing          # certificates/provisioning profiles
+        - ios_signing              # holds CERTIFICATE_PRIVATE_KEY (PKCS#8 PEM), PROVISIONING_PROFILE_NAME, etc.
+        - certificate_credentials  # optional alias group name if used by team
       vars:
         XCODE_PROJECT_PATH: apps/mobile-native/ios/NexaraApp.xcodeproj
         XCODE_SCHEME: NexaraApp
@@ -212,6 +213,10 @@ workflows:
       - name: Fetch signing files (App Store Connect integration)
         script: |
           set -euo pipefail
+          if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            echo "ERROR: CERTIFICATE_PRIVATE_KEY missing. Add it to group 'ios_signing' as PKCS#8 PEM."
+            exit 1
+          fi
           echo "Fetching signing files for $BUNDLE_ID (iOS App Store)…"
           app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
       - name: Install certificates into keychain

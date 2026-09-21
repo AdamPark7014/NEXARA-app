@@ -66,7 +66,7 @@ Opcional (solo si no usas integración y prefieres variables):
     - `APP_STORE_CONNECT_KEY_IDENTIFIER`
     - `APP_STORE_CONNECT_PRIVATE_KEY`
 - En cualquier caso, crea también el grupo `ios_signing`:
-    - `CERTIFICATE_PRIVATE_KEY`: clave privada para firmar (si usas .p12, coloca la contraseña; si usas PEM, el contenido/clave).
+    - `CERTIFICATE_PRIVATE_KEY`: clave privada en formato PKCS#8 PEM (contenido completo del PEM). Requerida para que Codemagic gestione y guarde certificados de firma.
     - `PROVISIONING_PROFILE_NAME`: nombre del perfil de aprovisionamiento App Store.
     - `BUNDLE_ID`: bundle id de la app (ej. `mx.nexara.mobile.NexaraApp`).
 
