@@ -56,6 +56,9 @@ import mx.nexara.mobile.nativeapp.access.ClientSector
 import mx.nexara.mobile.nativeapp.ui.console.clients.ClientDetailScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.ClientsListScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.NewClientScreen
+import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.CotizacionDetalleScreen
+import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.CotizacionesScreen
+import mx.nexara.mobile.nativeapp.ui.console.herramientas.HerramientasScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.KpisEquipoScreen
@@ -108,6 +111,14 @@ internal object ConsoleRoutes {
     /** Vehículos: ya tiene pantalla nativa (solicitar, salida y regreso con fotos). */
     const val Vehiculos = "console/vehiculos"
 
+    /** Cotizaciones (`/erp/cotizaciones`) — consulta: lista, detalle y PDF. */
+    const val Cotizaciones = "console/cotizaciones"
+
+    /** Una cotización por dentro (`/erp/cotizaciones/:id`). */
+    const val CotizacionDetalle = "console/cotizaciones/{id}"
+
+    fun cotizacionDetalle(id: Long): String = "console/cotizaciones/$id"
+
     /** KPIs del equipo (`/erp/asistencias/indicadores`) — consulta del periodo. */
     const val KpisEquipo = "console/kpis-equipo"
 
@@ -119,6 +130,9 @@ internal object ConsoleRoutes {
 
     /** Almacén (`/erp/almacen`) — existencias y bajo mínimo, solo consulta. */
     const val Almacen = "console/almacen"
+
+    /** Herramientas (`/erp/almacen/herramientas`) — mi kit, mis préstamos y pedir más plazo. */
+    const val Herramientas = "console/herramientas"
 
     /** Viáticos: mis anticipos y, para quien autoriza, los de su gente. */
     const val Viaticos = "console/viaticos"
@@ -147,7 +161,9 @@ internal object ConsoleRoutes {
      * A dónde lleva un módulo de «Más»: su pantalla nativa si ya existe, si no
      * la ficha con el enlace a la web.
      *
-     * Cotizaciones y Herramientas siguen sin pantalla propia; van en otra ola.
+     * Ya no queda ninguno en la ficha; el `else` se conserva porque el día que
+     * se añada un módulo nuevo a [CoreExtraModule] tiene que caer ahí y no
+     * romper la compilación de una pantalla que todavía no existe.
      */
     fun forExtra(module: CoreExtraModule): String = when (module) {
         CoreExtraModule.VEHICULOS -> Vehiculos
@@ -155,7 +171,9 @@ internal object ConsoleRoutes {
         CoreExtraModule.ORGANIGRAMA -> Organigrama
         CoreExtraModule.PROYECTOS -> Proyectos
         CoreExtraModule.ALMACEN -> Almacen
+        CoreExtraModule.HERRAMIENTAS -> Herramientas
         CoreExtraModule.VIATICOS -> Viaticos
+        CoreExtraModule.COTIZACIONES -> Cotizaciones
         else -> modulePlaceholder(module.key)
     }
 
@@ -296,6 +314,11 @@ fun ConsoleNavHost(
                 // lista. Es la diferencia entre «te autorizaron algo» y saber qué.
                 extra == CoreExtraModule.VIATICOS && (link.entityId ?: 0L) > 0L ->
                     ConsoleRoutes.viaticoDetalle(link.entityId!!)
+                // Igual con una cotización: el aviso de «aprobada» o
+                // «rechazada» trae su id, y `/erp/cotizaciones/:id` también.
+                // Abrir la lista y dejar que la busque sería perder el enlace.
+                extra == CoreExtraModule.COTIZACIONES && (link.entityId ?: 0L) > 0L ->
+                    ConsoleRoutes.cotizacionDetalle(link.entityId!!)
                 else -> ConsoleRoutes.forExtra(extra)
             }
             navController.navigate(ruta) { launchSingleTop = true }
@@ -335,6 +358,9 @@ fun ConsoleNavHost(
         ConsoleRoutes.Organigrama -> "Organigrama"
         ConsoleRoutes.Proyectos -> "Proyectos"
         ConsoleRoutes.Almacen -> "Almacén"
+        ConsoleRoutes.Herramientas -> "Herramientas"
+        ConsoleRoutes.Cotizaciones -> "Cotizaciones"
+        ConsoleRoutes.CotizacionDetalle -> "Cotización"
         ConsoleRoutes.Viaticos -> "Viáticos"
         ConsoleRoutes.NuevoViatico -> "Pedir viático"
         ConsoleRoutes.ViaticoDetalle -> "Viático"
@@ -569,6 +595,32 @@ fun ConsoleNavHost(
             }
             nxComposable(ConsoleRoutes.Almacen, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.ALMACEN in extras) AlmacenScreen()
+            }
+            // Herramientas: mi kit, mis préstamos y pedir más plazo. Comprueba el
+            // módulo igual que el resto de «Más»; el permiso de verdad
+            // (`tools.view`) lo decide el API, y su 403 se enseña tal cual —la
+            // pantalla aguanta que falle solo una de las dos listas.
+            nxComposable(ConsoleRoutes.Herramientas, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.HERRAMIENTAS in extras) HerramientasScreen()
+            }
+            // Cotizaciones: consulta. La lista y el detalle comprueban el
+            // módulo igual que el resto de «Más»; el permiso de verdad
+            // (`cotizaciones.access`) lo decide el API, y su 403 se enseña tal
+            // cual.
+            nxComposable(ConsoleRoutes.Cotizaciones, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.COTIZACIONES in extras) {
+                    CotizacionesScreen(
+                        onAbrirCotizacion = { id ->
+                            navController.navigate(ConsoleRoutes.cotizacionDetalle(id)) {
+                                launchSingleTop = true
+                            }
+                        },
+                    )
+                }
+            }
+            nxComposable(ConsoleRoutes.CotizacionDetalle, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                if (CoreExtraModule.COTIZACIONES in extras) CotizacionDetalleScreen(cotizacionId = id)
             }
             // Viáticos: el técnico pide desde la calle y la dirección resuelve
             // desde donde esté. La lista se recarga sola cuando el alta, una
