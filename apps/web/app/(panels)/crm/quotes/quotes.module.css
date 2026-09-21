@@ -1,69 +1,3 @@
-/* Shared CRM quotes visual language */
-
-.quotesHero {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-@media (max-width: 900px) {
-  .quotesHero {
-    grid-template-columns: 1fr;
-  }
-}
-
-.quotesPathCard {
-  display: grid;
-  gap: 10px;
-  padding: 18px 20px;
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  text-decoration: none;
-  color: inherit;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
-}
-
-.quotesPathCard:hover {
-  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
-}
-
-.quotesPathCardPrimary {
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), var(--surface) 55%);
-  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
-}
-
-.quotesPathEyebrow {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--primary);
-}
-
-.quotesPathTitle {
-  font-size: 17px;
-  font-weight: 750;
-  line-height: 1.25;
-}
-
-.quotesPathText {
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--text-secondary);
-}
-
-.quotesPathCta {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--primary);
-}
-
 .quotesLayout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -313,35 +247,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.quotesEmptyBoost {
-  border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--border));
-  border-radius: 16px;
-  padding: 28px 22px;
-  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
-  display: grid;
-  gap: 14px;
-  justify-items: start;
-}
-
-.quotesStatusChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 700;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-}
-
-.quotesCtChipOk {
-  color: #15803d;
-  border-color: color-mix(in srgb, #15803d 30%, var(--border));
-  background: color-mix(in srgb, #15803d 8%, var(--surface));
 }
 
 .quotesMiniOffer {

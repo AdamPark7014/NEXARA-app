@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
-import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import InlineAlert from "@/components/ui/InlineAlert";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import { listSalesQuotes, type SalesQuote } from "@/lib/sales-api";
+import { formatApiError } from "@/lib/erp-api";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { buildApiUrl } from "@/lib/api-base";
 import { smartQuoteCtStatus } from "@/lib/smart-quote-api";
 import SupplierStatsBar from "./components/SupplierStatsBar";
-import styles from "./quotes.module.css";
 
 const toDateInput = (date: Date) => {
   const year = date.getFullYear();
@@ -45,6 +46,44 @@ function formatStatus(s: string) {
   return m[s] ?? s;
 }
 
+/**
+ * Tono del estado: `neutral` para lo que solo avanza en el flujo, color solo
+ * cuando el renglón pide algo o ya salió mal (contrato, regla 3).
+ */
+function statusTone(s: string): StatusTone {
+  if (s === "APPROVED") return "success";
+  if (s === "REJECTED" || s === "EXPIRED") return "danger";
+  return "neutral";
+}
+
+const pesos = (n: number) =>
+  new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(n);
+
+const shortDay = (value: string) =>
+  new Date(value).toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+
+/**
+ * A 375px una tabla de siete columnas se va de ancho y obliga a arrastrar en
+ * horizontal para leer un total. Por debajo de 720px el renglón se colapsa a
+ * dos columnas y el contexto baja bajo el folio (contrato, regla 2).
+ */
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 720px)");
+    const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return narrow;
+}
+
 export default function QuotesPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getCrmSalesSectionConfig(user, "quotes"), [user]);
@@ -52,6 +91,7 @@ export default function QuotesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
+  const narrow = useIsNarrow();
 
   useEffect(() => {
     if (searchParams.get("new") === "1" && cfg.canCreate) {
@@ -60,7 +100,10 @@ export default function QuotesPage() {
   }, [searchParams, cfg.canCreate, router]);
 
   const [items, setItems] = useState<SalesQuote[]>([]);
+  /** Solo la primera carga deja la pantalla en blanco. */
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const loadedOnce = useRef(false);
   const [searchQ, setSearchQ] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [periodFrom, setPeriodFrom] = useState("");
@@ -75,15 +118,19 @@ export default function QuotesPage() {
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    if (loadedOnce.current) setRefreshing(true);
+    else setLoading(true);
     setLoadError(null);
     try {
       setItems(await listSalesQuotes(token));
+      loadedOnce.current = true;
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "No se pudieron cargar las cotizaciones");
-      setItems([]);
+      // Un fallo al refrescar no borra lo que ya está en pantalla: la lista
+      // anterior sigue siendo cierta hasta que llegue una nueva.
+      setLoadError(formatApiError(e, "No se pudieron cargar las cotizaciones"));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [token]);
 
@@ -152,9 +199,7 @@ export default function QuotesPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setPdfErr(
-        `No se pudo descargar el PDF de ${q.quoteNumber}: ${e instanceof Error ? e.message : "error desconocido"}`,
-      );
+      setPdfErr(`No se pudo descargar el PDF de ${q.quoteNumber}. ${formatApiError(e)}`);
     } finally {
       setPdfBusyId(null);
     }
@@ -219,161 +264,226 @@ export default function QuotesPage() {
     );
   };
 
-  const columns: Column<SalesQuote>[] = [
-    {
-      key: "quoteNumber",
-      label: "Cotización",
-      render: (q) => (
-        <div>
-          <Link
-            href={`/crm/quotes/${q.id}`}
-            style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}
-          >
-            {q.quoteNumber}
-          </Link>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            {new Date(q.issueDate).toLocaleDateString("es-MX", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "clientCompany",
-      label: "Cliente",
-      render: (q) => (
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 13 }}>{q.clientCompany ?? "—"}</div>
-          {q.clientName && (
-            <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{q.clientName}</div>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "projectName",
-      label: "Proyecto",
-      render: (q) => q.projectName ?? "—",
-      width: 160,
-    },
-    {
-      key: "total",
-      label: "Total",
-      align: "right",
-      render: (q) => <Money value={Number(q.total)} />,
-      width: 110,
-    },
-    {
-      key: "validUntil",
-      label: "Vigencia",
-      render: (q) => {
-        if (!q.validUntil) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
-        const daysLeft = Math.ceil((new Date(q.validUntil).getTime() - Date.now()) / 86400000);
-        const isActive = q.status !== "APPROVED" && q.status !== "REJECTED";
-        if (!isActive) {
-          return (
-            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-              {new Date(q.validUntil).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
-            </span>
-          );
-        }
-        const color =
-          daysLeft < 0
-            ? "var(--danger)"
-            : daysLeft <= 5
-              ? "var(--danger)"
-              : daysLeft <= 14
-                ? "var(--warning)"
-                : "var(--text-secondary)";
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 12, color }}>
-              {new Date(q.validUntil).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
-            </span>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color }}>
-              {daysLeft < 0 ? "EXPIRADA" : `${daysLeft}d`}
-            </span>
-          </div>
-        );
+  /** Una celda de la tira filtra en el sitio; volver a pulsarla lo deshace. */
+  const toggleStatus = (status: string) =>
+    setFilterStatus((current) => (current === status ? "" : status));
+
+  const metrics = useMemo<Metric[]>(() => {
+    const countBy = (s: string) => periodItems.filter((q) => q.status === s).length;
+    const aprobadas = periodItems.filter((q) => q.status === "APPROVED");
+    const valorAprobado = aprobadas.reduce((s, q) => s + Number(q.total ?? 0), 0);
+    const valorTotal = periodItems.reduce((s, q) => s + Number(q.total ?? 0), 0);
+    const enviadas = countBy("SENT");
+    const rechazadas = countBy("REJECTED");
+    const borradores = countBy("DRAFT");
+    const tasa = periodItems.length > 0 ? Math.round((aprobadas.length / periodItems.length) * 100) : 0;
+
+    return [
+      {
+        label: "cotizaciones",
+        value: periodItems.length,
+        hint: borradores > 0 ? `${borradores} sin salir de borrador` : "ninguna en borrador",
       },
-      width: 90,
-    },
-    {
-      key: "status",
-      label: "Estado",
-      render: (q) => {
-        const s = q.status;
-        const v =
-          s === "APPROVED"
-            ? "positive"
-            : s === "REJECTED" || s === "EXPIRED"
-              ? "danger"
-              : s === "SENT"
-                ? "accent"
-                : "neutral";
-        return <Tag variant={v}>{formatStatus(s)}</Tag>;
+      {
+        label: "enviadas",
+        value: enviadas,
+        hint: enviadas > 0 ? "esperan respuesta del cliente" : "nada pendiente de respuesta",
+        tone: enviadas > 0 ? "warning" : "default",
+        onClick: () => toggleStatus("SENT"),
       },
-      width: 100,
-    },
-    {
-      key: "id",
-      label: "Acciones",
-      align: "center",
-      render: (q) => (
-        <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
-          <Link href={`/crm/quotes/${q.id}`}>
-            <Button variant="ghost" size="sm">
-              Ver
-            </Button>
-          </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconLeft="📄"
-            loading={pdfBusyId === q.id}
-            disabled={pdfBusyId !== null && pdfBusyId !== q.id}
-            onClick={() => void downloadQuotePdf(q)}
-            title={`Descargar PDF de ${q.quoteNumber}`}
-          >
-            Descargar PDF
-          </Button>
-        </div>
-      ),
-      width: 200,
-    },
-  ];
+      {
+        label: "aprobadas",
+        value: aprobadas.length,
+        hint: `${tasa}% de las del periodo`,
+        tone: aprobadas.length > 0 ? "success" : "default",
+        onClick: () => toggleStatus("APPROVED"),
+      },
+      {
+        label: "rechazadas",
+        value: rechazadas,
+        hint: rechazadas > 0 ? "el cliente dijo que no" : "ninguna rechazada",
+        tone: rechazadas > 0 ? "danger" : "default",
+        onClick: () => toggleStatus("REJECTED"),
+      },
+      {
+        label: "valor aprobado",
+        value: pesos(valorAprobado),
+        hint: `de ${pesos(valorTotal)} cotizado`,
+        tone: valorAprobado > 0 ? "success" : "default",
+      },
+    ];
+  }, [periodItems]);
+
+  const pdfButton = (q: SalesQuote) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      loading={pdfBusyId === q.id}
+      disabled={pdfBusyId !== null && pdfBusyId !== q.id}
+      onClick={() => void downloadQuotePdf(q)}
+      title={`Descargar PDF de ${q.quoteNumber}`}
+    >
+      PDF
+    </Button>
+  );
+
+  /** Vigencia: solo grita cuando queda poco y la cotización sigue viva. */
+  const vigencia = (q: SalesQuote) => {
+    if (!q.validUntil) return null;
+    const isActive = q.status !== "APPROVED" && q.status !== "REJECTED";
+    const daysLeft = Math.ceil((new Date(q.validUntil).getTime() - Date.now()) / 86400000);
+    if (!isActive) {
+      return (
+        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+          vence {shortDay(q.validUntil)}
+        </span>
+      );
+    }
+    const color =
+      daysLeft < 0
+        ? "var(--state-danger-text)"
+        : daysLeft <= 5
+          ? "var(--state-danger-text)"
+          : daysLeft <= 14
+            ? "var(--state-warning-text)"
+            : "var(--text-tertiary)";
+    return (
+      <span style={{ fontSize: 11.5, color }}>
+        {daysLeft < 0 ? `venció ${shortDay(q.validUntil)}` : `vence ${shortDay(q.validUntil)} · ${daysLeft}d`}
+      </span>
+    );
+  };
+
+  const quoteCell = (q: SalesQuote, withStatus: boolean) => {
+    const vence = vigencia(q);
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+        <Link
+          href={`/crm/quotes/${q.id}`}
+          style={{ fontWeight: 650, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}
+        >
+          {q.quoteNumber}
+        </Link>
+        <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>
+          {[q.clientCompany, q.clientName].filter(Boolean).join(" · ") || "Sin cliente"}
+        </span>
+        {q.projectName && (
+          <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{q.projectName}</span>
+        )}
+        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+          {shortDay(q.issueDate)}
+          {vence ? " · " : ""}
+          {vence}
+        </span>
+        {withStatus && <StatusDot label={formatStatus(q.status)} tone={statusTone(q.status)} />}
+      </div>
+    );
+  };
+
+  // Sin `useMemo`: las celdas cierran sobre `token` y sobre qué PDF se está
+  // bajando, y una tabla memoizada se quedaba con la versión anterior.
+  const columns: Column<SalesQuote>[] = (() => {
+    if (narrow) {
+      return [
+        {
+          key: "quoteNumber",
+          label: "Cotización",
+          render: (q) => quoteCell(q, true),
+        },
+        {
+          key: "total",
+          label: "Total",
+          align: "right",
+          numeric: true,
+          width: 116,
+          render: (q) => (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <Money value={Number(q.total)} />
+              {pdfButton(q)}
+            </div>
+          ),
+        },
+      ];
+    }
+
+    return [
+      {
+        key: "quoteNumber",
+        label: "Cotización",
+        render: (q) => quoteCell(q, false),
+      },
+      {
+        key: "total",
+        label: "Total",
+        align: "right",
+        numeric: true,
+        width: 120,
+        render: (q) => <Money value={Number(q.total)} />,
+      },
+      {
+        key: "status",
+        label: "Estado",
+        width: 120,
+        render: (q) => <StatusDot label={formatStatus(q.status)} tone={statusTone(q.status)} />,
+      },
+      {
+        key: "id",
+        label: "",
+        align: "right",
+        width: 76,
+        render: (q) => pdfButton(q),
+      },
+    ];
+  })();
 
   const syncLabel = ctStatus?.lastSync?.finishedAt
-    ? `CT ${ctStatus.total.toLocaleString("es-MX")} SKUs · sync ${new Date(
+    ? `Catálogo CT: ${ctStatus.total.toLocaleString("es-MX")} SKUs, al día ${new Date(
         ctStatus.lastSync.finishedAt,
       ).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
     : ctStatus
-      ? `CT ${ctStatus.total.toLocaleString("es-MX")} SKUs`
+      ? `Catálogo CT: ${ctStatus.total.toLocaleString("es-MX")} SKUs`
       : null;
+
+  const hasFilters = Boolean(searchQ.trim() || filterStatus);
+  const clearFilters = () => {
+    const currentMonth = getCurrentMonthPeriod();
+    setSearchQ("");
+    setFilterStatus("");
+    setPeriodFrom(currentMonth.from);
+    setPeriodTo(currentMonth.to);
+  };
+
+  // Sin una sola cotización dada de alta, la tira son cinco ceros encima de un
+  // «no hay nada»: le quita el sitio a lo único que ayuda ahí, que es decir de
+  // dónde sale la primera. Un periodo que sí cerró en cero SÍ se enseña, porque
+  // eso es información (contrato, regla 7).
+  const hasAnyQuote = items.length > 0;
 
   return (
     <>
       <PageHeader
         eyebrow="CRM · Ventas"
         title={cfg.title}
-        subtitle="Arma propuestas rápidas con el mayorista o una cotización formal completa."
+        density="ops"
+        meta={
+          syncLabel ? (
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{syncLabel}</span>
+          ) : undefined
+        }
         actions={
           <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>
-              Actualizar
+            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading || refreshing}>
+              {refreshing ? "Actualizando…" : "Actualizar"}
             </Button>
-            {cfg.canCreate && (
+            {cfg.canCreate && hasAnyQuote && (
               <>
                 <Link href="/crm/quotes/new">
-                  <Button variant="secondary" iconLeft="📝">
+                  <Button size="sm" variant="secondary">
                     Formulario completo
                   </Button>
                 </Link>
                 <Link href="/crm/quotes/builder">
-                  <Button variant="primary" iconLeft="⚡">
+                  <Button size="sm" variant="primary">
                     Cotizar en minutos
                   </Button>
                 </Link>
@@ -383,263 +493,126 @@ export default function QuotesPage() {
         }
       />
 
-      {cfg.canCreate && (
-        <div className={styles.quotesHero}>
-          <Link href="/crm/quotes/builder" className={`${styles.quotesPathCard} ${styles.quotesPathCardPrimary}`}>
-            <div className={styles.quotesPathEyebrow}>Recomendado</div>
-            <div className={styles.quotesPathTitle}>Cotizar en minutos</div>
-            <p className={styles.quotesPathText}>
-              Busca en CT Online, compara precio/stock/margen y arma la cotización guiada con mano de obra.
-            </p>
-            <span className={styles.quotesPathCta}>Empezar ahora →</span>
-          </Link>
-          <Link href="/crm/quotes/new" className={styles.quotesPathCard}>
-            <div className={styles.quotesPathEyebrow}>Formal</div>
-            <div className={styles.quotesPathTitle}>Formulario completo</div>
-            <p className={styles.quotesPathText}>
-              Condiciones comerciales, alcance, anticipo, catálogo Nexara y partidas con mano de obra.
-            </p>
-            <span className={styles.quotesPathCta}>Abrir formulario →</span>
-          </Link>
-        </div>
-      )}
-
-      <SupplierStatsBar token={token} from={periodFrom} to={periodTo} />
-
-      {syncLabel && (
-        <div style={{ marginBottom: 14 }}>
-          <span className={`${styles.quotesStatusChip} ${styles.quotesCtChipOk}`}>{syncLabel}</span>
-        </div>
-      )}
-
-      {!loading && periodItems.length > 0 && (() => {
-        const aprobadas = periodItems.filter((q) => q.status === "APPROVED");
-        const valorAprobado = aprobadas.reduce((s, q) => s + Number(q.total ?? 0), 0);
-        const valorTotal = periodItems.reduce((s, q) => s + Number(q.total ?? 0), 0);
-        const tasaAprobacion = Math.round((aprobadas.length / periodItems.length) * 100);
-        const byStatus = [
-          {
-            label: "Borrador",
-            count: periodItems.filter((q) => q.status === "DRAFT").length,
-            color: "var(--text-tertiary)",
-          },
-          {
-            label: "Enviada",
-            count: periodItems.filter((q) => q.status === "SENT").length,
-            color: "var(--primary)",
-          },
-          { label: "Aprobada", count: aprobadas.length, color: "var(--success)" },
-          {
-            label: "Rechazada",
-            count: periodItems.filter((q) => q.status === "REJECTED").length,
-            color: "var(--danger)",
-          },
-        ].filter((x) => x.count > 0);
-        return (
-          <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: 12,
-                marginBottom: 14,
-              }}
-            >
-              <KpiCard label="Total" value={periodItems.length} icon="📋" />
-              <KpiCard
-                label="Aprobadas"
-                value={aprobadas.length}
-                variant="positive"
-                icon="✅"
-                hint={`${tasaAprobacion}% aprobación`}
-              />
-              <KpiCard
-                label="Valor aprobado"
-                value={<Money value={valorAprobado} compact />}
-                variant="positive"
-                icon="💰"
-                hint={`de ${new Intl.NumberFormat("es-MX", {
-                  style: "currency",
-                  currency: "MXN",
-                  notation: "compact",
-                }).format(valorTotal)} total`}
-              />
-              <KpiCard
-                label="Rechazadas"
-                value={periodItems.filter((q) => q.status === "REJECTED").length}
-                variant="danger"
-                icon="❌"
-              />
-            </div>
-            {byStatus.length > 0 && (
-              <div
-                style={{
-                  marginBottom: 16,
-                  padding: "12px 16px",
-                  background: "var(--surface-2)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 10,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "var(--text-tertiary)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginBottom: 10,
-                  }}
-                >
-                  Estado de cotizaciones
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {byStatus.map(({ label, count, color }) => (
-                    <div
-                      key={label}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "90px 1fr 36px",
-                        gap: 10,
-                        alignItems: "center",
-                      }}
-                    >
-                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>
-                        {label}
-                      </span>
-                      <div
-                        style={{
-                          height: 6,
-                          borderRadius: 3,
-                          background: "var(--surface)",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${(count / periodItems.length) * 100}%`,
-                            background: color,
-                            borderRadius: 3,
-                          }}
-                        />
-                      </div>
-                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>
-                        {count}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        );
-      })()}
-
-      <FilterToolbar
-        search={{
-          value: searchQ,
-          onChange: setSearchQ,
-          placeholder: "Buscar por folio, cliente o proyecto…",
-        }}
-        dates={[
-          { label: "Desde", value: periodFrom, onChange: setPeriodFrom },
-          { label: "Hasta", value: periodTo, onChange: setPeriodTo },
-        ]}
-        selects={[
-          {
-            label: "Estado",
-            value: filterStatus,
-            onChange: setFilterStatus,
-            options: [
-              { value: "DRAFT", label: "Borrador" },
-              { value: "SENT", label: "Enviada" },
-              { value: "APPROVED", label: "Aprobada" },
-              { value: "REJECTED", label: "Rechazada" },
-              { value: "EXPIRED", label: "Vencida" },
-            ],
-            allowAll: true,
-          },
-        ]}
-        onClear={() => {
-          const currentMonth = getCurrentMonthPeriod();
-          setSearchQ("");
-          setFilterStatus("");
-          setPeriodFrom(currentMonth.from);
-          setPeriodTo(currentMonth.to);
-        }}
-        resultCount={loading ? null : highlighted.length}
-        rightActions={
-          periodItems.length > 0 ? (
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={exportQuotesExcel}>
-              Descargar Excel
+      {loadError && (
+        <InlineAlert
+          message={
+            hasAnyQuote
+              ? `No se pudo actualizar la lista, sigues viendo la última carga. ${loadError}`
+              : loadError
+          }
+          onDismiss={() => setLoadError(null)}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void load()}>
+              Reintentar
             </Button>
-          ) : undefined
-        }
-      />
-
-      {pdfErr && (
-        <p
-          style={{
-            margin: "10px 0",
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid var(--danger)",
-            color: "var(--danger)",
-            fontSize: 12,
-          }}
-        >
-          {pdfErr}
-        </p>
+          }
+        />
       )}
 
-      <Section
-        title={loading ? "Cargando…" : `${highlighted.length} cotización${highlighted.length === 1 ? "" : "es"}`}
-      >
-        {loading && (
-          <EmptyState icon="⏳" title="Cargando cotizaciones…" description="Consultando documentos." />
-        )}
-        {!loading && loadError && (
+      {pdfErr && <InlineAlert message={pdfErr} onDismiss={() => setPdfErr(null)} />}
+
+      {!loading && hasAnyQuote && (
+        <div style={{ marginBottom: 14 }}>
+          <MetricStrip metrics={metrics} ariaLabel="Resumen del periodo" />
+        </div>
+      )}
+
+      {!loading && hasAnyQuote && (
+        <FilterToolbar
+          search={{
+            value: searchQ,
+            onChange: setSearchQ,
+            placeholder: "Buscar por folio, cliente o proyecto…",
+          }}
+          dates={[
+            { label: "Desde", value: periodFrom, onChange: setPeriodFrom },
+            { label: "Hasta", value: periodTo, onChange: setPeriodTo },
+          ]}
+          selects={[
+            {
+              label: "Estado",
+              value: filterStatus,
+              onChange: setFilterStatus,
+              options: [
+                { value: "DRAFT", label: "Borrador" },
+                { value: "SENT", label: "Enviada" },
+                { value: "APPROVED", label: "Aprobada" },
+                { value: "REJECTED", label: "Rechazada" },
+                { value: "EXPIRED", label: "Vencida" },
+              ],
+              allowAll: true,
+            },
+          ]}
+          onClear={clearFilters}
+          resultCount={highlighted.length}
+          rightActions={
+            periodItems.length > 0 ? (
+              <Button variant="ghost" size="sm" onClick={exportQuotesExcel}>
+                Descargar Excel
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+
+      <div aria-busy={loading || refreshing}>
+        {loading ? (
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+            {token ? "Cargando cotizaciones…" : "Esperando la sesión para pedir las cotizaciones…"}
+          </p>
+        ) : !hasAnyQuote ? (
           <EmptyState
-            icon="⚠️"
-            title="No se pudo cargar"
-            description={loadError}
+            variant="page"
+            title="Aún no hay cotizaciones"
+            description={
+              cfg.canCreate
+                ? "La primera sale de aquí: busca el equipo en el catálogo CT y el sistema arma la propuesta con precio, stock y mano de obra. Si ya tienes el alcance cerrado, usa el formulario completo."
+                : "Todavía nadie ha levantado una cotización en esta empresa."
+            }
             action={
-              <Button size="sm" variant="secondary" onClick={() => void load()}>
-                Reintentar
+              cfg.canCreate ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                  <Link href="/crm/quotes/builder">
+                    <Button size="sm" variant="primary">
+                      Cotizar en minutos
+                    </Button>
+                  </Link>
+                  <Link href="/crm/quotes/new">
+                    <Button size="sm" variant="secondary">
+                      Formulario completo
+                    </Button>
+                  </Link>
+                </div>
+              ) : undefined
+            }
+          />
+        ) : highlighted.length === 0 ? (
+          <EmptyState
+            variant="compact"
+            title="Ninguna coincide"
+            description={
+              hasFilters
+                ? "Ni el texto ni el estado dan resultados en estas fechas."
+                : "No se emitió ninguna cotización en el periodo elegido."
+            }
+            action={
+              <Button size="sm" variant="secondary" onClick={clearFilters}>
+                Volver al mes actual
               </Button>
             }
           />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={highlighted}
+            rowKey={(q) => q.id}
+            density="compact"
+            ariaLabel="Cotizaciones"
+          />
         )}
-        {!loading && !loadError && highlighted.length === 0 && (
-          <div className={styles.quotesEmptyBoost}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>Aún no hay cotizaciones</div>
-              <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                Empieza por la ruta rápida con catálogo CT, o abre el formulario completo si ya tienes el
-                alcance cerrado.
-              </p>
-            </div>
-            {cfg.canCreate && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Link href="/crm/quotes/builder">
-                  <Button variant="primary" iconLeft="⚡">
-                    Cotizar en minutos
-                  </Button>
-                </Link>
-                <Link href="/crm/quotes/new">
-                  <Button variant="secondary" iconLeft="📝">
-                    Formulario completo
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
-        )}
-        {!loading && !loadError && highlighted.length > 0 && (
-          <DataTable columns={columns} rows={highlighted} rowKey={(q) => q.id} />
-        )}
-      </Section>
+      </div>
+
+      {hasAnyQuote && <SupplierStatsBar token={token} from={periodFrom} to={periodTo} />}
     </>
   );
 }
