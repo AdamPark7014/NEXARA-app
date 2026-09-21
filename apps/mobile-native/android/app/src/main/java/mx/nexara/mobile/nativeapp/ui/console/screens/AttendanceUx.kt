@@ -11,6 +11,11 @@ import mx.nexara.mobile.nativeapp.ui.enterprise.NxMetric
  */
 object AttendanceUx {
 
+    /**
+     * Ya no se pinta en la tira (sobraba: el encabezado y la pastilla «Todos»
+     * dicen lo mismo), pero la constante se queda porque `estadoDeMetrica`
+     * tiene que seguir sabiendo que «total» no filtra por ningún estado.
+     */
     const val METRICA_TOTAL = "total"
     const val METRICA_EN_JORNADA = "en_jornada"
     const val METRICA_COMPLETARON = "completaron"
@@ -45,13 +50,12 @@ object AttendanceUx {
         val enJornada = porEstado[AttendanceEstado.PRESENTE] ?: 0
         val completaron = porEstado[AttendanceEstado.COMPLETO] ?: 0
         val sinChecada = porEstado[AttendanceEstado.AUSENTE] ?: 0
+        // Tres y no cuatro: `NxMetricStrip` pasa a dos filas a partir de la
+        // cuarta, y dos filas empujaban a la primera persona fuera de la
+        // pantalla. El total del equipo no se pierde —lo dicen el encabezado
+        // de la lista y la pastilla «Todos»—, así que la celda que se va es la
+        // única que no aportaba nada que no estuviera ya escrito dos veces.
         return listOf(
-            NxMetric(
-                clave = METRICA_TOTAL,
-                etiqueta = "Equipo",
-                valor = personas.size.toString(),
-                pista = "en tu alcance",
-            ),
             NxMetric(
                 clave = METRICA_EN_JORNADA,
                 etiqueta = "En jornada",

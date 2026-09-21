@@ -38,8 +38,11 @@ class AttendanceUxTest {
         // El conteo real es 3: que las demás cifras den cero no lo esconde.
         val personas = (1L..3L).map { persona(it, AttendanceEstado.AUSENTE) }
         val metricas = AttendanceUx.metricas(personas)
-        assertEquals(4, metricas.size)
-        assertEquals("3", metricas.first { it.clave == AttendanceUx.METRICA_TOTAL }.valor)
+        // Tres celdas: la cuarta obligaba a `NxMetricStrip` a partirse en dos
+        // filas y empujaba a la primera persona fuera de la pantalla.
+        assertEquals(3, metricas.size)
+        assertTrue(metricas.none { it.clave == AttendanceUx.METRICA_TOTAL })
+        assertEquals("3", metricas.first { it.clave == AttendanceUx.METRICA_SIN_CHECADA }.valor)
         assertEquals("0", metricas.first { it.clave == AttendanceUx.METRICA_EN_JORNADA }.valor)
     }
 
