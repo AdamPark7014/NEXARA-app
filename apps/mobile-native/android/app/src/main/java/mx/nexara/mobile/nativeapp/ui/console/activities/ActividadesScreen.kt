@@ -1,7 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.activities
 
 import android.content.Context
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,17 +9,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -36,13 +37,8 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -85,14 +81,22 @@ import mx.nexara.mobile.nativeapp.data.api.TeamBoardUserDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.CoreActivitiesRepository
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDenseSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEstadoPantalla
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterBar
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFilterPill
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxGlyph
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconBadge
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIconText
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxIcons
-import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxMetricStrip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSegmented
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusDot
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxUi
 import mx.nexara.mobile.nativeapp.ui.enterprise.icon
+import mx.nexara.mobile.nativeapp.ui.enterprise.nxEstadoPantalla
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import java.io.IOException
 
@@ -104,12 +108,17 @@ private const val VISTA_EQUIPO = "equipo"
 private data class PendingMove(val item: MyActivityItemDto, val from: Int, val to: Int)
 
 /**
- * «Actividades» de Core — paridad con apps/web/app/(panels)/erp/pizarra/page.tsx:
+ * «Actividades» de Core — paridad con apps/web/app/(panels)/erp/pizarra/page.tsx.
  *
  * - El CEO solo ve la pizarra del equipo (asigna y revisa, no ejecuta).
- * - Quien tiene gente en su pizarra elige «✅ Mis actividades» o «👥 Mi equipo»
+ * - Quien tiene gente en su pizarra elige «Mis actividades» o «Mi equipo»
  *   (se recuerda la última).
  * - Todos los demás ven directo su lista.
+ *
+ * La pantalla sigue el contrato de diseño de `.ai/DISENO-FINANZAS.md`: una tira
+ * de cifras en vez de tarjetas con resplandor, el estado como punto y palabra,
+ * una sola barra de filtros, un único botón primario y ninguna caja dentro de
+ * otra caja.
  */
 @Composable
 fun ActividadesScreen(
@@ -200,7 +209,11 @@ fun ActividadesScreen(
         }
         when {
             // Solo quien volvió a la pestaña «Mi equipo» espera a la pizarra.
-            cargandoEquipo && vista == VISTA_EQUIPO -> NxLoadingBlock("Cargando actividades…")
+            cargandoEquipo && vista == VISTA_EQUIPO -> NxSkeletonList(
+                itemCount = 4,
+                itemHeight = 96.dp,
+                modifier = Modifier.padding(16.dp),
+            )
             verMias -> MisActividadesContent(
                 user = user,
                 repo = repo,
@@ -225,40 +238,49 @@ fun ActividadesScreen(
     }
 }
 
+/**
+ * Pestañas subrayadas, como en la web. Antes era una píldora blanca con borde
+ * dentro del área de contenido: una caja dentro de otra caja que se comía
+ * 68 dp de alto para decir dos palabras.
+ */
 @Composable
 private fun VistaTabs(vista: String, onChange: (String) -> Unit) {
-    Row(
-        modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(14.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        listOf(
-            Triple(VISTA_MIAS, "Mis actividades", NxGlyph.APPROVED.icon),
-            Triple(VISTA_EQUIPO, "Mi equipo", Icons.Outlined.Groups),
-        ).forEach { (id, label, icon) ->
-            val on = vista == id
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (on) NxColors.Brand else Color.Transparent)
-                    .clickable { onChange(id) },
-                contentAlignment = Alignment.Center,
-            ) {
-                NxIconText(
-                    text = label,
-                    icon = icon,
-                    fontSize = 14.sp,
-                    fontWeight = if (on) FontWeight.ExtraBold else FontWeight.SemiBold,
-                    color = if (on) Color.White else NxColors.Slate,
-                )
+    val opciones = listOf(
+        Triple(VISTA_MIAS, "Mis actividades", NxGlyph.APPROVED.icon),
+        Triple(VISTA_EQUIPO, "Mi equipo", Icons.Outlined.Groups),
+    )
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            opciones.forEach { (id, label, icon) ->
+                val on = vista == id
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onChange(id) }
+                        .padding(top = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    NxIconText(
+                        text = label,
+                        icon = icon,
+                        fontSize = 13.5.sp,
+                        fontWeight = if (on) FontWeight.Bold else FontWeight.Medium,
+                        color = if (on) NxColors.Brand else NxUi.Fg2,
+                        iconSize = 17.dp,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    // El subrayado es el único adorno: marca dónde estás sin dibujar una caja.
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .background(if (on) NxColors.Brand else Color.Transparent),
+                    )
+                }
             }
         }
+        HorizontalDivider(color = NxUi.Border)
     }
 }
 
@@ -278,23 +300,30 @@ private fun TeamBoardContent(
     asignadasPorMi: List<BoardAsignadaPorMiDto> = emptyList(),
     onOpenActivity: (Long, String?) -> Unit = { _, _ -> },
 ) {
-    val counts = ActividadesUx.boardCounts(users)
-    /** Estado elegido en los chips; null = todos. */
-    var filtro by rememberSaveable { mutableStateOf<String?>(null) }
-    val visibles = ActividadesUx.filterBoard(users, filtro)
+    /** Aro elegido en la barra; null = todos. */
+    var filtro by rememberSaveable { mutableStateOf<EquipoAro?>(null) }
+    val visibles = EquipoEstado.filtrar(users, filtro)
+    val metricas = EquipoEstado.metricas(users)
+    val estado = nxEstadoPantalla(cargando = loading, error = error, hayDatos = users.isNotEmpty())
+
     Column(Modifier.fillMaxSize()) {
-        BoardRangeSelector(
-            rango = rango,
-            onRango = onRango,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        )
-        if (users.isNotEmpty()) {
-            BoardFilterRow(
-                total = users.size,
-                counts = counts,
-                selected = filtro,
-                onSelect = { filtro = it },
+        // Regla 8: el rango y el estado viven en la MISMA fila; ni cajas ni dos renglones.
+        NxFilterBar(modifier = Modifier.padding(vertical = 10.dp)) {
+            NxSegmented(
+                options = BoardRange.entries.map { it.etiqueta },
+                selectedIndex = BoardRange.entries.indexOf(rango),
+                onSelect = { onRango(BoardRange.entries[it]) },
             )
+            EquipoEstado.filtros(users).forEach { f ->
+                NxFilterPill(
+                    label = f.etiqueta,
+                    count = f.conteo,
+                    color = f.color,
+                    selected = filtro == f.aro,
+                    // Tocar el filtro activo vuelve a «Todos».
+                    onClick = { filtro = if (filtro == f.aro) null else f.aro },
+                )
+            }
         }
         PullToRefreshBox(
             isRefreshing = loading && users.isNotEmpty(),
@@ -302,20 +331,21 @@ private fun TeamBoardContent(
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 156.dp),
+                columns = GridCells.Adaptive(minSize = 150.dp),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                when {
-                    loading && users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
-                        NxLoadingBlock("Cargando…")
+                // Los cuatro estados de pantalla son excluyentes: nunca se pintan dos a la vez.
+                when (estado) {
+                    NxEstadoPantalla.CARGANDO -> item(span = { GridItemSpan(maxLineSpan) }) {
+                        NxSkeletonList(itemCount = 4, itemHeight = 96.dp)
                     }
-                    error != null && users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
-                        NxErrorBlock(error, onRefresh)
+                    NxEstadoPantalla.ERROR -> item(span = { GridItemSpan(maxLineSpan) }) {
+                        NxErrorBlock(error.orEmpty(), onRefresh)
                     }
-                    users.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
+                    NxEstadoPantalla.VACIO -> item(span = { GridItemSpan(maxLineSpan) }) {
                         NxEmptyState(
                             title = "Nadie en tu equipo por ahora",
                             subtitle = "Cuando alguien quede a tu cargo aparecerá aquí.",
@@ -323,40 +353,56 @@ private fun TeamBoardContent(
                             onAction = onRefresh,
                         )
                     }
-                    visibles.isEmpty() -> item(span = { GridItemSpan(maxLineSpan) }) {
-                        NxEmptyState(
-                            title = "Nadie en «${CoreActivityRules.boardStatusLabel(filtro)}»",
-                            subtitle = "Nadie de tu equipo está en ese estado ahora.",
-                            actionLabel = "Ver a todos",
-                            onAction = { filtro = null },
-                        )
+                    NxEstadoPantalla.CONTENIDO -> {
+                        // Regla 7: la tira solo se pinta cuando hay equipo que contar.
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            NxMetricStrip(
+                                items = metricas,
+                                seleccion = filtro?.clave,
+                                onSelect = { clave ->
+                                    val aro = EquipoAro.entries.firstOrNull { it.clave == clave }
+                                    filtro = if (filtro == aro) null else aro
+                                },
+                            )
+                        }
+                        if (visibles.isEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                NxEmptyState(
+                                    title = "Nadie en «${filtro?.etiqueta.orEmpty()}»",
+                                    subtitle = "Nadie de tu equipo está en ese estado ahora.",
+                                    actionLabel = "Ver a todos",
+                                    onAction = { filtro = null },
+                                )
+                            }
+                        }
+                        gridItems(visibles, key = { it.id }) { u ->
+                            PersonBoardCard(user = u, meId = meId, onClick = { onOpenPerson(u.id) })
+                        }
                     }
-                }
-                gridItems(visibles, key = { it.id }) { u ->
-                    PersonBoardCard(user = u, isSelf = u.id == meId, onClick = { onOpenPerson(u.id) })
                 }
 
                 // Contrato C: lo que yo asigné en el rango, con persona, estado y semáforo.
                 if (asignadasPorMi.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                "ASIGNADAS POR MÍ (${asignadasPorMi.size})",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = NxColors.Muted,
-                            )
-                            Text(
-                                "Lo que repartiste ${BoardRange.descripcion(rango).replaceFirstChar { it.lowercase() }}.",
-                                fontSize = 12.sp,
-                                color = NxColors.Muted,
-                            )
-                        }
+                        NxDenseSectionHeader(
+                            title = "Asignadas por mí (${asignadasPorMi.size})",
+                            hint = "Lo que repartiste ${BoardRange.descripcion(rango).replaceFirstChar { it.lowercase() }}.",
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
                     }
-                    asignadasPorMi.forEach { a ->
-                        item(span = { GridItemSpan(maxLineSpan) }, key = "apm-${a.id}") {
-                            AsignadaPorMiCard(a = a, onClick = { onOpenActivity(a.id, null) })
+                    // Una sola superficie con filas separadas por una línea: no doce tarjetas.
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(NxUi.RadiusLg))
+                                .background(NxColors.Card)
+                                .border(1.dp, NxUi.Border, RoundedCornerShape(NxUi.RadiusLg)),
+                        ) {
+                            asignadasPorMi.forEachIndexed { i, a ->
+                                if (i > 0) HorizontalDivider(color = NxUi.BorderSubtle)
+                                AsignadaPorMiRow(a = a, onClick = { onOpenActivity(a.id, null) })
+                            }
                         }
                     }
                 }
@@ -364,213 +410,158 @@ private fun TeamBoardContent(
         }
     }
 }
-
-/** Una sola fila deslizable de filtros: Todos · Activo · Atrasado · Terminó · Sin actividad. */
-@Composable
-private fun BoardFilterRow(
-    total: Int,
-    counts: Map<String, Int>,
-    selected: String?,
-    onSelect: (String?) -> Unit,
-) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-    ) {
-        item(key = "todos") {
-            FilterChip(
-                selected = selected == null,
-                onClick = { onSelect(null) },
-                label = { Text("Todos $total", maxLines = 1) },
-                colors = boardChipColors(),
-            )
-        }
-        items(ActividadesUx.boardFilterOptions(counts, selected), key = { it }) { status ->
-            val color = Color(CoreActivityRules.boardStatusColor(status))
-            FilterChip(
-                selected = selected == status,
-                // Tocar el chip activo vuelve a «Todos».
-                onClick = { onSelect(if (selected == status) null else status) },
-                label = { Text("${CoreActivityRules.boardStatusLabel(status)} ${counts[status] ?: 0}", maxLines = 1) },
-                leadingIcon = { Box(Modifier.size(8.dp).clip(CircleShape).background(color)) },
-                colors = boardChipColors(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun boardChipColors() = FilterChipDefaults.filterChipColors(
-    containerColor = Color.White,
-    selectedContainerColor = NxColors.BrandSoft,
-    selectedLabelColor = NxColors.BrandDark,
-    labelColor = NxColors.Slate,
-)
 
 /** Una actividad que yo repartí: a quién, cómo va y su semáforo. */
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AsignadaPorMiCard(a: BoardAsignadaPorMiDto, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        modifier = Modifier.fillMaxWidth(),
+private fun AsignadaPorMiRow(a: BoardAsignadaPorMiDto, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                listOfNotNull(a.anNumber, a.titulo).joinToString(" · ").ifBlank { "Actividad #${a.id}" },
-                fontSize = 14.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = NxColors.Slate,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        Text(
+            listOfNotNull(a.anNumber, a.titulo).joinToString(" · ").ifBlank { "Actividad #${a.id}" },
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = NxColors.Slate,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        a.quien?.nombre?.takeIf { it.isNotBlank() }?.let {
+            NxIconText(
+                text = CoreActivityRules.shortName(it),
+                icon = NxGlyph.PERSON.icon,
+                fontSize = 12.5.sp,
+                color = NxColors.Muted,
             )
-            a.quien?.nombre?.takeIf { it.isNotBlank() }?.let {
-                NxIconText(
-                    text = CoreActivityRules.shortName(it),
-                    icon = NxGlyph.PERSON.icon,
-                    fontSize = 12.5.sp,
-                    color = NxColors.Muted,
-                )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            ActivitySemaforo.luz(a.semaforo)?.let { luz ->
+                NxStatusDot(luz.etiqueta, color = ActividadesUx.colorSemaforo(a.semaforo))
             }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                ActivitySemaforo.luz(a.semaforo)?.let { luz -> ToneChip("● ${luz.etiqueta}", luz.color) }
-                ToneChip(CoreActivityRules.estatusUi(a.estatus))
-                if (ActivitySemaforo.sinIniciar(a.aceptacion, a.inicioRealAt, a.estatus)) {
-                    ToneChip(ActivitySemaforo.CHIP_SIN_INICIAR, CoreActivityRules.NARANJA)
-                }
-                ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
-                    ToneChip(texto, ActivitySemaforo.planRealColor(a.excedida))
-                }
+            NxStatusDot(
+                CoreActivityRules.estatusUi(a.estatus).label,
+                color = ActividadesUx.colorEstatus(a.estatus),
+            )
+            if (ActivitySemaforo.sinIniciar(a.aceptacion, a.inicioRealAt, a.estatus)) {
+                NxStatusDot(ActivitySemaforo.CHIP_SIN_INICIAR, color = CoreActivityRules.NARANJA)
             }
-            if (ActivitySemaforo.fueRechazada(a.aceptacion)) {
+            ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
                 Text(
-                    ActivitySemaforo.rechazadaTexto(a.motivoRechazo),
+                    texto,
                     fontSize = 12.5.sp,
-                    color = Color(CoreActivityRules.ROJO),
+                    color = if (a.excedida == true) Color(CoreActivityRules.ROJO) else NxColors.Muted,
+                    maxLines = 1,
                 )
             }
+        }
+        if (ActivitySemaforo.fueRechazada(a.aceptacion)) {
+            Text(
+                ActivitySemaforo.rechazadaTexto(a.motivoRechazo),
+                fontSize = 12.5.sp,
+                color = Color(CoreActivityRules.ROJO),
+            )
         }
     }
 }
 
+/**
+ * Una persona en la pizarra: el aro de color dice el estado, y debajo se lee en
+ * dos renglones qué está haciendo y en qué situación está.
+ *
+ * Antes la tarjeta apilaba hasta tres actividades con su barra de avance y su
+ * texto de plan contra real: en un teléfono eso son ocho renglones de 10 sp por
+ * persona, y con seis personas ya no se ve a nadie. Lo detallado vive donde
+ * corresponde, que es la pizarra de esa persona, a un toque de aquí.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PersonBoardCard(user: TeamBoardUserDto, isSelf: Boolean, onClick: () -> Unit) {
-    val statusColor = Color(CoreActivityRules.boardStatusColor(user.status))
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelf) NxColors.BrandSoft.copy(alpha = 0.35f) else Color.White,
-        ),
-        border = BorderStroke(
-            if (isSelf) 2.dp else 1.dp,
-            if (isSelf) NxColors.Brand.copy(alpha = 0.55f) else Color(0xFFE2E8F0),
-        ),
-        modifier = Modifier.fillMaxWidth(),
+private fun PersonBoardCard(user: TeamBoardUserDto, meId: Long?, onClick: () -> Unit) {
+    val aro = EquipoEstado.aro(user.status)
+    val aroColor = Color(aro.color)
+    val esYo = meId != null && user.id == meId
+    val shape = RoundedCornerShape(NxUi.RadiusLg)
+    val abierta = user.openActivities.orEmpty().firstOrNull()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(NxColors.Card)
+            .border(1.dp, if (esYo) NxColors.Brand.copy(alpha = 0.55f) else NxUi.Border, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 18.dp, bottom = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        // El aro ES el estado: no hace falta además un punto, una pastilla y una leyenda.
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .border(3.dp, aroColor, CircleShape)
+                .padding(4.dp),
         ) {
-            Box {
-                PersonAvatar(user.nombre, user.avatarUrl, 72.dp)
-                Box(
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .padding(3.dp)
-                        .clip(CircleShape)
-                        .background(statusColor),
-                )
-            }
+            PersonAvatar(user.nombre, user.avatarUrl, 58.dp)
+        }
+        Text(
+            user.nombre ?: "—",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = NxColors.Slate,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+        user.puesto?.takeIf { it.isNotBlank() }?.let {
             Text(
-                user.nombre ?: "—",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = NxColors.Slate,
+                it,
+                fontSize = 11.sp,
+                color = NxColors.Muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
-            if (isSelf) {
-                Text("TÚ", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Brand, letterSpacing = 1.sp)
-            }
-            Text(
-                CoreActivityRules.boardEstadoTexto(user.status, user.currentLateMinutes, user.idleSinceAt),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = statusColor,
-                textAlign = TextAlign.Center,
+        }
+        Text(
+            EquipoEstado.queHace(user),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = NxColors.Slate,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            EquipoEstado.contexto(user),
+            fontSize = 11.sp,
+            color = if (aro == EquipoAro.RETRASO) aroColor else NxColors.Muted,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+        // El avance de lo que trae entre manos: es dato, no adorno.
+        abierta?.progressPct?.let { pct ->
+            val v = pct.coerceIn(0.0, 100.0)
+            LinearProgressIndicator(
+                progress = { (v / 100.0).toFloat() },
+                modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(999.dp)),
+                color = if (v >= 100.0) Color(CoreActivityRules.VERDE) else NxColors.Brand,
+                trackColor = NxUi.BorderSubtle,
             )
-            BoardStatusExtras(user = user, centered = true)
-            val open = user.openActivities.orEmpty()
-            if (open.isNotEmpty()) {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    open.take(3).forEach { a ->
-                        val suffix = when (a.assignmentCharge?.lowercase()) {
-                            "despacho" -> " · Despacho"
-                            "ejecucion" -> " · Ejecución"
-                            else -> ""
-                        }
-                        // Semáforo por actividad (contrato C): el punto de color delante del título.
-                        val luz = ActivitySemaforo.luz(a.semaforo)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            if (luz != null) {
-                                Box(Modifier.size(7.dp).clip(CircleShape).background(Color(luz.color)))
-                            }
-                            Text(
-                                "${a.titulo.orEmpty()}$suffix",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (a.excedida == true) Color(CoreActivityRules.ROJO) else NxColors.Muted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
-                            Text(
-                                texto,
-                                fontSize = 10.sp,
-                                color = Color(ActivitySemaforo.planRealColor(a.excedida)),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        val pct = (a.progressPct ?: 0.0).coerceIn(0.0, 100.0)
-                        LinearProgressIndicator(
-                            progress = { (pct / 100.0).toFloat() },
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(999.dp)),
-                            color = if (pct >= 100.0) Color(CoreActivityRules.VERDE) else NxColors.Brand,
-                            trackColor = Color(0xFFE2E8F0),
-                        )
-                    }
-                }
-            } else {
-                HorizontalDivider(color = Color(0xFFE2E8F0))
-                Text(
-                    user.currentActivity?.titulo
-                        ?: user.lastFinished?.titulo?.let { "Última: $it" }
-                        ?: "Sin actividades hoy",
-                    fontSize = 12.sp,
-                    color = NxColors.Muted,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        }
+        val marcas = EquipoEstado.marcas(user, meId)
+        if (marcas.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                marcas.forEach { m -> NxStatusDot(m.texto, color = m.color, fontSize = 11.sp) }
             }
         }
     }
@@ -622,6 +613,8 @@ private fun MisActividadesContent(
     val canReorder = data?.canReorder == true && open.size > 1
     val canSelfAssign = data?.canSelfAssign == true && onSelfAssign != null
     val firstName = CoreActivityRules.firstName(user?.nombre)
+    val hayAlgo = open.isNotEmpty() || done.isNotEmpty() || seguimiento.isNotEmpty()
+    val estado = nxEstadoPantalla(cargando = loading && data == null, error = error, hayDatos = hayAlgo)
 
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -634,190 +627,184 @@ private fun MisActividadesContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize().background(NxColors.Surface),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Encabezado corto: saludo y resumen en una línea; lo primero que se ve es la actividad.
+            // Encabezado de dos renglones: saludo y qué hacer ahora. Nada más:
+            // lo primero que se tiene que ver es la actividad, no la bienvenida.
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         Text(
                             if (firstName.isNotBlank()) "Hola, $firstName" else "Tu día",
                             fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.Bold,
                             color = NxColors.Slate,
                         )
                         Text(
-                            if (loading && data == null) {
-                                "Cargando tus actividades…"
-                            } else {
-                                ActividadesUx.resumenDia(open.size, urgentes, done.size, seguimiento.size)
-                            },
+                            ActividadesUx.instruccionDia(open.size, loading && data == null),
                             fontSize = 13.sp,
-                            color = if (urgentes > 0) Color(CoreActivityRules.ROJO) else NxColors.Muted,
+                            color = NxUi.Fg2,
                         )
                     }
-                    // Con la lista vacía, el botón vive en el estado vacío (una sola acción).
+                    // Secundario y en gris: el primario de la pantalla es empezar la #1 (regla 4).
                     if (canSelfAssign && open.isNotEmpty()) {
-                        OutlinedButton(
+                        TextButton(
                             onClick = { onSelfAssign?.invoke() },
-                            modifier = Modifier.heightIn(min = 48.dp),
-                        ) { Text("Auto-asignarme", fontWeight = FontWeight.SemiBold) }
+                            modifier = Modifier.heightIn(min = NxUi.TouchH),
+                        ) { Text("Auto-asignarme", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = NxUi.Fg2) }
                     }
                 }
             }
 
-            error?.let {
-                item { NxErrorBlock(it) { reload++ } }
+            // Regla 7: sin nada que contar, la tira no se pinta.
+            val metricas = ActividadesUx.metricas(open.size, urgentes, done.size, seguimiento.size)
+            if (metricas.isNotEmpty()) {
+                item { NxMetricStrip(items = metricas) }
             }
 
-            if (canReorder) {
-                item {
-                    SoftNote(
-                        title = "Tú decides el orden.",
-                        text = "Usa «Subir» y «Bajar». Cada cambio te pide un motivo corto de por qué la harás en ese lugar.",
-                        color = 0xFF2563EBL,
+            when (estado) {
+                NxEstadoPantalla.CARGANDO -> item { NxSkeletonList(itemCount = 3, itemHeight = 128.dp) }
+                NxEstadoPantalla.ERROR -> item { NxErrorBlock(error.orEmpty()) { reload++ } }
+                NxEstadoPantalla.VACIO -> item {
+                    NxEmptyState(
+                        title = "Todo al día",
+                        subtitle = "Cuando te asignen algo aparecerá aquí.",
+                        actionLabel = if (canSelfAssign) "Auto-asignarme una actividad" else null,
+                        onAction = if (canSelfAssign) ({ onSelfAssign?.invoke() }) else null,
                     )
                 }
-            } else if (!loading && open.size > 1 && data?.canReorder != true) {
-                item {
-                    Text(
-                        "El orden sale de la prioridad y la fecha. Si algo no cuadra, avísale a tu encargado.",
-                        fontSize = 12.5.sp,
-                        color = NxColors.Muted,
-                    )
-                }
-            }
-
-            if (loading && data == null) {
-                item { NxLoadingBlock("Cargando tus actividades…") }
-            }
-
-            if (!loading && open.isEmpty() && error == null) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color.White)
-                            .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 20.dp, vertical = 28.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        NxIconBadge(icon = NxGlyph.APPROVED.icon, size = 56.dp)
-                        Text("Todo al día", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
-                        Text("Cuando te asignen algo aparecerá aquí.", fontSize = 13.sp, color = NxColors.Muted)
-                        if (canSelfAssign) {
-                            Button(
-                                onClick = { onSelfAssign?.invoke() },
-                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
-                            ) { Text("＋ Auto-asignarme una actividad") }
-                        }
-                    }
-                }
-            }
-
-            itemsIndexed(open, key = { _, a -> "open-${a.id}" }) { index, a ->
-                OpenActivityCard(
-                    a = a,
-                    index = index,
-                    total = open.size,
-                    highlighted = highlightId == a.id,
-                    canReorder = canReorder,
-                    iniciando = iniciandoId == a.id,
-                    iniciarError = iniciarError?.takeIf { iniciarErrorId == a.id },
-                    onIniciar = { tab ->
-                        scope.launch {
-                            iniciandoId = a.id
-                            iniciarError = null
-                            try {
-                                withContext(Dispatchers.IO) { repo.iniciarActividad(a.id) }
-                                reload++
-                                onOpenActivity(a.id, tab)
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: IOException) {
-                                // Sin señal no se inventa la hora: la foto de entrada marca el inicio al subirse.
-                                onOpenActivity(a.id, tab)
-                            } catch (e: Exception) {
-                                iniciarErrorId = a.id
-                                iniciarError = e.toUserMessage("No se pudo iniciar la actividad")
-                            } finally {
-                                iniciandoId = null
-                            }
-                        }
-                    },
-                    onOpen = { tab -> onOpenActivity(a.id, tab) },
-                    onRepartir = { user?.id?.let(onOpenPerson) },
-                    onMove = { from, to -> if (to in open.indices && to != from) pendingMove = PendingMove(a, from, to) },
-                )
-            }
-
-            if (seguimiento.isNotEmpty()) {
-                item {
-                    Column {
-                        NxIconText(
-                            text = "En seguimiento (${seguimiento.size})",
-                            icon = Icons.Outlined.Visibility,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = NxColors.Slate,
-                        )
-                        Text(
-                            "Ya las repartiste: aquí ves a quién se las pasaste y cómo va quien las ejecuta.",
-                            fontSize = 12.5.sp,
-                            color = NxColors.Muted,
-                        )
-                    }
-                }
-                items(seguimiento, key = { "seg-${it.id}" }) { s ->
-                    SeguimientoCard(
-                        s = s,
-                        onOpenHistory = { onOpenActivity(s.id, "historial") },
-                        onReprogramado = { reload++ },
-                    )
-                }
-            }
-
-            if (done.isNotEmpty()) {
-                item {
-                    OutlinedButton(onClick = { showDone = !showDone }) {
-                        Icon(NxGlyph.DONE.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(6.dp))
-                        Text("Hechas hoy (${done.size}) ${if (showDone) "▲" else "▼"}")
-                    }
-                }
-                if (showDone) {
-                    items(done, key = { "done-${it.id}" }) { a ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White)
-                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                                .clickable { onOpenActivity(a.id, null) }
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            NxIconText(
-                                text = a.titulo.orEmpty(),
-                                icon = NxGlyph.DONE.icon,
-                                fontSize = 13.sp,
-                                color = NxColors.Slate,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
+                NxEstadoPantalla.CONTENIDO -> {
+                    if (canReorder) {
+                        item {
                             Text(
-                                a.fechaFinalizacion?.let { CoreActivityRules.formatClock(it) } ?: a.estatus.orEmpty(),
-                                fontSize = 13.sp,
+                                "Tú decides el orden: usa «Subir» y «Bajar». Cada cambio pide un motivo corto.",
+                                fontSize = 12.5.sp,
                                 color = NxColors.Muted,
                             )
+                        }
+                    } else if (open.size > 1) {
+                        item {
+                            Text(
+                                "El orden sale de la prioridad y la fecha. Si algo no cuadra, avísale a tu encargado.",
+                                fontSize = 12.5.sp,
+                                color = NxColors.Muted,
+                            )
+                        }
+                    }
+
+                    itemsIndexed(open, key = { _, a -> "open-${a.id}" }) { index, a ->
+                        OpenActivityCard(
+                            a = a,
+                            index = index,
+                            total = open.size,
+                            highlighted = highlightId == a.id,
+                            canReorder = canReorder,
+                            iniciando = iniciandoId == a.id,
+                            iniciarError = iniciarError?.takeIf { iniciarErrorId == a.id },
+                            onIniciar = { tab ->
+                                scope.launch {
+                                    iniciandoId = a.id
+                                    iniciarError = null
+                                    try {
+                                        withContext(Dispatchers.IO) { repo.iniciarActividad(a.id) }
+                                        reload++
+                                        onOpenActivity(a.id, tab)
+                                    } catch (e: CancellationException) {
+                                        throw e
+                                    } catch (e: IOException) {
+                                        // Sin señal no se inventa la hora: la foto de entrada marca el inicio al subirse.
+                                        onOpenActivity(a.id, tab)
+                                    } catch (e: Exception) {
+                                        iniciarErrorId = a.id
+                                        iniciarError = e.toUserMessage("No se pudo iniciar la actividad")
+                                    } finally {
+                                        iniciandoId = null
+                                    }
+                                }
+                            },
+                            onOpen = { tab -> onOpenActivity(a.id, tab) },
+                            onRepartir = { user?.id?.let(onOpenPerson) },
+                            onMove = { from, to -> if (to in open.indices && to != from) pendingMove = PendingMove(a, from, to) },
+                        )
+                    }
+
+                    if (seguimiento.isNotEmpty()) {
+                        item {
+                            NxDenseSectionHeader(
+                                title = "En seguimiento (${seguimiento.size})",
+                                hint = "Ya las repartiste: aquí ves a quién y cómo va quien las ejecuta.",
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                        items(seguimiento, key = { "seg-${it.id}" }) { s ->
+                            SeguimientoCard(
+                                s = s,
+                                onOpenHistory = { onOpenActivity(s.id, "historial") },
+                                onReprogramado = { reload++ },
+                            )
+                        }
+                    }
+
+                    if (done.isNotEmpty()) {
+                        item {
+                            NxDenseSectionHeader(
+                                title = "Hechas hoy (${done.size})",
+                                modifier = Modifier.padding(top = 6.dp),
+                                trailing = {
+                                    TextButton(onClick = { showDone = !showDone }) {
+                                        Text(
+                                            if (showDone) "Ocultar" else "Ver",
+                                            fontSize = 13.sp,
+                                            color = NxColors.Brand,
+                                            fontWeight = FontWeight.Medium,
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        if (showDone) {
+                            item {
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(NxUi.RadiusLg))
+                                        .background(NxColors.Card)
+                                        .border(1.dp, NxUi.Border, RoundedCornerShape(NxUi.RadiusLg)),
+                                ) {
+                                    done.forEachIndexed { i, a ->
+                                        if (i > 0) HorizontalDivider(color = NxUi.BorderSubtle)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { onOpenActivity(a.id, null) }
+                                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            NxIconText(
+                                                text = a.titulo.orEmpty(),
+                                                icon = NxGlyph.DONE.icon,
+                                                fontSize = 13.sp,
+                                                color = NxColors.Slate,
+                                                iconTint = Color(CoreActivityRules.VERDE),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                            Text(
+                                                a.fechaFinalizacion?.let { CoreActivityRules.formatClock(it) }
+                                                    ?: a.estatus.orEmpty(),
+                                                fontSize = 13.sp,
+                                                color = NxColors.Muted,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -847,6 +834,15 @@ private fun MisActividadesContent(
     }
 }
 
+/**
+ * Una actividad de la cola.
+ *
+ * El orden de lectura es el del técnico: número y título arriba y grandes,
+ * enseguida el botón que dice el siguiente paso, y solo después el estado y los
+ * datos. Los estados van como punto y palabra, y el color aparece únicamente
+ * cuando algo pide acción: con seis pastillas rellenas por tarjeta nada
+ * destacaba.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OpenActivityCard(
@@ -866,160 +862,211 @@ private fun OpenActivityCard(
 ) {
     val pr = CoreActivityRules.priorityUi(a.prioridad)
     val first = index == 0
-    val prColor = Color(pr.color ?: CoreActivityRules.NARANJA)
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (first) NxColors.BrandSoft.copy(alpha = 0.3f) else Color.White,
-        ),
-        border = BorderStroke(
-            when {
-                highlighted -> 2.dp
-                first -> 1.5.dp
-                else -> 1.dp
-            },
-            when {
-                highlighted -> NxColors.Brand
-                first -> NxColors.Brand.copy(alpha = 0.4f)
-                else -> Color(0xFFE2E8F0)
-            },
-        ),
-        modifier = Modifier.fillMaxWidth(),
+    val prColor = ActividadesUx.colorPrioridad(a.prioridad)?.let { Color(it) } ?: NxUi.BorderStrong
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(NxColors.Card)
+            .border(
+                if (highlighted || first) 1.5.dp else 1.dp,
+                when {
+                    highlighted -> NxColors.Brand
+                    first -> NxColors.Brand.copy(alpha = 0.45f)
+                    else -> NxUi.Border
+                },
+                shape,
+            )
+            // La barra de prioridad del borde izquierdo, igual que en la web.
+            .drawBehind { drawRect(color = prColor, size = Size(4.dp.toPx(), size.height)) }
+            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .drawBehind { drawRect(color = prColor, size = Size(5.dp.toPx(), size.height)) }
-                .padding(start = 18.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
                     .background(if (first) NxColors.Brand else NxColors.BrandSoft),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "${index + 1}",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
                     color = if (first) Color.White else NxColors.Brand,
                 )
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 if (first) {
-                    Text("EMPIEZA POR AQUÍ", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Brand, letterSpacing = 1.sp)
-                }
-                Column {
-                    Text(a.titulo.orEmpty(), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
-                    a.anNumber?.let { Text("Folio $it", fontSize = 12.sp, color = NxColors.Muted) }
-                }
-                // Una acción principal que dice el siguiente paso; el detalle queda como secundaria.
-                // Sin inicio real es «Iniciar actividad»: no hay aceptar ni rechazar (regla del 18-09).
-                val accion = ActividadesUx.primaryAction(a)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    when (accion.kind) {
-                        ActividadesUx.PrimaryKind.ABRIR -> OutlinedButton(
-                            onClick = { onOpen(null) },
-                            modifier = Modifier.heightIn(min = 48.dp),
-                        ) { Text("Abrir") }
-                        ActividadesUx.PrimaryKind.VER -> {
-                            OutlinedButton(
-                                onClick = { onOpen(accion.tab) },
-                                modifier = Modifier.heightIn(min = 48.dp),
-                            ) { Text(accion.label) }
-                            TextButton(onClick = { onOpen(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                                Text("Detalle", color = NxColors.Brand)
-                            }
-                        }
-                        else -> {
-                            Button(
-                                onClick = {
-                                    when {
-                                        accion.kind == ActividadesUx.PrimaryKind.REPARTIR -> onRepartir()
-                                        accion.marcaInicio -> onIniciar(accion.tab)
-                                        else -> onOpen(accion.tab)
-                                    }
-                                },
-                                enabled = !iniciando,
-                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
-                                modifier = Modifier.heightIn(min = 48.dp),
-                            ) { Text(if (iniciando) "Iniciando…" else accion.label, fontWeight = FontWeight.Bold) }
-                            TextButton(onClick = { onOpen(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                                Text("Detalle", color = NxColors.Brand)
-                            }
-                        }
-                    }
-                }
-                iniciarError?.let { Text(it, fontSize = 12.5.sp, color = Color(CoreActivityRules.ROJO)) }
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (a.porRepartir == true) {
-                        ToneChip("Te toca repartirla", CoreActivityRules.NARANJA, icon = NxGlyph.DISPATCH.icon)
-                    }
-                    // Semáforo del servidor: primero, porque es el «cómo vas».
-                    ActivitySemaforo.luz(a.semaforo)?.let { luz ->
-                        ToneChip("● ${luz.etiqueta}", luz.color)
-                    }
-                    ToneChip(CoreActivityRules.estatusUi(a.estatus))
-                    ToneChip("● ${pr.label}", pr.color)
-                    ToneChip(CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom))
-                    ToneChip(
-                        text = when {
-                            a.autoAsignada == true -> "Auto-asignada"
-                            a.quienAsigno?.nombre != null ->
-                                ActivitySemaforo.asignadaPorTexto(a.quienAsigno?.nombre).orEmpty()
-                            else -> "Asignada"
-                        },
-                        icon = if (a.autoAsignada == true) NxGlyph.PERSON.icon else null,
-                    )
-                    // «Plan 2 h · real 2 h 30 min», en rojo cuando ya se pasó.
-                    ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)?.let { texto ->
-                        ToneChip(texto, ActivitySemaforo.planRealColor(a.excedida))
-                    }
-                }
-                val meta = buildList {
-                    // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
-                    add(
-                        (
-                            ActivityPeriodo.cuandoTexto(a.periodo, CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima))
-                                ?: "Sin fecha"
-                            ) to NxIcons.Calendar,
-                    )
-                    a.tiempoEstimadoMin?.takeIf { it > 0 }?.let { est ->
-                        val tope = a.tiempoMaximoMin?.takeIf { it > 0 }?.let { " · tope ${CoreActivityRules.formatMinutes(it)}" }.orEmpty()
-                        add("${CoreActivityRules.formatMinutes(est)}$tope" to Icons.Outlined.Schedule)
-                    }
-                    (a.cliente ?: a.proyecto)?.takeIf { it.isNotBlank() }?.let { add(it to Icons.Outlined.LocationOn) }
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    meta.forEach { (text, icon) -> NxIconText(text = text, icon = icon, fontSize = 13.sp, color = NxColors.Muted) }
-                }
-                a.indicaciones?.takeIf { it.isNotBlank() }?.let { SoftNote(text = it) }
-                a.ordenJustificacion?.takeIf { it.isNotBlank() }?.let {
-                    NxIconText(
-                        text = "Por qué va aquí: $it",
-                        icon = NxGlyph.DOCUMENTATION.icon,
-                        fontSize = 12.5.sp,
-                        color = NxColors.Muted,
+                    Text(
+                        "EMPIEZA POR AQUÍ",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NxColors.Brand,
+                        letterSpacing = 1.sp,
                     )
                 }
-                if (canReorder) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text("↑ Subir") }
-                        OutlinedButton(onClick = { onMove(index, index + 1) }, enabled = index < total - 1) { Text("↓ Bajar") }
-                        if (index > 1) {
-                            OutlinedButton(onClick = { onMove(index, 0) }) { Text("⤒ Hacerla primero") }
-                        }
+                Text(
+                    a.titulo.orEmpty(),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NxColors.Slate,
+                    lineHeight = 20.sp,
+                )
+                // El tipo, con su ícono: es lo que distingue una obra de un trámite de un vistazo.
+                NxIconText(
+                    text = listOfNotNull(
+                        CoreActivityRules.kindLabel(a.coreKind, a.ticketTypeCustom),
+                        a.anNumber?.takeIf { it.isNotBlank() }?.let { "Folio $it" },
+                    ).joinToString(" · "),
+                    icon = CoreActivityRules.kindGlyph(a.coreKind).icon,
+                    fontSize = 12.sp,
+                    color = NxColors.Muted,
+                    iconSize = 15.dp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        // Una acción principal que dice el siguiente paso; el detalle queda como secundaria.
+        // Sin inicio real es «Iniciar actividad»: no hay aceptar ni rechazar (regla del 18-09).
+        // Regla 4: solo la #1 lleva el botón lleno — el resto espera su turno.
+        val accion = ActividadesUx.primaryAction(a)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            val etiqueta = if (iniciando) "Iniciando…" else accion.label
+            val alPulsar: () -> Unit = {
+                when {
+                    accion.kind == ActividadesUx.PrimaryKind.REPARTIR -> onRepartir()
+                    accion.kind == ActividadesUx.PrimaryKind.ABRIR -> onOpen(null)
+                    accion.marcaInicio -> onIniciar(accion.tab)
+                    else -> onOpen(accion.tab)
+                }
+            }
+            if (first) {
+                Button(
+                    onClick = alPulsar,
+                    enabled = !iniciando,
+                    colors = ButtonDefaults.buttonColors(containerColor = NxColors.Brand),
+                    modifier = Modifier.heightIn(min = NxUi.TouchH),
+                ) { Text(etiqueta, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+            } else {
+                OutlinedButton(
+                    onClick = alPulsar,
+                    enabled = !iniciando,
+                    modifier = Modifier.heightIn(min = NxUi.TouchH),
+                ) { Text(etiqueta, fontWeight = FontWeight.Medium, fontSize = 14.sp) }
+            }
+            if (accion.kind != ActividadesUx.PrimaryKind.ABRIR) {
+                TextButton(onClick = { onOpen(null) }, modifier = Modifier.heightIn(min = NxUi.TouchH)) {
+                    Text("Detalle", color = NxUi.Fg2, fontSize = 13.sp)
+                }
+            }
+        }
+        iniciarError?.let { Text(it, fontSize = 12.5.sp, color = Color(CoreActivityRules.ROJO)) }
+
+        // Estado: punto y palabra. Gris para el flujo normal, color solo si pide acción.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (a.porRepartir == true) {
+                NxStatusDot("Te toca repartirla", color = CoreActivityRules.NARANJA, fontWeight = FontWeight.Bold)
+            }
+            ActivitySemaforo.luz(a.semaforo)?.let { luz ->
+                NxStatusDot(luz.etiqueta, color = ActividadesUx.colorSemaforo(a.semaforo))
+            }
+            NxStatusDot(
+                CoreActivityRules.estatusUi(a.estatus).label,
+                color = ActividadesUx.colorEstatus(a.estatus),
+            )
+            NxStatusDot(pr.label, color = ActividadesUx.colorPrioridad(a.prioridad))
+        }
+
+        // Cuándo, cuánto y dónde: tres datos con su ícono, en una sola línea si caben.
+        val meta = buildList {
+            // Varios días: «Día 3 de 10 · termina vie 25 sep» en vez de la hora del primer día.
+            add(
+                (
+                    ActivityPeriodo.cuandoTexto(a.periodo, CoreActivityRules.formatWhen(a.fechaInicio ?: a.fechaMaxima))
+                        ?: "Sin fecha"
+                    ) to NxIcons.Calendar,
+            )
+            val tiempo = ActivitySemaforo.planRealTexto(a.minutosPlan, a.minutosReales)
+                ?: a.tiempoEstimadoMin?.takeIf { it > 0 }?.let { est ->
+                    val tope = a.tiempoMaximoMin?.takeIf { it > 0 }
+                        ?.let { " · tope ${CoreActivityRules.formatMinutes(it)}" }.orEmpty()
+                    "${CoreActivityRules.formatMinutes(est)}$tope"
+                }
+            tiempo?.let { add(it to Icons.Outlined.Schedule) }
+            (a.cliente ?: a.proyecto)?.takeIf { it.isNotBlank() }?.let { add(it to Icons.Outlined.LocationOn) }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            meta.forEach { (text, icon) ->
+                NxIconText(
+                    text = text,
+                    icon = icon,
+                    fontSize = 12.5.sp,
+                    color = if (text.startsWith("Plan") && a.excedida == true) {
+                        Color(CoreActivityRules.ROJO)
+                    } else {
+                        NxColors.Muted
+                    },
+                    iconSize = 15.dp,
+                )
+            }
+        }
+
+        // Quién la mandó: dato de contexto, no otro chip de colores.
+        val quien = when {
+            a.autoAsignada == true -> "Auto-asignada"
+            else -> ActivitySemaforo.asignadaPorTexto(a.quienAsigno?.nombre)
+        }
+        quien?.let {
+            NxIconText(text = it, icon = NxGlyph.PERSON.icon, fontSize = 12.5.sp, color = NxColors.Muted, iconSize = 15.dp)
+        }
+
+        // Nota con una línea de margen en vez de un recuadro relleno: el borde
+        // que se quitó no aportaba nada que no diga ya la sangría (regla 9).
+        a.indicaciones?.takeIf { it.isNotBlank() }?.let { NotaConMargen(it) }
+        a.ordenJustificacion?.takeIf { it.isNotBlank() }?.let {
+            NxIconText(
+                text = "Por qué va aquí: $it",
+                icon = NxGlyph.DOCUMENTATION.icon,
+                fontSize = 12.5.sp,
+                color = NxColors.Muted,
+                iconSize = 15.dp,
+            )
+        }
+        if (canReorder) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) {
+                    Text("↑ Subir", fontSize = 13.sp, color = NxUi.Fg2)
+                }
+                TextButton(onClick = { onMove(index, index + 1) }, enabled = index < total - 1) {
+                    Text("↓ Bajar", fontSize = 13.sp, color = NxUi.Fg2)
+                }
+                if (index > 1) {
+                    TextButton(onClick = { onMove(index, 0) }) {
+                        Text("Hacerla primero", fontSize = 13.sp, color = NxUi.Fg2)
                     }
                 }
             }
         }
+    }
+}
+
+/** Texto con una línea vertical a la izquierda: agrupa sin dibujar otra caja. */
+@Composable
+private fun NotaConMargen(text: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(Modifier.width(2.dp).fillMaxHeight().background(NxUi.BorderStrong))
+        Text(text, fontSize = 13.sp, color = NxUi.Fg2, lineHeight = 18.sp)
     }
 }
 
@@ -1033,50 +1080,72 @@ private fun SeguimientoCard(
     val pasadaA = s.pasadaA.orEmpty()
     val ejecutor = pasadaA.reversed().firstOrNull { !it.rol.equals("LEAD", ignoreCase = true) }
     val primera = pasadaA.firstOrNull()
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        modifier = Modifier.fillMaxWidth(),
+    val shape = RoundedCornerShape(NxUi.RadiusLg)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(NxColors.Card)
+            .border(1.dp, NxUi.Border, shape)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text(s.titulo.orEmpty(), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Slate)
-                    s.anNumber?.let { Text("Folio $it", fontSize = 12.sp, color = NxColors.Muted) }
-                }
-                TextButton(onClick = onOpenHistory) { Text("Ver registro →", color = NxColors.Brand, fontWeight = FontWeight.SemiBold) }
-            }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ToneChip(CoreActivityRules.estatusUi(s.estatus))
-                ToneChip(CoreActivityRules.kindLabel(s.coreKind, s.ticketTypeCustom))
-                if (ejecutor != null) {
-                    val avance = CoreActivityRules.avanceUi(ejecutor.evidenceStatus)
-                    ToneChip("${CoreActivityRules.shortName(ejecutor.nombre)}: ${avance.label}", avance.color)
-                } else {
-                    ToneChip("Falta que la asignen", CoreActivityRules.NARANJA)
-                }
-            }
-            if (pasadaA.isNotEmpty()) {
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(s.titulo.orEmpty(), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = NxColors.Slate)
                 NxIconText(
-                    text = "Enviada a ${pasadaA.joinToString(" → ") { CoreActivityRules.shortName(it.nombre) }}" +
-                        (primera?.at?.let { CoreActivityRules.formatWhen(it) }?.let { " · $it" } ?: ""),
-                    icon = NxGlyph.DISPATCH.icon,
-                    fontSize = 13.sp,
+                    text = listOfNotNull(
+                        CoreActivityRules.kindLabel(s.coreKind, s.ticketTypeCustom),
+                        s.anNumber?.takeIf { it.isNotBlank() }?.let { "Folio $it" },
+                    ).joinToString(" · "),
+                    icon = CoreActivityRules.kindGlyph(s.coreKind).icon,
+                    fontSize = 12.sp,
                     color = NxColors.Muted,
+                    iconSize = 15.dp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            s.ultimaReprogramacion?.let { r ->
-                NxIconText(
-                    text = "Reprogramada por ${CoreActivityRules.shortName(r.por).ifBlank { "alguien" }} · " +
-                        CoreActivityRules.formatWhen(r.at).orEmpty(),
-                    icon = Icons.Outlined.Schedule,
-                    fontSize = 12.5.sp,
-                    color = NxColors.Muted,
-                )
+            TextButton(onClick = onOpenHistory) {
+                Text("Ver registro", color = NxColors.Brand, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
-            ReprogramarDespachoInline(activityId = s.id, fechaActual = s.fechaInicio, onDone = onReprogramado)
         }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            NxStatusDot(
+                CoreActivityRules.estatusUi(s.estatus).label,
+                color = ActividadesUx.colorEstatus(s.estatus),
+            )
+            if (ejecutor != null) {
+                val avance = CoreActivityRules.avanceUi(ejecutor.evidenceStatus)
+                NxStatusDot(
+                    "${CoreActivityRules.shortName(ejecutor.nombre)}: ${avance.label}",
+                    color = avance.color.takeIf { it == CoreActivityRules.VERDE },
+                )
+            } else {
+                NxStatusDot("Falta que la asignen", color = CoreActivityRules.NARANJA)
+            }
+        }
+        if (pasadaA.isNotEmpty()) {
+            NxIconText(
+                text = "Enviada a ${pasadaA.joinToString(" → ") { CoreActivityRules.shortName(it.nombre) }}" +
+                    (primera?.at?.let { CoreActivityRules.formatWhen(it) }?.let { " · $it" } ?: ""),
+                icon = NxGlyph.DISPATCH.icon,
+                fontSize = 12.5.sp,
+                color = NxColors.Muted,
+                iconSize = 15.dp,
+            )
+        }
+        s.ultimaReprogramacion?.let { r ->
+            NxIconText(
+                text = "Reprogramada por ${CoreActivityRules.shortName(r.por).ifBlank { "alguien" }} · " +
+                    CoreActivityRules.formatWhen(r.at).orEmpty(),
+                icon = Icons.Outlined.Schedule,
+                fontSize = 12.5.sp,
+                color = NxColors.Muted,
+                iconSize = 15.dp,
+            )
+        }
+        ReprogramarDespachoInline(activityId = s.id, fechaActual = s.fechaInicio, onDone = onReprogramado)
     }
 }
 
@@ -1096,7 +1165,7 @@ private fun ReorderDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = {
             Column {
-                Text("CAMBIAR ORDEN", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = NxColors.Muted)
+                Text("CAMBIAR ORDEN", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NxColors.Muted)
                 Text(
                     "«${move.item.titulo.orEmpty()}» pasa del lugar #${move.from + 1} al #${move.to + 1}",
                     fontSize = 17.sp,
@@ -1109,18 +1178,19 @@ private fun ReorderDialog(
                 OutlinedTextField(
                     value = reason,
                     onValueChange = { reason = it.take(500) },
-                    label = { Text("¿Por qué la harás en ese lugar? *") },
+                    label = { Text("¿Por qué la harás en ese lugar?") },
                     placeholder = { Text("Ej. El cliente la necesita antes de las 12; la otra puede esperar a la tarde.") },
                     minLines = 3,
                     enabled = !saving,
+                    isError = error != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // La duda se resuelve bajo el control, al capturar, no después del error (regla 5).
                 Text(
-                    "${minOf(reason.trim().length, min)}/$min caracteres mínimo · queda guardado junto a la actividad.",
+                    error ?: "Mínimo $min caracteres · queda guardado junto a la actividad.",
                     fontSize = 11.5.sp,
-                    color = NxColors.Muted,
+                    color = if (error != null) Color(CoreActivityRules.ROJO) else NxColors.Muted,
                 )
-                error?.let { Text(it, fontSize = 13.sp, color = Color(0xFFDC2626)) }
             }
         },
         confirmButton = {
@@ -1148,7 +1218,7 @@ private fun ReorderDialog(
             ) { Text(if (saving) "Guardando…" else "Guardar orden") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancelar") }
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancelar", color = NxUi.Fg2) }
         },
     )
 }
