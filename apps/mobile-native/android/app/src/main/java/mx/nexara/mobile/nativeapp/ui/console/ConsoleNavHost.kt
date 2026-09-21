@@ -44,6 +44,7 @@ import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.SessionRevision
 import mx.nexara.mobile.nativeapp.data.notifications.NotificationsRepository
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.navigation.PendingModuleLink
@@ -277,6 +278,23 @@ fun ConsoleNavHost(
     val authRepo = remember(context) { AuthRepository(context) }
     val notificationsRepo = remember(context) { NotificationsRepository(context) }
     val user = remember { authRepo.loadSession() }
+
+    /**
+     * La misma sesión, pero releída cuando se guarda una versión nueva.
+     *
+     * La sesión se enriquece DESPUÉS del login: `me/navigation` llega segundos
+     * más tarde y es quien trae la lista de módulos. Leyéndola una sola vez, el
+     * menú de «Más» se quedaba recortado a los cuatro que tiene todo el personal
+     * —sin Cotizaciones, Proyectos, Almacén ni KPIs— hasta que se cerraba la app.
+     *
+     * **Sólo alimenta «Más».** Las pestañas de abajo y el destino inicial del
+     * grafo siguen saliendo de la primera lectura a propósito: cambiar
+     * `startDestination` con el NavHost ya vivo deja la pila incoherente y las
+     * pestañas dejan de responder —probado: con esto enchufado a `modules`, el
+     * botón de Chat no abría nada y ninguna pestaña quedaba marcada—.
+     */
+    val revisionSesion by SessionRevision.valor.collectAsState()
+    val userAlDia = remember(revisionSesion) { authRepo.loadSession() } ?: user
     val navController = rememberNavController()
     var chatChannelId by remember { mutableStateOf<Long?>(null) }
     var chatMessageId by remember { mutableStateOf<Long?>(null) }
@@ -290,7 +308,7 @@ fun ConsoleNavHost(
 
     val modules = remember(user) { CoreMenu.modulesFor(user) }
     /** «Más»: el resto de Core (cotizaciones, proyectos, KPIs, almacén, herramientas, vehículos, organigrama). */
-    val extras = remember(user) { CoreMenu.extraModulesFor(user) }
+    val extras = remember(userAlDia) { CoreMenu.extraModulesFor(userAlDia) }
     val tabs = remember(modules) { modules.map { ConsoleRoutes.forModule(it) to it } }
     val startRoute = tabs.firstOrNull()?.first ?: ConsoleRoutes.MyProfile
 
