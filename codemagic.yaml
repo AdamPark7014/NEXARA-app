@@ -151,6 +151,8 @@ workflows:
     name: iOS App Store (Archive + IPA export)
     max_build_duration: 90
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Codemagic NEXARA
     environment:
       xcode: 16.2
       groups:
