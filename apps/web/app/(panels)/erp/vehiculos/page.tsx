@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -16,9 +16,11 @@ import {
   MIS_VEHICULOS_PATH,
   VEHICULOS_GPS_PATH,
   VEHICULOS_PATH,
+  puedeGestionarInventarioVehiculos,
   puedeVerGpsDireccion,
 } from "@/lib/recursos-core";
 import {
+  crearVehiculoInventario,
   etiquetaEstatus,
   formatoFecha,
   formatoKm,
@@ -30,18 +32,26 @@ import styles from "./vehiculos-core.module.css";
 
 /**
  * Flotilla en Core (`/erp/vehiculos`): qué hay, quién lo trae y cuándo vuelve.
- * Antes esta ruta reexportaba la pantalla de OPS; ahora es propia y lee
- * `vehicles/flotilla`. `/ops/vehicles` sigue existiendo tal cual.
+ * Quien tiene `vehicles.inventory` puede dar de alta unidades (POST inventory).
  */
 export default function VehiculosPage() {
   const router = useRouter();
   const { user } = useUser();
   const token = user?.token ?? "";
   const verGps = puedeVerGpsDireccion(user);
+  const puedeAlta = puedeGestionarInventarioVehiculos(user);
 
   const [vehiculos, setVehiculos] = useState<VehiculoFlota[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [showAlta, setShowAlta] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [placas, setPlacas] = useState("");
+  const [notas, setNotas] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [altaError, setAltaError] = useState<string | null>(null);
+  const [altaOk, setAltaOk] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     if (!token) return;
@@ -137,6 +147,26 @@ export default function VehiculosPage() {
     },
   ];
 
+  async function guardarAlta(e: FormEvent) {
+    e.preventDefault();
+    if (!nombre.trim() || guardando) return;
+    setGuardando(true);
+    setAltaError(null);
+    setAltaOk(null);
+    try {
+      const creado = await crearVehiculoInventario(token, { nombre, placas, notas });
+      setNombre("");
+      setPlacas("");
+      setNotas("");
+      setAltaOk(`${creado.nombre} quedó en la flotilla`);
+      await cargar();
+    } catch (err) {
+      setAltaError(formatApiError(err, "No se pudo agregar el vehículo"));
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   return (
     <div className={styles.wrap}>
       <PageHeader
@@ -145,6 +175,18 @@ export default function VehiculosPage() {
         density="ops"
         actions={
           <>
+            {puedeAlta && (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setShowAlta((v) => !v);
+                  setAltaError(null);
+                  setAltaOk(null);
+                }}
+              >
+                {showAlta ? "Cerrar" : "Agregar"}
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => void cargar()} disabled={cargando}>
               Actualizar
             </Button>
@@ -167,6 +209,59 @@ export default function VehiculosPage() {
       />
 
       {error && <InlineAlert message={error} variant="danger" />}
+
+      {showAlta && puedeAlta && (
+        <Section title="Nuevo vehículo">
+          <form className={styles.altaForm} onSubmit={(e) => void guardarAlta(e)}>
+            {altaError && <InlineAlert message={altaError} variant="danger" />}
+            {altaOk && <InlineAlert message={altaOk} variant="success" />}
+            <div className={styles.altaGrid}>
+              <div className={styles.altaCampo}>
+                <label htmlFor="vehiculo-nombre">Nombre</label>
+                <input
+                  id="vehiculo-nombre"
+                  className="input"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  placeholder="Nissan Frontier 2026"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className={styles.altaCampo}>
+                <label htmlFor="vehiculo-placas">Placas</label>
+                <input
+                  id="vehiculo-placas"
+                  className="input"
+                  value={placas}
+                  onChange={(e) => setPlacas(e.target.value)}
+                  placeholder="SR-36-051"
+                />
+              </div>
+              <div className={styles.altaCampoFull}>
+                <label htmlFor="vehiculo-notas">Notas</label>
+                <textarea
+                  id="vehiculo-notas"
+                  className="input"
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  rows={2}
+                  placeholder="Opcional"
+                />
+              </div>
+            </div>
+            <div className={styles.altaAcciones}>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={!nombre.trim() || guardando}
+              >
+                {guardando ? "Guardando…" : "Guardar en flotilla"}
+              </Button>
+            </div>
+          </form>
+        </Section>
+      )}
 
       <div className={styles.kpis}>
         <KpiCard label="Vehículos" value={kpis.total} />
@@ -200,7 +295,11 @@ export default function VehiculosPage() {
             density="compact"
             onRowClick={(v) => router.push(`${VEHICULOS_PATH}/${v.id}`)}
             emptyTitle="Sin vehículos"
-            emptyDescription="La flotilla está vacía."
+            emptyDescription={
+              puedeAlta
+                ? "Agrega la primera unidad con el botón Agregar."
+                : "La flotilla está vacía."
+            }
           />
         )}
       </Section>

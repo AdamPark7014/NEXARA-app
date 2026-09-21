@@ -250,6 +250,40 @@ export async function solicitarVehiculo(token: string, body: SolicitudVehiculoBo
   await erpFetch("vehicles", token, { method: "POST", body: JSON.stringify(body) });
 }
 
+export type AltaVehiculoBody = {
+  nombre: string;
+  placas?: string | null;
+  notas?: string | null;
+};
+
+/** Alta de unidad en el inventario (`POST vehicles/inventory`). Requiere `vehicles.inventory`. */
+export async function crearVehiculoInventario(
+  token: string,
+  body: AltaVehiculoBody,
+): Promise<{ id: number; nombre: string; placas: string | null }> {
+  const nombre = body.nombre.trim();
+  if (!nombre) throw new Error("El nombre del vehículo es obligatorio");
+  const data = await erpFetch<{ id?: number; nombre?: string; placas?: string | null }>(
+    "vehicles/inventory",
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        nombre,
+        placas: body.placas?.trim() || null,
+        notas: body.notas?.trim() || null,
+        estatus: "Disponible",
+        activo: true,
+      }),
+    },
+  );
+  return {
+    id: Number(data?.id ?? 0),
+    nombre: data?.nombre ?? nombre,
+    placas: data?.placas ?? null,
+  };
+}
+
 /* ── Escritura del checklist ─────────────────────────────────────────── */
 
 /**

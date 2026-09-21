@@ -9,7 +9,14 @@ import VehiculosPage from "./page";
 
 const push = vi.hoisted(() => vi.fn());
 const usuario = vi.hoisted(() => ({
-  actual: { id: 7, nombre: "Ada Lovelace", email: "ada@nexara.com.mx", token: "jwt" },
+  actual: {
+    id: 7,
+    nombre: "Ada Lovelace",
+    email: "ada@nexara.com.mx",
+    token: "jwt",
+    permissions: [] as string[],
+    isSuperAdmin: false,
+  },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -56,16 +63,30 @@ const FLOTILLA = [
 ];
 
 function stubFetch(body: unknown = { vehiculos: FLOTILLA }, status = 200) {
-  const fetchMock = vi.fn(
-    async () =>
-      new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }),
-  );
+  const fetchMock = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    const href = String(url);
+    if (href.includes("vehicles/inventory") && init?.method === "POST") {
+      const payload = JSON.parse(String(init.body ?? "{}")) as { nombre?: string; placas?: string | null };
+      return new Response(
+        JSON.stringify({ id: 88, nombre: payload.nombre, placas: payload.placas ?? null }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
 
 afterEach(() => {
-  usuario.actual = { id: 7, nombre: "Ada Lovelace", email: "ada@nexara.com.mx", token: "jwt" };
+  usuario.actual = {
+    id: 7,
+    nombre: "Ada Lovelace",
+    email: "ada@nexara.com.mx",
+    token: "jwt",
+    permissions: [],
+    isSuperAdmin: false,
+  };
 });
 
 describe("flotilla en Core", () => {
@@ -107,7 +128,14 @@ describe("flotilla en Core", () => {
     expect(screen.queryByRole("button", { name: "GPS" })).not.toBeInTheDocument();
     unmount();
 
-    usuario.actual = { id: 1, nombre: "Christian", email: "gerencia@nexara.com.mx", token: "jwt" };
+    usuario.actual = {
+      id: 1,
+      nombre: "Christian",
+      email: "gerencia@nexara.com.mx",
+      token: "jwt",
+      permissions: [],
+      isSuperAdmin: false,
+    };
     stubFetch();
     render(<VehiculosPage />);
     expect(await screen.findByRole("button", { name: "GPS" })).toBeInTheDocument();
@@ -119,5 +147,40 @@ describe("flotilla en Core", () => {
 
     expect(await screen.findByRole("button", { name: "Reintentar" })).toBeInTheDocument();
     expect(screen.getAllByText(/no puede ver la flotilla/).length).toBeGreaterThan(0);
+  });
+
+  it("con permiso de inventario aparece Agregar y guarda en vehicles/inventory", async () => {
+    usuario.actual = {
+      id: 1,
+      nombre: "Christian",
+      email: "gerencia@nexara.com.mx",
+      token: "jwt",
+      permissions: ["vehicles.inventory"],
+      isSuperAdmin: false,
+    };
+    const fetchMock = stubFetch();
+    const user = userEvent.setup();
+    render(<VehiculosPage />);
+
+    expect(await screen.findByRole("button", { name: "Agregar" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Agregar" }));
+    expect(await screen.findByRole("heading", { name: "Nuevo vehículo" })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Nombre"), "Hilux blanca");
+    await user.type(screen.getByLabelText("Placas"), "XYZ-99-01");
+    await user.click(screen.getByRole("button", { name: "Guardar en flotilla" }));
+
+    await vi.waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        (c) => String(c[0]).includes("vehicles/inventory") && (c[1] as RequestInit)?.method === "POST",
+      );
+      expect(post).toBeTruthy();
+      expect(JSON.parse(String((post![1] as RequestInit).body))).toMatchObject({
+        nombre: "Hilux blanca",
+        placas: "XYZ-99-01",
+        estatus: "Disponible",
+        activo: true,
+      });
+    });
   });
 });
