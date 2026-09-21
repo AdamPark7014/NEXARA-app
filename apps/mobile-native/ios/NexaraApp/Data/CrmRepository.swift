@@ -23,8 +23,8 @@ final class CrmRepository {
         return ConsoleHelpers.decodeMap(data)
     }
 
-    func downloadCotizacionPdf(id: Int, internal: Bool = false) async throws -> Data {
-        let path = internal ? "cotizaciones/\(id)/pdf/internal" : "cotizaciones/\(id)/pdf"
+    func downloadCotizacionPdf(id: Int, internal isInternal: Bool = false) async throws -> Data {
+        let path = isInternal ? "cotizaciones/\(id)/pdf/internal" : "cotizaciones/\(id)/pdf"
         return try await api.getBinary(path)
     }
 
@@ -217,7 +217,8 @@ final class CrmRepository {
     }
 
     func downloadAssetBytes(_ relativeOrAbsoluteUrl: String) async throws -> Data {
-        let url = ApiUrls.absoluteAsset(relativeOrAbsoluteUrl)
+        let urlString = ApiUrls.absoluteAsset(relativeOrAbsoluteUrl)
+        guard let url = URL(string: urlString) else { throw ApiError.invalidURL }
         var req = URLRequest(url: url)
         if let token = SessionStore.shared.token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

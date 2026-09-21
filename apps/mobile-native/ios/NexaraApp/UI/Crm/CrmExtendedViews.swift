@@ -511,23 +511,7 @@ struct CrmSalesTeamView: View {
     }
 }
 
-private extension ConsoleHelpers {
-    static func mapStr(_ m: [String: Any], _ k1: String, _ k2: String = "", default def: String = "") -> String {
-        let a = mapStr(m, k1)
-        if !a.isEmpty { return a }
-        if !k2.isEmpty { let b = mapStr(m, k2); if !b.isEmpty { return b } }
-        return def
-    }
-
-    static func mapDouble(_ m: [String: Any], _ k1: String, _ k2: String = "") -> Double {
-        for k in [k1, k2] where !k.isEmpty {
-            if let n = m[k] as? Double { return n }
-            if let n = m[k] as? Int { return Double(n) }
-            if let s = m[k] as? String, let n = Double(s) { return n }
-        }
-        return 0
-    }
-}
+// Use global ConsoleHelpers.mapStr/mapDouble (variadic) to avoid overload ambiguity
 
 private func fmtMxn(_ v: Double) -> String {
     if v >= 1_000_000 { return String(format: "$%.1fM", v / 1_000_000) }
@@ -1034,7 +1018,8 @@ struct CrmClientDetailView: View {
             if tickets.isEmpty {
                 VStack { Spacer(); Text("Sin tickets del cliente").foregroundColor(.secondary); Spacer() }
             } else {
-                List(tickets, id: \.crmKey) { t in
+                List {
+                    ForEach(Array(tickets.enumerated()), id: \.offset) { _, t in
                     let subject = ConsoleHelpers.mapStr(t, "subject", "descripcion", "title")
                     let status  = ConsoleHelpers.mapStr(t, "status", "estado")
                     let date    = String(ConsoleHelpers.mapStr(t, "createdAt", "fecha").prefix(10))
@@ -1045,6 +1030,7 @@ struct CrmClientDetailView: View {
                             Spacer()
                             if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
                         }
+                    }
                     }
                 }.listStyle(.plain)
             }
@@ -1062,7 +1048,8 @@ struct CrmClientDetailView: View {
             if facturas.isEmpty {
                 VStack { Spacer(); Text("Sin facturas").foregroundColor(.secondary); Spacer() }
             } else {
-                List(facturas, id: \.crmKey) { inv in
+                List {
+                    ForEach(Array(facturas.enumerated()), id: \.offset) { _, inv in
                     let num = ConsoleHelpers.mapStr(inv, "invoiceNumber", "folio")
                     let status = ConsoleHelpers.mapStr(inv, "status", "estado")
                     let total = ConsoleHelpers.mapDouble(inv, "totalAmount", "total")
@@ -1074,6 +1061,7 @@ struct CrmClientDetailView: View {
                             Text(fmtMxn(total)).font(.caption.bold())
                         }
                     }
+                    }
                 }.listStyle(.plain)
             }
         }
@@ -1084,12 +1072,14 @@ struct CrmClientDetailView: View {
             if sucursales.isEmpty {
                 VStack { Spacer(); Text("Sin sucursales").foregroundColor(.secondary); Spacer() }
             } else {
-                List(sucursales, id: \.crmKey) { b in
+                List {
+                    ForEach(Array(sucursales.enumerated()), id: \.offset) { _, b in
                     let name = ConsoleHelpers.mapStr(b, "name", "nombre", "branchName")
                     let address = ConsoleHelpers.mapStr(b, "address", "direccion")
                     VStack(alignment: .leading, spacing: 4) {
                         Text(name.isEmpty ? "Sucursal" : name).font(.subheadline.bold())
                         if !address.isEmpty { Text(address).font(.caption).foregroundColor(.secondary) }
+                    }
                     }
                 }.listStyle(.plain)
             }
@@ -1101,7 +1091,8 @@ struct CrmClientDetailView: View {
             if servicios.isEmpty {
                 VStack { Spacer(); Text("Sin contratos de servicio").foregroundColor(.secondary); Spacer() }
             } else {
-                List(servicios, id: \.crmKey) { s in
+                List {
+                    ForEach(Array(servicios.enumerated()), id: \.offset) { _, s in
                     let name = ConsoleHelpers.mapStr(s, "name", "nombre", "contractNumber")
                     let status = ConsoleHelpers.mapStr(s, "status", "estado")
                     let expiry = String(ConsoleHelpers.mapStr(s, "expiresAt", "endDate", "vigencia").prefix(10))
@@ -1112,6 +1103,7 @@ struct CrmClientDetailView: View {
                             Spacer()
                             if !expiry.isEmpty { Text(expiry).font(.caption2).foregroundColor(.secondary) }
                         }
+                    }
                     }
                 }.listStyle(.plain)
             }
@@ -1168,4 +1160,14 @@ struct CrmClientDetailView: View {
 
 private extension String {
     func ifBlankExt(_ fallback: String) -> String { isEmpty ? fallback : self }
+    func ifEmptyExt(_ fallback: String) -> String { isEmpty ? fallback : self }
+}
+
+// Local ID helpers for lists in this file
+private extension Dictionary where Key == String, Value == Any {
+    var crmKey: String {
+        if let n = self["id"] as? Int { return "crm-\(n)" }
+        if let s = self["id"] as? String { return "crm-\(s)" }
+        return UUID().uuidString
+    }
 }
