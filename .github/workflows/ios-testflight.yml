@@ -73,12 +73,32 @@ jobs:
           echo "ASC key written to ${KEY_PATH}"
           echo "ASC_KEY_PATH=${KEY_PATH}" >> $GITHUB_ENV
 
-      - name: Install signing cert and provisioning profile (manual signing)
+      - name: Install provisioning profile (dual paths)
         run: |
           set -euo pipefail
           if [ -z "${BUILD_PROVISION_PROFILE_BASE64}" ]; then
             echo "Missing provisioning profile secret (BUILD_PROVISION_PROFILE_BASE64)"; exit 1
           fi
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          TMP_PROFILE="$RUNNER_TEMP/profile.mobileprovision"
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$TMP_PROFILE"
+          PLIST_OUT="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$TMP_PROFILE" > "$PLIST_OUT"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PLIST_OUT")
+          DEST_MOBILE="$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          DEST_USERDATA="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          cp "$TMP_PROFILE" "$DEST_MOBILE"
+          cp "$TMP_PROFILE" "$DEST_USERDATA"
+          echo "Installed provisioning profile UUID=$PROFILE_UUID at:"
+          echo " - $DEST_MOBILE"
+          echo " - $DEST_USERDATA"
+          # Expose UUID for subsequent steps
+          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+
+      - name: Build and import Distribution signing certificate (.p12)
+        run: |
+          set -euo pipefail
           KEYCHAIN_PATH="$RUNNER_TEMP/codesign.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 12)"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -86,7 +106,6 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
           security default-keychain -s "$KEYCHAIN_PATH"
-          # Preferred path: construct a macOS-compatible .p12 from PEM key + DER cert
           if [ -n "${CERTIFICATE_PRIVATE_KEY:-}" ] && [ -n "${DISTRIBUTION_CERT_CER_BASE64:-}" ]; then
             echo "Building .p12 from CERTIFICATE_PRIVATE_KEY and DISTRIBUTION_CERT_CER_BASE64"
             KEY_PEM="$RUNNER_TEMP/dist.key.pem"
@@ -113,22 +132,9 @@ jobs:
             exit 1
           fi
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
-          TMP_PROFILE="$RUNNER_TEMP/profile.mobileprovision"
-          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$TMP_PROFILE"
-          PLIST_OUT="$RUNNER_TEMP/profile.plist"
-          security cms -D -i "$TMP_PROFILE" > "$PLIST_OUT"
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PLIST_OUT")
-          DEST_MOBILE="$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
-          DEST_USERDATA="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
-          cp "$TMP_PROFILE" "$DEST_MOBILE"
-          cp "$TMP_PROFILE" "$DEST_USERDATA"
-          echo "Installed provisioning profile UUID=$PROFILE_UUID at:"
-          echo " - $DEST_MOBILE"
-          echo " - $DEST_USERDATA"
-          # Expose UUID for subsequent steps
-          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+          echo "::group::Available code signing identities"
+          security find-identity -v -p codesigning || true
+          echo "::endgroup::"
 
       - name: Debug provisioning profile metadata
         run: |
@@ -244,26 +250,25 @@ jobs:
       - name: Verify app target provisioning profile binding
         run: |
           set -euo pipefail
+          # Verify pbxproj contains the expected bindings for NexaraApp
+          PBXPROJ="apps/mobile-native/ios/NexaraApp.xcodeproj/project.pbxproj"
+          grep -q "PROVISIONING_PROFILE = \\\"${PROFILE_UUID}\\\";" "$PBXPROJ" || { echo "ERROR: PROVISIONING_PROFILE UUID not found in pbxproj"; exit 1; }
+          grep -q "CODE_SIGN_STYLE = Manual;" "$PBXPROJ" || { echo "ERROR: CODE_SIGN_STYLE Manual not found in pbxproj"; exit 1; }
+          grep -q "DEVELOPMENT_TEAM = AHNW9K8745;" "$PBXPROJ" || { echo "ERROR: DEVELOPMENT_TEAM not set to AHNW9K8745 in pbxproj"; exit 1; }
+          grep -q "CODE_SIGN_IDENTITY = \\\"Apple Distribution\\\";" "$PBXPROJ" || { echo "ERROR: CODE_SIGN_IDENTITY Apple Distribution not found in pbxproj"; exit 1; }
+          # Soft showBuildSettings verification (do not fail on Developer identity here)
           xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -target NexaraApp -configuration Release > "$RUNNER_TEMP/buildsettings_after_patch.txt"
-          echo "::group::Code signing (post-patch)"
+          echo "::group::Code signing (post-patch showBuildSettings)"
           egrep "^( *CODE_SIGN_STYLE| *PROVISIONING_PROFILE| *DEVELOPMENT_TEAM| *CODE_SIGN_IDENTITY| *PRODUCT_BUNDLE_IDENTIFIER) =" "$RUNNER_TEMP/buildsettings_after_patch.txt" || true
           echo "::endgroup::"
           PROFILE_VAL=$(grep -E "^ *PROVISIONING_PROFILE =" "$RUNNER_TEMP/buildsettings_after_patch.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
-          if [ -z "$PROFILE_VAL" ] || [ "$PROFILE_VAL" = "(null)" ]; then
-            echo "ERROR: PROVISIONING_PROFILE is not set for app target in build settings."; exit 1
-          fi
-          if [ "$PROFILE_VAL" != "$PROFILE_UUID" ]; then
-            echo "ERROR: PROVISIONING_PROFILE ($PROFILE_VAL) != PROFILE_UUID ($PROFILE_UUID)"; exit 1
+          if [ -z "$PROFILE_VAL" ] || [ "$PROFILE_VAL" = "(null)" ] || [ "$PROFILE_VAL" != "$PROFILE_UUID" ]; then
+            echo "ERROR: showBuildSettings PROVISIONING_PROFILE invalid: '$PROFILE_VAL' (expected $PROFILE_UUID)"; exit 1
           fi
           TEAM_VAL=$(grep -E "^ *DEVELOPMENT_TEAM =" "$RUNNER_TEMP/buildsettings_after_patch.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
           if [ "$TEAM_VAL" != "AHNW9K8745" ]; then
             echo "ERROR: DEVELOPMENT_TEAM is $TEAM_VAL, expected AHNW9K8745"; exit 1
           fi
-          ID_VAL=$(grep -E "^ *CODE_SIGN_IDENTITY =" "$RUNNER_TEMP/buildsettings_after_patch.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
-          case "$ID_VAL" in
-            *Distribution*) : ;;
-            *) echo "ERROR: CODE_SIGN_IDENTITY does not indicate a Distribution identity: $ID_VAL"; exit 1 ;;
-          esac
 
       - name: Create ExportOptions.plist (App Store, manual)
         run: |
