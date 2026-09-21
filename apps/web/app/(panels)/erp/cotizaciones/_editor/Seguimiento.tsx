@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   aprobarCotizacion,
+  asignarCotizacion,
+  companerosQueCotizan,
   formatoFecha,
   formatoMoneda,
   marcarRevisada,
   rechazarCotizacion,
   refoliarCotizacion,
+  type CompaneroQueCotiza,
   type CotizacionDetalle,
   type VersionCotizacion,
 } from "@/lib/cotizaciones-api";
@@ -40,6 +43,33 @@ export default function Seguimiento({
 }) {
   const [rechazo, setRechazo] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [traspaso, setTraspaso] = useState(false);
+  const [companeros, setCompaneros] = useState<CompaneroQueCotiza[] | null>(null);
+  const [destinatario, setDestinatario] = useState("");
+  const [notaTraspaso, setNotaTraspaso] = useState("");
+
+  // La lista de quién cotiza se pide al abrir el diálogo, no al pintar el seguimiento: es una
+  // llamada que solo hace falta si de verdad vas a pasársela a alguien.
+  useEffect(() => {
+    if (!traspaso || !token || companeros) return;
+    let vivo = true;
+    companerosQueCotizan(token)
+      .then((lista) => {
+        if (vivo) setCompaneros(lista);
+      })
+      .catch((e) => {
+        if (vivo) onError(e instanceof Error ? e.message : "No se pudo leer quién puede cotizar");
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [traspaso, token, companeros, onError]);
+
+  function cerrarTraspaso() {
+    setTraspaso(false);
+    setDestinatario("");
+    setNotaTraspaso("");
+  }
 
   async function hacer(accion: () => Promise<CotizacionDetalle>, aviso: string) {
     if (!token) return false;
@@ -73,6 +103,16 @@ export default function Seguimiento({
           </div>
         </div>
         <div className={styles.hojaAcciones}>
+          {!detalle.bloqueada ? (
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              disabled={ocupado || !token}
+              onClick={() => setTraspaso(true)}
+            >
+              Enviar a un compañero
+            </button>
+          ) : null}
           {estado !== "APROBADA" ? (
             <button
               type="button"
@@ -115,6 +155,18 @@ export default function Seguimiento({
           >
             Asignar folio
           </button>
+        </div>
+      ) : null}
+
+      {detalle.asignadoA ? (
+        <div className={`${styles.aviso} ${styles.avisoInfo}`}>
+          <p>
+            Le toca a <strong>{detalle.asignadoA.nombre}</strong>
+            {detalle.asignadoA.puesto ? ` (${detalle.asignadoA.puesto})` : ""}
+            {detalle.asignadoPor ? `, se la pasó ${detalle.asignadoPor.nombre}` : ""}
+            {detalle.asignadoEn ? ` el ${formatoFecha(detalle.asignadoEn)}` : ""}.
+            {detalle.asignadoNota ? ` «${detalle.asignadoNota}»` : ""}
+          </p>
         </div>
       ) : null}
 
@@ -187,6 +239,80 @@ export default function Seguimiento({
             </Link>
           ))}
         </p>
+      ) : null}
+
+      {traspaso ? (
+        <Dialogo
+          titulo="Enviar a un compañero"
+          onCerrar={cerrarTraspaso}
+          ocupado={ocupado}
+          pie={
+            <>
+              <button type="button" className={styles.ghostBtn} onClick={cerrarTraspaso} disabled={ocupado}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={ocupado || !destinatario}
+                onClick={async () => {
+                  const ok = await hacer(
+                    () => asignarCotizacion(token!, detalle.id, Number(destinatario), notaTraspaso),
+                    "Se la pasaste a tu compañero y ya le llegó el aviso.",
+                  );
+                  if (ok) cerrarTraspaso();
+                }}
+              >
+                Enviar
+              </button>
+            </>
+          }
+        >
+          <div className={styles.campo}>
+            <label className={styles.etiqueta} htmlFor="destinatario-traspaso">
+              A quién
+            </label>
+            <select
+              id="destinatario-traspaso"
+              className={styles.select}
+              value={destinatario}
+              disabled={!companeros}
+              onChange={(e) => setDestinatario(e.target.value)}
+            >
+              <option value="">{companeros ? "Elige a un compañero…" : "Cargando…"}</option>
+              {(companeros ?? []).map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                  {c.puesto ? ` · ${c.puesto}` : ""}
+                </option>
+              ))}
+            </select>
+            <p className={styles.pista}>
+              Solo sale quien puede cotizar. La cotización sigue siendo de{" "}
+              {detalle.elaboro?.nombre || "quien la elaboró"}: el folio no cambia.
+            </p>
+          </div>
+
+          <div className={styles.campo}>
+            <label className={styles.etiqueta} htmlFor="nota-traspaso">
+              Nota <span style={{ fontWeight: 400 }}>(opcional)</span>
+            </label>
+            <textarea
+              id="nota-traspaso"
+              className={styles.textoCampo}
+              style={{ minHeight: "4.5rem", resize: "vertical", overflow: "auto" }}
+              maxLength={500}
+              value={notaTraspaso}
+              onChange={(e) => setNotaTraspaso(e.target.value)}
+              placeholder="Ej. Falta el precio del NVR; revísalo y mándala tú."
+            />
+            <p className={styles.pista}>Va en el aviso que le llega.</p>
+          </div>
+
+          {companeros?.length === 0 ? (
+            <p className={styles.pista}>No hay nadie más que pueda cotizar ahora mismo.</p>
+          ) : null}
+        </Dialogo>
       ) : null}
 
       {rechazo !== null ? (

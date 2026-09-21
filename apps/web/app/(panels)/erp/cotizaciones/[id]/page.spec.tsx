@@ -96,6 +96,12 @@ const DETALLE = {
   actividades: [],
 };
 
+/** Lo que devuelve `GET cotizaciones/companeros`: el personal que cotiza, sin ti. */
+const COMPANEROS = [
+  { id: 4, nombre: "Josué Cervantes", email: "infraestructura@nexara.com.mx", puesto: "Encargado de Obra" },
+  { id: 5, nombre: "Daniela Hernández", email: "daniela.hernandez@nexara.com.mx", puesto: "Encargada comercial" },
+];
+
 function servidor() {
   const llamadas: Array<{ metodo: string; url: string; cuerpo: unknown }> = [];
   const fetchMock = vi.fn(async (entrada: RequestInfo | URL, init?: RequestInit) => {
@@ -103,6 +109,10 @@ function servidor() {
     const metodo = init?.method ?? "GET";
     llamadas.push({ metodo, url, cuerpo: init?.body ? JSON.parse(String(init.body)) : null });
     if (url.includes("cotizaciones/core/7")) return json(DETALLE);
+    if (url.includes("cotizaciones/companeros")) return json(COMPANEROS);
+    if (url.includes("cotizaciones/7/asignar")) {
+      return json({ ...DETALLE, asignadoA: { id: 4, nombre: "Josué Cervantes", puesto: "Encargado de Obra" } });
+    }
     if (url.includes("cotizaciones/plantillas")) return json([]);
     if (url.includes("cotizaciones/paquetes")) return json([]);
     if (url.includes("cotizaciones/7/versiones")) return json([]);
@@ -234,5 +244,42 @@ describe("editor de cotización", () => {
       expect(String((envio?.cuerpo as { message: string }).message)).toContain("Plaza Norte");
     });
     expect(await screen.findByText(/Enviada a compras@plazanorte.mx/)).toBeInTheDocument();
+  });
+
+  it("la pasa a un compañero con una nota, y solo ofrece a quien puede cotizar", async () => {
+    const llamadas = servidor();
+    const user = userEvent.setup();
+    render(<CotizacionDetallePage />);
+    await user.click(await screen.findByRole("button", { name: "Enviar a un compañero" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Enviar a un compañero" });
+    // La lista no se pide al pintar el seguimiento, solo al abrir el diálogo.
+    await waitFor(() => expect(llamadas.some((l) => l.url.includes("cotizaciones/companeros"))).toBe(true));
+    const aQuien = within(dialogo).getByLabelText("A quién");
+    await waitFor(() =>
+      expect(within(aQuien as HTMLSelectElement).getByRole("option", { name: /Josué Cervantes/ })).toBeInTheDocument(),
+    );
+
+    await user.selectOptions(aQuien, "4");
+    await user.type(within(dialogo).getByLabelText(/^Nota/), "Falta el precio del NVR.");
+    await user.click(within(dialogo).getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => {
+      const traspaso = llamadas.find((l) => l.url.includes("/asignar"));
+      expect(traspaso?.cuerpo).toEqual({ destinatarioId: 4, nota: "Falta el precio del NVR." });
+    });
+    // Al volver, el seguimiento dice a quién le toca.
+    expect(await screen.findByText(/Le toca a/)).toHaveTextContent("Josué Cervantes");
+  });
+
+  it("sin elegir a nadie no deja enviar", async () => {
+    servidor();
+    const user = userEvent.setup();
+    render(<CotizacionDetallePage />);
+    await user.click(await screen.findByRole("button", { name: "Enviar a un compañero" }));
+    const dialogo = await screen.findByRole("dialog", { name: "Enviar a un compañero" });
+    expect(within(dialogo).getByRole("button", { name: "Enviar" })).toBeDisabled();
+    // El folio no cambia: la cotización sigue siendo de quien la elaboró.
+    expect(within(dialogo).getByText(/el folio no cambia/)).toBeInTheDocument();
   });
 });

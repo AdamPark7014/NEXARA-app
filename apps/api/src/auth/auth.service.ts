@@ -13,7 +13,7 @@ import {
   isSuperAdminEmail,
   isCeoEquivalentEmail,
 } from '../common/platform-accounts.js';
-import { LEGACY_TO_V2, ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
+import { LEGACY_TO_V2, ROLES, puedeCotizar, type RoleKey } from '../common/rbac/roles.v2.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { fechaAviso } from '../notifications/notification-push-meta.js';
 import { canManageTools } from '../tool-requests/tools-access.js';
@@ -451,7 +451,6 @@ export class AuthService {
       set.add(PERMISSIONS.SALES_VIEW);
       set.add(PERMISSIONS.SALES_MANAGE);
       set.add(PERMISSIONS.PANEL_VENTAS);
-      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
       set.add(PERMISSIONS.CLIENTS_VIEW);
       set.add(PERMISSIONS.CLIENTS_MANAGE);
       set.add(PERMISSIONS.CATALOG_VIEW);
@@ -459,7 +458,6 @@ export class AuthService {
 
     // Dirección: CEO y directores consultan cotizaciones (detalle + PDF)
     if (roleKey === 'ceo' || roleKey === 'dir_admin' || roleKey === 'dir_operaciones') {
-      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
       set.add(PERMISSIONS.SALES_VIEW);
       set.add(PERMISSIONS.CATALOG_VIEW);
     }
@@ -476,8 +474,19 @@ export class AuthService {
 
     // Contabilidad: lectura de cotizaciones vinculadas a facturación
     if (roleKey === 'contabilidad') {
-      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
       set.add(PERMISSIONS.DOCUMENTS_VIEW);
+    }
+
+    /**
+     * Quién cotiza (`cotizaciones.access`) — una sola regla, no cuatro sueltas.
+     *
+     * Adam (20-09): **cotizan los encargados de área**, además de dirección y del equipo comercial.
+     * La lista vive en `ROLES_QUE_COTIZAN` (roles.v2.ts), que es la misma fuente que usan la matriz
+     * de URLs y el selector de «Enviar a un compañero»: si mañana cambia quién cotiza, se cambia
+     * ahí y los tres sitios se enteran. Escribir vs. solo leer lo sigue decidiendo la matriz.
+     */
+    if (puedeCotizar(roleKey)) {
+      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
     }
 
     // ── Contabilidad / Finanzas ─────────────────────────────────────
@@ -665,7 +674,6 @@ export class AuthService {
     if (roleKey === 'coord_admin') {
       set.add(PERMISSIONS.SALES_VIEW);
       set.add(PERMISSIONS.PANEL_VENTAS);
-      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
       set.add(PERMISSIONS.CLIENTS_VIEW);
       set.add(PERMISSIONS.CLIENTS_MANAGE);
       set.add(PERMISSIONS.CATALOG_VIEW);

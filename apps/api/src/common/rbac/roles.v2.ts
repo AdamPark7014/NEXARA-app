@@ -164,3 +164,45 @@ export function tier(role: RoleKey): number {
 export function canApproveAt(role: RoleKey, requiredTier: number): boolean {
   return tier(role) >= requiredTier;
 }
+
+/**
+ * Encargados de área: quienes llevan un frente de la empresa y responden por él.
+ *
+ * No son «los jefes» del organigrama (eso es `ROLE_TIER`) ni un puesto: `puesto` es texto libre que
+ * RH cambia, y el correo es un dato de la persona, no del papel que ocupa. Lo estable es la clave de
+ * rol, que es justo lo que la matriz de URLs y `AuthService` ya usan para decidir.
+ */
+export const ROLES_ENCARGADOS_DE_AREA: RoleKey[] = [
+  ROLES.ARQUITECTO,        // Obra
+  ROLES.COORD_OPERACIONES, // Operaciones y servicios
+  ROLES.ADMINISTRATIVO,    // Administración / comercial
+  ROLES.ING_SOPORTE,       // Sistemas y soporte
+];
+
+/**
+ * Quién puede cotizar (`cotizaciones.access`).
+ *
+ * Decisión de Adam (20-09): **cotizan los encargados de área**, además de dirección y del equipo
+ * comercial que ya lo hacía. Es la misma regla que ya asumía `folio-core.ts` cuando decidió que el
+ * folio dijera de quién es la cotización.
+ *
+ * `cotizaciones.access` abre el módulo; **escribir** lo sigue decidiendo la matriz de URLs
+ * (`COTIZACIONES_CORE_URL_RULES`), por eso contabilidad está aquí y aun así solo lee.
+ */
+export const ROLES_QUE_COTIZAN: RoleKey[] = [
+  ROLES.CEO,
+  ROLES.DIR_ADMIN,
+  ROLES.DIR_OPERACIONES,
+  ROLES.COORD_ADMIN,
+  ROLES.COORD_VENTAS,
+  ROLES.VENDEDOR,
+  ROLES.CONTABILIDAD,
+  ...ROLES_ENCARGADOS_DE_AREA,
+];
+
+const SET_QUE_COTIZAN = new Set<string>(ROLES_QUE_COTIZAN);
+
+/** ¿Esta clave de rol cotiza? `super_admin` entra por su bypass, no por aquí. */
+export function puedeCotizar(roleKey: string | null | undefined): boolean {
+  return SET_QUE_COTIZAN.has(String(roleKey ?? ''));
+}

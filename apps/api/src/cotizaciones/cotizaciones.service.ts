@@ -84,6 +84,13 @@ import {
   partidasDePaquete,
 } from './paquetes.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { ROLES_QUE_COTIZAN, ROLE_LABELS, type RoleKey } from '../common/rbac/roles.v2.js';
+import {
+  MENSAJE_PROBLEMA,
+  avisoDeTraspaso,
+  limpiarNota,
+  revisarEnvioInterno,
+} from './envio-interno.js';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -419,7 +426,13 @@ export class CotizacionesService {
     const quote = await this.db.cotizacion.findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
       // Las partidas en el orden en que se capturaron: así salen en el editor y en el PDF.
-      include: { items: { orderBy: { id: 'asc' } }, createdBy: true, company: true },
+      include: {
+        items: { orderBy: { id: 'asc' } },
+        createdBy: true,
+        company: true,
+        asignadoA: { select: { id: true, nombre: true, email: true, puesto: true, avatarUrl: true } },
+        asignadoPor: { select: { id: true, nombre: true, email: true, puesto: true, avatarUrl: true } },
+      },
     });
     assertCompanyAccess(quote, companyId, 'Cotizacion');
     return quote;
@@ -482,6 +495,15 @@ export class CotizacionesService {
           }
         : null,
       cadenaParticipantes: cadena,
+      // Envío interno: a quién le toca ahora, quién se la pasó y con qué nota. No va en el PDF.
+      asignadoA: quote.asignadoA
+        ? { id: quote.asignadoA.id, nombre: quote.asignadoA.nombre, puesto: quote.asignadoA.puesto ?? null }
+        : null,
+      asignadoPor: quote.asignadoPor
+        ? { id: quote.asignadoPor.id, nombre: quote.asignadoPor.nombre, puesto: quote.asignadoPor.puesto ?? null }
+        : null,
+      asignadoNota: quote.asignadoNota ?? null,
+      asignadoEn: quote.asignadoEn ?? null,
       // 01 Objetivo en sus tres partes (el texto guardado lleva marcas) y lo que el PDF pondría solo.
       objetivoPartes: leerObjetivo(quote.objetivo),
       objetivoSugerido: objetivoDePropuesta({
@@ -1292,6 +1314,106 @@ export class CotizacionesService {
       where: { id },
       data: { planos: previos.filter((p: any) => String(p?.url ?? '') !== url) as Prisma.InputJsonValue },
     });
+    return this.detalleCore(id, companyId);
+  }
+
+  /**
+   * A quién se le puede pasar una cotización: el personal que cotiza.
+   *
+   * La lista sale de `ROLES_QUE_COTIZAN` —la misma con la que `AuthService` reparte
+   * `cotizaciones.access`—, no de nombres ni correos escritos a mano. Fuera los inactivos: pasarle
+   * el trabajo a alguien que ya no entra es perderlo en silencio.
+   */
+  async companerosQueCotizan(excluirUserId?: number | null) {
+    const filas = await this.db.user.findMany({
+      where: {
+        isActive: true,
+        roleKey: { in: ROLES_QUE_COTIZAN as string[] },
+        ...(excluirUserId ? { id: { not: excluirUserId } } : {}),
+      },
+      orderBy: [{ nombre: 'asc' }],
+      select: { id: true, nombre: true, email: true, puesto: true, avatarUrl: true, roleKey: true },
+    });
+
+    return filas.map((u) => ({
+      id: u.id,
+      nombre: u.nombre,
+      email: u.email,
+      // `puesto` es texto libre de RH y cambia; si está vacío, la etiqueta del rol siempre está.
+      puesto: u.puesto?.trim() || ROLE_LABELS[u.roleKey as RoleKey]?.es || null,
+      avatarUrl: u.avatarUrl ?? null,
+    }));
+  }
+
+  /**
+   * «Enviar a un compañero»: la cotización pasa a ser de otra persona que también cotiza, con una
+   * nota opcional, y le llega el aviso.
+   *
+   * No toca el folio ni el autor (`createdById`): quien la elaboró sigue siendo quien la elaboró y
+   * su nomenclatura sigue en el folio. Esto solo dice a quién le toca ahora.
+   *
+   * El aviso va por `NotificationsService.createNotification`, que ya lleva campana, socket y push:
+   * no hay un segundo mecanismo de avisos para esto. Tampoco se registra al destinatario en
+   * `CotizacionParticipante`: ahí se anota **lo que alguien hizo** (revisó, aprobó, envió) y de ahí
+   * sale la cadena de siglas del folio; recibirla todavía no es haber hecho nada.
+   */
+  async asignarACompanero(
+    id: number,
+    destinatarioId: number,
+    nota: string | undefined,
+    actor: { id?: number | null; nombre?: string | null } | undefined,
+    companyId?: number | null,
+  ) {
+    const quote = await this.findOne(id, companyId);
+
+    const destinatario = Number.isFinite(destinatarioId)
+      ? await this.db.user.findUnique({
+          where: { id: destinatarioId },
+          select: { id: true, nombre: true, roleKey: true, isActive: true },
+        })
+      : null;
+
+    const problema = revisarEnvioInterno({
+      bloqueada: estaBloqueada(quote.status),
+      actorId: actor?.id ?? null,
+      companyId: null,
+      destinatario,
+    });
+    if (problema) throw new BadRequestException(MENSAJE_PROBLEMA[problema]);
+
+    const notaLimpia = limpiarNota(nota);
+    await this.db.cotizacion.update({
+      where: { id },
+      data: {
+        asignadoAId: destinatario!.id,
+        asignadoPorId: actor?.id ?? null,
+        asignadoNota: notaLimpia,
+        asignadoEn: new Date(),
+      },
+    });
+
+    const aviso = avisoDeTraspaso({
+      folio: quote.quoteNumber,
+      deNombre: actor?.nombre ?? null,
+      nota: notaLimpia,
+    });
+
+    // El aviso es un extra: si el push falla, el traspaso ya está hecho y no se deshace.
+    await this.notificationsService
+      .createNotification({
+        userId: destinatario!.id,
+        type: 'QUOTE_ASSIGNED',
+        category: 'sales',
+        title: aviso.titulo,
+        message: aviso.mensaje,
+        entityType: 'COTIZACION',
+        relatedEntityId: id,
+        relatedUrl: appUrls.erpCotizaciones(id),
+        triggerUserId: actor?.id ?? undefined,
+        companyId: quote.companyId ?? undefined,
+      } as any)
+      .catch(() => undefined);
+
     return this.detalleCore(id, companyId);
   }
 
