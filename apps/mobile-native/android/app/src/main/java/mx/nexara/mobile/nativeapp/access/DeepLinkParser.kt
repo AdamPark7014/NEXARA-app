@@ -150,7 +150,18 @@ object DeepLinkParser {
                 val personId = second?.toLongOrNull()?.takeIf { it > 0L }
                 module(
                     CoreKeys.ACTIVITIES,
-                    params = if (personId != null) extra + (BOARD_USER_PARAM to personId.toString()) else extra,
+                    params = when {
+                        // Con persona se abre su día: ahí no hay pestañas que elegir.
+                        personId != null -> extra + (BOARD_USER_PARAM to personId.toString())
+                        // Quien pidió una vista concreta manda.
+                        extra.containsKey("vista") -> extra
+                        // «Pizarra» es el equipo. Sin esto el enlace caía en el
+                        // valor por defecto de la pantalla, «Mis actividades», y
+                        // un aviso que decía «ve a la pizarra» te dejaba viendo
+                        // tu propia lista — la misma pantalla que
+                        // `mis-actividades`, sin forma de notar la diferencia.
+                        else -> extra + ("vista" to "equipo")
+                    },
                 )
             }
             first in MY_ACTIVITIES_SEGMENTS && activityId != null ->

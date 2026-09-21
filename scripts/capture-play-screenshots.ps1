@@ -175,16 +175,27 @@ function Invoke-AutoLogin([string]$Adb, [string]$Serial, [string]$UserEmail, [st
   Start-Sleep -Seconds 12
 }
 
-# 8 capturas Play Store — todas con deep link automático
+# 8 capturas Play Store — todas con deep link automático.
+#
+# Los destinos se revisaron contra `DeepLinkParser.kt` el 21-09-2026. Los tres
+# que había antes —«Ventas dashboard», «Smart Quote» y «Selector paneles»— ya no
+# existen: se borraron al dejar el sistema con rutas de ERP solamente, y el
+# guion seguía navegando hacia ellos. El resultado eran capturas repetidas de la
+# misma pantalla, que es peor que no tener capturas.
+#
+# Orden pensado para quien mira la ficha de Play sin conocer la app: primero qué
+# hace (trabajo del día), luego cómo se comprueba (evidencias, jornada), luego
+# lo que la vuelve un ERP (cotizaciones, viáticos) y al final cómo se coordina
+# el equipo.
 $screens = @(
-  @{ Order = 1; Name = "Ventas dashboard";     File = "01-ventas-dashboard.png";     DeepLink = "nexara://ventas/dashboard" }
-  @{ Order = 2; Name = "Smart Quote";         File = "02-smart-quote.png";         DeepLink = "nexara://ventas/smart-quote" }
-  @{ Order = 3; Name = "Chat";                File = "03-chat.png";                DeepLink = "nexara://erp/chat" }
-  @{ Order = 4; Name = "Actividades OPS";     File = "04-actividades.png";         DeepLink = "nexara://operacion/activities" }
-  @{ Order = 5; Name = "Tickets portal";      File = "05-tickets.png";             DeepLink = "nexara://portal/tickets" }
-  @{ Order = 6; Name = "Notificaciones";       File = "06-notificaciones.png";      DeepLink = "nexara://erp/notifications-center" }
-  @{ Order = 7; Name = "GPS / mapa";          File = "07-mapa-gps.png";            DeepLink = "nexara://operacion/gps" }
-  @{ Order = 8; Name = "Selector paneles";    File = "08-selector-paneles.png";    DeepLink = "nexara://panels" }
+  @{ Order = 1; Name = "Actividades del día"; File = "01-actividades.png";     DeepLink = "nexara://erp/mis-actividades" }
+  @{ Order = 2; Name = "Equipo en la pizarra"; File = "02-pizarra.png";        DeepLink = "nexara://erp/pizarra" }
+  @{ Order = 3; Name = "Asistencias";          File = "03-asistencias.png";    DeepLink = "nexara://erp/asistencias" }
+  @{ Order = 4; Name = "Cotizaciones";         File = "04-cotizaciones.png";   DeepLink = "nexara://erp/cotizaciones" }
+  @{ Order = 5; Name = "Viáticos";             File = "05-viaticos.png";       DeepLink = "nexara://erp/mis-viaticos" }
+  @{ Order = 6; Name = "Chat del equipo";      File = "06-chat.png";           DeepLink = "nexara://erp/chat" }
+  @{ Order = 7; Name = "Notificaciones";       File = "07-notificaciones.png"; DeepLink = "nexara://erp/notifications-center" }
+  @{ Order = 8; Name = "Mi perfil";            File = "08-mi-perfil.png";      DeepLink = "nexara://erp/my-profile" }
 )
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -236,7 +247,8 @@ if (-not $SkipLaunch) {
 if (-not $SkipLogin) {
   if ([string]::IsNullOrWhiteSpace($Email) -or [string]::IsNullOrWhiteSpace($Password)) {
     Write-Note "Faltan credenciales. Define PLAY_REVIEWER_EMAIL y PLAY_REVIEWER_PASSWORD."
-    Write-Note "Provisionar: cd apps/api && npm run seed:play-reviewer"
+    Write-Note "Provisionar en produccion (borra la membresia mala y refresca la demo):"
+    Write-Note "  ssh -i \$HOME\.ssh\id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109 'docker exec -e PLAY_REVIEWER_PASSWORD=\"...\" nexara-api npm run seed:play-reviewer'"
     Write-Note "Continuando sin auto-login (debes estar logueado manualmente)."
   } else {
     Write-Step "Preparación + auto-login (solo debug)"

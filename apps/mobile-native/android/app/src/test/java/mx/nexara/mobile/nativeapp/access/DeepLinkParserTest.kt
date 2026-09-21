@@ -48,6 +48,28 @@ class DeepLinkParserTest {
     }
 
     @Test
+    fun pizarraSolaAbreLaPestanaDelEquipo() {
+        // Sin esto, `/erp/pizarra` y `/erp/mis-actividades` llevaban a la MISMA
+        // pantalla con la MISMA pestaña: el aviso que decía «ve a la pizarra»
+        // te dejaba mirando tu propia lista, y las capturas de la tienda salían
+        // repetidas sin que nada avisara.
+        val dest = module("/erp/pizarra")
+        assertEquals("equipo", DeepLinkNavigation.actividadesVista(link(dest)))
+    }
+
+    @Test
+    fun misActividadesSigueAbriendoLoTuyo() {
+        val dest = module("/erp/mis-actividades")
+        assertEquals("mias", DeepLinkNavigation.actividadesVista(link(dest)))
+    }
+
+    @Test
+    fun laVistaPedidaAManoGanaSobreElValorDePizarra() {
+        val dest = module("/erp/pizarra?vista=mias")
+        assertEquals("mias", DeepLinkNavigation.actividadesVista(link(dest)))
+    }
+
+    @Test
     fun pizarraPersonOpensTheirDay() {
         val dest = module("/erp/pizarra/33")
         assertEquals("activities", dest.key)
