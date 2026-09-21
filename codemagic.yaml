@@ -154,7 +154,6 @@ workflows:
       groups:
         # Define these groups in Codemagic UI and add secrets/variables there
         - ios_signing          # certificates/provisioning profiles
-        - app_store_connect    # ASC API key variables
       vars:
         XCODE_PROJECT_PATH: apps/mobile-native/ios/NexaraApp.xcodeproj
         XCODE_SCHEME: NexaraApp
@@ -162,10 +161,11 @@ workflows:
         EXPORT_DIR: $CM_BUILD_DIR/build/export
         EXPORT_PLIST: $CM_BUILD_DIR/build/ExportOptions.plist
         DERIVED_DATA: $CM_BUILD_DIR/DerivedData
-        # App Store Connect API key (set these in `app_store_connect` group):
-        # - APP_STORE_CONNECT_ISSUER_ID:        <Issuer ID from App Store Connect>
-        # - APP_STORE_CONNECT_KEY_IDENTIFIER:   <Key ID (e.g., ABCDE12345)>
-        # - APP_STORE_CONNECT_PRIVATE_KEY:      <Private key PEM contents or base64-encoded PEM>
+        # If NOT using Codemagic's App Store Connect integration and instead using api_key mode,
+        # define the following variables in a group (example `app_store_connect`) and switch auth to `api_key`:
+        #   APP_STORE_CONNECT_ISSUER_ID
+        #   APP_STORE_CONNECT_KEY_IDENTIFIER
+        #   APP_STORE_CONNECT_PRIVATE_KEY
         #
         # iOS signing (set in `ios_signing` group or via Codemagic UI):
         # - CERTIFICATE_PRIVATE_KEY:            <PKCS#12 .p12 password or raw PEM private key>
@@ -252,10 +252,7 @@ workflows:
       - DerivedData/Logs/Build/*.xcactivitylog
     publishing:
       app_store_connect:
-        auth: api_key
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        auth: integration
         submit_to_testflight: true
         # No enviar automáticamente a App Review; TestFlight primero:
         submit_to_app_store: false
