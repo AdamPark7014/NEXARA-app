@@ -9,16 +9,28 @@
  *
  * Es idempotente — puede correrse N veces.
  *
+ * Al terminar siembra también el contenido de demostración del tenant
+ * (`seed-play-demo-data.ts`): un tenant vacío deja al revisor frente a pantallas
+ * en blanco, que es de las cosas por las que rechazan una app. Para refrescar
+ * solo el contenido, sin rotar la contraseña ya pegada en Play Console, corre
+ * `npm run seed:play-demo`.
+ *
  * Run:
  *   cd apps/api && npm run seed:play-reviewer
  *
  * Para fijar la contraseña en vez de generarla:
  *   PLAY_REVIEWER_PASSWORD='...' npm run seed:play-reviewer
+ *
+ * Para omitir el contenido de demostración:
+ *   PLAY_REVIEWER_SKIP_DEMO_DATA=1 npm run seed:play-reviewer
  */
 
 import { randomInt } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
+
+import { DEMO_COMPANY_SLUG, assertDemoTenant } from '../src/common/tenant/demo-tenant';
+import { seedPlayDemoData } from './seed-play-demo-data';
 
 const prisma = new PrismaClient();
 
@@ -26,7 +38,6 @@ const REVIEWER_EMAIL = (process.env.PLAY_REVIEWER_EMAIL || 'play.review@nexara.c
   .trim()
   .toLowerCase();
 const REVIEWER_NAME = 'Revisor App Store / Google Play';
-const DEMO_COMPANY_SLUG = 'nexara-demo';
 const DEMO_COMPANY_LEGAL_NAME = 'NEXARA Demo (revisión de tiendas)';
 const DEMO_DEPARTMENT = 'Demostración';
 const DEMO_EMPLOYEE_NUMBER = 'DEMO-01';
@@ -52,23 +63,18 @@ function generatePassword(length = 21): string {
 async function ensureDemoCompany(): Promise<number> {
   const existing = await prisma.companyProfile.findUnique({
     where: { slug: DEMO_COMPANY_SLUG },
-    select: { id: true, isActive: true, isPrimary: true },
+    select: { id: true, slug: true, isActive: true, isPrimary: true },
   });
 
   if (existing) {
-    if (existing.isPrimary) {
-      throw new Error(
-        `La empresa ${DEMO_COMPANY_SLUG} está marcada como primaria. Aborto: la cuenta demo no debe vivir en el tenant real.`,
-      );
-    }
+    // Guardia compartido con el sembrado de contenido: aborta si la empresa
+    // resuelta es la primaria o si el slug no es el esperado.
+    const id = assertDemoTenant(existing);
     if (!existing.isActive) {
-      await prisma.companyProfile.update({
-        where: { id: existing.id },
-        data: { isActive: true },
-      });
+      await prisma.companyProfile.update({ where: { id }, data: { isActive: true } });
     }
-    console.log(`   🏢 Tenant demo existente (id=${existing.id})`);
-    return existing.id;
+    console.log(`   🏢 Tenant demo existente (id=${id})`);
+    return id;
   }
 
   const created = await prisma.companyProfile.create({
@@ -185,6 +191,14 @@ async function seedReviewer() {
     },
     update: { isDefault: true, employeeNumber: DEMO_EMPLOYEE_NUMBER },
   });
+
+  // Contenido de demostración. Va antes del recuadro de credenciales para que la
+  // contraseña quede como último renglón del log y no se pierda en el scroll.
+  if (process.env.PLAY_REVIEWER_SKIP_DEMO_DATA !== '1') {
+    await seedPlayDemoData(prisma, { revisorEmail: REVIEWER_EMAIL });
+  } else {
+    console.log('   ⏭️  Contenido de demostración omitido (PLAY_REVIEWER_SKIP_DEMO_DATA=1)');
+  }
 
   const ok = await bcryptjs.compare(
     password,
