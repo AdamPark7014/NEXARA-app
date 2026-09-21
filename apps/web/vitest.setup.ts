@@ -1,6 +1,20 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+
+/**
+ * Margen de espera de `findBy*` y `waitFor`.
+ *
+ * El segundo que trae Testing Library por defecto alcanza cuando un archivo
+ * corre solo, no cuando corren ochenta y seis en paralelo: la prueba de
+ * sintonización de INTEGRA fallaba a 1541 ms buscando un texto que la pantalla
+ * aún no había pintado porque seguía en «Comprobando…». Fallaba a veces, que es
+ * la peor forma de fallar — un suite que se cae al azar deja de creerse.
+ *
+ * Cuatro segundos no esconden un elemento que de verdad falta: solo tarda más
+ * en decirlo.
+ */
+configure({ asyncUtilTimeout: 4000 });
 
 // Cada test arranca con el localStorage limpio: la empresa activa multi-tenant
 // se persiste ahí y se filtraría de un test al siguiente.
