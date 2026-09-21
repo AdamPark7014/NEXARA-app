@@ -175,3 +175,39 @@ export function resumenLiquidacion(viatico: {
     estado: saldoCent === 0 ? 'CUADRADO' : saldoCent > 0 ? 'POR_DEVOLVER' : 'POR_REEMBOLSAR',
   };
 }
+
+/**
+ * Reparte un total entre varias actividades en partes iguales, al centavo.
+ *
+ * Existe porque asignar un viático semanal a una cuadrilla se captura una vez
+ * y se carga a las cinco actividades de la semana: pedirle al usuario que
+ * teclee cinco importes que sumen exacto es pedirle que haga la división
+ * larga, y el primer centavo que baile lo rechaza `validarReparto`.
+ *
+ * El sobrante se da de a un centavo a las primeras partes. Repartir $100 entre
+ * 3 da 33.34 / 33.33 / 33.33, no tres de 33.33 que suman 99.99.
+ */
+export function repartirEnPartesIguales(total: unknown, actividadIds: number[]): Parte[] {
+  const centavosTotal = aCentavos(total);
+  if (!Number.isFinite(centavosTotal) || centavosTotal <= 0) {
+    throw new Error('El monto a repartir debe ser mayor que cero.');
+  }
+  const ids = actividadIds.filter((id) => Number.isInteger(id) && id > 0);
+  if (ids.length === 0) {
+    throw new Error('Hace falta al menos una actividad para repartir el viático.');
+  }
+  if (ids.length > centavosTotal) {
+    throw new Error(
+      `No se puede repartir ${pesos(centavosTotal)} entre ${ids.length} actividades: ` +
+        'a alguna le tocaría menos de un centavo.',
+    );
+  }
+
+  const base = Math.floor(centavosTotal / ids.length);
+  const sobrante = centavosTotal - base * ids.length;
+  return ids.map((actividadId, i) => ({
+    actividadId,
+    monto: (base + (i < sobrante ? 1 : 0)) / 100,
+    nota: null,
+  }));
+}
