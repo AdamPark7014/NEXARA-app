@@ -45,7 +45,7 @@ import { randomBytes } from 'crypto';
 import { Prisma, PrismaClient } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
 
-import { DEMO_COMPANY_SLUG, assertDemoTenant } from '../src/common/tenant/demo-tenant';
+import { DEMO_COMPANY_SLUG, assertDemoTenant } from './demo-tenant';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fechas — siempre en la zona de la operación, no en la del servidor

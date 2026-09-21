@@ -29,7 +29,7 @@ import { randomInt } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
 
-import { DEMO_COMPANY_SLUG, assertDemoTenant } from '../src/common/tenant/demo-tenant';
+import { DEMO_COMPANY_SLUG, assertDemoTenant } from './demo-tenant';
 import { seedPlayDemoData } from './seed-play-demo-data';
 
 const prisma = new PrismaClient();
