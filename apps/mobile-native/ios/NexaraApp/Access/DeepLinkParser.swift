@@ -94,10 +94,16 @@ enum DeepLinkParser {
         return value
     }
 
-    /// Enlace a un módulo del hub «Más».
-    private static func extraLink(_ module: CoreExtraModule) -> CoreLink {
-        CoreLink(module: .actividades, extra: module)
+    /// Enlace a un módulo del hub «Más». `entityId` solo lo usan los que abren
+    /// un detalle (hoy, Viáticos).
+    private static func extraLink(_ module: CoreExtraModule, entityId: Int64? = nil) -> CoreLink {
+        CoreLink(module: .actividades, entityId: entityId, extra: module)
     }
+
+    /// Viáticos. La web los tiene bajo `/erp/finance/viatics`, y los enlaces
+    /// viejos bajo `/ops/viatics` y `/ops/my-viatics`; las tres formas abren la
+    /// misma pantalla, conservando el id cuando viene.
+    private static let viaticHeads: Set<String> = ["viatics", "viaticos", "my-viatics", "mis-viaticos"]
 
     private static func parse(segments rawSegments: [String], params: [String: String]) -> DeepLinkDestination? {
         let segments = rawSegments.map { $0.lowercased() }.filter { !$0.isEmpty }
@@ -146,6 +152,13 @@ enum DeepLinkParser {
         if head == "ops", rest.count == 1, myActivityHeads.contains(rest[0]) {
             return CoreLink(module: .actividades, vista: "mias")
         }
+        // Viáticos vive en `/erp/finance/viatics`, y «finance» es un panel viejo:
+        // `/finance/viatics/:id` y `/ops/viatics/:id` abren la misma pantalla.
+        if head == "ops" || head == "finance", let first = rest.first, viaticHeads.contains(first) {
+            let idRuta = positiveInt64(rest.count >= 2 ? rest[1] : nil)
+            return extraLink(.viaticos, entityId: idRuta ?? positiveInt64(params["highlight"]))
+        }
+
         // Vehículos, herramientas y proyectos de Operaciones viven ahora en
         // /erp (la web ya manda `/ops/projects` a `/erp/proyectos`).
         if head == "ops", let first = rest.first {
@@ -206,8 +219,14 @@ enum DeepLinkParser {
         case "vehiculos":
             // Incluye `mis-vehiculos`, `:id` y `gps`.
             return .core(extraLink(.vehiculos))
+        case "finance":
+            // Donde la web tiene los viáticos: `/erp/finance/viatics[/:id]`.
+            guard let second, viaticHeads.contains(second) else { return .core(CoreLink.home) }
+            return .core(extraLink(.viaticos, entityId: positiveInt64(parts.count >= 3 ? parts[2] : nil)))
         case "organigrama":
             return .core(extraLink(.organigrama))
+        case "viatics", "viaticos", "my-viatics", "mis-viaticos":
+            return .core(extraLink(.viaticos, entityId: positiveInt64(second)))
         case "hr":
             // `/erp/hr/orgchart`; lo demás de RH no existe en Core.
             return .core(second == "orgchart" ? extraLink(.organigrama) : CoreLink.home)

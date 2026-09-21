@@ -132,6 +132,13 @@ object DeepLinkParser {
     private val PROJECT_SEGMENTS = setOf("proyectos", "projects")
     private val ORGCHART_SEGMENTS = setOf("organigrama", "orgchart")
 
+    /**
+     * Viáticos. La web los tiene bajo `/erp/finance/viatics`, y los enlaces
+     * viejos bajo `/ops/viatics` y `/ops/my-viatics`; las tres formas abren la
+     * misma pantalla, conservando el id cuando viene.
+     */
+    private val VIATIC_SEGMENTS = setOf("viatics", "viaticos", "my-viatics", "mis-viaticos")
+
     private fun coreDestination(parts: List<String>, params: Map<String, String>): DeepLinkDestination {
         val extra = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
         val first = parts.firstOrNull() ?: return CORE_HOME
@@ -174,6 +181,15 @@ object DeepLinkParser {
             first in TOOL_SEGMENTS -> module(CoreKeys.HERRAMIENTAS, params = extra)
             first in VEHICLE_SEGMENTS ->
                 module(CoreKeys.VEHICULOS, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
+            // `/erp/finance/viatics[/:id]` — donde la web tiene viáticos.
+            first == "finance" && second in VIATIC_SEGMENTS ->
+                module(
+                    CoreKeys.VIATICOS,
+                    entityId = parts.getOrNull(2)?.toLongOrNull()?.takeIf { it > 0L },
+                    params = extra,
+                )
+            first in VIATIC_SEGMENTS ->
+                module(CoreKeys.VIATICOS, entityId = second?.toLongOrNull()?.takeIf { it > 0L }, params = extra)
             first in ORGCHART_SEGMENTS || (first == "hr" && second in ORGCHART_SEGMENTS) ->
                 module(CoreKeys.ORGANIGRAMA, params = extra)
             // `/erp/hr/attendance` y `/erp/hr/lunch-breaks` (appUrls viejos) → Asistencias.
@@ -233,6 +249,17 @@ object DeepLinkParser {
         if (head in LEGACY_ACTIVITY_HEADS && parts.size == 1 && first in MY_ACTIVITIES_SEGMENTS) {
             return module(CoreKeys.MY_ACTIVITIES)
         }
+        // Viáticos vive en `/erp/finance/viatics`, y «finance» es un panel viejo:
+        // `/finance/viatics/:id` y `/ops/viatics/:id` abren la misma pantalla.
+        if (first in VIATIC_SEGMENTS && (head == "ops" || head == "finance")) {
+            return module(
+                CoreKeys.VIATICOS,
+                entityId = parts.getOrNull(1)?.toLongOrNull()?.takeIf { it > 0L }
+                    ?: params.longParam("highlight"),
+                params = extra,
+            )
+        }
+
         // Módulos de OPS que se mudaron a Core (`coreSurfaceRedirect` → `MOVED_TO_CORE` en la web):
         // vehículos, herramientas y proyectos abren su ficha de «Más».
         if (head == "ops") {

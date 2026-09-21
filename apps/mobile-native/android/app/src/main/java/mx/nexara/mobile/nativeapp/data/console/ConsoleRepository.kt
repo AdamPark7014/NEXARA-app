@@ -286,44 +286,6 @@ class ConsoleRepository(context: Context) {
             )
         )
 
-    suspend fun viaticsFetch() = api.getViatics()
-
-    suspend fun createViatic(
-        amount: Double,
-        motivo: String,
-        categoria: String?,
-        activityId: Long?,
-        ticketEvidenciaUrl: String,
-    ) = api.createViatic(
-        mx.nexara.mobile.nativeapp.data.api.CreateViaticJsonRequest(
-            montoSolicitado = amount,
-            motivo = motivo,
-            categoria = categoria,
-            actividadId = activityId,
-            ticketEvidenciaUrl = ticketEvidenciaUrl,
-        ),
-    )
-
-    suspend fun assignViatic(
-        usuarioId: Long,
-        amount: Double,
-        motivo: String,
-        categoria: String? = null,
-        activityId: Long? = null,
-        projectId: Long? = null,
-        vehicleId: Long? = null,
-    ) = api.assignViatic(
-        mx.nexara.mobile.nativeapp.data.api.AssignViaticJsonRequest(
-            usuarioId = usuarioId,
-            montoSolicitado = amount,
-            motivo = motivo,
-            categoria = categoria,
-            actividadId = activityId,
-            projectId = projectId,
-            vehicleId = vehicleId,
-        ),
-    )
-
     suspend fun gpsMe() = api.getGpsMe()
 
     suspend fun gpsTeam() = api.getGpsTeam()

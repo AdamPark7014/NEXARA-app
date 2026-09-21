@@ -26,7 +26,6 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceDetailDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityIncidentDto
 import mx.nexara.mobile.nativeapp.data.api.ActivityRecommendationDto
-import mx.nexara.mobile.nativeapp.data.api.ViaticDto
 import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia

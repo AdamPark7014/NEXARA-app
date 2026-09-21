@@ -120,7 +120,14 @@ class CoreMenuTest {
             navModuleKeys = listOf("activities", "attendance", "erp-herramientas", "erp-vehiculos", "erp-organigrama"),
         )
         assertEquals(
-            listOf(CoreExtraModule.HERRAMIENTAS, CoreExtraModule.VEHICULOS, CoreExtraModule.ORGANIGRAMA),
+            // Viáticos va siempre: el gasto de bolsillo no depende del rol
+            // (ver `CoreExtraModule.paraTodoElPersonal`).
+            listOf(
+                CoreExtraModule.HERRAMIENTAS,
+                CoreExtraModule.VEHICULOS,
+                CoreExtraModule.ORGANIGRAMA,
+                CoreExtraModule.VIATICOS,
+            ),
             CoreMenu.extraModulesFor(ingeniero),
         )
         assertTrue(CoreMenu.canOpenExtra(ingeniero, "erp-vehiculos"))
@@ -140,6 +147,7 @@ class CoreMenuTest {
                 CoreExtraModule.HERRAMIENTAS,
                 CoreExtraModule.VEHICULOS,
                 CoreExtraModule.ORGANIGRAMA,
+                CoreExtraModule.VIATICOS,
             ),
             CoreMenu.extraModulesFor(almacen),
         )
@@ -149,7 +157,12 @@ class CoreMenuTest {
     fun masSinNavegacionDaLosTresDeTodoElPersonal() {
         // Sin conexión o con sesión restaurada: herramientas, vehículos y organigrama.
         assertEquals(
-            listOf(CoreExtraModule.HERRAMIENTAS, CoreExtraModule.VEHICULOS, CoreExtraModule.ORGANIGRAMA),
+            listOf(
+                CoreExtraModule.HERRAMIENTAS,
+                CoreExtraModule.VEHICULOS,
+                CoreExtraModule.ORGANIGRAMA,
+                CoreExtraModule.VIATICOS,
+            ),
             CoreMenu.extraModulesFor(user(roleKey = "ing_campo")),
         )
         // El super admin ve todo el catálogo; cliente y sucursal, nada.
@@ -166,6 +179,26 @@ class CoreMenuTest {
             assertEquals(module, CoreExtraModule.fromKey(module.key))
         }
         assertTrue(CoreExtraModule.fromKey("pizarra") == null)
+    }
+
+    /**
+     * `me/navigation` nombra los viáticos de dos formas según la ruta que tenga
+     * el rol en url-matrix (`navigation-module-map.ts`: `viatics`,
+     * `my-viatics`). Las dos tienen que abrir el mismo módulo.
+     */
+    @Test
+    fun viaticosRespondenASusDosClaves() {
+        assertEquals(CoreExtraModule.VIATICOS, CoreExtraModule.fromKey("viatics"))
+        assertEquals(CoreExtraModule.VIATICOS, CoreExtraModule.fromKey("my-viatics"))
+
+        val soporte = user(roleKey = "ing_soporte", navModuleKeys = listOf("activities", "my-viatics"))
+        assertTrue(CoreMenu.canOpenExtra(soporte, "viatics"))
+        assertTrue(CoreMenu.extraModulesFor(soporte).contains(CoreExtraModule.VIATICOS))
+
+        // Y a quien la navegación no se los nombra, se los da igual: el CEO
+        // solo tiene comodines de panel y es quien tiene que autorizar.
+        val ceo = user(roleKey = "ceo", navModuleKeys = listOf("activities", "attendance", "chat"))
+        assertTrue(CoreMenu.extraModulesFor(ceo).contains(CoreExtraModule.VIATICOS))
     }
 
     @Test

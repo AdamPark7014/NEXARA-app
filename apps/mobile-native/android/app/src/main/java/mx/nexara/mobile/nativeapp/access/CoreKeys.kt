@@ -45,4 +45,17 @@ object CoreKeys {
 
     /** Organigrama (`/erp/organigrama`). */
     const val ORGANIGRAMA = "erp-organigrama"
+
+    /**
+     * Viáticos (`/erp/finance/viatics`).
+     *
+     * A diferencia de los otros módulos de «Más», la clave no es la del
+     * `CORE_EXTRA_MODULES` del API —ahí no está—, sino la que `me/navigation`
+     * ya emite para cualquier ruta que contenga `viatic`
+     * (`navigation-module-map.ts`: `android: ['viatics', 'my-viatics']`).
+     */
+    const val VIATICOS = "viatics"
+
+    /** La otra clave que manda `me/navigation` para lo mismo. */
+    const val MIS_VIATICOS = "my-viatics"
 }
