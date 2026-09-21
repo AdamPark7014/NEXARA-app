@@ -1,0 +1,16 @@
+{
+  "//": "Autocontenido a propósito: la imagen de producción solo copia `prisma/`, `dist/`, `package.json` y `node_modules`; NO lleva el tsconfig de la API, así que un `extends` a `../tsconfig.json` no resuelve dentro del contenedor. Y `module: commonjs` es lo que permite que los sembradores importen su módulo hermano `demo-tenant.ts`: en ESM, ts-node exige una extensión `.js` que no existe.",
+  "compilerOptions": {
+    "target": "ES2021",
+    "lib": ["ES2021"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": true
+  },
+  "include": ["./**/*.ts"]
+}
