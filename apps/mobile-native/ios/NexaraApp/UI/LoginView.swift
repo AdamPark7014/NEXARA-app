@@ -154,6 +154,13 @@ struct LoginView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.top, 20)
+
+                    // Versión y aviso de privacidad, como en el login de Android.
+                    // Aquí importa más que en ninguna otra pantalla: es la única a
+                    // la que llega quien todavía no ha entrado, y las tiendas piden
+                    // que el aviso sea alcanzable desde dentro de la app.
+                    NxAppMetaFooter()
+                        .padding(.top, 12)
                         .padding(.bottom, 32)
                 }
             }
