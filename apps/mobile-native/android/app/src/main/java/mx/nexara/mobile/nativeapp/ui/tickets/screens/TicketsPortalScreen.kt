@@ -192,7 +192,6 @@ fun TicketsPortalScreen(
     onOpenTickets: () -> Unit,
     onOpenFeedbackPending: () -> Unit,
     onOpenInventories: () -> Unit,
-    onOpenChat: () -> Unit = {},
     onOpenServices: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -354,7 +353,6 @@ fun TicketsPortalScreen(
                 }
             }
             item {
-                PortalNavCard(title = "Chat", subtitle = "Mensajes con soporte", onClick = onOpenChat)
             }
             item {
                 OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth()) {

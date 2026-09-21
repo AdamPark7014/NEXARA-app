@@ -14,9 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -46,7 +44,11 @@ private object TicketsRoutes {
     const val FeedbackPending = "tickets/feedback/pending"
     const val Inventories = "tickets/inventories"
     const val InventoryDetail = "tickets/inventories/{id}"
-    const val Chat = "tickets/chat"
+    // El chat NO se le ofrece al portal: `ChatController` entero está detrás de
+    // `StaffOnlyGuard`, que responde 403 a toda cuenta con `isClient` o
+    // `isBranchUser`. La tarjeta decía «Mensajes con soporte» y llevaba a un
+    // error garantizado. Abrir el chat a los portales es otra decisión, de
+    // producto y de privacidad, no un hueco que rellenar aquí.
     const val Services = "tickets/services"
     const val Help = "tickets/help"
 
@@ -57,7 +59,7 @@ private object TicketsRoutes {
         "tickets" -> Tickets
         "inventories", "inventarios" -> Inventories
         "feedback-pending", "feedback" -> FeedbackPending
-        "chat" -> Chat
+        // «chat» cae al inicio del portal: no hay chat para cuentas externas.
         "mis-servicios", "services", "my-services" -> Services
         "help", "ayuda", "centro-de-ayuda" -> Help
         "portal", "home", "dashboard" -> Portal
@@ -71,8 +73,6 @@ fun TicketsNavHost(
     onLogout: () -> Unit,
 ) {
     val navController = rememberNavController()
-    var chatChannelId by remember { mutableStateOf<Long?>(null) }
-    var chatMessageId by remember { mutableStateOf<Long?>(null) }
 
     val deepLinkSignal by PendingDeepLink.signal.collectAsState()
     LaunchedEffect(deepLinkSignal) {
@@ -84,10 +84,6 @@ fun TicketsNavHost(
             return@LaunchedEffect
         }
         val link = PendingModuleLink(key = module.key, entityId = module.entityId, params = module.params)
-        if (link.key == "chat") {
-            chatChannelId = DeepLinkNavigation.chatChannelId(link)
-            chatMessageId = DeepLinkNavigation.chatMessageId(link)
-        }
         val entityRoute = DeepLinkNavigation.ticketsRoute(link)
         val target = entityRoute ?: TicketsRoutes.routeForModuleKey(DeepLinkNavigation.ticketsModuleKey(link))
         navController.navigate(target) { launchSingleTop = true }
@@ -106,7 +102,6 @@ fun TicketsNavHost(
             TicketsRoutes.Tickets -> "Tickets"
             TicketsRoutes.FeedbackPending -> "Feedback pendiente"
             TicketsRoutes.Inventories -> "Inventarios"
-            TicketsRoutes.Chat -> "Chat equipo"
             TicketsRoutes.Services -> "Mis servicios"
             TicketsRoutes.Help -> "Centro de ayuda"
             else -> "Tickets / Portal"
@@ -149,7 +144,6 @@ fun TicketsNavHost(
                     onOpenTickets = { navController.navigate(TicketsRoutes.Tickets) { launchSingleTop = true } },
                     onOpenFeedbackPending = { navController.navigate(TicketsRoutes.FeedbackPending) { launchSingleTop = true } },
                     onOpenInventories = { navController.navigate(TicketsRoutes.Inventories) { launchSingleTop = true } },
-                    onOpenChat = { navController.navigate(TicketsRoutes.Chat) { launchSingleTop = true } },
                     onOpenServices = { navController.navigate(TicketsRoutes.Services) { launchSingleTop = true } },
                     onOpenHelp = { navController.navigate(TicketsRoutes.Help) { launchSingleTop = true } },
                 )
@@ -162,13 +156,6 @@ fun TicketsNavHost(
             nxComposable(TicketsRoutes.Services, style = NxNavAnimStyle.Push) {
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.PortalServicesScreen(
                     onBack = { navController.popBackStack() },
-                )
-            }
-            nxComposable(TicketsRoutes.Chat, style = NxNavAnimStyle.Push) {
-                mx.nexara.mobile.nativeapp.ui.chat.ChatScreen(
-                    onBack = { navController.popBackStack() },
-                    initialChannelId = chatChannelId,
-                    initialMessageId = chatMessageId,
                 )
             }
             nxComposable(TicketsRoutes.Profile, style = NxNavAnimStyle.Push) {
