@@ -393,8 +393,40 @@ Borrador para copiar al formulario. Cada fila está cruzada contra el código, n
 | ¿Los usuarios pueden pedir la eliminación de sus datos? | **Sí** | https://nexara.com.mx/legal/eliminar-cuenta (ver §7) |
 | ¿Se comparten datos con terceros? | **No** | No hay venta ni cesión publicitaria. Google (Firebase Cloud Messaging y Crashlytics) actúa como **encargado del tratamiento**, no como destinatario: en el formulario de Play eso **no** cuenta como «compartir» |
 | ¿La recopilación es opcional para el usuario? | **Parcial** | Ubicación, fotos y archivos son opcionales y se piden en tiempo de ejecución. Identidad y push son necesarios para operar |
-| Ubicación en segundo plano | **No aplica** | El manifiesto solo declara `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`. No hay `ACCESS_BACKGROUND_LOCATION` ni `FOREGROUND_SERVICE` → no hay que llenar la declaración de ubicación en segundo plano |
+| Ubicación en segundo plano (`ACCESS_BACKGROUND_LOCATION`) | **No aplica** | El manifiesto no lo declara: la app no pide ubicación con la pantalla apagada y la aplicación cerrada |
 | ¿Prácticas de seguridad revisadas por un tercero? | **No** | Responder «No» sin más; no es un requisito |
+
+### 6.5.1 Servicio en primer plano de ubicación — **obligatorio, y estaba mal documentado**
+
+Hasta hoy esta guía decía que no había `FOREGROUND_SERVICE` y que no tocaba
+llenar ninguna declaración de ubicación. **Es falso**, y saltarse esta pantalla
+es motivo de rechazo. El manifiesto declara:
+
+```xml
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+...
+<service android:name=".util.JornadaGpsService"
+         android:foregroundServiceType="location" />
+```
+
+Con `targetSdk = 36`, Play Console exige la declaración **«Permisos de servicio
+en primer plano»** para el tipo `location`, con vídeo de demostración. No es la
+misma pantalla que la de ubicación en segundo plano, y no se sustituyen.
+
+**Qué contestar:**
+
+| Campo | Qué poner |
+|---|---|
+| Tipo de servicio en primer plano | `location` |
+| ¿Cuál es la función principal? | Registrar la trayectoria de la jornada de un técnico de campo mientras su jornada está abierta |
+| Descripción | «NEXARA es una herramienta de trabajo para empresas de instalación en campo. Cuando un técnico registra su entrada de jornada, la app sigue su ubicación para documentar los traslados entre los servicios que atiende ese día, y así justificar tiempos y viáticos ante su empresa y ante el cliente. El seguimiento empieza sólo cuando el propio técnico registra su entrada, se muestra en una notificación permanente mientras está activo, y se detiene al registrar la salida. Fuera de la jornada la app no accede a la ubicación.» |
+| Vídeo de demostración | `apps/mobile-native/play-releases/NEXARA-GPS-de-jornada.mp4` — súbelo a YouTube **como «no listado»** y pega el enlace; Play no acepta el archivo directamente |
+
+El vídeo tiene que enseñar el recorrido completo: registrar entrada → aparece la
+notificación permanente → la trayectoria se va guardando → registrar salida →
+la notificación desaparece. Si no se ve que el usuario lo inicia y lo detiene,
+lo rechazan.
 
 > **Coherencia con el aviso de privacidad.** Lo que se marque aquí tiene que estar dicho en
 > https://nexara.com.mx/legal/privacidad. Antes de enviar, confirma que esa página menciona
