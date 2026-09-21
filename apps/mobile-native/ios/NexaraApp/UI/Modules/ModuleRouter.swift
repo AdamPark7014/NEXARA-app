@@ -144,7 +144,7 @@ struct ModuleRouter {
         case (.console, "analytics"), (.console, "bi"):
             ErpBiView()
         case (.console, "executive"):
-            ExecutiveView(panel: panel)
+            ExecutiveView(panel: .erp)
         case (.console, "pipeline"):
             CrmPipelineView()
         case (.console, "approvals"):

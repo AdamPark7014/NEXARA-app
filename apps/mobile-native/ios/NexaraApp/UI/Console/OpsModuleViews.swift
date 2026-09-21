@@ -637,19 +637,23 @@ struct StockView: View {
             searchBar("Buscar…", text: $vm.query)
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.tab == 0 {
-                List(vm.filteredStock.prefix(60), id: { opsIdKey($0,"stk") }) { item in
+                List {
+                    ForEach(Array(vm.filteredStock.prefix(60).enumerated()), id: \.offset) { _, item in
                     Button { selectedStock = item } label: { StockItemRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
                         .listRowSeparator(.hidden)
+                    }
                 }
                 .listStyle(.plain)
             } else {
-                List(vm.filteredWh.prefix(60), id: { opsIdKey($0,"wh") }) { item in
-                    Button { selectedWh = item } label: { WarehouseRow(item: item) }
+                List {
+                    ForEach(Array(vm.filteredWh.prefix(60).enumerated()), id: \.offset) { _, item in
+                        Button { selectedWh = item } label: { WarehouseRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
                         .listRowSeparator(.hidden)
+                    }
                 }
                 .listStyle(.plain)
             }
