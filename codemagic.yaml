@@ -136,7 +136,7 @@ workflows:
     #     beta_groups:
     #       - Internal Testers
     #   scripts:
-    #     - name: Export signed IPA for TestFlight
+    #     - name: Export signed IPA for TestFlight      
     #       script: |
     #         # Requires provisioning profiles and certificates supplied via Codemagic
     #         xcodebuild -exportArchive \
@@ -147,7 +147,7 @@ workflows:
     #     - build/export/*.ipa
   ios-app-store:
     integrations:
-          app_store_connect: NEXARA App Store Connect
+         app_store_connect: NEXARA App Store Connect
     name: iOS App Store (Archive + IPA export)
     max_build_duration: 90
     instance_type: mac_mini_m2
