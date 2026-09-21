@@ -142,6 +142,17 @@ fun ActividadesScreen(
                 ?: VISTA_MIAS,
         )
     }
+
+    // Un deep link que llega con la pantalla YA abierta no la vuelve a crear:
+    // la clave de `rememberSaveable` cambia, pero el valor guardado se restaura
+    // y la pestaña se queda donde estaba. Así, un aviso de «revisa la pizarra»
+    // recibido mientras mirabas tus actividades no movía nada y parecía que el
+    // enlace estaba roto. Aquí se aplica aunque la pantalla siga viva.
+    LaunchedEffect(initialVista) {
+        CoreActivityRules.normalizeVista(initialVista)?.let { pedida ->
+            if (pedida != vista) vista = pedida
+        }
+    }
     var board by remember { mutableStateOf<TeamBoardResponseDto?>(null) }
     var boardError by remember { mutableStateOf<String?>(null) }
     var boardLoading by remember { mutableStateOf(true) }
