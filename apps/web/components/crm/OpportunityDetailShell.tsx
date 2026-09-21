@@ -39,7 +39,18 @@ export default function OpportunityDetailShell({ id, children }: { id: string; c
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!token || !numericId) return;
+    if (!numericId) {
+      setLoading(false);
+      setError("Esa oportunidad no existe o el enlace está mal formado.");
+      return;
+    }
+    if (!token) {
+      // Salir sin tocar `loading` dejaba el esqueleto puesto para siempre, sin
+      // decir por qué, cuando la sesión no llegaba a estar lista.
+      setLoading(false);
+      setError("Tu sesión todavía no está lista. Espera unos segundos; si sigue igual, vuelve a entrar.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -47,7 +58,8 @@ export default function OpportunityDetailShell({ id, children }: { id: string; c
       setOpportunity(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la oportunidad");
-      setOpportunity(null);
+      // La oportunidad ya cargada se queda: un fallo al refrescar no es motivo
+      // para vaciar la pantalla que se estaba leyendo.
     } finally {
       setLoading(false);
     }
