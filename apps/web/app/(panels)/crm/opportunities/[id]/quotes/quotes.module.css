@@ -1,0 +1,204 @@
+/*
+ * Cotizaciones de una oportunidad.
+ *
+ * Existe por dos cosas que los estilos en línea no pueden hacer: la rejilla de
+ * partidas que se reordena por debajo de 620px (a 375px, seis columnas fijas
+ * obligan a arrastrar la pantalla de lado) y los separadores de 1px entre
+ * renglones, que sustituyen al recuadro que antes envolvía la tabla dentro de
+ * la caja del formulario, dentro de la sección: tres bordes para agrupar lo
+ * que ya agrupan el espaciado y la cabecera.
+ */
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.version {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.versionCopy {
+  min-width: 0;
+}
+
+.versionTitulo {
+  font-weight: 600;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.versionMeta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.versionAcciones {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Tocable de verdad: 40px de alto, no un texto de 13px. */
+.versionEnlace {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.versionEnlace:hover {
+  text-decoration: underline;
+}
+
+/* ─── Formulario de captura ─────────────────────────────────────────────── */
+
+.form {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.formTitulo {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.rotulo {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 6px;
+}
+
+/* Sin recuadro propio: la cabecera y las líneas de 1px ya agrupan. */
+.partidas {
+  display: grid;
+}
+
+.partidaCabeza,
+.partidaFila {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 56px 96px 56px 56px 32px;
+  gap: 6px;
+  align-items: center;
+}
+
+.partidaCabeza {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.partidaFila {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.partidaFila:last-child {
+  border-bottom: none;
+}
+
+.centro {
+  text-align: center;
+}
+
+.derecha {
+  text-align: right;
+}
+
+.quitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.quitar:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--border);
+}
+
+.quitar:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.totales {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.totalDescuento {
+  color: var(--danger);
+}
+
+.totalFinal {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+/* Acciones al pie, separadas por una línea, a la derecha. */
+.formPie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* A 375px seis columnas no caben: la descripción ocupa el renglón y los
+   números se reparten el siguiente. La cabecera sobra porque cada control
+   lleva su propio nombre accesible. */
+@media (max-width: 620px) {
+  .partidaCabeza {
+    display: none;
+  }
+
+  .partidaFila {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
+    padding: 10px 0;
+  }
+
+  .partidaFila > :first-child {
+    grid-column: 1 / -1;
+  }
+}

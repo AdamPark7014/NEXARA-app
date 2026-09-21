@@ -140,8 +140,10 @@ export default function CotizacionesPage() {
     try {
       setItems(await listarCotizaciones(token));
     } catch (e) {
+      // Un fallo al refrescar avisa arriba, pero NO borra lo que ya estaba en
+      // pantalla: vaciar la lista deja a quien la consulta peor que antes de
+      // pulsar «Reintentar».
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cotizaciones");
-      setItems([]);
     } finally {
       setCargando(false);
     }
@@ -225,6 +227,11 @@ export default function CotizacionesPage() {
     items.find((r) => partesDelFolio(r.folio)?.cadena.length) ?? items.find((r) => partesDelFolio(r.folio)) ?? null;
 
   const hayFiltros = Boolean(segmento || estado || q.trim());
+  /** El esqueleto solo en la primera carga: al refrescar, la lista se queda. */
+  const primeraCarga = cargando && items.length === 0;
+  /** Vacío de verdad: cero registros, no «las cifras dieron cero» (regla 7). */
+  const sinRegistros = !cargando && items.length === 0;
+
   const quitarFiltros = () => {
     setQ("");
     setSegmento(null);
@@ -255,16 +262,26 @@ export default function CotizacionesPage() {
                 y, desde el segundo envío, la revisión. El segmento no va en el folio: es un filtro.
               </p>
             </InfoPopover>
-            <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
-              Nueva cotización <Kbd>N</Kbd>
-            </ButtonLink>
+            {/* Sin registros el primario vive en el vacío, que además explica de
+                dónde sale la primera: dos botones iguales no son dos caminos. */}
+            {sinRegistros && !error ? null : (
+              <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
+                Nueva cotización <Kbd>N</Kbd>
+              </ButtonLink>
+            )}
           </>
         }
       />
 
-      {!cargando && items.length ? (
+      {/* Regla 7: la tira solo existe si hay registros. Cuatro celdas en cero
+          encima de un «no hay nada» ocupan el sitio de lo único que ayuda. */}
+      {items.length ? (
         <StatRow>
-          <Stat label="En la vista" value={visibles.length} hint={`de ${items.length} cotizaciones`} />
+          <Stat
+            label="En la vista"
+            value={formatoMoneda(cifras.total)}
+            hint={hayFiltros ? `${visibles.length} de ${items.length} cotizaciones` : `${items.length} cotizaciones`}
+          />
           <Stat label="Borradores" value={cifras.borradores} hint="por terminar" />
           <Stat
             label="Enviadas por cerrar"
@@ -299,6 +316,15 @@ export default function CotizacionesPage() {
         </Alert>
       ) : null}
 
+      {/* Regla 9: el aviso vive fuera de la tarjeta de la tabla, no metido
+          dentro con su propio recuadro. Y no sustituye a la lista: si ya
+          había filas, siguen ahí. */}
+      {error ? (
+        <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
+          {error}
+        </Alert>
+      ) : null}
+
       <div className={tabla.marco}>
         <div className={tabla.barra}>
           <div className={tabla.barraTabs}>
@@ -310,16 +336,9 @@ export default function CotizacionesPage() {
               onChange={(id) => setEstado(id === "TODAS" || id === estado ? null : id)}
             />
           </div>
-          <Toolbar
-            end={
-              <>
-                <span>
-                  {cargando ? "Cargando…" : `${visibles.length} de ${items.length} · ${formatoMoneda(cifras.total)}`}
-                </span>
-                {hayFiltros ? <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton> : null}
-              </>
-            }
-          >
+          {/* El conteo y el importe ya están en la tira: repetirlos aquí es
+              texto que no informa. La barra solo lleva controles. */}
+          <Toolbar end={hayFiltros ? <LinkButton onClick={quitarFiltros}>Quitar filtros</LinkButton> : null}>
             <label htmlFor="buscar-cotizaciones" className={styles.soloLector}>
               Buscar cotizaciones
             </label>
@@ -343,31 +362,18 @@ export default function CotizacionesPage() {
           </Toolbar>
         </div>
 
-        {error ? (
-          <div style={{ padding: "12px 16px 0" }}>
-            <Alert tone="danger" role="alert" action={<LinkButton onClick={() => void cargar()}>Reintentar</LinkButton>}>
-              {error}
-            </Alert>
-          </div>
-        ) : null}
-
-        {cargando ? (
+        {primeraCarga ? (
           <SkeletonRows rows={5} label="Cargando cotizaciones" />
-        ) : !items.length && !error ? (
+        ) : sinRegistros && !error ? (
           <EmptyState
             icon={<RequestQuoteOutlinedIcon />}
             title="Todavía no hay cotizaciones"
+            description="Una cotización nace del editor: eliges cliente y proyecto, capturas las partidas y el servidor emite el folio con tu nomenclatura. Desde ahí se envía por correo."
             action={
               <ButtonLink variant="primary" href="/erp/cotizaciones/nueva">
                 Crear la primera
               </ButtonLink>
             }
-          />
-        ) : !visibles.length && !error ? (
-          <EmptyState
-            icon={<FilterAltOffOutlinedIcon />}
-            title="Nada con estos filtros"
-            action={<Button onClick={quitarFiltros}>Quitar filtros</Button>}
           />
         ) : visibles.length ? (
           <nav className={styles.list} aria-label="Cotizaciones">
@@ -415,6 +421,12 @@ export default function CotizacionesPage() {
               </Link>
             ))}
           </nav>
+        ) : items.length ? (
+          <EmptyState
+            icon={<FilterAltOffOutlinedIcon />}
+            title="Nada con estos filtros"
+            action={<Button onClick={quitarFiltros}>Quitar filtros</Button>}
+          />
         ) : null}
       </div>
     </div>

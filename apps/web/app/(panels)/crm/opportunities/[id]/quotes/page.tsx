@@ -2,27 +2,27 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import Button from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { createSalesQuote, linkSalesQuoteToOpportunity } from "@/lib/sales-api";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
-import KpiCard from "@/components/ui/KpiCard";
+import { FinanceField, FinanceFormGrid, financeInputStyle } from "@/components/finance/FinanceModuleShell";
 import { useOpportunityDetail } from "@/components/crm/OpportunityDetailShell";
 import { toast } from "@/components/Toast";
+import styles from "./quotes.module.css";
 
 interface LineItem { name: string; qty: number; unitPrice: number; discount: number; tax: number }
 const emptyItem = (): LineItem => ({ name: "", qty: 1, unitPrice: 0, discount: 0, tax: 16 });
 
 const EMPTY_FORM = { projectName: "", validDays: 15, notes: "" };
 
-const inp: React.CSSProperties = {
-  width: "100%", padding: "7px 9px", border: "1px solid var(--border)", borderRadius: 7,
-  background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box",
-};
-const numInp: React.CSSProperties = { ...inp, textAlign: "right" };
+/** Controles de partida: el mismo input de finanzas, más corto y a la derecha. */
+const celdaInput: CSSProperties = { ...financeInputStyle, padding: "6px 8px", fontSize: 12.5 };
+const celdaNum: CSSProperties = { ...celdaInput, textAlign: "right" };
 
 function fmtMXN(n: number) {
   return `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -51,6 +51,12 @@ export default function OpportunityQuotesPage() {
   const taxTotal = lines.reduce((s, l) => { const b = l.qty * l.unitPrice * (1 - l.discount / 100); return s + b * (l.tax / 100); }, 0);
   const total = subtotal - discTotal + taxTotal;
 
+  const cerrarForm = () => {
+    setShowForm(false);
+    setForm({ ...EMPTY_FORM });
+    setLines([emptyItem()]);
+  };
+
   const createQuote = async () => {
     const validLines = lines.filter((l) => l.name.trim() && l.unitPrice > 0);
     if (!token || validLines.length === 0) return;
@@ -69,9 +75,7 @@ export default function OpportunityQuotesPage() {
       if (created?.id) {
         await linkSalesQuoteToOpportunity(token, created.id, opportunity.id, `v${(opportunity.quotes?.length ?? 0) + 1}`);
       }
-      setShowForm(false);
-      setForm({ ...EMPTY_FORM });
-      setLines([emptyItem()]);
+      cerrarForm();
       reload();
     } catch (e) {
       toast.error("Error: " + (e instanceof Error ? e.message : "desconocido"));
@@ -79,143 +83,195 @@ export default function OpportunityQuotesPage() {
   };
 
   const quotes = opportunity.quotes ?? [];
-  const clientName = opportunity.client?.name ?? opportunity.clientName ?? "—";
+  /** Regla 7: el vacío es cero versiones vinculadas, no un importe en cero. */
+  const sinRegistros = quotes.length === 0;
+  const conDoc = quotes.filter((q) => !!q.cotizacionId).length;
+  const conPdf = quotes.filter((q) => !!q.pdfUrl).length;
+  const sinPdf = quotes.length - conPdf;
+
+  const metrics: Metric[] = [
+    { label: "Versiones", value: quotes.length, hint: "vinculadas a la oportunidad" },
+    { label: "Con documento", value: conDoc, hint: "abren el detalle" },
+    { label: "Con PDF", value: conPdf, hint: "listas para enviar" },
+    {
+      label: "Sin PDF",
+      value: sinPdf,
+      hint: sinPdf > 0 ? "falta generarlo" : "ninguna pendiente",
+      tone: sinPdf > 0 ? "warning" : "default",
+    },
+  ];
+
+  const puedeGuardar = lines.filter((l) => l.name.trim() && l.unitPrice > 0).length > 0;
 
   return (
-    <>
-    {quotes.length > 0 && (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-        <KpiCard label="Cotizaciones" value={quotes.length} icon="📄" />
-        <KpiCard label="Con documento" value={quotes.filter((q) => !!q.cotizacionId).length} icon="📋" variant="accent" />
-        <KpiCard label="Con PDF" value={quotes.filter((q) => !!q.pdfUrl).length} icon="📑" variant="positive" />
-        <KpiCard label="Pendientes PDF" value={quotes.filter((q) => !q.pdfUrl).length} icon="⏳" variant={quotes.some((q) => !q.pdfUrl) ? "warning" : "default"} />
-      </div>
-    )}
-    {quotes.length > 1 && (() => {
-      const withDoc = quotes.filter((q) => !!q.cotizacionId).length;
-      const withPdf = quotes.filter((q) => !!q.pdfUrl).length;
-      const noPdf = quotes.length - withPdf;
-      const total = quotes.length;
-      return (
-        <div style={{ marginBottom: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Estado de documentos</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {([
-              { label: "Con PDF", count: withPdf, color: "var(--success)" },
-              { label: "Con doc", count: withDoc, color: "var(--primary)" },
-              { label: "Sin PDF", count: noPdf, color: "var(--warning)" },
-            ] as { label: string; count: number; color: string }[]).filter((r) => r.count > 0).map((r) => (
-              <div key={r.label} style={{ display: "grid", gridTemplateColumns: "80px 1fr 36px", gap: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
-                <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
-                </div>
-                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    })()}
-    <DetailSection title="Cotizaciones vinculadas">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-          Cliente: <strong>{clientName}</strong>
-        </div>
-        <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowForm(true)}>Nueva cotización</Button>
-      </div>
+    <div style={{ display: "grid", gap: 16 }}>
+      {/* Regla 7: sin versiones no se pinta la tira. Y las mismas tres cifras
+          no se repiten en una gráfica de barras debajo: ya están aquí. */}
+      {!sinRegistros && <MetricStrip metrics={metrics} ariaLabel="Resumen de cotizaciones de la oportunidad" />}
 
-      {quotes.length === 0 && !showForm ? (
-        <EmptyState
-          icon="📝"
-          title="Sin cotizaciones"
-          description="Crea la primera cotización para esta oportunidad."
-          action={<Button variant="primary" onClick={() => setShowForm(true)}>Nueva cotización</Button>}
-        />
-      ) : (
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10, marginBottom: showForm ? 20 : 0 }}>
-          {quotes.map((q) => (
-            <li key={q.id} style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "var(--surface)" }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{q.versionLabel?.trim() || `Cotización #${q.id}`}</div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
-                  {formatDateTime(q.createdAt)}
-                  {q.cotizacionId && <span style={{ marginLeft: 8 }}><Tag variant="neutral">Doc #{q.cotizacionId}</Tag></span>}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {q.pdfUrl && (
-                  <a href={buildApiUrl(q.pdfUrl.replace(/^\//, ""))} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>
-                    📄 PDF
-                  </a>
-                )}
-                {q.cotizacionId && (
-                  <Link href={`/crm/quotes/${q.cotizacionId}`}
-                    style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>
-                    Ver detalle →
-                  </Link>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* ── Inline create form ──────────────────────────────────────────────── */}
-      {showForm && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 20, background: "var(--surface-2)" }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Nueva cotización para: {opportunity.title}</div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 10, marginBottom: 14 }}>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Nombre del proyecto</label>
-              <input value={form.projectName} onChange={(e) => setForm((f) => ({ ...f, projectName: e.target.value }))} placeholder={opportunity.title} style={inp} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Vigencia (días)</label>
-              <input type="number" min={1} value={form.validDays} onChange={(e) => setForm((f) => ({ ...f, validDays: Number(e.target.value) }))} style={numInp} />
-            </div>
-          </div>
-
-          {/* Line items */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Partidas</div>
-          <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", marginBottom: 8 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 55px 100px 55px 55px 28px", gap: 4, padding: "6px 8px", background: "var(--surface-2)", fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)" }}>
-              <span>Descripción</span><span style={{ textAlign: "center" }}>Cant.</span><span style={{ textAlign: "right" }}>P. Unit.</span>
-              <span style={{ textAlign: "center" }}>Dto%</span><span style={{ textAlign: "center" }}>IVA%</span><span />
-            </div>
-            {lines.map((line, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 55px 100px 55px 55px 28px", gap: 4, padding: "6px 8px", borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
-                <input value={line.name} onChange={(e) => setLine(i, { name: e.target.value })} placeholder={`Partida ${i + 1}`} style={{ ...inp, padding: "5px 7px", fontSize: 12.5 }} />
-                <input type="number" min={1} value={line.qty} onChange={(e) => setLine(i, { qty: Number(e.target.value) })} style={{ ...numInp, padding: "5px 7px", fontSize: 12.5 }} />
-                <input type="number" min={0} step={0.01} value={line.unitPrice} onChange={(e) => setLine(i, { unitPrice: Number(e.target.value) })} style={{ ...numInp, padding: "5px 7px", fontSize: 12.5 }} />
-                <input type="number" min={0} max={100} value={line.discount} onChange={(e) => setLine(i, { discount: Number(e.target.value) })} style={{ ...numInp, padding: "5px 7px", fontSize: 12.5 }} />
-                <input type="number" min={0} max={100} value={line.tax} onChange={(e) => setLine(i, { tax: Number(e.target.value) })} style={{ ...numInp, padding: "5px 7px", fontSize: 12.5 }} />
-                <button onClick={() => removeLine(i)} disabled={lines.length === 1}
-                  style={{ background: "none", border: "none", cursor: lines.length > 1 ? "pointer" : "default", color: "var(--text-tertiary)", fontSize: 14, opacity: lines.length > 1 ? 1 : 0.3 }}>✕</button>
-              </div>
-            ))}
-          </div>
-          <Button size="sm" variant="secondary" onClick={addLine} iconLeft="+">Agregar partida</Button>
-
-          {/* Totals */}
-          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end", fontSize: 13, color: "var(--text-secondary)" }}>
-            <div>Subtotal: {fmtMXN(subtotal)}</div>
-            {discTotal > 0 && <div style={{ color: "#dc2626" }}>Descuento: −{fmtMXN(discTotal)}</div>}
-            <div>IVA: {fmtMXN(taxTotal)}</div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "var(--foreground)" }}>Total: {fmtMXN(total)}</div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-            <Button variant="secondary" onClick={() => { setShowForm(false); setLines([emptyItem()]); setForm({ ...EMPTY_FORM }); }}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void createQuote()} disabled={saving || lines.filter((l) => l.name.trim() && l.unitPrice > 0).length === 0}>
-              {saving ? "Creando…" : "Crear y vincular cotización"}
+      <DetailSection title="Cotizaciones vinculadas">
+        {/* Regla 8: una sola fila, sin caja, con el primario a la derecha. El
+            cliente ya está en la cabecera de la oportunidad: repetirlo aquí
+            no informaba de nada. Con el formulario abierto, el primario es
+            «Crear y vincular»: no hay dos. */}
+        {!sinRegistros && !showForm && (
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+              Nueva cotización
             </Button>
           </div>
-        </div>
-      )}
-    </DetailSection>
-    </>
+        )}
+
+        {sinRegistros && !showForm ? (
+          <EmptyState
+            title="Sin cotizaciones vinculadas"
+            description="Cada versión que captures aquí se crea como cotización y queda ligada a esta oportunidad, para seguir el histórico de lo que se le ofreció al cliente."
+            action={
+              <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+                Nueva cotización
+              </Button>
+            }
+          />
+        ) : quotes.length > 0 ? (
+          <ul className={styles.lista}>
+            {quotes.map((q) => (
+              <li key={q.id} className={styles.version}>
+                <div className={styles.versionCopy}>
+                  <div className={styles.versionTitulo}>{q.versionLabel?.trim() || `Cotización #${q.id}`}</div>
+                  <div className={styles.versionMeta}>
+                    {formatDateTime(q.createdAt)}
+                    {q.cotizacionId ? ` · Doc #${q.cotizacionId}` : ""}
+                  </div>
+                </div>
+                <div className={styles.versionAcciones}>
+                  {q.pdfUrl && (
+                    <a
+                      href={buildApiUrl(q.pdfUrl.replace(/^\//, ""))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={styles.versionEnlace}
+                    >
+                      Abrir PDF
+                    </a>
+                  )}
+                  {q.cotizacionId && (
+                    <Link href={`/crm/quotes/${q.cotizacionId}`} className={styles.versionEnlace}>
+                      Ver detalle
+                    </Link>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {/* ── Captura de una versión nueva ─────────────────────────────────
+            Una sola caja: antes eran tres (sección → panel → recuadro de
+            partidas) y ninguna añadía jerarquía. */}
+        {showForm && (
+          <div className={styles.form}>
+            <h3 className={styles.formTitulo}>Nueva cotización para {opportunity.title}</h3>
+
+            <FinanceFormGrid>
+              <FinanceField label="Nombre del proyecto" optional hint="Si lo dejas vacío se usa el título de la oportunidad.">
+                <input
+                  value={form.projectName}
+                  onChange={(e) => setForm((f) => ({ ...f, projectName: e.target.value }))}
+                  placeholder={opportunity.title}
+                  style={financeInputStyle}
+                />
+              </FinanceField>
+              <FinanceField label="Vigencia" hint="Días que la cotización sigue siendo válida.">
+                <input
+                  type="number"
+                  min={1}
+                  value={form.validDays}
+                  onChange={(e) => setForm((f) => ({ ...f, validDays: Number(e.target.value) }))}
+                  style={{ ...financeInputStyle, textAlign: "right" }}
+                />
+              </FinanceField>
+            </FinanceFormGrid>
+
+            <div>
+              <p className={styles.rotulo}>Partidas</p>
+              <div className={styles.partidas}>
+                <div className={styles.partidaCabeza} aria-hidden="true">
+                  <span>Descripción</span>
+                  <span className={styles.centro}>Cant.</span>
+                  <span className={styles.derecha}>P. unit.</span>
+                  <span className={styles.centro}>Dto %</span>
+                  <span className={styles.centro}>IVA %</span>
+                  <span />
+                </div>
+                {lines.map((line, i) => (
+                  <div key={i} className={styles.partidaFila}>
+                    {/* Cada control lleva nombre accesible: en móvil la
+                        cabecera desaparece y sin esto no se sabe qué es qué. */}
+                    <input
+                      value={line.name}
+                      onChange={(e) => setLine(i, { name: e.target.value })}
+                      placeholder={`Partida ${i + 1}`}
+                      aria-label={`Descripción de la partida ${i + 1}`}
+                      style={celdaInput}
+                    />
+                    <input
+                      type="number" min={1} value={line.qty}
+                      onChange={(e) => setLine(i, { qty: Number(e.target.value) })}
+                      aria-label={`Cantidad de la partida ${i + 1}`}
+                      style={celdaNum}
+                    />
+                    <input
+                      type="number" min={0} step={0.01} value={line.unitPrice}
+                      onChange={(e) => setLine(i, { unitPrice: Number(e.target.value) })}
+                      aria-label={`Precio unitario de la partida ${i + 1}`}
+                      style={celdaNum}
+                    />
+                    <input
+                      type="number" min={0} max={100} value={line.discount}
+                      onChange={(e) => setLine(i, { discount: Number(e.target.value) })}
+                      aria-label={`Descuento de la partida ${i + 1}`}
+                      style={celdaNum}
+                    />
+                    <input
+                      type="number" min={0} max={100} value={line.tax}
+                      onChange={(e) => setLine(i, { tax: Number(e.target.value) })}
+                      aria-label={`IVA de la partida ${i + 1}`}
+                      style={celdaNum}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeLine(i)}
+                      disabled={lines.length === 1}
+                      aria-label={`Quitar la partida ${i + 1}`}
+                      className={styles.quitar}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Button size="sm" variant="secondary" onClick={addLine} iconLeft="+">Agregar partida</Button>
+            </div>
+
+            <div className={styles.totales}>
+              <div>Subtotal: {fmtMXN(subtotal)}</div>
+              {discTotal > 0 && <div className={styles.totalDescuento}>Descuento: −{fmtMXN(discTotal)}</div>}
+              <div>IVA: {fmtMXN(taxTotal)}</div>
+              <div className={styles.totalFinal}>Total: {fmtMXN(total)}</div>
+            </div>
+
+            <div className={styles.formPie}>
+              <Button size="sm" variant="secondary" onClick={cerrarForm}>Cancelar</Button>
+              <Button size="sm" variant="primary" onClick={() => void createQuote()} disabled={saving || !puedeGuardar}>
+                {saving ? "Creando…" : "Crear y vincular"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DetailSection>
+    </div>
   );
 }
