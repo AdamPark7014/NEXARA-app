@@ -58,6 +58,7 @@ import mx.nexara.mobile.nativeapp.ui.console.clients.ClientsListScreen
 import mx.nexara.mobile.nativeapp.ui.console.clients.NewClientScreen
 import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.CotizacionDetalleScreen
 import mx.nexara.mobile.nativeapp.ui.console.cotizaciones.CotizacionesScreen
+import mx.nexara.mobile.nativeapp.ui.console.gastos.GastosScreen
 import mx.nexara.mobile.nativeapp.ui.console.herramientas.HerramientasScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.AlmacenScreen
@@ -134,6 +135,15 @@ internal object ConsoleRoutes {
     /** Herramientas (`/erp/almacen/herramientas`) — mi kit, mis préstamos y pedir más plazo. */
     const val Herramientas = "console/herramientas"
 
+    /**
+     * Gastos administrativos (`/erp/finance/expenses`) — registrar con la foto
+     * del ticket, autorizar y marcar pagado.
+     *
+     * Una sola ruta: la ficha de un gasto y el alta son hojas de la misma
+     * pantalla, porque de ninguna de las dos se sale a otro sitio.
+     */
+    const val Gastos = "console/gastos"
+
     /** Viáticos: mis anticipos y, para quien autoriza, los de su gente. */
     const val Viaticos = "console/viaticos"
 
@@ -174,6 +184,7 @@ internal object ConsoleRoutes {
         CoreExtraModule.HERRAMIENTAS -> Herramientas
         CoreExtraModule.VIATICOS -> Viaticos
         CoreExtraModule.COTIZACIONES -> Cotizaciones
+        CoreExtraModule.GASTOS -> Gastos
         else -> modulePlaceholder(module.key)
     }
 
@@ -602,6 +613,14 @@ fun ConsoleNavHost(
             // pantalla aguanta que falle solo una de las dos listas.
             nxComposable(ConsoleRoutes.Herramientas, style = NxNavAnimStyle.Push) {
                 if (CoreExtraModule.HERRAMIENTAS in extras) HerramientasScreen()
+            }
+            // Gastos: registrar con la foto del ticket donde se pagó, y
+            // autorizar o marcar pagado desde donde estés. Comprueba el módulo
+            // igual que el resto de «Más»; los permisos de verdad
+            // (`contabilidad.view` para ver y registrar, `contabilidad.manage`
+            // para decidir) los aplica el API, y su 403 se enseña tal cual.
+            nxComposable(ConsoleRoutes.Gastos, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.GASTOS in extras) GastosScreen()
             }
             // Cotizaciones: consulta. La lista y el detalle comprueban el
             // módulo igual que el resto de «Más»; el permiso de verdad
