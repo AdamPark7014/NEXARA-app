@@ -3,8 +3,34 @@
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-21
 - **Rama:** `mejora/calidad-y-web`
-- **HEAD:** `GET /company/mine` dejó de arrastrar a cualquiera a la empresa real; login móvil sin bucle ni cascada
-- **Verificado:** `company-tenant-pin.spec.ts` 7/7 · Android `testDebugUnitTest` verde · login del revisor comprobado contra producción desde el emulador
+- **HEAD:** ola móvil completa — Cotizaciones y Herramientas nativas, Actividades y Asistencias rediseñadas, iOS al día, viáticos en lote
+- **Verificado:** Android `testDebugUnitTest` 564/564 · web 65 archivos / 594 pruebas · API `company-tenant-pin` 7/7, `viatico-asignacion-lote` 8/8, `viatico-reparto` 41/41, `navigation-module-map` 5/5
+
+## Estado de la ola móvil (21-09, cinco frentes en paralelo)
+
+- **Cotizaciones** y **Herramientas** dejan de ser cascarones: pantalla nativa,
+  lista y detalle. Ya no queda ningún módulo de «Más» que mande al navegador.
+- **Actividades** y **Asistencias** rediseñadas contra las 9 reglas.
+- **iOS** cerró cuatro huecos reales (salto de prioridad, aviso de sesión
+  expirada, onboarding, permisos en Mi perfil). **Nada de iOS se compiló: no hay
+  Mac.** Hay que pasarlo por Xcode antes de darlo por bueno.
+- **Viáticos en lote** (`POST viaticos/assign/lote`) con su pantalla en la web.
+
+### Dos hallazgos que siguen abiertos
+
+1. **`GET /cotizaciones/core` devuelve 20 como máximo, no 200.** `take` es un
+   *getter* (`this.limit ?? 20`) y el ValidationPipe global tiene
+   `transform: true`, así que `query?.take` nunca es `undefined` y el `?? 200`
+   es código muerto. Afecta a la web y a la app. `limit` tiene `@Max(100)`, así
+   que pedir 200 desde el cliente daría 400: hay que decidir si esa lista pagina
+   de verdad o lleva su propio tope. Es el mismo patrón del tope de 100.
+2. **El alta de préstamo de herramienta no se puede completar.** Las dos
+   personas que `tools-access.ts` autoriza a crear préstamos necesitan
+   `GET tool-requests/inventory` para elegir la herramienta, y ese endpoint pide
+   `tools.manage`, que no tienen. La pantalla lo dice en español en vez de
+   fingir que funciona.
+
+
 
 ## Lo que se encontró hoy y hay que entender antes de tocar nada
 
