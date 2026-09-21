@@ -1,0 +1,202 @@
+/**
+ * NEXARA · Solicitudes entre pares (pestaña de Actividades).
+ *
+ * Los estilos viven aquí y no en `style={{…}}` porque el contrato pide dos
+ * cosas que un atributo en línea no sabe decir: una rejilla que se colapsa a
+ * una columna en pantalla angosta, y controles de 40 px con el dedo cuando con
+ * ratón el contrato fija 32/36 px (regla 4 de `.ai/DISENO-FINANZAS.md`).
+ *
+ * Colores, tamaños, radios y espacios salen de `--ui-*`: ni un hex aquí.
+ */
+
+.vista {
+  display: grid;
+  gap: var(--ui-s5);
+  min-width: 0;
+}
+
+.bloque {
+  display: grid;
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--ui-fs-section);
+  line-height: var(--ui-lh-section);
+  font-weight: var(--ui-fw-section);
+  letter-spacing: var(--ui-tracking-section);
+  color: var(--ui-fg);
+}
+
+.conteo {
+  margin-left: var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  font-weight: var(--ui-fw-meta);
+  color: var(--ui-fg-3);
+}
+
+/*
+ * El formulario no se estira a los 1 400 px del panel: un renglón de captura
+ * de ese ancho no se lee mejor, se lee peor. Se le pone tope y la rejilla
+ * reparte ese ancho entre los dos campos de la primera fila.
+ */
+.formulario {
+  display: grid;
+  gap: var(--ui-s3);
+  max-width: 56rem;
+  min-width: 0;
+}
+
+.rejilla {
+  display: grid;
+  /* Un selector de persona no necesita lo mismo que «¿Qué necesitas?». */
+  grid-template-columns: minmax(10rem, 18rem) minmax(12rem, 1fr);
+  gap: var(--ui-s3) var(--ui-s4);
+  align-items: start;
+  min-width: 0;
+}
+
+.campo {
+  display: grid;
+  gap: var(--ui-s1);
+  min-width: 0;
+}
+
+.campoFull {
+  grid-column: 1 / -1;
+}
+
+/*
+ * Dos columnas solo cuando de verdad caben: con la barra lateral del panel, un
+ * ancho de ventana menor que esto deja al área de contenido sin sitio para las
+ * dos, y el campo largo se estrangula antes que el corto.
+ */
+@media (max-width: 860px) {
+  .rejilla {
+    grid-template-columns: 1fr;
+  }
+}
+
+.etiqueta {
+  font-size: var(--ui-fs-label);
+  line-height: var(--ui-lh-label);
+  font-weight: var(--ui-fw-label);
+  color: var(--ui-fg-2);
+}
+
+.opcional {
+  font-weight: var(--ui-fw-body);
+  color: var(--ui-fg-3);
+}
+
+.control {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: var(--ui-control-h-lg);
+  padding: 0 var(--ui-s2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-fg);
+  font: inherit;
+  font-size: var(--ui-fs-body);
+}
+
+.control:focus {
+  outline: none;
+  border-color: var(--ui-brand);
+  box-shadow: var(--ui-ring);
+}
+
+.control:disabled {
+  color: var(--ui-fg-4);
+}
+
+textarea.control {
+  height: auto;
+  min-height: calc(var(--ui-row-h) * 2);
+  padding: var(--ui-s2);
+  line-height: var(--ui-lh-body);
+  resize: vertical;
+}
+
+.pista {
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-fg-3);
+}
+
+.error {
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-danger-text);
+}
+
+.ok {
+  margin-right: auto;
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  color: var(--ui-success-text);
+}
+
+/* Acciones al pie, separadas por una línea y a la derecha (regla 5). */
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-s3);
+  max-width: 56rem;
+  padding-top: var(--ui-s3);
+  border-top: 1px solid var(--ui-border-subtle);
+}
+
+/* Estado, fecha y motivo dentro de la tarjeta: uno bajo otro, sin separadores. */
+.bloqueMeta {
+  display: grid;
+  gap: var(--ui-s1);
+  min-width: 0;
+}
+
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--ui-s3);
+  min-width: 0;
+}
+
+.rechazo {
+  display: grid;
+  gap: var(--ui-s1);
+  width: 100%;
+  min-width: 0;
+}
+
+.rechazoBotones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ui-s2);
+}
+
+/*
+ * Con ratón manda la regla 4 (32 px). Con el dedo ese mismo control se falla:
+ * en puntero grueso todo lo tocable sube a 40 px y el tipo a 16 px, que es lo
+ * que evita que iOS haga zoom al enfocar un campo.
+ */
+@media (pointer: coarse) {
+  .vista button,
+  .vista select,
+  .vista textarea,
+  .vista input:not([type="checkbox"]):not([type="radio"]) {
+    min-height: var(--ui-row-h);
+  }
+
+  .control {
+    font-size: var(--ui-text-lg);
+  }
+}
