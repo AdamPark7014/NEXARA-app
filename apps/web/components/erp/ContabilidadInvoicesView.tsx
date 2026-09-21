@@ -94,6 +94,18 @@ const TONO_ESTADO: Record<"ok" | "warn" | "bad" | "mute", StatusTone> = {
 
 type Mode = "cxc" | "cxp" | "all";
 
+/**
+ * Tope del DTO de la API (`PaginationQueryDto`, `@Max(100)`).
+ *
+ * Esta vista pedía `limit=200` para traérselo todo de una, así que la ruta
+ * contestaba 400 y la pantalla de Facturas no cargó nunca: salía el error de
+ * validación crudo encima de un «Todavía no hay facturas».
+ */
+const POR_PAGINA = 100;
+
+/** Páginas por tanda. Lo que quede fuera se avisa en pantalla, no se calla. */
+const PAGINAS_POR_TANDA = 5;
+
 export default function ContabilidadInvoicesView({
   mode = "all",
   title,
@@ -108,6 +120,9 @@ export default function ContabilidadInvoicesView({
   const [items, setItems] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Cuántas quedaron fuera de la tanda, para decirlo en vez de recortar en silencio. */
+  const [parcial, setParcial] = useState<{ cargadas: number; total: number } | null>(null);
+  const [tandas, setTandas] = useState(1);
   const [q, setQ] = useState("");
   const [aging, setAging] = useState<"" | "vencido" | "hoy" | "d7">("");
   const [selected, setSelected] = useState<InvoiceRow | null>(null);
@@ -140,26 +155,39 @@ export default function ContabilidadInvoicesView({
     setLoading(true);
     setError(null);
     try {
-      const qs = new URLSearchParams();
-      if (typeParam) qs.set("type", typeParam);
-      qs.set("limit", "200");
-      // `erpFetch` devuelve `unknown` si no se le dice qué esperar, y entonces
-      // `data?.items` no compila. La ruta contesta el arreglo pelón o envuelto,
-      // según el endpoint, así que se declaran las tres formas.
-      const data = await erpFetch<
-        InvoiceRow[] | { items?: InvoiceRow[]; data?: InvoiceRow[] } | null
-      >(`accounting/invoices?${qs}`, token);
-      const rows: InvoiceRow[] = Array.isArray(data)
-        ? data
-        : data?.items ?? data?.data ?? [];
-      setItems(rows);
+      const acumuladas: InvoiceRow[] = [];
+      let total = 0;
+      for (let pagina = 1; pagina <= tandas * PAGINAS_POR_TANDA; pagina += 1) {
+        const qs = new URLSearchParams();
+        if (typeParam) qs.set("type", typeParam);
+        qs.set("limit", String(POR_PAGINA));
+        qs.set("page", String(pagina));
+        // `erpFetch` devuelve `unknown` si no se le dice qué esperar, y entonces
+        // `data?.items` no compila. La ruta contesta el arreglo pelón o envuelto,
+        // según el endpoint, así que se declaran las tres formas.
+        const data = await erpFetch<
+          | InvoiceRow[]
+          | { items?: InvoiceRow[]; data?: InvoiceRow[]; meta?: { total?: number } }
+          | null
+        >(`accounting/invoices?${qs}`, token);
+        const rows: InvoiceRow[] = Array.isArray(data)
+          ? data
+          : data?.items ?? data?.data ?? [];
+        acumuladas.push(...rows);
+        const informado = Array.isArray(data) ? undefined : data?.meta?.total;
+        total = informado ?? acumuladas.length;
+        if (rows.length < POR_PAGINA || acumuladas.length >= total) break;
+      }
+      setItems(acumuladas);
+      setParcial(total > acumuladas.length ? { cargadas: acumuladas.length, total } : null);
     } catch (e) {
       setError(formatApiError(e));
       setItems([]);
+      setParcial(null);
     } finally {
       setLoading(false);
     }
-  }, [token, typeParam]);
+  }, [token, typeParam, tandas]);
 
   useEffect(() => {
     void load();
@@ -488,12 +516,32 @@ export default function ContabilidadInvoicesView({
         />
       </div>
 
+      {parcial && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            margin: "-4px 0 12px",
+          }}
+        >
+          <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: 0 }}>
+            Se cargaron las {parcial.cargadas} facturas más recientes de {parcial.total}. La
+            búsqueda y los filtros solo miran las cargadas.
+          </p>
+          <Button size="sm" variant="secondary" onClick={() => setTandas((n) => n + 1)} disabled={loading}>
+            Cargar más
+          </Button>
+        </div>
+      )}
+
       {error && (
         <>
           {/* Qué pasó, por qué, y qué hacer — junto a la tabla que quedó vacía. */}
           <InlineAlert
             variant="danger"
-            message={`No se pudieron cargar las facturas. ${error} Vuelve a intentarlo; si sigue igual, avisa a soporte.`}
+            message={`No se pudieron cargar las facturas. Vuelve a intentarlo; si sigue igual, avisa a soporte con este dato: «${error.replace(/\s*\.?\s*$/, "")}».`}
           />
           <div style={{ margin: "-4px 0 12px" }}>
             <Button size="sm" variant="secondary" onClick={() => void load()}>
@@ -505,7 +553,7 @@ export default function ContabilidadInvoicesView({
 
       {loading ? (
         <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Cargando…</p>
-      ) : filtered.length === 0 ? (
+      ) : error ? null : filtered.length === 0 ? (
         <EmptyState
           title={emptyTitle}
           description={emptyDesc}
