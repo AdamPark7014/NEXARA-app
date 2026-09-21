@@ -6,16 +6,18 @@
 
 ## Hecho
 
-### Deploy en curso / typefix
-- Push `28617a75` a origin; `update.sh` en Hetzner falló el build web por tipo en `puedeGestionarInventarioVehiculos` (`permissions: null` vs `undefined`).
-- Fix tipado en `recursos-core.ts` → redeploy.
+### Deploy prod (Hetzner)
+- `011969f5` en servidor; `nexara-api` healthy + `nexara-web` up.
+- https://core.nexara.com.mx/erp/vehiculos y `/erp/finance/viatics` → 200.
+- Incluye: Agregar flotilla, Asignar viático (lote), FormField UX.
 
-### Pasada UX formularios (tramos 1–2)
-FormField + formularios Core/cliente/perfil/sucursales.
+### Fix build
+- Tipado `puedeGestionarInventarioVehiculos` (`permissions: null` → `undefined`).
 
 ## A medias
-- Redeploy tras el fix de tipos.
-- Play Console / FormField restantes / docs nativos.
+- Play Console (AAB/capturas).
+- Más FormField: OpsActivity, VehicleCheckout, proyectos/procurement.
+- Documentos nativos / tope cotizaciones / tools.manage.
 
 ## No tocar
 Puente NAS · keystore Play · `NO TOCAR LIBREMENTE`.
