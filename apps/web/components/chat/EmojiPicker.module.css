@@ -1,0 +1,138 @@
+/* Selector de emoji. Superficie elevada: flota sobre el compositor. */
+
+.panel {
+  position: absolute;
+  z-index: 20;
+  width: 304px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s2);
+  padding: var(--ui-s2);
+  background: var(--ui-surface-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-elev-pop);
+}
+
+.search {
+  width: 100%;
+  height: var(--ui-control-h);
+  padding: 0 var(--ui-s2);
+  font-family: var(--ui-font);
+  font-size: var(--ui-fs-body);
+  color: var(--ui-fg);
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  outline: none;
+}
+
+.search::placeholder {
+  color: var(--ui-fg-3);
+}
+
+.search:focus-visible {
+  border-color: var(--ui-brand-border);
+  box-shadow: var(--ui-ring);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--ui-s0);
+  padding-bottom: var(--ui-s1);
+  border-bottom: 1px solid var(--ui-border-subtle);
+}
+
+.tab {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  font-size: 15px;
+  line-height: 1;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.tab:hover {
+  background: var(--ui-hover);
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.tabActive {
+  background: var(--ui-brand-bg);
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: var(--ui-s0);
+  max-height: 196px;
+  overflow-y: auto;
+}
+
+.gridStickers {
+  grid-template-columns: repeat(4, 1fr);
+  max-height: 236px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  font-size: 19px;
+  line-height: 1;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.item:hover {
+  background: var(--ui-hover);
+}
+
+.item:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.itemSticker {
+  flex-direction: column;
+  gap: var(--ui-s1);
+  aspect-ratio: auto;
+  padding: var(--ui-s2) var(--ui-s1);
+  font-size: 28px;
+}
+
+.itemNombre {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: var(--ui-fw-caption);
+  color: var(--ui-fg-2);
+  text-align: center;
+}
+
+.vacio {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--ui-s3) 0;
+  text-align: center;
+  font-size: var(--ui-fs-meta);
+  color: var(--ui-fg-3);
+}
