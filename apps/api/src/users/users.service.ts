@@ -13,6 +13,7 @@ import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
 import { NON_EMPLOYEE_EMAILS, PLATFORM_DEVELOPER_EMAIL, STORE_REVIEWER_EMAIL, TESTER_CEO_EMAIL } from '../common/platform-accounts.js';
 import { asignablesDe, esJefe } from '../me/equipo-alcance.js';
+import { motivoLateralInvalida } from './organigrama-lateral.js';
 import {
   buildAccessScheduleAssignment,
   deviceMatchesDoorScope,
@@ -1138,6 +1139,34 @@ export class UsersService {
     });
   }
 
+  /**
+   * Colocar a alguien **al lado** de otra persona en el organigrama (o quitarle esa
+   * colocación con `null`).
+   *
+   * No toca `managerId`: quien está al lado de José Antonio le pasa trabajo, no le manda.
+   * Ni el alcance de equipo, ni los superiores de una actividad, ni quién aprueba una
+   * comida, ni «tiene personal a su cargo» leen este campo. Es dibujo.
+   */
+  async setLateral(userId: number, lateralDeId: number | null, companyId?: number | null) {
+    await this.assertUserInCompany(userId, companyId);
+    if (lateralDeId != null) {
+      await this.assertUserInCompany(lateralDeId, companyId);
+    }
+    const tenantId = requireCompanyId(companyId);
+    const personas = await this.prisma['user'].findMany({
+      where: { isActive: true, ...this.companyMembershipFilter(tenantId) },
+      select: { id: true, managerId: true, lateralDeId: true },
+    });
+    const motivo = motivoLateralInvalida(userId, lateralDeId ?? null, personas);
+    if (motivo) throw new BadRequestException(motivo);
+
+    return this.prisma['user'].update({
+      where: { id: userId },
+      data: { lateralDeId: lateralDeId ?? null },
+      select: { id: true, nombre: true, managerId: true, lateralDeId: true },
+    });
+  }
+
   async getOrgchart(companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     // Christian (dueño) sí va en el organigrama como raíz. Claudia (tester), Adam
@@ -1157,6 +1186,9 @@ export class UsersService {
         id: true,
         nombre: true,
         managerId: true,
+        // Colocación al costado. Va como un escalar más: el árbol que se devuelve sigue
+        // siendo el de `managerId` y nadie más que el dibujo lo mira.
+        lateralDeId: true,
         puesto: true,
         avatarUrl: true,
         role: { select: { id: true, nombre: true } },

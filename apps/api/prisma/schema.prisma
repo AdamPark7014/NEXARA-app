@@ -939,6 +939,15 @@ model User {
   manager   User?  @relation("UserReportsTo", fields: [managerId], references: [id])
   reportees User[] @relation("UserReportsTo")
 
+  /// Colocación **lateral** en el organigrama: se dibuja al costado de esta persona,
+  /// a su misma altura y con línea punteada. No es una línea de mando y no se lee
+  /// en ningún cálculo de alcance, permisos, notificaciones ni KPIs: esos siguen
+  /// mirando solo `managerId`. Luis al lado de José Antonio le manda trabajo, pero
+  /// no es su jefe, y ninguna pantalla debe contarlo como subordinado suyo.
+  lateralDeId        Int?
+  lateralDe          User?  @relation("UserLateralDe", fields: [lateralDeId], references: [id], onDelete: SetNull)
+  lateralesAsignados User[] @relation("UserLateralDe")
+
   // === Contenido autoreado ===
   caseStudiesAuthored     CaseStudy[]          @relation("CaseStudyAuthor")
   socialPostsAuthored     SocialPost[]         @relation("SocialPostAuthor")

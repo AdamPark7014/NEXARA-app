@@ -26,12 +26,23 @@ import { resolveAssetUrl } from "@/lib/evidence-display";
 import MetricStrip from "@/components/ui/MetricStrip";
 import {
   type OrgChartNode,
+  ANCHO_TARJETA,
+  HUECO,
+  MAX_POR_FILA,
+  SANGRIA,
+  contarSubordinados,
+  convieneCompacto,
+  esLateral,
   flattenOrgNodes,
+  hijosDeMando,
+  lateralesDe,
   orgNodeSubtitle,
   maxOrgDepth,
   countWithManager,
   countWithoutManager,
   countOrphanRoots,
+  raicesDibujadas,
+  soloHojas,
 } from "@/lib/orgchart-layout";
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
@@ -48,19 +59,21 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 }
 
 const LINE = "color-mix(in srgb, var(--primary) 55%, var(--border))";
-/** Ancho de la tarjeta de persona; la maquetacion del arbol depende de el. */
-const ANCHO_TARJETA = 168;
-/** Hermanos por renglon antes de envolver: mas de esto estira el arbol a lo ancho. */
-const MAX_POR_FILA = 4;
+/** Línea de una colocación lateral: punteada y más tenue. No es mando. */
+const LINEA_LATERAL = "color-mix(in srgb, var(--text-tertiary) 70%, transparent)";
 const ZOOM_MIN = 0.3;
 /**
- * Suelo del ajuste automático. Por debajo los nombres dejan de leerse, así que
- * más vale que la página se desplace a que el organigrama salga ilegible; a
- * mano se puede bajar hasta `ZOOM_MIN`.
+ * Por debajo de esto los nombres dejan de leerse. **No es un suelo al que
+ * agarrarse**: cuando el árbol extendido no cabría ni a este zoom, lo que cambia
+ * es la forma del árbol (modo compacto), no el número. Encajar a la fuerza un
+ * zoom que sigue desbordando la caja es lo que hacía que el botón dijera
+ * «ajustar» y el organigrama saliera cortado igual.
  */
 const ZOOM_LEGIBLE = 0.45;
 const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.1;
+/** Altura aproximada del centro de la tarjeta: dónde nace un codo o una línea lateral. */
+const CENTRO_TARJETA = 26;
 
 function norm(s: string) {
   return s
@@ -136,16 +149,34 @@ function NodeCard({
   const [selectedManager, setSelectedManager] = useState(
     node.managerId ? String(node.managerId) : "",
   );
+  const [selectedLateral, setSelectedLateral] = useState(
+    node.lateralDeId ? String(node.lateralDeId) : "",
+  );
 
-  const saveManager = async () => {
+  /**
+   * Guarda las dos colocaciones por separado, porque son dos cosas distintas:
+   * «reporta a» cambia la línea de mando (y con ella permisos y alcance), «al
+   * lado de» solo cambia dónde se dibuja. Cada una tiene su endpoint y solo se
+   * llama la que cambió.
+   */
+  const guardarColocacion = async () => {
     setSaving(true);
     setSaveErr(null);
     try {
       const managerId = selectedManager ? parseInt(selectedManager, 10) : null;
-      await apiFetch(`users/${node.id}/manager`, token, {
-        method: "PATCH",
-        body: JSON.stringify({ managerId }),
-      });
+      const lateralDeId = selectedLateral ? parseInt(selectedLateral, 10) : null;
+      if (managerId !== (node.managerId ?? null)) {
+        await apiFetch(`users/${node.id}/manager`, token, {
+          method: "PATCH",
+          body: JSON.stringify({ managerId }),
+        });
+      }
+      if (lateralDeId !== (node.lateralDeId ?? null)) {
+        await apiFetch(`users/${node.id}/lateral`, token, {
+          method: "PATCH",
+          body: JSON.stringify({ lateralDeId }),
+        });
+      }
       setEditing(false);
       onRefresh();
     } catch (e: unknown) {
@@ -163,6 +194,7 @@ function NodeCard({
   collectDesc(node);
   const managerOptions = allUsers.filter((u) => !descendants.has(u.id));
   const puesto = orgNodeSubtitle(node);
+  const aCargo = contarSubordinados(node);
 
   return (
     <div
@@ -184,8 +216,8 @@ function NodeCard({
         // y para caber en pantalla habia que encogerlo al 40 %, donde el nombre
         // ya no se lee. Quitando ancho a la tarjeta, cabe al ~50 %: se gana
         // legibilidad sin quitar informacion.
-        minWidth: 164,
-        width: 168,
+        minWidth: ANCHO_TARJETA - 4,
+        width: ANCHO_TARJETA,
         boxShadow: highlighted
           ? "0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent)"
           : "0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent)",
@@ -200,9 +232,11 @@ function NodeCard({
           onClick={() => {
             setEditing((e) => !e);
             setSelectedManager(node.managerId ? String(node.managerId) : "");
+            setSelectedLateral(node.lateralDeId ? String(node.lateralDeId) : "");
             setSaveErr(null);
           }}
-          title="Editar jefe"
+          title={`Colocar a ${node.nombre} en el organigrama`}
+          aria-label={`Colocar a ${node.nombre} en el organigrama`}
           style={{
             position: "absolute",
             top: 8,
@@ -250,11 +284,21 @@ function NodeCard({
           ) : null}
         </div>
       </div>
-      {node.department && (
-        <div>
-          <Tag variant={isRoot ? "accent" : "neutral"} size="sm">
-            {node.department.nombre}
-          </Tag>
+      {(node.department || aCargo > 0) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+          {node.department && (
+            <Tag variant={isRoot ? "accent" : "neutral"} size="sm">
+              {node.department.nombre}
+            </Tag>
+          )}
+          {aCargo > 0 && (
+            <span
+              style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 600 }}
+              title={`Gente a cargo de ${node.nombre} por línea de mando`}
+            >
+              {aCargo} a cargo
+            </span>
+          )}
         </div>
       )}
 
@@ -268,10 +312,14 @@ function NodeCard({
             borderTop: "1px solid var(--border)",
           }}
         >
-          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600 }}>
+          <label
+            htmlFor={`jefe-${node.id}`}
+            style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600 }}
+          >
             Reporta a:
           </label>
           <select
+            id={`jefe-${node.id}`}
             value={selectedManager}
             onChange={(e) => setSelectedManager(e.target.value)}
             style={{
@@ -291,13 +339,44 @@ function NodeCard({
               </option>
             ))}
           </select>
+          <label
+            htmlFor={`lateral-${node.id}`}
+            style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 600, marginTop: 2 }}
+          >
+            Al lado de:
+          </label>
+          <select
+            id={`lateral-${node.id}`}
+            value={selectedLateral}
+            onChange={(e) => setSelectedLateral(e.target.value)}
+            style={{
+              fontSize: 12,
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              padding: "6px 8px",
+              background: "var(--surface)",
+              color: "var(--foreground)",
+            }}
+          >
+            <option value="">— En su lugar del árbol —</option>
+            {managerOptions.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre}
+                {orgNodeSubtitle(u) ? ` · ${orgNodeSubtitle(u)}` : ""}
+              </option>
+            ))}
+          </select>
+          <div style={{ fontSize: 10, color: "var(--text-tertiary)", lineHeight: 1.35 }}>
+            Se dibuja a su costado, a la misma altura y con línea punteada. No manda sobre esa
+            persona ni cuenta como gente suya.
+          </div>
           {saveErr && (
             <div style={{ fontSize: 11, color: "var(--danger)" }}>{saveErr}</div>
           )}
           <div style={{ display: "flex", gap: 6 }}>
             <button
               type="button"
-              onClick={() => void saveManager()}
+              onClick={() => void guardarColocacion()}
               disabled={saving}
               style={{
                 fontSize: 11,
@@ -346,9 +425,23 @@ interface TreeBranchProps {
   isRoot?: boolean;
   matchIds: Set<number> | null;
   hasActiveFilter: boolean;
+  /** Apila en columna a los jefes cuyos hijos son todos hojas. */
+  compacto: boolean;
+  /** Profundidad de laterales ya atravesada; corta cualquier dato en ciclo. */
+  saltoLateral?: number;
 }
 
-/** Rama del flowchart: nodo + conectores SVG/CSS + hijos en fila. */
+/** Hasta dónde se sigue una cadena de laterales al dibujar. */
+const MAX_SALTOS_LATERALES = 6;
+
+/**
+ * Rama del flowchart: nodo + conectores + su gente debajo + quien vaya a su costado.
+ *
+ * Tres formas de unir, y cada línea significa algo distinto:
+ *  - vertical llena hacia abajo → manda sobre;
+ *  - codo llena en columna (modo compacto) → lo mismo, pero apilado para caber;
+ *  - horizontal **punteada** al costado → colocación lateral: ni manda ni cuelga.
+ */
 function TreeBranch({
   node,
   allUsers,
@@ -358,21 +451,29 @@ function TreeBranch({
   isRoot = false,
   matchIds,
   hasActiveFilter,
+  compacto,
+  saltoLateral = 0,
 }: TreeBranchProps) {
-  const kids = node.children ?? [];
+  // Los hijos colocados al costado de alguien salen de la fila de mando: si se
+  // quedaran, les bajaría encima una línea de jefe que es justo lo que no son.
+  const kids = hijosDeMando(node);
   const hasKids = kids.length > 0;
+  const laterales =
+    saltoLateral < MAX_SALTOS_LATERALES ? lateralesDe(node.id, allUsers) : [];
   /** Con muchos hermanos se cambia ancho por alto. */
   const envuelve = kids.length > MAX_POR_FILA;
+  /** Hijos todos hoja: en vez de una fila larguísima, una columna con codos. */
+  const apila = compacto && soloHojas(node);
   const isMatch = !hasActiveFilter || (matchIds?.has(node.id) ?? true);
   const highlighted = hasActiveFilter && (matchIds?.has(node.id) ?? false);
   const dimmed = hasActiveFilter && !isMatch;
 
-  return (
+  const tarjetaYGente = (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
+        alignItems: apila ? "flex-start" : "center",
         position: "relative",
       }}
     >
@@ -387,9 +488,60 @@ function TreeBranch({
         highlighted={highlighted}
       />
 
-      {hasKids && (
+      {hasKids && apila && (
+        <div style={{ width: "100%" }}>
+          {kids.map((child, i) => {
+            const ultimo = i === kids.length - 1;
+            return (
+              <div
+                key={child.id}
+                style={{ position: "relative", paddingLeft: SANGRIA, paddingTop: i === 0 ? 8 : 10 }}
+              >
+                {/* Espina vertical: llega hasta el último codo y ahí se corta. */}
+                <div
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    top: 0,
+                    width: 2,
+                    height: ultimo ? CENTRO_TARJETA + (i === 0 ? 8 : 10) : "100%",
+                    background: LINE,
+                    borderRadius: 1,
+                  }}
+                />
+                {/* Codo hacia la tarjeta. */}
+                <div
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    left: 10,
+                    top: CENTRO_TARJETA + (i === 0 ? 8 : 10),
+                    width: SANGRIA - 10,
+                    height: 2,
+                    background: LINE,
+                    borderRadius: 1,
+                  }}
+                />
+                <TreeBranch
+                  node={child}
+                  allUsers={allUsers}
+                  token={token}
+                  onRefresh={onRefresh}
+                  canEditOrg={canEditOrg}
+                  matchIds={matchIds}
+                  hasActiveFilter={hasActiveFilter}
+                  compacto={compacto}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {hasKids && !apila && (
         <>
-          {/* Drop from parent to horizontal bar */}
+          {/* Bajada del jefe a la barra horizontal */}
           <div
             aria-hidden
             style={{ width: 2, height: 18, background: LINE, flexShrink: 0, borderRadius: 1 }}
@@ -422,12 +574,12 @@ function TreeBranch({
                 flexWrap: envuelve ? "wrap" : "nowrap",
                 justifyContent: "center",
                 alignItems: "flex-start",
-                gap: 16,
+                gap: HUECO,
                 rowGap: 18,
                 // Con muchos hermanos, una sola fila estira el arbol a lo ancho
                 // y obliga a encogerlo hasta que no se lee. Se cambia ancho por
                 // alto: cuatro por renglon.
-                maxWidth: envuelve ? MAX_POR_FILA * (ANCHO_TARJETA + 16) : undefined,
+                maxWidth: envuelve ? MAX_POR_FILA * (ANCHO_TARJETA + HUECO) : undefined,
               }}
             >
               {kids.map((child) => (
@@ -451,6 +603,7 @@ function TreeBranch({
                     canEditOrg={canEditOrg}
                     matchIds={matchIds}
                     hasActiveFilter={hasActiveFilter}
+                    compacto={compacto}
                   />
                 </div>
               ))}
@@ -458,6 +611,41 @@ function TreeBranch({
           </div>
         </>
       )}
+    </div>
+  );
+
+  if (laterales.length === 0) return tarjetaYGente;
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start" }}>
+      {tarjetaYGente}
+      {laterales.map((lat) => (
+        <div key={lat.id} style={{ display: "flex", alignItems: "flex-start" }}>
+          {/* Línea punteada, a la altura de la tarjeta y sin punta: acompaña, no manda. */}
+          <div
+            aria-hidden
+            title={`${lat.nombre} va al lado de ${node.nombre}`}
+            style={{
+              width: HUECO,
+              height: 0,
+              marginTop: CENTRO_TARJETA,
+              borderTop: `2px dashed ${LINEA_LATERAL}`,
+              flexShrink: 0,
+            }}
+          />
+          <TreeBranch
+            node={lat}
+            allUsers={allUsers}
+            token={token}
+            onRefresh={onRefresh}
+            canEditOrg={canEditOrg}
+            matchIds={matchIds}
+            hasActiveFilter={hasActiveFilter}
+            compacto={compacto}
+            saltoLateral={saltoLateral + 1}
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -527,6 +715,12 @@ export default function OrgChartView({
   const [tamanoNatural, setTamanoNatural] = useState<{ w: number; h: number } | null>(null);
   /** Mientras nadie toque el zoom a mano, el arbol se reajusta solo al cambiar el ancho. */
   const zoomManual = useRef(false);
+  /** Ancho útil del lienzo; decide la forma del árbol (extendido o compacto). */
+  const [anchoLienzo, setAnchoLienzo] = useState(0);
+  /** `null` = lo decide el propio árbol; true/false = lo decidió Adam con el botón. */
+  const [compactoManual, setCompactoManual] = useState<boolean | null>(null);
+  /** A dónde dejar el desplazamiento tras un zoom a mano, para no perder de vista lo mirado. */
+  const objetivoScroll = useRef<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
   const [panning, setPanning] = useState(false);
@@ -554,8 +748,21 @@ export default function OrgChartView({
   const withoutManager = useMemo(() => countWithoutManager(roots), [roots]);
   const orphanRoots = useMemo(() => countOrphanRoots(roots), [roots]);
   const levels = useMemo(() => maxOrgDepth(roots), [roots]);
-  const trueRoots = useMemo(() => roots.filter((r) => r.managerId == null), [roots]);
-  const danglingRoots = useMemo(() => roots.filter((r) => r.managerId != null), [roots]);
+  /** Quien se dibuja al costado de alguien no encabeza nada: sale de la fila de raíces. */
+  const dibujables = useMemo(() => raicesDibujadas(roots), [roots]);
+  const trueRoots = useMemo(() => dibujables.filter((r) => r.managerId == null), [dibujables]);
+  const danglingRoots = useMemo(() => dibujables.filter((r) => r.managerId != null), [dibujables]);
+  const laterales = useMemo(() => allUsers.filter((u) => esLateral(u)).length, [allUsers]);
+
+  /**
+   * Forma del árbol. Se decide con los **datos**, no midiendo el DOM: así no puede
+   * entrar en el vaivén medir → escalar → volver a medir. Si extendido no cabría ni
+   * al zoom mínimo legible, se apila.
+   */
+  const compacto = useMemo(
+    () => compactoManual ?? convieneCompacto(roots, anchoLienzo - 24, ZOOM_LEGIBLE),
+    [compactoManual, roots, anchoLienzo],
+  );
 
   const byDept = useMemo(() => {
     const map: Record<string, number> = {};
@@ -592,57 +799,110 @@ export default function OrgChartView({
   }, [allUsers, hasActiveFilter, hasDept, hasSearch, q, selectedDept]);
 
   /**
-   * Ajusta el arbol al ancho disponible.
+   * **Mide. Solo mide.** Y se ejecuta siempre, toque quien toque el zoom.
    *
-   * Arrancaba siempre al 100 %, asi que con 16 personas el organigrama salia
-   * cortado y habia que arrastrarlo de lado para verlo entero — justo lo que no
-   * debe pasar en una vista cuyo unico trabajo es enseñar la estructura de un
-   * vistazo. `scale()` no cambia el tamaño de caja, asi que `scrollWidth` del
-   * contenido sigue siendo el ancho natural aunque ya este escalado.
+   * Aquí estaba el fallo de fondo. Medir el árbol y decidir el zoom vivían en la
+   * misma función, y esa función estaba condicionada a «nadie ha tocado el zoom».
+   * En cuanto Adam pulsaba +, dejaba de decidirse el zoom (correcto) pero también
+   * dejaba de medirse el árbol (nada correcto): la caja escalada se quedaba
+   * clavada en el último tamaño natural conocido. Abrir el ✎ o cambiar de área
+   * hacía crecer el contenido dentro de una caja congelada y, como el lienzo
+   * recortaba lo que sobraba, media rama desaparecía sin barra a la que agarrarse.
+   * Ampliar «no servía»: ampliabas y el recorte se comía lo que acababas de ganar.
    *
-   * Nunca amplia por encima del 100 %: un organigrama de tres personas se ve
-   * raro estirado a pantalla completa.
+   * `scale()` encoge el DIBUJO pero no la CAJA, así que `scrollWidth` sigue siendo
+   * el ancho natural aunque el árbol ya esté escalado.
    */
-  const ajustarAlAncho = useCallback(() => {
+  const medir = useCallback(() => {
     const caja = canvasRef.current;
     const contenido = contentRef.current;
-    if (!caja || !contenido) return;
-    const anchoNatural = contenido.scrollWidth;
-    const altoNatural = contenido.scrollHeight;
-    if (anchoNatural <= 0) return;
-    setTamanoNatural({ w: anchoNatural, h: altoNatural });
+    if (!caja || !contenido) return null;
+    setAnchoLienzo(caja.clientWidth);
+    const w = contenido.scrollWidth;
+    const h = contenido.scrollHeight;
+    if (w <= 0) return null;
+    // Se conserva el objeto cuando la medida no cambió: así el efecto no se
+    // reengancha solo y el observador no se persigue la cola.
+    setTamanoNatural((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+    return { w, h, caja };
+  }, []);
 
-    // Se ajusta a las DOS medidas. Mirar solo el ancho hacía que el árbol
-    // entrara de lado y se cortara por abajo: con 16 personas quedaban tres
-    // tarjetas partidas por la mitad contra el borde de la caja.
+  /**
+   * Decide el zoom para que el árbol quepa entero, de ancho y de alto.
+   *
+   * Ya no hay suelo de legibilidad aquí. Lo había, y era el motivo de que el
+   * organigrama «se siguiera cortando»: con 16 personas el ajuste real daba 33 %
+   * y se subía a la fuerza al 45 %, devolviendo un árbol de 1,350px dentro de un
+   * hueco de 976px. El botón decía «ajustar» y entregaba algo cortado. La
+   * legibilidad se defiende cambiando la FORMA del árbol (modo compacto), no
+   * mintiendo con el número.
+   *
+   * Nunca amplía por encima del 100 %: un organigrama de tres personas se ve raro
+   * estirado a pantalla completa.
+   */
+  const ajustarAlAncho = useCallback(() => {
+    const medida = medir();
+    if (!medida) return;
+    const { w, h, caja } = medida;
     const anchoDisponible = caja.clientWidth - 24; // relleno lateral del lienzo
     const altoDisponible = Math.max(
       360,
       (typeof window !== "undefined" ? window.innerHeight : 900) - caja.getBoundingClientRect().top - 48,
     );
-    const factor = Math.min(1, anchoDisponible / anchoNatural, altoDisponible / Math.max(1, altoNatural));
-    setZoom(Math.max(ZOOM_LEGIBLE, Math.round(factor * 100) / 100));
+    const factor = Math.min(1, anchoDisponible / w, altoDisponible / Math.max(1, h));
+    setZoom(Math.max(ZOOM_MIN, Math.round(factor * 100) / 100));
+    objetivoScroll.current = null;
     caja.scrollLeft = 0;
     caja.scrollTop = 0;
-  }, []);
+  }, [medir]);
 
-  /** Al entrar y al cambiar el ancho, si nadie toco el zoom a mano. */
+  /**
+   * Al entrar, al cambiar el ancho y al cambiar el contenido. Medir va siempre;
+   * decidir el zoom, solo mientras nadie lo haya tomado a mano.
+   */
   useEffect(() => {
     const caja = canvasRef.current;
-    if (!caja || typeof ResizeObserver === "undefined") return;
-    const reajustar = () => {
-      if (!zoomManual.current) ajustarAlAncho();
+    if (!caja) return;
+    const reaccionar = () => {
+      if (zoomManual.current) medir();
+      else ajustarAlAncho();
     };
-    reajustar();
-    const observador = new ResizeObserver(reajustar);
+    reaccionar();
+    if (typeof ResizeObserver === "undefined") return;
+    const observador = new ResizeObserver(reaccionar);
     observador.observe(caja);
+    // También el contenido: abrir el ✎ o plegar una rama cambia el árbol sin
+    // cambiar el lienzo, y esa caja también tiene que enterarse.
+    if (contentRef.current) observador.observe(contentRef.current);
     return () => observador.disconnect();
-  }, [ajustarAlAncho, roots, selectedDept, searchQuery]);
+  }, [ajustarAlAncho, medir, roots, selectedDept, searchQuery, compacto]);
 
+  /**
+   * Ampliar y alejar dejando quieto lo que se está mirando. Antes el zoom crecía
+   * desde la esquina superior izquierda sin tocar el desplazamiento: pulsabas + y
+   * la parte que te interesaba se iba de la pantalla, que es otra forma de que
+   * «no se pueda hacer zoom».
+   */
   const bumpZoom = (delta: number) => {
+    const nuevo = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((zoom + delta) * 10) / 10));
+    if (nuevo === zoom) return;
     zoomManual.current = true;
-    setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + delta) * 10) / 10)));
+    const caja = canvasRef.current;
+    if (caja && zoom > 0) {
+      const centro = caja.scrollLeft + caja.clientWidth / 2;
+      objetivoScroll.current = (centro * nuevo) / zoom - caja.clientWidth / 2;
+    }
+    setZoom(nuevo);
   };
+
+  /** Aplica el desplazamiento calculado arriba, ya con el árbol pintado al nuevo tamaño. */
+  useEffect(() => {
+    const caja = canvasRef.current;
+    const objetivo = objetivoScroll.current;
+    if (!caja || objetivo == null) return;
+    objetivoScroll.current = null;
+    caja.scrollLeft = Math.max(0, objetivo);
+  }, [zoom]);
 
   const onCanvasPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -720,6 +980,15 @@ export default function OrgChartView({
                     tone: orphanRoots > 0 ? "warning" : "default",
                   },
                   { label: "Niveles", value: levels },
+                  ...(laterales > 0
+                    ? [
+                        {
+                          label: "Al costado",
+                          value: laterales,
+                          hint: "sin línea de mando",
+                        },
+                      ]
+                    : []),
                 ]}
               />
             </div>
@@ -894,8 +1163,8 @@ export default function OrgChartView({
                       zoomManual.current = false;
                       ajustarAlAncho();
                     }}
-                    title="Ajustar el organigrama al ancho de la pantalla"
-                    aria-label="Zoom 100%"
+                    title="Ajustar el organigrama a la pantalla"
+                    aria-label={`Ajustar a la pantalla (ahora al ${Math.round(zoom * 100)}%)`}
                   >
                     {Math.round(zoom * 100)}%
                   </button>
@@ -910,6 +1179,19 @@ export default function OrgChartView({
                     +
                   </button>
                 </div>
+                <button
+                  type="button"
+                  style={chipStyle(compacto)}
+                  aria-pressed={compacto}
+                  onClick={() => setCompactoManual(!compacto)}
+                  title={
+                    compacto
+                      ? "Ahora los equipos van apilados en columna. Púlsalo para extenderlos en fila."
+                      : "Apila en columna los equipos cuya gente no tiene a nadie debajo: el árbol cabe sin encogerlo."
+                  }
+                >
+                  {compacto ? "Compacto" : "Extendido"}
+                </button>
                 {hasActiveFilter && (
                   <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                     {matchIds?.size ?? 0} coincidencia{(matchIds?.size ?? 0) === 1 ? "" : "s"}
@@ -983,7 +1265,7 @@ export default function OrgChartView({
                 // rebanaba las tarjetas de la última fila. Si el árbol no cabe,
                 // se desplaza la página entera y ninguna tarjeta queda a medias.
                 overflowX: "auto",
-                overflowY: "hidden",
+                overflowY: "auto",
                 padding: "16px 12px 24px",
                 background:
                   "radial-gradient(ellipse at top, color-mix(in srgb, var(--primary) 6%, transparent), transparent 55%)",
@@ -1034,6 +1316,7 @@ export default function OrgChartView({
                       isRoot
                       matchIds={matchIds}
                       hasActiveFilter={hasActiveFilter}
+                      compacto={compacto}
                     />
                   ))}
                 </div>
@@ -1073,6 +1356,7 @@ export default function OrgChartView({
                           isRoot
                           matchIds={matchIds}
                           hasActiveFilter={hasActiveFilter}
+                          compacto={compacto}
                         />
                       ))}
                     </div>
