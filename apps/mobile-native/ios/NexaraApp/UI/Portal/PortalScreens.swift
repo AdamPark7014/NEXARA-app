@@ -598,23 +598,43 @@ struct PortalFeedbackView: View {
         FeedbackDraftBinding(
             rating: Binding(
                 get: { drafts[id]?.rating ?? "5" },
-                set: { updateDraft(id) { $0.rating = $1 } }
+                set: { newValue in
+                    updateDraft(id) { draft in
+                        draft.rating = newValue
+                    }
+                }
             ),
             wasOnTime: Binding(
                 get: { drafts[id]?.wasOnTime ?? "YES" },
-                set: { updateDraft(id) { $0.wasOnTime = $1 } }
+                set: { newValue in
+                    updateDraft(id) { draft in
+                        draft.wasOnTime = newValue
+                    }
+                }
             ),
             wasFriendly: Binding(
                 get: { drafts[id]?.wasFriendly ?? "YES" },
-                set: { updateDraft(id) { $0.wasFriendly = $1 } }
+                set: { newValue in
+                    updateDraft(id) { draft in
+                        draft.wasFriendly = newValue
+                    }
+                }
             ),
             wasSolved: Binding(
                 get: { drafts[id]?.wasSolved ?? "YES" },
-                set: { updateDraft(id) { $0.wasSolved = $1 } }
+                set: { newValue in
+                    updateDraft(id) { draft in
+                        draft.wasSolved = newValue
+                    }
+                }
             ),
             comments: Binding(
                 get: { drafts[id]?.comments ?? "" },
-                set: { updateDraft(id) { $0.comments = $1 } }
+                set: { newValue in
+                    updateDraft(id) { draft in
+                        draft.comments = newValue
+                    }
+                }
             )
         )
     }
