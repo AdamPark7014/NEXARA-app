@@ -222,10 +222,10 @@ jobs:
                   body = re.sub(r'\\s*%s\\s*=\\s*[^;]*;' % re.escape(k), '', body)
               inject = (
                   f"\\n\\t\\t\\t\\tCODE_SIGN_STYLE = Manual;"
-                  f"\\n\\t\\t\\t\\tCODE_SIGN_IDENTITY = \"Apple Distribution\";"
+                  f"\\n\\t\\t\\t\\tCODE_SIGN_IDENTITY = \\\"Apple Distribution\\\";"
                   f"\\n\\t\\t\\t\\tDEVELOPMENT_TEAM = AHNW9K8745;"
-                  f"\\n\\t\\t\\t\\tPROVISIONING_PROFILE = {uuid};"
-                  f"\\n\\t\\t\\t\\tPROVISIONING_PROFILE_SPECIFIER = \"NEXARA App Store\";"
+                  f"\\n\\t\\t\\t\\tPROVISIONING_PROFILE = \\\"{uuid}\\\";"
+                  f"\\n\\t\\t\\t\\tPROVISIONING_PROFILE_SPECIFIER = \\\"NEXARA App Store\\\";"
               )
               new_body = body.rstrip() + inject + "\\n\\t\\t\\t"
               return match.group(0).replace(body, new_body)
@@ -234,6 +234,18 @@ jobs:
               f.write(s2)
           print("Bound provisioning profile to NexaraApp target configurations.")
           PY
+
+      - name: Verify app target provisioning profile binding
+        run: |
+          set -euo pipefail
+          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -scheme "$XCODE_SCHEME" -configuration Release > "$RUNNER_TEMP/buildsettings_after_patch.txt"
+          echo "::group::Code signing (post-patch)"
+          egrep "^( *CODE_SIGN_STYLE| *PROVISIONING_PROFILE| *DEVELOPMENT_TEAM| *CODE_SIGN_IDENTITY| *PRODUCT_BUNDLE_IDENTIFIER) =" "$RUNNER_TEMP/buildsettings_after_patch.txt" || true
+          echo "::endgroup::"
+          PROFILE_VAL=$(grep -E "^ *PROVISIONING_PROFILE =" "$RUNNER_TEMP/buildsettings_after_patch.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
+          if [ -z "$PROFILE_VAL" ] || [ "$PROFILE_VAL" = "(null)" ]; then
+            echo "ERROR: PROVISIONING_PROFILE is not set for app target in build settings."; exit 1
+          fi
 
       - name: Create ExportOptions.plist (App Store, manual)
         run: |
@@ -272,10 +284,6 @@ jobs:
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
             OTHER_CODE_SIGN_FLAGS="--keychain $RUNNER_TEMP/codesign.keychain-db" \
             -derivedDataPath "$DERIVED" \
             -resultBundlePath "$RUNNER_TEMP/BuildResult" \
