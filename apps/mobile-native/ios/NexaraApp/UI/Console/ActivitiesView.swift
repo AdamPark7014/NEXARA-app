@@ -691,7 +691,7 @@ struct ActivityDetailByIdView: View {
                 ActivityDetailView(
                     activity: activity,
                     onBack: { dismiss() },
-                    initialTabKey: initialTabKey,
+                    initialTabKey: initialTabKey
                 )
             } else {
                 VStack(spacing: 12) {
