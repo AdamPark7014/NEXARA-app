@@ -1,0 +1,64 @@
+/* Actividades · «Mi equipo»: UNA fila de tres cifras con barra de acento.
+   Sustituye a las dos bandas que se comían ~300px antes de ver a una persona. */
+
+.fila {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ui-s3);
+  margin-bottom: var(--ui-s4);
+}
+
+.celda {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--ui-s3) var(--ui-s3) var(--ui-s3) var(--ui-s3);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-left: 3px solid var(--acento, var(--ui-border-strong));
+  border-radius: var(--ui-radius);
+}
+
+.trabajando { --acento: var(--ui-success); }
+.retraso { --acento: var(--ui-warning); }
+.libres { --acento: var(--ui-info); }
+
+.etiqueta {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  font-weight: var(--ui-fw-caption);
+  color: var(--ui-fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cifra {
+  font-size: var(--ui-fs-stat);
+  line-height: var(--ui-lh-stat);
+  font-weight: var(--ui-fw-stat);
+  letter-spacing: var(--ui-tracking-stat);
+  color: var(--ui-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.pista {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .fila {
+    gap: var(--ui-s2);
+  }
+  .celda {
+    padding: var(--ui-s2);
+  }
+  .pista {
+    display: none;
+  }
+}

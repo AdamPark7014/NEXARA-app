@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import { Avatar } from "@/components/base";
+import { AvatarAro } from "@/components/pizarra/EquipoPersonaCard";
 import { PrioridadChip, SemaforoDot } from "@/components/pizarra/PizarraKpi";
-import { resolveAssetUrl } from "@/lib/evidence-display";
 import type { Prioridad, Semaforo } from "@/lib/team-board-api";
 
 export type PersonaPhotoCardProps = {
@@ -12,7 +11,7 @@ export type PersonaPhotoCardProps = {
   nombre: string;
   puesto?: string | null;
   avatarUrl?: string | null;
-  /** Foto grande 180–240px (default 200). */
+  /** Foto redonda de 56-120px (default 88). Se acota: 200px era media tarjeta. */
   photoSize?: number;
   title: string;
   subtitle?: string | null;
@@ -23,16 +22,29 @@ export type PersonaPhotoCardProps = {
   children?: ReactNode;
 };
 
+/** Dos renglones completos: lo que importa ya no se corta a media palabra. */
+const DOS_RENGLONES: CSSProperties = {
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+  overflowWrap: "anywhere",
+};
+
 /**
- * Tarjeta unificada con foto grande para Equipo, Asignadas por mí y Solicitudes.
- * Mis actividades conserva su propio layout.
+ * Tarjeta con foto para «Asignadas por mí» y «Solicitudes de equipo».
+ *
+ * Mismo lenguaje que «Mi equipo» (foto redonda, textos centrados, nada
+ * cortado), pero sin aro de estado: aquí la persona no es el sujeto del
+ * estado — lo es la actividad o la solicitud, que ya traen su semáforo.
+ * «Mis actividades» conserva su propio layout.
  */
 export default function PersonaPhotoCard({
   href,
   nombre,
   puesto,
   avatarUrl,
-  photoSize = 200,
+  photoSize = 88,
   title,
   subtitle,
   prioridad,
@@ -41,16 +53,15 @@ export default function PersonaPhotoCard({
   actions,
   children,
 }: PersonaPhotoCardProps) {
-  const size = Math.min(240, Math.max(180, Math.round(photoSize)));
-  const src = avatarUrl ? resolveAssetUrl(avatarUrl) : null;
+  const size = Math.min(120, Math.max(56, Math.round(photoSize)));
 
   const shell: CSSProperties = {
     display: "grid",
-    gap: 10,
-    padding: 12,
-    borderRadius: 14,
-    border: "1px solid var(--ui-border, var(--border))",
-    background: "var(--ui-surface, var(--surface))",
+    gap: 8,
+    padding: "var(--ui-s3)",
+    borderRadius: "var(--ui-radius-lg)",
+    border: "1px solid var(--ui-border)",
+    background: "var(--ui-surface)",
     color: "inherit",
     textDecoration: "none",
     minWidth: 0,
@@ -58,59 +69,70 @@ export default function PersonaPhotoCard({
 
   const body = (
     <>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-        <span
+      <div style={{ display: "grid", justifyItems: "center", gap: 2, minWidth: 0 }}>
+        <AvatarAro nombre={nombre} avatarUrl={avatarUrl} size={size} />
+        <div
           style={{
-            width: size,
-            height: size,
-            borderRadius: 16,
-            overflow: "hidden",
-            flex: "0 0 auto",
-            background: "var(--ui-bg-2, var(--bg-secondary, #f3f4f6))",
-            display: "grid",
-            placeItems: "center",
-          }}
-        >
-          {src ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src}
-              alt={nombre}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            <Avatar url={null} name={nombre} size={Math.min(96, Math.floor(size * 0.45))} />
-          )}
-        </span>
-        <div style={{ textAlign: "center", minWidth: 0, width: "100%" }}>
-          <div style={{ fontWeight: 650, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis" }}>
-            {nombre}
-          </div>
-          {puesto ? (
-            <div style={{ fontSize: 12, color: "var(--ui-fg-2, var(--text-secondary))" }}>{puesto}</div>
-          ) : null}
-        </div>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-        <SemaforoDot semaforo={semaforo} />
-        <PrioridadChip prioridad={prioridad} />
-        <span
-          style={{
-            fontWeight: 700,
-            fontSize: 14,
+            fontWeight: 600,
+            fontSize: "var(--ui-fs-body)",
+            lineHeight: "var(--ui-lh-label)",
+            maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            minWidth: 0,
           }}
         >
-          {title}
-        </span>
+          {nombre}
+        </div>
+        {puesto ? (
+          <div
+            style={{
+              fontSize: "var(--ui-fs-caption)",
+              lineHeight: "var(--ui-lh-caption)",
+              color: "var(--ui-fg-2)",
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {puesto}
+          </div>
+        ) : null}
+      </div>
+
+      {semaforo || prioridad ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <SemaforoDot semaforo={semaforo} />
+          <PrioridadChip prioridad={prioridad} />
+        </div>
+      ) : null}
+
+      <div
+        style={{
+          ...DOS_RENGLONES,
+          fontWeight: 600,
+          fontSize: "var(--ui-fs-meta)",
+          lineHeight: "var(--ui-lh-meta)",
+          textAlign: "center",
+        }}
+        title={title}
+      >
+        {title}
       </div>
 
       {subtitle ? (
-        <div style={{ fontSize: 12.5, color: "var(--ui-fg-2, var(--text-secondary))" }}>{subtitle}</div>
+        <div
+          style={{
+            ...DOS_RENGLONES,
+            fontSize: "var(--ui-fs-caption)",
+            lineHeight: "var(--ui-lh-caption)",
+            color: "var(--ui-fg-2)",
+            textAlign: "center",
+          }}
+        >
+          {subtitle}
+        </div>
       ) : null}
       {meta}
       {children}
@@ -120,7 +142,7 @@ export default function PersonaPhotoCard({
   return (
     <div style={shell}>
       {href ? (
-        <Link href={href} style={{ color: "inherit", textDecoration: "none", display: "grid", gap: 10 }}>
+        <Link href={href} style={{ color: "inherit", textDecoration: "none", display: "grid", gap: 8 }}>
           {body}
         </Link>
       ) : (

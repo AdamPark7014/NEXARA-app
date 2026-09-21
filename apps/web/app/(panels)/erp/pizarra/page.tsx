@@ -1,33 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import ReplayIcon from "@mui/icons-material/Replay";
-import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import OutboxOutlinedIcon from "@mui/icons-material/OutboxOutlined";
 import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
+import MonitorOutlinedIcon from "@mui/icons-material/MonitorOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { Alert, Badge, Button, EmptyState, PageHead, Skeleton, Stat, StatRow, Tabs, TONE_COLOR, type Tone } from "@/components/base";
+import { Alert, Button, EmptyState, PageHead, Skeleton, Tabs } from "@/components/base";
 import { useUser } from "@/components/UserContext";
 import { formatApiError } from "@/lib/erp-api";
 import MisActividadesView from "@/components/pizarra/MisActividadesView";
 import AsignadasPorMiView from "@/components/pizarra/AsignadasPorMiView";
 import SolicitudesEquipoView from "@/components/pizarra/SolicitudesEquipoView";
-import PersonaPhotoCard from "@/components/pizarra/PersonaPhotoCard";
 import FlujoKpiStrip from "@/components/pizarra/FlujoKpiStrip";
-import { RangoSelector, SemaforoDot } from "@/components/pizarra/PizarraKpi";
+import CentroOperativo from "@/components/pizarra/CentroOperativo";
+import EquipoPersonaCard, { rejillaEquipo } from "@/components/pizarra/EquipoPersonaCard";
+import ResumenEquipo from "@/components/pizarra/ResumenEquipo";
+import { hayFlujo } from "@/components/pizarra/equipo-estado";
+import { RangoSelector } from "@/components/pizarra/PizarraKpi";
 import { isCeoEmail } from "@/lib/activity-kinds";
 import {
-  STATUS_LABELS,
   fetchTeamBoard,
-  formatMinutes,
-  formatPct,
   type BoardRange,
-  type BoardUserStatus,
   type RangoPreset,
   type TeamBoardResponse,
-  type TeamBoardUser,
 } from "@/lib/team-board-api";
 import p from "./pizarra.module.css";
 
@@ -35,167 +32,21 @@ import p from "./pizarra.module.css";
 type Vista = "mias" | "equipo" | "asignadas" | "solicitudes";
 const VISTA_KEY = "nx-actividades-vista";
 
-/** Estado de la persona → tono de la base (el mismo en el punto, el texto y la cifra de arriba). */
-const TONO_ESTADO: Record<BoardUserStatus, Tone> = {
-  activo: "success",
-  atrasado: "danger",
-  libre: "info",
-  sin_actividad: "neutral",
-  inactivo: "neutral",
-};
-
-const TEXTO_TONO: Record<Tone, string> = {
-  success: "var(--ui-success-text)",
-  danger: "var(--ui-danger-text)",
-  info: "var(--ui-info-text)",
-  warning: "var(--ui-warning-text)",
-  violet: "var(--ui-violet-text)",
-  brand: "var(--ui-brand-text)",
-  neutral: "var(--ui-fg-2)",
-  outline: "var(--ui-fg-2)",
-};
-
-/** Cifras de arriba: cuántas personas hay en cada estado. */
-const ETIQUETA_CIFRA: Record<BoardUserStatus, string> = {
-  activo: "Activos",
-  atrasado: "Atrasados",
-  libre: "Terminaron",
-  sin_actividad: "Sin actividad",
-  inactivo: "Inactivos",
-};
-
-/** Qué significa cada cifra: en el `title`, no en la pantalla. */
-const PISTA_ESTADO: Record<BoardUserStatus, string> = {
-  activo: "Con una actividad en curso",
-  atrasado: "Pasados de su fecha máxima",
-  libre: "Ya cerraron lo que tenían",
-  sin_actividad: "Sin nada abierto",
-  inactivo: "Sin registro reciente",
-};
-
-/** Estado con detalle: cuánto atraso lleva o desde cuándo terminó su última actividad. */
-function estadoTexto(u: TeamBoardUser, ahora: number): string {
-  if (u.status === "atrasado" && u.currentLateMinutes) {
-    return `Atrasado ${formatMinutes(u.currentLateMinutes)}`;
-  }
-  if (u.status === "libre" && u.idleSinceAt) {
-    const min = Math.max(0, Math.floor((ahora - new Date(u.idleSinceAt).getTime()) / 60_000));
-    return min < 1 ? "Sin actividad desde hace un momento" : `Sin actividad desde hace ${formatMinutes(min)}`;
-  }
-  return STATUS_LABELS[u.status];
-}
-
-function terminoTexto(f: NonNullable<TeamBoardUser["lastFinished"]>): string {
-  const hora = new Date(f.finishedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
-  if (f.lateMinutes == null) return `Finalizó a las ${hora}`;
-  if (f.lateMinutes <= 0) return `Finalizó a las ${hora}, a tiempo`;
-  return `Finalizó a las ${hora} con ${formatMinutes(f.lateMinutes)} de atraso`;
-}
-
-function PersonCard({ user, isSelf }: { user: TeamBoardUser; isSelf?: boolean }) {
-  const tono = TONO_ESTADO[user.status];
-  const act = user.currentActivity;
-  const open = user.openActivities ?? [];
-  const fin = user.lastFinished;
-  const k = user.kpis;
-  const principal = open[0] ?? null;
-  return (
-    <PersonaPhotoCard
-      href={`/erp/pizarra/${user.id}`}
-      nombre={user.nombre}
-      puesto={user.puesto || "Sin puesto"}
-      avatarUrl={user.avatarUrl}
-      photoSize={200}
-      title={principal?.titulo ?? act?.titulo ?? (fin ? `Última: ${fin.titulo}` : "Sin actividades hoy")}
-      subtitle={estadoTexto(user, Date.now())}
-      prioridad={principal?.prioridad}
-      semaforo={principal?.semaforo}
-      meta={
-        <div style={{ display: "grid", gap: 8 }}>
-          {isSelf ? <Badge tone="brand">Tú</Badge> : null}
-          <span style={{ fontSize: 12.5, color: TEXTO_TONO[tono] }}>
-            {user.status === "libre" && fin ? terminoTexto(fin) : STATUS_LABELS[user.status]}
-          </span>
-          {user.enCorreccion || user.enEsperaAprobacion ? (
-            <div className={p.chips}>
-              {user.enCorreccion ? (
-                <Badge tone="warning">
-                  <ReplayIcon aria-hidden="true" />
-                  Corrigiendo evidencia
-                </Badge>
-              ) : null}
-              {user.enEsperaAprobacion ? (
-                <Badge tone="violet">
-                  <HourglassTopIcon aria-hidden="true" />
-                  {user.enEsperaAprobacion > 1
-                    ? `${user.enEsperaAprobacion} en espera de aprobación`
-                    : "En espera de aprobación"}
-                </Badge>
-              ) : null}
-            </div>
-          ) : null}
-          {k ? (
-            <dl className={p.kpis}>
-              <div className={p.kpi} title={`${k.aTiempo} de ${k.cerradas} cerradas dentro de su fecha máxima`}>
-                <dt>A tiempo</dt>
-                <dd>{formatPct(k.aTiempoPct)}</dd>
-              </div>
-              <div className={p.kpi} title={`Plan ${formatMinutes(k.minutosPlan)} contra real ${formatMinutes(k.minutosReales)}`}>
-                <dt>Eficiencia</dt>
-                <dd>{formatPct(k.eficienciaPct)}</dd>
-              </div>
-              <div
-                className={p.kpi}
-                title={`${formatMinutes(k.minutosEnActividad)} en actividad de ${formatMinutes(k.minutosAsistidos)} asistidos`}
-              >
-                <dt>Productividad</dt>
-                <dd>{formatPct(k.productividadPct)}</dd>
-              </div>
-            </dl>
-          ) : null}
-          {open.length > 1 ? (
-            <ul className={p.acts}>
-              {open.slice(1, 3).map((a) => (
-                <li key={a.id} className={p.act} title={`${a.anNumber} · ${a.titulo}`}>
-                  <span className={p.actLinea}>
-                    <SemaforoDot semaforo={a.semaforo} size={7} />
-                    <span className={p.actTitulo}>{a.titulo}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {k ? (
-            <span className={p.cerradas}>
-              {k.cerradas}/{k.asignadas} cerradas
-              {k.rechazadas > 0 ? ` · ${k.rechazadas} rechazada${k.rechazadas > 1 ? "s" : ""}` : ""}
-            </span>
-          ) : null}
-        </div>
-      }
-    />
-  );
-}
-
 function TarjetasCargando() {
   return (
-    <div className={p.rejilla} aria-busy="true" aria-label="Cargando al equipo">
-      {Array.from({ length: 6 }, (_, i) => (
+    <div className={rejillaEquipo} aria-busy="true" aria-label="Cargando al equipo">
+      {Array.from({ length: 8 }, (_, i) => (
         <div key={i} className={p.esqueleto}>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <Skeleton width={36} height={36} radius={18} />
-            <div style={{ flex: 1, display: "grid", gap: 6 }}>
-              <Skeleton width="60%" />
-              <Skeleton width="40%" height={10} />
-            </div>
-          </div>
-          <Skeleton height={32} />
-          <Skeleton width="80%" height={10} />
+          <Skeleton width={74} height={74} radius={37} />
+          <Skeleton width="70%" height={12} />
+          <Skeleton width="50%" height={10} />
+          <Skeleton width="90%" height={10} />
         </div>
       ))}
     </div>
   );
 }
+
 
 const PESTANAS = [
   { id: "mias" as const, label: "Mis actividades", icon: TaskAltIcon },
@@ -212,6 +63,8 @@ export default function PizarraPage() {
   const [vista, setVista] = useState<Vista>("mias");
   const [preset, setPreset] = useState<RangoPreset>("hoy");
   const [rango, setRango] = useState<BoardRange>({});
+  /** Modo centro operativo: la pizarra a pantalla completa para la pared. */
+  const [centro, setCentro] = useState(false);
 
   // ?vista=mias|equipo|asignadas manda (enlaces viejos de Mis actividades); si no, la última elegida.
   useEffect(() => {
@@ -266,11 +119,6 @@ export default function PizarraPage() {
       return 0;
     });
   }, [data?.users, user?.id]);
-  const counts = useMemo(() => {
-    const acc: Partial<Record<BoardUserStatus, number>> = {};
-    for (const u of users) acc[u.status] = (acc[u.status] ?? 0) + 1;
-    return acc;
-  }, [users]);
 
   const isCeo = isCeoEmail(user?.email);
   const otros = users.filter((u) => u.id !== user?.id).length;
@@ -288,11 +136,13 @@ export default function PizarraPage() {
   const conPestanas = pestanas.length > 0;
   const vistaActiva: Vista = conPestanas && pestanas.includes(vista) ? vista : pestanas[0] ?? "equipo";
   const verMias = vistaActiva === "mias";
+  const verEquipo = vistaActiva === "equipo";
   const verAsignadas = vistaActiva === "asignadas";
   const verSolicitudes = vistaActiva === "solicitudes";
 
   const cambiarVista = (v: Vista) => {
     setVista(v);
+    if (v !== "equipo") setCentro(false);
     try {
       window.localStorage.setItem(VISTA_KEY, v);
     } catch {
@@ -351,9 +201,10 @@ export default function PizarraPage() {
     return <MisActividadesView />;
   }
 
-  const estados = (Object.keys(STATUS_LABELS) as BoardUserStatus[])
-    // «Inactivo» ya no se asigna; solo aparece si una API vieja lo manda.
-    .filter((key) => key !== "inactivo" || (counts[key] ?? 0) > 0);
+  // Regla 7: el flujo del periodo con todo en cero no informa. Solo se pinta si
+  // hay movimiento real, y detrás de la gente: la gente es lo que se viene a ver.
+  const flujo =
+    data?.workflow && hayFlujo(data.workflow) ? <FlujoKpiStrip workflow={data.workflow} /> : null;
 
   return (
     <div className={p.pagina}>
@@ -361,10 +212,23 @@ export default function PizarraPage() {
         title="Actividades"
         actions={
           verMias ? null : (
-            <Button onClick={() => void load()} disabled={loading || !token}>
-              <RefreshIcon aria-hidden="true" />
-              Actualizar
-            </Button>
+            <>
+              {verEquipo ? (
+                <Button
+                  variant="primary"
+                  onClick={() => setCentro(true)}
+                  disabled={users.length === 0}
+                  title="Pantalla completa para dejarla puesta en una pantalla de la oficina"
+                >
+                  <MonitorOutlinedIcon aria-hidden="true" />
+                  Centro operativo
+                </Button>
+              ) : null}
+              <Button onClick={() => void load()} disabled={loading || !token}>
+                <RefreshIcon aria-hidden="true" />
+                Actualizar
+              </Button>
+            </>
           )
         }
         tabs={
@@ -396,24 +260,14 @@ export default function PizarraPage() {
             />
           </div>
 
-          {data?.workflow ? <FlujoKpiStrip workflow={data.workflow} /> : null}
-
           {verAsignadas ? (
-            <AsignadasPorMiView token={token} rango={preset === "hoy" ? {} : rango} />
+            <>
+              <AsignadasPorMiView token={token} rango={preset === "hoy" ? {} : rango} />
+              {flujo}
+            </>
           ) : (
             <>
-              <StatRow cols={estados.length}>
-                {estados.map((key) => (
-                  <Stat
-                    key={key}
-                    label={ETIQUETA_CIFRA[key]}
-                    dot={TONE_COLOR[TONO_ESTADO[key]]}
-                    value={counts[key] ?? 0}
-                    title={PISTA_ESTADO[key]}
-                    tone={key === "atrasado" && (counts[key] ?? 0) > 0 ? "danger" : "default"}
-                  />
-                ))}
-              </StatRow>
+              <ResumenEquipo users={users} />
 
               {loading && !data ? (
                 <TarjetasCargando />
@@ -424,12 +278,22 @@ export default function PizarraPage() {
               ) : users.length === 0 ? (
                 <EmptyState icon={<GroupsOutlinedIcon />} title="Nadie en tu equipo" />
               ) : (
-                <div className={p.rejilla}>
+                <div className={rejillaEquipo}>
                   {users.map((u) => (
-                    <PersonCard key={u.id} user={u} isSelf={u.id === user?.id} />
+                    <EquipoPersonaCard key={u.id} user={u} isSelf={u.id === user?.id} />
                   ))}
                 </div>
               )}
+
+              {flujo}
+
+              {centro ? (
+                <CentroOperativo
+                  users={users}
+                  onCerrar={() => setCentro(false)}
+                  onRefrescar={() => void load()}
+                />
+              ) : null}
             </>
           )}
         </>
