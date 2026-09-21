@@ -90,7 +90,11 @@ struct PortalBranchesView: View {
             }
         }
         .navigationTitle("Sucursales")
-        .toolbar { ToolbarItem(placement: .primaryAction) { Button { onNew() } label: { Image(systemName: "plus") } } } }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { onNew() } label: { Image(systemName: "plus") }
+            }
+        }
         .task { await reload() }
         .refreshable { await reload() }
     }
@@ -225,7 +229,7 @@ struct PortalBranchEditView: View {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
+    // keep only helpers not provided globally
     func ifBlank(_ fallback: () -> String) -> String { isEmpty ? fallback() : self }
 }
 

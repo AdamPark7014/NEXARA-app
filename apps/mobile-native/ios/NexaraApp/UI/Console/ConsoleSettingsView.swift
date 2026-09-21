@@ -192,6 +192,4 @@ final class ConsoleSettingsVM: ObservableObject {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
-}
+ 

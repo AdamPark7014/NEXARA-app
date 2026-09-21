@@ -648,7 +648,6 @@ private func whIsLow(_ m: [String: Any]) -> Bool {
 }
 
 private extension String {
-    var nilIfEmpty: String? { isEmpty ? nil : self }
     func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }
 
