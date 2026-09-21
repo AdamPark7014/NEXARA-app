@@ -162,6 +162,26 @@ describe('PDF Propuesta técnica', () => {
     expect(texto).toContain('Plano remoto');
   });
 
+  it('encabeza la hoja de cotización con total, anticipo y vigencia', async () => {
+    const texto = textoPorHoja(await generarPropuestaTecnicaPdf({ ...payloadDePrueba(), anticipoPct: 60 })).join('\n');
+    expect(texto).toContain('TOTAL (MXN)');
+    expect(texto).toContain('ANTICIPO PARA INICIAR (60%)');
+    expect(texto).toContain('VIGENCIA DE LOS PRECIOS');
+  });
+
+  it('no pone la tarjeta de anticipo cuando la cotización no lo pide', async () => {
+    const texto = textoPorHoja(await generarPropuestaTecnicaPdf({ ...payloadDePrueba(), anticipoPct: 0 })).join('\n');
+    expect(texto).toContain('TOTAL (MXN)');
+    expect(texto).not.toContain('ANTICIPO PARA INICIAR');
+  });
+
+  it('sin partidas no pinta la tira de resumen: serían tres ceros sobre un vacío', async () => {
+    const vacia = { ...payloadDePrueba(), grupos: [], subtotal: 0, iva: 0, total: 0, anticipoPct: 60 };
+    const texto = textoPorHoja(await generarPropuestaTecnicaPdf(vacia)).join('\n');
+    expect(texto).not.toContain('TOTAL (MXN)');
+    expect(texto).not.toContain('ANTICIPO PARA INICIAR');
+  });
+
   it('sin partidas, alcance ni planos sigue produciendo el documento y la portada lo dice', async () => {
     const payload = payloadDePrueba();
     payload.grupos = [];
