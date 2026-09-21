@@ -7,6 +7,7 @@ import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { exportToExcel } from "@/lib/export-excel";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { FormField, FormGrid } from '@/components/ui/FormField';
 
 export type Branch = {
   id: number;
@@ -510,18 +511,22 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
             <p style={sectionTextStyle}>Define la sucursal como la reconocerán operaciones, reportes y portal de tickets.</p>
           </div>
           <div className={styles.formGrid}>
-            <input
-              className="input"
-              placeholder="Nombre de la sucursal"
-              value={branchDraft.name}
-              onChange={(e) => setBranchDraft({ ...branchDraft, name: e.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Número de sucursal"
-              value={branchDraft.branchNumber}
-              onChange={(e) => setBranchDraft({ ...branchDraft, branchNumber: e.target.value })}
-            />
+            <FormField label="Nombre" hint="Como la reconocen operaciones y el portal.">
+              <input
+                className="input"
+                placeholder="Nombre de la sucursal"
+                value={branchDraft.name}
+                onChange={(e) => setBranchDraft({ ...branchDraft, name: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Número" hint="Clave corta de la sucursal.">
+              <input
+                className="input"
+                placeholder="Número de sucursal"
+                value={branchDraft.branchNumber}
+                onChange={(e) => setBranchDraft({ ...branchDraft, branchNumber: e.target.value })}
+              />
+            </FormField>
           </div>
         </div>
 
@@ -549,32 +554,40 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
             <p style={sectionTitleStyle}>Acceso al portal</p>
             <p style={sectionTextStyle}>Estas credenciales se usarán para ingresar al portal de tickets y registrar solicitudes desde la sucursal.</p>
           </div>
-          <div className={styles.formGrid}>
-            <input
-              className="input"
-              placeholder="Usuario acceso sucursal (email)"
-              value={branchDraft.portalEmail}
-              onChange={(e) => setBranchDraft({ ...branchDraft, portalEmail: e.target.value })}
-              type="email"
-            />
-            <div className={styles.passwordWrap}>
+          <FormGrid>
+            <FormField label="Usuario del portal" hint="Correo con el que entra la sucursal.">
               <input
                 className="input"
-                type={showPassword ? 'text' : 'password'}
-                placeholder={editingBranchId ? 'Nuevo password (opcional)' : 'Password sucursal'}
-                value={branchDraft.portalPassword}
-                onChange={(e) => setBranchDraft({ ...branchDraft, portalPassword: e.target.value })}
+                placeholder="Usuario acceso sucursal (email)"
+                value={branchDraft.portalEmail}
+                onChange={(e) => setBranchDraft({ ...branchDraft, portalEmail: e.target.value })}
+                type="email"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className={styles.passwordToggle}
-                title={showPassword ? 'Ocultar' : 'Mostrar'}
-              >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
-              </button>
-            </div>
-          </div>
+            </FormField>
+            <FormField
+              label="Contraseña"
+              optional={Boolean(editingBranchId)}
+              hint={editingBranchId ? 'Vacío = se mantiene la actual.' : 'Obligatoria al crear.'}
+            >
+              <div className={styles.passwordWrap}>
+                <input
+                  className="input"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder={editingBranchId ? 'Nuevo password (opcional)' : 'Password sucursal'}
+                  value={branchDraft.portalPassword}
+                  onChange={(e) => setBranchDraft({ ...branchDraft, portalPassword: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className={styles.passwordToggle}
+                  title={showPassword ? 'Ocultar' : 'Mostrar'}
+                >
+                  {showPassword ? 'Ocultar' : 'Mostrar'}
+                </button>
+              </div>
+            </FormField>
+          </FormGrid>
         </div>
 
         {/* Estado activo */}

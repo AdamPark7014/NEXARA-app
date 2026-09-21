@@ -6,6 +6,7 @@ import styles from './ClientCreationForm.module.css';
 import { Socket } from 'socket.io-client';
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 import PhoneField from '@/components/PhoneField';
+import { FormField, FormGrid } from '@/components/ui/FormField';
 
 interface ClientCreationFormProps {
   onClientCreated?: () => void;
@@ -178,165 +179,189 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
       <div className={styles.panel}>
         <div>
           <h3 className={styles.panelTitle}>Crear nuevo cliente</h3>
-          <div className={styles.helperText}>Completa la información del cliente y su acceso al portal de tickets.</div>
+          <div className={styles.helperText}>Datos del cliente y acceso al portal de tickets.</div>
         </div>
-        
-        <div className={styles.grid}>
-          <input 
-            className="input" 
-            placeholder="Nombre del cliente *" 
-            value={newClient.name} 
-            onChange={(e) => updateClientField('name', e.target.value)} 
-          />
-          <input 
-            className="input" 
-            placeholder="Nombre de contacto" 
-            value={newClient.contactName} 
-            onChange={(e) => updateClientField('contactName', e.target.value)} 
-          />
-          <input 
-            className="input" 
-            placeholder="Email de contacto" 
-            type="email"
-            value={newClient.contactEmail} 
-            onChange={(e) => updateClientField('contactEmail', e.target.value)} 
-          />
-          <PhoneField
-            value={newClient.contactPhone}
-            onChange={(v) => updateClientField('contactPhone', v)}
-            placeholder="Teléfono"
-          />
-          <input 
-            className="input" 
-            placeholder="Dirección" 
-            value={newClient.address} 
-            onChange={(e) => updateClientField('address', e.target.value)} 
-          />
-          <input 
-            className="input" 
-            placeholder="Ciudad" 
-            value={newClient.city} 
-            onChange={(e) => updateClientField('city', e.target.value)} 
-          />
-          <input 
-            className="input" 
-            placeholder="Estado" 
-            value={newClient.state} 
-            onChange={(e) => updateClientField('state', e.target.value)} 
-          />
-          <input 
-            className="input" 
-            placeholder="País" 
-            value={newClient.country} 
-            onChange={(e) => updateClientField('country', e.target.value)} 
-          />
-          <input 
-            className="input" 
-            placeholder="Codigo de cuenta" 
-            value={newClient.accountCode} 
-            onChange={(e) => updateClientField('accountCode', e.target.value)} 
-          />
-          <input 
-            className="input" 
-            placeholder="Email para portal de tickets" 
-            type="email"
-            value={newClient.portalEmail} 
-            onChange={(e) => updateClientField('portalEmail', e.target.value)} 
-          />
-          <div className={styles.passwordRow}>
+
+        <FormGrid>
+          <FormField label="Nombre del cliente" hint="Razón social o nombre comercial.">
             <input
-              className={`input ${styles.passwordInput}`}
-              type={showClientPassword ? 'text' : 'password'}
-              placeholder="Contraseña para portal"
-              value={newClient.portalPassword}
-              onChange={(e) => updateClientField('portalPassword', e.target.value)}
+              className="input"
+              placeholder="Nombre del cliente *"
+              value={newClient.name}
+              onChange={(e) => updateClientField('name', e.target.value)}
             />
-            <button
-              className="button-secondary"
-              type="button"
-              onClick={() => setShowClientPassword((prev) => !prev)}
-            >
-              {showClientPassword ? '👁️' : '👁️‍🗨️'}
-            </button>
-          </div>
-          <div className={styles.statusCard}>
-            <div className={styles.statusCopy}>
-              <div className={styles.statusLabel}>Estado del cliente</div>
-              <div className={styles.statusText}>
-                {newClient.isActive ? 'Cliente activo. Podra acceder al portal y a sus servicios.' : 'Cliente inactivo. Se crea sin acceso operativo.'}
-              </div>
-            </div>
-            <button
-              className={`${styles.statusButton} ${newClient.isActive ? styles.statusButtonActive : ''}`}
-              type="button"
-              onClick={() => updateClientField('isActive', !newClient.isActive)}
-            >
-              {newClient.isActive ? 'Activo' : 'Inactivo'}
-            </button>
-          </div>
-          
-          {/* Logo Upload */}
-          <div
-            onDragOver={(event) => {
-              event.preventDefault();
-              setClientLogoDragging(true);
-            }}
-            onDragLeave={() => setClientLogoDragging(false)}
-            onDrop={handleLogoDrop}
-            className={`${styles.logoDropzone} ${clientLogoDragging ? styles.logoDropzoneActive : ''}`}
-          >
-            <div className={styles.logoTop}>
-              <div>
-                <div className={styles.logoTitle}>Logo del cliente</div>
-                <div className={styles.logoHint}>Arrastra la imagen aquí o súbela manualmente. Se mostrará en el portal de tickets.</div>
-              </div>
+          </FormField>
+          <FormField label="Contacto" optional hint="Persona de enlace en el cliente.">
+            <input
+              className="input"
+              placeholder="Nombre de contacto"
+              value={newClient.contactName}
+              onChange={(e) => updateClientField('contactName', e.target.value)}
+            />
+          </FormField>
+          <FormField label="Email de contacto" optional>
+            <input
+              className="input"
+              placeholder="Email de contacto"
+              type="email"
+              value={newClient.contactEmail}
+              onChange={(e) => updateClientField('contactEmail', e.target.value)}
+            />
+          </FormField>
+          <FormField label="Teléfono" optional>
+            <PhoneField
+              value={newClient.contactPhone}
+              onChange={(v) => updateClientField('contactPhone', v)}
+              placeholder="Teléfono"
+            />
+          </FormField>
+          <FormField label="Dirección" optional fullWidth>
+            <input
+              className="input"
+              placeholder="Dirección"
+              value={newClient.address}
+              onChange={(e) => updateClientField('address', e.target.value)}
+            />
+          </FormField>
+          <FormField label="Ciudad" optional>
+            <input
+              className="input"
+              placeholder="Ciudad"
+              value={newClient.city}
+              onChange={(e) => updateClientField('city', e.target.value)}
+            />
+          </FormField>
+          <FormField label="Estado" optional>
+            <input
+              className="input"
+              placeholder="Estado"
+              value={newClient.state}
+              onChange={(e) => updateClientField('state', e.target.value)}
+            />
+          </FormField>
+          <FormField label="País" optional>
+            <input
+              className="input"
+              placeholder="País"
+              value={newClient.country}
+              onChange={(e) => updateClientField('country', e.target.value)}
+            />
+          </FormField>
+          <FormField label="Código de cuenta" optional hint="Referencia interna contable o ERP.">
+            <input
+              className="input"
+              placeholder="Codigo de cuenta"
+              value={newClient.accountCode}
+              onChange={(e) => updateClientField('accountCode', e.target.value)}
+            />
+          </FormField>
+          <FormField label="Email del portal" optional hint="Usuario para tickets.nexara.com.mx.">
+            <input
+              className="input"
+              placeholder="Email para portal de tickets"
+              type="email"
+              value={newClient.portalEmail}
+              onChange={(e) => updateClientField('portalEmail', e.target.value)}
+            />
+          </FormField>
+          <FormField label="Contraseña del portal" optional hint="Se muestra una sola vez al crear.">
+            <div className={styles.passwordRow}>
+              <input
+                className={`input ${styles.passwordInput}`}
+                type={showClientPassword ? 'text' : 'password'}
+                placeholder="Contraseña para portal"
+                value={newClient.portalPassword}
+                onChange={(e) => updateClientField('portalPassword', e.target.value)}
+              />
               <button
                 className="button-secondary"
                 type="button"
-                onClick={() => clientLogoInputRef.current?.click()}
+                onClick={() => setShowClientPassword((prev) => !prev)}
               >
-                Seleccionar imagen
+                {showClientPassword ? 'Ocultar' : 'Mostrar'}
               </button>
             </div>
-            <input
-              ref={clientLogoInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleLogoSelect(e.target.files?.[0] || null)}
-              className={styles.hiddenInput}
-            />
-            {clientLogoPreview ? (
-              <div className={styles.logoPreview}>
-                <img
-                  src={clientLogoPreview}
-                  alt="Preview logo"
-                  className={styles.logoImage}
-                />
-                <div className={styles.logoName}>{clientLogo?.name}</div>
+          </FormField>
+          <FormField label="Estado" fullWidth hint="Inactivo se crea sin acceso al portal.">
+            <div className={styles.statusCard}>
+              <div className={styles.statusCopy}>
+                <div className={styles.statusText}>
+                  {newClient.isActive
+                    ? 'Cliente activo: podrá entrar al portal y a sus servicios.'
+                    : 'Cliente inactivo: se crea sin acceso operativo.'}
+                </div>
               </div>
-            ) : (
-              <div className={styles.logoEmpty}>No hay logo seleccionado.</div>
-            )}
-          </div>
-        </div>
-        
-        {/* Credentials Display */}
+              <button
+                className={`${styles.statusButton} ${newClient.isActive ? styles.statusButtonActive : ''}`}
+                type="button"
+                onClick={() => updateClientField('isActive', !newClient.isActive)}
+              >
+                {newClient.isActive ? 'Activo' : 'Inactivo'}
+              </button>
+            </div>
+          </FormField>
+
+          <FormField label="Logo" optional fullWidth hint="Se muestra en el portal de tickets.">
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                setClientLogoDragging(true);
+              }}
+              onDragLeave={() => setClientLogoDragging(false)}
+              onDrop={handleLogoDrop}
+              className={`${styles.logoDropzone} ${clientLogoDragging ? styles.logoDropzoneActive : ''}`}
+            >
+              <div className={styles.logoTop}>
+                <div>
+                  <div className={styles.logoTitle}>Arrastra la imagen aquí</div>
+                  <div className={styles.logoHint}>O súbela con el botón.</div>
+                </div>
+                <button
+                  className="button-secondary"
+                  type="button"
+                  onClick={() => clientLogoInputRef.current?.click()}
+                >
+                  Seleccionar imagen
+                </button>
+              </div>
+              <input
+                ref={clientLogoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleLogoSelect(e.target.files?.[0] || null)}
+                className={styles.hiddenInput}
+              />
+              {clientLogoPreview ? (
+                <div className={styles.logoPreview}>
+                  <img
+                    src={clientLogoPreview}
+                    alt="Vista previa del logo"
+                    className={styles.logoImage}
+                  />
+                  <div className={styles.logoName}>{clientLogo?.name}</div>
+                </div>
+              ) : (
+                <div className={styles.logoEmpty}>No hay logo seleccionado.</div>
+              )}
+            </div>
+          </FormField>
+        </FormGrid>
+
         {createdClientCredentials && (createdClientCredentials.email || createdClientCredentials.password) && (
           <div className={styles.credentialsCard}>
-            <div className={styles.credentialTitle}>✅ Credenciales del portal de tickets</div>
+            <div className={styles.credentialTitle}>Credenciales del portal de tickets</div>
             {createdClientCredentials.email && (
-              <div className={styles.credentialMeta}>📧 Usuario: {createdClientCredentials.email}</div>
+              <div className={styles.credentialMeta}>Usuario: {createdClientCredentials.email}</div>
             )}
             {createdClientCredentials.password && (
-              <div className={styles.credentialMeta}>🔑 Contraseña: {createdClientCredentials.password}</div>
+              <div className={styles.credentialMeta}>Contraseña: {createdClientCredentials.password}</div>
             )}
             <div className={styles.credentialNote}>
-              ⚠️ Guarda estas credenciales. El cliente las usará en tickets.nexara.com.mx
+              Guarda estas credenciales. El cliente las usará en tickets.nexara.com.mx
             </div>
           </div>
         )}
-        
-        {/* Submit Button */}
+
         <div className={styles.footer}>
           <button className="button-primary" onClick={handleCreateClient}>
             Crear cliente

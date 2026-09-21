@@ -6,18 +6,16 @@
 
 ## Hecho
 
-### Pasada UX formularios (tramo 1)
-- Nuevo `FormField` / `FormGrid` en `components/ui/FormField` — mismo contrato que Finanzas (hint bajo el control, opcional en etiqueta, error que reemplaza hint).
-- Finanzas reexporta `FinanceField`/`FinanceFormGrid` desde ahí (`.ai/DISENO-FINANZAS.md` actualizado).
-- Inputs globales (`utilities.scss`): `font-size: 16px` + `min-height` 44px en puntero grueso (anti-zoom iOS).
-- Migrados a FormField: viático, vehículo, herramienta, multas (sin emojis/asteriscos).
-- Tests verdes: viatics lote, ClientCreation, VehicleCheckout, viatics-reparto (27).
+### Pasada UX formularios (tramo 2)
+- `ClientCreationForm`, `MyProfileForm`, `BranchesForm` → `FormField`/`FormGrid`.
+- Sin emojis en credenciales/toggle de password; hints bajo cada campo.
+- Tests: ClientCreation 8 + Branches 9 verdes.
 
-### Alta flotilla + Excel credenciales
-(ver turnos previos; flotilla pendiente deploy).
+### Tramo 1 (previo)
+- `FormField` compartido; viático/vehículo/herramienta/multas; inputs 16px globales.
 
 ## A medias
-- **Más formularios** aún con labels sueltos: `ClientCreationForm`, `MyProfileForm`, `BranchesForm`, `OpsActivityForm`, `VehicleCheckoutForm`, proyectos/clientes/procurement, etc. Misma pieza `FormField`.
+- Siguiente lote FormField: `OpsActivityForm`, `VehicleCheckoutForm`, proyectos/procurement, etc.
 - Play Console / deploy web (flotilla + Asignar viático + FormField).
 - Documentos nativos / tope cotizaciones / tools.manage.
 
