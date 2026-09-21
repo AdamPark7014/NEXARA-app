@@ -269,6 +269,22 @@ export class UsersController {
     return this.usersService.setManager(id, managerId, companyId);
   }
 
+  /**
+   * Colocar a alguien **al lado** de otra persona del organigrama, o quitarle esa
+   * colocación con `lateralDeId: null`. Mismo permiso que reasignar jefe, porque se
+   * edita en la misma pantalla; pero esto no cambia a quién reporta ni a quién manda.
+   */
+  @Patch(':id/lateral')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  async setLateral(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('lateralDeId') lateralDeId: number | null,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.setLateral(id, lateralDeId, companyId);
+  }
+
   @Get('public-team')
   async findPublicTeam(
     @Query('limit') limit?: string,
