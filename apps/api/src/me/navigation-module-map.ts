@@ -25,6 +25,13 @@ export const CORE_EXTRA_MODULES: ReadonlyArray<{ key: string; url: string }> = [
   { key: 'erp-herramientas', url: '/erp/almacen/herramientas' },
   { key: 'erp-vehiculos', url: '/erp/vehiculos' },
   { key: 'erp-organigrama', url: '/erp/organigrama' },
+  // Segunda ola de «Más»: los módulos que la app todavía mandaba al navegador.
+  // Aparecen aquí para que `me/navigation` los nombre y el teléfono sepa cuáles
+  // puede abrir; que además tengan pantalla nativa es cosa de la app.
+  { key: 'erp-gastos', url: '/erp/finance/expenses' },
+  { key: 'erp-aprobaciones', url: '/erp/approvals' },
+  { key: 'erp-pagos-empleados', url: '/erp/finance/employee-payments' },
+  { key: 'erp-documentos', url: '/erp/documents' },
 ];
 
 /** Comodines que abren un panel entero: devuelve su base (`''` = todo). */
@@ -44,6 +51,16 @@ export const PATH_MODULE_HINTS: PathModuleHint[] = [
   { match: /^\/erp\/almacen\/herramientas(\/|$)/, android: ['erp-herramientas'], web: ['erp-herramientas'] },
   { match: /^\/erp\/vehiculos(\/|$)/, android: ['erp-vehiculos'], web: ['erp-vehiculos'] },
   { match: /^\/erp\/organigrama(\/|$)/, android: ['erp-organigrama'], web: ['erp-organigrama'] },
+  // Anclados a /erp igual que los de arriba. `/erp/finance/expenses` no abre
+  // Viáticos, que vive en `/erp/finance/viatics` y tiene su propia regla.
+  { match: /^\/erp\/finance\/expenses(\/|$)/, android: ['erp-gastos'], web: ['erp-gastos'] },
+  { match: /^\/erp\/approvals(\/|$)/, android: ['erp-aprobaciones'], web: ['erp-aprobaciones'] },
+  {
+    match: /^\/erp\/finance\/employee-payments(\/|$)/,
+    android: ['erp-pagos-empleados'],
+    web: ['erp-pagos-empleados'],
+  },
+  { match: /^\/erp\/documents(\/|$)/, android: ['erp-documentos'], web: ['erp-documentos'] },
   { match: /\/my-profile|\/users\/profile/, android: ['my-profile'], web: ['my-profile'] },
   { match: /user-preferences|my-preferences/, android: ['my-preferences'], web: ['my-preferences'] },
   { match: /\/calendar/, android: ['calendar'], web: ['calendar'] },
