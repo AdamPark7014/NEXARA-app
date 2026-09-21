@@ -126,6 +126,9 @@ function escaparHtml(texto: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/** Cuántas cotizaciones sirve `listaCore` cuando nadie pide un `limit`. */
+const TOPE_LISTA_CORE = 200;
+
 @Injectable()
 export class CotizacionesService {
   constructor(
@@ -574,7 +577,18 @@ export class CotizacionesService {
     const filas = await this.db.cotizacion.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: query?.take ?? 200,
+      // `query.take` es un *getter* (`this.limit ?? 20`) y el ValidationPipe
+      // global tiene `transform: true`, así que `query` siempre llega como
+      // instancia real del DTO: `query?.take` nunca es `undefined` y el
+      // `?? 200` era código muerto. Esta lista llevaba meses cortada en 20 sin
+      // decirlo, igual que las siete pantallas del tope de 100.
+      //
+      // Se lee `limit`, que sí es opcional. Quien no lo manda quiere la lista
+      // de trabajo entera; `limit` está topado en 100 por el DTO, así que
+      // pedir más desde el cliente daría 400. Si algún día 200 no alcanza, la
+      // respuesta tiene que dejar de ser un arreglo pelado y empezar a decir
+      // cuántas hay: un tope que no se anuncia es el mismo error otra vez.
+      take: query?.limit ?? TOPE_LISTA_CORE,
       skip: query?.skip ?? 0,
       include: {
         createdBy: {
