@@ -70,6 +70,11 @@ Opcional (solo si no usas integración y prefieres variables):
     - `PROVISIONING_PROFILE_NAME`: nombre del perfil de aprovisionamiento App Store.
     - `BUNDLE_ID`: bundle id de la app (ej. `mx.nexara.mobile.NexaraApp`).
 
+Nota (cuentas personales de Codemagic):
+- Los “Environment groups” no están disponibles. En su lugar, usa Application → Environment variables y agrega:
+  - `CERTIFICATE_PRIVATE_KEY` (PKCS#8 PEM, marcado como Secure)
+  - (Opcional) `PROVISIONING_PROFILE_NAME` si manejas perfiles manualmente
+
 3) Activar workflow iOS App Store en `codemagic.yaml`:
 - Ya existe el workflow `ios-app-store`:
   - Archiva (Release) y exporta IPA con `method=app-store`.

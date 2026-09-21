@@ -153,10 +153,6 @@ workflows:
       app_store_connect: Codemagic NEXARA
     environment:
       xcode: 16.2
-      groups:
-        # Define these groups in Codemagic UI and add secrets/variables there
-        - ios_signing              # holds CERTIFICATE_PRIVATE_KEY (PKCS#8 PEM), PROVISIONING_PROFILE_NAME, etc.
-        - certificate_credentials  # optional alias group name if used by team
       vars:
         XCODE_PROJECT_PATH: apps/mobile-native/ios/NexaraApp.xcodeproj
         XCODE_SCHEME: NexaraApp
@@ -165,6 +161,8 @@ workflows:
         EXPORT_PLIST: $CM_BUILD_DIR/build/ExportOptions.plist
         DERIVED_DATA: $CM_BUILD_DIR/DerivedData
         BUNDLE_ID: mx.nexara.mobile.NexaraApp
+        # Note: On Codemagic Personal accounts, set CERTIFICATE_PRIVATE_KEY
+        # as an Application Environment Variable (secure) instead of groups.
         # If NOT using Codemagic's App Store Connect integration and instead using api_key mode,
         # define the following variables in a group (example `app_store_connect`) and switch auth to `api_key`:
         #   APP_STORE_CONNECT_ISSUER_ID
