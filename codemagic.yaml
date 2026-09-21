@@ -165,6 +165,7 @@ workflows:
         EXPORT_DIR: $CM_BUILD_DIR/build/export
         EXPORT_PLIST: $CM_BUILD_DIR/build/ExportOptions.plist
         DERIVED_DATA: $CM_BUILD_DIR/DerivedData
+        BUNDLE_ID: mx.nexara.mobile.NexaraApp
         # If NOT using Codemagic's App Store Connect integration and instead using api_key mode,
         # define the following variables in a group (example `app_store_connect`) and switch auth to `api_key`:
         #   APP_STORE_CONNECT_ISSUER_ID
@@ -208,6 +209,19 @@ workflows:
           echo "Using XcodeGen spec: ${SPEC_FILE}"
           xcodegen generate --spec "${SPEC_FILE}"
           test -d NexaraApp.xcodeproj
+      - name: Fetch signing files (App Store Connect integration)
+        script: |
+          set -euo pipefail
+          echo "Fetching signing files for $BUNDLE_ID (iOS App Store)…"
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+      - name: Install certificates into keychain
+        script: |
+          set -euo pipefail
+          keychain add-certificates
+      - name: Apply provisioning profiles to Xcode project
+        script: |
+          set -euo pipefail
+          xcode-project use-profiles
       - name: Archive (Release, iOS Device)
         script: |
           set -euo pipefail
