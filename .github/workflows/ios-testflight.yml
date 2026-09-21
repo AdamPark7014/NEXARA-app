@@ -168,6 +168,44 @@ jobs:
           echo "Team ID(s): $(/usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' "$PLIST_OUT" || true)"
           echo "Entitlements aps-environment: $(/usr/libexec/PlistBuddy -c 'Print Entitlements:aps-environment' "$PLIST_OUT" || true)"
 
+      - name: Bind provisioning profile to NexaraApp target (patch project.pbxproj)
+        working-directory: apps/mobile-native/ios
+        run: |
+          set -euo pipefail
+          if [ -z "${PROFILE_UUID:-}" ]; then echo "PROFILE_UUID missing"; exit 1; fi
+          python3 - << 'PY'
+          import re, os
+          path = "NexaraApp.xcodeproj/project.pbxproj"
+          with open(path, "r", encoding="utf-8") as f:
+              s = f.read()
+          m = re.search(r'/\\* Build configuration list for PBXNativeTarget "NexaraApp" \\*/.*?buildConfigurations = \\((.*?)\\);', s, re.S)
+          app_cfgs = set()
+          if m:
+              app_cfgs = set(re.findall(r'([A-F0-9]{24})', m.group(1)))
+          uuid = os.environ.get("PROFILE_UUID","")
+          def patch_app(match):
+              cfg_uuid = match.group(1)
+              body = match.group(2)
+              if cfg_uuid not in app_cfgs:
+                  return match.group(0)
+              # Remove any existing conflicting keys
+              for k in ["CODE_SIGN_STYLE","CODE_SIGN_IDENTITY","DEVELOPMENT_TEAM","PROVISIONING_PROFILE","PROVISIONING_PROFILE_SPECIFIER"]:
+                  body = re.sub(r'\\s*%s\\s*=\\s*[^;]*;' % re.escape(k), '', body)
+              inject = (
+                  f"\\n\\t\\t\\t\\tCODE_SIGN_STYLE = Manual;"
+                  f"\\n\\t\\t\\t\\tCODE_SIGN_IDENTITY = \"Apple Distribution\";"
+                  f"\\n\\t\\t\\t\\tDEVELOPMENT_TEAM = AHNW9K8745;"
+                  f"\\n\\t\\t\\t\\tPROVISIONING_PROFILE = {uuid};"
+                  f"\\n\\t\\t\\t\\tPROVISIONING_PROFILE_SPECIFIER = \"NEXARA App Store\";"
+              )
+              new_body = body.rstrip() + inject + "\\n\\t\\t\\t"
+              return match.group(0).replace(body, new_body)
+          s2 = re.sub(r'([A-F0-9]{24}) /\\* .*? \\*/ = \\{\\s*isa = XCBuildConfiguration;\\s*buildSettings = \\{(.*?)\\};\\s*name = .*?;\\s*\\};', patch_app, s, flags=re.S)
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(s2)
+          print("Bound provisioning profile to NexaraApp target configurations.")
+          PY
+
       - name: Create ExportOptions.plist (App Store, manual)
         run: |
           mkdir -p "$(dirname "$EXPORT_PLIST")"
@@ -209,8 +247,6 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
-            PROVISIONING_PROFILE="${PROFILE_UUID}" \
-            PROVISIONING_PROFILE_SPECIFIER="NEXARA App Store" \
             OTHER_CODE_SIGN_FLAGS="--keychain $RUNNER_TEMP/codesign.keychain-db" \
             -derivedDataPath "$DERIVED" \
             -resultBundlePath "$RUNNER_TEMP/BuildResult" \
