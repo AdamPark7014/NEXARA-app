@@ -59,40 +59,7 @@ jobs:
           echo "Using XcodeGen spec: ${SPEC_FILE}"
           xcodegen generate --spec "${SPEC_FILE}"
           test -d NexaraApp.xcodeproj
-      - name: Disable code signing for non-app targets (patch project.pbxproj)
-        working-directory: apps/mobile-native/ios
-        run: |
-          set -euo pipefail
-          python3 - << 'PY'
-          import re, sys, io, os
-          path = "NexaraApp.xcodeproj/project.pbxproj"
-          with open(path, "r", encoding="utf-8") as f:
-              s = f.read()
-          m = re.search(r'/\\* Build configuration list for PBXNativeTarget "NexaraApp" \\*/.*?buildConfigurations = \\((.*?)\\);', s, re.S)
-          app_cfgs = set()
-          if m:
-              app_cfgs = set(re.findall(r'([A-F0-9]{24})', m.group(1)))
-          def repl(match):
-              uuid = match.group(1)
-              body = match.group(2)
-              if uuid in app_cfgs:
-                  return match.group(0)
-              keys = [
-                  ('CODE_SIGNING_ALLOWED','NO'),
-                  ('CODE_SIGNING_REQUIRED','NO'),
-                  ('CODE_SIGN_IDENTITY',''),
-                  ('PROVISIONING_PROFILE_SPECIFIER',''),
-              ]
-              for k,_ in keys:
-                  body = re.sub(r'\\s*%s\\s*=\\s*[^;]*;' % re.escape(k), '', body)
-              injected = ''.join('\\n\\t\\t\\t\\t%s = %s;' % (k,v) for k,v in keys)
-              new_body = body.rstrip() + injected + '\\n\\t\\t\\t'
-              return match.group(0).replace(body, new_body)
-          s2 = re.sub(r'([A-F0-9]{24}) /\\* .*? \\*/ = \\{\\s*isa = XCBuildConfiguration;\\s*buildSettings = \\{(.*?)\\};\\s*name = .*?;\\s*\\};', repl, s, flags=re.S)
-          with open(path, "w", encoding="utf-8") as f:
-              f.write(s2)
-          print("Patched code signing for non-app targets.")
-          PY
+      # Removed fragile regex patch; a structured patch runs later to bind app and disable others
 
       - name: Prepare App Store Connect API key
         run: |
@@ -197,48 +164,87 @@ jobs:
           echo "aps-environment in entitlements:"
           /usr/libexec/PlistBuddy -c 'Print aps-environment' "$ENT_ABS" || true
 
-      - name: Bind provisioning profile to NexaraApp target (patch project.pbxproj)
+      - name: Bind signing for app target and disable others (structured pbxproj patch)
         working-directory: apps/mobile-native/ios
         run: |
           set -euo pipefail
           if [ -z "${PROFILE_UUID:-}" ]; then echo "PROFILE_UUID missing"; exit 1; fi
           python3 - << 'PY'
-          import re, os
+          import re, os, sys
           path = "NexaraApp.xcodeproj/project.pbxproj"
           with open(path, "r", encoding="utf-8") as f:
               s = f.read()
-          m = re.search(r'/\\* Build configuration list for PBXNativeTarget "NexaraApp" \\*/.*?buildConfigurations = \\((.*?)\\);', s, re.S)
+          profile_uuid = os.environ.get("PROFILE_UUID","")
+          TEAM = "AHNW9K8745"
+          # Find all native targets with their config list UUIDs and names
+          targets = []
+          for tm in re.finditer(r'([A-F0-9]{24}) /\\* (.*?) \\*/ = \\{\\s*isa = PBXNativeTarget;[\\s\\S]*?buildConfigurationList = ([A-F0-9]{24}) /\\* Build configuration list for PBXNativeTarget \"(.*?)\" \\*/;', s):
+              target_uuid = tm.group(1)
+              target_name_comment = tm.group(2)
+              cfg_list_uuid = tm.group(3)
+              target_name = tm.group(4)
+              targets.append((target_uuid, target_name, cfg_list_uuid))
+          # Helper: get config UUIDs from a configuration list UUID
+          def get_cfg_uuids(cfg_list_uuid, target_name):
+              lm = re.search(rf'{cfg_list_uuid} /\\* Build configuration list for PBXNativeTarget \"{re.escape(target_name)}\" \\*/ = \\{{[\\s\\S]*?buildConfigurations = \\(([\\s\\S]*?)\\);', s)
+              if not lm:
+                  return []
+              inside = lm.group(1)
+              return re.findall(r'([A-F0-9]{24}) /\\* .*? \\*/,?', inside)
+          # Helper: patch one XCBuildConfiguration's buildSettings
+          def patch_config(txt, cfg_uuid, settings_to_set, keys_to_clear):
+              pat = rf'({cfg_uuid}) /\\* .*? \\*/ = \\{{\\s*isa = XCBuildConfiguration;\\s*buildSettings = \\{{([\\s\\S]*?)\\}};\\s*name = .*?;\\s*\\}};'
+              def repl(m):
+                  body = m.group(2)
+                  # remove any existing relevant keys
+                  for k in set(list(keys_to_clear) + list(settings_to_set.keys())):
+                      body = re.sub(rf'\\s*{re.escape(k)}\\s*=\\s*[^;]*;', '', body)
+                  # inject desired settings
+                  inject_lines = []
+                  for k,v in settings_to_set.items():
+                      inject_lines.append(f"\\n\\t\\t\\t\\t{k} = {v};")
+                  new_body = body.rstrip() + ''.join(inject_lines) + "\\n\\t\\t\\t"
+                  return m.group(0).replace(m.group(2), new_body)
+              return re.sub(pat, repl, txt, count=1, flags=re.S)
+          # Compute app and non-app config UUIDs
           app_cfgs = set()
-          if m:
-              app_cfgs = set(re.findall(r'([A-F0-9]{24})', m.group(1)))
-          uuid = os.environ.get("PROFILE_UUID","")
-          def patch_app(match):
-              cfg_uuid = match.group(1)
-              body = match.group(2)
-              if cfg_uuid not in app_cfgs:
-                  return match.group(0)
-              # Remove any existing conflicting keys
-              for k in ["CODE_SIGN_STYLE","CODE_SIGN_IDENTITY","DEVELOPMENT_TEAM","PROVISIONING_PROFILE","PROVISIONING_PROFILE_SPECIFIER"]:
-                  body = re.sub(r'\\s*%s\\s*=\\s*[^;]*;' % re.escape(k), '', body)
-              inject = (
-                  f"\\n\\t\\t\\t\\tCODE_SIGN_STYLE = Manual;"
-                  f"\\n\\t\\t\\t\\tCODE_SIGN_IDENTITY = \\\"Apple Distribution\\\";"
-                  f"\\n\\t\\t\\t\\tDEVELOPMENT_TEAM = AHNW9K8745;"
-                  f"\\n\\t\\t\\t\\tPROVISIONING_PROFILE = \\\"{uuid}\\\";"
-                  f"\\n\\t\\t\\t\\tPROVISIONING_PROFILE_SPECIFIER = \\\"NEXARA App Store\\\";"
-              )
-              new_body = body.rstrip() + inject + "\\n\\t\\t\\t"
-              return match.group(0).replace(body, new_body)
-          s2 = re.sub(r'([A-F0-9]{24}) /\\* .*? \\*/ = \\{\\s*isa = XCBuildConfiguration;\\s*buildSettings = \\{(.*?)\\};\\s*name = .*?;\\s*\\};', patch_app, s, flags=re.S)
+          other_cfgs = set()
+          for _, name, cfg_list in targets:
+              cfgs = get_cfg_uuids(cfg_list, name)
+              if name == "NexaraApp":
+                  app_cfgs.update(cfgs)
+              else:
+                  other_cfgs.update(cfgs)
+          # Apply patches
+          clear_app = ["CODE_SIGN_STYLE","CODE_SIGN_IDENTITY","DEVELOPMENT_TEAM","PROVISIONING_PROFILE","PROVISIONING_PROFILE_SPECIFIER"]
+          app_set = {
+              "CODE_SIGN_STYLE": "Manual",
+              "CODE_SIGN_IDENTITY": "\\\"Apple Distribution\\\"",
+              "DEVELOPMENT_TEAM": TEAM,
+              "PROVISIONING_PROFILE": f"\\\"{profile_uuid}\\\"",
+              "PROVISIONING_PROFILE_SPECIFIER": "\\\"NEXARA App Store\\\"",
+          }
+          for cfg in app_cfgs:
+              s = patch_config(s, cfg, app_set, clear_app)
+          clear_other = ["CODE_SIGN_STYLE","CODE_SIGN_IDENTITY","DEVELOPMENT_TEAM","PROVISIONING_PROFILE","PROVISIONING_PROFILE_SPECIFIER","CODE_SIGNING_ALLOWED","CODE_SIGNING_REQUIRED"]
+          other_set = {
+              "CODE_SIGNING_ALLOWED": "NO",
+              "CODE_SIGNING_REQUIRED": "NO",
+              "CODE_SIGN_IDENTITY": "",
+              "PROVISIONING_PROFILE": "",
+              "PROVISIONING_PROFILE_SPECIFIER": "",
+          }
+          for cfg in other_cfgs:
+              s = patch_config(s, cfg, other_set, clear_other)
           with open(path, "w", encoding="utf-8") as f:
-              f.write(s2)
-          print("Bound provisioning profile to NexaraApp target configurations.")
+              f.write(s)
+          print(f"Patched {len(app_cfgs)} app configs and {len(other_cfgs)} non-app configs.")
           PY
 
       - name: Verify app target provisioning profile binding
         run: |
           set -euo pipefail
-          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -scheme "$XCODE_SCHEME" -configuration Release > "$RUNNER_TEMP/buildsettings_after_patch.txt"
+          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -target NexaraApp -configuration Release > "$RUNNER_TEMP/buildsettings_after_patch.txt"
           echo "::group::Code signing (post-patch)"
           egrep "^( *CODE_SIGN_STYLE| *PROVISIONING_PROFILE| *DEVELOPMENT_TEAM| *CODE_SIGN_IDENTITY| *PRODUCT_BUNDLE_IDENTIFIER) =" "$RUNNER_TEMP/buildsettings_after_patch.txt" || true
           echo "::endgroup::"
@@ -246,6 +252,18 @@ jobs:
           if [ -z "$PROFILE_VAL" ] || [ "$PROFILE_VAL" = "(null)" ]; then
             echo "ERROR: PROVISIONING_PROFILE is not set for app target in build settings."; exit 1
           fi
+          if [ "$PROFILE_VAL" != "$PROFILE_UUID" ]; then
+            echo "ERROR: PROVISIONING_PROFILE ($PROFILE_VAL) != PROFILE_UUID ($PROFILE_UUID)"; exit 1
+          fi
+          TEAM_VAL=$(grep -E "^ *DEVELOPMENT_TEAM =" "$RUNNER_TEMP/buildsettings_after_patch.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
+          if [ "$TEAM_VAL" != "AHNW9K8745" ]; then
+            echo "ERROR: DEVELOPMENT_TEAM is $TEAM_VAL, expected AHNW9K8745"; exit 1
+          fi
+          ID_VAL=$(grep -E "^ *CODE_SIGN_IDENTITY =" "$RUNNER_TEMP/buildsettings_after_patch.txt" | awk -F'= ' '{print $2}' | tr -d '[:space:]' | tail -n 1)
+          case "$ID_VAL" in
+            *Distribution*) : ;;
+            *) echo "ERROR: CODE_SIGN_IDENTITY does not indicate a Distribution identity: $ID_VAL"; exit 1 ;;
+          esac
 
       - name: Create ExportOptions.plist (App Store, manual)
         run: |
