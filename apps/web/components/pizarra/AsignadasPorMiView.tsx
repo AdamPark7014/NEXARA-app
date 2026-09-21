@@ -200,7 +200,7 @@ export default function AsignadasPorMiView({
           Ninguna asignación coincide con estos filtros.
         </p>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
           {filtered.map((a) => (
             <PersonaPhotoCard
               key={`${a.id}-${a.persona.id}`}
@@ -208,7 +208,7 @@ export default function AsignadasPorMiView({
               nombre={a.persona.nombre}
               puesto={a.persona.puesto}
               avatarUrl={a.persona.avatarUrl}
-              photoSize={200}
+              photoSize={88}
               title={`${a.anNumber} · ${a.titulo}`}
               subtitle={`${a.estatus} · Asignada ${fecha(a.fechaAsignacion)}`}
               prioridad={a.prioridad}

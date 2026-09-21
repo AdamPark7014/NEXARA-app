@@ -1,0 +1,245 @@
+/* Actividades · MODO CENTRO OPERATIVO.
+   La pizarra puesta en una pantalla de la oficina: se lee a varios metros. */
+
+.capa {
+  /* ── Tokens locales ───────────────────────────────────────────────────
+     Esta capa va SIEMPRE en oscuro, aunque la persona tenga el ERP en claro:
+     es una pantalla de pared encendida todo el día y el fondo claro de
+     `--ui-bg` deslumbra en una sala. `body.dark` no sirve como interruptor
+     porque el tema lo elige cada quien en su sesión, no la pantalla.
+
+     Por eso la capa redeclara, solo dentro de sí misma, el subconjunto de
+     `--ui-*` que necesitan sus hijos (incluido el aro de la foto de
+     `EquipoPersonaCard`). Los valores son copia LITERAL de los que
+     `app/ui-tokens.scss` ya declara en `body.dark`: si allí cambian, aquí
+     también. No son colores nuevos ni una cuarta escala. */
+  --ui-bg: #0b1120;
+  --ui-surface: #0f172a;
+  --ui-surface-2: #111a2e;
+  --ui-hover: #172136;
+  --ui-active: #1d2942;
+  --ui-fg: #e2e8f0;
+  --ui-fg-2: #94a3b8;
+  --ui-fg-3: #64748b;
+  --ui-border: #1e293b;
+  --ui-border-strong: #334155;
+  --ui-brand: #1f9e84;
+  --ui-brand-text: #3cc9a9;
+  --ui-success: #22c55e;
+  --ui-warning: #f59e0b;
+  --ui-info: #38bdf8;
+  --ui-violet: #a78bfa;
+  --ui-violet-text: #c4b5fd;
+  --ui-info-text: #7dd3fc;
+
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-s4);
+  padding: var(--ui-s5);
+  overflow: auto;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  font-family: var(--ui-font);
+}
+
+/* ─── Barra de arriba ──────────────────────────────────────────────────── */
+
+.barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ui-s3);
+  padding-bottom: var(--ui-s3);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.titulo {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ui-fg);
+}
+
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-s4);
+  margin: var(--ui-s2) 0 0;
+  font-size: 18px;
+  color: var(--ui-fg-2);
+}
+
+.cuenta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.punto {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--acento, var(--ui-fg-3));
+}
+
+.puntoTrabajando { --acento: var(--ui-success); }
+.puntoRetraso { --acento: var(--ui-warning); }
+.puntoLibre { --acento: var(--ui-info); }
+
+.derecha {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-s4);
+}
+
+.reloj {
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-fg);
+}
+
+.salir {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 var(--ui-s4);
+  font-family: inherit;
+  font-size: var(--ui-fs-label);
+  font-weight: var(--ui-fw-label);
+  color: var(--ui-fg);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  cursor: pointer;
+  transition: background-color var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.salir:hover {
+  background: var(--ui-hover);
+}
+
+.salir:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.tecla {
+  padding: 1px 6px;
+  font-size: var(--ui-fs-caption);
+  font-family: var(--ui-font-mono);
+  color: var(--ui-fg-2);
+  background: var(--ui-active);
+  border-radius: var(--ui-radius-sm);
+}
+
+/* ─── La gente ─────────────────────────────────────────────────────────── */
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ui-s5);
+  align-content: start;
+}
+
+.persona {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  text-align: center;
+}
+
+.nombre {
+  margin-top: var(--ui-s3);
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 650;
+  color: var(--ui-fg);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.puesto {
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--ui-fg-2);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actividad {
+  margin-top: var(--ui-s2);
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--ui-fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.contexto {
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--ui-fg-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.vacio {
+  margin: auto;
+  font-size: 20px;
+  color: var(--ui-fg-2);
+}
+
+@media (max-width: 640px) {
+  .capa {
+    padding: var(--ui-s4);
+  }
+  .reloj {
+    font-size: 28px;
+  }
+  .titulo {
+    font-size: 22px;
+  }
+  .rejilla {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--ui-s4);
+  }
+  .nombre {
+    font-size: 17px;
+  }
+  .actividad {
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .salir {
+    transition: none;
+  }
+}

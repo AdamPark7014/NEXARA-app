@@ -1,0 +1,196 @@
+/* Actividades · «Mi equipo»: la rejilla de gente y la tarjeta compacta.
+   Lenguaje aprobado: foto redonda con aro de estado, nombre, puesto y dos
+   renglones con qué hace y en qué. Solo tokens --ui-*. */
+
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--ui-s3);
+}
+
+.tarjeta {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--ui-s3) var(--ui-s2) var(--ui-s3);
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  transition: border-color var(--ui-duration-fast) var(--ui-ease-standard);
+}
+
+.tarjeta:hover {
+  border-color: var(--ui-border-strong);
+  color: inherit;
+}
+
+.tarjeta:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-ring);
+}
+
+.tarjetaYo {
+  border-color: var(--ui-brand-border);
+}
+
+/* ─── Foto redonda con aro de estado ───────────────────────────────────── */
+
+.aro {
+  position: relative;
+  box-sizing: border-box;
+  width: var(--foto, 74px);
+  height: var(--foto, 74px);
+  flex: 0 0 auto;
+  padding: 3px;
+  border-radius: 50%;
+  border: 3px solid var(--aro, var(--ui-border-strong));
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--ui-s2);
+}
+
+.aroTrabajando { --aro: var(--ui-success); }
+.aroRetraso { --aro: var(--ui-warning); }
+.aroLibre { --aro: var(--ui-info); }
+
+.foto,
+.ini {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: block;
+  object-fit: cover;
+}
+
+/* Sin foto: iniciales sobre una tinta estable por nombre. Nunca un hueco
+   blanco. Las cuatro tintas evitan verde y ámbar a propósito: esos dos son el
+   aro, y el relleno del disco no debe poder confundirse con el estado. */
+.ini {
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--foto, 74px) * 0.34);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  background: var(--tinta-bg, var(--ui-hover));
+  color: var(--tinta-fg, var(--ui-fg-2));
+}
+
+.tinta0 {
+  --tinta-bg: color-mix(in srgb, var(--ui-brand) 16%, var(--ui-surface));
+  --tinta-fg: var(--ui-brand-text);
+}
+
+.tinta1 {
+  --tinta-bg: color-mix(in srgb, var(--ui-info) 16%, var(--ui-surface));
+  --tinta-fg: var(--ui-info-text);
+}
+
+.tinta2 {
+  --tinta-bg: color-mix(in srgb, var(--ui-violet) 16%, var(--ui-surface));
+  --tinta-fg: var(--ui-violet-text);
+}
+
+.tinta3 {
+  --tinta-bg: var(--ui-active);
+  --tinta-fg: var(--ui-fg-2);
+}
+
+/* ─── Textos ───────────────────────────────────────────────────────────── */
+
+.nombre {
+  font-size: var(--ui-fs-body);
+  line-height: var(--ui-lh-label);
+  font-weight: 600;
+  color: var(--ui-fg);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.puesto {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Lo que importa — qué está haciendo — cabe entero en dos renglones. */
+.actividad {
+  margin-top: var(--ui-s2);
+  font-size: var(--ui-fs-meta);
+  line-height: var(--ui-lh-meta);
+  font-weight: var(--ui-fw-meta);
+  color: var(--ui-fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.contexto {
+  font-size: var(--ui-fs-caption);
+  line-height: var(--ui-lh-caption);
+  color: var(--ui-fg-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.marcas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin-top: var(--ui-s2);
+}
+
+.marca {
+  font-size: var(--ui-fs-caption);
+  line-height: 1.2;
+  font-weight: 550;
+  padding: 2px 6px;
+  border-radius: var(--ui-radius-sm);
+}
+
+.marcaYo {
+  background: var(--ui-brand-bg);
+  color: var(--ui-brand-text);
+}
+
+.marcaCorrige {
+  background: var(--ui-warning-bg);
+  color: var(--ui-warning-text);
+}
+
+.marcaEspera {
+  background: var(--ui-violet-bg);
+  color: var(--ui-violet-text);
+}
+
+/* Con dedo, la tarjeta entera es el destino y ya pasa de 40px; lo que se
+   revisa aquí es que el aro no encoja por debajo de eso. */
+@media (pointer: coarse) {
+  .aro {
+    --foto: 80px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta {
+    transition: none;
+  }
+}

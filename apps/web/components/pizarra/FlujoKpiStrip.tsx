@@ -14,7 +14,7 @@ export default function FlujoKpiStrip({
   detalleHref?: string | null;
 }) {
   return (
-    <div style={{ marginBottom: "var(--ui-s4, 16px)", display: "grid", gap: 8 }}>
+    <div style={{ marginTop: "var(--ui-s5)", marginBottom: "var(--ui-s4)", display: "grid", gap: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 650 }}>Flujo del periodo</span>
         {detalleHref ? (
