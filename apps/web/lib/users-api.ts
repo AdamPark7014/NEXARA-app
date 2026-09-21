@@ -59,16 +59,60 @@ const apiFetch = async (path: string, token: string, init: RequestInit = {}) => 
   return text ? JSON.parse(text) : null;
 };
 
-/** Listado de usuarios visibles para el caller. */
-export const listUsers = async (token: string, params?: { limit?: number; page?: number }): Promise<ApiUserRow[]> => {
-  const search = new URLSearchParams();
-  if (params?.limit) search.set("limit", String(params.limit));
-  if (params?.page) search.set("page", String(params.page));
-  const path = `users${search.toString() ? `?${search.toString()}` : ""}`;
-  const data = await apiFetch(path, token, { method: "GET" });
+/** Tope de `limit` en `PaginationQueryDto`: pedir más devuelve 400. */
+const USUARIOS_POR_PAGINA = 100;
+
+/** Cincuenta páginas. Cinco mil usuarios es techo de cordura, no de negocio. */
+const PAGINAS_MAX = 50;
+
+const filasDeRespuesta = (data: unknown): ApiUserRow[] => {
   if (Array.isArray(data)) return data as ApiUserRow[];
-  if (data && Array.isArray((data as { data: ApiUserRow[] }).data)) return (data as { data: ApiUserRow[] }).data;
+  if (data && Array.isArray((data as { data: ApiUserRow[] }).data)) {
+    return (data as { data: ApiUserRow[] }).data;
+  }
   return [];
+};
+
+const totalDeRespuesta = (data: unknown): number | undefined =>
+  Array.isArray(data) ? undefined : (data as { meta?: { total?: number } } | null)?.meta?.total;
+
+/**
+ * Listado de usuarios visibles para el caller.
+ *
+ * Recorre páginas hasta completar la lista. Antes pedía en una sola llamada lo
+ * que le dijeran, y eso salía mal por los dos lados: tres pantallas pedían
+ * `limit: 200` contra un DTO que topa en 100 —400 y catálogo vacío, sin que
+ * nadie lo viera— y la que llamaba sin parámetros se quedaba con los 20 del
+ * valor por omisión de la API, creyendo que eran todos.
+ *
+ * Pasar `page` sigue trayendo esa página y solo esa: quien pagina, manda.
+ */
+export const listUsers = async (
+  token: string,
+  params?: { limit?: number; page?: number },
+): Promise<ApiUserRow[]> => {
+  const porPagina = Math.min(params?.limit ?? USUARIOS_POR_PAGINA, USUARIOS_POR_PAGINA);
+
+  const pedir = async (pagina: number) => {
+    const search = new URLSearchParams();
+    search.set("limit", String(porPagina));
+    search.set("page", String(pagina));
+    return apiFetch(`users?${search.toString()}`, token, { method: "GET" });
+  };
+
+  if (params?.page) return filasDeRespuesta(await pedir(params.page));
+
+  const acumuladas: ApiUserRow[] = [];
+  for (let pagina = 1; pagina <= PAGINAS_MAX; pagina += 1) {
+    const data = await pedir(pagina);
+    const filas = filasDeRespuesta(data);
+    acumuladas.push(...filas);
+    const total = totalDeRespuesta(data);
+    if (params?.limit && acumuladas.length >= params.limit) break;
+    if (filas.length < porPagina) break;
+    if (total != null && acumuladas.length >= total) break;
+  }
+  return params?.limit ? acumuladas.slice(0, params.limit) : acumuladas;
 };
 
 /** Asigna el rol RBAC v2 (`roleKey`) a un usuario. */
