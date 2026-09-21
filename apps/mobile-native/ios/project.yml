@@ -40,7 +40,7 @@ targets:
     entitlements:
       path: Resources/NexaraApp.entitlements
       properties:
-        aps-environment: development
+        aps-environment: production
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: mx.nexara.mobile.NexaraApp
