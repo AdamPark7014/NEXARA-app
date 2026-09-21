@@ -6,18 +6,16 @@
 
 ## Hecho
 
-### Pasada UX formularios (tramo 2)
-- `ClientCreationForm`, `MyProfileForm`, `BranchesForm` → `FormField`/`FormGrid`.
-- Sin emojis en credenciales/toggle de password; hints bajo cada campo.
-- Tests: ClientCreation 8 + Branches 9 verdes.
+### Deploy en curso / typefix
+- Push `28617a75` a origin; `update.sh` en Hetzner falló el build web por tipo en `puedeGestionarInventarioVehiculos` (`permissions: null` vs `undefined`).
+- Fix tipado en `recursos-core.ts` → redeploy.
 
-### Tramo 1 (previo)
-- `FormField` compartido; viático/vehículo/herramienta/multas; inputs 16px globales.
+### Pasada UX formularios (tramos 1–2)
+FormField + formularios Core/cliente/perfil/sucursales.
 
 ## A medias
-- Siguiente lote FormField: `OpsActivityForm`, `VehicleCheckoutForm`, proyectos/procurement, etc.
-- Play Console / deploy web (flotilla + Asignar viático + FormField).
-- Documentos nativos / tope cotizaciones / tools.manage.
+- Redeploy tras el fix de tipos.
+- Play Console / FormField restantes / docs nativos.
 
 ## No tocar
 Puente NAS · keystore Play · `NO TOCAR LIBREMENTE`.
