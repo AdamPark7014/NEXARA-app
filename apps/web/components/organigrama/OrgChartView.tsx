@@ -53,6 +53,12 @@ const ANCHO_TARJETA = 168;
 /** Hermanos por renglon antes de envolver: mas de esto estira el arbol a lo ancho. */
 const MAX_POR_FILA = 4;
 const ZOOM_MIN = 0.3;
+/**
+ * Suelo del ajuste automático. Por debajo los nombres dejan de leerse, así que
+ * más vale que la página se desplace a que el organigrama salga ilegible; a
+ * mano se puede bajar hasta `ZOOM_MIN`.
+ */
+const ZOOM_LEGIBLE = 0.45;
 const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.1;
 
@@ -605,9 +611,17 @@ export default function OrgChartView({
     const altoNatural = contenido.scrollHeight;
     if (anchoNatural <= 0) return;
     setTamanoNatural({ w: anchoNatural, h: altoNatural });
-    const disponible = caja.clientWidth - 24; // el relleno lateral del lienzo
-    const factor = Math.min(1, disponible / anchoNatural);
-    setZoom(Math.max(ZOOM_MIN, Math.round(factor * 100) / 100));
+
+    // Se ajusta a las DOS medidas. Mirar solo el ancho hacía que el árbol
+    // entrara de lado y se cortara por abajo: con 16 personas quedaban tres
+    // tarjetas partidas por la mitad contra el borde de la caja.
+    const anchoDisponible = caja.clientWidth - 24; // relleno lateral del lienzo
+    const altoDisponible = Math.max(
+      360,
+      (typeof window !== "undefined" ? window.innerHeight : 900) - caja.getBoundingClientRect().top - 48,
+    );
+    const factor = Math.min(1, anchoDisponible / anchoNatural, altoDisponible / Math.max(1, altoNatural));
+    setZoom(Math.max(ZOOM_LEGIBLE, Math.round(factor * 100) / 100));
     caja.scrollLeft = 0;
     caja.scrollTop = 0;
   }, []);
@@ -964,8 +978,12 @@ export default function OrgChartView({
               onPointerUp={onCanvasPointerUp}
               onPointerCancel={onCanvasPointerUp}
               style={{
-                overflow: "auto",
-                maxHeight: "min(70vh, 720px)",
+                // Sin `maxHeight`: la caja crece con el árbol ya escalado. Antes
+                // recortaba a 70vh y desplazaba por dentro, que es lo que
+                // rebanaba las tarjetas de la última fila. Si el árbol no cabe,
+                // se desplaza la página entera y ninguna tarjeta queda a medias.
+                overflowX: "auto",
+                overflowY: "hidden",
                 padding: "16px 12px 24px",
                 background:
                   "radial-gradient(ellipse at top, color-mix(in srgb, var(--primary) 6%, transparent), transparent 55%)",
