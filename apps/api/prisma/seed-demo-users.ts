@@ -33,19 +33,6 @@ type DemoUser = {
  * soporte@nexara.com.mx usa ing_soporte (no ing_campo).
  * Contraseñas: Nexara! + número de empleado (únicas).
  */
-/**
- * Contraseña de la cuenta que usa el revisor de Google Play y de App Store.
- *
- * No va escrita aquí a propósito. Las demás de este archivo están en claro y
- * eso ya es deuda; esta al menos no se suma. Se pasa al ejecutar el seed:
- *
- *   PLAY_REVIEW_PASSWORD='...' npm run prisma:seed
- *
- * Sin la variable, la cuenta se omite y el seed avisa — no se inventa una
- * contraseña débil ni se deja la anterior en silencio.
- */
-const PLAY_REVIEW_PASSWORD = process.env.PLAY_REVIEW_PASSWORD?.trim() || '';
-
 const DEMO_USERS: DemoUser[] = [
   {
     nombre: 'Claudia Bernal',
@@ -172,18 +159,6 @@ const DEMO_USERS: DemoUser[] = [
     employeeNumber: 'NX-408',
     puesto: 'Ingeniero de Campo',
     password: 'Nexara!NX408',
-  },
-  {
-    // Cuenta de demostración para la revisión de Google Play y App Store.
-    // El rechazo del 18-09-2026 fue, literalmente, «las credenciales de inicio
-    // de sesión son incorrectas»: el revisor no pudo entrar.
-    nombre: 'Revisor App Store / Google Play',
-    email: 'play.review@nexara.com.mx',
-    roleKey: 'ceo',
-    departmentName: 'Dirección General',
-    employeeNumber: 'NX-900',
-    puesto: 'Cuenta de demostración',
-    password: PLAY_REVIEW_PASSWORD,
   },
 ];
 
@@ -349,7 +324,9 @@ async function seedDemoUsers() {
       console.warn(
         `   ⚠️  ${u.email} se omite: falta su contraseña.
 ` +
-          '      Para la cuenta de revisión:  PLAY_REVIEW_PASSWORD='...' npm run prisma:seed',
+          '      La cuenta de revisión de tiendas NO va aquí: vive en su propio
+' +
+          '      tenant aislado. Usa `npm run seed:play-reviewer`.',
       );
       continue;
     }
