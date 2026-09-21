@@ -1,5 +1,8 @@
 "use client";
 
+// Evidencias de la actividad. Vivía en /ops/activities/[id]/evidences y Core la
+// reexportaba; ahora vive aquí, que es la única superficie alcanzable.
+
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { buildApiUrl } from "@/lib/api-base";

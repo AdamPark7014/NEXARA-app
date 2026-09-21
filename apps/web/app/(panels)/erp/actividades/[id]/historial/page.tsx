@@ -1,5 +1,8 @@
 "use client";
 
+// Historial de la actividad (incluye el registro de despacho). Vivía en
+// /ops/activities/[id]/historial y Core la reexportaba; ahora vive aquí.
+
 import { useCallback, useEffect, useState } from "react";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";

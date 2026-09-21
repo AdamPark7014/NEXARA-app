@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * Herramientas en Core (`/erp/almacen/herramientas`). Vivía en `/ops/tools` y Core
+ * la reexportaba; ahora vive aquí.
+ *
+ * Todo el personal pide y ve su kit; aprobar, entregar e inventariar es de quien
+ * tiene `TOOLS_MANAGE` (la pantalla ya enseña la vista de gestión solo a ellos).
+ */
+
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";

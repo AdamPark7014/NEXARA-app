@@ -1,3 +1,8 @@
+// Resto del panel INTEGRA: la superficie web se borró (fuera de /erp no hay rutas),
+// pero este archivo sobrevive porque lo consumen piezas que sí están vivas:
+// components/app-shell/AppShell.tsx, components/presence/* y lib/presence-api.ts.
+// No genera ninguna ruta (no hay page.tsx ni layout.tsx en esta carpeta).
+// Pendiente: mudarlo a components/integra/ cuando nadie más esté escribiendo en app-shell.
 import type { IntegraCapabilities } from "./_lib";
 
 const CAPS_KEY = "nexara_integra_caps";

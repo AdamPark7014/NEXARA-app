@@ -1,5 +1,8 @@
 "use client";
 
+// Detalle de la actividad. Vivía en /ops/activities/[id] y Core la reexportaba;
+// ahora vive aquí, que es la única superficie alcanzable.
+
 import { useCallback, useState } from "react";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
