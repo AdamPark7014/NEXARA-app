@@ -109,17 +109,6 @@ data class ViaticoDto(
     fun estaPendiente(): Boolean = estatus.equals("Pendiente", ignoreCase = true)
 }
 
-/** `POST viatics/assign` — el jefe asigna un anticipo, sin ticket previo. */
-data class AsignarViaticoBody(
-    val usuarioId: Long,
-    val montoSolicitado: Double,
-    val motivo: String,
-    val categoria: String? = null,
-    val actividadId: Long? = null,
-    val projectId: Long? = null,
-    val vehicleId: Long? = null,
-)
-
 /** Una parte del reparto, tal como la espera `ViaticoParteDto` del servidor. */
 data class ViaticoParteBody(
     val actividadId: Long,
@@ -146,6 +135,11 @@ data class ResolverViaticoBody(
  * reventaría con «Required value 'id' missing» y la persona vería un error de
  * programador en vez de «quedó en la cola». El repositorio mira el cuerpo y la
  * pantalla recarga del servidor después de cada acción.
+ *
+ * `POST viatics/assign` —el jefe asigna un anticipo a alguien, sin ticket
+ * previo— no se declara aquí: ninguna de las cinco pantallas lo usa todavía, y
+ * este módulo nació precisamente de limpiar tres métodos de viáticos que nadie
+ * llamaba. Se añade el día que haya pantalla que lo pida.
  */
 interface ViaticosApi {
 
@@ -180,10 +174,6 @@ interface ViaticosApi {
         @Part("vehicleId") vehicleId: RequestBody?,
         @Part ticketEvidencia: MultipartBody.Part,
     ): ResponseBody
-
-    /** `POST viatics/assign` — asignación a otra persona (solo quien administra viáticos). */
-    @POST("viatics/assign")
-    suspend fun asignar(@Body body: AsignarViaticoBody): ResponseBody
 
     /** `PUT viatics/:id/reparto` — la suma tiene que ser el total, al centavo. */
     @PUT("viatics/{id}/reparto")
