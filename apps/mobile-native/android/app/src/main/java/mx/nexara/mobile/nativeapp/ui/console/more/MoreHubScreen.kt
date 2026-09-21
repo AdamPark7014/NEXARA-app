@@ -17,14 +17,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.RequestQuote
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -53,6 +57,10 @@ fun CoreExtraModule.icon(): ImageVector = when (this) {
     CoreExtraModule.VEHICULOS -> Icons.Default.DirectionsCar
     CoreExtraModule.ORGANIGRAMA -> Icons.Default.AccountTree
     CoreExtraModule.VIATICOS -> Icons.Default.Payments
+    CoreExtraModule.GASTOS -> Icons.Default.ReceiptLong
+    CoreExtraModule.APROBACIONES -> Icons.Default.FactCheck
+    CoreExtraModule.PAGOS_EMPLEADOS -> Icons.Default.AccountBalanceWallet
+    CoreExtraModule.DOCUMENTOS -> Icons.Default.Description
 }
 
 /**
