@@ -22,6 +22,7 @@ import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { AgregarPaqueteDto, LigarActividadDto, RechazarCotizacionDto } from './dto/rechazar-cotizacion.dto.js';
+import { AsignarCotizacionDto } from './dto/asignar-cotizacion.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -63,6 +64,17 @@ export class CotizacionesController {
   @Get('core')
   listaCore(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
     return this.cotizacionesService.listaCore(query, companyId);
+  }
+
+  /**
+   * A quién se le puede pasar una cotización (el personal que cotiza).
+   * Va **antes** de `:id` para que Nest no lea «companeros» como un id.
+   */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get('companeros')
+  companeros(@CurrentUser() user: any) {
+    return this.cotizacionesService.companerosQueCotizan(user?.id);
   }
 
   /** Catálogo de paquetes. Antes de `:id` para que no lo tome por un id. */
@@ -297,6 +309,28 @@ export class CotizacionesController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.cotizacionesService.refoliar(id, user?.id, companyId);
+  }
+
+  /**
+   * «Enviar a un compañero»: la cotización queda asignada a otra persona que cotiza, con nota
+   * opcional, y le llega el aviso. No es el envío al cliente (`POST :id/enviar`).
+   */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Post(':id/asignar')
+  asignar(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AsignarCotizacionDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.asignarACompanero(
+      id,
+      dto.destinatarioId,
+      dto.nota,
+      { id: user?.id, nombre: user?.nombre },
+      companyId,
+    );
   }
 
   /** 03 Planos: sube un plano o anexo propio de la cotización. */

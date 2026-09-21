@@ -143,6 +143,23 @@ export type PlanoCotizacion = {
   activityId?: number | null;
 };
 
+/** Alguien del personal que cotiza: a quien se le puede pasar una cotización. */
+export type CompaneroQueCotiza = {
+  id: number;
+  nombre: string;
+  email: string;
+  /** Su puesto, o la etiqueta de su rol si RH no lo capturó. */
+  puesto?: string | null;
+  avatarUrl?: string | null;
+};
+
+/** A quién le toca ahora la cotización (envío interno). No es el cliente. */
+export type AsignacionCotizacion = {
+  id: number;
+  nombre: string;
+  puesto?: string | null;
+};
+
 export type CotizacionRow = {
   id: number;
   folio: string;
@@ -190,6 +207,11 @@ export type CotizacionDetalle = {
   necesitaRefolio?: boolean;
   cadenaParticipantes?: string | null;
   elaboro?: AutorCotizacion | null;
+  /** Envío interno: a quién le toca, quién se la pasó y por qué. */
+  asignadoA?: AsignacionCotizacion | null;
+  asignadoPor?: AsignacionCotizacion | null;
+  asignadoNota?: string | null;
+  asignadoEn?: string | null;
   createdById?: number | null;
   issueDate?: string | null;
   validUntil?: string | null;
@@ -334,6 +356,19 @@ export function rechazarCotizacion(token: string, id: number, motivo: string) {
 
 export function marcarRevisada(token: string, id: number) {
   return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/revisar`, token, { method: "POST" });
+}
+
+/** El personal que cotiza (sin ti): a quién se le puede pasar. Lo decide el rol, no una lista. */
+export function companerosQueCotizan(token: string) {
+  return cotFetch<CompaneroQueCotiza[]>(`cotizaciones/companeros`, token);
+}
+
+/** «Enviar a un compañero»: se la pasa a otra persona que cotiza, con una nota opcional. */
+export function asignarCotizacion(token: string, id: number, destinatarioId: number, nota?: string) {
+  return cotFetch<CotizacionDetalle>(`cotizaciones/${id}/asignar`, token, {
+    method: "POST",
+    body: JSON.stringify({ destinatarioId, nota: nota?.trim() || undefined }),
+  });
 }
 
 export function participantesDeCotizacion(token: string, id: number) {
