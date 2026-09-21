@@ -1,5 +1,9 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, configure } from '@testing-library/react';
+// `configure` de `@testing-library/dom` y no el de `react`: el de react acepta
+// su propia Config, sin `asyncUtilTimeout`, y el build de Docker —instalación
+// limpia— lo rechazaba aunque el `tsc` de esta máquina lo diera por bueno.
+import { configure } from '@testing-library/dom';
+import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
 /**
