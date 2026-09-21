@@ -19,6 +19,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService, type INotificationPayload } from '../notifications/notifications.service.js';
 import { ORG_ROLE_KEYS, type OrgRoleKey } from '../common/org-roles.js';
+import { appUrls } from '../common/app-urls.js';
 
 const MARGIN_ALERT_THRESHOLD_PERCENT = 10;
 const STOCK_ALERT_DEDUP_HOURS = 24;
@@ -150,7 +151,7 @@ export class AlertsService {
               message: `Margen real de ${realMarginPct.toFixed(1)}% (umbral ${MARGIN_ALERT_THRESHOLD_PERCENT}%). Revisa costos reales vs presupuesto.`,
               entityType: 'SalesProject',
               relatedEntityId: p.id,
-              relatedUrl: `/crm/projects/${p.id}`,
+              relatedUrl: appUrls.erpProyectos(p.id),
               priority: realMarginPct < 0 ? 'high' : 'normal',
             },
             {
@@ -212,8 +213,8 @@ export class AlertsService {
         if (!targets.length) continue;
 
         const landingUrl = v.activityId
-          ? `/ops/activities/${v.activityId}`
-          : `/ops/maintenance/contracts`;
+          ? appUrls.erpActividad(v.activityId)
+          : appUrls.opsMaintenanceContracts();
 
         const title = overdue
           ? `⛔ SLA vencido — visita mantenimiento ${v.contract?.contractNumber || ''}`

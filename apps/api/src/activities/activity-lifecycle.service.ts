@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { ACTIVITY_STATUS, statusVariants } from './activity-status.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { appUrls } from '../common/app-urls.js';
 
 /**
  * Efectos en cadena al cerrar una actividad.
@@ -217,7 +218,7 @@ export class ActivityLifecycleService {
               : `Tu OT "${label}" fue devuelta a campo para corrección.`,
             entityType: 'ACTIVITY',
             relatedEntityId: activityId,
-            relatedUrl: `/ops/activities/${activityId}`,
+            relatedUrl: appUrls.erpActividad(activityId),
           } as any)
           .catch(() => null);
       }

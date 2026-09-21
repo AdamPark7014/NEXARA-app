@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { closedStatusVariants } from '../activities/activity-status.js';
+import { appUrls } from '../common/app-urls.js';
 
 export type ActivityFeedItem = {
   id: string;
@@ -134,7 +135,7 @@ export class ActivityFeedService {
               at: (a.fechaEntregaEsperada ?? now).toISOString(),
               title: `SLA vencido · ${a.anNumber}`,
               subtitle: `${a.client?.name ?? 'Cliente'} — ${a.titulo}`,
-              deepLink: `/ops/activities/${a.id}`,
+              deepLink: appUrls.erpActividad(a.id),
               icon: '⏱️',
               priority: 'high',
             });
@@ -162,7 +163,7 @@ export class ActivityFeedService {
               at: t.createdAt.toISOString(),
               title: `Ticket portal · ${t.client?.name ?? 'Cliente'}`,
               subtitle: (t.description || '').slice(0, 120),
-              deepLink: `/ops/support/${t.id}`,
+              deepLink: appUrls.opsSupport(t.id),
               icon: '🎫',
               priority: t.urgency === 'HIGH' ? 'high' : 'normal',
             });
@@ -199,7 +200,7 @@ export class ActivityFeedService {
               title: `Seguimiento vencido · ${a.subject}`,
               subtitle: a.lead?.name ?? a.opportunity?.title ?? undefined,
               deepLink: a.opportunity?.id
-                ? `/crm/opportunities/${a.opportunity.id}`
+                ? appUrls.crmOpportunity(a.opportunity.id)
                 : '/crm/agenda',
               icon: '📞',
               priority: 'high',
@@ -231,7 +232,7 @@ export class ActivityFeedService {
               at: (q.validUntil ?? now).toISOString(),
               title: `Cotización por expirar · ${q.quoteNumber}`,
               subtitle: q.clientCompany || q.clientName || undefined,
-              deepLink: `/crm/quotes/${q.id}`,
+              deepLink: appUrls.erpCotizaciones(q.id),
               icon: '📄',
               priority: 'high',
             });
@@ -318,10 +319,10 @@ export class ActivityFeedService {
   private deepLinkForAudit(entityType: string, entityId?: number | null): string | undefined {
     if (!entityId) return undefined;
     const t = String(entityType).toLowerCase();
-    if (t.includes('activity') || t.includes('actividad')) return `/ops/activities/${entityId}`;
-    if (t.includes('client')) return `/crm/clients/${entityId}`;
-    if (t.includes('quote') || t.includes('cotizacion')) return `/crm/quotes/${entityId}`;
-    if (t.includes('opportunity')) return `/crm/opportunities/${entityId}`;
+    if (t.includes('activity') || t.includes('actividad')) return appUrls.erpActividad(entityId);
+    if (t.includes('client')) return appUrls.erpClientes(entityId);
+    if (t.includes('quote') || t.includes('cotizacion')) return appUrls.erpCotizaciones(entityId);
+    if (t.includes('opportunity')) return appUrls.crmOpportunity(entityId);
     if (t.includes('invoice') || t.includes('factura')) return `/erp/invoicing/${entityId}`;
     if (t.includes('purchase') || t.includes('orden')) return `/erp/procurement?tab=orders&id=${entityId}`;
     return undefined;

@@ -15,6 +15,7 @@ import { getOrgTier, ORG_ROLE_KEYS, ORG_TIER, type OrgRoleKey } from '../common/
 import { isSuperAdminEmail } from '../common/platform-accounts.js';
 import { resolveUploadsDir } from '../common/uploads-path.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { appUrls } from '../common/app-urls.js';
 
 type UploadedChatFile = {
   originalname: string;
@@ -1112,14 +1113,14 @@ export class ChatService {
         id: a.id,
         label: `${a.anNumber} · ${a.titulo}`,
         subtitle: a.estatus,
-        href: `/ops/activities/${a.id}`,
+        href: appUrls.erpActividad(a.id),
       })),
       ...evidences.map((e) => ({
         kind: 'EVIDENCE' as const,
         id: e.id,
         label: `Evidencia #${e.id} · ${e.tipoEvidencia}`,
         subtitle: `${e.actividad.anNumber} · ${e.actividad.titulo} · ${e.estatus}`,
-        href: `/ops/activities/${e.actividadId}/evidences`,
+        href: appUrls.erpActividadEvidencias(e.actividadId),
       })),
     ];
   }

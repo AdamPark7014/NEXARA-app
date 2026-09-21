@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { appUrls } from '../common/app-urls.js';
 import {
   ACTIVITY_STATUS,
   closedStatusVariants,
@@ -291,7 +292,7 @@ export class AcsOpsBridgeService {
           message,
           relatedEntityId: activityId ?? undefined,
           entityType: activityId ? 'Activity' : 'IntegraPushEvent',
-          relatedUrl: activityId ? `/ops/activities/${activityId}` : '/integra/events',
+          relatedUrl: activityId ? appUrls.erpActividad(activityId) : '/integra/events',
           priority: 'high',
         }),
       ),

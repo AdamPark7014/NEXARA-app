@@ -3014,6 +3014,8 @@ enum NotificationType {
   ACTIVITY_APPROVED
   ACTIVITY_REJECTED
   ACTIVITY_RESUBMIT_REQUESTED
+  /// Un revisor devolvio la OT a campo al rechazar su validacion de cierre.
+  ACTIVITY_VALIDATION_REJECTED
 
   // EVIDENCE - Evidencias
   EVIDENCE_SUBMITTED
@@ -3056,6 +3058,8 @@ enum NotificationType {
   VEHICLE_RENEWAL_REQUESTED
   VEHICLE_RENEWAL_APPROVED
   VEHICLE_RENEWAL_REJECTED
+  /// El uso asignado de un vehiculo esta por vencer (ingeniero y sus superiores).
+  VEHICLE_USAGE_EXPIRING
 
   // QUOTES - Cotizaciones
   QUOTE_EXPIRING
@@ -3065,9 +3069,15 @@ enum NotificationType {
   QUOTE_SENT
   /// El cliente la rechazó con motivo desde el enlace.
   QUOTE_REJECTED
+  /// El workflow autorizo el descuento: la cotizacion ya puede salir al cliente.
+  QUOTE_DISCOUNT_APPROVED
+  /// El workflow no autorizo el descuento (avisa a quien la hizo).
+  QUOTE_DISCOUNT_REJECTED
 
   // ORDERS - Órdenes
   ORDER_CREATED
+  /// Hay borrador de pedido a CT Online listo para revisar y confirmar.
+  CT_ORDER_DRAFT
 
   // PROJECTS - Proyectos
   PROJECT_COMPLETED
@@ -3077,6 +3087,13 @@ enum NotificationType {
   SALES_LEAD_CREATED
   SALES_OPPORTUNITY_CREATED
   SALES_OPPORTUNITY_STAGE_CHANGED
+  /// El workflow autorizo el proyecto de ventas: pasa a ejecucion.
+  SALES_PROJECT_APPROVED
+  /// El workflow no autorizo el proyecto: queda en pausa hasta revision.
+  SALES_PROJECT_REJECTED
+  /// Proyecto de ventas sobrepresupuesto o con margen real bajo (tarea programada).
+  /// Distinto de MARGIN_ALERT, que es la alerta generica cross-modulo de alerts.service.
+  SALES_PROJECT_MARGIN_ALERT
 
   // Confirmación al usuario que ejecutó la acción
   USER_ACTION_CONFIRMED
@@ -3133,6 +3150,16 @@ enum NotificationType {
 
   // Chat
   CHAT_MENTION
+
+  // WORKFLOW - Cadena de aprobaciones (/erp/approvals)
+  /// Aprobada en todos los niveles: avisa a quien la inicio.
+  WORKFLOW_APPROVED
+  /// Rechazada en algun paso: avisa a quien la inicio, con el motivo.
+  WORKFLOW_REJECTED
+  /// Te toca aprobar un paso.
+  WORKFLOW_PENDING
+  /// El paso supero su SLA y sigue sin decision.
+  WORKFLOW_ESCALATION
 }
 
 model Notification {

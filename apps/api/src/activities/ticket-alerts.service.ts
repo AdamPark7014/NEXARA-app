@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { closedStatusSqlList } from './activity-status.js';
 import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 import { fechaAviso, horaAviso } from '../notifications/notification-push-meta.js';
+import { appUrls } from '../common/app-urls.js';
 
 type SlaRow = {
   id: number;
@@ -94,7 +95,7 @@ export class TicketAlertsService {
               icon: 'atraso',
               entityType: 'Activity',
               relatedEntityId: activity.id,
-              relatedUrl: `/ops/activities/${activity.id}`,
+              relatedUrl: appUrls.erpActividad(activity.id),
               companyId: activity.companyId,
             })
             .catch((err) => this.logger.warn(`SLA notify: ${err?.message || err}`)),
@@ -163,7 +164,7 @@ export class TicketAlertsService {
               icon: 'vencida',
               entityType: 'Activity',
               relatedEntityId: activity.id,
-              relatedUrl: `/ops/activities/${activity.id}`,
+              relatedUrl: appUrls.erpActividad(activity.id),
               companyId: activity.companyId,
             })
             .catch((err) => this.logger.warn(`SLA breach notify: ${err?.message || err}`)),
