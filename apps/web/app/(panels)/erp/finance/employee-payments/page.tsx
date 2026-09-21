@@ -97,7 +97,7 @@ const rowMetaStyle: CSSProperties = {
   color: "var(--text-tertiary)",
   lineHeight: 1.35,
 };
-const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text, #b91c1c)" };
+const rowMetaWarnStyle: CSSProperties = { color: "var(--state-danger-text)" };
 const breakdownPanelStyle: CSSProperties = {
   padding: 14,
   border: "1px solid var(--nx-panel-hairline, var(--border))",
@@ -339,7 +339,6 @@ export default function EmployeePaymentsPage() {
       // Antes salía en silencio y la pantalla se quedaba en «Cargando pagos…»
       // para siempre. Ahora dice qué pasa y qué hacer.
       setLoading(false);
-      setItems([]);
       setError("Tu sesión no tiene un token válido. Vuelve a iniciar sesión para ver los pagos.");
       return;
     }
@@ -366,8 +365,10 @@ export default function EmployeePaymentsPage() {
         })),
       );
     } catch (e) {
+      // Un fallo al refrescar NO borra lo que ya estaba en pantalla: se avisa
+      // arriba y la tabla sigue mostrando la última lista buena. Vaciarla
+      // convertía un timeout en «no hay pagos», que es mentira.
       setError(formatApiError(e, "No se pudieron cargar los pagos"));
-      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -401,6 +402,13 @@ export default function EmployeePaymentsPage() {
   useEffect(() => {
     if (tab === "analytics") void loadAnalytics();
   }, [tab, loadAnalytics]);
+
+  /**
+   * La regla 7 distingue «no hay ni un pago» de «los filtros no dejaron pasar
+   * ninguno»: son dos pantallas distintas y solo la primera explica de dónde
+   * sale el primer registro.
+   */
+  const hasFilters = Boolean(searchQ.trim() || filterUser || filterStatus);
 
   const visibleItems = useMemo(() => {
     let result = items;
@@ -719,6 +727,9 @@ export default function EmployeePaymentsPage() {
               {nombre}
             </Link>
             <div style={rowMetaStyle}>
+              {/* En móvil el estado deja de ser columna y baja aquí: antes
+                  empujaba la tabla más allá del ancho de la pantalla. */}
+              {narrow ? <StatusDot label={p.status ?? "—"} tone={statusTone(p.status)} /> : null}
               {meta.length > 0 ? <span>{meta.join(" · ")}</span> : null}
               {urls.length > 0 ? (
                 <>
@@ -771,12 +782,16 @@ export default function EmployeePaymentsPage() {
       render: (p) => <Money value={p.amount} />,
       width: 120,
     },
-    {
-      key: "status",
-      label: "Estado",
-      render: (p) => <StatusDot label={p.status ?? "—"} tone={statusTone(p.status)} />,
-      width: 110,
-    },
+    ...(narrow
+      ? []
+      : ([
+          {
+            key: "status",
+            label: "Estado",
+            render: (p: Payment) => <StatusDot label={p.status ?? "—"} tone={statusTone(p.status)} />,
+            width: 110,
+          },
+        ] as Column<Payment>[])),
     {
       key: "id",
       label: "",
@@ -825,40 +840,59 @@ export default function EmployeePaymentsPage() {
           </div>
         );
       },
-      width: 220,
+      // En móvil la columna se estrecha a lo que ocupen los botones: fijarla en
+      // 220px era lo que obligaba a hacer scroll lateral a 375px.
+      width: narrow ? undefined : 220,
     },
   ];
 
   const invalidFields = (Object.keys(formErrors) as (keyof FormErrors)[]).filter((k) => formErrors[k]);
 
+  /**
+   * Regla 7: cuatro celdas en `$0` encima de un «Sin pagos» no informan de
+   * nada y le quitan el sitio a lo único que ayuda ahí —de dónde sale el
+   * primer pago y el botón que lo crea—. La condición es el conteo de filas,
+   * no que el importe sea cero.
+   */
+  const showMetrics = tab === "lista" && visibleItems.length > 0;
+  /** Sin un solo pago y sin filtros puestos no hay nada que buscar ni exportar. */
+  const showToolbar = items.length > 0 || hasFilters;
+  /** La primera carga sí tapa la pantalla; un refresco posterior, no. */
+  const firstLoad = loading && items.length === 0;
+
+  const clearFilters = () => {
+    setSearchQ("");
+    setFilterUser("");
+    setFilterStatus("");
+  };
+
+  /** Regla 4: un solo primario por pantalla, y es la acción a la que se vino. */
+  const primaryAction = cfg.canCreate ? (
+    <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
+      Registrar pago
+    </Button>
+  ) : null;
+
+  const refreshAction = (
+    <Button
+      size="sm"
+      variant="ghost"
+      style={toolbarButtonStyle}
+      onClick={() => void load()}
+      disabled={loading}
+    >
+      {loading ? "Actualizando…" : "Actualizar"}
+    </Button>
+  );
+
   return (
     <>
       <FinanceModuleShell
-        eyebrow="ERP · Finanzas"
+        variant="flat"
         title={cfg.title || "Pagos a empleados"}
         subtitle={cfg.subtitle}
-        actions={
-          <>
-            <Button
-              size="sm"
-              variant="ghost"
-              style={toolbarButtonStyle}
-              onClick={() => void load()}
-              disabled={loading}
-            >
-              {loading ? "Actualizando…" : "Actualizar"}
-            </Button>
-            {cfg.canCreate && (
-              <Button size="sm" variant="primary" style={toolbarButtonStyle} onClick={openNew}>
-                Registrar pago
-              </Button>
-            )}
-          </>
-        }
         kpis={
-          <div style={{ gridColumn: "1 / -1" }}>
-            <MetricStrip metrics={metrics} ariaLabel="Resumen de pagos a empleados" />
-          </div>
+          showMetrics ? <MetricStrip metrics={metrics} ariaLabel="Resumen de pagos a empleados" /> : undefined
         }
         tabs={[
           { id: "lista", label: "Lista" },
@@ -869,32 +903,33 @@ export default function EmployeePaymentsPage() {
       >
         {tab === "analytics" ? (
           <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "end" }}>
-              <FinanceField label="Desde" hint="Deja vacío para incluir todo el histórico." optional>
-                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={financeInputStyle} />
-              </FinanceField>
-              <FinanceField label="Hasta" optional>
-                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={financeInputStyle} />
-              </FinanceField>
-              <Button
-                size="sm"
-                variant="secondary"
-                style={toolbarButtonStyle}
-                onClick={() => void loadAnalytics()}
-                disabled={analyticsLoading}
-              >
-                {analyticsLoading ? "Calculando…" : "Aplicar"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                style={toolbarButtonStyle}
-                onClick={() => void downloadPdf()}
-                disabled={pdfBusy}
-              >
-                {pdfBusy ? "Generando…" : "Descargar PDF"}
-              </Button>
-            </div>
+            {/* Regla 8: rango, acción y exportación en una sola fila, sin caja. */}
+            <FilterToolbar
+              dates={[
+                { label: "Desde", value: dateFrom, onChange: setDateFrom },
+                { label: "Hasta", value: dateTo, onChange: setDateTo },
+              ]}
+              onClear={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+              style={{ marginBottom: 0 }}
+              rightActions={
+                <>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    style={toolbarButtonStyle}
+                    onClick={() => void loadAnalytics()}
+                    disabled={analyticsLoading}
+                  >
+                    {analyticsLoading ? "Calculando…" : "Aplicar"}
+                  </Button>
+                  <ListExportActions onPdf={() => void downloadPdf()} pdfBusy={pdfBusy} />
+                  {primaryAction}
+                </>
+              }
+            />
             {analyticsError && (
               <InlineAlert
                 message={analyticsError}
@@ -914,9 +949,19 @@ export default function EmployeePaymentsPage() {
               </div>
             )}
             {!analyticsLoading && !analytics && !analyticsError && (
-              <div style={statusPanelStyle}>Elige un rango y pulsa «Aplicar» para calcular el resumen.</div>
+              <div style={statusPanelStyle}>
+                Pulsa «Aplicar» para calcular el resumen. Sin fechas cubre todo el histórico.
+              </div>
             )}
-            {!analyticsLoading && analytics && (
+            {/* Regla 7 en el periodo: si no hubo ni un pago, la tira de ceros
+                no dice nada; la frase sí. Con filas, aunque sumen cero, se
+                enseña: un periodo que cerró en cero es información. */}
+            {!analyticsLoading && analytics && analytics.count === 0 && (
+              <div style={statusPanelStyle}>
+                En el periodo elegido no hay ningún pago registrado.
+              </div>
+            )}
+            {!analyticsLoading && analytics && analytics.count > 0 && (
               <>
                 <MetricStrip
                   ariaLabel="Resumen del periodo"
@@ -938,37 +983,40 @@ export default function EmployeePaymentsPage() {
           </div>
         ) : (
           <>
-            <FilterToolbar
-              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado, concepto o ref. contable…" }}
-              selects={[
-                {
-                  label: "Empleado",
-                  value: filterUser,
-                  onChange: setFilterUser,
-                  options: users.map((u) => ({ value: String(u.id), label: u.nombre })),
-                  allowAll: true,
-                },
-                {
-                  label: "Estado",
-                  value: filterStatus,
-                  onChange: setFilterStatus,
-                  options: STATUSES.map((s) => ({ value: s, label: s })),
-                  allowAll: true,
-                },
-              ]}
-              onClear={() => {
-                setSearchQ("");
-                setFilterUser("");
-                setFilterStatus("");
-              }}
-              resultCount={loading ? null : visibleItems.length}
-              rightActions={
-                <ListExportActions
-                  onExcel={exportExcel}
-                  excelDisabled={visibleItems.length === 0}
-                />
-              }
-            />
+            {/* Regla 8: buscador, selectores, exportación y la acción principal
+                en una sola fila. Sin recuadro propio: cada control ya trae su
+                borde y meterlos en una caja es dibujarlo dos veces. */}
+            {showToolbar && (
+              <FilterToolbar
+                search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado, concepto o ref. contable…" }}
+                selects={[
+                  {
+                    label: "Empleado",
+                    value: filterUser,
+                    onChange: setFilterUser,
+                    options: users.map((u) => ({ value: String(u.id), label: u.nombre })),
+                    allowAll: true,
+                  },
+                  {
+                    label: "Estado",
+                    value: filterStatus,
+                    onChange: setFilterStatus,
+                    options: STATUSES.map((s) => ({ value: s, label: s })),
+                    allowAll: true,
+                  },
+                ]}
+                onClear={clearFilters}
+                style={{ marginBottom: 0 }}
+                resultCount={firstLoad ? null : visibleItems.length}
+                rightActions={
+                  <>
+                    {refreshAction}
+                    <ListExportActions onExcel={exportExcel} excelDisabled={visibleItems.length === 0} />
+                    {primaryAction}
+                  </>
+                }
+              />
+            )}
             {actionError && (
               <InlineAlert
                 message={actionError}
@@ -1004,32 +1052,39 @@ export default function EmployeePaymentsPage() {
                 }
               />
             )}
-            {loading ? (
+            {firstLoad ? (
               <div style={{ ...statusPanelStyle, padding: 32 }} role="status" aria-live="polite">
                 Cargando pagos…
               </div>
-            ) : !error ? (
+            ) : error && items.length === 0 ? null : (
               <DataTable
                 columns={columns}
                 rows={visibleItems}
                 rowKey={(p) => p.id}
                 density="compact"
                 ariaLabel="Pagos a empleados"
-                emptyTitle="Sin pagos registrados"
+                emptyTitle={hasFilters ? "Ningún pago coincide" : "Todavía no hay pagos"}
                 emptyDescription={
-                  searchQ || filterUser || filterStatus
+                  hasFilters
                     ? "Ningún pago coincide con los filtros aplicados."
-                    : "Registra el primer pago a empleados."
+                    : cfg.canCreate
+                      ? "Un pago nace de un periodo trabajado: eliges a la persona, el rango de fechas y el neto que se deposita. Queda en borrador hasta que alguien lo aprueba."
+                      : "Aquí aparecen los pagos por periodo trabajado que captura el equipo administrativo."
                 }
                 emptyAction={
-                  cfg.canCreate && !searchQ && !filterUser && !filterStatus ? (
-                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={openNew}>
-                      Registrar pago
+                  hasFilters ? (
+                    <Button size="sm" variant="secondary" style={toolbarButtonStyle} onClick={clearFilters}>
+                      Limpiar filtros
                     </Button>
-                  ) : undefined
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                      {primaryAction}
+                      {refreshAction}
+                    </div>
+                  )
                 }
               />
-            ) : null}
+            )}
           </>
         )}
       </FinanceModuleShell>

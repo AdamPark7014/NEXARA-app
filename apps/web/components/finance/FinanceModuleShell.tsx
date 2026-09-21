@@ -18,6 +18,16 @@ type FinanceModuleShellProps = {
   activeTab?: string;
   onTabChange?: (id: string) => void;
   children: ReactNode;
+  /**
+   * `panel` (por defecto) conserva la píldora de pestañas y la tarjeta de
+   * contenido con las que ya viven el resto de módulos: nada cambia para ellos.
+   *
+   * `flat` aplica la regla 9 de `.ai/DISENO-FINANZAS.md` —ni una caja dentro de
+   * otra—: las pestañas se subrayan en vez de meterse en una píldora, y el
+   * contenido se apoya en la página en lugar de envolver la tabla (que ya trae
+   * su propio borde) en un segundo rectángulo.
+   */
+  variant?: "panel" | "flat";
 };
 
 export const financeInputStyle: CSSProperties = {
@@ -41,9 +51,11 @@ export function FinanceModuleShell({
   activeTab,
   onTabChange,
   children,
+  variant = "panel",
 }: FinanceModuleShellProps) {
+  const flat = variant === "flat";
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell}${flat ? ` ${styles.shellFlat}` : ""}`}>
       <div className={styles.header}>
         <div className={styles.headerCopy}>
           {eyebrow ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
@@ -53,19 +65,22 @@ export function FinanceModuleShell({
         {actions ? <div className={styles.actions}>{actions}</div> : null}
       </div>
 
-      {kpis ? <div className={styles.kpiRow}>{kpis}</div> : null}
+      {kpis ? <div className={flat ? styles.kpiRowFlat : styles.kpiRow}>{kpis}</div> : null}
 
       {tabs && tabs.length > 0 ? (
-        <div className={styles.tabs} role="tablist">
+        <div className={flat ? styles.tabsFlat : styles.tabs} role="tablist">
           {tabs.map((tab) => {
             const active = tab.id === activeTab;
+            const className = flat
+              ? `${styles.tabFlat}${active ? ` ${styles.tabFlatActive}` : ""}`
+              : `${styles.tab}${active ? ` ${styles.tabActive}` : ""}`;
             return (
               <button
                 key={tab.id}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className={`${styles.tab}${active ? ` ${styles.tabActive}` : ""}`}
+                className={className}
                 onClick={() => onTabChange?.(tab.id)}
               >
                 {tab.label}
@@ -75,7 +90,7 @@ export function FinanceModuleShell({
         </div>
       ) : null}
 
-      <div className={styles.content}>{children}</div>
+      <div className={flat ? styles.contentFlat : styles.content}>{children}</div>
     </div>
   );
 }

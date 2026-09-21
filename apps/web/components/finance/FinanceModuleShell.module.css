@@ -100,6 +100,84 @@
   min-height: 120px;
 }
 
+/* ── Variante «flat» — regla 9 de .ai/DISENO-FINANZAS.md ──────────────────
+   Ni una caja dentro de otra. La píldora de pestañas y la tarjeta de contenido
+   solo añadían un borde y un relleno alrededor de cosas que ya traen el suyo
+   (la tabla, los controles). La jerarquía la dan el espaciado y la tipografía.
+   Es opt-in: sin `variant="flat"` nada cambia para el resto de módulos.       */
+
+.shellFlat {
+  gap: 14px;
+}
+
+/* La tira de cifras ya se reparte sola en celdas: no necesita una rejilla
+   encima que obligue a las pantallas a colarse con `grid-column: 1 / -1`. */
+.kpiRowFlat {
+  display: block;
+  min-width: 0;
+}
+
+.tabsFlat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabFlat {
+  appearance: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  margin-bottom: -1px;
+  padding: 0 0 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.tabFlat:hover {
+  color: var(--foreground, var(--text-primary));
+}
+
+.tabFlat:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tabFlatActive {
+  color: var(--foreground, var(--text-primary));
+  border-bottom-color: var(--primary);
+}
+
+.contentFlat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Con ratón el contrato fija 32px (regla 4). Con el dedo ese mismo control se
+   falla: en un puntero grueso todo lo tocable sube a 40px sin cambiar el
+   diseño de escritorio. */
+@media (pointer: coarse) {
+  .shellFlat button,
+  .shellFlat select,
+  .shellFlat input:not([type="checkbox"]):not([type="radio"]) {
+    min-height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabFlat {
+    transition: none;
+  }
+}
+
 .formGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -141,6 +219,6 @@
 
 .fieldError {
   font-size: 11px;
-  color: var(--state-danger-text, #b91c1c);
+  color: var(--state-danger-text);
   line-height: 1.4;
 }
