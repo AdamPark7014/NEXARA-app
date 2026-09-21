@@ -190,6 +190,9 @@ export function payloadDePropuesta(quote: CotizacionParaPropuesta, extras: Extra
     iva: numero(quote.taxTotal),
     total: numero(quote.total),
     currency: normalizarMoneda(quote.currency),
+    // El anticipo ya se usaba para redactar los términos; ahora también encabeza
+    // la hoja de cotización, que es donde el cliente lo busca.
+    anticipoPct: quote.depositPercent ?? null,
     terminos: secciones.terminos ? terminos : { ...terminos, lineas: [], partes: [] },
     participantes: secciones.firma ? (extras.participantes ?? []) : [],
     empresa: extras.empresa ?? null,

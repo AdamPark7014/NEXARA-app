@@ -49,8 +49,12 @@ const C = {
   tenue: '#94A3B8',
   /** Filetes. */
   linea: '#E5E7EB',
-  /** Encabezado de la tabla. */
-  cabecera: '#F3F4F6',
+  /** Encabezado de la tabla: oscuro con texto en blanco, como el resto de PDFs NEXARA. */
+  cabecera: '#0B1F3A',
+  /** Banda superior de portada y hojas interiores — tinte del verde de marca. */
+  tinte: '#EAF6F3',
+  /** Relleno de tarjetas y recuadros. */
+  suave: '#F5F7FB',
   /** Verde de la marca: solo filetes, numerales y números de sección. */
   acento: '#1F9E84',
   blanco: '#FFFFFF',
@@ -210,6 +214,8 @@ export type PropuestaPayload = {
   iva: number;
   total: number;
   currency: string;
+  /** Porcentaje de anticipo; se enseña en la tira de resumen de la hoja de cotización. */
+  anticipoPct?: number | null;
   terminos: { titulo: string; lineas: string[] };
   participantes: Array<{ nombre: string; rolEtiqueta: string; siglas: string }>;
   empresa?: PropuestaEmpresa | null;
@@ -531,6 +537,12 @@ function marcoDeSeccion(ctx: Ctx) {
   if (ctx.modo !== 'seccion' || ctx.pintandoMarco) return;
   ctx.pintandoMarco = true;
   try {
+    // Banda superior: el mismo recurso que la cabecera del resto de PDFs NEXARA,
+    // en tinte del verde de marca para no pelearse con la portada.
+    doc.save();
+    doc.rect(0, 0, ANCHO, CABEZA.filete + 8).fill(C.tinte);
+    doc.rect(0, 0, ANCHO, 4).fill(C.acento);
+    doc.restore();
     firmaDeMarca(ctx, COL_X, CABEZA.marcaY, CABEZA.marcaAlto, 8, 2.4);
     if (ctx.seccion) {
       renglon(doc, ctx.seccion.toUpperCase(), COL_DER, CABEZA.base, {
@@ -541,8 +553,6 @@ function marcoDeSeccion(ctx: Ctx) {
         espaciado: 1.2,
       });
     }
-    filete(doc, COL_X, COL_DER, CABEZA.filete);
-
     filete(doc, COL_X, COL_DER, PIE.filete);
     renglon(doc, `Propuesta técnica  ·  ${ctx.payload.folio}`, COL_X, PIE.base, {
       tamano: 8,
@@ -751,6 +761,11 @@ function portada(ctx: Ctx, indice: Array<{ numero: string; titulo: string; nota?
   const { doc, payload, empresa } = ctx;
   abrirPagina(ctx, 'portada');
   const X = COL_X;
+
+  // Barra de acento a sangre, como la cabecera del resto de documentos NEXARA.
+  doc.save();
+  doc.rect(0, 0, ANCHO, 6).fill(C.acento);
+  doc.restore();
 
   // Marca, nombre y lema.
   const { xNombre } = firmaDeMarca(ctx, X, 58, 30, 12.5, 4.2);
@@ -1136,7 +1151,7 @@ function encabezadoTabla(doc: Doc, y: number, columnas: Columna[]) {
     renglon(doc, col.titulo, x, base, {
       tamano: 7.5,
       fuente: F.semi,
-      color: C.pizarra,
+      color: C.blanco,
       espaciado: 1,
       alinear: col.alinear,
       max: col.ancho - 10,
@@ -1264,7 +1279,7 @@ function recuadro(
   if (o.medir) return altoTotal;
 
   doc.save();
-  doc.rect(x + 0.5, y + 0.5, ancho - 1, altoTotal - 1).lineWidth(1).strokeColor(C.linea).stroke();
+  doc.rect(x, y, ancho, altoTotal).fill(C.suave);
   doc.restore();
   renglon(doc, titulo.toUpperCase(), x + pad, baseTitulo, {
     tamano: 7.5,
@@ -1280,6 +1295,67 @@ function recuadro(
     doc.text(valor || '—', x + pad, p.arriba, { width: anchoValor, lineGap: gap, height: p.alto + 1, ellipsis: true });
   });
   return altoTotal;
+}
+
+/**
+ * Tira de resumen sobre la tabla: lo que se busca al abrir una cotización.
+ *
+ * Es el mismo recurso que encabeza el reporte de viáticos —tarjeta en gris
+ * suave con una barra de acento a la izquierda—, que es el que Adam señaló como
+ * referencia. Antes el total solo aparecía al pie de la tabla, en la columna de
+ * la derecha, después de todas las partidas.
+ */
+function tarjetasResumen(ctx: Ctx, y: number): number {
+  const { doc, payload } = ctx;
+  // Sin partidas no hay nada que resumir: tres celdas en $0.00 sobre un «Sin
+  // partidas capturadas» ocupan sitio y no dicen nada (regla 7 del contrato).
+  if (!payload.grupos.some((g) => g.partidas.length)) return 0;
+  const moneda = String(payload.opciones?.moneda ?? payload.currency ?? '').trim().toUpperCase() || 'MXN';
+  const anticipoPct = Number(payload.anticipoPct) || 0;
+  const total = Number(payload.total) || 0;
+
+  const tarjetas: Array<{ etiqueta: string; valor: string; acento: string }> = [
+    { etiqueta: `Total (${moneda})`, valor: `$ ${numeroMx.format(total)}`, acento: C.acento },
+  ];
+  if (anticipoPct > 0) {
+    tarjetas.push({
+      etiqueta: `Anticipo para iniciar (${anticipoPct}%)`,
+      valor: `$ ${numeroMx.format(Math.round((total * anticipoPct) / 100 * 100) / 100)}`,
+      acento: '#B7791F',
+    });
+  }
+  tarjetas.push({
+    etiqueta: 'Vigencia de los precios',
+    valor: fechaLarga(payload.validUntil) ?? 'Sujeta a confirmación',
+    acento: '#1F6BBA',
+  });
+
+  const separacion = 12;
+  const ancho = (COL_ANCHO - separacion * (tarjetas.length - 1)) / tarjetas.length;
+  const alto = 44;
+
+  tarjetas.forEach((t, i) => {
+    const x = COL_X + i * (ancho + separacion);
+    doc.save();
+    doc.rect(x, y, ancho, alto).fill(C.suave);
+    doc.rect(x, y, 3, alto).fill(t.acento);
+    doc.restore();
+    renglon(doc, t.etiqueta.toUpperCase(), x + 12, y + 17, {
+      tamano: 7,
+      fuente: F.medio,
+      color: C.pizarra,
+      espaciado: 1,
+      max: ancho - 24,
+    });
+    renglon(doc, t.valor, x + 12, y + 35, {
+      tamano: 12.5,
+      fuente: F.titulo,
+      color: C.tinta,
+      max: ancho - 24,
+    });
+  });
+
+  return alto;
 }
 
 function seccionCotizacion(ctx: Ctx) {
@@ -1328,7 +1404,9 @@ function seccionCotizacion(ctx: Ctx) {
   const cDescripcion = columna('descripcion')!;
   const compacta = !columna('unidad');
 
-  let y = encabezadoTabla(doc, yRecuadros + alto + 24, columnas);
+  const altoTarjetas = tarjetasResumen(ctx, yRecuadros + alto + 16);
+  const trasTarjetas = altoTarjetas ? 16 + altoTarjetas + 18 : 24;
+  let y = encabezadoTabla(doc, yRecuadros + alto + trasTarjetas, columnas);
 
   // Las partidas van seguidas, sin subtotales por grupo (el modelo no los tiene).
   const partidas = payload.grupos.flatMap((g) => g.partidas);
