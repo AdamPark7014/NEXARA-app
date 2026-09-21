@@ -16,6 +16,7 @@ import { ROLES } from "@/lib/rbac";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import { formatApiError } from "@/lib/erp-api";
 
 interface Snapshot {
   id: number;
@@ -49,6 +50,46 @@ async function apiFetch<T = unknown>(path: string, token: string, opts?: Request
   return res.json() as Promise<T>;
 }
 
+/**
+ * Tope del DTO de la API (`PaginationQueryDto`, `@Max(100)`).
+ *
+ * El alta de inventario pedía `service-clients?limit=200`, así que la ruta
+ * contestaba 400 y el desplegable «Cliente» quedaba vacío: sin cliente no hay
+ * sucursal, y sin sucursal el formulario no deja guardar nada.
+ */
+const POR_PAGINA = 100;
+
+/** Techo de seguridad del recorrido. Si se alcanza, se dice en pantalla. */
+const MAX_PAGINAS = 20;
+
+/** Respuesta paginada de la API cuando se le pasa `limit`. */
+type Pagina<T> = T[] | { data?: T[]; meta?: { total?: number } };
+
+/**
+ * Trae el padrón de clientes completo en páginas de 100.
+ *
+ * Un desplegable no admite «Cargar más»: o está el cliente o no está, y un
+ * inventario levantado contra el cliente equivocado no se arregla solo. Por
+ * eso se piden páginas sucesivas hasta cubrir el `meta.total` de la API.
+ */
+async function fetchClientes(
+  token: string,
+): Promise<{ filas: ServiceClient[]; parcial: { cargados: number; total: number } | null }> {
+  const filas: ServiceClient[] = [];
+  let total = 0;
+  for (let pagina = 1; pagina <= MAX_PAGINAS; pagina += 1) {
+    const d = await apiFetch<Pagina<ServiceClient>>(
+      `service-clients?limit=${POR_PAGINA}&page=${pagina}`,
+      token,
+    );
+    const lote: ServiceClient[] = Array.isArray(d) ? d : (d?.data ?? []);
+    filas.push(...lote);
+    total = Array.isArray(d) ? filas.length : (d?.meta?.total ?? filas.length);
+    if (lote.length < POR_PAGINA || filas.length >= total) return { filas, parcial: null };
+  }
+  return { filas, parcial: { cargados: filas.length, total } };
+}
+
 export default function AssetsPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "assets"), [user]);
@@ -80,6 +121,8 @@ export default function AssetsPage() {
   const [equipRows, setEquipRows] = useState<EquipmentRow[]>([{ equipmentName: "", serialNumber: "", model: "" }]);
   const [saving, setSaving] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  /** Clientes que quedaron fuera del recorrido: se avisa en vez de recortar. */
+  const [clientesParcial, setClientesParcial] = useState<{ cargados: number; total: number } | null>(null);
 
   const downloadReport = async (id: number) => {
     if (!token) return;
@@ -96,7 +139,7 @@ export default function AssetsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al descargar reporte");
+      toast.error(formatApiError(e, "Error al descargar reporte"));
     }
   };
 
@@ -107,7 +150,7 @@ export default function AssetsPage() {
       const data = await apiFetch("inventories?limit=100", token);
       setItems(Array.isArray(data) ? data : ((data as { data?: Snapshot[] })?.data ?? []));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar activos en campo");
+      setError(formatApiError(e, "Error al cargar activos en campo"));
     } finally { setLoading(false); }
   }, [token]);
 
@@ -115,11 +158,18 @@ export default function AssetsPage() {
 
   useEffect(() => {
     if (!token || !showForm || clients.length) return;
-    apiFetch<ServiceClient[]>("service-clients?limit=200", token)
-      .then((d) => setClients(Array.isArray(d) ? d : ((d as { data?: ServiceClient[] })?.data ?? [])))
+    void fetchClientes(token)
+      .then(({ filas, parcial }) => {
+        setClients(filas);
+        setClientesParcial(parcial);
+        setCatalogError(null);
+      })
       .catch((e) => {
         setClients([]);
-        setCatalogError(e instanceof Error ? e.message : "No se pudieron cargar clientes");
+        setClientesParcial(null);
+        setCatalogError(
+          `No se pudo cargar el padrón de clientes, así que la lista está vacía y el inventario no se puede registrar. Vuelve a abrir el formulario; si sigue igual, avisa a soporte con este dato: «${formatApiError(e, "el servidor no contestó").replace(/\s*\.?\s*$/, "")}».`,
+        );
       });
   }, [token, showForm, clients.length]);
 
@@ -162,7 +212,7 @@ export default function AssetsPage() {
       setEquipRows([{ equipmentName: "", serialNumber: "", model: "" }]);
       void load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo registrar el inventario");
+      toast.error(formatApiError(e, "No se pudo registrar el inventario"));
     } finally { setSaving(false); }
   };
 
@@ -259,7 +309,13 @@ export default function AssetsPage() {
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
           <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 13 }}>Registrar inventario en sitio</p>
-          {catalogError && <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--danger)" }}>{catalogError}</p>}
+          {catalogError && <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--danger)", lineHeight: 1.45 }}>{catalogError}</p>}
+          {!catalogError && clientesParcial && (
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--state-warning-text)", lineHeight: 1.45 }}>
+              Se cargaron {clientesParcial.cargados} clientes de {clientesParcial.total}: si el de
+              esta visita no aparece en la lista, búscalo primero en el padrón de clientes.
+            </p>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Cliente *</label>

@@ -14,6 +14,7 @@ import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 
 interface Contract {
@@ -41,6 +42,40 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   if (res.status === 204) return null;
   const t = await res.text();
   return t ? JSON.parse(t) : null;
+}
+
+/**
+ * Tope del DTO de la API (`PaginationQueryDto`, `@Max(100)`).
+ *
+ * El alta de contrato pedía `service-clients?limit=200`, así que la ruta
+ * contestaba 400: el desplegable «Cliente» del formulario nunca se llenó y,
+ * al ser obligatorio, no se podía dar de alta ningún contrato desde aquí.
+ */
+const POR_PAGINA = 100;
+
+/** Techo de seguridad del recorrido. Si se alcanza, se dice en pantalla. */
+const MAX_PAGINAS = 20;
+
+/**
+ * Trae el padrón de clientes completo en páginas de 100.
+ *
+ * Un desplegable no admite «Cargar más»: o está el cliente o no está, y si se
+ * recortara en silencio el contrato se firmaría contra otro. Por eso se piden
+ * páginas sucesivas hasta cubrir el `meta.total` de la propia API.
+ */
+async function fetchClientes(
+  token: string,
+): Promise<{ filas: ServiceClient[]; parcial: { cargados: number; total: number } | null }> {
+  const filas: ServiceClient[] = [];
+  let total = 0;
+  for (let pagina = 1; pagina <= MAX_PAGINAS; pagina += 1) {
+    const d = await apiFetch(`service-clients?limit=${POR_PAGINA}&page=${pagina}`, token);
+    const lote: ServiceClient[] = Array.isArray(d) ? d : (d?.data ?? []);
+    filas.push(...lote);
+    total = Array.isArray(d) ? filas.length : (d?.meta?.total ?? filas.length);
+    if (lote.length < POR_PAGINA || filas.length >= total) return { filas, parcial: null };
+  }
+  return { filas, parcial: { cargados: filas.length, total } };
 }
 
 const FREQUENCIES = ["WEEKLY", "BIWEEKLY", "MONTHLY", "BIMONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"] as const;
@@ -72,6 +107,8 @@ export default function MaintenanceContractsPage() {
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState<ServiceClient[]>([]);
   const [clientsErr, setClientsErr] = useState<string | null>(null);
+  /** Clientes que quedaron fuera del recorrido: se avisa en vez de recortar. */
+  const [clientsParcial, setClientsParcial] = useState<{ cargados: number; total: number } | null>(null);
   const [selected, setSelected] = useState<Contract | null>(null);
   const [visits, setVisits] = useState<Array<{ id: number; scheduledDate: string; description?: string; status: string; activityId?: number | null }>>([]);
   const [visitsLoading, setVisitsLoading] = useState(false);
@@ -88,7 +125,7 @@ export default function MaintenanceContractsPage() {
       const data = await apiFetch("maintenance-contracts", token);
       setItems(Array.isArray(data) ? data : (data?.data ?? []));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar contratos");
+      setError(formatApiError(e, "Error al cargar contratos"));
     } finally { setLoading(false); }
   }, [token]);
 
@@ -96,9 +133,17 @@ export default function MaintenanceContractsPage() {
 
   useEffect(() => {
     if (showForm && token && !clients.length) {
-      apiFetch("service-clients?limit=200", token)
-        .then((d) => setClients(Array.isArray(d) ? d : (d?.data ?? [])))
-        .catch((e) => setClientsErr(e instanceof Error ? e.message : "No se pudieron cargar clientes"));
+      void fetchClientes(token)
+        .then(({ filas, parcial }) => {
+          setClients(filas);
+          setClientsParcial(parcial);
+          setClientsErr(null);
+        })
+        .catch((e) =>
+          setClientsErr(
+            `No se pudo cargar el padrón de clientes, así que la lista está vacía. Vuelve a abrir el formulario; si sigue igual, avisa a soporte con este dato: «${formatApiError(e, "el servidor no contestó").replace(/\s*\.?\s*$/, "")}».`,
+          ),
+        );
     }
   }, [showForm, token, clients.length]);
 
@@ -111,7 +156,7 @@ export default function MaintenanceContractsPage() {
       setVisits(Array.isArray(data) ? data : (data?.data ?? []));
     } catch (e) {
       setVisits([]);
-      setVisitsErr(e instanceof Error ? e.message : "No se pudieron cargar visitas");
+      setVisitsErr(formatApiError(e, "No se pudieron cargar visitas"));
     } finally {
       setVisitsLoading(false);
     }
@@ -144,7 +189,7 @@ export default function MaintenanceContractsPage() {
       setItems((prev) => prev.map((i) => (i.id === selected.id ? { ...i, ...updated } : i)));
       setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
     } catch (e) {
-      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(formatApiError(e, "No se pudo completar la operación"));
     } finally {
       setEditSaving(false);
     }
@@ -165,7 +210,7 @@ export default function MaintenanceContractsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al descargar PDF");
+      toast.error(formatApiError(e, "Error al descargar PDF"));
     }
   };
 
@@ -175,7 +220,7 @@ export default function MaintenanceContractsPage() {
       await apiFetch(`maintenance-contracts/visits/${visitId}/generate-ot`, token, { method: "POST", body: "{}" });
       if (selected) void loadVisits(selected.id);
     } catch (e) {
-      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(formatApiError(e, "No se pudo completar la operación"));
     }
   };
 
@@ -185,7 +230,7 @@ export default function MaintenanceContractsPage() {
       await apiFetch(`maintenance-contracts/visits/${visitId}/complete`, token, { method: "POST", body: "{}" });
       if (selected) void loadVisits(selected.id);
     } catch (e) {
-      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(formatApiError(e, "No se pudo completar la operación"));
     }
   };
 
@@ -209,7 +254,7 @@ export default function MaintenanceContractsPage() {
       setShowForm(false);
       setForm({ ...emptyForm });
     } catch (e) {
-      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+      toast.error(formatApiError(e, "No se pudo crear el contrato"));
     } finally { setSaving(false); }
   };
 
@@ -249,7 +294,7 @@ export default function MaintenanceContractsPage() {
     try {
       await apiFetch(`maintenance-contracts/${c.id}/status`, token, { method: "PATCH", body: JSON.stringify({ status }) });
       setItems((prev) => prev.map((i) => (i.id === c.id ? { ...i, status: status as Contract["status"] } : i)));
-    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(formatApiError(e, "No se pudo completar la operación")); }
   };
 
   const columns: Column<Contract>[] = [
@@ -345,7 +390,13 @@ export default function MaintenanceContractsPage() {
                 <option value="">— Seleccionar —</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              {clientsErr && <p style={{ fontSize: 11, color: "var(--danger)", margin: "4px 0 0" }}>{clientsErr}</p>}
+              {clientsErr && <p style={{ fontSize: 11, color: "var(--danger)", margin: "4px 0 0", lineHeight: 1.45 }}>{clientsErr}</p>}
+              {!clientsErr && clientsParcial && (
+                <p style={{ fontSize: 11, color: "var(--state-warning-text)", margin: "4px 0 0", lineHeight: 1.45 }}>
+                  Se cargaron {clientsParcial.cargados} clientes de {clientsParcial.total}: si el
+                  que buscas no aparece, búscalo primero en el padrón de clientes.
+                </p>
+              )}
             </div>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Frecuencia *</label>

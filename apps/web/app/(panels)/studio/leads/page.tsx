@@ -14,6 +14,7 @@ import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 
 
@@ -29,6 +30,17 @@ interface ContactMessage {
 }
 
 interface SourceRow { source: string; total: number; responded: number; conversionPct: number }
+
+/**
+ * Tope del DTO de la API (`PaginationQueryDto`, `@Max(100)`). El cotejo con el
+ * CRM pedía `limit=200`, así que la ruta contestaba 400 y el `catch` de más
+ * abajo se lo tragaba: ningún mensaje se marcaba nunca como «En CRM» y el
+ * botón «Enviar a CRM» seguía activo aunque el lead ya estuviera creado.
+ */
+const POR_PAGINA = 100;
+
+/** Techo de seguridad de los recorridos paginados. */
+const MAX_PAGINAS = 20;
 
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const res = await fetch(buildApiUrl(path), {
@@ -78,6 +90,8 @@ export default function StudioLeadsPage() {
   const [filterSource, setFilterSource] = useState("");
   const [promotingId, setPromotingId] = useState<number | null>(null);
   const [promotedIds, setPromotedIds] = useState<Set<number>>(() => new Set());
+  /** Por qué el distintivo «En CRM» puede no ser de fiar en esta carga. */
+  const [crmAviso, setCrmAviso] = useState<string | null>(null);
 
   const promoteToCrm = async (m: ContactMessage) => {
     if (!token) return;
@@ -104,7 +118,7 @@ export default function StudioLeadsPage() {
       setPromotedIds((prev) => new Set(prev).add(m.id));
       toast.success("Lead enviado a CRM");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo enviar a CRM");
+      toast.error(formatApiError(e, "No se pudo enviar a CRM"));
     } finally {
       setPromotingId(null);
     }
@@ -114,23 +128,35 @@ export default function StudioLeadsPage() {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const pageSize = 100;
-      let page = 1;
       const all: ContactMessage[] = [];
-      while (true) {
-        const data = await apiFetch(`contact-messages?limit=${pageSize}&page=${page}`, token);
+      for (let page = 1; page <= MAX_PAGINAS; page += 1) {
+        const data = await apiFetch(`contact-messages?limit=${POR_PAGINA}&page=${page}`, token);
         const rows = Array.isArray(data) ? data : (data?.data ?? []);
         all.push(...rows);
         const total = data?.meta?.total ?? rows.length;
-        if (all.length >= total || rows.length < pageSize) break;
-        page += 1;
+        if (all.length >= total || rows.length < POR_PAGINA) break;
       }
       setMessages(all);
 
       // Persistencia de «ya en CRM»: leads con source=Studio (email o contactMessageId en notes)
+      setCrmAviso(null);
       try {
-        const crm = await apiFetch("ventas/leads?limit=200", token);
-        const leads = Array.isArray(crm) ? crm : (crm?.data ?? []);
+        // Se recorre el CRM entero en páginas de 100: un lead que quedara
+        // fuera del cotejo se volvería a enviar y quedaría duplicado.
+        const leads: Array<Record<string, unknown>> = [];
+        let crmCompleto = false;
+        for (let page = 1; page <= MAX_PAGINAS; page += 1) {
+          const crm = await apiFetch(`ventas/leads?limit=${POR_PAGINA}&page=${page}`, token);
+          const lote = Array.isArray(crm) ? crm : (crm?.data ?? []);
+          leads.push(...lote);
+          const total = Array.isArray(crm) ? leads.length : (crm?.meta?.total ?? leads.length);
+          if (lote.length < POR_PAGINA || leads.length >= total) { crmCompleto = true; break; }
+        }
+        if (!crmCompleto) {
+          setCrmAviso(
+            `El cotejo con el CRM se quedó en los ${leads.length} leads más recientes. Alguno de los mensajes marcados como pendientes podría estar ya en el pipeline: compruébalo antes de volver a enviarlo.`,
+          );
+        }
         const promoted = new Set<number>();
         const studioEmails = new Set<string>();
         const byMsgId = new Set<number>();
@@ -148,11 +174,15 @@ export default function StudioLeadsPage() {
           else if (msg.email && studioEmails.has(msg.email.trim().toLowerCase())) promoted.add(msg.id);
         }
         setPromotedIds(promoted);
-      } catch {
-        /* promote check best-effort */
+      } catch (e) {
+        // El listado de mensajes sí cargó: no se tumba la pantalla por esto.
+        // Pero callarlo hacía que todo saliera como «pendiente de enviar».
+        setCrmAviso(
+          `No se pudo cotejar con el CRM, así que ninguno aparece como «En CRM» aunque ya lo esté. ${formatApiError(e, "El servidor no contestó al listado de leads.")}`,
+        );
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar leads del sitio");
+      setError(formatApiError(e, "Error al cargar leads del sitio"));
     } finally { setLoading(false); }
   }, [token]);
 
@@ -249,6 +279,21 @@ export default function StudioLeadsPage() {
           </Section>
 
           <Section eyebrow="Bandeja" title="Mensajes de contacto">
+            {crmAviso && (
+              <p
+                style={{
+                  margin: "0 0 12px",
+                  padding: "9px 12px",
+                  borderRadius: 8,
+                  background: "var(--state-warning-bg)",
+                  color: "var(--state-warning-text)",
+                  fontSize: 12.5,
+                  lineHeight: 1.45,
+                }}
+              >
+                {crmAviso}
+              </p>
+            )}
             <FilterToolbar
               search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre, email, empresa o mensaje…" }}
               selects={[
