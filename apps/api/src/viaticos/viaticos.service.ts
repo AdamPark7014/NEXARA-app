@@ -22,6 +22,7 @@ import {
   resumenLiquidacion,
   validarReparto,
   type Parte,
+  repartirEnPartesIguales,
 } from './viatico-reparto.js';
 
 /** Cap list endpoints when the client omits limit (mobile dashboard was unbounded). */
@@ -408,6 +409,163 @@ export class ViaticosService {
     });
 
     return viatico;
+  }
+
+  /**
+   * Asigna el mismo viático a varias personas de una vez.
+   *
+   * Así se asigna de verdad: la cuadrilla sale el lunes a cubrir las
+   * actividades de la semana y se le da gasolina y casetas a los cuatro de
+   * golpe. Con el endpoint de uno en uno había que repetir la misma captura
+   * una vez por persona, y cada repetición es una ocasión de teclear mal el
+   * monto.
+   *
+   * Dos ejes distintos, que se confunden fácil:
+   *   - **beneficiarios** → un viático por cabeza; `montoPorPersona` es lo que
+   *     recibe cada uno, no el total del lote.
+   *   - **actividades** → un solo viático repartido entre ellas, que es lo que
+   *     mantiene honesto el costo por proyecto.
+   *
+   * Se valida TODO antes de crear nada. Un lote a medias deja a unos con
+   * dinero y a otros sin él, y nadie se entera de a quién le faltó hasta que
+   * reclama.
+   */
+  async assignLote(dto: any, actor: any, companyId?: number | null) {
+    if (!actor?.id) {
+      throw new ForbiddenException('Se requiere autenticación para asignar viáticos');
+    }
+
+    const soloIdsValidos = (raw: unknown): number[] => [
+      ...new Set((Array.isArray(raw) ? raw : []).map((v) => Number(v))),
+    ].filter((id) => Number.isInteger(id) && id > 0);
+
+    const usuarioIds = soloIdsValidos(dto?.usuarioIds);
+    if (usuarioIds.length === 0) {
+      throw new BadRequestException('Elige al menos un beneficiario.');
+    }
+
+    const actividadIds = soloIdsValidos(dto?.actividadIds);
+    const projectId = dto?.projectId ? Number(dto.projectId) : null;
+    if (actividadIds.length === 0 && !projectId) {
+      throw new BadRequestException(
+        'La asignación debe ligarse a al menos una actividad o a un proyecto.',
+      );
+    }
+
+    const tenantId = await resolveRequiredCompanyId(
+      this.prisma,
+      companyId ?? (dto?.companyId ? Number(dto.companyId) : null),
+    );
+
+    // Beneficiarios: que existan, que estén activos y que sean de esta empresa.
+    const beneficiarios = await this.prisma.user.findMany({
+      where: { id: { in: usuarioIds } },
+      select: { id: true, nombre: true, isActive: true },
+    });
+    const porId = new Map(beneficiarios.map((u) => [u.id, u]));
+    const inexistentes = usuarioIds.filter((id) => !porId.has(id));
+    if (inexistentes.length > 0) {
+      throw new BadRequestException(
+        `No encontramos ${inexistentes.length === 1 ? 'al beneficiario' : 'a los beneficiarios'} ` +
+          `${inexistentes.map((id) => `#${id}`).join(', ')}.`,
+      );
+    }
+    const inactivos = beneficiarios.filter((u) => u.isActive === false);
+    if (inactivos.length > 0) {
+      throw new BadRequestException(
+        `${inactivos.map((u) => u.nombre).join(', ')} ` +
+          `${inactivos.length === 1 ? 'está inactivo' : 'están inactivos'}: ` +
+          'quítalo de la lista antes de asignar.',
+      );
+    }
+
+    // Actividades: de esta empresa. Repartir hacia la actividad de otra
+    // empresa sería una fuga de datos disfrazada de contabilidad.
+    if (actividadIds.length > 0) {
+      const existentes = await this.prisma.activity.findMany({
+        where: { id: { in: actividadIds }, ...companyWhere(tenantId) },
+        select: { id: true },
+      });
+      const encontradas = new Set(existentes.map((a) => a.id));
+      const faltantes = actividadIds.filter((id) => !encontradas.has(id));
+      if (faltantes.length > 0) {
+        throw new BadRequestException(
+          `No encontramos ${faltantes.length === 1 ? 'la actividad' : 'las actividades'} ` +
+            `${faltantes.map((id) => `#${id}`).join(', ')} en tu empresa.`,
+        );
+      }
+    }
+
+    const montoPorPersona = Number(dto?.montoPorPersona);
+    if (!Number.isFinite(montoPorPersona) || montoPorPersona <= 0) {
+      throw new BadRequestException('El monto por persona debe ser mayor que cero.');
+    }
+
+    // Con una sola actividad el viático cuelga de ella, como siempre. Con
+    // varias, `actividadId` queda como ancla y el reparto es quien manda.
+    const actividadId = actividadIds[0] ?? null;
+    const partes =
+      actividadIds.length > 1
+        ? repartirEnPartesIguales(montoPorPersona, actividadIds)
+        : undefined;
+
+    const motivo = this.motivoDeLote(dto, actividadIds.length);
+
+    const creados: any[] = [];
+    for (const usuarioId of usuarioIds) {
+      creados.push(
+        await this.assign(
+          {
+            usuarioId,
+            actividadId,
+            projectId,
+            vehicleId: dto?.vehicleId ? Number(dto.vehicleId) : null,
+            categoria: dto?.categoria,
+            montoSolicitado: montoPorPersona,
+            motivo,
+            partes,
+          },
+          actor,
+          tenantId,
+        ),
+      );
+    }
+
+    return {
+      creados: creados.length,
+      montoPorPersona,
+      montoTotal: Number((montoPorPersona * creados.length).toFixed(2)),
+      actividadesCubiertas: actividadIds.length,
+      viaticos: creados,
+    };
+  }
+
+  /**
+   * El texto que verá quien lo reciba y quien lo apruebe. Un viático semanal
+   * sin decir de qué semana es imposible de conciliar tres meses después.
+   */
+  private motivoDeLote(dto: any, cuantasActividades: number): string {
+    const base = String(dto?.motivo ?? '').trim();
+    const periodo = this.periodoLegible(dto?.desde, dto?.hasta);
+    const cobertura =
+      cuantasActividades > 1 ? `${cuantasActividades} actividades` : null;
+    const partes = [base || 'Viático asignado', periodo, cobertura].filter(Boolean);
+    return partes.join(' · ').slice(0, 255);
+  }
+
+  private periodoLegible(desde?: string, hasta?: string): string | null {
+    const dia = (v?: string) => {
+      if (!v) return null;
+      const d = new Date(v);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+    const a = dia(desde);
+    const b = dia(hasta);
+    if (!a && !b) return null;
+    const fmt = (d: Date) =>
+      d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    if (a && b) return `del ${fmt(a)} al ${fmt(b)}`;
+    return a ? `desde el ${fmt(a)}` : `hasta el ${fmt(b!)}`;
   }
 
   /**

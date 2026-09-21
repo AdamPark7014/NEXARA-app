@@ -28,6 +28,7 @@ import { COLUMNAS_VIATICOS } from '../common/excel/reportes.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { CreateViaticoDto } from './dto/create-viatico.dto.js';
 import { AssignViaticoDto } from './dto/assign-viatico.dto.js';
+import { AssignViaticoLoteDto } from './dto/assign-viatico-lote.dto.js';
 import { UpdateViaticoDto } from './dto/update-viatico.dto.js';
 import { ComprobarViaticoDto, SetViaticoRepartoDto } from './dto/viatico-reparto.dto.js';
 
@@ -130,6 +131,36 @@ export class ViaticosController {
         ticketEvidenciaUrl,
         estatus: 'Pendiente',
         partes: body.partes,
+      },
+      user,
+      companyId,
+    );
+  }
+
+  /**
+   * Asigna el mismo viático a varias personas y/o varias actividades de una vez:
+   * la cuadrilla que sale el lunes a cubrir la semana. `montoPorPersona` es lo
+   * que recibe cada beneficiario, no el total del lote.
+   */
+  @Post('assign/lote')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  assignLote(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: AssignViaticoLoteDto,
+  ) {
+    return this.viaticosService.assignLote(
+      {
+        usuarioIds: body.usuarioIds,
+        actividadIds: body.actividadIds,
+        projectId: body.projectId ?? null,
+        vehicleId: body.vehicleId ?? null,
+        categoria: body.categoria,
+        montoPorPersona: Number(body.montoPorPersona),
+        motivo: body.motivo,
+        desde: body.desde,
+        hasta: body.hasta,
       },
       user,
       companyId,

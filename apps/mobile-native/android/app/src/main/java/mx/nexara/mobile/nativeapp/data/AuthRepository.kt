@@ -201,10 +201,12 @@ class AuthRepository(
             companyIdProvider = { sessionStore.load()?.companyId },
         ).create(mx.nexara.mobile.nativeapp.data.api.AuthApi::class.java)
 
+        // `company/mine` ya viene ordenado por `isDefault` descendente: la
+        // primera es la empresa del usuario. Preferir la primaria por encima de
+        // eso sacaba de su tenant a quien pertenece a más de una empresa.
         val companyId = runCatching {
             val companies = api.companyMine()
-            companies.firstOrNull { it.isPrimary == true }?.id
-                ?: companies.firstOrNull()?.id
+            companies.firstOrNull()?.id
         }.getOrNull()?.takeIf { it > 0L } ?: user.companyId
 
         val nav = runCatching { api.meNavigation() }.getOrNull()

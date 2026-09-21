@@ -277,21 +277,37 @@ PLAY_REVIEWER_PASSWORD='...' npm run seed:play-reviewer
 |---|---|
 | Nombre de las credenciales | `Cuenta de demostración NEXARA` |
 | Nombre de usuario | `play.review@nexara.com.mx` |
-| Contraseña | *(la que imprimió el script)* |
+| Contraseña | `NexaraPlayReview2026!` |
+
+*(Verificada contra producción el 21-09-2026: `POST /api/auth/login` responde 200 y la app
+nativa entra con ella. Si se vuelve a sembrar sin `PLAY_REVIEWER_PASSWORD`, el script genera
+una nueva y esta tabla queda mintiendo.)*
 
 Y en el campo de instrucciones:
 
 ```
-La app es una plataforma de gestión empresarial (ERP/CRM) de uso profesional. No tiene
-registro público: las cuentas las crea el administrador de cada organización.
+NEXARA es una plataforma de gestión de operaciones de campo para empresas de
+seguridad electrónica y redes. Es una herramienta de trabajo interno: no tiene
+registro público porque las cuentas las crea el administrador de cada empresa.
 
-1. Abre la app e inicia sesión con el usuario y contraseña de arriba.
-2. La cuenta pertenece a una organización de demostración con datos ficticios.
-3. Tras iniciar sesión verás el selector de paneles según los permisos del rol.
-4. Los permisos de ubicación y cámara se piden solo al entrar al panel OPS y son
-   opcionales: la app funciona si se rechazan.
+1. Abre la app e inicia sesión con el usuario y la contraseña de arriba.
+2. La cuenta pertenece a una empresa de demostración con datos ficticios. No
+   tiene acceso a ninguna otra.
+3. Abajo hay cuatro secciones: Actividades, Asistencias, Chat y Mi perfil.
+   - Actividades: el trabajo asignado del día y el de todo el equipo.
+   - Asistencias: entrada y salida de jornada.
+   - Chat: mensajería interna del equipo.
+   - Mi perfil: permisos de la cuenta y cierre de sesión.
+   El icono de cuadrícula, arriba a la derecha, abre el resto de módulos
+   (viáticos, vehículos, almacén, proyectos, organigrama).
+4. Permisos, todos opcionales — la app funciona si se rechazan:
+   - Notificaciones: se pide al entrar.
+   - Ubicación: se pide al registrar entrada de jornada en Asistencias. La
+     ubicación en segundo plano sólo se usa mientras la jornada está abierta y
+     se detiene al registrar la salida.
+   - Cámara: se pide al adjuntar evidencia fotográfica a una actividad.
 
-La misma cuenta funciona en la versión web: https://app.nexara.com.mx
+La misma cuenta funciona en la versión web: https://core.nexara.com.mx
 ```
 
 > **Por qué un tenant aparte y no la cuenta de un empleado:** entregar credenciales reales
@@ -302,10 +318,24 @@ La misma cuenta funciona en la versión web: https://app.nexara.com.mx
 > tras 5 contraseñas incorrectas. Si el revisor se atora, vuelve a correr el seed (limpia
 > `lockedUntil`) o usa `reset-user-password.sh`. Copia la contraseña con cuidado al pegarla.
 
-> **El tenant demo nace vacío.** Pantallas sin datos son aceptables para Google, pero una que
-> truene no lo es. Prueba la cuenta panel por panel en un teléfono real antes de enviar; si algún
-> módulo falla o se ve demasiado hueco, carga un puñado de registros ficticios en ese tenant
-> (un cliente, una oportunidad, una actividad) antes de la revisión.
+> **Los datos de demostración caducan.** `seed-play-demo-data.ts` fecha todo respecto al día
+> en que corre: actividades de «hoy», checadas de «hoy». El tablero del día pide justo la fecha
+> de hoy, así que **un día después de sembrar el revisor ya ve «Nada por hacer»**. Google revisa
+> días después de enviar, y una app que se ve vacía es motivo de rechazo. Hay que volver a
+> sembrar el mismo día del envío —y otra vez si la revisión se alarga:
+>
+> ```bash
+> docker exec nexara-api npm run seed:play-demo
+> ```
+>
+> Lo correcto es dejarlo en un cron diario en el servidor; mientras no exista, es trabajo manual
+> y hay que acordarse.
+
+> **Comprobado el 21-09-2026:** la cuenta entra, el tablero responde y las cuatro secciones
+> cargan. Lo que rompía antes era `GET /company/mine`, que inscribía a quien lo llamara en la
+> empresa real y la dejaba como predeterminada: el revisor salía de su tenant en su primer
+> login, veía empleados reales y sus propias actividades de demo desaparecían. Corregido en
+> `CompanyService.listForUser`; **el despliegue de ese cambio es requisito para enviar.**
 
 ### 6.2 Anuncios
 **No**, la app no contiene anuncios.

@@ -1,6 +1,11 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ViaticosService } from './viaticos.service.js';
-import { normalizarPartes, resumenLiquidacion, validarReparto } from './viatico-reparto.js';
+import {
+  normalizarPartes,
+  repartirEnPartesIguales,
+  resumenLiquidacion,
+  validarReparto,
+} from './viatico-reparto.js';
 
 const EMPRESA = 7;
 const OTRA_EMPRESA = 9;
@@ -431,5 +436,37 @@ describe('autorizar por menos de lo solicitado', () => {
     await expect(
       service.approveOrReject(50, { ...ADMIN, isSuperAdmin: true }, 'approve', undefined, EMPRESA, 5000),
     ).rejects.toThrow(/más de lo solicitado/i);
+  });
+});
+
+describe('repartirEnPartesIguales', () => {
+  it('reparte exacto cuando la división es limpia', () => {
+    const partes = repartirEnPartesIguales(300, [1, 2, 3]);
+    expect(partes.map((p) => p.monto)).toEqual([100, 100, 100]);
+    expect(validarReparto(partes, 300)).toEqual({ ok: true });
+  });
+
+  it('da el sobrante a las primeras partes en vez de perder centavos', () => {
+    const partes = repartirEnPartesIguales(100, [7, 8, 9]);
+    expect(partes.map((p) => p.monto)).toEqual([33.34, 33.33, 33.33]);
+    expect(validarReparto(partes, 100)).toEqual({ ok: true });
+  });
+
+  it('cuadra al centavo con importes feos', () => {
+    const partes = repartirEnPartesIguales(1234.57, [1, 2, 3, 4, 5, 6, 7]);
+    expect(validarReparto(partes, 1234.57)).toEqual({ ok: true });
+  });
+
+  it('conserva el orden de las actividades que se le dan', () => {
+    const partes = repartirEnPartesIguales(90, [42, 7, 13]);
+    expect(partes.map((p) => p.actividadId)).toEqual([42, 7, 13]);
+  });
+
+  it('se niega si a alguna actividad le tocaría menos de un centavo', () => {
+    expect(() => repartirEnPartesIguales(0.02, [1, 2, 3])).toThrow(/menos de un centavo/);
+  });
+
+  it('se niega sin actividades', () => {
+    expect(() => repartirEnPartesIguales(100, [])).toThrow(/al menos una actividad/);
   });
 });
