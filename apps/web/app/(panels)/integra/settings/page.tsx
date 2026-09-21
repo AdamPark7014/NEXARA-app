@@ -19,7 +19,8 @@ import {
 } from "../_Console";
 import { RetryNotice, RowsSkeleton } from "../_AccessUi";
 import { ModuleSwitch } from "../_ModuleSwitch";
-import { getActiveCompanyId } from "@/lib/tenant";
+import { buildApiUrl } from "@/lib/api-base";
+import { getActiveCompanyId, withTenantHeaders } from "@/lib/tenant";
 import { diagnosticar, pedirIntegra, type Diagnostico } from "../_fallosApi";
 import styles from "../integra.module.css";
 import a from "../_access.module.css";
@@ -90,6 +91,72 @@ function normalizarClientes(raw: unknown): ServiceClient[] {
   return salida;
 }
 
+/**
+ * Tope del DTO de la API (`PaginationQueryDto`, `@Max(100)`).
+ *
+ * Esta pantalla pedía `limit=200`, así que `service-clients` contestaba 400 y
+ * el `catch` de abajo lo daba por «listado opcional»: el desplegable «Cliente
+ * operativo (ERP)» salía siempre vacío, y el aviso que manda a vincular un
+ * cliente apuntaba a una lista en la que no había nada que elegir.
+ */
+const POR_PAGINA = 100;
+
+/** Techo de seguridad del recorrido. Si se alcanza, se dice en pantalla. */
+const MAX_PAGINAS = 20;
+
+/**
+ * `service-clients` es una ruta del ERP, no de INTEGRA.
+ *
+ * `pedirIntegra` cuelga `siteId` de toda URL, y el `ValidationPipe` global
+ * corre con `forbidNonWhitelisted`: ese parámetro de más bastaba para que la
+ * ruta contestara 400 aunque el `limit` fuera correcto —el segundo motivo,
+ * independiente del tope, por el que la lista llegaba vacía—. Así que se pide
+ * en crudo, conservando la cabecera de empresa, que sí hace falta.
+ */
+async function pedirErp<T>(path: string): Promise<T> {
+  const res = await fetch(buildApiUrl(path), {
+    credentials: "include",
+    headers: new Headers(withTenantHeaders({ "Content-Type": "application/json" })),
+  });
+  if (!res.ok) {
+    const cuerpo: unknown = await res.json().catch(() => null);
+    const msg = (cuerpo as { message?: unknown } | null)?.message;
+    throw new Error(
+      typeof msg === "string"
+        ? msg
+        : Array.isArray(msg)
+          ? msg.filter((x): x is string => typeof x === "string").join(" · ")
+          : `HTTP ${res.status}`,
+    );
+  }
+  return (await res.json()) as T;
+}
+
+/** Lo que quedó fuera del recorrido, para decirlo en vez de recortar callando. */
+type Parcial = { cargados: number; total: number };
+
+/**
+ * Trae el padrón de clientes completo en páginas de 100.
+ *
+ * Un desplegable no admite «Cargar más»: o está el cliente o no está. Si se
+ * recortara en silencio, el sitio se vincularía al cliente equivocado —o se
+ * quedaría sin vincular, que es lo que apaga el ticket automático de las
+ * alarmas—, así que se piden páginas sucesivas hasta cubrir el `meta.total`.
+ */
+async function cargarClientesOps(): Promise<{ filas: ServiceClient[]; parcial: Parcial | null }> {
+  const filas: ServiceClient[] = [];
+  let total = 0;
+  for (let pagina = 1; pagina <= MAX_PAGINAS; pagina += 1) {
+    const raw = await pedirErp<unknown>(`service-clients?limit=${POR_PAGINA}&page=${pagina}`);
+    const lote = normalizarClientes(raw);
+    filas.push(...lote);
+    const informado = Number((raw as { meta?: { total?: unknown } } | null)?.meta?.total);
+    total = Number.isFinite(informado) ? informado : filas.length;
+    if (lote.length < POR_PAGINA || filas.length >= total) return { filas, parcial: null };
+  }
+  return { filas, parcial: { cargados: filas.length, total } };
+}
+
 export default function IntegraSettingsPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [name, setName] = useState("");
@@ -107,6 +174,8 @@ export default function IntegraSettingsPage() {
   const [provider, setProvider] = useState<"ARTEMIS" | "HCT" | "ISAPI">("ARTEMIS");
   const [serviceClientId, setServiceClientId] = useState("");
   const [serviceClients, setServiceClients] = useState<ServiceClient[]>([]);
+  /** Por qué el desplegable de cliente operativo puede no estar completo. */
+  const [clientesAviso, setClientesAviso] = useState<string | null>(null);
   const [targetCompanyId, setTargetCompanyId] = useState("");
   /** Diagnóstico del último fallo: distingue permiso de servidor caído. */
   const [fallo, setFallo] = useState<Diagnostico | null>(null);
@@ -122,10 +191,22 @@ export default function IntegraSettingsPage() {
     try {
       setSites(await pedirIntegra<Site[]>("integra/sites"));
       try {
-        setServiceClients(normalizarClientes(await pedirIntegra<unknown>("service-clients?limit=200")));
-      } catch {
+        const { filas, parcial } = await cargarClientesOps();
+        setServiceClients(filas);
+        setClientesAviso(
+          parcial
+            ? `Se cargaron ${parcial.cargados} clientes de ${parcial.total}: si el de este sitio no aparece, búscalo primero en el padrón de OPS.`
+            : null,
+        );
+      } catch (e) {
         /* Listado opcional: sin él el sitio se crea igual, solo que sin
-           vincular cliente operativo. No merece bloquear la pantalla. */
+           vincular cliente operativo. No merece bloquear la pantalla —pero
+           tampoco callarse, porque entonces la lista vacía parece un padrón
+           vacío y nadie sabe que hay clientes que no se están viendo. */
+        setServiceClients([]);
+        setClientesAviso(
+          `No se pudo cargar el padrón de clientes de OPS, así que esta lista está vacía y el sitio se creará sin vincular. ${e instanceof Error && e.message ? `Detalle: ${e.message}` : "El servidor no contestó."}`,
+        );
       }
     } catch (e) {
       setFallo(diagnosticar(e, "cargar los sitios"));
@@ -273,7 +354,11 @@ export default function IntegraSettingsPage() {
         <RowsSkeleton rows={4} />
       ) : null}
 
-      {!loading && sites.length === 0 ? (
+      {/* El onboarding solo cuando de verdad no hay sitios. Si la carga falló,
+          `sites` está vacío porque no se pudo preguntar, no porque el cliente
+          no tenga ninguno: pintarlo junto al aviso de error decía a la vez
+          «no se pudo cargar» y «todavía no has creado ninguno». */}
+      {!loading && !fallo && sites.length === 0 ? (
         <div className={`${styles.igOnboard} ${a.onboard}`}>
           <div className={styles.igOnboardCard}>
             <EmptyState
@@ -475,6 +560,7 @@ export default function IntegraSettingsPage() {
                     ))}
                   </select>
                 </IgField>
+                {clientesAviso && <p className={a.hint}>{clientesAviso}</p>}
 
                 <details className={styles.igAdvanced}>
                   <summary>Avanzado</summary>

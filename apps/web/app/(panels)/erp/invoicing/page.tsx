@@ -83,6 +83,48 @@ function apiTypeParam(filter: "" | "INCOME" | "EXPENSE"): string {
   return "";
 }
 
+/**
+ * Tope del DTO de la API (`PaginationQueryDto`, `@Max(100)`).
+ *
+ * El selector de cliente pedía `limit=200`, así que la ruta contestaba 400 y
+ * la lista llegaba vacía —no recortada—: el campo «Cliente» del alta se
+ * escondía entero y nadie podía ligar la factura a su expediente.
+ */
+const POR_PAGINA = 100;
+
+/** Techo de seguridad del recorrido. Si se alcanza, se dice en pantalla. */
+const MAX_PAGINAS = 20;
+
+/** Lo que quedó fuera del recorrido, para decirlo en vez de callarlo. */
+type Parcial = { cargados: number; total: number };
+
+/**
+ * Trae un catálogo completo en páginas de 100.
+ *
+ * Un desplegable no admite «Cargar más»: o está el cliente o no está. Si se
+ * recortara en silencio, el que quedara fuera sería inseleccionable y quien
+ * factura no tendría forma de enterarse, así que se piden páginas sucesivas
+ * hasta completar el `meta.total` que informa la propia API.
+ */
+async function fetchCatalogo<T>(
+  ruta: string,
+  token: string,
+): Promise<{ filas: T[]; parcial: Parcial | null }> {
+  const filas: T[] = [];
+  let total = 0;
+  for (let pagina = 1; pagina <= MAX_PAGINAS; pagina += 1) {
+    const sep = ruta.includes("?") ? "&" : "?";
+    const data = await apiFetch(`${ruta}${sep}limit=${POR_PAGINA}&page=${pagina}`, token);
+    const lote: T[] = Array.isArray(data) ? data : (data?.data ?? []);
+    filas.push(...lote);
+    total = Array.isArray(data) ? filas.length : (data?.meta?.total ?? filas.length);
+    if (lote.length < POR_PAGINA || filas.length >= total) {
+      return { filas, parcial: null };
+    }
+  }
+  return { filas, parcial: { cargados: filas.length, total } };
+}
+
 export default function InvoicingPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "invoicing"), [user]);
@@ -120,6 +162,8 @@ export default function InvoicingPage() {
    */
   const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string; rfc?: string | null }>>([]);
   const [salesClients, setSalesClients] = useState<Array<{ id: number; name: string; taxId?: string | null }>>([]);
+  /** Clientes que no cupieron en el recorrido: se avisa, no se recorta callando. */
+  const [clientesParciales, setClientesParciales] = useState<Parcial | null>(null);
   /** Errores de timbrar/cancelar que mueren con el ConfirmDialog si solo hay toast. */
   const [actionError, setActionError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
@@ -162,7 +206,9 @@ export default function InvoicingPage() {
       const data = await apiFetch(`accounting/invoices?${params}`, token);
       setItems(Array.isArray(data) ? data : (data?.data ?? []));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar facturación");
+      // El cuerpo crudo de Nest («{"message":["…"],"statusCode":400}») no es
+      // una frase: `formatApiError` saca el motivo legible que va al vacío.
+      setError(formatApiError(e, "Error al cargar facturación"));
     } finally { setLoading(false); }
   }, [token, filter]);
 
@@ -187,9 +233,15 @@ export default function InvoicingPage() {
     void apiFetch("procurement/purchase-orders/suppliers", token)
       .then((data) => setSuppliers(Array.isArray(data) ? data : (data?.data ?? [])))
       .catch(() => setSuppliers([]));
-    void apiFetch("ventas/clientes?limit=200", token)
-      .then((data) => setSalesClients(Array.isArray(data) ? data : (data?.data ?? [])))
-      .catch(() => setSalesClients([]));
+    void fetchCatalogo<{ id: number; name: string; taxId?: string | null }>("ventas/clientes", token)
+      .then(({ filas, parcial }) => {
+        setSalesClients(filas);
+        setClientesParciales(parcial);
+      })
+      .catch(() => {
+        setSalesClients([]);
+        setClientesParciales(null);
+      });
   }, [showForm, token]);
 
   const [searchQ, setSearchQ] = useState("");
@@ -892,7 +944,11 @@ export default function InvoicingPage() {
             <FinanceField
               label={form.type === "INCOME" ? "Cliente" : "Proveedor"}
               optional
-              hint="Ligarla es lo que la hace aparecer en su expediente y en cuentas por cobrar o por pagar."
+              hint={
+                form.type === "INCOME" && clientesParciales
+                  ? `Se cargaron ${clientesParciales.cargados} clientes de ${clientesParciales.total}: si el que buscas no aparece, captura el receptor a mano y ligarás la factura después desde su expediente.`
+                  : "Ligarla es lo que la hace aparecer en su expediente y en cuentas por cobrar o por pagar."
+              }
             >
               <select
                 value={form.counterpartyId}
