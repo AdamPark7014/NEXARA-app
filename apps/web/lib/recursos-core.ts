@@ -48,5 +48,12 @@ export function coreVehiclesHome(user: UserAccessInput | null | undefined): stri
 export function puedeGestionarInventarioVehiculos(
   user?: { isSuperAdmin?: boolean; permissions?: string[] | null } | null,
 ): boolean {
-  return hasPermission(user, PERMISSIONS.VEHICLES_INVENTORY);
+  if (!user) return false;
+  return hasPermission(
+    {
+      isSuperAdmin: user.isSuperAdmin,
+      permissions: user.permissions ?? undefined,
+    },
+    PERMISSIONS.VEHICLES_INVENTORY,
+  );
 }
