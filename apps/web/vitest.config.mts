@@ -41,5 +41,9 @@ export default defineConfig({
     exclude: ['node_modules/**', '.next/**', 'build/**'],
     restoreMocks: true,
     clearMocks: true,
+    // Los cinco segundos por omisión los agota el editor de cotizaciones, cuya
+    // prueba más lenta ya gasta 2,6 s en solitario tecleando con `userEvent`.
+    // Con la máquina cargada se pasaba de largo y el suite fallaba a ratos.
+    testTimeout: 15_000,
   },
 });
