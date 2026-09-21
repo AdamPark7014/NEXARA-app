@@ -2,9 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
-import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import MetricStrip, { type Metric } from "@/components/ui/MetricStrip";
+import DataTable, { Money, type Column } from "@/components/ui/DataTable";
+import StatusDot, { type StatusTone } from "@/components/ui/StatusDot";
+import InlineAlert from "@/components/ui/InlineAlert";
+import ListExportActions from "@/components/ui/ListExportActions";
 import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
@@ -12,15 +16,49 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
+import { formatApiError } from "@/lib/erp-api";
 import { listSalesQuotes, type SalesQuote } from "@/lib/sales-api";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Borrador", SENT: "Enviada", APPROVED: "Aprobada",
   REJECTED: "Rechazada", EXPIRED: "Vencida",
 };
-const STATUS_VARIANT: Record<string, "positive" | "accent" | "warning" | "danger" | "neutral"> = {
-  DRAFT: "neutral", SENT: "accent", APPROVED: "positive",
+
+/**
+ * Regla 3 del contrato: punto y palabra, no pastilla rellena. Neutro para los
+ * pasos normales del flujo; color solo cuando el renglón pide algo o algo
+ * salió mal.
+ */
+const STATUS_TONE: Record<string, StatusTone> = {
+  DRAFT: "neutral", SENT: "neutral", APPROVED: "success",
   REJECTED: "danger", EXPIRED: "warning",
+};
+
+/**
+ * El primario de esta pantalla navega, así que tiene que ser un enlace:
+ * hacerlo con un manejador rompe ctrl+clic y «abrir en pestaña nueva».
+ * `Button` de `components/ui` solo renderiza `<button>` y envolverlo en
+ * `<Link>` deja un `<a><button>` —HTML inválido, dos controles anunciados
+ * para una sola acción—. El componente compartido no se toca: se resuelve
+ * aquí con los mismos tokens de un primario de 32px.
+ */
+const accionPrimaria: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  height: 32,
+  padding: "0 12px",
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  fontFamily: "inherit",
+  lineHeight: 1,
+  whiteSpace: "nowrap",
+  textDecoration: "none",
+  background: "color-mix(in srgb, var(--primary) 85%, var(--nx-ink))",
+  color: "var(--ui-fg-on-brand)",
+  border: "1px solid color-mix(in srgb, var(--primary) 62%, var(--nx-ink))",
 };
 
 export default function ClientQuotesPage() {
@@ -47,6 +85,16 @@ export default function ClientQuotesPage() {
     return rows;
   }, [quotes, searchQ, filterStatus]);
 
+  const resumen = useMemo(() => {
+    const porEstado: Record<string, number> = {};
+    let totalAprobado = 0;
+    for (const q of quotes) {
+      porEstado[q.status] = (porEstado[q.status] ?? 0) + 1;
+      if (q.status === "APPROVED") totalAprobado += Number(q.total ?? 0);
+    }
+    return { porEstado, totalAprobado };
+  }, [quotes]);
+
   const load = useCallback(async () => {
     if (!token || !client) return;
     setLoading(true);
@@ -55,7 +103,9 @@ export default function ClientQuotesPage() {
       const data = await listSalesQuotes(token, { clientName: client.name });
       setQuotes(data);
     } catch (e) {
-      setQError(e instanceof Error ? e.message : "Error al cargar cotizaciones");
+      // Se avisa del fallo, pero lo que ya estaba en la tabla se queda: un
+      // refresco que falla no puede dejar la pantalla peor que antes.
+      setQError(formatApiError(e, "No se pudieron cargar las cotizaciones"));
     } finally {
       setLoading(false);
     }
@@ -67,16 +117,48 @@ export default function ClientQuotesPage() {
   if (!client) return null;
 
   const pdfDocs = (client.documents ?? []).filter((d) => /cotiz|quote|propuesta/i.test(d.type));
+  const nuevaHref = `/crm/quotes/builder?clientId=${client.id}&clientName=${encodeURIComponent(client.name)}`;
 
-  const aprobadas = quotes.filter((q) => q.status === "APPROVED").length;
-  const totalAprobado = quotes.filter((q) => q.status === "APPROVED").reduce((s, q) => s + Number(q.total ?? 0), 0);
+  /** Regla 7: el vacío es «no hay ni un registro», no «la suma dio cero». */
+  const sinRegistros = quotes.length === 0;
+  const primeraCarga = loading && sinRegistros;
+
+  const aprobadas = resumen.porEstado.APPROVED ?? 0;
+  const enviadas = resumen.porEstado.SENT ?? 0;
+  const vencidas = resumen.porEstado.EXPIRED ?? 0;
+
+  const metrics: Metric[] = [
+    { label: "Cotizaciones", value: quotes.length, hint: "de este cliente" },
+    {
+      label: "Enviadas",
+      value: enviadas,
+      hint: "esperando respuesta",
+      onClick: () => setFilterStatus(filterStatus === "SENT" ? "" : "SENT"),
+    },
+    {
+      label: "Aprobadas",
+      value: aprobadas,
+      hint: aprobadas === 1 ? "1 de las enviadas" : `${aprobadas} de ${quotes.length}`,
+      onClick: () => setFilterStatus(filterStatus === "APPROVED" ? "" : "APPROVED"),
+    },
+    { label: "Total aprobado", value: <Money value={resumen.totalAprobado} />, hint: "suma de las aprobadas" },
+  ];
+  if (vencidas > 0) {
+    metrics.push({
+      label: "Vencidas",
+      value: vencidas,
+      hint: "sin respuesta, ya sin vigencia",
+      tone: "warning",
+      onClick: () => setFilterStatus(filterStatus === "EXPIRED" ? "" : "EXPIRED"),
+    });
+  }
 
   const quoteCols: Column<SalesQuote>[] = [
     {
       key: "quoteNumber",
       label: "Folio",
       render: (q) => (
-        <Link href={`/crm/quotes/${q.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
+        <Link href={`/crm/quotes/${q.id}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
           {q.quoteNumber}
         </Link>
       ),
@@ -86,129 +168,133 @@ export default function ClientQuotesPage() {
     {
       key: "status",
       label: "Estado",
-      render: (q) => <Tag variant={STATUS_VARIANT[q.status] ?? "neutral"}>{STATUS_LABEL[q.status] ?? q.status}</Tag>,
+      render: (q) => <StatusDot tone={STATUS_TONE[q.status] ?? "neutral"} label={STATUS_LABEL[q.status] ?? q.status} />,
       width: 110,
     },
-    { key: "issueDate", label: "Emisión", render: (q) => new Date(q.issueDate).toLocaleDateString("es-MX"), width: 110 },
-    { key: "total", label: "Total", render: (q) => <Money value={Number(q.total)} />, width: 120 },
+    { key: "issueDate", label: "Emisión", render: (q) => new Date(q.issueDate).toLocaleDateString("es-MX"), width: 110, numeric: true },
+    { key: "total", label: "Total", render: (q) => <Money value={Number(q.total)} />, width: 120, align: "right", numeric: true },
   ];
 
   return (
-    <>
-      {!loading && quotes.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-          <KpiCard label="Cotizaciones" value={quotes.length} icon="📄" />
-          <KpiCard label="Aprobadas" value={aprobadas} variant={aprobadas > 0 ? "positive" : "default"} icon="✅" />
-          <KpiCard label="Total aprobado" value={new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(totalAprobado)} variant="accent" icon="💰" />
-          <KpiCard label="Tasa aprobación" value={`${quotes.length > 0 ? Math.round((aprobadas / quotes.length) * 100) : 0}%`} variant={aprobadas / Math.max(quotes.length, 1) >= 0.5 ? "positive" : "warning"} icon="📊" />
-        </div>
-      )}
-      {!loading && quotes.length > 0 && (() => {
-        const byStatus: Record<string, number> = {};
-        for (const q of quotes) byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
-        const total = quotes.length;
-        const statusColors: Record<string, string> = { DRAFT: "var(--text-tertiary)", SENT: "var(--primary)", APPROVED: "var(--success)", REJECTED: "var(--danger)", EXPIRED: "var(--warning)" };
-        return (
-          <div style={{ marginBottom: 14, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Distribución por estado</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
-                <div key={s} style={{ display: "grid", gridTemplateColumns: "90px 1fr 30px", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 11.5, color: "var(--text-secondary)", fontWeight: 500 }}>{STATUS_LABEL[s] ?? s}</span>
-                  <div style={{ height: 5, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: statusColors[s] ?? "var(--primary)", borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+    <div style={{ display: "grid", gap: 16 }}>
+      {/* Regla 7: sin registros no se pinta la tira. Cuatro celdas en cero
+          encima de un «Sin cotizaciones» ocupan el sitio de lo que ayuda. */}
+      {!sinRegistros && <MetricStrip metrics={metrics} ariaLabel="Resumen de cotizaciones del cliente" />}
 
-      <DetailSection title="Cotizaciones CRM">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-            {quotes.length} cotización{quotes.length !== 1 ? "es" : ""}
-          </span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
-            <Link href={`/crm/quotes/builder?clientId=${client.id}&clientName=${encodeURIComponent(client.name)}`} style={{ textDecoration: "none" }}>
-              <Button variant="primary" size="sm" iconLeft="+">Nueva cotización</Button>
-            </Link>
-          </div>
-        </div>
+      <DetailSection title="Cotizaciones">
+        {qError && (
+          <InlineAlert
+            variant="danger"
+            message={qError}
+            style={{ marginBottom: 0 }}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void load()}>
+                Reintentar
+              </Button>
+            }
+          />
+        )}
 
-        {quotes.length > 0 && (
+        {/* Regla 8: buscador, selector y acciones en UNA fila, sin caja ni
+            fondo propios, y el primario a la derecha de esa misma fila. */}
+        {!sinRegistros && (
           <FilterToolbar
-            search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por número o proyecto…" }}
+            search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por folio o proyecto…" }}
             selects={[{
               label: "Estado",
               value: filterStatus,
               onChange: setFilterStatus,
-              options: Object.entries(STATUS_LABEL).map(([v, l]) => ({ value: v, label: l })),
+              // El conteo por estado va en la propia opción: dice lo mismo que
+              // la gráfica de barras que ocupaba una caja entera encima.
+              options: Object.entries(STATUS_LABEL).map(([v, l]) => ({
+                value: v,
+                label: resumen.porEstado[v] ? `${l} (${resumen.porEstado[v]})` : l,
+              })),
               allowAll: true,
             }]}
             onClear={() => { setSearchQ(""); setFilterStatus(""); }}
-            resultCount={visibleQuotes.length}
+            style={{ marginBottom: 0 }}
+            resultCount={primeraCarga ? null : visibleQuotes.length}
             rightActions={
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleQuotes, [
-                { key: "quoteNumber", label: "Número" },
-                { key: "projectName", label: "Proyecto" },
-                { key: "status", label: "Estado", format: (v) => STATUS_LABEL[String(v)] ?? String(v) },
-                { key: "total", label: "Total" },
-                { key: "issueDate", label: "Fecha", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
-              ], "cotizaciones-cliente")}>Excel</Button>
+              // El contenedor de `rightActions` no salta de renglón: a 375px
+              // tres acciones seguidas sacarían la fila de la pantalla. El
+              // salto se resuelve aquí, sin tocar el componente compartido.
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
+                  {loading ? "Actualizando…" : "Actualizar"}
+                </Button>
+                <ListExportActions
+                  excelDisabled={visibleQuotes.length === 0}
+                  onExcel={() => exportToExcel(visibleQuotes, [
+                    { key: "quoteNumber", label: "Número" },
+                    { key: "projectName", label: "Proyecto" },
+                    { key: "status", label: "Estado", format: (v) => STATUS_LABEL[String(v)] ?? String(v) },
+                    { key: "total", label: "Total" },
+                    { key: "issueDate", label: "Fecha", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
+                  ], "cotizaciones-cliente")}
+                />
+                <Link href={nuevaHref} style={accionPrimaria}>Nueva cotización</Link>
+              </div>
             }
           />
         )}
 
-        {loading && <EmptyState icon="⏳" title="Cargando cotizaciones…" description="" />}
-        {!loading && qError && (
-          <EmptyState icon="⚠️" title="No se pudieron cargar" description={qError}
-            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
-        )}
-        {!loading && !qError && quotes.length === 0 && (
-          <EmptyState icon="📝" title="Sin cotizaciones"
-            description="Crea una cotización para este cliente desde la sección de Cotizaciones."
-            action={
-              <Link href={`/crm/quotes/builder?clientId=${client.id}&clientName=${encodeURIComponent(client.name)}`} style={{ textDecoration: "none" }}>
-                <Button size="sm" variant="primary">Nueva cotización</Button>
-              </Link>
-            }
+        {primeraCarga ? (
+          <p role="status" aria-live="polite" style={{ margin: 0, padding: "24px 0", textAlign: "center", fontSize: 13, color: "var(--text-secondary)" }}>
+            Cargando cotizaciones…
+          </p>
+        ) : sinRegistros && !qError ? (
+          // El vacío explica de dónde sale la primera y trae el botón que la
+          // crea. Aquí vive el único primario cuando no hay nada que filtrar.
+          <EmptyState
+            title="Sin cotizaciones"
+            description={`Las cotizaciones de ${client.name} se arman en el generador: eliges las partidas, se calcula el total y queda ligada a este cliente.`}
+            action={<Link href={nuevaHref} style={accionPrimaria}>Nueva cotización</Link>}
           />
-        )}
-        {!loading && !qError && quotes.length > 0 && (
+        ) : !sinRegistros ? (
           <DataTable
             columns={quoteCols}
             rows={visibleQuotes}
             rowKey={(q) => q.id}
-            emptyTitle="Sin resultados"
-            emptyDescription="Ajusta los filtros de búsqueda."
+            density="compact"
+            ariaLabel="Cotizaciones del cliente"
+            emptyTitle="Nada con estos filtros"
+            emptyDescription="Ajusta la búsqueda o el estado."
+            emptyAction={
+              <Button size="sm" variant="secondary" onClick={() => { setSearchQ(""); setFilterStatus(""); }}>
+                Quitar filtros
+              </Button>
+            }
           />
-        )}
+        ) : null}
       </DetailSection>
 
       {pdfDocs.length > 0 && (
         <DetailSection title="PDFs adjuntos">
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
             {pdfDocs.map((d) => (
-              <li key={d.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{d.fileName || d.type}</div>
+              <li key={d.id} style={{ padding: "10px 14px", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, overflowWrap: "anywhere" }}>{d.fileName || d.type}</div>
                   <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 2 }}>
                     {d.type} · v{d.version} · {new Date(d.createdAt).toLocaleDateString("es-MX")}
                   </div>
                 </div>
-                <a href={buildApiUrl(d.fileUrl.replace(/^\//, ""))} target="_blank" rel="noreferrer"
-                  style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
-                  PDF
+                <a
+                  href={buildApiUrl(d.fileUrl.replace(/^\//, ""))}
+                  target="_blank"
+                  rel="noreferrer"
+                  // Un enlace que se toca con el dedo necesita alto real, no
+                  // solo texto: 40px es el mínimo del contrato.
+                  style={{ display: "inline-flex", alignItems: "center", minHeight: 40, padding: "0 8px", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}
+                >
+                  Abrir PDF
                 </a>
               </li>
             ))}
           </ul>
         </DetailSection>
       )}
-    </>
+    </div>
   );
 }
