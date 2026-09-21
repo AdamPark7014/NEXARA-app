@@ -11,43 +11,6 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-data class ViaticDto(
-    val id: Long,
-    val usuarioId: Long? = null,
-    val montoSolicitado: Double? = null,
-    val estatusPago: String? = null,
-    val estatus: String? = null,
-    val razonGasto: String? = null,
-    val motivo: String? = null,
-    val categoria: String? = null,
-    val createdAt: String? = null,
-    val usuario: SimpleUserDto? = null,
-    val actividadId: Long? = null,
-    val actividad: ActivityShortDto? = null,
-    val ticketEvidenciaUrl: String? = null,
-) {
-    fun displayStatus(): String = estatusPago ?: estatus ?: "—"
-    fun linkedActivityId(): Long? = actividadId ?: actividad?.id
-}
-
-data class CreateViaticJsonRequest(
-    val montoSolicitado: Double,
-    val motivo: String,
-    val categoria: String? = null,
-    val actividadId: Long? = null,
-    val ticketEvidenciaUrl: String,
-)
-
-data class AssignViaticJsonRequest(
-    val usuarioId: Long,
-    val montoSolicitado: Double,
-    val motivo: String,
-    val categoria: String? = null,
-    val actividadId: Long? = null,
-    val projectId: Long? = null,
-    val vehicleId: Long? = null,
-)
-
 data class ActivityShortDto(
     val id: Long? = null,
     val anNumber: String? = null,
@@ -458,18 +421,10 @@ data class AttendanceRegisterResponse(
  * BaseURL ya incluye /api.
  */
 interface ConsoleApi {
-    @GET("viatics")
-    suspend fun getViatics(): List<ViaticDto>
-
-    @retrofit2.http.POST("viatics")
-    suspend fun createViatic(
-        @retrofit2.http.Body body: CreateViaticJsonRequest,
-    ): ViaticDto
-
-    @retrofit2.http.POST("viatics/assign")
-    suspend fun assignViatic(
-        @retrofit2.http.Body body: AssignViaticJsonRequest,
-    ): ViaticDto
+    // Los viáticos vivían aquí como cableado muerto —tres métodos que ninguna
+    // pantalla llamaba— y con un contrato incompleto (sin reparto, sin
+    // comprobación, sin liquidación). Ahora tienen módulo propio: ver
+    // `ViaticosApi` y `data/viaticos/ViaticosRepository`.
 
     @GET("activities")
     suspend fun getActivities(

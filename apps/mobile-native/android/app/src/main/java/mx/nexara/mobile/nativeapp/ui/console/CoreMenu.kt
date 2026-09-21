@@ -47,6 +47,18 @@ enum class CoreExtraModule(
     /** Página web del módulo (se abre en `https://core.nexara.com.mx`). */
     val webPath: String,
     val summary: String,
+    /**
+     * Lo ve todo el personal, tenga o no su clave en `me/navigation`.
+     *
+     * Solo Viáticos. Los demás módulos de «Más» se conceden por rol, pero el
+     * gasto de bolsillo lo hace cualquiera y lo autoriza la dirección: las
+     * reglas del CEO son comodines de ruta (todo `/erp`, y `/api` en GET, con
+     * doble asterisco) y no producen
+     * la clave `viatics`, así que filtrar por navegación se lo escondería justo
+     * a quien tiene que aprobar desde la calle. Quien no tenga el permiso ve el
+     * mensaje del 403 del API, que es quien de verdad decide.
+     */
+    val paraTodoElPersonal: Boolean = false,
 ) {
     COTIZACIONES(CoreKeys.COTIZACIONES, "Cotizaciones", "/erp/cotizaciones", "Propuestas técnicas: folio, envío y seguimiento."),
     PROYECTOS(CoreKeys.PROYECTOS, "Proyectos", "/erp/proyectos", "Cronograma, alcance, equipo y documentos."),
@@ -55,14 +67,29 @@ enum class CoreExtraModule(
     HERRAMIENTAS(CoreKeys.HERRAMIENTAS, "Herramientas", "/erp/almacen/herramientas", "Solicita herramienta, revisa tu kit y tus préstamos."),
     VEHICULOS(CoreKeys.VEHICULOS, "Vehículos", "/erp/vehiculos", "Solicita un vehículo; entrega y recepción con fotos."),
     ORGANIGRAMA(CoreKeys.ORGANIGRAMA, "Organigrama", "/erp/organigrama", "Quién reporta a quién en NEXARA."),
+    VIATICOS(
+        CoreKeys.VIATICOS,
+        "Viáticos",
+        "/erp/finance/viatics",
+        "Pide un viático con la foto del ticket, repártelo y compruébalo.",
+        paraTodoElPersonal = true,
+    ),
     ;
 
     /** URL completa en la web de Core. */
     val webUrl: String get() = CoreMenu.CORE_WEB_BASE + webPath
 
+    /**
+     * Claves con las que `me/navigation` puede nombrar este módulo. Casi
+     * siempre una; Viáticos llega como `viatics` o como `my-viatics` según la
+     * ruta que tenga el rol en url-matrix.
+     */
+    val claves: Set<String>
+        get() = if (this == VIATICOS) setOf(CoreKeys.VIATICOS, CoreKeys.MIS_VIATICOS) else setOf(key)
+
     companion object {
         fun fromKey(key: String?): CoreExtraModule? =
-            key?.trim()?.lowercase()?.let { k -> entries.firstOrNull { it.key == k } }
+            key?.trim()?.lowercase()?.let { k -> entries.firstOrNull { k in it.claves } }
     }
 }
 
@@ -71,11 +98,15 @@ object CoreMenu {
     /** Donde vive la web de Core; «Abrir en la web» arma sus enlaces aquí. */
     const val CORE_WEB_BASE = "https://core.nexara.com.mx"
 
-    /** Los tres de «Más» que todo el personal tiene (herramientas, vehículos, organigrama). */
+    /**
+     * Los de «Más» que todo el personal tiene: herramientas, vehículos,
+     * organigrama y viáticos (ver [CoreExtraModule.paraTodoElPersonal]).
+     */
     private val EVERYONE_EXTRAS = listOf(
         CoreExtraModule.HERRAMIENTAS,
         CoreExtraModule.VEHICULOS,
         CoreExtraModule.ORGANIGRAMA,
+        CoreExtraModule.VIATICOS,
     )
 
     /**
@@ -91,11 +122,15 @@ object CoreMenu {
         if (user.isSuperAdmin) return CoreExtraModule.entries.toList()
         val keys = user.navModuleKeys?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
         if (keys.isNullOrEmpty()) return EVERYONE_EXTRAS
-        return CoreExtraModule.entries.filter { it.key in keys }
+        return CoreExtraModule.entries.filter { modulo ->
+            modulo.paraTodoElPersonal || modulo.claves.any { it in keys }
+        }
     }
 
-    fun canOpenExtra(user: SessionUser?, key: String): Boolean =
-        extraModulesFor(user).any { it.key == key }
+    fun canOpenExtra(user: SessionUser?, key: String): Boolean {
+        val buscado = key.trim().lowercase()
+        return extraModulesFor(user).any { buscado in it.claves }
+    }
 
     /** Roles con todo Core en url-matrix (todo /erp o `CORE_OLA1_URL_RULES`). */
     private val FULL_CORE_ROLES = setOf(

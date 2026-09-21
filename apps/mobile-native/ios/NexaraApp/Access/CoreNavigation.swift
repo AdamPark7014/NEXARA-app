@@ -52,6 +52,10 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
     case herramientas = "erp-herramientas"
     case vehiculos = "erp-vehiculos"
     case organigrama = "erp-organigrama"
+    /// Viáticos. La clave NO sale de `CORE_EXTRA_MODULES` —ahí no está—, sino de
+    /// la que `me/navigation` ya emite para cualquier ruta que contenga
+    /// `viatic` (`navigation-module-map.ts`: `viatics`, `my-viatics`).
+    case viaticos = "viatics"
 
     var id: String { rawValue }
 
@@ -64,6 +68,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .herramientas: return "Herramientas"
         case .vehiculos: return "Vehículos"
         case .organigrama: return "Organigrama"
+        case .viaticos: return "Viáticos"
         }
     }
 
@@ -76,6 +81,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .herramientas: return "wrench.and.screwdriver"
         case .vehiculos: return "car"
         case .organigrama: return "person.3"
+        case .viaticos: return "banknote"
         }
     }
 
@@ -89,6 +95,7 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .herramientas: return "/erp/almacen/herramientas"
         case .vehiculos: return "/erp/vehiculos"
         case .organigrama: return "/erp/organigrama"
+        case .viaticos: return "/erp/finance/viatics"
         }
     }
 
@@ -102,8 +109,26 @@ enum CoreExtraModule: String, CaseIterable, Identifiable, Hashable {
         case .herramientas: return "Solicita herramienta, revisa tu kit y tus préstamos."
         case .vehiculos: return "Solicita un vehículo; entrega y recepción con fotos."
         case .organigrama: return "Quién reporta a quién en NEXARA."
+        case .viaticos: return "Pide un viático con la foto del ticket, repártelo y compruébalo."
         }
     }
+
+    /// Claves con las que `me/navigation` puede nombrar el módulo. Casi siempre
+    /// una; Viáticos llega como `viatics` o como `my-viatics` según la ruta que
+    /// tenga el rol en url-matrix.
+    var claves: Set<String> {
+        self == .viaticos ? ["viatics", "my-viatics"] : [rawValue]
+    }
+
+    /// Lo ve todo el personal, tenga o no su clave en `me/navigation`.
+    ///
+    /// Solo Viáticos. Los demás módulos de «Más» se conceden por rol, pero el
+    /// gasto de bolsillo lo hace cualquiera y lo autoriza la dirección: las
+    /// reglas del CEO son comodines de panel y no producen la clave `viatics`,
+    /// así que filtrar por navegación se lo escondería justo a quien tiene que
+    /// aprobar desde la calle. Quien no tenga el permiso ve el mensaje del 403
+    /// del API, que es quien de verdad decide.
+    var paraTodoElPersonal: Bool { self == .viaticos }
 
     /// El módulo en la web (`CoreNavigation.coreWebBase` + `webPath`), mientras
     /// la app no tenga pantalla nativa.
@@ -129,8 +154,16 @@ enum CoreNavigation {
         guard let user, !isExternal(user) else { return [] }
         if user.isSuperAdmin { return CoreExtraModule.allCases }
         let nav = Set((user.navModules ?? []).map { $0.lowercased() })
-        guard !nav.isEmpty else { return [.herramientas, .vehiculos, .organigrama] }
-        return CoreExtraModule.allCases.filter { nav.contains($0.rawValue) }
+        guard !nav.isEmpty else { return [.herramientas, .vehiculos, .organigrama, .viaticos] }
+        return CoreExtraModule.allCases.filter { modulo in
+            modulo.paraTodoElPersonal || !modulo.claves.isDisjoint(with: nav)
+        }
+    }
+
+    /// El módulo de «Más» que nombra esta clave de `me/navigation`.
+    static func extraModule(forKey key: String) -> CoreExtraModule? {
+        let buscada = key.trimmingCharacters(in: .whitespaces).lowercased()
+        return CoreExtraModule.allCases.first { $0.claves.contains(buscada) }
     }
 
     /// Cliente / sucursal: solo el portal de tickets, nunca Core.

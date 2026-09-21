@@ -134,7 +134,6 @@ class DeepLinkParserTest {
             "/crm/opportunities/42",
             "/crm/leads?highlight=15",
             "/ventas/smart-quote",
-            "/ops/viatics?highlight=7",
             "/ops/maintenance?woId=1",
             "/ops/chat",
             // Las rutas de «operacion» no son las de «ops»: la web tampoco las lleva a un módulo.
@@ -145,7 +144,6 @@ class DeepLinkParserTest {
             "/contabilidad/pagos",
             "/erp/dashboard",
             "/erp/hr/fines?highlight=1",
-            "/erp/finance/viatics",
             "/panels",
         ).forEach { url ->
             assertEquals("$url debe abrir la casa de Core", DeepLinkParser.CORE_HOME, DeepLinkParser.parseWebPath(url))
@@ -171,6 +169,23 @@ class DeepLinkParserTest {
         assertEquals(7L, module("/erp/vehiculos/7").entityId)
         assertEquals(CoreKeys.ORGANIGRAMA, module("/erp/organigrama").key)
         assertEquals(CoreKeys.ORGANIGRAMA, module("/erp/hr/orgchart").key)
+        // Viáticos vive bajo /erp/finance en la web; el id se conserva para
+        // abrir el viático del aviso y no la lista.
+        assertEquals(CoreKeys.VIATICOS, module("/erp/finance/viatics").key)
+        assertEquals(31L, module("/erp/finance/viatics/31").entityId)
+        assertEquals(CoreKeys.VIATICOS, module("/erp/viaticos").key)
+        assertEquals(12L, module("/erp/viaticos/12").entityId)
+    }
+
+    /** Las rutas viejas de viáticos (`/ops` y `/finance`) abren la misma pantalla. */
+    @Test
+    fun lasRutasViejasDeViaticosAbrenElModulo() {
+        assertEquals(CoreKeys.VIATICOS, module("/ops/viatics").key)
+        assertEquals(7L, module("/ops/viatics?highlight=7").entityId)
+        assertEquals(9L, module("/ops/viatics/9").entityId)
+        assertEquals(CoreKeys.VIATICOS, module("/ops/my-viatics").key)
+        assertEquals(CoreKeys.VIATICOS, module("/finance/viatics").key)
+        assertEquals(4L, module("/finance/viatics/4").entityId)
     }
 
     @Test

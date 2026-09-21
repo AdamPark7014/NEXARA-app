@@ -56,7 +56,6 @@ class AppUrlsParityTest {
         home("crmLead", "/crm/leads?highlight=1"),
         home("crmClient", "/crm/clients/1"),
         home("crmQuote", "/crm/quotes/1"),
-        home("opsViatic", "/ops/viatics?highlight=1"),
         home("opsMaintenance", "/ops/maintenance?woId=1"),
         home("opsSupport", "/ops/support/1"),
         home("erpFines", "/erp/hr/fines?highlight=1"),
@@ -78,6 +77,11 @@ class AppUrlsParityTest {
         Case("opsMyVehicles", "/ops/my-vehicles?highlight=1", PanelId.ERP, CoreKeys.VEHICULOS, null),
         Case("opsTools", "/ops/tools?tab=requests&highlight=1", PanelId.ERP, CoreKeys.HERRAMIENTAS, null),
         Case("erpWarehouse", "/erp/warehouse?productId=1", PanelId.ERP, CoreKeys.ALMACEN, null),
+        // Viáticos: el aviso trae el id y abre ESE viático, no la lista. Antes
+        // de tener pantalla caía en la casa de Core.
+        Case("opsViatic", "/ops/viatics?highlight=1", PanelId.ERP, CoreKeys.VIATICOS, 1L),
+        Case("erpViatics", "/erp/finance/viatics", PanelId.ERP, CoreKeys.VIATICOS, null),
+        Case("erpViaticDetail", "/erp/finance/viatics/1", PanelId.ERP, CoreKeys.VIATICOS, 1L),
     )
 
     @Test

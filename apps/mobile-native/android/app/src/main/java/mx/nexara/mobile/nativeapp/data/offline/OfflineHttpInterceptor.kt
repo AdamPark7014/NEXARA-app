@@ -142,6 +142,22 @@ class OfflineHttpInterceptor(
         /** `/iniciar` solo de actividades propias: otras rutas con ese nombre sí se pueden encolar. */
         private fun esIniciarActividad(ruta: String): Boolean =
             ruta.contains("/me/activities/") && ruta.trimEnd('/').endsWith("/iniciar")
+
+        /**
+         * Decidir un viático (autorizar, rechazar, marcar pagado) es de la misma
+         * familia que cancelar una actividad: el API todavía puede rechazarlo
+         * —porque otro ya lo cerró, porque la cifra se pasa de lo solicitado, o
+         * porque la póliza falla— y encolado daría por hecho un dinero que nadie
+         * autorizó. «Marcar pagado», además, levanta un asiento contable.
+         *
+         * Pedir, repartir y comprobar sí se encolan: son del propio interesado,
+         * el cuadre ya se comprobó en la app y no mueven dinero por sí solos.
+         */
+        private fun esDecisionDeViatico(ruta: String): Boolean {
+            if (!ruta.contains("/viatics/")) return false
+            val limpia = ruta.trimEnd('/')
+            return limpia.endsWith("/approve") || limpia.endsWith("/pagado")
+        }
         private val BORRADO_SOLO_EN_LINEA = listOf("/ventas/clientes/", "/operational-projects/")
 
         fun isQueueable(url: String, method: String = "POST"): Boolean {
@@ -149,6 +165,7 @@ class OfflineHttpInterceptor(
             if (NOT_QUEUEABLE.any { ruta.contains(it) }) return false
             if (SOLO_EN_LINEA.any { ruta.contains(it) }) return false
             if (esIniciarActividad(ruta)) return false
+            if (esDecisionDeViatico(ruta)) return false
             if (method.equals("DELETE", ignoreCase = true) && BORRADO_SOLO_EN_LINEA.any { ruta.contains(it) }) return false
             return true
         }

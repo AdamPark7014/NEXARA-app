@@ -169,50 +169,7 @@ struct AttendanceDaySummary: Hashable {
     }
 }
 
-// MARK: - Viatics (mirror Android ViaticDto)
-
-struct ViaticItem: Hashable, Identifiable {
-    let id: Int64
-    let usuarioId: Int64?
-    let montoSolicitado: Double
-    let estatusPago: String
-    let estatus: String
-    let razonGasto: String
-    let categoria: String
-    let createdAt: String
-    let userName: String
-    let activityLabel: String
-    let ticketEvidenciaUrl: String
-    let raw: [String: Any]
-
-    var displayStatus: String {
-        let s = estatusPago.isEmpty ? estatus : estatusPago
-        return s.isEmpty ? "—" : s
-    }
-    var displayConcept: String { razonGasto.isEmpty ? "Sin concepto" : razonGasto }
-    var dateLabel: String { String(createdAt.prefix(10)) }
-
-    static func == (lhs: ViaticItem, rhs: ViaticItem) -> Bool { lhs.id == rhs.id }
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
-
-    init(raw: [String: Any]) {
-        self.raw = raw
-        let usuario = raw["usuario"] as? [String: Any]
-        let actividad = raw["actividad"] as? [String: Any]
-        id = StockParse.int64(raw["id"]) ?? 0
-        usuarioId = StockParse.int64(raw["usuarioId"], raw["userId"])
-            ?? StockParse.int64(usuario?["id"])
-        montoSolicitado = StockParse.dbl(raw["montoSolicitado"], raw["amount"], raw["monto"], raw["total"]) ?? 0
-        estatusPago = StockParse.str(raw["estatusPago"])
-        estatus = StockParse.str(raw["estatus"], raw["status"], raw["estado"])
-        razonGasto = StockParse.str(raw["razonGasto"], raw["concepto"], raw["descripcion"], raw["motivo"])
-        categoria = StockParse.str(raw["categoria"])
-        createdAt = StockParse.str(raw["createdAt"], raw["fecha"])
-        userName = StockParse.str(
-            raw["usuarioNombre"], raw["userName"], raw["nombre"],
-            usuario?["nombre"], usuario?["name"]
-        )
-        activityLabel = StockParse.str(actividad?["anNumber"], raw["actividadAn"])
-        ticketEvidenciaUrl = StockParse.str(raw["ticketEvidenciaUrl"])
-    }
-}
+// Los viáticos vivían aquí como un molde de datos muerto: una `ViaticItem` que
+// ninguna vista usaba y que no sabía de repartos, comprobación ni liquidación.
+// Ahora tienen módulo propio: ver `Data/ViaticosRepository.swift` y
+// `UI/Core/Viaticos/`.
