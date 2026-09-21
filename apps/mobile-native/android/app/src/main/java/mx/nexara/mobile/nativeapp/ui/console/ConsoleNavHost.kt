@@ -66,6 +66,7 @@ import mx.nexara.mobile.nativeapp.ui.console.more.ModulePlaceholderScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.MoreHubScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.OrgchartScreen
 import mx.nexara.mobile.nativeapp.ui.console.more.ProyectosScreen
+import mx.nexara.mobile.nativeapp.ui.console.pagos.PagosEmpleadosScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.vehiculos.VehiculosScreen
 import mx.nexara.mobile.nativeapp.ui.console.viaticos.NuevoViaticoScreen
@@ -134,6 +135,15 @@ internal object ConsoleRoutes {
     /** Herramientas (`/erp/almacen/herramientas`) — mi kit, mis préstamos y pedir más plazo. */
     const val Herramientas = "console/herramientas"
 
+    /**
+     * Pagos a empleados (`/erp/finance/employee-payments`) — consulta.
+     *
+     * Solo la lista: capturar un pago, autorizarlo, marcarlo pagado o anularlo
+     * piden `CONTABILIDAD_MANAGE` y asientan contabilidad, así que se quedan en
+     * la computadora.
+     */
+    const val PagosEmpleados = "console/pagos-empleados"
+
     /** Viáticos: mis anticipos y, para quien autoriza, los de su gente. */
     const val Viaticos = "console/viaticos"
 
@@ -161,9 +171,10 @@ internal object ConsoleRoutes {
      * A dónde lleva un módulo de «Más»: su pantalla nativa si ya existe, si no
      * la ficha con el enlace a la web.
      *
-     * Ya no queda ninguno en la ficha; el `else` se conserva porque el día que
-     * se añada un módulo nuevo a [CoreExtraModule] tiene que caer ahí y no
-     * romper la compilación de una pantalla que todavía no existe.
+     * En la ficha quedan Gastos, Aprobaciones y Documentos, que entraron al menú
+     * con la segunda ola y todavía no tienen pantalla. El `else` también protege
+     * el día que se añada un módulo nuevo a [CoreExtraModule]: cae ahí y no
+     * rompe la compilación de una pantalla que todavía no existe.
      */
     fun forExtra(module: CoreExtraModule): String = when (module) {
         CoreExtraModule.VEHICULOS -> Vehiculos
@@ -174,6 +185,7 @@ internal object ConsoleRoutes {
         CoreExtraModule.HERRAMIENTAS -> Herramientas
         CoreExtraModule.VIATICOS -> Viaticos
         CoreExtraModule.COTIZACIONES -> Cotizaciones
+        CoreExtraModule.PAGOS_EMPLEADOS -> PagosEmpleados
         else -> modulePlaceholder(module.key)
     }
 
@@ -361,6 +373,7 @@ fun ConsoleNavHost(
         ConsoleRoutes.Herramientas -> "Herramientas"
         ConsoleRoutes.Cotizaciones -> "Cotizaciones"
         ConsoleRoutes.CotizacionDetalle -> "Cotización"
+        ConsoleRoutes.PagosEmpleados -> "Pagos a empleados"
         ConsoleRoutes.Viaticos -> "Viáticos"
         ConsoleRoutes.NuevoViatico -> "Pedir viático"
         ConsoleRoutes.ViaticoDetalle -> "Viático"
@@ -621,6 +634,13 @@ fun ConsoleNavHost(
             nxComposable(ConsoleRoutes.CotizacionDetalle, style = NxNavAnimStyle.Push) { entry ->
                 val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
                 if (CoreExtraModule.COTIZACIONES in extras) CotizacionDetalleScreen(cotizacionId = id)
+            }
+            // Pagos a empleados: consulta. Comprueba el módulo igual que el resto
+            // de «Más»; el permiso de verdad (`CONTABILIDAD_VIEW`) y hasta dónde
+            // llega el alcance —toda la empresa o solo el departamento— los
+            // decide el API, y su 403 se enseña tal cual.
+            nxComposable(ConsoleRoutes.PagosEmpleados, style = NxNavAnimStyle.Push) {
+                if (CoreExtraModule.PAGOS_EMPLEADOS in extras) PagosEmpleadosScreen()
             }
             // Viáticos: el técnico pide desde la calle y la dirección resuelve
             // desde donde esté. La lista se recarga sola cuando el alta, una
