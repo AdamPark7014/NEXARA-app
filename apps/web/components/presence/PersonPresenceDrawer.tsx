@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PersonFaceThumb } from "@/app/(panels)/integra/_PersonFace";
+import { PersonFaceThumb } from "@/components/presence/_PersonFace";
 import {
   fetchPersonPresence,
   hhmmEs,
