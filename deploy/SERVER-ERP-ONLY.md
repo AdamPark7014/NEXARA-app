@@ -6,6 +6,9 @@ This repository includes reusable panels and components (studio, ops, crm, etc.)
 What ships to production
 - ERP web app: `apps/web/app/(panels)/erp/**`
 - Shared UI and ERP-required libraries under `apps/web/components/**` (e.g. `finance`, `hr`, `ops` where ERP uses them)
+- Integra shared helpers relocated out of panel routes:
+  - `apps/web/lib/integra-shared/**` (site selection, API helpers, capabilities)
+  - `apps/web/components/presence/**` (presence UI pieces such as `_PersonFace`)
 
 What is intentionally excluded from the production image
 - Non-ERP panels under `apps/web/app/(panels)/`:
@@ -19,6 +22,10 @@ What is intentionally excluded from the production image
 How it’s enforced
 - `.dockerignore` excludes the folders above so they aren’t copied into the Docker build context. The web Dockerfile (`deploy/docker/Dockerfile.web`) uses `COPY . .`, so the ignore list drives what makes it into the image.
 - ERP code no longer imports from `components/crm/*` (Procurement page now uses `components/erp/erp-chrome.module.css`), so excluding `components/crm/**` does not break the build.
+- ERP and shared presence code must import Integra helpers from the new neutral paths:
+  - Use `@/lib/integra-shared/_lib` and `@/lib/integra-shared/_caps`
+  - Use `@/components/presence/_PersonFace`
+  - Do NOT import from `@/app/(panels)/integra/*` — that path is dockerignored.
 
 Notes and risks
 - Do NOT exclude `apps/web/components/ops/**`: ERP uses these components (actividades, evidencias, asistencia). Excluding that folder would break the web build.

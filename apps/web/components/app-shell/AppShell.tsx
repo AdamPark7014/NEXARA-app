@@ -56,8 +56,8 @@ import {
   getCachedProvider,
   subscribeCapabilities,
   subscribeProvider,
-} from "@/app/(panels)/integra/_caps";
-import type { IntegraCapabilities } from "@/app/(panels)/integra/_lib";
+} from "@/lib/integra-shared/_caps";
+import type { IntegraCapabilities } from "@/lib/integra-shared/_lib";
 import { getUserHomeUrlAbsolute } from "@/lib/panel-home";
 import type { User } from "@/components/UserContext";
 import { buildCrossPanelUrl, detectCurrentPanelId, isCrossPanelHref, resolveCrossPanelHref } from "@/lib/cross-panel-handoff";

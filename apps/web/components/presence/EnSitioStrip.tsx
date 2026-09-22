@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PersonFaceThumb, prefetchPersonFace } from "@/app/(panels)/integra/_PersonFace";
+import { PersonFaceThumb, prefetchPersonFace } from "@/components/presence/_PersonFace";
 import {
   fetchOccupancy,
   relAgeEs,

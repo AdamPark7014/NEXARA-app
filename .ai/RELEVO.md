@@ -2,7 +2,7 @@
 
 - **Último turno:** cursor
 - **Fecha:** 2026-09-22
-- **Rama:** mejora/calidad-y-web
+- **Rama:** cursor/relocate-integra-shared-a46f
 
 ## Hecho
 
@@ -13,6 +13,11 @@
   - `apps/web/app/(panels)/{finance,hr,integra}/**`
   - `apps/web/components/{studio,crm}/**`
 - Doc de despliegue: `deploy/SERVER-ERP-ONLY.md` (qué entra, qué se excluye, riesgos).
+ - FIX urgente: se movieron los helpers compartidos de Integra fuera de `app/(panels)/integra/**`:
+   - Nuevos: `apps/web/lib/integra-shared/_lib.ts`, `apps/web/lib/integra-shared/_caps.ts`
+   - Nuevo comp: `apps/web/components/presence/_PersonFace.tsx`
+   - Importadores actualizados (`AppShell`, `presence/*`, `lib/presence-api.ts`).
+   - Build verificado: `npm run build --workspace=apps/web` OK.
 
 ## A medias
 - Sin cambios pendientes de esta tarea.

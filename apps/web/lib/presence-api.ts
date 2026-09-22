@@ -1,6 +1,6 @@
 import { buildApiUrl } from "@/lib/api-base";
 import { withTenantHeaders } from "@/lib/tenant";
-import { getActiveIntegraSiteId } from "@/app/(panels)/integra/_lib";
+import { getActiveIntegraSiteId } from "@/lib/integra-shared/_lib";
 
 export type PresenceOccRow = {
   personId: string;
