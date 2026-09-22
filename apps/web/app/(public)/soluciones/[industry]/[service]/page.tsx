@@ -51,6 +51,7 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   const pageKeywords = getPageKeywords(category, "Puebla");
 
   return {
+    robots: { index: true, follow: true },
     title: { absolute: title },
     description,
     keywords: [
@@ -172,7 +173,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Inicio", item: siteUrl },
-      { "@type": "ListItem", position: 2, name: "Servicios", item: `${siteUrl}/servicios` },
+      { "@type": "ListItem", position: 2, name: "Soluciones", item: `${siteUrl}/soluciones` },
       {
         "@type": "ListItem",
         position: 3,
@@ -253,7 +254,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
             <Link href="/">Inicio</Link>
           </li>
           <li>
-            <Link href="/servicios">Servicios</Link>
+            <Link href="/soluciones">Soluciones</Link>
           </li>
           <li>
             <Link

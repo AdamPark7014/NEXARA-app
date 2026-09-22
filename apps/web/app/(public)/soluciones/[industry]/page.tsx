@@ -135,6 +135,57 @@ const INDUSTRY_HUBS: Record<
     ],
     image: "/images/hero/hero-06.png",
   },
+  logistica: {
+    name: "Logística y distribución",
+    risk: "Rutas + patio",
+    lead: "Conectividad estable en patios y almacenes, CCTV perimetral y visibilidad de operación.",
+    pain: "Sitios con exteriores, naves y andenes exigen diseño distinto al de oficina: interferencia, polvo y movimiento constante.",
+    focus: [
+      "Cobertura de CCTV en patios, accesos y andenes",
+      "Redes para almacenes y picking con roaming estable",
+      "Soporte operativo por ventana y turno",
+    ],
+    services: [
+      { id: "cctv", label: "Videovigilancia perimetral", text: "Accesos, patios y andenes con evidencia útil." },
+      { id: "redes", label: "Redes y Wi‑Fi", text: "Conectividad para handhelds, picking y oficinas." },
+      { id: "soporte", label: "Soporte TI", text: "Mesa de ayuda y atención a incidentes de patio." },
+    ],
+    image: "/images/hero/hero-08.png",
+  },
+  "pymes-y-startups": {
+    name: "PyMEs y startups",
+    risk: "Crecimiento + orden",
+    lead: "Infraestructura sencilla que no se rompe al crecer: red, cómputo y soporte con SLA claros.",
+    pain: "El improvisado de hoy se vuelve deuda técnica mañana: sin estándar ni soporte, cada alta y mudanza se traba.",
+    focus: [
+      "Red y Wi‑Fi empresarial desde el día uno",
+      "Parque de cómputo inventariado y con respaldo",
+      "Soporte con catálogo y tiempos definidos",
+    ],
+    services: [
+      { id: "redes", label: "Redes y Wi‑Fi", text: "Cableado, switching y Wi‑Fi listos para crecer." },
+      { id: "computo", label: "Equipo de cómputo", text: "Equipos, puesta a punto y respaldos básicos." },
+      { id: "soporte", label: "Soporte TI", text: "Mesa de ayuda remota y visitas programadas." },
+    ],
+    image: "/images/hero/hero-01.png",
+  },
+  "seguridad-electronica": {
+    name: "Seguridad electrónica",
+    risk: "Incidentes + evidencia",
+    lead: "CCTV útil, control de acceso y monitoreo con registros que se pueden defender.",
+    pain: "Sistemas desconectados o sin mantenimiento no sirven el día del incidente — ni para disuadir ni para investigar.",
+    focus: [
+      "Cobertura útil y grabación confiable",
+      "Control de acceso por zonas y horarios",
+      "Monitoreo y mantenimiento programado",
+    ],
+    services: [
+      { id: "cctv", label: "Cámaras y video", text: "Diseño y puesta a punto con acceso remoto." },
+      { id: "redes", label: "Red y energía", text: "Infraestructura que sostiene la seguridad." },
+      { id: "soporte", label: "Soporte y mantenimiento", text: "Atención a fallas y visitas periódicas." },
+    ],
+    image: "/images/hero/hero-07.png",
+  },
 };
 
 export function generateStaticParams() {
@@ -150,6 +201,7 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   const title = `${hub.name}: CCTV, redes y soporte TI en México | NEXARA`;
   const description = `${hub.lead} Cotiza soluciones Nexara para ${hub.name} en Puebla, CDMX y cobertura nacional.`;
   return {
+    robots: { index: true, follow: true },
     title: { absolute: title },
     description,
     keywords: [
@@ -210,7 +262,7 @@ export default function IndustryHubPage({ params }: { params: Params }) {
       "@type": "BreadcrumbList",
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Inicio", item: siteUrl },
-        { "@type": "ListItem", position: 2, name: "Soluciones", item: `${siteUrl}/servicios` },
+        { "@type": "ListItem", position: 2, name: "Soluciones", item: `${siteUrl}/soluciones` },
         { "@type": "ListItem", position: 3, name: hub.name, item: `${siteUrl}${hubPath}` },
       ],
     },
