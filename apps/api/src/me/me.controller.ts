@@ -65,13 +65,28 @@ export class MeController {
     return this.myActivities.list({ id: Number(user.id), email: user.email ?? null }, companyId);
   }
 
-  /** Solicitudes de equipo (pares / mismo rango o superior). */
+  /** Actividades que le pedí a un compañero y las que me pidieron a mí. */
   @Get('activity-requests')
   listPeerRequests(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
     if (!user?.id || user?.isClient || user?.isBranchUser) {
       throw new UnauthorizedException('Token de usuario inválido');
     }
     return this.peerRequests.listMine({ id: Number(user.id), email: user.email }, companyId);
+  }
+
+  /** A quién le puedo pedir una actividad: todo el personal de la empresa. */
+  @Get('activity-requests/candidates')
+  listPeerRequestCandidates(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    return this.peerRequests.listCandidates(
+      { id: Number(user.id), email: user.email },
+      companyId,
+    );
   }
 
   @Post('activity-requests')

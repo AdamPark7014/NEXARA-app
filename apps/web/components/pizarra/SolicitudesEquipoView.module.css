@@ -30,6 +30,19 @@
   color: var(--ui-fg);
 }
 
+/*
+ * La línea que dice para qué sirve el bloque. Va pegada al encabezado y con el
+ * mismo tope de ancho que el formulario: leerla no debe costar un barrido de
+ * 1 400 px.
+ */
+.intro {
+  margin: 0;
+  max-width: 56rem;
+  font-size: var(--ui-fs-body);
+  line-height: var(--ui-lh-body);
+  color: var(--ui-fg-2);
+}
+
 .conteo {
   margin-left: var(--ui-s2);
   font-size: var(--ui-fs-meta);
