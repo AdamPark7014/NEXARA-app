@@ -465,19 +465,22 @@ jobs:
           if [ ! -f "$IPA" ]; then echo "IPA not found"; ls -R "$EXPORT_DIR"; exit 1; fi
           echo "IPA found at: $IPA"
           ls -lah "$IPA" || true
-          echo "Uploading to TestFlight via altool (API key)…"
-          LOG="$RUNNER_TEMP/altool-upload.log"
+          echo "Uploading to TestFlight via iTMSTransporter (API key)…"
+          LOG="$RUNNER_TEMP/transporter-upload.log"
           set +e
-          xcrun altool --upload-app --type ios \
-            --file "$IPA" \
-            --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$LOG"
+          xcrun iTMSTransporter -m upload \
+            -assetFile "$IPA" \
+            -apiKey "$ASC_KEY_ID" -apiIssuer "$ASC_ISSUER_ID" \
+            -v informational -t Upload 2>&1 | tee "$LOG"
           STATUS=${PIPESTATUS[0]}
           set -e
-          if [ $STATUS -eq 0 ]; then
-            if grep -qiE 'UPLOAD FAILED|Validation failed|Invalid bundle|Missing required icon file|SDK version issue' "$LOG"; then
-              echo "altool reported validation issues despite exit code 0"; exit 1
-            fi
+          # Fail on any ERROR lines regardless of exit code
+          if grep -qi '^ERROR:' "$LOG"; then
+            echo "Transporter reported ERROR lines"; exit 1
+          fi
+          # Require a definitive success marker
+          if ! grep -qiE 'has been uploaded successfully|No errors uploading|Transporter transfer successful|UPLOAD SUCCEEDED|Delivery UUID' "$LOG"; then
+            echo "Did not detect a definitive Transporter success marker"; exit 1
           fi
           exit $STATUS
 
