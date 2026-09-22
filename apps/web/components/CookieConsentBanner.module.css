@@ -13,9 +13,9 @@
   right: 16px;
   bottom: 16px;
   z-index: 100050;
-  max-width: 720px;
+  max-width: 520px;
   margin: 0 auto;
-  padding: 18px 18px 16px;
+  padding: 14px 14px 12px;
   border-radius: 14px;
   border: 1px solid var(--cc-line);
   background:
@@ -27,16 +27,16 @@
 }
 
 .title {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   font-family: var(--cc-display);
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .text {
-  margin: 0 0 14px;
-  font-size: 0.9rem;
+  margin: 0 0 10px;
+  font-size: 0.86rem;
   line-height: 1.55;
   color: var(--cc-muted);
 }
@@ -58,9 +58,9 @@
 .btnGhost {
   appearance: none;
   border-radius: 9px;
-  padding: 9px 14px;
+  padding: 8px 12px;
   font-family: var(--cc-ui);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
