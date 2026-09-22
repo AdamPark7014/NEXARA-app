@@ -5,6 +5,8 @@ export const CORE_OLA1_MODULE_IDS: readonly string[] = [
   'asistencias',
   'chat',
   'my-profile',
+  // Vista ejecutiva (KPIs) — visible para dirección en Core.
+  'executive',
   'erp-clients',
   // Cotizaciones entra a Core: sin esto el módulo existe pero el sidebar lo esconde.
   'erp-cotizaciones',

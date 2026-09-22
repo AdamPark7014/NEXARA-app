@@ -51,8 +51,6 @@ export const CORE_OLA1_PAGE_PATHS: PageRule[] = [
   '/erp/actividades/servicios',
   '/erp/actividades/servicios/**',
   '/erp/my-profile',
-  '/erp/clientes',
-  '/erp/clientes/**',
 ];
 
 /**
@@ -69,6 +67,9 @@ export const COTIZACIONES_CORE_PATHS: PageRule[] = ['/erp/cotizaciones', '/erp/c
  * presupuesto y la cartera. El personal de campo sigue viendo sus actividades en la pizarra.
  */
 export const PROYECTOS_CORE_PATHS: PageRule[] = ['/erp/proyectos', '/erp/proyectos/**'];
+
+/** Clientes en Core (`/erp/clientes`): restringido a dirección/ventas. */
+export const CLIENTES_CORE_PATHS: PageRule[] = ['/erp/clientes', '/erp/clientes/**'];
 
 /**
  * Recursos de Core para todo el personal interno (espejo de `CORE_RECURSOS_URL_RULES` en la API):
@@ -387,6 +388,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_VENTAS]: [
     ...CORE_RECURSOS_PATHS,
     '/crm/**',
+    ...CLIENTES_CORE_PATHS,
     ...COTIZACIONES_CORE_PATHS,
     ...PROYECTOS_CORE_PATHS,
     '/crm/chat',
@@ -415,6 +417,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.VENDEDOR]: [
     ...CORE_RECURSOS_PATHS,
     '/crm/**',
+    ...CLIENTES_CORE_PATHS,
     '/crm/chat',
     '/erp/chat',
     '/erp/reuniones',
