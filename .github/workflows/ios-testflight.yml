@@ -335,6 +335,7 @@ jobs:
           DERIVED="$RUNNER_TEMP/DerivedData"
           mkdir -p "$DERIVED"
           set +e
+          ARCH_LOG="$RUNNER_TEMP/archive.log"
           xcodebuild \
             -project "$XCODE_PROJECT_PATH" \
             -scheme "$XCODE_SCHEME" \
@@ -345,8 +346,8 @@ jobs:
             -resultBundlePath "$RUNNER_TEMP/BuildResult" \
             INFOPLIST_FILE="$GITHUB_WORKSPACE/apps/mobile-native/ios/Resources/Info.plist" \
             GENERATE_INFOPLIST_FILE=NO \
-            archive -archivePath "$ARCHIVE_PATH"
-          STATUS=$?
+            archive -archivePath "$ARCHIVE_PATH" 2>&1 | tee "$ARCH_LOG"
+          STATUS=${PIPESTATUS[0]}
           if [ $STATUS -ne 0 ]; then
             echo "::group::Last 200 lines of latest xcactivitylog"
             LATEST_LOG=$(ls -t "$DERIVED/Logs/Build"/*.xcactivitylog 2>/dev/null | head -n 1 || true)
@@ -359,7 +360,55 @@ jobs:
             echo "::endgroup::"
             exit $STATUS
           fi
+          echo "::group::Archive Info.plist diagnostics"
+          grep -E "ProcessInfoPlistFile|Info\\.plist|INFOPLIST" "$ARCH_LOG" || true
+          echo "::endgroup::"
 
+      - name: Patch embedded Info.plist (launch/orientations/icons)
+        run: |
+          set -euo pipefail
+          if [ ! -d "$ARCHIVE_PATH" ]; then
+            echo "ERROR: Archive directory missing at $ARCHIVE_PATH"; exit 1
+          fi
+          APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Could not locate .app inside archive at $ARCHIVE_PATH"; ls -R "$ARCHIVE_PATH" || true; exit 1
+          fi
+          PLIST="$APP_DIR/Info.plist"
+          if [ ! -f "$PLIST" ]; then
+            echo "ERROR: Info.plist not found at $PLIST"; ls -R "$APP_DIR" || true; exit 1
+          fi
+          echo "Patching $PLIST"
+          echo "::group::Before patch (plutil -p)"
+          /usr/bin/plutil -p "$PLIST" | head -n 100 || true
+          echo "::endgroup::"
+          # Ensure UILaunchScreen dict and safe area inset flag
+          /usr/libexec/PlistBuddy -c 'Print :UILaunchScreen' "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c 'Add :UILaunchScreen dict' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Print :UILaunchScreen:UILaunchScreenRespectsSafeAreaInsets' "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c 'Add :UILaunchScreen:UILaunchScreenRespectsSafeAreaInsets bool true' "$PLIST"
+          # iPhone orientations
+          /usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations' "$PLIST" 2>/dev/null || {
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations array' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:1 string UIInterfaceOrientationLandscapeLeft' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:2 string UIInterfaceOrientationLandscapeRight' "$PLIST"
+          }
+          # iPad orientations (tilde key)
+          /usr/libexec/PlistBuddy -c 'Print :UISupportedInterfaceOrientations~ipad' "$PLIST" 2>/dev/null || {
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad array' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:0 string UIInterfaceOrientationPortrait' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:1 string UIInterfaceOrientationPortraitUpsideDown' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:2 string UIInterfaceOrientationLandscapeLeft' "$PLIST"
+            /usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations~ipad:3 string UIInterfaceOrientationLandscapeRight' "$PLIST"
+          }
+          # CFBundleIconName
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c 'Add :CFBundleIconName string AppIcon' "$PLIST"
+          /usr/bin/plutil -lint "$PLIST" || { echo "ERROR: Patched Info.plist failed lint"; exit 1; }
+          echo "::group::After patch (plutil -p)"
+          /usr/bin/plutil -p "$PLIST" | head -n 100 || true
+          echo "::endgroup::"
       - name: Inspect built Info.plist in archive (launch/orientations)
         run: |
           set -euo pipefail
