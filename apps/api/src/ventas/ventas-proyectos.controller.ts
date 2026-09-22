@@ -23,6 +23,14 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
+/** Catálogo para ligar viáticos/finanzas sin exigir panel de ventas. */
+const PROJECT_CATALOG_ACCESS = [
+  PERMISSIONS.SALES_VIEW,
+  PERMISSIONS.PANEL_VENTAS,
+  PERMISSIONS.VIATICS_VIEW,
+  PERMISSIONS.VIATICS_MANAGE,
+  PERMISSIONS.CONTABILIDAD_VIEW,
+];
 
 @Controller('ventas/proyectos')
 export class VentasProyectosController {
@@ -49,7 +57,7 @@ export class VentasProyectosController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
+  @RBAC({ anyPermissions: PROJECT_CATALOG_ACCESS })
   findAll(
     @CurrentUser() user: any,
     @Query() query: SalesPaginationQueryDto,

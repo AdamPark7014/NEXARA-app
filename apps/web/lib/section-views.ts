@@ -142,7 +142,8 @@ export function resolveOpsPairNav(
       if (isFieldRole(v2)) return 'self';
       // Arquitecto supervisa OT/evidencias pero no gestiona flotilla.
       if (v2 === ROLES.ARQUITECTO) return null;
-      if (isOpsManager(v2) || v2 === ROLES.ADMINISTRATIVO) return 'team';
+      if (v2 === ROLES.ADMINISTRATIVO || v2 === ROLES.CONTABILIDAD) return null;
+      if (isOpsManager(v2)) return 'team';
       return null;
     default:
       return null;
@@ -264,6 +265,7 @@ export function shouldShowModuleInSidebar(
       if (EXECUTIVE.has(v2)) return false;
       return resolveViaticsSidebarHome(user) === 'ops-self';
     case 'ops-vehicles': {
+      if (v2 === ROLES.ADMINISTRATIVO || v2 === ROLES.CONTABILIDAD) return false;
       const ov = user?.moduleAccess?.['ops-vehicles'];
       if (ov === 'both') return true;
       return resolveOpsPairNav(user, 'vehicles') === 'team';
@@ -351,9 +353,11 @@ export function shouldShowModuleInSidebar(
     // campo (OPS_MANAGERS) lo consultan para planear la OT.
     case 'erp-almacen':
       return WAREHOUSE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO || OPS_MANAGERS.has(v2);
-    // Todo el personal pide herramienta y vehículo, y ve el organigrama.
+    // Campo pide kit/auto; oficina financiera no necesita esos menús.
     case 'erp-herramientas':
     case 'erp-vehiculos':
+      if (v2 === ROLES.ADMINISTRATIVO || v2 === ROLES.CONTABILIDAD) return false;
+      return v2 !== ROLES.CLIENTE;
     case 'erp-organigrama':
       return v2 !== ROLES.CLIENTE;
     case 'procurement':
