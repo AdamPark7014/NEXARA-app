@@ -2,7 +2,7 @@
 
 - **Último turno:** claude-code
 - **Fecha:** 2026-09-22
-- **Rama:** mejora/calidad-y-web
+- **Rama:** fix/solicitudes-todos-los-usuarios (sale de `origin/main`)
 
 ## Hecho
 
@@ -37,9 +37,18 @@ Cambios:
 Verificado: `npm run typecheck` limpio · `npm run test:api` 2 328 pruebas en verde.
 
 ## A medias
-- **Sin desplegar.** Adam pidió desplegar al Hetzner; falta correr
-  `./deploy/update.sh --force-all --with-migrate` en `/var/www/nexara-app`.
-  No hay migración de base en este cambio.
+- **Sin desplegar, y a propósito.** Adam pidió desplegar, pero el servidor no está
+  como decía la memoria:
+  - `/var/www/nexara-app` está en **`main`**, no en `mejora/calidad-y-web`.
+  - Ese `main` del servidor va **2 commits por delante de `origin/main`**, y esos
+    dos commits no están en ningún remoto: `7c78d369` (CSP `frame-ancestors`
+    para que ZynoraTek pueda embeber nexara.com.mx, y quita `X-Frame-Options`)
+    y el merge `9d99d85a`. Nadie los ha subido.
+  - `mejora/calidad-y-web` está **14 commits detrás** de `origin/main`: ya se
+    fusionó vía PR #9 y quedó vieja. Desplegarla habría retrocedido el servidor.
+  Por eso el trabajo se rehízo sobre `origin/main` en esta rama. Falta que Adam
+  decida qué hacer con los dos commits del servidor antes de mover `main`.
+  Este cambio **no lleva migración** de base.
 - Esta pantalla no existe en `apps/mobile-native`: no hay paridad móvil pendiente.
 
 ## Ojo (no es mío)
