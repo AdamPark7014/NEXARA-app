@@ -350,6 +350,4 @@ private func invStatusColor(_ status: String) -> Color {
     }
 }
 
-private extension String {
-    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
-}
+// Uses global String.ifEmpty from ConsoleHelpers.swift

@@ -225,10 +225,10 @@ struct StudioPagesView: View {
     private func save(_ section: String) async {
         saving = true; defer { saving = false }
         do {
-            guard let data = jsonDraft.data(using: .utf8),
-                  let obj = try JSONSerialization.jsonObject(with: data) else {
+            guard let data = jsonDraft.data(using: .utf8) else {
                 error = "JSON inválido"; return
             }
+            let obj = try JSONSerialization.jsonObject(with: data)
             _ = try await StudioRepository.shared.upsertPageContent(section: section, content: obj)
             selected = nil; jsonDraft = ""
         } catch let e { error = e.localizedDescription }
