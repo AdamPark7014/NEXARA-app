@@ -1462,6 +1462,50 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * SLA breach de ticket: notifica a la persona responsable y a su cadena
+   * de mando. Alta prioridad, con dedupe ~2 h para evitar spam desde el cron.
+   */
+  async notifyTicketSlaBreach(params: { activityId: number; userId: number }) {
+    try {
+      const { activity, jefes } = await this.activityZoneWatcherIds(params.activityId, params.userId);
+      if (!activity) return;
+      const actividad = nombreActividad(activity.titulo);
+      const quien = persona(await this.resolveActorName(params.userId));
+      const comun = {
+        type: 'SLA_BREACH' as const,
+        category: 'sla-breach',
+        icon: 'vencida' as const,
+        relatedEntityId: params.activityId,
+        entityType: 'Activity',
+        priority: 'high' as const,
+        // El cron corre cada hora: dedupe en 2 horas para no repetir.
+        dedupeSeconds: 2 * 60 * 60,
+      };
+      // Responsable
+      await this.notificationsService.createNotification({
+        ...comun,
+        userId: params.userId,
+        title: `${actividad} está vencida`,
+        message: unir(activity.client?.name),
+        relatedUrl: appUrls.erpActividad(params.activityId),
+      });
+      // Cadena de mando
+      for (const uid of jefes) {
+        await this.notificationsService.createNotification({
+          ...comun,
+          userId: uid,
+          triggerUserId: params.userId,
+          title: `${actividad} está vencida`,
+          message: unir(`${quien} — responsable`, activity.client?.name),
+          relatedUrl: appUrls.erpActividad(params.activityId),
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyTicketSlaBreach', error);
+    }
+  }
+
+  /**
    * Inicio marcado: empezó lejos del sitio del cliente o antes que otra de más prioridad.
    * Nunca bloquea la foto de entrada; solo deja constancia a los superiores.
    */
