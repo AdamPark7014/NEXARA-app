@@ -107,15 +107,28 @@ jobs:
           set -euo pipefail
           ICONSET="${GITHUB_WORKSPACE}/apps/mobile-native/ios/Resources/Assets.xcassets/AppIcon.appiconset"
           mkdir -p "$ICONSET"
-          SRC_1024="$ICONSET/icon-1024.png"
-          if [ ! -f "$SRC_1024" ]; then
+          SRC_1024_TMP="$RUNNER_TEMP/src-1024.png"
+          if [ ! -f "$ICONSET/icon-1024.png" ]; then
             echo "icon-1024.png not found; fetching brand mark and generating..."
             TMP_SRC="$RUNNER_TEMP/brand-src.png"
             curl -fsSL "https://nexara.com.mx/brand/nexara-mark-v4-512.png" -o "$TMP_SRC"
-            sips -s format png -z 1024 1024 "$TMP_SRC" --out "$SRC_1024" >/dev/null
+            sips -s format png -z 1024 1024 "$TMP_SRC" --out "$SRC_1024_TMP" >/dev/null
+          else
+            cp "$ICONSET/icon-1024.png" "$SRC_1024_TMP"
           fi
-          sips -s format png -z 120 120 "$SRC_1024" --out "$ICONSET/icon-120.png" >/dev/null
-          sips -s format png -z 152 152 "$SRC_1024" --out "$ICONSET/icon-152.png" >/dev/null
+          # Strip alpha by round-tripping via BMP (BMP has no alpha)
+          BMP_NOALPHA="$RUNNER_TEMP/icon-1024-noalpha.bmp"
+          FINAL_1024="$ICONSET/icon-1024.png"
+          sips -s format bmp "$SRC_1024_TMP" --out "$BMP_NOALPHA" >/dev/null
+          sips -s format png "$BMP_NOALPHA" --out "$FINAL_1024" >/dev/null
+          # Generate required iPhone/iPad sizes from the non-alpha 1024
+          sips -s format png -z 120 120 "$FINAL_1024" --out "$ICONSET/icon-120.png" >/dev/null
+          sips -s format png -z 152 152 "$FINAL_1024" --out "$ICONSET/icon-152.png" >/dev/null
+          echo "::group::sips metadata (alpha) for icons"
+          sips -g all "$FINAL_1024" | grep -i alpha || true
+          sips -g all "$ICONSET/icon-120.png" | grep -i alpha || true
+          sips -g all "$ICONSET/icon-152.png" | grep -i alpha || true
+          echo "::endgroup::"
           echo "AppIcon contents:"
           ls -lah "$ICONSET" || true
 
@@ -273,7 +286,7 @@ jobs:
           <plist version="1.0">
             <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>signingStyle</key>
               <string>manual</string>
               <key>provisioningProfiles</key>
@@ -291,6 +304,27 @@ jobs:
           </plist>
           PLIST
           cat "$EXPORT_PLIST"
+
+      - name: Inspect built Info.plist in archive (launch/orientations)
+        run: |
+          set -euo pipefail
+          APP_INFO_PLIST="$ARCHIVE_PATH/Products/Applications/NexaraApp.app/Info.plist"
+          if [ ! -f "$APP_INFO_PLIST" ]; then
+            echo "ERROR: Info.plist not found in archive at $APP_INFO_PLIST"; ls -R "$ARCHIVE_PATH"; exit 1
+          fi
+          echo "::group::Embedded Info.plist keys"
+          /usr/libexec/PlistBuddy -c 'Print CFBundleIconName' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$APP_INFO_PLIST" || true
+          /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" || true
+          echo "::endgroup::"
+          if ! /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+            echo "ERROR: UISupportedInterfaceOrientations~ipad missing in embedded Info.plist"; exit 1
+          fi
+          if ! /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+            echo "ERROR: UILaunchStoryboardName missing in embedded Info.plist"; exit 1
+          fi
 
       - name: Archive (Release, iOS Device) — Manual signing from pbxproj
         run: |
@@ -339,9 +373,18 @@ jobs:
           echo "IPA found at: $IPA"
           ls -lah "$IPA" || true
           echo "Uploading to TestFlight via altool (API key)…"
+          LOG="$RUNNER_TEMP/altool-upload.log"
+          set +e
           xcrun altool --upload-app --type ios \
             --file "$IPA" \
             --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID"
-          echo "Upload requested. Processing may take several minutes on App Store Connect."
+            --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$LOG"
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ $STATUS -eq 0 ]; then
+            if grep -qiE 'UPLOAD FAILED|Validation failed|Invalid bundle|Missing required icon file|SDK version issue' "$LOG"; then
+              echo "altool reported validation issues despite exit code 0"; exit 1
+            fi
+          fi
+          exit $STATUS
 

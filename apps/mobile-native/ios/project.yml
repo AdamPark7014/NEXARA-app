@@ -50,6 +50,9 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Resources/NexaraApp.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: AHNW9K8745
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Resources/Info.plist
+        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
     # Dependencias Firebase se agregan en Xcode vía Swift Package Manager:
     #   File > Add Packages > https://github.com/firebase/firebase-ios-sdk
     #   Agregar: FirebaseMessaging, FirebaseAnalytics.
