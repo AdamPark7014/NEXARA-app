@@ -40,6 +40,14 @@ jobs:
         with:
           xcode-version: '16.2'
 
+      - name: Initialize Xcode platforms (ensure iOS SDK is available)
+        run: |
+          set -euo pipefail
+          xcodebuild -runFirstLaunch || true
+          xcodebuild -downloadPlatform iOS || true
+          xcodebuild -downloadAllPlatforms || true
+          xcodebuild -showsdks || true
+
       - name: Show macOS and Xcode
         run: |
           sw_vers
@@ -152,7 +160,7 @@ jobs:
       - name: Verify entitlements and bundle id in build settings
         run: |
           set -euo pipefail
-          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -scheme "$XCODE_SCHEME" -configuration Release -destination 'generic/platform=iOS' > "$RUNNER_TEMP/buildsettings.txt"
+          xcodebuild -showBuildSettings -project "$XCODE_PROJECT_PATH" -target NexaraApp -configuration Release > "$RUNNER_TEMP/buildsettings.txt"
           echo "::group::Build Settings (filtered)"
           grep -E "PRODUCT_BUNDLE_IDENTIFIER|CODE_SIGN_ENTITLEMENTS" "$RUNNER_TEMP/buildsettings.txt" || true
           echo "::endgroup::"
