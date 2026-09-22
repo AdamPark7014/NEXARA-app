@@ -6,6 +6,7 @@ import {
   CORE_HOME_PATH,
   coreSurfaceRedirect,
 } from '@/lib/core-surface';
+import { GEO_SEARCH_ALIASES } from '@/lib/seo/geo-cities';
 
 /**
  * Middleware para manejar subdominios dinámicos
@@ -269,11 +270,24 @@ export function middleware(request: NextRequest) {
 
   const hostWithoutPort = hostname.split(':')[0];
   const requestPathname = request.nextUrl.pathname;
+  const isGetLike = request.method === 'GET' || request.method === 'HEAD';
+
+  // ── Alias SEO locales (p. ej., /cctv-puebla) → ruta canónica /cobertura/<city>/<service>
+  if (isGetLike) {
+    const alias = GEO_SEARCH_ALIASES.find(
+      (a) => a.source.toLowerCase() === requestPathname.toLowerCase(),
+    );
+    if (alias) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/cobertura/${alias.city}/${alias.service}`;
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+  }
 
   // Core-only: subdominios no-core → core.nexara.com.mx (soft redirect)
   if (
     CORE_SURFACE_ONLY &&
-    (request.method === 'GET' || request.method === 'HEAD') &&
+    isGetLike &&
     hostWithoutPort.endsWith('.nexara.com.mx')
   ) {
     const sub = hostWithoutPort.split('.')[0];
