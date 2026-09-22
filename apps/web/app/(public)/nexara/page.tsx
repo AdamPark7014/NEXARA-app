@@ -182,6 +182,23 @@ export default async function NexaraPage() {
           },
         }}
       />
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "ProfessionalService",
+          name: "NEXARA · CCTV y redes en Puebla",
+          url: siteBaseUrl(),
+          telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
+          areaServed: { "@type": "City", name: "Puebla", containedInPlace: { "@type": "AdministrativeArea", name: "Puebla" } },
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: "Ignacio Allende 512 · Santiago Momoxpan",
+            addressLocality: "San Pedro Cholula",
+            addressRegion: "Puebla",
+            addressCountry: "MX",
+          },
+        }}
+      />
       {heroBootstrap.posterUrl ? (
         <link rel="preload" as="image" href={heroBootstrap.posterUrl} fetchPriority="high" />
       ) : null}
@@ -440,7 +457,7 @@ export default async function NexaraPage() {
               currentPath="/"
               maxIndustries={4}
               maxServicesPerIndustry={3}
-              showGeo={false}
+              showGeo={true}
             />
           </div>
         </section>
