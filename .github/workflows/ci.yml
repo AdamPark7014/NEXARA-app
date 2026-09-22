@@ -92,6 +92,7 @@ jobs:
                --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' \
                --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=dist \
                --exclude='*.spec.ts' --exclude='*.test.ts' \
+               --exclude='*.spec.tsx' --exclude='*.test.tsx' \
                . > /tmp/fugas.txt; then
             echo "::error::Posibles credenciales en claro:"
             cat /tmp/fugas.txt
@@ -114,6 +115,12 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Evita instalar el paquete obsoleto "tools" que ya no existe en ubuntu-latest.
+          packages: |
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
 
       - name: Assemble debug + unit tests
         working-directory: apps/mobile-native/android
