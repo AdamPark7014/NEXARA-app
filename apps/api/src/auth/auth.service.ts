@@ -475,6 +475,9 @@ export class AuthService {
     // Contabilidad: lectura de cotizaciones vinculadas a facturación
     if (roleKey === 'contabilidad') {
       set.add(PERMISSIONS.DOCUMENTS_VIEW);
+      // Catálogo de proyectos al ligar viáticos (GET ventas/proyectos).
+      set.add(PERMISSIONS.VIATICS_VIEW);
+      set.add(PERMISSIONS.SALES_VIEW);
     }
 
     /**
@@ -595,6 +598,9 @@ export class AuthService {
       set.add(PERMISSIONS.VIATICS_VIEW);
       set.add(PERMISSIONS.VIATICS_CREATE);
       set.add(PERMISSIONS.CONTABILIDAD_VIEW);
+      // CRM ya está en PAGE_MATRIX; hace falta para GET ventas/proyectos (viáticos).
+      set.add(PERMISSIONS.SALES_VIEW);
+      set.add(PERMISSIONS.CLIENTS_VIEW);
     }
 
     // ── Asistencia personal (ventas, studio y otros con check-in propio) ─

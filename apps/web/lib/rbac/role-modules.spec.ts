@@ -536,17 +536,14 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'erp-almacen',
     'erp-cotizaciones',
-    'erp-herramientas',
     'erp-organigrama',
     'erp-proyectos',
-    'erp-vehiculos',
     'expenses-admin',
     'invoicing',
     'lunch-breaks',
     'my-profile',
     'news',
     'notifications-center',
-    'ops-vehicles',
     'pizarra',
     'procurement',
     'reuniones',
@@ -820,9 +817,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
     'documents',
     'employee-payments',
     'erp-contabilidad',
-    'erp-herramientas',
     'erp-organigrama',
-    'erp-vehiculos',
     'expenses-admin',
     'exports',
     'invoicing',
@@ -852,7 +847,7 @@ const EXPECTED_MODULES: Record<RoleKey, string[]> = {
 
 /** Suelo por puesto: por debajo de esto el rol no puede hacer su trabajo. */
 const MIN_MODULES: Partial<Record<RoleKey, number>> = {
-  administrativo: 20,
+  administrativo: 17,
   contabilidad: 19,
   rh: 16,
   vendedor: 15,
@@ -1142,14 +1137,22 @@ describe('cada puesto llega a su objeto de trabajo', () => {
 describe('Core · Recursos (almacen, herramientas, vehiculos, organigrama)', () => {
   const INTERNAL = ALL_ROLES.filter((r) => r !== ROLES.CLIENTE);
 
-  it('todo el personal interno pide herramienta y vehiculo, y ve el organigrama', () => {
-    for (const role of INTERNAL) {
+  it('campo y operaciones piden herramienta y vehiculo; oficina financiera no', () => {
+    const FIELD_AND_OPS = INTERNAL.filter(
+      (r) => r !== ROLES.ADMINISTRATIVO && r !== ROLES.CONTABILIDAD,
+    );
+    for (const role of FIELD_AND_OPS) {
       expect(visibleModules(role), role).toEqual(
         expect.arrayContaining(['erp-herramientas', 'erp-vehiculos', 'erp-organigrama']),
       );
       expect(canOpenPage(role, '/erp/almacen/herramientas'), role).toBe(true);
       expect(canOpenPage(role, '/erp/vehiculos/mis-vehiculos'), role).toBe(true);
       expect(canOpenPage(role, '/erp/organigrama'), role).toBe(true);
+    }
+    for (const role of [ROLES.ADMINISTRATIVO, ROLES.CONTABILIDAD]) {
+      expect(visibleModules(role), role).not.toContain('erp-herramientas');
+      expect(visibleModules(role), role).not.toContain('erp-vehiculos');
+      expect(visibleModules(role), role).toContain('erp-organigrama');
     }
     expect(visibleModules(ROLES.CLIENTE)).not.toContain('erp-vehiculos');
     expect(canOpenPage(ROLES.CLIENTE, '/erp/vehiculos')).toBe(false);
