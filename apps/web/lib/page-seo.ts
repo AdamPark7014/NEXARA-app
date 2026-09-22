@@ -95,7 +95,7 @@ export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
       "Cada vertical con su riesgo típico: CCTV, redes y soporte alineados a tu operación.",
     ogImageUrl: DEFAULT_OG,
     keywords: "soluciones TI por industria, CCTV retail, redes manufactura",
-    noIndex: true,
+    noIndex: false,
   },
   nosotros: {
     title: "Nosotros | NEXARA",
