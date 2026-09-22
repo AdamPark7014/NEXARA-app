@@ -354,13 +354,19 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" || true
           /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations' "$APP_INFO_PLIST" || true
           /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" || true
+          echo "::group::Embedded Info.plist (filtered dump)"
+          if command -v rg >/dev/null 2>&1; then
+            /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | rg -i 'orientation|launch|icon' || true
+          else
+            /usr/libexec/PlistBuddy -c 'Print' "$APP_INFO_PLIST" | grep -iE 'orientation|launch|icon' || true
+          fi
+          echo "::endgroup::"
           echo "::endgroup::"
           if ! /usr/libexec/PlistBuddy -c 'Print UISupportedInterfaceOrientations~ipad' "$APP_INFO_PLIST" >/dev/null 2>&1; then
             echo "ERROR: UISupportedInterfaceOrientations~ipad missing in embedded Info.plist"; exit 1
           fi
-          if ! /usr/libexec/PlistBuddy -c 'Print UILaunchStoryboardName' "$APP_INFO_PLIST" >/dev/null 2>&1 && \
-             ! /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" >/dev/null 2>&1; then
-            echo "ERROR: Neither UILaunchStoryboardName nor UILaunchScreen present in embedded Info.plist"; exit 1
+          if ! /usr/libexec/PlistBuddy -c 'Print UILaunchScreen' "$APP_INFO_PLIST" >/dev/null 2>&1; then
+            echo "ERROR: UILaunchScreen missing in embedded Info.plist"; exit 1
           fi
 
       - name: Export signed IPA (App Store)

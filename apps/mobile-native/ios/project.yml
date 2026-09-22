@@ -24,6 +24,8 @@ targets:
     sources:
       - path: NexaraApp
       - path: Resources
+        excludes:
+          - "**/*.storyboard"
     dependencies:
       - package: SocketIO
         product: SocketIO
@@ -52,7 +54,7 @@ targets:
         DEVELOPMENT_TEAM: AHNW9K8745
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/Info.plist
-        INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
     # Dependencias Firebase se agregan en Xcode vía Swift Package Manager:
     #   File > Add Packages > https://github.com/firebase/firebase-ios-sdk
     #   Agregar: FirebaseMessaging, FirebaseAnalytics.
