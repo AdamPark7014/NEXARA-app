@@ -203,7 +203,7 @@ struct MaintenanceView: View {
                         ForEach([("todos","Todas"),("abiertas","Abiertas"),("progreso","En progreso"),("cerradas","Cerradas")], id: \.0) { key, label in
                             Button(label) { vm.statusFilter = key }
                                 .buttonStyle(.bordered)
-                                .tint(vm.statusFilter == key ? .teal : .secondary)
+                                .tint(vm.statusFilter == key ? Color(\"AccentColor\") : Color.secondary)
                         }
                     }.padding(.horizontal)
                 }
@@ -724,8 +724,8 @@ private struct StockItemRow: View {
         let low  = qty <= 5
         HStack(spacing:12) {
             ZStack {
-                RoundedRectangle(cornerRadius:8).fill((low ? Color.red : Color.teal).opacity(0.10)).frame(width:38,height:38)
-                Image(systemName:"cube.box").foregroundColor(low ? .red : .teal).font(.system(size:16))
+                RoundedRectangle(cornerRadius:8).fill((low ? Color.red : Color(\"AccentColor\")).opacity(0.10)).frame(width:38,height:38)
+                Image(systemName:"cube.box").foregroundColor(low ? Color.red : Color(\"AccentColor\")).font(.system(size:16))
             }
             VStack(alignment:.leading, spacing:2) {
                 Text(name.isEmpty ? "Producto" : name).font(.subheadline).bold()
@@ -1055,7 +1055,7 @@ struct AuditView: View {
                     }()
                     let today = vm.items.filter { $0.createdAt.prefix(10) == todayStr }.count
                     Divider().frame(height:32)
-                    OpsKpi(label: "Hoy", value: "\(today)", color: .teal)
+                    OpsKpi(label: "Hoy", value: "\(today)", color: Color(\"AccentColor\"))
                 }
                 .padding(.horizontal).padding(.vertical,6)
                 .background(Color(.secondarySystemGroupedBackground))
@@ -1969,9 +1969,9 @@ private struct NewsletterRow: View {
         let unsub  = item.isUnsubscribed
         HStack(spacing:12) {
             ZStack {
-                Circle().fill((unsub ? Color.secondary : Color.teal).opacity(0.12)).frame(width:38,height:38)
+                Circle().fill((unsub ? Color.secondary : Color(\"AccentColor\")).opacity(0.12)).frame(width:38,height:38)
                 Image(systemName: unsub ? "envelope.badge.slash" : "envelope.badge")
-                    .foregroundColor(unsub ? .secondary : .teal).font(.system(size:16))
+                    .foregroundColor(unsub ? Color.secondary : Color(\"AccentColor\")).font(.system(size:16))
             }
             VStack(alignment:.leading, spacing:2) {
                 Text(email.isEmpty ? "Sin email" : email).font(.subheadline).bold()
@@ -1979,9 +1979,9 @@ private struct NewsletterRow: View {
             }
             Spacer()
             Text(unsub ? "Baja" : "Activo").font(.caption2).bold()
-                .foregroundColor(unsub ? .secondary : .teal)
+                .foregroundColor(unsub ? Color.secondary : Color(\"AccentColor\"))
                 .padding(.horizontal,6).padding(.vertical,2)
-                .background((unsub ? Color.secondary : Color.teal).opacity(0.10)).clipShape(Capsule())
+                .background((unsub ? Color.secondary : Color(\"AccentColor\")).opacity(0.10)).clipShape(Capsule())
         }
         .padding(10)
         .background(Color(.secondarySystemGroupedBackground))

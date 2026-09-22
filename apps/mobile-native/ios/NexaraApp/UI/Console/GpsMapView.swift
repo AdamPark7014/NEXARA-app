@@ -46,7 +46,7 @@ struct GpsMapView: View {
                         Divider().frame(height: 36)
                         GpsKpiChip(label: "Con GPS", value: "\(vm.pins.count)", color: .green)
                         Divider().frame(height: 36)
-                        GpsKpiChip(label: "Activos", value: "\(active > 0 ? active : vm.pins.count)", color: .teal)
+                        GpsKpiChip(label: "Activos", value: "\(active > 0 ? active : vm.pins.count)", color: Color(\"AccentColor\"))
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 6)
@@ -122,7 +122,7 @@ private struct GpsLocationRow: View {
 
         HStack(spacing: 12) {
             Image(systemName: "mappin.circle.fill")
-                .font(.title2).foregroundColor(.teal)
+                .font(.title2).foregroundColor(Color(\"AccentColor\"))
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).font(.subheadline).bold()
                 Text("\(lat), \(lng)").font(.caption).foregroundColor(.secondary)

@@ -108,7 +108,7 @@ struct ProcurementModuleView: View {
                   Text(r.status).font(.caption2).bold()
                   Spacer()
                   if let qty = r.quantity {
-                    Text("Cantidad: \(qty)").font(.caption2).foregroundColor(.teal)
+                    Text("Cantidad: \(qty)").font(.caption2).foregroundColor(Color(\"AccentColor\"))
                   }
                 }
               }

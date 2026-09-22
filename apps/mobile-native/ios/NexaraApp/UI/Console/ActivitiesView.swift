@@ -40,7 +40,7 @@ struct ActivityDetailView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.teal)
+                .tint(Color("AccentColor"))
                 .padding(.horizontal)
                 .padding(.bottom, 8)
             }
@@ -538,7 +538,7 @@ struct ActivitiesView: View {
                                 Text(s.capitalized)
                                     .font(.caption).bold()
                                     .padding(.horizontal, 12).padding(.vertical, 6)
-                                    .background(isSelected ? Color.teal : Color(.secondarySystemGroupedBackground))
+                                    .background(isSelected ? Color("AccentColor") : Color(.secondarySystemGroupedBackground))
                                     .foregroundColor(isSelected ? .white : .primary)
                                     .clipShape(Capsule())
                             }
