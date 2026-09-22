@@ -488,11 +488,11 @@ jobs:
           /usr/bin/plutil -p "$PLIST" | head -n 100 || true
           echo "::endgroup::"
 
-      - name: Neutralize Starscream resource bundles
+      - name: Neutralize third-party resource bundles (Starscream/Firebase/Google/Promises)
         run: |
           set -euo pipefail
           APP_DIR="$(/usr/bin/find "$ARCHIVE_PATH" -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
-          echo "Scanning for Starscream bundles in: $APP_DIR"
+          echo "Scanning for third-party .bundle resources in: $APP_DIR"
           if [ -z "$APP_DIR" ]; then
             echo "ERROR: Could not locate .app inside archive at $ARCHIVE_PATH"; ls -R "$ARCHIVE_PATH" || true; exit 1
           fi
@@ -506,8 +506,27 @@ jobs:
               id=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$bundle/Info.plist" 2>/dev/null || echo "")
             fi
             name="$(basename "$bundle")"
-            if echo "$name" | grep -qi 'Starscream' || echo "$id" | grep -qi '^starscream\\.' ; then
-              echo "Removing Starscream bundle: $bundle (CFBundleIdentifier='$id')"
+            # Heuristics:
+            #  - Explicit Starscream match (existing behavior)
+            #  - Any CFBundleIdentifier that ends with ".resources" (e.g., firebase-ios-sdk.FirebaseCore.resources)
+            #  - Well-known third-party prefixes: firebase, google, com.google, googleutilities, googledatatransport, promises
+            #  - Only applies to .bundle directories (never touches frameworks)
+            if \
+              echo "$name" | grep -qiE 'Starscream|Firebase|Google|GoogleUtilities|GoogleDataTransport|Promises|FBLPromises' || \
+              echo "$name" | grep -qi '\\.resources' || \
+              \
+              # CFBundleIdentifier-based patterns
+              echo "$id"   | grep -qi '^starscream\\.' || \
+              echo "$id"   | grep -qi '\\.resources$' || \
+              echo "$id"   | grep -qi '^firebase' || \
+              echo "$id"   | grep -qi '^firebase-ios-sdk' || \
+              echo "$id"   | grep -qi '^com\\.google\\.' || \
+              echo "$id"   | grep -qi '^google\\.' || \
+              echo "$id"   | grep -qi 'googleutilities' || \
+              echo "$id"   | grep -qi 'googledatatransport' || \
+              echo "$id"   | grep -qi 'promises' \
+            ; then
+              echo "Removing third-party resource bundle: $bundle (name='$name', CFBundleIdentifier='$id')"
               rm -rf "$bundle"
               removed=$((removed+1))
             fi
