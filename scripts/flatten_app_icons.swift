@@ -1,71 +1,69 @@
 #!/usr/bin/env swift
 import Foundation
-import AppKit
+import CoreGraphics
+import ImageIO
 
-func flattenPng(at url: URL) throws {
-    guard let img = NSImage(contentsOf: url) else {
+func flattenPNG(at url: URL) throws {
+    guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
         throw NSError(domain: "flatten", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to load \(url.path)"])
     }
-    var width = Int(img.size.width)
-    var height = Int(img.size.height)
-    if let rep = img.representations.first {
-        if rep.pixelsWide > 0 { width = rep.pixelsWide }
-        if rep.pixelsHigh > 0 { height = rep.pixelsHigh }
-    }
-    guard width > 0, height > 0 else {
+    let width = cg.width
+    let height = cg.height
+    guard width > 0 && height > 0 else {
         throw NSError(domain: "flatten", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid image size for \(url.path)"])
     }
-    guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil,
-                                        pixelsWide: width,
-                                        pixelsHigh: height,
-                                        bitsPerSample: 8,
-                                        samplesPerPixel: 3,
-                                        hasAlpha: false,
-                                        isPlanar: false,
-                                        colorSpaceName: .deviceRGB,
-                                        bytesPerRow: 0,
-                                        bitsPerPixel: 24) else {
-        throw NSError(domain: "flatten", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to create bitmap for \(url.path)"])
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    // 32-bit RGB (no alpha) using noneSkipLast
+    let bitmapInfo = CGBitmapInfo.byteOrder32Big.union(CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue))
+    guard let ctx = CGContext(data: nil,
+                              width: width,
+                              height: height,
+                              bitsPerComponent: 8,
+                              bytesPerRow: 0,
+                              space: colorSpace,
+                              bitmapInfo: bitmapInfo.rawValue) else {
+        throw NSError(domain: "flatten", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to create CGContext for \(url.path)"])
     }
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
-    NSColor.white.setFill()
-    NSRect(x: 0, y: 0, width: width, height: height).fill()
-    img.draw(in: NSRect(x: 0, y: 0, width: width, height: height), from: .zero, operation: .sourceOver, fraction: 1)
-    NSGraphicsContext.restoreGraphicsState()
-    guard let data = bitmap.representation(using: .png, properties: [:]) else {
-        throw NSError(domain: "flatten", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to encode PNG for \(url.path)"])
+    // Fill white background
+    ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+    ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    // Draw source image
+    ctx.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+    guard let outImage = ctx.makeImage() else {
+        throw NSError(domain: "flatten", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to create output image for \(url.path)"])
     }
-    try data.write(to: url, options: .atomic)
+    guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+        throw NSError(domain: "flatten", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to create destination for \(url.path)"])
+    }
+    CGImageDestinationAddImage(dest, outImage, nil)
+    if !CGImageDestinationFinalize(dest) {
+        throw NSError(domain: "flatten", code: 6, userInfo: [NSLocalizedDescriptionKey: "Failed to finalize PNG for \(url.path)"])
+    }
     FileHandle.standardOutput.write(("Flattened \(url.lastPathComponent) \(width)x\(height)\n").data(using: .utf8)!)
 }
 
-func main() throws {
+func main() -> Int32 {
     let args = CommandLine.arguments
     guard args.count == 2 else {
-        FileHandle.standardError.write("Usage: flatten_app_icons.swift <AppIcon.appiconset dir>\n".data(using: .utf8)!)
-        exit(2)
+        fputs("Usage: flatten_app_icons.swift <AppIcon.appiconset dir>\n", stderr)
+        return 2
     }
-    let dir = URL(fileURLWithPath: args[1])
-    let fm = FileManager.default
-    guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil, options: []) else {
-        throw NSError(domain: "flatten", code: 5, userInfo: [NSLocalizedDescriptionKey: "Cannot list directory \(dir.path)"])
+    let dirURL = URL(fileURLWithPath: args[1])
+    guard let items = try? FileManager.default.contentsOfDirectory(at: dirURL, includingPropertiesForKeys: nil, options: []) else {
+        fputs("Cannot list directory \(dirURL.path)\n", stderr)
+        return 2
     }
     var failures = 0
     for url in items where url.pathExtension.lowercased() == "png" {
-        do { try autoreleasepool { try flattenPng(at: url) } }
+        do { try flattenPNG(at: url) }
         catch {
             failures += 1
-            FileHandle.standardError.write(("WARN: \(error)\n").data(using: .utf8)!)
+            fputs("WARN: \(error)\n", stderr)
         }
     }
-    if failures > 0 {
-        FileHandle.standardError.write(("Completed with \(failures) failures\n").data(using: .utf8)!)
-    }
+    return failures == 0 ? 0 : 1
 }
 
-do { try main() } catch {
-    FileHandle.standardError.write(("ERROR: \(error)\n").data(using: .utf8)!)
-    exit(1)
-}
+exit(main())
 
